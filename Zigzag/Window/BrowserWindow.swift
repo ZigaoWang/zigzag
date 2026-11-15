@@ -23,33 +23,11 @@ final class BrowserWindow: NSWindow {
         titlebarSeparatorStyle = .none
         // Rows and buttons come and go; Tab (with Full Keyboard Access) follows whatever is on screen now.
         autorecalculatesKeyViewLoop = true
-        // AppKit puts the buttons back whenever it relays the title bar; we put them back where they belong.
-        let views = buttons + [standardWindowButton(.closeButton)?.superview?.superview].compactMap { $0 }
-        for view in views {
-            view.postsFrameChangedNotifications = true
-            NotificationCenter.default.addObserver(self, selector: #selector(buttonFrameChanged), name: NSView.frameDidChangeNotification, object: view)
-        }
+        // AppKit puts the buttons back whenever it relays the title bar; they go back where they belong.
+        TrafficLightKeeper.install(in: self) { [weak self] in self?.layoutTrafficLights() }
     }
 
-    private var relayoutScheduled = false
     private var buttonSpacing: CGFloat?
-    private var isPlacingTrafficLights = false
-
-    /// Puts the buttons back the moment AppKit moves them, so the wrong spot never reaches the screen,
-    /// then once more after AppKit finishes its own pass.
-    @objc private func buttonFrameChanged() {
-        if !isPlacingTrafficLights {
-            isPlacingTrafficLights = true
-            layoutTrafficLights()
-            isPlacingTrafficLights = false
-        }
-        guard !relayoutScheduled else { return }
-        relayoutScheduled = true
-        DispatchQueue.main.async { [weak self] in
-            self?.relayoutScheduled = false
-            self?.layoutTrafficLights()
-        }
-    }
 
     override var title: String {
         didSet { if title != oldValue { layoutTrafficLights() } }
@@ -367,6 +345,62 @@ final class BrowserWindow: NSWindow {
     var trafficLightHeight: CGFloat { standardWindowButton(.closeButton)?.frame.height ?? 14 }
 }
 
+/// Keeps a window's traffic lights where Zigzag puts them. AppKit sets them back to its own spot whenever it lays the
+/// title bar out again (a new title, a change of key window, a resize), and they're put back at once. That alone
+/// leaves the green button in AppKit's spot: it's the last one AppKit moves, and a button moved again from inside the
+/// notice of its own move stays where AppKit put it. Put back on the next turn of the run loop, it showed there for a
+/// frame first. So this view, inside the title bar, puts them back once more in the layout pass AppKit runs before
+/// the frame is drawn.
+final class TrafficLightKeeper: NSView {
+    private let place: () -> Void
+    private var isPlacing = false
+
+    /// `place` puts the buttons where they belong; it's called after each move AppKit makes.
+    @discardableResult
+    static func install(in window: NSWindow, place: @escaping () -> Void) -> TrafficLightKeeper? {
+        guard let close = window.standardWindowButton(.closeButton), let titlebar = close.superview else { return nil }
+        let keeper = TrafficLightKeeper(place: place)
+        titlebar.addSubview(keeper)
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+        for view in buttons + [titlebar.superview].compactMap({ $0 }) {
+            view.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(keeper, selector: #selector(moved(_:)), name: NSView.frameDidChangeNotification, object: view)
+        }
+        return keeper
+    }
+
+    private init(place: @escaping () -> Void) {
+        self.place = place
+        super.init(frame: .zero)
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    @objc private func moved(_ note: Notification) {
+        guard !isPlacing else { return }
+        #if DEBUG
+        if let view = note.object as? NSView, let window { TrafficLightWatch.moved(view, in: window) }
+        #endif
+        placeNow()
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        placeNow()
+    }
+
+    private func placeNow() {
+        guard !isPlacing else { return }
+        isPlacing = true
+        place()
+        isPlacing = false
+    }
+}
+
 extension NSWindow {
     /// Puts the system buttons with the close button's top left at `origin` (window coordinates from the top left).
     /// `spacing` is measured once, from AppKit's own layout, and kept by the caller (returned): read later, mid-move,
@@ -380,24 +414,31 @@ extension NSWindow {
         if spacing == nil, let mini = standardWindowButton(.miniaturizeButton), mini.frame.minX > close.frame.minX {
             spacing = mini.frame.minX - close.frame.minX
         }
-        let step = spacing ?? 20
         // Grow the titlebar so the buttons can sit lower than AppKit's default. Its top is pinned every time, not only
         // when the height changes: a resize from code moves the window's top without touching the height.
         if let container = titlebar.superview {
-            let wanted = origin.y + height + Tokens.Space.x1
+            let wanted = NSWindow.titlebarHeight(forTrafficLightsAt: origin, buttonHeight: height)
             var frame = container.frame
             frame.size.height = wanted
             frame.origin.y = (contentView?.frame.height ?? frame.maxY) - wanted
             if container.frame != frame { container.frame = frame }
         }
-        for (index, button) in buttons.enumerated() {
-            let x = origin.x + CGFloat(index) * step
-            let y = titlebar.frame.height - origin.y - height
-            if button.frame.origin != NSPoint(x: x, y: y) {
-                button.setFrameOrigin(NSPoint(x: x, y: y))
-            }
+        let origins = NSWindow.trafficLightOrigins(at: origin, step: spacing ?? 20, buttonHeight: height, titlebarHeight: titlebar.frame.height)
+        for (button, point) in zip(buttons, origins) where button.frame.origin != point {
+            button.setFrameOrigin(point)
         }
         return spacing
+    }
+
+    /// How tall the title bar is made for buttons whose top left is at `origin`: room for them and a little below.
+    static func titlebarHeight(forTrafficLightsAt origin: NSPoint, buttonHeight: CGFloat) -> CGFloat {
+        origin.y + buttonHeight + Tokens.Space.x1
+    }
+
+    /// The close, minimize and zoom buttons' frame origins in a title bar `titlebarHeight` tall (AppKit's coordinates,
+    /// from the bottom), for the close button's top left at `origin` from the window's top left, `step` apart.
+    static func trafficLightOrigins(at origin: NSPoint, step: CGFloat, buttonHeight: CGFloat, titlebarHeight: CGFloat) -> [NSPoint] {
+        (0..<3).map { NSPoint(x: origin.x + CGFloat($0) * step, y: titlebarHeight - origin.y - buttonHeight) }
     }
 
     /// A press on chrome that stands in for the title bar (the sidebar, the bar above the page): a drag moves the

@@ -584,9 +584,93 @@ final class PageCardView: NSView {
         webView.perform(setGround, with: color)
     }
 
+    // MARK: Swiping back and forward
+
+    /// Under the page while a swipe pushes it aside (`SwipeNavigator`): the plain backdrop a page at a size of its own
+    /// lies on, in light or dark, with the page's shadow falling onto it, so the gap reads as the page lifted off its
+    /// place. Not the card's ground, the page's own color, which next to the page's edge could show as a stray strip.
+    private let swipeBackdrop = ColorView(color: Tokens.Color.pdfBackdrop)
+    /// The page's shadow on the backdrop, moving with the page; only its leading edge shows.
+    private let swipeShade = CALayer()
+    /// Counts settles, so one that finishes after a new swipe began leaves the backdrop be.
+    private var swipeSettles = 0
+
+    /// What moves aside with the fingers: the page and whatever covers it (a PDF, Reader).
+    private var swipeMoving: [CALayer] {
+        [holder, document, overlay, placeholder].compactMap { $0?.layer } + [swipeShade]
+    }
+
+    /// The page pushed `offset` points aside, the backdrop showing in the gap. Everything stays inside the card: its
+    /// corners and, in a split, its pane.
+    func setSwipeOffset(_ offset: CGFloat) {
+        swipeSettles += 1
+        holder?.wantsLayer = true
+        if swipeBackdrop.superview !== clip {
+            clip.addSubview(swipeBackdrop, positioned: .below, relativeTo: clip.subviews.first)
+            swipeBackdrop.layer?.addSublayer(swipeShade)
+        }
+        Tokens.Motion.withoutAnimation {
+            swipeBackdrop.frame = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - contentTop)
+            swipeBackdrop.isHidden = false
+            // Only the page's own rectangle: anything WebKit draws past it (a header's color carried out sideways)
+            // would otherwise come into the gap.
+            holder?.layer?.masksToBounds = true
+            swipeShade.frame = holder.map { swipeBackdrop.convert($0.frame, from: clip) } ?? swipeBackdrop.bounds
+            swipeShade.shadowPath = CGPath(rect: swipeShade.bounds, transform: nil)
+            swipeShade.shadowColor = cgColor(Tokens.Color.panelShadow)
+            swipeShade.shadowOpacity = 1
+            swipeShade.shadowRadius = Tokens.Shadow.sheetRadius
+            swipeShade.shadowOffset = .zero
+            for layer in swipeMoving {
+                layer.removeAnimation(forKey: "swipe.settle")
+                layer.setAffineTransform(CGAffineTransform(translationX: offset, y: 0))
+            }
+        }
+    }
+
+    /// The page back in its place, gliding there from wherever the fingers left it, and the backdrop gone after it.
+    func settleSwipe() {
+        swipeSettles += 1
+        let settle = swipeSettles
+        let finish = { [weak self] in
+            guard let self, self.swipeSettles == settle else { return }
+            self.swipeBackdrop.isHidden = true
+            self.holder?.layer?.masksToBounds = false
+        }
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { MainActor.assumeIsolated { finish() } }
+        for layer in swipeMoving {
+            let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
+            Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
+            guard from != .identity, !Tokens.Motion.reduceMotion else { continue }
+            // The app's critically damped spring, as stiff as before (a perceptual 0.35 s).
+            let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
+            back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
+            back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            layer.add(back, forKey: "swipe.settle")
+        }
+        CATransaction.commit()
+    }
+
+    /// Any swipe dropped at once: everything back in its place, the backdrop gone.
+    private func dropSwipe() {
+        guard !swipeBackdrop.isHidden, swipeBackdrop.superview != nil else { return }
+        swipeSettles += 1
+        Tokens.Motion.withoutAnimation {
+            for layer in swipeMoving {
+                layer.removeAnimation(forKey: "swipe.settle")
+                layer.setAffineTransform(.identity)
+            }
+            holder?.layer?.masksToBounds = false
+            swipeBackdrop.isHidden = true
+        }
+    }
+
     /// Puts a web view in the card, in its holder. The new one goes in before the old one leaves, so nothing flickers.
     func show(_ newWebView: WKWebView?, placeholderImage: NSImage? = nil) {
         guard newWebView !== webView else { return }
+        // A swipe on the page leaving is over: its holder goes back to its place, wherever it shows next.
+        dropSwipe()
         let old = webView, oldHolder = holder
         let owner = (newWebView as? BrowserWebView)?.owner
         // A tab's page comes in the tab's own holder, with whatever is docked beside it.

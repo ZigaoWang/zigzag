@@ -1065,19 +1065,27 @@ final class ScrimView: ColorView {
     override func mouseDown(with event: NSEvent) { onClick?() }
     override var mouseDownCanMoveWindow: Bool { false }
 
-    /// Fades in from wherever it's drawn: shown again while still fading out, it turns around instead of flashing
-    /// back to nothing first.
-    func show() {
+    /// Going: clicks reach what's under it at once, rather than meeting a dimming that's already on its way out.
+    private var isLeaving = false
+    override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
+
+    /// Fades in with what it's behind, from wherever it's drawn: shown again while still fading out, it turns around
+    /// instead of flashing back to nothing first. `evenFromKeyboard`: it comes with something that shows up even from
+    /// a key (a peek), rather than at once with the command bar. Not `animated`: simply there.
+    func show(evenFromKeyboard: Bool = false, animated: Bool = true) {
+        isLeaving = false
         let shown = layer?.presentation()?.opacity
-        Tokens.Motion.withoutAnimation { alphaValue = shown.map { CGFloat($0) } ?? 0 }
-        Tokens.Motion.animate(Tokens.Motion.feedback) { self.animator().alphaValue = 1 }
+        Tokens.Motion.withoutAnimation { alphaValue = animated ? shown.map { CGFloat($0) } ?? 0 : 1 }
+        guard animated else { layer?.removeAnimation(forKey: "opacity"); return }
+        Tokens.Motion.fadeBackdrop(self, entering: true, evenFromKeyboard: evenFromKeyboard)
     }
 
     /// `evenFromKeyboard`: it fades with something that leaves even from a key (a peek), rather than going at once
     /// with the command bar.
     func hide(evenFromKeyboard: Bool = false) {
-        Tokens.Motion.animate(Tokens.Motion.leaving, evenFromKeyboard: evenFromKeyboard, { self.animator().alphaValue = 0 }, completion: {
-            if self.alphaValue == 0 { self.removeFromSuperview() }
-        })
+        isLeaving = true
+        Tokens.Motion.fadeBackdrop(self, entering: false, evenFromKeyboard: evenFromKeyboard) {
+            if self.isLeaving { self.removeFromSuperview() }
+        }
     }
 }

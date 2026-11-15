@@ -239,6 +239,9 @@ final class TabPreviewController {
         if isNew {
             panel.frame = frame
             overlay.addSubview(panel)
+            // Out of the row it's for: from its side toward the sidebar, at the row's height.
+            let rowY = overlay.isFlipped ? rowFrame.midY - frame.minY : frame.maxY - rowFrame.midY
+            panel.growsFrom = CGPoint(x: controller.root.sidebarOnRight ? 1 : 0, y: min(max(rowY / max(height, 1), 0), 1))
             panel.present()
         } else if panel.frame != frame {
             Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { panel.animator().frame = frame }

@@ -236,6 +236,27 @@ final class SwipeNavigator {
         }
     }
 
+    #if DEBUG
+    /// Debug builds: holds a swipe at `progress` of the way to navigating (1 arms it), as fingers resting there would,
+    /// so a test copy can show it without a trackpad (`swipestep back 0.5`). `nil` lets go without navigating.
+    func debugHold(direction wanted: Int, progress value: CGFloat?) {
+        guard let value else {
+            if state == .tracking { cancel() }
+            state = .idle
+            return
+        }
+        if state != .tracking || direction != wanted {
+            if state == .tracking { cancel() }
+            direction = wanted
+            armed = false
+            state = .tracking
+            showArrow()
+        }
+        dx = CGFloat(-wanted) * value * Self.threshold
+        update()
+    }
+    #endif
+
     // MARK: The arrow
 
     private func showArrow() {
@@ -244,6 +265,15 @@ final class SwipeNavigator {
         let arrow = SwipeArrowView(back: direction < 0)
         overlay.addSubview(arrow)
         self.arrow = arrow
+    }
+
+    /// The card showing this page, which moves it aside over a backdrop of its own; none for a page shown some
+    /// other way, which moves by itself.
+    private var card: PageCardView? {
+        var view = webView?.superview
+        while let current = view, !(current is PageCardView) { view = current.superview }
+        guard let card = view as? PageCardView, card.webView === webView else { return nil }
+        return card
     }
 
     /// How far the page has moved with the fingers, at most `maxShift`, with resistance so it slows as it goes.
@@ -257,11 +287,13 @@ final class SwipeNavigator {
         guard let webView, let arrow, let overlay = arrow.superview else { return }
         // The page follows the fingers a little, and the arrow waits in the gap that opens at its edge.
         let offset = shift * CGFloat(-direction)
-        Tokens.Motion.withoutAnimation { webView.layer?.setAffineTransform(CGAffineTransform(translationX: offset, y: 0)) }
+        if let card {
+            card.setSwipeOffset(offset)
+        } else {
+            Tokens.Motion.withoutAnimation { webView.layer?.setAffineTransform(CGAffineTransform(translationX: offset, y: 0)) }
+        }
         let page = overlay.convert(webView.bounds, from: webView)
-        let size = SwipeArrowView.size
-        let gapMid = (direction < 0 ? page.minX : page.maxX) + offset / 2
-        arrow.frame = NSRect(x: round(gapMid - size / 2), y: round(page.midY - size / 2), width: size, height: size)
+        arrow.frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
         arrow.progress = min(progress, 1)
         let nowArmed = progress >= 1
         if nowArmed != armed {
@@ -273,6 +305,7 @@ final class SwipeNavigator {
 
     /// The page settles back into place: with the page it went to, or without, if let go too soon.
     private func settlePage() {
+        if let card { card.settleSwipe(); return }
         guard let layer = webView?.layer else { return }
         let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
         Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
@@ -451,6 +484,17 @@ final class SwipeArrowView: NSView {
     private let symbol = NSImageView()
     var progress: CGFloat = 0 { didSet { refresh() } }
     var isArmed = false { didSet { refresh(animated: true) } }
+
+    /// Where the arrow floats for a page whose place is `page` (before it moved), pushed `offset` points aside: in the
+    /// middle of the gap that opens at its edge, and never nearer that edge than a margin, so it never hangs over the
+    /// sidebar, the next pane or the window's edge. While the gap is narrower than the arrow, it floats over the page.
+    static func frame(in page: NSRect, offset: CGFloat, back: Bool) -> NSRect {
+        let margin = Tokens.Space.x2
+        let edge = back ? page.minX : page.maxX
+        let middle = edge + offset / 2 - size / 2
+        let x = back ? max(middle, edge + margin) : min(middle, edge - margin - size)
+        return NSRect(x: round(x), y: round(page.midY - size / 2), width: size, height: size)
+    }
 
     init(back: Bool) {
         super.init(frame: NSRect(x: 0, y: 0, width: Self.size, height: Self.size))

@@ -109,6 +109,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Developer Mode | 开发者模式 | 开发模式, 开发人员模式 | As macOS and Arc name it: a site's state with the developer tools, and the main switch in Settings › Developer. |
 | Development site | 开发网站 | 开发站点, 本地网站 | A site you build, listed in Settings › Developer: 网站 as everywhere else in Zigzag, and not 本地, since a listed site needn't be on this Mac. |
 | Feature Flags (WebKit's, in Settings › Developer) | 功能标志 | 功能开关, 实验性功能 | Safari's Develop › Feature Flags. Each flag's own name and line are WebKit's and stay in English; only Zigzag's words around them are translated. |
+| Disable Images, Disable Styles (developer tools) | 停用图像, 停用样式 | 关闭图片, 禁用样式 | Safari's Develop menu, beside 停用 JavaScript: 图像 as macOS says it, and 停用 for every one of these switches. |
 
 ## How it reads
 

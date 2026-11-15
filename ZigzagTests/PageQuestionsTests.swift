@@ -29,6 +29,20 @@ struct PageQuestionsTests {
         #expect(PageQuestions.mayShow(next, in: overlay))
     }
 
+    /// In a split, each pane's top is its own: a question on one pane doesn't hold up a camera question on another.
+    @Test func questionsOnOtherPanesShowTogether() {
+        let overlay = NSView(frame: NSRect(x: 0, y: 0, width: 1200, height: 800))
+        let left = PermissionPrompt(frame: NSRect(x: 130, y: 12, width: 340, height: 120))
+        let camera = PermissionPrompt(frame: NSRect(x: 730, y: 12, width: 340, height: 120))
+        overlay.addSubview(left)
+        overlay.addSubview(camera)
+        camera.isHidden = true
+        #expect(PageQuestions.mayShow(camera, in: overlay))
+        // On the same pane, where they'd cover each other, it waits.
+        camera.frame.origin.x = 300
+        #expect(!PageQuestions.mayShow(camera, in: overlay))
+    }
+
     @Test func aToastGoesUnderWhatsAtTheTop() {
         let page = NSRect(x: 300, y: 40, width: 900, height: 700)
         // Nothing there: the whole page.

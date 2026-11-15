@@ -210,6 +210,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         let fieldInOverlay = overlay.convert(webView.convert(field, to: nil), from: nil)
         menu.frame = Self.menuFrame(under: fieldInOverlay, in: overlay.bounds, height: menu.contentHeight)
         overlay.addSubview(menu)
+        menu.grow(from: fieldInOverlay)
         menu.present()
         self.menu = menu
         target = (webView, frame, origin)
@@ -496,9 +497,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// panel can't open, the click on the field has brought Zigzag's menu as it always has.
     func keyIconClicked(in webView: BrowserWebView) {
         debugLog("autofill key icon clicked")
-        // The Mac's panel, whoever fills here: with a password manager doing the filling, Zigzag's own is off, and the
-        // panel is where that manager's logins show too (#57).
-        guard SystemAutoFillPanel.isAvailable, Self.justClicked(webView.lastClickUp), Self.isInFront(webView),
+        // Only where the key is Zigzag's to show (`AutofillKeyIcon.shows`): a field marked before Fill passwords was
+        // turned off does nothing.
+        guard #available(macOS 27, *), AutofillKeyIcon.shows(in: webView), Self.justClicked(webView.lastClickUp), Self.isInFront(webView),
               let origin = Origin(webView.url) else { return }
         // Zigzag's menu for the same click, shown or on its way, makes room for the panel.
         generation += 1

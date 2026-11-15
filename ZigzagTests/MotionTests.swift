@@ -174,4 +174,53 @@ struct MotionTests {
         #expect(panel.superview == nil)
         #expect(panel.layer?.opacity == 1)
     }
+
+    @MainActor @Test func aLeavingPanelLetsClicksThrough() {
+        let host = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        host.wantsLayer = true
+        let panel = FloatingPanelView(frame: NSRect(x: 20, y: 20, width: 200, height: 40))
+        host.addSubview(panel)
+        let inside = NSPoint(x: 40, y: 30)
+        panel.present()
+        #expect(panel.hitTest(inside) != nil)
+        // On its way out it's still drawn, but a click lands on what's under it.
+        panel.dismiss()
+        #expect(panel.superview === host)
+        #expect(panel.hitTest(inside) == nil)
+        // Shown again while leaving: it takes clicks again.
+        panel.present()
+        #expect(panel.hitTest(inside) != nil)
+    }
+
+    @MainActor @Test func aScrimGoingLetsClicksThroughAndTurnsAround() {
+        let host = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        host.wantsLayer = true
+        let scrim = ScrimView()
+        scrim.frame = host.bounds
+        host.addSubview(scrim)
+        let inside = NSPoint(x: 100, y: 100)
+        scrim.show(evenFromKeyboard: true)
+        #expect(scrim.hitTest(inside) != nil)
+        scrim.hide(evenFromKeyboard: true)
+        #expect(scrim.hitTest(inside) == nil)
+        // Shown again at once, mid-fade: there, fully, taking clicks.
+        scrim.show(animated: false)
+        #expect(scrim.alphaValue == 1)
+        #expect(scrim.hitTest(inside) != nil)
+    }
+
+    @MainActor @Test func aFieldsMenuGrowsOutOfItsField() {
+        let host = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        let field = NSRect(x: 40, y: 40, width: 120, height: 24)
+        // Under the field: out of its top, across from the field's middle.
+        let below = FloatingPanelView(frame: NSRect(x: 40, y: 68, width: 240, height: 100))
+        host.addSubview(below)
+        below.grow(from: field)
+        #expect(below.growsFrom == CGPoint(x: 0.25, y: 0))
+        // No room under it, so above: out of its bottom.
+        let above = FloatingPanelView(frame: NSRect(x: 40, y: -64, width: 240, height: 100))
+        host.addSubview(above)
+        above.grow(from: field)
+        #expect(above.growsFrom.y == 1)
+    }
 }

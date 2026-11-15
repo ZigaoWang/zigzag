@@ -75,7 +75,7 @@ final class ExtensionInstalls {
         if profile.isDefault {
             // Its file is the package's too.
             ExtensionStore.remove(keys: State.keys, from: stateFile(for: id))
-            for name in ["loaded", "proxy.json", "UserScripts.json"] { try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name)) }
+            for name in ["loaded", "proxy.json", "UserScripts.json", "ContextMenus.json"] { try? FileManager.default.removeItem(at: folder(for: id).appendingPathComponent(name)) }
         } else {
             try? FileManager.default.removeItem(at: folder(for: id))
             ExtensionStore.forgetWhatWasRead()

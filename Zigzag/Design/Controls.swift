@@ -981,7 +981,7 @@ final class PrimaryButton: InteractiveView {
 /// A text button: quiet text that fills under the pointer ("Clear", "Skip"), or with `form` the secondary look
 /// (`ButtonLook.secondary`). Kept for the forms that still build on it; new code uses `PillButton`.
 final class TextButton: InteractiveView {
-    private let label: Label
+    let label: Label
     /// The secondary look (white, a hairline, a faint shadow) rather than text alone.
     var showsFillAtRest = false { didSet { needsLayout = true; stateDidChange(animated: false) } }
     /// Overrides the label color (destructive actions).
@@ -1059,8 +1059,26 @@ final class TextButton: InteractiveView {
         let ink = applyButtonLook(showsFillAtRest ? .secondary : .quiet)
         // Text alone takes the disabled ink when it can't be used, rather than fading past reading.
         if !showsFillAtRest { alphaValue = 1 }
-        label.textColor = isEnabled || showsFillAtRest ? textColor ?? ink : Tokens.Color.textDisabled
+        // In its own color (Back and Skip, pale on the welcome's blue), it fades that color: the neutral disabled
+        // gray would go muddy on a ground it wasn't made for.
+        label.textColor = isEnabled || showsFillAtRest ? textColor ?? ink : textColor.map(Self.disabledInk) ?? Tokens.Color.textDisabled
         label.alphaValue = 1
+    }
+
+    /// How much of its own color's strength text in a custom color keeps while it can't be used: plainly fainter,
+    /// still 3:1 on the ground it was picked for (pale ribbon on the welcome's navy).
+    nonisolated static let disabledFade: CGFloat = 0.8
+
+    /// `color`, faded for a disabled button, in whichever appearance it's drawn.
+    nonisolated static func disabledInk(_ color: NSColor) -> NSColor {
+        NSColor(name: nil) { appearance in
+            var faded = color
+            appearance.performAsCurrentDrawingAppearance {
+                let resolved = color.usingColorSpace(.sRGB) ?? color
+                faded = resolved.withAlphaComponent(resolved.alphaComponent * disabledFade)
+            }
+            return faded
+        }
     }
 
 }
@@ -1861,6 +1879,7 @@ final class MenuPanel: FloatingPanelView {
     /// Leaves quicker and subtler than it came: a fade as it eases a touch smaller toward its control, from wherever
     /// it is, so a quick open and close never jumps.
     private func leave() {
+        dismissing = true
         Tokens.Motion.present(self, from: .point(growsFrom), entering: false) { [weak self] in self?.removeFromSuperview() }
     }
 

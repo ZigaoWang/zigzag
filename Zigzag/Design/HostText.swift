@@ -90,6 +90,89 @@ nonisolated enum AddressText {
     }
 }
 
+/// A page's whole address where there's room for it (the bar above the page, a pop-up window, Zigzag Mini's strip),
+/// as Chrome shows it: no "https://", no "www.", the host in the text's own ink and what follows it (path, query,
+/// fragment) quiet. The sidebar's narrow field keeps the host alone. Only for a website's page (http and https);
+/// every other page keeps its name (`AddressView.name(of:)`). The host is the one WebKit loads ("xn--" for an
+/// international name) and never has a user name and password ahead of it.
+nonisolated enum FullAddress {
+    struct Parts: Equatable {
+        /// The site with a port that isn't the usual one: "linux.do", "localhost:3000", "[::1]:8080".
+        var host: String
+        /// The rest, decoded to read (`AddressText.readable`): "/t/topic/482293?page=2#reply". Empty on a site's front page.
+        var rest: String
+        var whole: String { host + rest }
+    }
+
+    /// The most of the rest kept: the field shows its start, and a data-heavy query can run to megabytes.
+    static let longestRest = 1000
+
+    static func parts(of url: URL?) -> Parts? {
+        guard let url, let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              let raw = url.host(percentEncoded: false), !raw.isEmpty,
+              // Anything but the ASCII spelling WebKit loads is left to the name, which shows the host as it always has.
+              raw.unicodeScalars.allSatisfy({ $0.isASCII && $0.value > 0x20 && $0.value != 0x7F }) else { return nil }
+        var host = raw.lowercased().withoutWWW
+        if host.contains(":") { host = "[\(host)]" }
+        let usual = scheme == "https" ? 443 : 80
+        if let port = url.port, port != usual { host += ":\(port)" }
+        let path = url.path(percentEncoded: true)
+        let query = url.query(percentEncoded: true)
+        let fragment = url.fragment(percentEncoded: true)
+        var rest = path == "/" && query == nil && fragment == nil ? "" : path
+        if let query { rest += (rest.isEmpty ? "/" : "") + "?" + query }
+        if let fragment { rest += (rest.isEmpty ? "/" : "") + "#" + fragment }
+        if rest.count > longestRest { rest = String(rest.prefix(longestRest)) }
+        return Parts(host: host, rest: AddressText.readable(rest))
+    }
+
+    /// How the address fits `room`: whole, its rest cut at the end, while the host and the start of the rest fit
+    /// (`leastRest` characters of it and "…"); the host alone (cut the usual way, `AddressView.lineBreak(forName:)`)
+    /// when they don't, as the host is never squeezed for the rest's sake. `measure` gives a text's width.
+    enum Shown: Equatable { case whole, host }
+
+    /// The least of the rest worth showing before its cut: less reads as noise after the host.
+    static let leastRest = 4
+
+    static func shown(_ parts: Parts, room: CGFloat, measure: (String) -> CGFloat) -> Shown {
+        if parts.rest.isEmpty || measure(parts.whole) <= room { return .whole }
+        return measure(parts.host + parts.rest.prefix(leastRest) + HostText.ellipsis) <= room ? .whole : .host
+    }
+
+    /// The address as styled text: the host in `color`, the rest in `quiet`, cut at its end with "…".
+    @MainActor static func styled(_ parts: Parts, font: NSFont, color: NSColor = Tokens.Color.textPrimary,
+                                  quiet: NSColor = Tokens.Color.textSecondary, alignment: NSTextAlignment = .natural) -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        paragraph.alignment = alignment
+        // Always left to right: an address read in a right-to-left language still runs host first.
+        paragraph.baseWritingDirection = .leftToRight
+        let base: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
+        let text = NSMutableAttributedString(string: parts.host, attributes: base.merging([.foregroundColor: color]) { $1 })
+        text.append(NSAttributedString(string: parts.rest, attributes: base.merging([.foregroundColor: quiet]) { $1 }))
+        return text
+    }
+
+    /// Puts the address in `label`, `room` wide (its text's room, without the label's insets): whole, or the host
+    /// alone in `color` when the host and a little after it don't fit (`shown`). Sets nothing when that's what it
+    /// shows already, as the field lays itself out throughout a page load.
+    @MainActor static func show(_ parts: Parts, in label: Label, room: CGFloat, color: NSColor = Tokens.Color.textPrimary,
+                                quiet: NSColor = Tokens.Color.textSecondary) {
+        let font = label.font ?? Tokens.Font.body()
+        let wanted: NSAttributedString
+        switch shown(parts, room: room, measure: { ceil(($0 as NSString).size(withAttributes: [.font: font]).width) }) {
+        case .whole:
+            wanted = styled(parts, font: font, color: color, quiet: quiet, alignment: label.alignment)
+        case .host:
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = AddressView.lineBreak(forName: parts.host)
+            paragraph.alignment = label.alignment
+            wanted = NSAttributedString(string: parts.host, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph])
+        }
+        if !label.attributedStringValue.isEqual(to: wanted) { label.attributedStringValue = wanted }
+    }
+}
+
 /// A site's host as a header shows it (#189): its subdomains quiet, the registrable domain (google.com, bbc.co.uk) in
 /// the text's own ink, as that's the part that proves whose site it is. Too long for its room, it first shrinks a
 /// little, then drops whole subdomain labels from the start ("…mail." stays out, a cut word reads like another), and

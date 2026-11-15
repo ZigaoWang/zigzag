@@ -289,18 +289,24 @@ enum Tokens {
 
         /// The bottom bar: 26pt buttons, 4pt from its edges, a space key (`spaceKey`) for each space.
         static let bottomBarHeight: CGFloat = 34
-        /// A space's icon in the bottom bar, in place of its dot (#210): with the sidebar's size, a step more than
-        /// its rows take, so a small mark still says which space it is (14, 16, 20).
-        static var spaceIcon: CGFloat {
-            switch current {
-            case .small: 14
-            case .medium: 16
-            case .large: 20
-            }
-        }
+        /// A space's icon in the bottom bar, in place of its dot (#210, #238): a favorite's icon, so it scales with
+        /// the sidebar's size as the rows do (16, 18, 20).
+        static var spaceIcon: CGFloat { spaceIcon(for: current) }
+        static func spaceIcon(for size: Size) -> CGFloat { (18 * size.scale / 2).rounded() * 2 }
         /// Each space's target in the bottom bar: a toolbar button, and at Large a little more round its larger icon,
         /// as tall as the bar leaves room for.
-        static var spaceTarget: CGFloat { current == .large ? 28 : button }
+        static var spaceTarget: CGFloat { spaceTarget(for: current) }
+        static func spaceTarget(for size: Size) -> CGFloat { size == .large ? 28 : button }
+        /// Room round a space's icon in its target: its targets are never narrower than the icon and this, so with
+        /// many spaces the row scrolls before their icons get smaller (#238).
+        static let spaceIconRoom: CGFloat = 4
+        /// How wide each space's target is with `count` spaces in `available` points: as wide as `spaceTarget` when
+        /// they all fit, narrower to fit more, never so narrow it squeezes an icon (or below `smallest` for dots);
+        /// past that, the row scrolls.
+        static func spaceKeyWidth(available: CGFloat, count: Int, hasIcons: Bool, smallest: CGFloat, size: Size) -> CGFloat {
+            let least = hasIcons ? max(smallest, spaceIcon(for: size) + spaceIconRoom) : smallest
+            return max(least, min(spaceTarget(for: size), floor(available / CGFloat(max(count, 1)))))
+        }
         /// The now-playing card above the bottom bar: a row's height, at every size.
         static var nowPlayingHeight: CGFloat { rowHeight }
     }
@@ -842,6 +848,22 @@ enum Tokens {
             // Leaving, it lands back in place the moment its fade reaches nothing, so nothing has to hold the pose.
             layer.add(move, forKey: "presence.transform")
             CATransaction.commit()
+        }
+
+        /// A backdrop (a sheet's scrim, the dimming under a peek) fading in with what it's behind, in `enter`, and out
+        /// with it, in `exit`, eased out, from whatever it shows now; with Reduce Motion in `crossfade`, as what's on it
+        /// does. `evenFromKeyboard` false: from a key it's simply there, or gone, with what came at once (the command bar).
+        static func fadeBackdrop(_ view: NSView, entering: Bool, evenFromKeyboard: Bool = true, completion: (@MainActor () -> Void)? = nil) {
+            if let layer = view.layer, layer.animation(forKey: "opacity") != nil, let shown = layer.presentation()?.opacity {
+                withoutAnimation { view.alphaValue = CGFloat(shown) }
+            }
+            let instant = isFromKey && !evenFromKeyboard
+            let time = instant ? 0 : presenceDuration(.inPlace, entering: entering, reduceMotion: reduceMotion) * debugSlowdown
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = time
+                context.timingFunction = easeOut
+                view.animator().alphaValue = entering ? 1 : 0
+            }, completionHandler: Self.completion(completion))
         }
 
         /// Takes away what `present(_:from:entering:)` left on `view`, so it shows plainly where it is.
@@ -1471,6 +1493,12 @@ enum Tokens {
             highLight: white(0.75), highDark: white(0.12))
         static let keyEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: white(0.09),
             highLight: Color.hex(0x000000, alpha: 0.4), highDark: white(0.35))
+        /// A favorite whose page is open: a brighter tile than a closed one, half way to the card you're on, so which
+        /// are open reads at a glance on any color or grain; a step brighter still under the pointer.
+        static let openTile = Color.dynamic(light: white(0.74), dark: white(0.125),
+            highLight: white(0.9), highDark: white(0.19))
+        static let openTileHover = Color.dynamic(light: white(0.84), dark: white(0.15),
+            highLight: white(0.95), highDark: white(0.22))
         /// A favorite whose page is open: a fine edge, the only line on a tile.
         static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16),
             highLight: Color.hex(0x000000, alpha: 0.45), highDark: white(0.45))

@@ -968,6 +968,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let webRTCToggle = Toggle()
     private let cookieBanners = DropdownButton()
     private let pipToggle = Toggle()
+    private let leavePipToggle = Toggle()
     private let fullScreenFill = DropdownButton()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
@@ -1445,6 +1446,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                control: pipToggle)
         videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Show a mini player setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(videoRow)
+        leavePipToggle.onChange = { on in AutoPictureInPicture.isOn = on }
+        let leaveRow = FormRow(title: String(localized: "Picture in picture when you leave Zigzag", comment: "A setting in Settings › Tabs: a playing video floats over other apps when you switch to another app or desktop."),
+                               detail: String(localized: "A video you’re watching floats over other apps and desktops when you switch away, and goes back in its page when you come back to it.", comment: "Explanation under “Picture in picture when you leave Zigzag” in Settings › Tabs."),
+                               control: leavePipToggle)
+        leaveRow.keywords = String(localized: "picture in picture pip floating video other app desktop space full screen leave switch away automatic", comment: "Words that find the Picture in picture when you leave Zigzag setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(leaveRow)
         fullScreenFill.options = PageFullScreen.Fill.allCases.map { fill in
             let title = switch fill {
             case .screen: String(localized: "The Whole Screen", comment: "A choice for “Full screen videos fill” in Settings › Tabs: a video in full screen covers the whole screen, as usual.")
@@ -3265,6 +3272,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         webRTCToggle.isOn = WebRTCProtection.isOn
         cookieBanners.selectedIndex = CookieBanners.Mode.allCases.firstIndex(of: CookieBanners.mode) ?? 0
         pipToggle.isOn = PictureInPicture.followsTabs
+        leavePipToggle.isOn = AutoPictureInPicture.isOn
         fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless

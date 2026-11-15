@@ -25,6 +25,36 @@ enum WebKitSetup {
         return configuration
     }
 
+    /// A configuration WebKit hands over for a page another opened (a tab, or a pop-up window) shares that page's
+    /// preferences, the same object: a change made for one page (its WebRTC switch, Disable Styles) would reach the
+    /// other, whatever its site. Every web view made from one gets preferences of its own instead, the same in all
+    /// else, with what a tab's developer tools change back as WebKit has it; the page then sets its own (its tab's
+    /// choices, its WebRTC switch). Feature flags reach it as any open page (`FeatureFlags`).
+    static func separatePreferences(of configuration: WKWebViewConfiguration) {
+        guard let own = configuration.preferences.copy() as? WKPreferences else { return }
+        PageStyles.set(true, in: own)
+        configuration.preferences = own
+    }
+
+    /// Sets one of WebKit's own unpublished preferences (`key`, as KVC has it: `_set<Key>:` behind it), only when this
+    /// WebKit still has it, and only when it differs (read only where WebKit has the getter too).
+    static func setIfAvailable(_ on: Bool, key: String, in preferences: WKPreferences) {
+        guard hasPreference(key) else { return }
+        if preferences.responds(to: NSSelectorFromString("_" + key)), preferences.value(forKey: key) as? Bool == on { return }
+        preferences.setValue(on, forKey: key)
+    }
+
+    /// Whether this WebKit has one of its unpublished preferences, by its KVC key.
+    static func hasPreference(_ key: String) -> Bool {
+        WKPreferences.instancesRespond(to: NSSelectorFromString("_set" + key.prefix(1).uppercased() + key.dropFirst() + ":"))
+    }
+
+    /// WKWebView still goes Back on ⌫ (and Forward on ⇧⌫) when no field has the focus; Safari and Chrome dropped that
+    /// years ago, so a ⌫ that misses a text box would leave the page you were on.
+    static func turnOffBackspaceNavigation(_ preferences: WKPreferences) {
+        setIfAvailable(false, key: "backspaceKeyNavigationEnabled", in: preferences)
+    }
+
     /// Applies our defaults. Popup configurations handed to us by WebKit already carry most of these.
     static func configure(_ configuration: WKWebViewConfiguration, for profile: Profile) {
         configuration.websiteDataStore = profile.store
@@ -40,10 +70,9 @@ enum WebKitSetup {
         #endif
         // WKWebView leaves a page's own Picture in Picture off for every video (Safari has it on), so sites like
         // Bilibili say they "don't support it" and View › Picture in Picture finds nothing to float. Pages still need
-        // a click to float a video. The key is WebKit's own and unpublished, so it's only set when WebKit still has it.
-        if configuration.preferences.responds(to: NSSelectorFromString("_setAllowsPictureInPictureMediaPlayback:")) {
-            configuration.preferences.setValue(true, forKey: "allowsPictureInPictureMediaPlayback")
-        }
+        // a click to float a video.
+        setIfAvailable(true, key: "allowsPictureInPictureMediaPlayback", in: configuration.preferences)
+        turnOffBackspaceNavigation(configuration.preferences)
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.upgradeKnownHostsToHTTPS = true
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")

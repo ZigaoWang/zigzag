@@ -82,4 +82,53 @@ struct ExtensionMenuItemsTests {
         #expect(plan.removed.first === existing.last)
         #expect(plan.added.isEmpty && plan.adopted.isEmpty)
     }
+    // MARK: Kept across relaunches (#239)
+
+    /// Downie adds its items on install only; Zigzag keeps them as Chrome does, with every change the extension makes.
+    @available(macOS 15.4, *)
+    @Test func menuItemsAreKeptWithTheirChanges() {
+        var items = BridgeContextMenus.apply("create", args: [["id": "open-in-downie", "title": "Open link in Downie", "contexts": ["link"]]], to: [])
+        items = BridgeContextMenus.apply("create", args: [["id": "mp4", "title": "MP4", "contexts": ["page"]]], to: items)
+        items = BridgeContextMenus.apply("create", args: [["id": "mp4-hd", "parentId": "mp4", "title": "HD"]], to: items)
+        items = BridgeContextMenus.apply("create", args: [["title": "No ID"]], to: items)
+        #expect(items.compactMap { $0["id"] as? String } == ["open-in-downie", "mp4", "mp4-hd"])
+        // Made again with the same ID: the newer one, in the same place.
+        items = BridgeContextMenus.apply("create", args: [["id": "open-in-downie", "title": "Send to Downie", "contexts": ["link"]]], to: items)
+        #expect(items.first?["title"] as? String == "Send to Downie")
+        items = BridgeContextMenus.apply("update", args: ["mp4", ["title": "MP4 video", "id": "renamed"]], to: items)
+        #expect(items[1]["title"] as? String == "MP4 video")
+        #expect(items[1]["id"] as? String == "mp4")
+        // Removing one takes its own items with it.
+        items = BridgeContextMenus.apply("remove", args: ["mp4"], to: items)
+        #expect(items.compactMap { $0["id"] as? String } == ["open-in-downie"])
+        #expect(BridgeContextMenus.apply("removeAll", args: [], to: items).isEmpty)
+    }
+
+    @available(macOS 15.4, *)
+    @Test func keptItemsComeBackOnlyToTheSameVersionAsItStarts() {
+        let kept = BridgeContextMenus.Kept(version: "1.3.3", items: [["id": "mp4", "title": "MP4", "contexts": ["page"]]])
+        #expect(BridgeContextMenus.toRestore(kept, version: "1.3.3", isNewInstall: false, persistentBackground: false).count == 1)
+        // A new install or an update adds its own, on install; a background that never sleeps adds them as it starts.
+        #expect(BridgeContextMenus.toRestore(kept, version: "1.3.3", isNewInstall: true, persistentBackground: false).isEmpty)
+        #expect(BridgeContextMenus.toRestore(kept, version: "1.4", isNewInstall: false, persistentBackground: false).isEmpty)
+        #expect(BridgeContextMenus.toRestore(kept, version: "1.3.3", isNewInstall: false, persistentBackground: true).isEmpty)
+        // Items made before Zigzag kept them: the extension is told once that Zigzag was updated, and adds them again.
+        #expect(BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: false, persistentBackground: false))
+        #expect(!BridgeContextMenus.addsItemsAgain(neverKept: false, isNewInstall: false, persistentBackground: false))
+        #expect(!BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: true, persistentBackground: false))
+        #expect(!BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: false, persistentBackground: true))
+    }
+
+    /// Downie's button sends the tab to its app's link: no popup, no new tab, but not nothing, so its options stay shut.
+    @available(macOS 15.4, *)
+    @Test func aClickThatSendsTheTabSomewhereDidSomething() {
+        let clicked = Date()
+        let soon = clicked.addingTimeInterval(0.1), earlier = clicked.addingTimeInterval(-60)
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: soon))
+        #expect(ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: earlier))
+        #expect(ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: nil))
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: true, sidePanelShown: false, tabsBefore: 2, tabsNow: 2, tabLoadedAt: nil))
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: true, tabsBefore: 2, tabsNow: 2, tabLoadedAt: nil))
+        #expect(!ExtensionHost.clickShowedNothing(clickedAt: clicked, popupShown: false, sidePanelShown: false, tabsBefore: 2, tabsNow: 3, tabLoadedAt: nil))
+    }
 }

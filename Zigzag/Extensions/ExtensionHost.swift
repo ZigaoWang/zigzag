@@ -104,6 +104,74 @@ struct KeepAlivePorts<Port: AnyObject> {
     func port(for id: String) -> Port? { ports[id] }
 }
 
+/// Whether the 1Password app trusts Zigzag, as its helper's replies tell it. Trust belongs to the app, not a
+/// profile, so one record serves the whole session.
+///
+/// The helper turns a browser away with a `BrowserVerificationFailed` reply, but not only when you haven't added it:
+/// it also says so when the 1Password app is slow to check Zigzag's signature (starting up, waking, locked), and a
+/// one-off message can be turned away while the connection beside it works. So a turn-away only counts when nothing
+/// gets through for a few seconds after it, and never once anything has: 1Password working, with Zigzag in its
+/// browser list, kept showing the note to add Zigzag.
+struct OnePasswordTrust {
+    enum Reply: Equatable {
+        /// Turned away: Zigzag may not be in 1Password's list of browsers.
+        case turnedAway
+        /// Something only a trusted browser hears (the app's lock state, a new client, autofill).
+        case connected
+        /// Said either way: the app quit, went offline, or couldn't be reached.
+        case other
+    }
+
+    /// How long a turn-away waits for another connection to get through before it's shown.
+    static let grace: TimeInterval = 5
+
+    /// The type a helper reply carries, inside its content's content.
+    static func type(of message: Any) -> String? {
+        let content = (message as? [String: Any])?["content"] as? [String: Any]
+        return (content?["content"] as? [String: Any])?["type"] as? String
+    }
+
+    static func reply(_ type: String) -> Reply {
+        switch type {
+        case "BrowserVerificationFailed": .turnedAway
+        case "Offline", "AppQuit", "BrowserHelperNotRegistered", "MainAppNotRunning", "MainAppOpenTimeout",
+             "CannotOpenMainApp", "LostConnectionToApp", "Error", "Failure": .other
+        default: .connected
+        }
+    }
+
+    /// Something got through this session.
+    private(set) var connected = false
+    /// When it was first turned away, with nothing through since.
+    private(set) var turnedAwayAt: Date?
+    private var told = false
+
+    mutating func heard(_ reply: Reply, at now: Date = Date()) {
+        switch reply {
+        case .connected:
+            connected = true
+            turnedAwayAt = nil
+        case .turnedAway:
+            if !connected, turnedAwayAt == nil { turnedAwayAt = now }
+        case .other:
+            break
+        }
+    }
+
+    /// Whether Zigzag needs adding in 1Password: turned away at least `grace` ago, and nothing through since.
+    func needsAdding(at now: Date = Date()) -> Bool {
+        guard !connected, let turnedAwayAt else { return false }
+        return now.timeIntervalSince(turnedAwayAt) >= Self.grace
+    }
+
+    /// Whether to say so now: only the first time it needs adding.
+    mutating func tell(at now: Date = Date()) -> Bool {
+        guard needsAdding(at: now), !told else { return false }
+        told = true
+        return true
+    }
+}
+
 /// Runs browser extensions with WebKit's extension engine: Chrome Web Store extensions, and 1Password
 /// set up for you, so they work the way they do in other browsers.
 @available(macOS 15.4, *)
@@ -282,6 +350,19 @@ final class ExtensionHost: NSObject {
     /// When each extension's button was last clicked.
     private var actionClicks: [String: Date] = [:]
     func lastActionClick(_ id: String) -> Date { actionClicks[id] ?? .distantPast }
+
+    /// When each extension last sent a tab to an address (tabs.update). Downie's button sends the tab to its app's
+    /// link: the tab count stays the same, yet the click did something.
+    private var tabLoads: [String: Date] = [:]
+    func noteTabLoad(_ id: String) { tabLoads[id] = Date() }
+
+    /// Whether a click on an extension's button showed nothing at all, so its options page opens instead: no popup,
+    /// no side panel, no new tab, and no tab sent anywhere since the click.
+    static func clickShowedNothing(clickedAt: Date, popupShown: Bool, sidePanelShown: Bool, tabsBefore: Int, tabsNow: Int, tabLoadedAt: Date?) -> Bool {
+        if popupShown || sidePanelShown || tabsNow != tabsBefore { return false }
+        if let tabLoadedAt, tabLoadedAt >= clickedAt { return false }
+        return true
+    }
 
     /// What you last did with each extension: the tab you used it on, and when you last touched its own pages. Some
     /// APIs act only in answer to that (tab capture, opening a download, asking for more access), as in Chrome.
@@ -753,7 +834,7 @@ final class ExtensionHost: NSObject {
         weak var controller: BrowserWindowController?
     }
     private var popupRequest: PopupRequest?
-    private static var toldAboutVerification = false
+    private static var onePasswordTrust = OnePasswordTrust()
     private var popupShownAt: Date?
     static let log = Logger(subsystem: "wang.zigao.zigzag", category: "extensions")
     weak var lastAction: WKWebExtension.Action?
@@ -914,14 +995,18 @@ final class ExtensionHost: NSObject {
             }
             return
         }
+        let clickedAt = Date()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
-            guard let self, self.popupShownAt == nil else { return }
-            // Its side panel opening (Claude's, from its own click handler) is it doing something.
-            if WindowManager.shared.controllers.contains(where: { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }) { return }
+            guard let self else { return }
+            // Its side panel opening (Claude's, from its own click handler) is it doing something. So is sending the tab
+            // to an address: Downie sends it to its app's link, which opens Downie or asks first (#239).
+            let sidePanelShown = WindowManager.shared.controllers.contains { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }
             let tabsNow = WindowManager.shared.controllers.map(\.tabManager.allTabs.count).reduce(0, +)
+            guard Self.clickShowedNothing(clickedAt: clickedAt, popupShown: self.popupShownAt != nil, sidePanelShown: sidePanelShown,
+                                          tabsBefore: tabsBefore, tabsNow: tabsNow, tabLoadedAt: self.tabLoads[item.id]) else { return }
             // This profile's copy of its options, in a space on this profile, never in a private window.
             let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
-            guard tabsNow == tabsBefore, let options = context.optionsPageURL, let controller = key ?? self.openWindows.first,
+            guard let options = context.optionsPageURL, let controller = key ?? self.openWindows.first,
                   let space = controller.tabManager.space(for: self.profile) else { return }
             ExtensionLog.write("click did nothing; opening its options")
             controller.tabManager.newTab(url: options, spaceID: space)
@@ -950,15 +1035,42 @@ final class ExtensionHost: NSObject {
     /// Native-messaging replies are read for one thing: an app saying it doesn't trust this browser yet.
     /// 1Password says so in its first message; other apps would need their own reading here.
     fileprivate func nativeHostReplied(_ message: Any, for id: String) {
-        guard id == ExtensionStore.onePasswordID else { return }
-        let dict = message as? [String: Any]
-        let inner = (dict?["content"] as? [String: Any])?["content"] as? [String: Any]
-        guard let type = inner?["type"] as? String else { return }
+        guard id == ExtensionStore.onePasswordID, let type = OnePasswordTrust.type(of: message) else { return }
         if type != "Success" { ExtensionLog.write("1Password app replied: \(type)") }
-        // Turned away: say so where you're looking, once a session, instead of leaving 1Password's spinner going.
-        if type == "BrowserVerificationFailed", !Self.toldAboutVerification,
-           let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first {
-            Self.toldAboutVerification = true
+        let reply = OnePasswordTrust.reply(type)
+        let wasConnected = Self.onePasswordTrust.connected
+        Self.onePasswordTrust.heard(reply)
+        switch reply {
+        case .connected:
+            // It trusts Zigzag: no note about adding it, in any profile, for the rest of the session.
+            guard !wasConnected else { return }
+            for profile in Profiles.shared.all {
+                profile.startedExtensions?.setAttention(nil, for: id)
+            }
+        case .turnedAway:
+            if wasConnected {
+                ExtensionLog.write("1Password turned one connection away after another got through; not asking to add Zigzag")
+                return
+            }
+            // Given a moment: another connection getting through means this was the app being slow, not untrusting.
+            DispatchQueue.main.asyncAfter(deadline: .now() + OnePasswordTrust.grace + 0.1) { [weak self] in
+                self?.askToAddIfStillTurnedAway(for: id)
+            }
+        case .other:
+            break
+        }
+    }
+
+    /// Turned away, and nothing got through since: 1Password really doesn't trust Zigzag yet.
+    private func askToAddIfStillTurnedAway(for id: String) {
+        guard Self.onePasswordTrust.needsAdding() else { return }
+        setAttention(Attention(
+            title: String(localized: "Connect 1Password to Zigzag", comment: "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag."),
+            message: String(localized: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.", comment: "Steps in the note from the 1Password extension's button. Keep each step on its own line starting with its number and a period (1. 2. 3.); the line after the blank line is a note. Settings › Browser and Add Browser are names in 1Password."),
+            buttonTitle: String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), appBundleID: "com.1password.1password"), for: id)
+        // Said where you're looking, once a session, instead of leaving 1Password's spinner going.
+        if let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first,
+           Self.onePasswordTrust.tell() {
             Toast.show(String(localized: "1Password doesn’t trust Zigzag yet. In 1Password, go to Settings › Browser › Add Browser and choose Zigzag.", comment: "Toast when the 1Password app turns Zigzag away. Settings › Browser › Add Browser are names in 1Password; match 1Password's own translation."),
                        symbol: "exclamationmark.triangle", action: (String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), {
                            if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
@@ -966,10 +1078,6 @@ final class ExtensionHost: NSObject {
                            }
                        }), duration: 15, in: controller)
         }
-        setAttention(type == "BrowserVerificationFailed" ? Attention(
-            title: String(localized: "Connect 1Password to Zigzag", comment: "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag."),
-            message: String(localized: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.", comment: "Steps in the note from the 1Password extension's button. Keep each step on its own line starting with its number and a period (1. 2. 3.); the line after the blank line is a note. Settings › Browser and Add Browser are names in 1Password."),
-            buttonTitle: String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), appBundleID: "com.1password.1password") : nil, for: id)
     }
 
     /// An extension asked for its companion app, and that app isn't on this Mac.
@@ -1542,6 +1650,7 @@ extension Tab: WKWebExtensionTab {
             completionHandler(nil)
             return
         }
+        profile.extensions.noteTabLoad(context.uniqueIdentifier)
         load(url)
         completionHandler(nil)
     }

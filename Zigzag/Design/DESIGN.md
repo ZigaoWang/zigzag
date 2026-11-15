@@ -253,8 +253,10 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - Showing up and going: one vocabulary, `Motion.present(_:from:entering:)`, and `FloatingPanelView.present` and
   `dismiss` on it. Where a thing lives decides where it comes from (`Motion.Origin`):
   - `.point`: a menu, popover or panel grows out of the control that opened it (`growsFrom`), from `enterScale`
-    (0.96) with a fade, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). A sheet grows from a little
-    below its middle (`sheetOrigin`), its scrim fading in `enter` and out in `exit`.
+    (0.96) with a fade, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). A field's menu grows from its
+    edge facing the field (`grow(from:)`), a tab's hover preview from its side facing the sidebar, at the row's
+    height. A sheet, a page's dialog too, grows from a little below its middle (`sheetOrigin`), its scrim fading in
+    `enter` and out in `exit` (`Motion.fadeBackdrop`); the dimming under a peek fades with its card the same way.
   - `.edge`: a bar that hangs from an edge slides `edgeOffset` (6pt) in from it: the find bar (⌘F) and a toast
     from the page's top, the Desk's and a PDF's bars from the bottom.
   - `.offstage`: a notice from outside (a site's question, Save password?, an offer) comes down from beyond the
@@ -262,6 +264,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   - `.inPlace`: what stands in for something under it (the address being edited) only fades.
   Leaving is quicker and subtler, two thirds to three quarters: `exit` (120ms) toward 0.98, or half the edge offset.
   The fade runs a touch quicker than the movement coming in, so it's solid before it settles.
+  Whatever is on its way out (a panel, a menu, a toast, a sheet and its scrim) takes no more clicks: they reach
+  what's under it at once, so a quick click after closing never lands on something already leaving.
 - The selected tab's card slides: picking another row with the pointer, the card travels there from the row it was
   on (`SelectionCardView`, `Motion.selection`, eased out), and the new row takes it over when it lands. A click
   mid-slide carries on from where the card is. From the keyboard, with Reduce Motion or while dragging, it lands.
@@ -280,11 +284,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   simply gone: the command bar (⌘T, ⌘L), the tab and space switchers (⌃Tab), the link under the pointer, and anything
   shown while ⌘T is handled (`Arrival.instant`, `Motion.isKeyboardDriven`). Typing, moving through a list with the
   arrows, and switching tabs never animate; the find bar following its tab comes and goes with the page, at once.
-  Changes made with `Motion.animate` (layout, hovers, lists) are still instant from a key, except the window's
-  layout (the sidebar, splits, switching spaces), which moves so you see where things went (`evenFromKeyboard`).
+  Changes made with `Motion.animate` (layout, hovers) are still instant from a key, except the window's layout (the
+  sidebar, splits, switching spaces), which moves so you see where things went (`evenFromKeyboard`), and the
+  sidebar's rows coming and going, which move the same from a key as from the pointer.
 - Light and dark cross-fade with the space's color when a space changes the window's mode: one fade, no flicker.
 - A closed tab's row folds away: it takes no more clicks, and its height closes as it fades, in step with the rows
-  below gliding up.
+  below gliding up. A new one (a new tab, a link opened in one, a tab moved in, a group or folder opened) does the
+  same backwards: the rows below glide down and its height opens as it fades in.
 - Reduce Motion (the Mac's, or Settings › Appearance › Reduce motion for Zigzag alone): nothing slides, scales or
   travels; fades and color changes still play (`Motion.animate(moves:)`), anything showing up or going crossfades
   in place in `crossfade` (120ms), and a space switch cross-fades the list in place instead of sliding it.
@@ -324,7 +330,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   several pages keeps the close button's room while it's hidden, so nothing in it moves under the pointer.
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size
-  (`Sidebar.spaceIcon`: 14, 16, 20), each in a 26pt key (28 at Large, `Sidebar.spaceTarget`).
+  (`Sidebar.spaceIcon`: a favorite's icon, 16, 18, 20), each in a 26pt key (28 at Large, `Sidebar.spaceTarget`).
+  With many spaces the keys narrow, but never past the icon and 4pt (`Sidebar.spaceKeyWidth`): the row scrolls first.
 - **Sidebar on the right** (#166, Settings › Appearance, View › Move Sidebar to Right): the whole layout is the
   left one's mirror image (`BrowserRootView.mirrored`): the page on the left, its window corners on its left side,
   the resize edge on the sidebar's left, the hidden sidebar coming out of the right edge, panels that open beside
@@ -365,8 +372,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   by 1, ⇧ by 10, Tab goes on to the height, and a side stays within `PageSizes.limits`. Pressed anywhere else, the
   readout (with the hover fill a button has) opens Page Size's menu. Where room is short the name goes first,
   then the readout.
-  ⋯ is filled (`ellipsis.circle.fill`) while something chosen under it is in effect (JavaScript off, another user
-  agent, outlines), so no choice is one nothing shows. Its menu: what gave way, what's on or off, User Agent under
+  ⋯ is filled (`ellipsis.circle.fill`) while something chosen under it is in effect (JavaScript, images or styles
+  off, another user agent, outlines, or what a button that gave way into it holds), so no choice is one nothing
+  shows. Its menu: what gave way, what's on or off, User Agent under
   its heading with Open In after it, then View Source, Developer Settings and Turn Off Developer Mode.
 - **Developer Mode for a site** (#141): one per-site switch (the list in Settings › Developer), turned on or off
   alike from Turn On (Off) Developer Mode in Site Controls' ⋯ menu and the command bar, and View › Developer ›
@@ -448,6 +456,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   `panelBackground`: the video live in a 54 by 32 thumbnail, the tab's title, play or pause, and expand; a click
   brings the card back there. The video plays on all the while. (Not the sidebar's Now Playing row: that shows only
   for a tab you can hear, and a silent video plays on too.)
+- **Picture in Picture when you leave** (`AutoPictureInPicture`, #238): leave Zigzag for another app or desktop while
+  the page you're on (the focused half of a split, Zigzag Mini's page, a private window's) plays a video you were
+  watching, and WebKit's own Picture in Picture floats it, no press on the page needed (a video it hasn't taken up,
+  one that started by itself and was never pressed, the page's script floats, `PageVideos`). Back in front of that page,
+  it goes back in; back on another tab, it floats on until you go to its tab. Only what Zigzag floated: one you
+  floated yourself stays. A video the page won't let float (`disablePictureInPicture`), one in full screen, and the
+  mini player's (already floating over everything) are left alone. Settings › Tabs turns it off.
 - **Full screen in the page** (`PageFullScreen`, #168): with Settings › Tabs › Full screen videos fill set to The Page,
   or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)
   fills the page card, or its pane in a split, in black, the window's chrome as it was. No bar, no note: the player's

@@ -288,7 +288,9 @@ final class BrowserRootView: SpaceFrameView {
             guard oldValue != isEmpty else { return }
             // The bar above the page takes the page's color, and there's none now.
             refreshGlassFrame()
-            Tokens.Motion.animate(Tokens.Motion.feedback) {
+            // A change of state in place, eased; opening a window or restoring one, it's simply there.
+            guard window?.isVisible == true else { emptyHint.alphaValue = isEmpty ? 1 : 0; return }
+            Tokens.Motion.animate(Tokens.Motion.change) {
                 self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
             }
         }
@@ -411,7 +413,7 @@ final class BrowserRootView: SpaceFrameView {
             zoomScrim.color = Tokens.Color.peekScrim
             zoomScrim.frame = cardFrame
             orderForZoom(cards[index])
-            if animated { zoomScrim.show() } else { zoomScrim.alphaValue = 1 }
+            zoomScrim.show(evenFromKeyboard: true, animated: animated)
         } else if zoomScrim.superview != nil {
             if animated { zoomScrim.hide(evenFromKeyboard: true) } else { zoomScrim.removeFromSuperview() }
         }

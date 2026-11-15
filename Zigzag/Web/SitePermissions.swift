@@ -1181,11 +1181,13 @@ final class PermissionPrompt: FloatingPanelView {
         guard let tab = askingTab, !tab.isClosed, controller.promptHolds(tab) else { finish(nil); return }
         let inFront = controller.promptShows(tab)
         if inFront, isHidden {
+            // Placed first, hidden still: a question over another pane of a split doesn't hold it up (`PageQuestions`).
+            place(in: controller)
             guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
             controller.clearForPrompt()
-            place(in: controller)
             isHidden = false
             slideIn()
+            PageQuestions.cameUp(in: controller)
         } else if !inFront, !isHidden {
             isHidden = true
             PageQuestions.turnFreed(in: controller)
@@ -1199,7 +1201,7 @@ final class PermissionPrompt: FloatingPanelView {
         tintStrength = nil
         isElevated = true
         radius = Tokens.Radius.panel
-        let area = controller.focusedPaneFrame
+        let area = askingTab.flatMap { controller.pageFrame(showing: $0) } ?? controller.focusedPaneFrame
         // Wide enough for the buttons, the menu and the duration on one line, within the page's own measure.
         let measured = answersWidth + Self.pad * 2
         let width = CardOverThePage.width(measured: measured, in: area)

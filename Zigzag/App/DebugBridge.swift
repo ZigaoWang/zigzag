@@ -479,6 +479,19 @@ enum DebugBridge {
         DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 80, y: view.isFlipped ? 60 : view.bounds.height - 60), in: view) }
     }
 
+    /// One line on what the developer tools did to a tab's page, for the scripted checks (`devjs`, `devpage`).
+    static func logDeveloperPage(of tab: Tab) {
+        let script = "[navigator.userAgent.includes('iPhone') ? 'iPhone' : navigator.userAgent.includes('iPad') ? 'iPad' : navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Zigzag', document.title, !!document.getElementById('\(PageOutlines.styleID)'), 'img=' + (document.images[0] ? document.images[0].naturalWidth : '-'), 'sheets=' + document.styleSheets.length].join(' | ')"
+        let preferences = tab.webView.map { webView in
+            "styles=\(webView.configuration.preferences.value(forKey: PageStyles.key) as? Bool ?? true) imagesWanted=\(PageImages.isOff(in: webView)) imageRule=\(PageImages.isOn(in: webView))"
+        } ?? "-"
+        let state = tab.developer
+        tab.webView?.evaluateJavaScript(script, in: nil, in: PageOutlines.world) { result in
+            let page = (try? result.get()) as? String ?? "-"
+            debugLog("devpage => tab=\(tab.url?.host() ?? "-") js=\(state.javaScriptOff ? "off" : "on") images=\(state.imagesOff ? "off" : "on") styles=\(state.stylesOff ? "off" : "on") ua=\(state.userAgent) outline=\(state.outlines) prefs: \(preferences) page: \(page)")
+        }
+    }
+
     static func run(_ command: String) {
         let parts = command.split(separator: " ", maxSplits: 1).map(String.init)
         guard let name = parts.first else { return }
@@ -556,6 +569,28 @@ enum DebugBridge {
         case "foldtab":
             let tabs = controller.tabManager.currentTabs
             if let i = Int(arg), tabs.indices.contains(i) { controller.tabManager.setNestedTabsCollapsed(tabs[i], !tabs[i].isCollapsed) }
+        // grouptabs <i,j,…>: the tabs at those places in the space's list grouped, as Group Tabs does (#209).
+        case "grouptabs":
+            let tabs = controller.tabManager.currentTabs
+            controller.groupWithUndo(arg.split(separator: ",").compactMap { Int($0) }.filter(tabs.indices.contains).map { tabs[$0] })
+        // groupfold <n>: the space's nth group folded or shown, as a click on its row does.
+        case "groupfold":
+            let groups = controller.tabManager.groups(in: controller.tabManager.currentSpaceID)
+            if let i = Int(arg), groups.indices.contains(i) { controller.listSetGroupOpen(groups[i].id, !groups[i].isOpen) }
+        // groupmenu <n> <title>: runs that item of the space's nth group's menu, as choosing it would.
+        case "groupmenu":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            let groups = controller.tabManager.groups(in: controller.tabManager.currentSpaceID)
+            guard f.count == 2, let i = Int(f[0]), groups.indices.contains(i) else { break }
+            let menu = SidebarMenus.groupMenu(for: groups[i], controller: controller)
+            if case let index = menu.indexOfItem(withTitle: f[1]), index >= 0 { menu.performActionForItem(at: index) }
+        // groups <path>: the space's groups of tabs, top to bottom, each with its name, whether it's open and its tabs.
+        case "groups":
+            let m = controller.tabManager
+            let json: [[String: Any]] = m.groups(in: m.currentSpaceID).map { group in
+                ["name": group.name, "open": group.isOpen, "tabs": m.tabs(inGroup: group.id).map(\.displayTitle)]
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: json) { try? data.write(to: URL(fileURLWithPath: arg)) }
         // tree <path>: the current space's tabs, each with how deep it's nested and whether it's folded.
         case "tree":
             let m = controller.tabManager
@@ -691,6 +726,32 @@ enum DebugBridge {
             if let root = controller.tabManager.selectedTab?.settingsView { rows(root).first?.openEditor() }
         case "saveprompt": if arg == "close" { SavePasswordPrompt.debugClose() } else { SavePasswordPrompt.debugPreview(in: controller) }
         case "select": controller.tabManager.select(at: Int(arg) ?? 0)
+        // lightswatch <seconds> <path>: where the traffic lights are in each frame that goes to the screen, and every
+        // move AppKit makes to them, for that long (`TrafficLightWatch`).
+        case "lightswatch":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            if f.count == 2, let seconds = Double(f[0]), let window = controller.window {
+                TrafficLightWatch.start(seconds: seconds, path: f[1], window: window)
+            }
+        // retile <count> <interval>: AppKit lays the title bar out again that many times (by changing the window's
+        // subtitle, which Zigzag doesn't watch), as it does on its own for a title, a key change or full screen.
+        case "retile":
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count == 2, let window = controller.window else { break }
+            for i in 0..<Int(f[0]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * f[1]) {
+                    MainActor.assumeIsolated { window.subtitle = i % 2 == 0 ? " " : "" }
+                }
+            }
+        // selectloop <count> <interval>: selects the first tabs in turn (up to four) that many times, that far apart (seconds).
+        case "selectloop":
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count == 2 else { break }
+            for i in 0..<Int(f[0]) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * f[1]) {
+                    MainActor.assumeIsolated { controller.tabManager.select(at: i % max(1, min(controller.tabManager.currentTabs.count, 4))) }
+                }
+            }
         // groundprobe select <index> | load <url> | open <url>: does that, then for 1.5 s writes to the debug log what's
         // behind the page in front every 50 ms (#134): the web view's own ground, its under-page color, the card's, and
         // what the page script has put in (Dark Reader's mode, the prepaint ground, darkened).
@@ -1119,23 +1180,25 @@ enum DebugBridge {
                     debugLog("devlook => chose=\(chosen.appearance) print=\(chosen.printStyles) effect=\(effect.appearance) print=\(effect.printStyles) view=\(tab.webView?.appearance?.name.rawValue ?? "-") media=\(tab.webView?.mediaType ?? "-") page: \(result as? String ?? "-") darkened=\(tab.darkPage?.darkened ?? false)")
                 }
             }
-        // devjs on|off, devua zigzag|iphone|ipad|chrome|firefox, devoutline on|off: the developer tools' Disable
-        // JavaScript, User Agent and Outline Every Element for the tab in front. Then, once the page has loaded again,
-        // what the page was told and whether its scripts ran, in the debug log.
-        case "devjs", "devua", "devoutline":
+        // devjs on|off, devimages on|off, devstyles on|off, devua zigzag|iphone|ipad|chrome|firefox, devoutline on|off:
+        // the developer tools' Disable JavaScript, Disable Images, Disable Styles, User Agent and Outline Every Element
+        // for the tab in front. Then, once the page has loaded again, what the page was told, whether its scripts ran,
+        // its first image's width (0: not loaded), how many style sheets it has, and its preferences, in the debug log.
+        case "devjs", "devimages", "devstyles", "devua", "devoutline":
             guard let tab = controller.tabManager.selectedTab else { break }
             if name == "devjs", arg == "on" || arg == "off" { tab.developer.javaScriptOff = arg == "off" }
+            if name == "devimages", arg == "on" || arg == "off" { tab.developer.imagesOff = arg == "off" }
+            if name == "devstyles", arg == "on" || arg == "off" { tab.developer.stylesOff = arg == "off" }
             if name == "devoutline", arg == "on" || arg == "off" { tab.developer.outlines = arg == "on" }
             if name == "devua", let agent = ["zigzag": DeveloperState.UserAgent.zigzag, "iphone": .iPhone, "ipad": .iPad, "chrome": .chrome, "firefox": .firefox][arg] {
                 tab.developer.userAgent = agent
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                let script = "[navigator.userAgent.includes('iPhone') ? 'iPhone' : navigator.userAgent.includes('iPad') ? 'iPad' : navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Zigzag', document.title, !!document.getElementById('\(PageOutlines.styleID)')].join(' | ')"
-                tab.webView?.evaluateJavaScript(script, in: nil, in: PageOutlines.world) { result in
-                    let page = (try? result.get()) as? String ?? "-"
-                    debugLog("devpage => tab=\(tab.url?.host() ?? "-") js=\(tab.developer.javaScriptOff ? "off" : "on") ua=\(tab.developer.userAgent) outline=\(tab.developer.outlines) page: \(page)")
-                }
-            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { DebugBridge.logDeveloperPage(of: tab) }
+        // devpage: the same line for the tab in front, changing nothing; devpage <n> for the tab at that place.
+        case "devpage":
+            let tabs = controller.tabManager.currentTabs
+            guard let tab = Int(arg).flatMap({ tabs.indices.contains($0) ? tabs[$0] : nil }) ?? controller.tabManager.selectedTab else { break }
+            DebugBridge.logDeveloperPage(of: tab)
         // devsize <width> <height> | fill | rotate: the developer tools' Page Size for the tab in front; then the
         // page's size and its holder's, and what's docked in it, in the debug log.
         case "devsize":
@@ -1598,6 +1661,12 @@ enum DebugBridge {
             // slowmo <factor>: every animation in the window runs that many times slower, to film and judge it.
             let factor = max(1, Float(arg) ?? 1)
             controller.window?.contentView?.layer?.speed = 1 / factor
+        case "motionlog":
+            // motionlog <path> [ms]: every frame for that long (3000 by default), what's drawn of each panel, sheet and
+            // scrim in the window (its on-screen opacity, scale and offset), as lines of text, to judge a movement.
+            let f = arg.split(separator: " ").map(String.init)
+            guard let path = f.first, let root = controller.window?.contentView else { break }
+            DebugBridge.logMotion(in: root, for: (f.count > 1 ? Double(f[1]) : nil) ?? 3000, to: path)
         case "quit": NSApp.terminate(nil)
         case "updaterelaunch":
             // updaterelaunch: quits as Sparkle does to restart for an update (its willRelaunch first); launching the
@@ -1934,6 +2003,12 @@ enum DebugBridge {
                let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
                 try? png.write(to: URL(fileURLWithPath: arg))
             }
+        case "swipestep":
+            // swipestep back|forward <0...1> | swipestep off: the page in front held mid-swipe, that far toward going.
+            let f = arg.split(separator: " ")
+            let direction = f.first == "forward" ? 1 : -1
+            let value = f.count > 1 ? Double(f[1]).map { CGFloat($0) } : nil
+            (controller.selectedTab?.webView as? BrowserWebView)?.debugHoldSwipe(direction: direction, progress: value)
         case "swipe":
             // swipe <dx per step>: a synthetic two-finger horizontal swipe over the sidebar.
             guard let window = controller.window else { break }
@@ -2057,6 +2132,7 @@ enum DebugBridge {
             // dialogstate <path>: the page dialogs showing, with what's in their fields (a password only as its length).
             if let data = try? JSONSerialization.data(withJSONObject: PageDialogSheet.debugState(), options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "dialogsaved": PageDialogSheet.debugShowSaved()
+        case "dialogcancel": PageDialogSheet.debugCancel()
         case "windowshot":
             // windowshot <path>: the window's own drawing, as a PNG; web content may be blank.
             guard let view = controller.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
@@ -2562,6 +2638,51 @@ enum DebugBridge {
         ProcessInfo.processInfo.environment["ZIGZAG_DATA_DIR"] != nil && PasswordStore.isTestVault
     }
 
+    /// `motionlog`: samples what the render server draws of the window's panels, sheets and scrims about every frame,
+    /// and writes one line per sample per view: milliseconds since the start, the view, opacity (its own and its
+    /// layer's on screen, times its ancestors'), scale and offset of its transform, and whether clicks reach it.
+    static func logMotion(in root: NSView, for milliseconds: Double, to path: String) {
+        let start = CACurrentMediaTime()
+        var lines: [String] = []
+        func watched(_ view: NSView) -> [NSView] {
+            let mine = view is FloatingPanelView || view is ScrimView || view is ConfirmSheet || view is FormSheet
+                || view is PageDialogSheet || view is WhatsNewSheet || view is TabPreviewView || view is EmptySpaceMark
+            return (mine ? [view] : []) + view.subviews.flatMap(watched)
+        }
+        func shownOpacity(_ view: NSView) -> Float {
+            var opacity: Float = 1
+            var current: NSView? = view
+            while let v = current, v !== root {
+                let layer = v.layer?.presentation() ?? v.layer
+                opacity *= (layer?.opacity ?? 1) * (v.isHidden ? 0 : 1)
+                current = v.superview
+            }
+            return opacity
+        }
+        motionTimer?.invalidate()
+        let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { _ in
+            MainActor.assumeIsolated {
+                let ms = (CACurrentMediaTime() - start) * 1000
+                // Not yet committed to the render server (just added): nothing of it is on screen to read.
+                for view in watched(root) where view.layer?.presentation() != nil {
+                    let t = (view.layer?.presentation() ?? view.layer)?.transform ?? CATransform3DIdentity
+                    let window = view.convert(NSPoint(x: view.bounds.midX, y: view.bounds.midY), to: nil)
+                    let hit = root.window?.contentView?.superview?.hitTest(root.window?.contentView?.superview?.convert(window, from: nil) ?? .zero)
+                    let reaches = hit.map { $0 === view || $0.isDescendant(of: view) } ?? false
+                    lines.append(String(format: "%7.1f %@ opacity=%.3f scale=%.4f dx=%.1f dy=%.1f clicks=%d", ms, String(describing: type(of: view)),
+                                        shownOpacity(view), t.m11, t.m41, t.m42, reaches ? 1 : 0))
+                }
+                guard ms >= milliseconds else { return }
+                motionTimer?.invalidate()
+                motionTimer = nil
+                try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+            }
+        }
+        motionTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+    private static var motionTimer: Timer?
+
     @available(macOS 15.4, *)
     static func extensionTest(_ id: String, page: URL, in controller: BrowserWindowController) async {
         var report: [String: Any] = ["id": id]
@@ -2753,5 +2874,93 @@ extension NSApplication {
     // After the exchange, these names call AppKit's own.
     @objc func zz_keyWindow() -> NSWindow? { DebugKeyWindow.window ?? zz_keyWindow() }
     @objc func zz_mainWindow() -> NSWindow? { DebugKeyWindow.window ?? zz_mainWindow() }
+}
+#endif
+
+#if DEBUG
+/// Debug builds only: `lightswatch <seconds> <path>` writes where the traffic lights are as each Core Animation commit
+/// goes out (what reaches the screen), whenever that changes, and every time AppKit moves one of them, with who moved
+/// it, so a one-frame jump shows up as a commit with the wrong place.
+@MainActor
+enum TrafficLightWatch {
+    private static var observer: CFRunLoopObserver?
+    private static var lines: [String] = []
+    private static var last = ""
+    private static var commits = 0
+    private static var start = Date()
+
+    static var isWatching: Bool { observer != nil }
+
+    /// Called when AppKit moves a button, before it's put back.
+    static func moved(_ view: NSView, in window: NSWindow) {
+        guard isWatching else { return }
+        let stack = Thread.callStackReturnAddresses.dropFirst(5).prefix(32).map { address -> String in
+            var info = Dl_info()
+            guard dladdr(UnsafeRawPointer(bitPattern: address.uintValue), &info) != 0, let name = info.dli_sname else { return "?" }
+            return String(cString: name)
+        }.joined(separator: " < ")
+        lines.append(String(format: "%.4f moved %@ to %@ by %@", Date().timeIntervalSince(start),
+                            String(describing: type(of: view)), NSStringFromRect(view.convert(view.bounds, to: nil)), stack))
+    }
+
+    static func start(seconds: Double, path: String, window: NSWindow) {
+        stop(path: nil)
+        lines = []; last = ""; commits = 0; start = Date()
+        watched = window
+        // What reaches the screen is what Core Animation commits, so the lights are read as each commit goes out: at
+        // every step of the run loop, the transaction open then is asked to call back just before it commits.
+        let observer = CFRunLoopObserverCreateWithHandler(nil, CFRunLoopActivity.allActivities.rawValue, true, 0) { _, _ in
+            MainActor.assumeIsolated { askForCommit() }
+        }
+        self.observer = observer
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { MainActor.assumeIsolated { stop(path: path) } }
+    }
+
+    private static weak var watched: NSWindow?
+    private static var asked = false
+
+    /// `+[CATransaction addCommitHandler:forPhase:]` (private; phase 1 is just before the commit).
+    private static func askForCommit() {
+        guard observer != nil, !asked else { return }
+        let selector = NSSelectorFromString("addCommitHandler:forPhase:")
+        guard let method = class_getClassMethod(CATransaction.self, selector) else { return }
+        typealias Add = @convention(c) (AnyClass, Selector, AnyObject, Int32) -> Void
+        let add = unsafeBitCast(method_getImplementation(method), to: Add.self)
+        let handler: @convention(block) () -> Void = {
+            guard Thread.isMainThread else { return }
+            MainActor.assumeIsolated {
+                asked = false
+                guard let window = watched else { return }
+                commits += 1
+                let state = describe(window)
+                if state != last {
+                    lines.append(String(format: "%.4f commit %d %@", Date().timeIntervalSince(start), commits, state))
+                    last = state
+                }
+            }
+        }
+        asked = true
+        add(CATransaction.self, selector, unsafeBitCast(handler, to: AnyObject.self), 1)
+    }
+
+    private static func stop(path: String?) {
+        if let observer { CFRunLoopObserverInvalidate(observer) }
+        observer = nil
+        guard let path else { return }
+        lines.append("commits \(commits)")
+        try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+    }
+
+    private static func describe(_ window: NSWindow) -> String {
+        let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+        let frames = buttons.map { b -> String in
+            let r = b.convert(b.bounds, to: nil)
+            return "\(Int(r.minX)),\(Int(r.minY))\(b.isHidden ? "h" : "")"
+        }
+        let container = buttons.first?.superview?.superview?.frame ?? .zero
+        let titlebar = buttons.first?.superview?.frame ?? .zero
+        return "lights=\(frames.joined(separator: " ")) container=\(NSStringFromRect(container)) titlebar=\(NSStringFromRect(titlebar))"
+    }
 }
 #endif

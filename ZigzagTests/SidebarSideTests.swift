@@ -259,6 +259,18 @@ struct PinnedSpaceNameTests {
         return row.subviews.compactMap { $0 as? Label }.filter { !$0.isHidden }.map(\.frame)
     }
 
+    @Test func aMovedOnPinnedRowShowsItsOwnIconUntilThePagesIsKnown() {
+        let tab = Tab(url: URL(string: "https://no-icon-yet.example.com/watch")!, title: "Video", spaceID: UUID())
+        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: 220, height: Tokens.Sidebar.rowHeight))
+        row.isBookmark = true
+        row.bookmarkIcon = IconChoice.pageIcon("star")
+        row.isAway = true
+        row.configure(tab: tab)
+        // The page it's on has no icon yet: the pinned page's own, never the globe.
+        #expect(row.icon.image === row.bookmarkIcon)
+        _ = tab
+    }
+
     @Test func aTabsTitleStaysPutUnderThePointer() {
         let (row, tab) = row(pinned: false, away: false)
         let rest = frames(row)

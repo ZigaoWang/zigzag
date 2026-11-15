@@ -215,7 +215,8 @@ extension InteractiveView {
                 text = ink ?? Tokens.Color.onPrimary
             }
         case .quiet:
-            fill = pressed ? Tokens.Color.pressedFill : hovered || isSelected ? Tokens.Color.hoverFill : nil
+            // Disabled, it doesn't answer the pointer: no wash that would say it can be clicked.
+            fill = !isEnabled ? nil : pressed ? Tokens.Color.pressedFill : hovered || isSelected ? Tokens.Color.hoverFill : nil
             text = !isEnabled ? Tokens.Color.textDisabled : hovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         }
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)

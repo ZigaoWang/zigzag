@@ -47,7 +47,7 @@ final class ExtensionBridge {
         userScripts = BridgeUserScripts(host: host)
         let others: [any BridgeNamespace.Type] = [BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self, BridgeNotifications.self, BridgeIdle.self,
                                                   BridgeDisplay.self, BridgeContexts.self, BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
-                                                  BridgeFavicons.self, BridgeExtensionFetch.self]
+                                                  BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self]
         let all: [any BridgeNamespace] = others.map { $0.init(host: host) } + [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts]
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }

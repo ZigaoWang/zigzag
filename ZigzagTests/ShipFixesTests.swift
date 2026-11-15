@@ -187,6 +187,22 @@ struct BookmarkFolderTests {
 
     // MARK: Swiping back and forward
 
+    /// The swipe arrow sits in the gap the page leaves, never over the sidebar, the next pane or the window's edge.
+    @Test func swipeArrowStaysInsideTheCard() {
+        let page = NSRect(x: 300, y: 0, width: 800, height: 600)
+        let size = SwipeArrowView.size, margin = Tokens.Space.x2
+        // Back: a wide gap centers it; a narrow one keeps it a margin in from the card's edge.
+        let wide = SwipeArrowView.frame(in: page, offset: size + margin * 4, back: true)
+        #expect(wide.minX == page.minX + margin * 2)
+        let narrow = SwipeArrowView.frame(in: page, offset: 10, back: true)
+        #expect(narrow.minX == page.minX + margin)
+        // Forward: the same at the right edge, the page pushed left.
+        let forward = SwipeArrowView.frame(in: page, offset: -10, back: false)
+        #expect(forward.maxX == page.maxX - margin)
+        // Halfway down the page, either way.
+        #expect(narrow.midY == page.midY)
+    }
+
     private func decide(dx: CGFloat, dy: CGFloat = 0, back: Bool = true, forward: Bool = false,
                         scrolls: (left: Bool, right: Bool)? = (false, false), page: SwipeDecision.Page = .left,
                         waited: TimeInterval = 0.02, overFrame: Bool = false) -> SwipeDecision {

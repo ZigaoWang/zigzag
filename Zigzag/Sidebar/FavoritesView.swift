@@ -363,7 +363,7 @@ final class FavoriteTile: InteractiveView {
     /// A tile group's third and fourth pages' icons.
     private var extraIcons: [FaviconView] = []
     /// Every page's icon view, in order.
-    private var pageIcons: [FaviconView] { [icon, partnerIcon] + extraIcons }
+    var pageIcons: [FaviconView] { [icon, partnerIcon] + extraIcons }
     /// While a tab is held over this tile's middle: the half it would open in, as a tab row shows it.
     private let dropHalf = ColorView()
     /// 0: would open on the left, 1: on the right, nil: not a split target.
@@ -374,14 +374,13 @@ final class FavoriteTile: InteractiveView {
             dropHalf.isHidden = splitSide == nil
         }
     }
-    /// Its page is loaded in the background: a fine edge and its icon at full strength, so you can tell at a glance
-    /// which are. Not for a page put to sleep or not loaded yet since Zigzag reopened: that looks like a favorite never
-    /// opened, its icon faded back (#205).
+    /// Its page is loaded in the background: a fine edge, so you can tell at a glance which are. Not for a page put to
+    /// sleep or not loaded yet since Zigzag reopened: that looks like a favorite never opened, with no edge (#205).
     private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
 
     /// How a favorite's tile looks, in the tab rows' terms: the one you're on has the selected tab's card; one whose
-    /// page is loaded has the open edge, its icons at full strength; one that isn't running is faded back, as a tab
-    /// left alone fades in the list, until the pointer comes to it.
+    /// page is loaded has the open edge; one that isn't running has neither. Its icon is always at full strength: a
+    /// favorite is a site you chose to keep in view, and a faded one read as washed out rather than as closed.
     enum Look: Equatable { case closed, open, selected }
 
     static func look(selected: Bool, loaded: [Bool]) -> Look {
@@ -390,7 +389,7 @@ final class FavoriteTile: InteractiveView {
 
     /// How strong a tile's icons are drawn.
     static func iconAlpha(_ look: Look, hovered: Bool) -> CGFloat {
-        look == .closed && !hovered ? Tokens.Opacity.fadedFloor : 1
+        1
     }
 
     /// Whether a favorite's open page has moved on from the address it was saved with, as a pinned tab's row tells
@@ -632,8 +631,7 @@ final class FavoriteTile: InteractiveView {
         refreshAway()
         let name = self.name
         // A favorite has no hover card, so one whose page isn't running says why in its tooltip: asleep, and what
-        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge, its icon
-        // faded back.
+        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge.
         let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.notLoadedNote].compactMap { $0 }
         toolTip = ([name].filter { !$0.isEmpty } + notes).joined(separator: "\n")
         if awayParts.first != true, let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
@@ -667,18 +665,26 @@ final class FavoriteTile: InteractiveView {
 
     /// A page that moved on shows the icon of the page it's on now, as its pinned row does, with the icon it was
     /// saved with small on the corner, the way an icon wears its app's badge, so the tile still says which favorite
-    /// it is. Pointing at it names both; its menu goes back.
+    /// it is. Pointing at it names both; its menu goes back. Only once that page's own icon is known
+    /// (`awayIcon`): until then the favorite's own, with no badge, never a stand-in for the page's.
     private func refreshAwayIcons() {
         guard let bookmark else { return }
         let live = livePages
         for (i, (page, view)) in zip([bookmark] + partners, pageIcons).enumerated() {
-            let away = isAway(part: i)
-            view.originalIcon = away ? page.displayIcon ?? FaviconView.globeIcon : nil
-            guard away, let now = live[i] else { continue }
-            // While it loads, the last icon stays under the loader rather than the globe flashing.
-            if now.favicon != nil || !now.isLoading, view.image !== now.favicon { view.image = now.favicon; needsLayout = true }
+            let now = Self.awayIcon(away: isAway(part: i), current: live[i]?.favicon)
+            view.originalIcon = now == nil ? nil : page.displayIcon ?? FaviconView.globeIcon
+            if let now {
+                if view.image !== now { view.image = now; needsLayout = true }
+            } else if isAway(part: i) {
+                guard let own = page.displayIcon else { FaviconStore.shared.prefetch(for: page.url); continue }
+                if view.image !== own { view.image = own; needsLayout = true }
+            }
         }
     }
+
+    /// The icon a favorite's page that moved on is drawn with: the page's own, once it's known; nil draws the
+    /// favorite as it was saved, its own icon and no badge.
+    static func awayIcon(away: Bool, current: NSImage?) -> NSImage? { away ? current : nil }
 
     override func layout() {
         super.layout()
@@ -753,10 +759,12 @@ final class FavoriteTile: InteractiveView {
         closeButton.isHidden = !(isOpen && isHovered) || number != nil
         let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
         for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
-        // A soft tile of the space's own color, a step lighter under the pointer; a fine edge while its page is open,
-        // so you can tell which are loaded. The one you're on is the selected tab's card.
+        // A soft tile of the space's own color, a step lighter under the pointer; brighter, with a fine edge, while its
+        // page is open, so you can tell which are loaded. The one you're on is the selected tab's card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
-            : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
+            : isPressed ? Tokens.Chrome.fieldPressed
+            : isOpen ? (isHovered ? Tokens.Chrome.openTileHover : Tokens.Chrome.openTile)
+            : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered, duration: Tokens.Motion.selection)
         Tokens.Motion.withoutAnimation {
             layer?.borderWidth = isSelected || isOpen ? Tokens.Metric.hairline : 0

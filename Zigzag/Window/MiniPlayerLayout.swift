@@ -20,6 +20,8 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var isStartedByUser = false
     /// It sits in a link: a card's preview of a page it goes to.
     var isInLink = false
+    /// The page said it mustn't float in Picture in Picture (its disablePictureInPicture attribute).
+    var blocksPictureInPicture = false
     /// Its CSS object-fit.
     var fit = "contain"
     var time: Double = 0
@@ -27,7 +29,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var duration: Double?
 
     init(index: Int, rect: CGRect, natural: CGSize, isPlaying: Bool, hasEnded: Bool = false, isMuted: Bool = false, loops: Bool = false,
-         autoplays: Bool = false, hasControls: Bool = false, isStartedByUser: Bool = false, isInLink: Bool = false, fit: String = "contain",
+         autoplays: Bool = false, hasControls: Bool = false, isStartedByUser: Bool = false, isInLink: Bool = false, blocksPictureInPicture: Bool = false, fit: String = "contain",
          time: Double = 0, duration: Double? = nil) {
         self.index = index
         self.rect = rect
@@ -40,6 +42,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
         self.hasControls = hasControls
         self.isStartedByUser = isStartedByUser
         self.isInLink = isInLink
+        self.blocksPictureInPicture = blocksPictureInPicture
         self.fit = fit
         self.time = time
         self.duration = duration
@@ -54,7 +57,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
         self.init(index: index, rect: CGRect(x: number("x"), y: number("y"), width: number("w"), height: number("h")),
                   natural: CGSize(width: number("vw"), height: number("vh")), isPlaying: flag("playing"), hasEnded: flag("ended"),
                   isMuted: flag("muted"), loops: flag("loop"), autoplays: flag("autoplay"), hasControls: flag("controls"),
-                  isStartedByUser: flag("user"), isInLink: flag("link"), fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
+                  isStartedByUser: flag("user"), isInLink: flag("link"), blocksPictureInPicture: flag("nopip"), fit: o["fit"] as? String ?? "contain", time: number("t"), duration: duration > 0 ? duration : nil)
     }
 
     /// Something you were watching, not a page's own motion: one you started or turned up yourself, or one you can

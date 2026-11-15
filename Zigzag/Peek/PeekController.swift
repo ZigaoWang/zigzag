@@ -161,7 +161,8 @@ final class PeekController {
             controller.root.overlay.addSubview(scrim)
             controller.root.overlay.addSubview(panel)
             panel.frame = panelFrame()
-            scrim.show()
+            // The dimming comes with the card, from a key too, as it goes with it.
+            scrim.show(evenFromKeyboard: true)
             grow()
             // Esc puts the peek away, the way it does a sheet; other keys go to the page as usual.
             escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in

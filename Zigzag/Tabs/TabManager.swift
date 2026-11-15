@@ -24,6 +24,10 @@ final class TabManager {
     /// How many closed tabs ⇧⌘T and ⌘Z can bring back: fifty more than the biggest lot closed at once. It never
     /// shrinks back, or closing two more after Clear took sixty would leave ⌘Z on the sixty short.
     private var closedLimit = 50
+    /// The groups of tabs (#209) this window has, by id; which tabs are in each, the tabs say (`Tab.groupID`).
+    private(set) var groups: [UUID: TabGroup] = [:]
+    /// Groups that went when their last tab closed or left, so ⌘Z or ⇧⌘T bringing a tab back brings its group too.
+    private var emptiedGroups: [UUID: TabGroup] = [:]
 
     weak var host: TabHost? {
         didSet { allTabs.forEach { $0.host = host } }
@@ -79,6 +83,8 @@ final class TabManager {
         var childIDs: [UUID] = []
         /// Whether the tabs under it were folded away, so they come back folded.
         var isCollapsed = false
+        /// The group of tabs it was in: brought back, it goes back in, the group with it if that went.
+        var groupID: UUID? = nil
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -268,6 +274,12 @@ final class TabManager {
         let place = newTabPlacement(in: space, opener: opener, select: select, site: url ?? site)
         tab.parentID = place.parent
         tabsBySpace[space, default: []].insert(tab, at: place.index)
+        // Opened from a tab in a group, just after the group's last tab: it's in the group too. Among the group's
+        // tabs, or under one of them, it is anyway.
+        let anchor = opener ?? (space == currentSpaceID ? selectedTab : nil)
+        if let group = anchor?.groupID, anchor?.spaceID == space, place.index > 0, tabs(in: space)[place.index - 1].groupID == group {
+            tab.groupID = group
+        }
         unfold(place.parent)
         if opener == nil, !select, Self.otherNewTabPlace == .next, space == currentSpaceID { placedBeside = PlacedBeside(anchor: selectedTab, last: tab) } else { placedBeside = nil }
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
@@ -278,7 +290,7 @@ final class TabManager {
             // Half of the split now, it's a row of its own, not one nested under the page it came from.
             liftToTopLevel(tab)
         }
-        changed.send(.structure)
+        structureChanged()
         if select {
             self.select(tab)
         } else {
@@ -298,6 +310,8 @@ final class TabManager {
         let childIDs: [UUID]
         /// The split or tile group it was in.
         let split: SplitPair?
+        /// The group of tabs it was in.
+        var groupID: UUID? = nil
     }
 
     /// Takes a tab out of the list, its page still open, for Zigzag Mini or another window to show: as for a closed
@@ -308,7 +322,8 @@ final class TabManager {
     func release(_ tab: Tab, toWindow: Bool = false) -> Place? {
         guard tab.bookmarkID == nil, let index = tabs(in: tab.spaceID).firstIndex(where: { $0 === tab }) else { return nil }
         let place = Place(spaceID: tab.spaceID, index: index, parentID: tab.parentID,
-                          childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id), split: split(for: tab))
+                          childIDs: tabs(in: tab.spaceID).filter { $0.parentID == tab.id }.map(\.id), split: split(for: tab),
+                          groupID: tab.groupID)
         let wasSelected = selectedTab === tab
         // Half of a split shown here: the rest of it stays on screen, as when the page closes.
         let partner = leaveGroup(tab, notify: false)
@@ -317,7 +332,7 @@ final class TabManager {
         recentTabIDs.removeAll { $0 == tab.id }
         tabTokens[tab.id] = nil
         if #available(macOS 15.4, *), !toWindow { ExtensionCenter.tabClosed(tab) }
-        changed.send(.structure)
+        structureChanged()
         if wasSelected {
             if let partner { select(partner) } else { selectAfterClosing(tab, index: index) }
         } else if place.split != nil {
@@ -339,9 +354,10 @@ final class TabManager {
                                         children: Set(place.childIDs.map(reopenedID)), in: treeNodes(in: space))
         tabsBySpace[space, default: []].insert(tab, at: at)
         applyTree(nodes, in: space)
+        tab.groupID = space == place.spaceID ? place.groupID.flatMap(regroup) : nil
         if let pair = place.split { rejoin(tab, was: tab.id, in: pair, space: space) }
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
-        changed.send(.structure)
+        structureChanged()
         select(tab)
     }
 
@@ -354,7 +370,7 @@ final class TabManager {
         recentTabIDs.removeAll { $0 == tab.id }
         tabTokens[tab.id] = nil
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
-        changed.send(.structure)
+        structureChanged()
         if wasSelected { selectAfterClosing(tab, index: 0) }
         return tab
     }
@@ -378,7 +394,7 @@ final class TabManager {
         list.insert(tab, at: at)
         tabsBySpace[currentSpaceID] = list
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
-        changed.send(.structure)
+        structureChanged()
         select(tab)
     }
 
@@ -428,7 +444,7 @@ final class TabManager {
         selectedBySpace = selection
         if Library.shared.space(currentSpaceID) != nil { self.currentSpaceID = currentSpaceID }
         if let tab = selectedTab { promote(tab) }
-        changed.send(.structure)
+        structureChanged()
         changed.send(.space)
         changed.send(.selection)
     }
@@ -547,6 +563,7 @@ final class TabManager {
         let id = UUID()
         tab.bookmarkID = id
         tab.isFavorite = true
+        tab.settleLandingIfLoading()
         bookmarkTabs[id] = tab
         Library.shared.addFavorite(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon, at: index, id: id, in: profile.id)
     }
@@ -575,6 +592,7 @@ final class TabManager {
             removeFromList(tab)
             mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon)
             tab.bookmarkID = mark.id
+            tab.settleLandingIfLoading()
             bookmarkTabs[mark.id] = tab
         }
         tab.isFavorite = true
@@ -607,6 +625,7 @@ final class TabManager {
                 removeFromList(page)
                 let mark = Bookmark(url: url, title: Self.bookmarkTitle(page.displayTitle, url: url), icon: page.customIcon)
                 page.bookmarkID = mark.id
+                page.settleLandingIfLoading()
                 bookmarkTabs[mark.id] = page
                 marks.append(mark)
             }
@@ -615,7 +634,7 @@ final class TabManager {
         if let layout = PinnedSplit(marks.map(\.id), as: pair) {
             Library.shared.addFavoriteSplit(marks, as: layout, at: index, in: profile.id)
         }
-        changed.send(.structure)
+        structureChanged()
         return true
     }
 
@@ -662,7 +681,9 @@ final class TabManager {
         let ids = Set(tabs.map(\.id))
         // Every split or group with a page in this list, a pinned page beside a tab and all.
         let groups = splits.filter { !ids.isDisjoint(with: $0.ids) }.map(\.ids)
-        let parents = Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a })
+        let nested = Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a })
+        // A group of tabs (#209) is kept or closed as one, as a nest is.
+        let parents = TabGroups.clearParents(nested, nodes: treeNodes(in: spaceID), groups: groupIDs(in: spaceID))
         let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse }.map(\.id))
         let ages = Dictionary(tabs.map { ($0.id, now.timeIntervalSince($0.lastActivated)) }, uniquingKeysWith: { a, _ in a })
         let (closing, kind) = Self.clearing(tabs.map(\.id), current: current?.id, groups: groups, parents: parents, busy: busy, ages: ages)
@@ -840,7 +861,7 @@ final class TabManager {
         }
         for tab in allTabs { tab.settleProfile() }
         if reselected { changed.send(.selection) }
-        changed.send(.structure)
+        structureChanged()
         if splits.count != splitCount { changed.send(.selection) }
     }
 
@@ -859,7 +880,7 @@ final class TabManager {
                     splits.append(pair)
                     pages.forEach { if $0 !== tab { $0.ensureWebView() } }
                 }
-                changed.send(.structure)
+                structureChanged()
             }
         }
         select(tab)
@@ -881,7 +902,7 @@ final class TabManager {
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         // Opened again after its folder was shut over it: it shows under the folder now, as a page opened there does.
         Library.shared.untuck(bookmark.id)
-        changed.send(.structure)
+        structureChanged()
         return tab
     }
 
@@ -897,6 +918,7 @@ final class TabManager {
                 let mark = Bookmark(url: page.url ?? url, title: Self.bookmarkTitle(page.displayTitle, url: page.url ?? url), icon: page.customIcon)
                 removeFromList(page)
                 page.bookmarkID = mark.id
+                page.settleLandingIfLoading()
                 page.setSpace(space)
                 bookmarkTabs[mark.id] = page
                 return mark
@@ -914,6 +936,7 @@ final class TabManager {
         removeFromList(tab)
         let bookmarkID = UUID()
         tab.bookmarkID = bookmarkID
+        tab.settleLandingIfLoading()
         tab.setSpace(space)
         bookmarkTabs[bookmarkID] = tab
         Library.shared.addBookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon, to: space, at: index, id: bookmarkID)
@@ -927,6 +950,7 @@ final class TabManager {
         let mark = Bookmark(url: url, title: Self.bookmarkTitle(tab.displayTitle, url: url), icon: tab.customIcon)
         removeFromList(tab)
         tab.bookmarkID = mark.id
+        tab.settleLandingIfLoading()
         tab.setSpace(space)
         bookmarkTabs[mark.id] = tab
         Library.shared.pinBeside(mark, bookmarkID, onRight: tabOnRight)
@@ -947,7 +971,7 @@ final class TabManager {
     /// (nil: the space you're in); a pinned page stays in its own.
     /// `parent`: the tab it goes under, where that keeps the groups whole (a drop among nested tabs).
     @discardableResult
-    func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil, in spaceID: UUID? = nil, under parent: UUID? = nil) -> Tab? {
+    func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil, in spaceID: UUID? = nil, under parent: UUID? = nil, group: UUID? = nil) -> Tab? {
         let isFavorite = Library.shared.isFavorite(bookmarkID)
         let space = (isFavorite ? spaceID : nil) ?? Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID
         if let pinned = Library.shared.pinnedSplit(containing: bookmarkID) { return unpin(pinned, returning: bookmarkID, toIndex: index, in: space) }
@@ -965,6 +989,7 @@ final class TabManager {
             let at = min(index ?? 0, tabsBySpace[tab.spaceID]?.count ?? 0)
             tab.parentID = TabTree.parent(at: at, preferring: parent, in: treeNodes(in: tab.spaceID))
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: at)
+            tab.groupID = group
             result = tab
         } else if let bookmark = Library.shared.bookmark(bookmarkID), let index {
             let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)
@@ -975,6 +1000,7 @@ final class TabManager {
             let at = min(index, tabsBySpace[tab.spaceID]?.count ?? 0)
             tab.parentID = TabTree.parent(at: at, preferring: parent, in: treeNodes(in: tab.spaceID))
             tabsBySpace[tab.spaceID, default: []].insert(tab, at: at)
+            tab.groupID = group
             result = tab
         }
         Library.shared.removeBookmark(bookmarkID)
@@ -1036,7 +1062,7 @@ final class TabManager {
         tab.setSpace(currentSpaceID)
         tab.parentID = nil
         tabsBySpace[currentSpaceID, default: []].insert(tab, at: 0)
-        changed.send(.structure)
+        structureChanged()
         select(tab)
     }
 
@@ -1094,7 +1120,7 @@ final class TabManager {
             recentTabIDs.removeAll { $0 == tab.id }
             tabTokens[tab.id] = nil
             tab.close()
-            changed.send(.structure)
+            structureChanged()
             if wasSelected { selectAfterClosing(tab, index: 0) }
             return
         }
@@ -1108,7 +1134,7 @@ final class TabManager {
         recentTabIDs.removeAll { $0 == tab.id }
         tabTokens[tab.id] = nil
         tab.close()
-        changed.send(.structure)
+        structureChanged()
         if wasSelected { selectAfterClosing(tab, index: index) }
     }
 
@@ -1125,7 +1151,7 @@ final class TabManager {
         recentTabIDs.removeAll { $0 == tab.id }
         tabTokens[tab.id] = nil
         tab.close()
-        changed.send(.structure)
+        structureChanged()
     }
 
     private func closedRecord(of tab: Tab, at index: Int, split pair: SplitPair?) -> ClosedTab {
@@ -1152,7 +1178,7 @@ final class TabManager {
         isBatching = true
         body()
         isBatching = false
-        changed.send(.structure)
+        structureChanged()
     }
 
     /// Set while Clear closes the last tabs: the space is left empty rather than opening a pinned page you
@@ -1207,12 +1233,14 @@ final class TabManager {
                                         children: Set(closed.childIDs.map(reopenedID)), in: treeNodes(in: space))
         tabsBySpace[space, default: []].insert(tab, at: at)
         applyTree(nodes, in: space)
+        // Back in its group, which comes back too if it went when the tab closed.
+        tab.groupID = space == closed.spaceID ? closed.groupID.flatMap(regroup) : nil
         // A reopened tab is a new tab: its partner, closed with it and back first, is found by the id it had.
         reopenedAs[closed.id] = tab.id
         if reopenedAs.count > 500 { reopenedAs = [closed.id: tab.id] }
         // Half of a split: back beside its partner, on the same side and at the same size, if that's still free.
         if let pair = closed.split { rejoin(tab, was: closed.id, in: pair, space: space) }
-        changed.send(.structure)
+        structureChanged()
         if select { self.select(tab) } else { recentTabIDs.insert(tab.id, at: min(1, recentTabIDs.count)) }
         return tab
     }
@@ -1272,8 +1300,17 @@ final class TabManager {
     /// Within its list, a tab moves with every tab nested under it. `index` counts the list without the tab alone,
     /// as before nesting; a place among its own nested tabs lands just after them. Into another space it goes on its
     /// own, and the tabs under it stay behind, a level up.
-    func move(_ tab: Tab, to index: Int, in spaceID: UUID? = nil, nesting: Nesting = .fit) {
+    /// What a move does with a tab's group (#209): `fit` keeps it in its group if it lands beside the group's tabs, else
+    /// it's in the group it lands among, if any; `into` puts it in that group (nil: none), as a drop says.
+    enum Grouping: Equatable {
+        case fit
+        case into(UUID?)
+    }
+
+    func move(_ tab: Tab, to index: Int, in spaceID: UUID? = nil, nesting: Nesting = .fit, grouping: Grouping = .fit) {
         guard tab.bookmarkID == nil else { return }
+        // Into another space, a tab leaves its group, unless it's put in one there.
+        let joining: UUID? = if case .into(let group) = grouping { group } else { nil }
         let target = spaceID ?? tab.spaceID
         // A split of two tabs (or a tile group of more) goes to another space as one, still side by side.
         let panes = self.panes(of: tab)
@@ -1287,10 +1324,10 @@ final class TabManager {
             var list = tabsBySpace[target] ?? []
             let at = max(0, min(index, list.count))
             let parent = TabTree.parentForInsertion(at: at, in: treeNodes(in: target))
-            halves.forEach { $0.parentID = parent }
+            halves.forEach { $0.parentID = parent; $0.groupID = joining }
             list.insert(contentsOf: halves, at: at)
             tabsBySpace[target] = list
-            changed.send(.structure)
+            structureChanged()
             return
         }
         if target != tab.spaceID {
@@ -1301,6 +1338,7 @@ final class TabManager {
             var list = tabsBySpace[target] ?? []
             let at = max(0, min(index, list.count))
             tab.parentID = TabTree.parentForInsertion(at: at, in: treeNodes(in: target))
+            tab.groupID = joining
             list.insert(tab, at: at)
             tabsBySpace[target] = list
         } else {
@@ -1312,18 +1350,29 @@ final class TabManager {
             }
             applyTree(TabTree.moving(tab.id, to: at, parent: parent, in: nodes), in: target)
             if case .under = nesting { unfold(tab.parentID) }
+            switch grouping {
+            case .into(let group): tab.groupID = group
+            case .fit:
+                // Still beside its group's tabs, it stays in the group; anywhere else it leaves it.
+                let list = tabs(in: target)
+                if let group = tab.groupID, let start = list.firstIndex(where: { $0 === tab }) {
+                    let end = TabTree.subtreeEnd(at: start, in: treeNodes(in: target))
+                    let beside = (start > 0 && list[start - 1].groupID == group) || (end < list.count && list[end].groupID == group)
+                    if !beside { tab.groupID = nil }
+                }
+            }
         }
         // No other space keeps it selected, whichever one is showing.
         for (space, id) in selectedBySpace where id == tab.id && space != target { selectedBySpace[space] = nil }
-        changed.send(.structure)
+        structureChanged()
     }
 
     /// Into another space: at `index` where it was dropped, else at the top.
-    func moveTabToSpace(_ tab: Tab, spaceID: UUID, at index: Int = 0) {
+    func moveTabToSpace(_ tab: Tab, spaceID: UUID, at index: Int = 0, grouping: Grouping = .fit) {
         // Either half of a split moving together counts: the page you were on leaves with it.
         let wasSelected = panes(of: tab).contains { selectedTab === $0 }
         let oldIndex = tabs(in: tab.spaceID).firstIndex { $0 === tab } ?? 0
-        move(tab, to: index, in: spaceID)
+        move(tab, to: index, in: spaceID, grouping: grouping)
         if wasSelected { selectAfterClosing(Tab(url: nil, spaceID: currentSpaceID), index: oldIndex) }
     }
 
@@ -1448,7 +1497,7 @@ final class TabManager {
         liftToTopLevel(tab)
         splits[index] = grown
         tab.ensureWebView()
-        changed.send(.structure)
+        structureChanged()
         select(tab)
     }
 
@@ -1466,7 +1515,7 @@ final class TabManager {
         }
         splits[index] = rest
         if notify {
-            changed.send(.structure)
+            structureChanged()
             changed.send(.selection)
         }
         // The page that grew over its room: the one whose place now covers part of where it was.
@@ -1485,7 +1534,7 @@ final class TabManager {
         tabs.forEach { liftToTopLevel($0) }
         splits.append(pair)
         tabs.forEach { $0.ensureWebView() }
-        changed.send(.structure)
+        structureChanged()
         select(tabs[tabs.count - 1])
     }
 
@@ -1563,7 +1612,7 @@ final class TabManager {
         splits.append(pair)
         Tutorial.complete("split")
         other.ensureWebView()
-        changed.send(.structure)
+        structureChanged()
         select(other)
     }
 
@@ -1580,7 +1629,7 @@ final class TabManager {
         let before = splits.count
         splits.removeAll { $0.contains(tab.id) }
         if notify, splits.count != before {
-            changed.send(.structure)
+            structureChanged()
             changed.send(.selection)
         }
     }
@@ -1588,7 +1637,7 @@ final class TabManager {
     /// Takes one pane out of its split and shows the other on its own.
     func unsplit(_ tab: Tab, keep other: Tab) {
         unsplit(tab, notify: false)
-        changed.send(.structure)
+        structureChanged()
         select(other)
     }
 
@@ -1608,7 +1657,7 @@ final class TabManager {
         splits[index].right = pair.left
         splits[index].ratio = 1 - pair.ratio
         rememberPinnedLayout(splits[index])
-        changed.send(.structure)
+        structureChanged()
     }
 
     /// Where the lines between a tile group's pages are (shares of the width and height); a split of two takes the
@@ -1626,7 +1675,7 @@ final class TabManager {
         guard Set(old.ids) == Set(new.ids), let index = splits.firstIndex(where: { $0.ids == old.ids && $0.shape.regions == old.shape.regions }) else { return false }
         splits[index] = new
         rememberPinnedLayout(new)
-        changed.send(.structure)
+        structureChanged()
         changed.send(.selection)
         return true
     }
@@ -1644,7 +1693,7 @@ final class TabManager {
         guard pages.count == pair.count else { return }
         pages.forEach { unsplit($0, notify: false) }
         splits.append(pair)
-        changed.send(.structure)
+        structureChanged()
         changed.send(.selection)
     }
 
@@ -1674,6 +1723,12 @@ final class TabManager {
         fileprivate var selected: [UUID: UUID]
         /// Which tab each nested tab is under.
         fileprivate var parents: [UUID: UUID] = [:]
+        /// Which group each tab in one is in, and the groups (#209).
+        fileprivate var groupOf: [UUID: UUID] = [:]
+        fileprivate var groups: [UUID: TabGroup] = [:]
+
+        /// The groups' names, the ones tabs here are in: renaming one is a change, folding it isn't.
+        fileprivate var groupNames: [UUID: String] { Dictionary(Set(groupOf.values).map { ($0, groups[$0]?.name ?? "") }, uniquingKeysWith: { a, _ in a }) }
 
         /// The same tabs in the same places, whatever else opened since; selection and split sizes don't count.
         fileprivate func matches(_ now: Arrangement) -> Bool {
@@ -1682,6 +1737,8 @@ final class TabManager {
                 && pinned == now.pinned.filter { ids.contains($0.value) }
                 && pairs == now.pairs.filter { $0.allSatisfy(ids.contains) }
                 && parents == now.parents.filter { ids.contains($0.key) }
+                && groupOf == now.groupOf.filter { ids.contains($0.key) }
+                && groupNames.allSatisfy { now.groups[$0.key]?.name == $0.value }
                 && now.tabs.keys.filter(ids.contains).count == ids.count
         }
 
@@ -1695,7 +1752,9 @@ final class TabManager {
                            pairs: splits.map(\.ids), splits: splits,
                            tabs: Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }),
                            spaces: Dictionary(tabs.map { ($0.id, $0.spaceID) }, uniquingKeysWith: { a, _ in a }), selected: selectedBySpace,
-                           parents: Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a }))
+                           parents: Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a }),
+                           groupOf: Dictionary(tabs.compactMap { tab in tab.groupID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a }),
+                           groups: groups)
     }
 
     /// Whether the tabs `done` placed are still where it left them.
@@ -1723,13 +1782,18 @@ final class TabManager {
             tab.bookmarkID = target.pinned.first { $0.value == id }?.key
             tab.isFavorite = tab.bookmarkID.map(Library.shared.isFavorite) ?? false
             tab.parentID = tab.bookmarkID == nil ? target.parents[id] : nil
+            tab.groupID = tab.bookmarkID == nil ? target.groupOf[id] : nil
         }
+        // The groups as they were, folded as they are now; the ones of tabs opened since stay.
+        var restored = target.groups
+        for (id, group) in groups { if restored[id] != nil { restored[id]?.isOpen = group.isOpen } else { restored[id] = group } }
+        groups = restored
         for space in Array(tabsBySpace.keys) { repairTree(in: space) }
         splits = target.splits.filter { $0.ids.allSatisfy { alive[$0] != nil } }
             + now.splits.filter { $0.ids.contains { since[$0] != nil } }
         for (space, id) in target.selected where alive[id] != nil { selectedBySpace[space] = id }
         selectedBySpace = selectedBySpace.filter { tab(with: $0.value) != nil }
-        changed.send(.structure)
+        structureChanged()
         changed.send(.selection)
     }
 
@@ -1795,7 +1859,7 @@ final class TabManager {
     func setNestedTabsCollapsed(_ tab: Tab, _ collapsed: Bool) {
         guard tab.isCollapsed != collapsed else { return }
         tab.isCollapsed = collapsed
-        changed.send(.structure)
+        structureChanged()
     }
 
     /// Move Tab Up and Down: past the tab beside it at its level, both with the tabs under them. The index counts the
@@ -1810,6 +1874,182 @@ final class TabManager {
         let rest = nodes.filter { $0.id != tab.id }
         let runCount = TabTree.subtreeEnd(at: start, in: nodes) - start - 1
         return target <= start ? target : min(target + runCount, rest.count)
+    }
+
+    // MARK: Groups of tabs
+
+    /// Tabs were added, removed or moved: each group is put right (one run of its space's list, see `TabGroups`), a
+    /// group left with no tabs goes, and then everything watching hears it.
+    func structureChanged() {
+        settleGroups()
+        changed.send(.structure)
+    }
+
+    private func settleGroups() {
+        for tab in bookmarkTabs.values { tab.groupID = nil }
+        guard !groups.isEmpty || tabsBySpace.values.contains(where: { $0.contains { $0.groupID != nil } }) else { return }
+        var claimed: [UUID: UUID] = [:]
+        let pinnedPages = Set(bookmarkTabs.values.map(\.id))
+        for (space, list) in tabsBySpace {
+            // A group lives in one space: anywhere else its tabs are in none.
+            let known = Set(groups.keys).filter { claimed[$0] == nil || claimed[$0] == space }
+            // The pages riding in another's row: a split's, in its first tab's, or in a pinned page's, in no group.
+            var riders: [UUID: UUID?] = [:]
+            let ids = Set(list.map(\.id))
+            for pair in splits where !ids.isDisjoint(with: pair.ids) {
+                let lead = pair.ids.first(where: ids.contains)
+                let pinned = pair.ids.contains(where: pinnedPages.contains)
+                for id in pair.ids where ids.contains(id) && (pinned || id != lead) { riders[id] = pinned ? .some(nil) : lead }
+            }
+            let settled = TabGroups.settled(treeNodes(in: space), groups: groupIDs(in: space), riders: riders, known: known)
+            for tab in list { tab.groupID = settled[tab.id] }
+            for group in Set(settled.values) { claimed[group] = space }
+        }
+        for (id, group) in groups where claimed[id] == nil {
+            groups[id] = nil
+            emptiedGroups[id] = group
+        }
+    }
+
+    /// Which group each tab of a space is in, those in one.
+    func groupIDs(in spaceID: UUID) -> [UUID: UUID] {
+        Dictionary(tabs(in: spaceID).compactMap { tab in tab.groupID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a })
+    }
+
+    func group(_ id: UUID) -> TabGroup? { groups[id] }
+
+    /// A group's tabs, in list order: the pages riding in its split rows too.
+    func tabs(inGroup id: UUID) -> [Tab] {
+        tabsBySpace.values.lazy.map { $0.filter { $0.groupID == id } }.first { !$0.isEmpty } ?? []
+    }
+
+    /// The groups in a space, top to bottom.
+    func groups(in spaceID: UUID) -> [TabGroup] {
+        var seen: Set<UUID> = []
+        return tabs(in: spaceID).compactMap { tab in tab.groupID.flatMap { seen.insert($0).inserted ? groups[$0] : nil } }
+    }
+
+    /// A group a tab coming back was in: the group, back if it went when its last tab closed; nil if it's gone
+    /// for good (ungrouped).
+    private func regroup(_ id: UUID) -> UUID? {
+        if groups[id] == nil, let group = emptiedGroups.removeValue(forKey: id) { groups[id] = group }
+        return groups[id] != nil ? id : nil
+    }
+
+    /// The groups of a session coming back, before its tabs are adopted.
+    func restoreGroups(_ restored: [TabGroup]) {
+        for group in restored { groups[group.id] = group }
+    }
+
+    /// A new group of these tabs (rows of the list: a split's row brings its other pages, a tab the ones nested under
+    /// it), named `name`, where the first of them is. Tabs from another group leave it. Returns the group's id.
+    @discardableResult
+    func makeGroup(with picked: [Tab], name: String) -> UUID? {
+        guard let space = picked.first(where: { $0.bookmarkID == nil })?.spaceID else { return nil }
+        let nodes = treeNodes(in: space)
+        let index = Dictionary(nodes.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var chosen = picked.filter { $0.bookmarkID == nil && $0.spaceID == space && index[$0.id] != nil }
+        chosen.sort { index[$0.id]! < index[$1.id]! }
+        guard let first = chosen.first else { return nil }
+        // Each with what's nested under it, once.
+        var blockIDs: [UUID] = []
+        var taken: Set<UUID> = []
+        for tab in chosen where !taken.contains(tab.id) {
+            let run = [tab.id] + TabTree.descendants(of: tab.id, in: nodes)
+            for id in run where taken.insert(id).inserted { blockIDs.append(id) }
+        }
+        var block = nodes.filter { taken.contains($0.id) }
+        for i in block.indices where !taken.contains(block[i].parent ?? UUID()) { block[i].parent = nil }
+        let rest = nodes.filter { !taken.contains($0.id) }
+        // Where the first one is: in its place at the top level, or nested, just after the tab it was nested in.
+        var root = first.id
+        let parents = Dictionary(nodes.map { ($0.id, $0.parent) }, uniquingKeysWith: { a, _ in a })
+        while let up = parents[root] ?? nil { root = up }
+        var at: Int
+        if root == first.id {
+            at = rest.filter { index[$0.id]! < index[first.id]! }.count
+        } else {
+            at = rest.firstIndex { $0.id == root }.map { TabTree.subtreeEnd(at: $0, in: rest) } ?? 0
+        }
+        // Never inside another group: after its tabs.
+        let current = groupIDs(in: space)
+        while at > 0, at < rest.count, let other = current[rest[at].id], current[rest[at - 1].id] == other { at += 1 }
+        let group = TabGroup(name: name)
+        groups[group.id] = group
+        applyTree(Array(rest[..<at]) + block + Array(rest[at...]), in: space)
+        for tab in tabs(in: space) where taken.contains(tab.id) { tab.groupID = group.id }
+        // A split's other pages come along into the group (see `settleGroups`).
+        structureChanged()
+        return group.id
+    }
+
+    /// The group goes; its tabs stay where they are, in no group.
+    func ungroup(_ id: UUID) {
+        guard groups[id] != nil else { return }
+        for tab in tabs(inGroup: id) { tab.groupID = nil }
+        groups[id] = nil
+        emptiedGroups[id] = nil
+        structureChanged()
+    }
+
+    func renameGroup(_ id: UUID, to name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, groups[id] != nil, groups[id]?.name != name else { return }
+        groups[id]?.name = name
+        structureChanged()
+    }
+
+    /// Folds a group's tabs away in the sidebar, or shows them again.
+    func setGroupOpen(_ id: UUID, _ open: Bool) {
+        guard groups[id] != nil, groups[id]?.isOpen != open else { return }
+        groups[id]?.isOpen = open
+        structureChanged()
+    }
+
+    /// A tab (with the tabs nested under it) into a group, after its last tab; nil takes it out of its group, just
+    /// after the group's tabs.
+    func setGroup(of tab: Tab, to id: UUID?) {
+        guard tab.bookmarkID == nil, tab.groupID != id else { return }
+        let space = tab.spaceID
+        let anchor = id ?? tab.groupID
+        let nodes = treeNodes(in: space)
+        guard let anchor, let start = nodes.firstIndex(where: { $0.id == tab.id }) else { return }
+        // Its own run left out, the place just after the group's last tab.
+        let run = Set([tab.id] + TabTree.descendants(of: tab.id, in: nodes))
+        let rest = nodes.filter { !run.contains($0.id) }
+        let current = groupIDs(in: space)
+        let at = (rest.lastIndex { current[$0.id] == anchor }).map { $0 + 1 } ?? min(start, rest.count)
+        applyTree(TabTree.moving(tab.id, to: at, parent: nil, in: nodes), in: space)
+        tab.groupID = id
+        structureChanged()
+    }
+
+    /// A whole group moved to `index` in the list without its tabs, in its own space or another, its tabs in their
+    /// order and still nested as they were. Never in the middle of another group or of a tab's nested tabs: just
+    /// after them.
+    func moveGroup(_ id: UUID, to index: Int, in spaceID: UUID? = nil) {
+        let members = tabs(inGroup: id)
+        guard let from = members.first?.spaceID else { return }
+        let target = spaceID ?? from
+        if target == from {
+            applyTree(TabGroups.moving(members.map(\.id), to: index, in: treeNodes(in: from), groups: groupIDs(in: from)), in: from)
+            structureChanged()
+            return
+        }
+        let wasSelected = members.contains { selectedTab === $0 }
+        let oldIndex = tabs(in: from).firstIndex { $0 === members[0] } ?? 0
+        let ids = Set(members.map(\.id))
+        // A split with a page outside the group can't span two spaces: it ends.
+        splits.removeAll { pair in pair.ids.contains(where: ids.contains) && !pair.ids.allSatisfy(ids.contains) }
+        tabsBySpace[from]?.removeAll { ids.contains($0.id) }
+        for tab in members {
+            tab.setSpace(target)
+            for (space, selected) in selectedBySpace where selected == tab.id && space != target { selectedBySpace[space] = nil }
+        }
+        tabsBySpace[target, default: []].append(contentsOf: members)
+        applyTree(TabGroups.moving(members.map(\.id), to: index, in: treeNodes(in: target), groups: groupIDs(in: target)), in: target)
+        structureChanged()
+        if wasSelected { selectAfterClosing(Tab(url: nil, spaceID: currentSpaceID), index: oldIndex) }
     }
 
     // MARK: Suspension
@@ -1884,7 +2124,7 @@ final class TabManager {
             if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
             tab.close()
         }
-        changed.send(.structure)
+        structureChanged()
     }
 }
 
@@ -1893,7 +2133,8 @@ extension TabManager.ClosedTab {
     init(_ tab: Tab, at index: Int, split pair: TabManager.SplitPair? = nil, childIDs: [UUID] = []) {
         self.init(id: tab.id, url: tab.url, title: tab.displayTitle, spaceID: tab.spaceID, index: index,
                   interactionState: tab.interactionStateForSaving, customTitle: tab.customTitle, customIcon: tab.customIcon, split: pair,
-                  lastActivated: tab.lastActivated, parentID: tab.parentID, childIDs: childIDs, isCollapsed: tab.isCollapsed)
+                  lastActivated: tab.lastActivated, parentID: tab.parentID, childIDs: childIDs, isCollapsed: tab.isCollapsed,
+                  groupID: tab.groupID)
     }
 
     /// What it had beyond its page, back on the tab that reopens it.

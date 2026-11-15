@@ -102,6 +102,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Developer tools turned on or off, or a site put on its list or taken off: open tabs are told at once.
         developerToken = DeveloperTools.changed.observe {
+            // Before the tabs: a page that comes onto the list waits for the rule that keeps its images off there.
+            PageImages.sitesChanged()
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshDevelopment(settingsChanged: true) }
             // Its menu items come and go with it, and whatever lists the menu bar's shortcuts hears of it.
             // The listed sizes in View › Developer › Page Size follow the list.
@@ -155,6 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // that couldn't be read come before either: what's new waits a launch.
         if Library.shared.profilesWereSetAside { tellProfilesSetAside() } else if !WhatsNew.offerIfUpdated() { offerDefaultBrowserOnce() }
         DockProgress.shared.start()
+        AutoPictureInPicture.shared.start()
         Tokens.Contrast.start()
         DebugBridge.start()
         // Only if you turned it on in Settings: otherwise nothing listens.

@@ -858,6 +858,23 @@
         }
       }
     },
+    "%@, group, %lld tabs" : {
+      "comment" : "Accessibility label of a group of tabs in the sidebar: its name, then how many tabs it holds.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, group, %2$lld tabs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，分组，%2$lld 个标签页"
+          }
+        }
+      }
+    },
     "%@, in %@" : {
       "comment" : "Under a space's name in Settings › Spaces, with more than one profile: what the space holds, then the profile it's on, like “3 open tabs, in Work”.",
       "localizations" : {
@@ -2158,6 +2175,17 @@
         }
       }
     },
+    "A video you’re watching floats over other apps and desktops when you switch away, and goes back in its page when you come back to it." : {
+      "comment" : "Explanation under “Picture in picture when you leave Zigzag” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切到其他 App 或桌面时，你正在看的视频会浮在最上面；回到它的页面时，再回到页面里。"
+          }
+        }
+      }
+    },
     "A video you’re watching follows you in a small player over the page. Its right-click menu can turn this off too." : {
       "comment" : "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs.",
       "localizations" : {
@@ -2495,6 +2523,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加到文件夹"
+          }
+        }
+      }
+    },
+    "Add to Group" : {
+      "comment" : "Item in a tab's context menu in the sidebar. Opens a list of the space's groups of tabs.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到分组"
           }
         }
       }
@@ -4972,6 +5011,17 @@
         }
       }
     },
+    "Close Group" : {
+      "comment" : "Item in a group of tabs' context menu in the sidebar: closes all its tabs, with Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭分组"
+          }
+        }
+      }
+    },
     "Close Other Tabs" : {
       "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.",
       "localizations" : {
@@ -5240,6 +5290,17 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Collapse Group" : {
+      "comment" : "Item in a group of tabs' context menu in the sidebar: folds its tabs away.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起分组"
           }
         }
       }
@@ -6372,6 +6433,17 @@
         }
       }
     },
+    "Disable Images" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while so: the page loads none of its images.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用图像"
+          }
+        }
+      }
+    },
     "Disable JavaScript" : {
       "comment" : "View › Developer menu item and command, on a development site, checked while so: the page's scripts don't run.",
       "localizations" : {
@@ -6379,6 +6451,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停用 JavaScript"
+          }
+        }
+      }
+    },
+    "Disable Styles" : {
+      "comment" : "View › Developer menu item and command, on a development site, checked while so: the page is drawn without its styles, as bare HTML.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用样式"
           }
         }
       }
@@ -7012,6 +7095,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你下载的一切都会交给 %@"
+          }
+        }
+      }
+    },
+    "Expand Group" : {
+      "comment" : "Item in a group of tabs' context menu in the sidebar: shows its tabs again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开分组"
           }
         }
       }
@@ -8034,6 +8128,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "绿色"
+          }
+        }
+      }
+    },
+    "Group %lld Tabs" : {
+      "comment" : "Menu item for several picked tabs: puts them in a new group of tabs, a folder among the tabs.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "New Group with Tab"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Group %lld Tabs"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "将 %lld 个标签页编组"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Group name" : {
+      "comment" : "Placeholder of the field that renames a group of tabs, in its sidebar row.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分组名称"
           }
         }
       }
@@ -9719,6 +9859,17 @@
         }
       }
     },
+    "Move Group" : {
+      "comment" : "Undo action name, shown in the Edit menu as Undo Move Group.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动分组"
+          }
+        }
+      }
+    },
     "Move Left" : {
       "comment" : "Item in the menu of an extension pinned to the address bar, and VoiceOver action on its button there: moves it one place to the left.\nVoiceOver action on a space's button at the bottom of the sidebar: moves the space one place to the left.",
       "localizations" : {
@@ -10271,6 +10422,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在里面新建文件夹"
+          }
+        }
+      }
+    },
+    "New Group" : {
+      "comment" : "Name a new group of tabs gets, until it's renamed.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建分组"
+          }
+        }
+      }
+    },
+    "New Group with Tab" : {
+      "comment" : "Item in a tab's context menu in the sidebar: puts the tab in a new group of tabs, a folder among the tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用标签页新建分组"
           }
         }
       }
@@ -12564,6 +12737,17 @@
         }
       }
     },
+    "Picture in picture when you leave Zigzag" : {
+      "comment" : "A setting in Settings › Tabs: a playing video floats over other apps when you switch to another app or desktop.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离开 Zigzag 时自动画中画"
+          }
+        }
+      }
+    },
     "Pin %lld Tabs" : {
       "comment" : "Menu item for several picked tabs",
       "localizations" : {
@@ -13798,6 +13982,17 @@
         }
       }
     },
+    "Remove from Group" : {
+      "comment" : "Item in a tab's context menu in the sidebar: takes the tab out of its group of tabs.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从分组中移除"
+          }
+        }
+      }
+    },
     "Remove from History" : {
       "comment" : "Tooltip of the × on a page on the History page.",
       "localizations" : {
@@ -13948,6 +14143,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新命名文件夹"
+          }
+        }
+      }
+    },
+    "Rename Group" : {
+      "comment" : "Undo action name, shown in the Edit menu as Undo Rename Group.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新命名分组"
           }
         }
       }
@@ -18684,6 +18890,17 @@
         }
       }
     },
+    "Ungroup" : {
+      "comment" : "Item in a group of tabs' context menu in the sidebar. The group goes; its tabs stay where they are.\nUndo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消分组"
+          }
+        }
+      }
+    },
     "Unload %lld Pages" : {
       "comment" : "Menu item for several picked pinned pages",
       "localizations" : {
@@ -21861,6 +22078,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电话"
+          }
+        }
+      }
+    },
+    "picture in picture pip floating video other app desktop space full screen leave switch away automatic" : {
+      "comment" : "Words that find the Picture in picture when you leave Zigzag setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画中画 悬浮 视频 其他 App 桌面 全屏 离开 切换 自动 picture in picture pip floating video other app desktop space full screen leave switch away automatic"
           }
         }
       }

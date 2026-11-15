@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -138,8 +138,9 @@ struct BookmarkTitleTests {
         #expect(FavoriteTile.look(selected: false, loaded: [false, false]) == .closed)
     }
 
-    @Test func aClosedTileIsFadedUntilThePointerComes() {
-        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == Tokens.Opacity.fadedFloor)
+    @Test func aTileIconIsNeverFaded() {
+        // Never faded: a closed favorite has no edge instead.
+        #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == 1)
         #expect(FavoriteTile.iconAlpha(.closed, hovered: true) == 1)
         #expect(FavoriteTile.iconAlpha(.open, hovered: false) == 1)
         #expect(FavoriteTile.iconAlpha(.selected, hovered: false) == 1)
@@ -199,5 +200,51 @@ struct BookmarkTitleTests {
         #expect(tile.awayParts == [false, true])
         #expect(tile.accessibilityLabel()?.contains("Notes — Video") == true)
         _ = (notes, video)
+    }
+
+    @Test func anAwayPageWithoutAnIconYetShowsTheFavoritesOwn() {
+        let current = NSImage(size: NSSize(width: 16, height: 16))
+        #expect(FavoriteTile.awayIcon(away: true, current: current) === current)
+        // Its page's icon isn't known yet: the favorite as it was saved, never a stand-in for that page's.
+        #expect(FavoriteTile.awayIcon(away: true, current: nil) == nil)
+        #expect(FavoriteTile.awayIcon(away: false, current: current) == nil)
+        let favorite = Bookmark(url: saved, title: "Mail", icon: "star")
+        let tile = FavoriteTile(bookmark: favorite)
+        let away = Tab(url: URL(string: "https://no-icon-yet.example.com/watch")!, title: "Video", spaceID: UUID())
+        tile.track(away)
+        #expect(tile.awayParts == [true])
+        // Its own icon, and no badge of it on the corner.
+        #expect(tile.pageIcons[0].image.map(IconChoice.isPageIcon) == true)
+        #expect(tile.pageIcons[0].originalIcon == nil)
+        _ = away
+    }
+
+    /// Made a favorite while its page is still on its way: where that load lands is its page too.
+    @Test func aFavoriteMadeWhileItsPageLoadsIsNotAwayWhereItLands() async throws {
+        let saved = URL(string: "https://en.wikipedia.org/")!
+        // The page sends itself on as it loads, as a site's redirect does.
+        let html = "<script>history.replaceState(null, '', '/wiki/Main_Page')</script>Main Page"
+        func open(settling: Bool) async throws -> Tab {
+            let tab = Tab(url: nil, spaceID: UUID())
+            let webView = tab.ensureWebView()
+            webView.loadHTMLString(html, baseURL: saved)
+            for _ in 0..<100 where !tab.isLoading { try await Task.sleep(for: .milliseconds(10)) }
+            #expect(tab.isLoading)
+            if settling { tab.settleLandingIfLoading() }
+            for _ in 0..<200 where tab.isLoading || tab.url?.path != "/wiki/Main_Page" { try await Task.sleep(for: .milliseconds(20)) }
+            #expect(tab.url?.path == "/wiki/Main_Page")
+            return tab
+        }
+        let favorite = try await open(settling: true)
+        #expect(favorite.pinnedLanding?.path == "/wiki/Main_Page")
+        #expect(!FavoriteTile.isAway(current: favorite.url, saved: saved, landing: favorite.pinnedLanding))
+        // The load over, a while longer for a page that sends itself on, then anywhere else is moving on.
+        #expect(favorite.landingUntil.map { $0 < Date().addingTimeInterval(9) } == true)
+        // One not settled (a plain tab) has no landing: the same page reads as away.
+        let plain = try await open(settling: false)
+        #expect(plain.pinnedLanding == nil)
+        #expect(FavoriteTile.isAway(current: plain.url, saved: saved, landing: plain.pinnedLanding))
+        favorite.close()
+        plain.close()
     }
 }

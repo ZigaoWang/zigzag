@@ -239,6 +239,134 @@ final class BridgeRuntime: BridgeNamespace {
     }
 }
 
+// MARK: - Context menu items kept
+
+/// An extension's right-click menu items, kept across relaunches as Chrome keeps them. WebKit forgets them when
+/// Zigzag quits, and an extension whose background only wakes for events adds them once, on install (Downie: its
+/// items were gone from every menu after a relaunch, #239). webkit-differences.js tells this what the extension
+/// creates, changes and removes, and asks once each time the extension starts what to put back.
+@available(macOS 15.4, *)
+@MainActor
+final class BridgeContextMenus: BridgeNamespace {
+    static let name = "contextMenusKept"
+    static let permission = ""
+    /// The extensions it answers: one profile's.
+    unowned let host: ExtensionHost
+    /// Asked to put its items back since it last started: once per start, so items it removed stay removed.
+    private var restored: Set<String> = []
+    init(host: ExtensionHost) { self.host = host }
+
+    func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
+        guard let context = host.context(for: extensionID) else { return nil }
+        let version = context.webExtension.version ?? ""
+        var kept = load(extensionID)
+        switch fn {
+        case "change":
+            guard let op = args.first as? String else { throw BridgeError.unsupported(Self.name, fn) }
+            // What was kept for another version is the old one's: the update's own install listener adds its items.
+            if kept.version != version { kept = Kept(version: version, items: []) }
+            kept.items = Self.apply(op, args: Array(args.dropFirst()), to: kept.items)
+            save(kept, for: extensionID)
+            return nil
+        case "restore":
+            guard restored.insert(extensionID).inserted else { return ["items": [], "browserUpdated": false] }
+            let isNewInstall = host.profile.installs.newlyInstalled.contains(extensionID)
+            let persistent = context.webExtension.hasPersistentBackgroundContent
+            let items = Self.toRestore(kept, version: version, isNewInstall: isNewInstall, persistentBackground: persistent)
+            let neverKept = !FileManager.default.fileExists(atPath: file(for: extensionID).path)
+            if items.isEmpty, kept.version != version { save(Kept(version: version, items: []), for: extensionID) }
+            return ["items": items, "browserUpdated": Self.addsItemsAgain(neverKept: neverKept, isNewInstall: isNewInstall, persistentBackground: persistent)]
+        default:
+            throw BridgeError.unsupported(Self.name, fn)
+        }
+    }
+
+    func release(_ extensionID: String) { restored.remove(extensionID) }
+
+    /// More than any extension's menu has; past it, new items aren't kept (they still show this session).
+    static let maxItems = 500
+
+    struct Kept {
+        var version: String
+        var items: [[String: Any]]
+    }
+
+    /// The items with one change made, as chrome.contextMenus makes it. An item without an ID of its own can't be
+    /// told apart from a new one, so it isn't kept (Chrome asks for one from extensions whose background sleeps).
+    static func apply(_ op: String, args: [Any], to items: [[String: Any]]) -> [[String: Any]] {
+        func id(_ value: Any?) -> String? {
+            if let text = value as? String { return text }
+            if let number = value as? NSNumber { return number.stringValue }
+            return nil
+        }
+        switch op {
+        case "create":
+            guard let properties = args.first as? [String: Any], let new = id(properties["id"]) else { return items }
+            // Made again with the same ID: the newer one stands, where the first was.
+            if let index = items.firstIndex(where: { id($0["id"]) == new }) {
+                var items = items
+                items[index] = properties
+                return items
+            }
+            return items.count < maxItems ? items + [properties] : items
+        case "update":
+            guard let target = id(args.first), let changes = args.dropFirst().first as? [String: Any] else { return items }
+            return items.map { item in
+                guard id(item["id"]) == target else { return item }
+                return item.merging(changes.filter { $0.key != "id" }) { _, new in new }
+            }
+        case "remove":
+            guard let target = id(args.first) else { return items }
+            // Its items go with it, and theirs.
+            var gone: Set<String> = [target]
+            var remaining = items
+            while let index = remaining.firstIndex(where: { id($0["id"]).map(gone.contains) == true || id($0["parentId"]).map(gone.contains) == true }) {
+                if let removed = id(remaining[index]["id"]) { gone.insert(removed) }
+                remaining.remove(at: index)
+            }
+            return remaining
+        case "removeAll":
+            return []
+        default:
+            return items
+        }
+    }
+
+    /// What to put back as the extension starts: what it had, unless it's new (it adds its own on install), was
+    /// updated since (its install listener adds the new version's), or runs a background that never sleeps, which
+    /// adds them itself each time it starts, as Chrome expects of it.
+    static func toRestore(_ kept: Kept, version: String, isNewInstall: Bool, persistentBackground: Bool) -> [[String: Any]] {
+        guard !isNewInstall, !persistentBackground, kept.version == version else { return [] }
+        return kept.items
+    }
+
+    /// Whether the extension is told Zigzag was updated (onInstalled, "chrome_update", as Chrome tells it after an
+    /// update of its own), so it adds its items again: once, the first time it starts with nothing kept for it. Items
+    /// it added before Zigzag kept them were never seen here, and it adds them only when told it was installed.
+    static func addsItemsAgain(neverKept: Bool, isNewInstall: Bool, persistentBackground: Bool) -> Bool {
+        neverKept && !isNewInstall && !persistentBackground
+    }
+
+    // MARK: Saved
+
+    private func file(for extensionID: String) -> URL {
+        host.profile.installs.folder(for: extensionID).appendingPathComponent("ContextMenus.json")
+    }
+
+    private func load(_ extensionID: String) -> Kept {
+        guard let data = try? Data(contentsOf: file(for: extensionID)),
+              let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return Kept(version: "", items: []) }
+        return Kept(version: saved["version"] as? String ?? "", items: saved["items"] as? [[String: Any]] ?? [])
+    }
+
+    private func save(_ kept: Kept, for extensionID: String) {
+        let saved: [String: Any] = ["version": kept.version, "items": kept.items]
+        guard JSONSerialization.isValidJSONObject(saved), let data = try? JSONSerialization.data(withJSONObject: saved) else { return }
+        try? FileManager.default.createDirectory(at: host.profile.installs.folder(for: extensionID), withIntermediateDirectories: true)
+        try? data.write(to: file(for: extensionID), options: .atomic)
+    }
+}
+
 // MARK: - Tab favicons
 
 /// `favIconUrl` on the tabs `tabs.query` and `tabs.get` answer, which WebKit leaves out: Sound Booster's popup shows
