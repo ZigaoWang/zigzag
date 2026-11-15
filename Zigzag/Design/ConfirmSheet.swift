@@ -44,6 +44,9 @@ final class ConfirmSheet: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+    /// Answered and fading away: clicks go through to what's under it at once.
+    private var isLeaving = false
+    override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
     override var isFlipped: Bool { true }
 
     static func show(in host: NSView, title: String, message: String, confirmTitle: String, destructive: Bool = false, completion: @escaping (Bool) -> Void) {
@@ -65,7 +68,7 @@ final class ConfirmSheet: NSView {
         sheet.alphaValue = 0
         // A question that interrupts you always eases in and out, even when a key brought it: unlike a menu you call
         // up many times a day, it should never just snap onto the window.
-        Tokens.Motion.animate(Tokens.Motion.entering, evenFromKeyboard: true, { sheet.animator().alphaValue = 1 })
+        Tokens.Motion.fadeBackdrop(sheet, entering: true)
         sheet.layoutSubtreeIfNeeded()
         sheet.panel.growsFrom = Tokens.Motion.sheetOrigin
         sheet.panel.present(arrival: .pop)
@@ -178,7 +181,8 @@ final class ConfirmSheet: NSView {
         let completion = self.completion
         self.completion = { _ in }
         panel.dismiss()
-        Tokens.Motion.animate(Tokens.Motion.leaving, evenFromKeyboard: true, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
+        isLeaving = true
+        Tokens.Motion.fadeBackdrop(self, entering: false) { self.removeFromSuperview() }
         completion(choice)
     }
 

@@ -850,6 +850,22 @@ enum Tokens {
             CATransaction.commit()
         }
 
+        /// A backdrop (a sheet's scrim, the dimming under a peek) fading in with what it's behind, in `enter`, and out
+        /// with it, in `exit`, eased out, from whatever it shows now; with Reduce Motion in `crossfade`, as what's on it
+        /// does. `evenFromKeyboard` false: from a key it's simply there, or gone, with what came at once (the command bar).
+        static func fadeBackdrop(_ view: NSView, entering: Bool, evenFromKeyboard: Bool = true, completion: (@MainActor () -> Void)? = nil) {
+            if let layer = view.layer, layer.animation(forKey: "opacity") != nil, let shown = layer.presentation()?.opacity {
+                withoutAnimation { view.alphaValue = CGFloat(shown) }
+            }
+            let instant = isFromKey && !evenFromKeyboard
+            let time = instant ? 0 : presenceDuration(.inPlace, entering: entering, reduceMotion: reduceMotion) * debugSlowdown
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = time
+                context.timingFunction = easeOut
+                view.animator().alphaValue = entering ? 1 : 0
+            }, completionHandler: Self.completion(completion))
+        }
+
         /// Takes away what `present(_:from:entering:)` left on `view`, so it shows plainly where it is.
         static func settle(_ view: NSView) {
             view.layer?.removeAnimation(forKey: "presence.opacity")

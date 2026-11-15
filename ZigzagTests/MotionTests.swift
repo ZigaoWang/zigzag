@@ -191,4 +191,21 @@ struct MotionTests {
         panel.present()
         #expect(panel.hitTest(inside) != nil)
     }
+
+    @MainActor @Test func aScrimGoingLetsClicksThroughAndTurnsAround() {
+        let host = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        host.wantsLayer = true
+        let scrim = ScrimView()
+        scrim.frame = host.bounds
+        host.addSubview(scrim)
+        let inside = NSPoint(x: 100, y: 100)
+        scrim.show(evenFromKeyboard: true)
+        #expect(scrim.hitTest(inside) != nil)
+        scrim.hide(evenFromKeyboard: true)
+        #expect(scrim.hitTest(inside) == nil)
+        // Shown again at once, mid-fade: there, fully, taking clicks.
+        scrim.show(animated: false)
+        #expect(scrim.alphaValue == 1)
+        #expect(scrim.hitTest(inside) != nil)
+    }
 }

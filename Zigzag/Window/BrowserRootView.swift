@@ -411,7 +411,7 @@ final class BrowserRootView: SpaceFrameView {
             zoomScrim.color = Tokens.Color.peekScrim
             zoomScrim.frame = cardFrame
             orderForZoom(cards[index])
-            if animated { zoomScrim.show() } else { zoomScrim.alphaValue = 1 }
+            zoomScrim.show(evenFromKeyboard: true, animated: animated)
         } else if zoomScrim.superview != nil {
             if animated { zoomScrim.hide(evenFromKeyboard: true) } else { zoomScrim.removeFromSuperview() }
         }

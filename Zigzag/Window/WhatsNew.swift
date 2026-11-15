@@ -374,6 +374,9 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+    /// Answered and fading away: clicks go through to what's under it at once.
+    private var isLeaving = false
+    override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
     override var isFlipped: Bool { true }
 
     /// A point's words, wrapping, with links you can click: read-only, drawn on the panel.
@@ -427,7 +430,7 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         sheet.layer?.backgroundColor = sheet.cgColor(Tokens.Color.scrim)
         sheet.alphaValue = 0
         // It eases in and out even from a key, as a confirmation does (`ConfirmSheet`).
-        Tokens.Motion.animate(Tokens.Motion.entering, evenFromKeyboard: true, { sheet.animator().alphaValue = 1 })
+        Tokens.Motion.fadeBackdrop(sheet, entering: true)
         sheet.layoutSubtreeIfNeeded()
         sheet.panel.growsFrom = Tokens.Motion.sheetOrigin
         sheet.panel.present(arrival: .pop)
@@ -524,7 +527,8 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
         panel.dismiss()
-        Tokens.Motion.animate(Tokens.Motion.leaving, evenFromKeyboard: true, { self.animator().alphaValue = 0 }, completion: { self.removeFromSuperview() })
+        isLeaving = true
+        Tokens.Motion.fadeBackdrop(self, entering: false) { self.removeFromSuperview() }
     }
 
     /// Gone, closed or with its window: what was waiting goes ahead.
