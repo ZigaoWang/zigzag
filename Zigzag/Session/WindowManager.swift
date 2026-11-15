@@ -346,11 +346,24 @@ final class WindowManager {
                    symbol: "macwindow",
                    action: (String(localized: "Use Zigzag Mini", comment: "Button in the toast offering to open links from other apps in Zigzag Mini: turns that on and moves this page into a Zigzag Mini window. Zigzag Mini is a name, kept in Latin letters."),
                             { [weak controller, weak tab] in
-                                MiniWindowController.opensExternalLinks = true
-                                guard let controller, let tab, controller.canOpenInMini(tab) else { return }
+                                guard let controller, let tab, controller.canOpenInMini(tab) else {
+                                    MiniWindowController.opensExternalLinks = true
+                                    return
+                                }
+                                // One ⌘Z takes the whole choice back: the page to its tab, and links to tabs again.
+                                let undo = controller.sidebarUndo
+                                undo.beginUndoGrouping()
+                                Self.setOpensLinksInMini(true, in: controller)
                                 controller.openInMini(tab)
+                                undo.endUndoGrouping()
                             }),
                    duration: 10, closes: true, in: controller)
+    }
+
+    /// Turns links from other apps in Zigzag Mini on or off, as a step ⌘Z in `controller` takes back.
+    private static func setOpensLinksInMini(_ on: Bool, in controller: BrowserWindowController) {
+        MiniWindowController.opensExternalLinks = on
+        controller.sidebarUndo.registerUndo(withTarget: controller) { setOpensLinksInMini(!on, in: $0) }
     }
 
     /// A page from another app goes to Zigzag Mini rather than a tab here.
