@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Protect IP address from WebRTC asks a site about calls only once: Don't Allow is kept as the site's Block, and a question you put away isn't asked again in any tab until Zigzag reopens. The switch stays in Site Controls.
+- Swiping back or forward on a page shows a plain gray backdrop beside it, in light or dark, with a soft shadow along the page's edge, instead of a strip of the page's own colors that could show odd bands. The round arrow stays inside the page's card, never hanging over the sidebar, the next pane or the window's edge.
 
 ## [0.9.1] - 2026-11-15
 
