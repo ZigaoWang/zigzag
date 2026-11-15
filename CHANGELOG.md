@@ -8,7 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - A long download name or command bar title no longer cuts shorter when you point at its row or move onto it, and a cut download name shows whole in a tooltip. Not secure in Site Controls and a failed extension install read clearly on light backgrounds, and a profile without extensions no longer says 0 extensions.
 - A window Zigzag reopens shows its tab, address and split view from its first frame, instead of a blank address for a moment, and the spaces in Switch Space… (⌥⌘S) have their names in the middle of their rows.
-- Check for Updates… no longer says Checking for updates… for good: it answers, or the toast goes within a minute and a half, and an update that's ready is only let go for a newer one Zigzag will really get. Find on page uses far less power on pages that keep changing, like YouTube, X or a live chat, and rests while you're in another window.
+- Check for Updates… no longer says Checking for updates… for good: it answers, or the toast goes within a minute and a half, and an update that's ready is only let go for a newer one Zigzag will really get. Find on page uses less power on pages that keep changing, like YouTube, X or a live chat, and rests while you're in another window.
 - Titles extensions give their right-click menu items as you select text are no longer saved to disk, nothing from a private window is, and saving the items no longer slows Zigzag down. A page opened from a file loose in your home folder can read only that file, not the files around it.
 
 ## [0.9.1] - 2026-11-15
