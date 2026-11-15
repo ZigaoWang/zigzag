@@ -70,6 +70,12 @@
   // The icons of open tabs, by address, for the favIconUrl WebKit's tabs leave out (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagFavicons', { value: (urls) => send('favicons', 'forPages', [urls]), configurable: true });
 
+  // The extension's right-click menu items, kept across relaunches as Chrome keeps them (webkit-differences.js).
+  Object.defineProperty(globalThis, '__zigzagContextMenus', {
+    value: { change: (op, args) => send('contextMenusKept', 'change', [op, ...args]), restore: () => send('contextMenusKept', 'restore', []) },
+    configurable: true,
+  });
+
   // WebKit omits SameSite cookies from credentialed extension fetches even with site access. For buffered
   // reads, Zigzag can fetch in a blank page at the target origin. Writes use a temporary native session with
   // the sender's Chrome extension Origin and this profile's cookies, syncing response cookie changes back.

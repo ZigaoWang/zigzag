@@ -588,6 +588,11 @@
     // Tampermonkey takes "install" to mean the scripts it already has were planted, and turns every one off. Zigzag
     // knows what it installed (BridgeRuntime): only a real install is passed on as one, a moment later.
     const installed = api.runtime.onInstalled;
+    // The extension's own listeners, for telling it Zigzag was updated (contextMenus, below). WebKit can answer
+    // Zigzag before the extension's script has run, so one added a moment after is told as it's added.
+    const installListeners = new Set();
+    let updatedUntil = 0;
+    const tellUpdated = (listener) => setTimeout(() => { try { listener({ reason: 'chrome_update' }); } catch (e) { console.error(e); } }, 0);
     if (installed && typeof installed.addListener === 'function' && typeof api.runtime.sendNativeMessage === 'function') {
       let fresh = null;
       const isFresh = () => fresh || (fresh = Promise.resolve(api.runtime.sendNativeMessage('zigzag.bridge', { ns: 'runtime', fn: 'isNewInstall', args: [] }))
@@ -603,10 +608,58 @@
           isFresh().then((yes) => { if (yes) listener(details, ...rest); });
         };
         guarded.set(listener, wrapped);
+        installListeners.add(listener);
+        if (Date.now() < updatedUntil) tellUpdated(listener);
         return add(wrapped);
       });
-      if (remove) setMember(['runtime', 'onInstalled'], 'removeListener', (listener) => remove(guarded.get(listener) || listener));
+      if (remove) setMember(['runtime', 'onInstalled'], 'removeListener', (listener) => { installListeners.delete(listener); return remove(guarded.get(listener) || listener); });
       if (has) setMember(['runtime', 'onInstalled'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
+    }
+
+    // contextMenus: Chrome keeps an extension's right-click menu items across restarts, WebKit forgets them when
+    // Zigzag quits. Extensions whose background sleeps add them once, on install, as Chrome tells them to, so Downie's
+    // were gone from every menu after a relaunch (#239). Zigzag keeps what each creates, changes and removes
+    // (ExtensionBridge's contextMenusKept) and puts it back once as the extension starts. One it already has (it
+    // added its own again) is left as it is. The first time, with nothing kept yet, it's told Zigzag was updated, as
+    // Chrome tells it after an update ("chrome_update"), so it adds the items it made before Zigzag kept them.
+    const keptMenus = globalThis.__zigzagContextMenus;
+    const menuNames = ['contextMenus', 'menus'].filter((name) => api[name] && typeof api[name].create === 'function');
+    if (keptMenus && menuNames.length) {
+      const note = (op, args) => { try { keptMenus.change(op, args).catch(() => {}); } catch (e) {} };
+      const createItem = api[menuNames[0]].create.bind(api[menuNames[0]]);
+      const wrapped = new WeakSet();
+      for (const name of menuNames) {
+        for (const op of ['create', 'update', 'remove', 'removeAll']) {
+          const original = api[name][op];
+          if (typeof original !== 'function' || wrapped.has(original)) continue;
+          const call = original.bind(api[name]);
+          const recorded = (...args) => {
+            const result = call(...args);
+            const given = args.filter((arg) => typeof arg !== 'function');
+            note(op, op === 'create' ? given.slice(0, 1) : op === 'update' ? given.slice(0, 2) : op === 'remove' ? given.slice(0, 1) : []);
+            return result;
+          };
+          wrapped.add(recorded);
+          setMember([name], op, recorded);
+        }
+      }
+      // Only its background puts them back: an extension page restored with the session can start first, and has
+      // no install listeners to tell.
+      let isBackground = isWorker;
+      try { isBackground = isBackground || (typeof api.extension.getBackgroundPage === 'function' && api.extension.getBackgroundPage() === globalThis); } catch (e) {}
+      const putBack = (answer) => {
+        const items = answer && Array.isArray(answer.items) ? answer.items : [];
+        for (const item of items) {
+          try { createItem(item, () => void api.runtime.lastError); } catch (e) {}
+        }
+        if (answer && answer.browserUpdated) {
+          updatedUntil = Date.now() + 10000;
+          installListeners.forEach(tellUpdated);
+        }
+      };
+      if (isBackground) {
+        try { keptMenus.restore().then(putBack, () => {}); } catch (e) {}
+      }
     }
 
     // Content scripts an extension registers: WebKit refuses file: match patterns, and one it refuses loses the whole
