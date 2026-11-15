@@ -51,6 +51,27 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         settingOn && !needsOnboarding && ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
+    /// The setting's offer has been made (`WindowManager.offerMini`): it's never made again, whatever the answer.
+    static var miniOffered: Bool {
+        get { UserDefaults.standard.bool(forKey: "MiniOfferShown") }
+        set { UserDefaults.standard.set(newValue, forKey: "MiniOfferShown") }
+    }
+
+    /// Whether a link from another app, opening as a new tab, offers Zigzag Mini: only one it would take with the
+    /// setting on, while the setting is off, and only if the offer hasn't been made before (#246).
+    nonisolated static func offersMini(for url: URL, settingOn: Bool, asked: Bool, needsOnboarding: Bool) -> Bool {
+        !settingOn && !asked && takes(url, settingOn: true, needsOnboarding: needsOnboarding)
+    }
+
+    enum OfferTurn: Equatable { case now, wait, never }
+
+    /// When the offer shows, checked each second: once the page has loaded and no other toast has been up for two
+    /// checks running (the offer to translate comes just after a page loads); never once you've gone to another tab.
+    nonisolated static func offerTurn(quiet: Bool, quietBefore: Bool, inFront: Bool) -> OfferTurn {
+        guard inFront else { return .never }
+        return quiet && quietBefore ? .now : .wait
+    }
+
     /// Opens one on `url`. `origin`: where on screen it grows from (the quick open bar it came out of); without
     /// one it takes the middle of the screen, a step down from any already there.
     @discardableResult

@@ -141,7 +141,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !pendingURLs.isEmpty {
             // A link for Zigzag Mini opens just that, as it would with Zigzag already running.
             if !restored, !WindowManager.shared.opensInMini(pendingURLs[0]) {
-                WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false)
+                let url = pendingURLs.removeFirst()
+                let offers = WindowManager.shared.offersMini(url)
+                let controller = WindowManager.shared.newWindow(url: url, showCommandBar: false)
+                if offers { WindowManager.shared.offerMini(in: controller) }
             }
             pendingURLs.forEach { WindowManager.shared.openExternal($0) }
             pendingURLs = []
@@ -295,7 +298,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Files opened with Zigzag, and links handed over as a document: web addresses and local files only.
     func application(_ application: NSApplication, open urls: [URL]) {
-        urls.filter { $0.isFileURL || ["http", "https"].contains($0.scheme?.lowercased() ?? "") }.forEach(open)
+        urls.filter(Self.opensAsDocument).forEach(open)
+    }
+
+    /// Whether a URL handed over as a document is opened: a local file (a tab, even with Zigzag Mini taking links:
+    /// a file you open is one you mean to keep at), or a web address (Zigzag Mini, when it takes links).
+    nonisolated static func opensAsDocument(_ url: URL) -> Bool {
+        url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
     private func open(_ url: URL) {
