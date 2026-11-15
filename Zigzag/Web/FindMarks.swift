@@ -140,10 +140,11 @@ enum FindMarks {
         try? await webView.runOwnScript(script + "\nreturn globalThis.__zigzagFind." + call + ";", asFunction: true, arguments: arguments)
     }
 
-    /// Marks every match of `query`, and the one WebKit's find just selected as the one you're on.
-    static func mark(_ query: String, in webView: WKWebView) async -> Snapshot? {
+    /// Marks every match of `query`, and the one WebKit's find just selected as the one you're on. `paused`: you're
+    /// in another window, so the page's changes aren't followed yet (`pause`).
+    static func mark(_ query: String, in webView: WKWebView, paused: Bool = false) async -> Snapshot? {
         install(in: webView)
-        return Snapshot(await run("mark(query, names)", ["query": query, "names": namesArgument], in: webView))
+        return Snapshot(await run("mark(query, names, paused)", ["query": query, "names": namesArgument, "paused": paused], in: webView))
     }
 
     /// Before going to the next match: the find starts from the match you're on, either way.
@@ -154,6 +155,12 @@ enum FindMarks {
     /// A tick clicked: the next find starts from the match before it, so it lands on it.
     static func moveCaret(toMatch index: Int, in webView: WKWebView) async {
         _ = await run("caretTo(index)", ["index": index], in: webView)
+    }
+
+    /// The window isn't the one you're in: the page's changes aren't watched until it is again, and then it's looked
+    /// at once.
+    static func pause(_ paused: Bool, in webView: WKWebView) {
+        webView.runOwnScript("if (globalThis.__zigzagFind) globalThis.__zigzagFind.pause(paused); return 0", asFunction: true, arguments: ["paused": paused])
     }
 
     /// Takes every mark off the page.
@@ -211,7 +218,8 @@ enum FindMarks {
         'canvas', 'video', 'audio', 'object', 'embed', 'img', 'picture', 'input']);
       const F = {
         version: 1, query: '', index: null, ranges: [], count: 0, current: null, docs: [], names: null,
-        caret: null, observers: [], timer: 0, firstWait: 0, rebuild: false,
+        caret: null, observers: [], timer: 0, firstWait: 0, rebuild: false, said: '', lastLook: 0, gap: 1000, paused: false,
+        looks: 0,
       };
       const isSpace = (code) => code === 32 || code === 9 || code === 10 || code === 13 || code === 12 || code === 160;
       // Lowercased one character at a time, so every place in the text still stands for one character of the page.
@@ -408,41 +416,72 @@ enum FindMarks {
 
       const snapshot = () => ({ marks: marks(), current: F.current === null ? -1 : F.current, count: F.count, dark: isDark(document) });
 
+      // Said to Zigzag only when it's not what Zigzag last heard: a page that changes without moving a match says nothing.
       const post = () => {
         const handler = window.webkit && webkit.messageHandlers && webkit.messageHandlers.zigzagFindMarks;
-        if (handler && F.query) handler.postMessage(snapshot());
+        if (!handler || !F.query) return;
+        const now = snapshot(), said = JSON.stringify(now);
+        if (said === F.said) return;
+        F.said = said;
+        handler.postMessage(now);
       };
 
-      // The page changed: looked at again once it settles, and at least once a second while it keeps changing.
+      // The page changed: looked at again once it settles, a quarter second later. A page that keeps changing (a
+      // clock, a live chat, a video's time) is looked at less and less often, down to every three seconds, until it
+      // has been calm for a while.
+      const SETTLE = 250, CALM = 5000, SLOWEST = 3000;
       const changed = (rebuild) => {
         if (rebuild) F.index = null;
         F.rebuild = F.rebuild || rebuild;
         clearTimeout(F.timer);
         const now = Date.now();
         if (!F.firstWait) F.firstWait = now;
-        const wait = now - F.firstWait > 1000 ? 0 : 250;
-        F.timer = setTimeout(() => {
-          F.firstWait = 0;
-          if (!F.query) return;
-          if (F.rebuild) {
-            const was = F.current !== null ? F.ranges[F.current] : null;
-            search();
-            const i = indexOf(was);
-            F.current = i >= 0 ? i : null;
-            paint();
-          }
-          F.rebuild = false;
-          post();
-        }, wait);
+        const next = F.lastLook + F.gap;
+        // Waited a whole gap since the first change: looked at as soon as the gap since the last look allows.
+        const wait = now - F.firstWait >= F.gap ? Math.max(0, next - now) : Math.max(SETTLE, next - now);
+        F.timer = setTimeout(look, wait);
+      };
+      const look = () => {
+        F.timer = 0;
+        F.firstWait = 0;
+        if (!F.query) return;
+        const now = Date.now();
+        F.gap = now - F.lastLook < CALM ? Math.min(F.gap + 1000, SLOWEST) : 1000;
+        F.lastLook = now;
+        if (F.rebuild) {
+          F.looks++;
+          const was = F.current !== null ? F.ranges[F.current] : null;
+          search();
+          const i = indexOf(was);
+          F.current = i >= 0 ? i : null;
+          paint();
+        }
+        F.rebuild = false;
+        post();
       };
 
-      const watch = () => {
-        if (F.observers.length) return;
+      // Only a change to the text can change the matches: a node with text added or taken away, or text edited
+      // (not a script's or style's). A details opened or something unhidden can show text there was. A class
+      // changing, which busy pages do all the time, is left alone.
+      const QUIET = new Set(['script', 'style', 'noscript', 'template']);
+      const hasText = (node) => (node.nodeType === 3 || node.nodeType === 1) && !QUIET.has(node.localName) && /\S/.test(node.textContent || '');
+      const touchesText = (records) => records.some((r) => {
+        if (r.type === 'attributes') return true;
+        if (r.type === 'characterData') { const parent = r.target.parentNode; return !parent || !QUIET.has(parent.localName); }
+        for (const n of r.addedNodes) if (hasText(n)) return true;
+        for (const n of r.removedNodes) if (hasText(n)) return true;
+        return false;
+      });
+
+      // While the window isn't the one you're in, nothing is watched; coming back, the page is looked at once. (A tab
+      // that isn't shown has no find bar: the bar goes with its tab, and its marks with it.)
+      const observe = () => {
+        if (F.observers.length || F.paused) return;
         for (const doc of F.docs) {
           const view = doc.defaultView;
           if (!view) continue;
-          const mutations = new view.MutationObserver(() => changed(true));
-          mutations.observe(doc, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open', 'class'] });
+          const mutations = new view.MutationObserver((records) => { if (touchesText(records)) changed(true); });
+          mutations.observe(doc, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open'] });
           F.observers.push(mutations);
         }
         let first = true;
@@ -450,11 +489,26 @@ enum FindMarks {
         sizes.observe(document.documentElement);
         F.observers.push(sizes);
       };
-      const unwatch = () => {
+      const sleep = () => {
         for (const o of F.observers) o.disconnect();
         F.observers = [];
         clearTimeout(F.timer);
+        F.timer = 0;
         F.firstWait = 0;
+      };
+      const wake = () => {
+        if (!F.query || F.observers.length || F.paused) return;
+        observe();
+        changed(true);
+      };
+      const watch = observe;
+      const unwatch = sleep;
+
+      F.pause = (paused) => {
+        F.paused = paused;
+        if (!F.query) return true;
+        if (paused) sleep(); else wake();
+        return true;
       };
 
       const selected = () => {
@@ -465,8 +519,10 @@ enum FindMarks {
         return null;
       };
 
-      F.mark = (query, names) => {
+      F.mark = (query, names, paused) => {
         F.names = names;
+        F.paused = !!paused;
+        if (F.paused) sleep();
         const same = query === F.query && F.index;
         F.query = query;
         const was = F.current !== null ? F.ranges[F.current] : null;
@@ -488,7 +544,10 @@ enum FindMarks {
         }
         paint();
         if (F.query) watch();
-        return snapshot();
+        const now = snapshot();
+        // What Zigzag hears now, so a look that finds the same says nothing.
+        F.said = JSON.stringify(now);
+        return now;
       };
 
       const select = (range) => {
@@ -522,12 +581,13 @@ enum FindMarks {
       F.clear = () => {
         unwatch();
         for (const doc of F.docs) unpaint(doc);
-        F.query = ''; F.index = null; F.ranges = []; F.count = 0; F.current = null; F.docs = []; F.caret = null;
+        F.query = ''; F.index = null; F.ranges = []; F.count = 0; F.current = null; F.docs = []; F.caret = null; F.said = '';
         return true;
       };
 
       F.state = () => ({ query: F.query, count: F.count, current: F.current === null ? -1 : F.current, docs: F.docs.length,
-        highlights: F.names ? Object.values(F.names).filter((n) => CSS.highlights.has(n)).length : 0, observers: F.observers.length });
+        highlights: F.names ? Object.values(F.names).filter((n) => CSS.highlights.has(n)).length : 0, observers: F.observers.length,
+        looks: F.looks, gap: F.gap, paused: F.paused });
 
       globalThis.__zigzagFind = F;
     }

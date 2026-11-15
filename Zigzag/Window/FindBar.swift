@@ -136,6 +136,15 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         doneButton.onClick = { [weak self] _ in self?.hide() }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
         ticks.onPick = { [weak self] index in self?.search(backwards: false, toMatch: index) }
+        NotificationCenter.default.addObserver(self, selector: #selector(keyChanged(_:)), name: NSWindow.didBecomeKeyNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyChanged(_:)), name: NSWindow.didResignKeyNotification, object: nil)
+    }
+
+    /// The page's marks aren't kept up with while you're in another window: busy pages change all the time.
+    @objc private func keyChanged(_ note: Notification) {
+        guard let changed = note.object as? NSWindow, changed === window?.window, isVisible, let searched, searchedPDF == nil,
+              FindMarks.isAvailable else { return }
+        FindMarks.pause(!changed.isKeyWindow, in: searched)
     }
 
     /// A tick for each match along the page's right edge (`FindMarks`).
@@ -356,7 +365,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private func refreshMarks(in webView: WKWebView, found: Int) async {
         guard found > 0 else { clearMarks(in: webView); return }
         let asked = query
-        guard let snapshot = await FindMarks.mark(asked, in: webView), isVisible, query == asked, searched === webView else { return }
+        // Marked again while you're in another window (a page that finished loading): left alone till you're back.
+        let away = window?.window?.isKeyWindow == false
+        guard let snapshot = await FindMarks.mark(asked, in: webView, paused: away), isVisible, query == asked, searched === webView else { return }
         ticks.attach(to: webView)
         ticks.snapshot = snapshot
         // WebKit counts its place on from the last match it found, so after a tick, or a click on the page, it can say

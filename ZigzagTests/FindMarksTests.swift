@@ -230,4 +230,55 @@ struct FindMarksTests {
         #expect(heard == nil)
         #expect(try await webView.runOwnScript("return globalThis.__zigzagFind.state().observers", asFunction: true) as? Int == 0)
     }
+
+    private func findState(_ webView: WKWebView, _ key: String) async throws -> Any? {
+        try await webView.runOwnScript("return globalThis.__zigzagFind.state()[key]", asFunction: true, arguments: ["key": key])
+    }
+
+    /// A busy page that only changes classes, or changes text without moving a match, is looked at rarely and says
+    /// nothing to the app.
+    @Test func aBusyPageIsLookedAtLessAndLessOften() async throws {
+        let (webView, window) = await page("""
+        <p>plum</p><p id=clock>0</p><div id=box>box</div>
+        <script>let n = 0; setInterval(() => { document.getElementById('box').className = 'c' + (n % 2); }, 50);
+          setInterval(() => { document.getElementById('clock').firstChild.data = String(++n); }, 100);</script>
+        """)
+        defer { window.close() }
+        FindMarks.install(in: webView)
+        _ = await PageFind.find("plum", in: webView, backwards: false, showsIndicator: false)
+        #expect(try #require(await FindMarks.mark("plum", in: webView)).count == 1)
+        var heard = 0
+        FindMarks.listen(to: webView) { _ in heard += 1 }
+        try? await Task.sleep(for: .seconds(4))
+        // Looked at after a quarter second, then a second, two and three apart: once a second it would be four or more.
+        let looks = try #require(try await findState(webView, "looks") as? Int)
+        #expect(looks >= 1 && looks <= 3)
+        #expect(heard == 0)
+        FindMarks.clear(in: webView)
+    }
+
+    /// Paused (you're in another window): nothing is watched; back, the page is looked at once and the change heard.
+    @Test func pausedMarksCatchUpOnReturn() async throws {
+        let (webView, window) = await page("<p>plum</p>")
+        defer { window.close() }
+        FindMarks.install(in: webView)
+        _ = await PageFind.find("plum", in: webView, backwards: false, showsIndicator: false)
+        #expect(try #require(await FindMarks.mark("plum", in: webView)).count == 1)
+        var heard: FindMarks.Snapshot?
+        FindMarks.listen(to: webView) { heard = $0 }
+        FindMarks.pause(true, in: webView)
+        #expect(try await findState(webView, "observers") as? Int == 0)
+        _ = try await pageScript(webView, "document.body.insertAdjacentHTML('beforeend', '<p>another plum</p>')")
+        try? await Task.sleep(for: .milliseconds(600))
+        #expect(heard == nil)
+        FindMarks.pause(false, in: webView)
+        let end = Date().addingTimeInterval(3)
+        while Date() < end, heard?.count != 2 { try? await Task.sleep(for: .milliseconds(50)) }
+        #expect(heard?.count == 2)
+        #expect(try await findState(webView, "observers") as? Int == 2)
+        // Marked while away: paused from the start.
+        _ = await FindMarks.mark("plum", in: webView, paused: true)
+        #expect(try await findState(webView, "observers") as? Int == 0)
+        FindMarks.clear(in: webView)
+    }
 }
