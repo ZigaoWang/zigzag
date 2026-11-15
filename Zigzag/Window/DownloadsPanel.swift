@@ -201,12 +201,15 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         actionButton.frame.origin = NSPoint(x: bounds.width - pad - b.width, y: (bounds.height - b.height) / 2)
         pauseButton.frame.origin = NSPoint(x: actionButton.frame.minX - pauseButton.frame.width, y: actionButton.frame.minY)
         let x = icon.frame.maxX + CardRow.inset - Label.inset
-        let right = !pauseButton.isHidden ? pauseButton.frame.minX : !actionButton.isHidden ? actionButton.frame.minX : bounds.width - pad
+        // A finished file's button waits for the pointer, but its room is kept: the name never cuts shorter on hover.
+        let right = !pauseButton.isHidden ? pauseButton.frame.minX : actionButton.frame.minX
         let width = max(0, right - Tokens.Space.x2 - x)
         let nameH = name.lineHeight, statusH = status.lineHeight
         let top = (bounds.height - nameH - statusH - 2) / 2
         name.frame = NSRect(x: x, y: top, width: width, height: nameH)
         status.frame = NSRect(x: x, y: name.frame.maxY + 2, width: width, height: statusH)
+        // A name cut in the middle shows whole under the pointer.
+        toolTip = name.inkWidth > width - Label.inset * 2 ? name.stringValue : nil
         if !bar.isHidden {
             // Under the text, lined up with it, as long as the name may run.
             bar.frame = NSRect(x: x + Label.inset, y: bounds.height - Tokens.Space.x2 + 1, width: max(0, width - Label.inset * 2), height: Self.barHeight)
