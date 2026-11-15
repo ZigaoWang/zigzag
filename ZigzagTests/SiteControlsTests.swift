@@ -68,6 +68,56 @@ struct SiteControlsPermissionTests {
         }
     }
 
+    /// The rule every other question already followed, and notifications were the one exception to: **"Always" keeps
+    /// the answer for the site — a no included — and "This time" leaves the site asking.** That the card now offers
+    /// the duration is the card; this is the part that matters, that a kept no is read back as Block rather than
+    /// being forgotten with the page.
+    @Test func aNotificationsAnswerCanBeKeptForTheSite() throws {
+        try withDefaults {
+            #expect(SitePermissions.choice(.notifications, origin: site) == .ask)
+
+            // "This time": nothing is kept for the site, so it still asks.
+            let thisTime = SitePermissions.rememberAnswer(
+                PermissionAnswer(action: NotificationPlace.blocked.action, remember: false),
+                subject: PermissionSubject.notifications, origin: site, tab: nil, isPrivate: false)
+            #expect(!thisTime)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .ask)
+
+            // "Always": Block for the site, exactly as choosing Block in Site Controls would keep it.
+            let always = SitePermissions.rememberAnswer(
+                PermissionAnswer(action: NotificationPlace.blocked.action, remember: true),
+                subject: PermissionSubject.notifications, origin: site, tab: nil, isPrivate: false)
+            #expect(!always)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .block)
+            #expect(SitePermissions.action(PermissionSubject.notifications, origin: site) == "deny")
+        }
+    }
+
+    /// Screen sharing follows the same rule as everything else now: **a kept no is a no for the site, and "this time"
+    /// leaves the site asking.** It used to be the one question that kept nothing at all — the same two answers
+    /// meaning something different there than on every other card.
+    @Test func aScreenSharingNoCanBeKeptForTheSite() throws {
+        try withDefaults {
+            #expect(SitePermissions.choice(.screen, origin: site) == .ask)
+            #expect(DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) == nil)
+
+            // "Always" on Don't Allow: Block for the site, read back as the same no when it next asks.
+            let always = SitePermissions.rememberAnswer(
+                PermissionAnswer(action: DisplayCaptureChoice.deny.action, remember: true),
+                subject: PermissionSubject.screen, origin: site, tab: nil, isPrivate: false)
+            #expect(!always)
+            #expect(SitePermissions.choice(.screen, origin: site) == .block)
+            #expect(DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) == .deny)
+
+            // A kept yes is the Share Window… answer, which is the filled button, and a kept Share Screen… is its own.
+            SitePermissions.rememberAnswer(PermissionAnswer(action: DisplayCaptureChoice.window.action, remember: true),
+                                           subject: PermissionSubject.screen, origin: site, tab: nil, isPrivate: false)
+            #expect(SitePermissions.choice(.screen, origin: site) == .allow)
+            #expect(DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) == .window)
+            #expect(DisplayCaptureChoice(action: DisplayCaptureChoice.screen.action) == .screen)
+        }
+    }
+
     /// Both places are a yes: the Permissions row counts them as allowed, and only Block as blocked.
     @Test func bothPlacesCountAsAllowed() {
         #expect(PermissionChoice.inZigzag.permits)

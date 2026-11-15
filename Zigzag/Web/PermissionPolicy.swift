@@ -43,6 +43,8 @@ nonisolated enum PermissionSubject {
     /// Whether a site may save files at all. The destination an allowed file goes to is a separate decision, made per
     /// file type by the download rules.
     static let downloads = "downloads"
+    /// Screen sharing, whose yes is *which* picker macOS shows rather than a plain allow.
+    static let screen = "screen"
 
     static func media(_ type: WKMediaCaptureType) -> String {
         switch type {

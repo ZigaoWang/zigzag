@@ -486,25 +486,27 @@ enum SitePermissions {
             ?? tab.flatMap { NotificationPlace(action: $0.permissionAnswers.action(key: origin, kind: PermissionSubject.notifications)) }
     }
 
-    /// Asked like the camera, and the answer is kept for the page. Not "this time" against "always": where a site's
-    /// notifications show is a setting rather than a grant, so the card offers no duration and the two places are
-    /// picked from its own dropdown — and Site Controls changes it afterwards, or does without it. A private window
-    /// never shows them anyway.
+    /// Asked like the camera, and answered like every other question: **"Always" keeps it for the site and "This
+    /// time" holds for the page**, with the place picked from the card's own dropdown. It used to be the one question
+    /// with no duration, on the argument that where a site's notifications show is a setting rather than a grant —
+    /// which left a *no* that couldn't be kept while every other card's could, and that is the thing that reads as
+    /// arbitrary. Site Controls still changes it afterwards. A private window keeps nothing, and never shows them.
     static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> NotificationPlace? {
         if let known = notificationPlace(origin: origin, tab: tab) { return known }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
-                                                actions: [.deny, .allow], chooser: PermissionChoice.notificationPlaces, canRemember: false,
+                                                actions: [.deny, .allow], chooser: PermissionChoice.notificationPlaces, canRemember: !isPrivate,
                                                 answered: {
                                                     knownAnswer(site: notifications(origin: origin),
                                                                 page: tab?.permissionAnswers.answer(key: origin, kind: PermissionSubject.notifications))
                                                 })
         guard let answer else { return nil }
         // Where they show is what the dropdown picked; nothing picked (a debug answer, an older caller) is the quiet
-        // one, in Zigzag. The page keeps the answer so the rest of its own notifications go the same way.
+        // one, in Zigzag. "Always" keeps it for the site like every other answer — the no included — and "This time"
+        // keeps it for the page.
         let place: NotificationPlace = answer.action == "deny" ? .blocked : (NotificationPlace(action: answer.choice) ?? .inZigzag)
-        _ = rememberAnswer(PermissionAnswer(action: place.action, remember: false), subject: PermissionSubject.notifications,
+        _ = rememberAnswer(PermissionAnswer(action: place.action, remember: answer.remember), subject: PermissionSubject.notifications,
                            origin: origin, tab: tab, isPrivate: isPrivate)
         return place
     }
@@ -574,15 +576,34 @@ enum SitePermissions {
         return rememberAnswer(answer, subject: PermissionSubject.media(type), origin: key, tab: tab, isPrivate: isPrivate) ? .grant : .deny
     }
 
-    /// Screen sharing (getDisplayMedia): asked every time, as Safari does, and nothing kept. Don't Allow, Share
-    /// Screen…, then Share Window… filled, as Safari offers them; either share hands over to macOS's own picker (ScreenCaptureKit's) for a window or a display, where you pick which.
+    /// Screen sharing (getDisplayMedia): Don't Allow, Share Screen…, then Share Window… filled, as Safari offers them;
+    /// either share hands over to macOS's own picker (ScreenCaptureKit's) for a window or a display, where you pick
+    /// which — so even an answer kept for the site does not capture anything without macOS asking.
+    ///
+    /// Answered like every other question: **"Always" keeps it for the site, a no included, and "This time" holds for
+    /// the page.** It used to be asked every single time with nothing kept, which made it the one card where the same
+    /// two answers meant something different from every other card's.
     static func requestDisplayCapture(origin securityOrigin: WKSecurityOrigin, window: NSWindow?, tab: Tab?) async -> DisplayCaptureChoice {
         guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
         let site = SiteOrigin.of(securityOrigin)
+        // Already answered for the site, or for this page: go the same way without asking again.
+        if let site, let kept = DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) {
+            return kept
+        }
+        if let site, let page = tab?.permissionAnswers.action(key: site, kind: PermissionSubject.screen),
+           let kept = DisplayCaptureChoice(action: page) {
+            return kept
+        }
         let answer = await PermissionPrompt.ask(host: askerName(site), origin: site, what: "your screen", symbol: "rectangle.on.rectangle",
                                                 in: controller, tab: tab, title: DisplayCaptureChoice.title,
-                                                actions: DisplayCaptureChoice.actions, canRemember: false)
-        return DisplayCaptureChoice(answer)
+                                                actions: DisplayCaptureChoice.actions, canRemember: site != nil)
+        let choice = DisplayCaptureChoice(answer)
+        if let site {
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: choice.action, remember: answer?.remember ?? false),
+                                              subject: PermissionSubject.screen, origin: site, tab: tab,
+                                              isPrivate: tab?.isPrivate ?? false)
+        }
+        return choice
     }
 }
 
@@ -598,6 +619,26 @@ enum DisplayCaptureChoice: Int, CaseIterable {
         case "allow": self = .window
         case "screen": self = .screen
         default: self = .deny
+        }
+    }
+
+    /// What it's kept as, in the same place every other permission answer is kept. "allow" is the filled answer's id,
+    /// which means Share Window…, so a kept window is the same answer the button gives.
+    var action: String {
+        switch self {
+        case .deny: "deny"
+        case .screen: "screen"
+        case .window: "allow"
+        }
+    }
+
+    /// The answer this was kept as, or nil where nothing has been kept.
+    init?(action: String?) {
+        switch action {
+        case "deny": self = .deny
+        case "screen": self = .screen
+        case "allow", "window": self = .window
+        default: return nil
         }
     }
 
@@ -622,7 +663,7 @@ enum DisplayCaptureChoice: Int, CaseIterable {
 /// What a site can ask for, as Site Controls has a row for each. Calls ask for the camera and microphone at once and
 /// are answered as one.
 enum SitePermission: String, CaseIterable {
-    case cameraAndMicrophone, location, notifications, popups, downloads, apps, webRTC
+    case cameraAndMicrophone, location, notifications, popups, downloads, apps, webRTC, screen
 
     /// The kinds of answer kept for it.
     var kinds: [String] {
@@ -634,6 +675,7 @@ enum SitePermission: String, CaseIterable {
         case .downloads: ["downloads"]
         case .apps: ["apps"]
         case .webRTC: ["webRTC"]
+        case .screen: ["screen"]
         }
     }
 
@@ -651,9 +693,10 @@ enum SitePermission: String, CaseIterable {
     /// The one kind a choice made in Site Controls is kept as.
     var primaryKind: String { self == .cameraAndMicrophone ? "cameraAndMicrophone" : rawValue }
 
-    /// A private window asks for the camera, location, apps to open and files to save (and keeps nothing); it never
-    /// shows notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab alone.
-    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location || self == .apps || self == .downloads || self == .webRTC }
+    /// A private window asks for the camera, location, apps to open, files to save and the screen (and keeps nothing);
+    /// it never shows notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab
+    /// alone.
+    var inPrivate: Bool { self == .cameraAndMicrophone || self == .location || self == .apps || self == .downloads || self == .webRTC || self == .screen }
 
     var title: String {
         switch self {
@@ -664,6 +707,7 @@ enum SitePermission: String, CaseIterable {
         case .downloads: String(localized: "Downloads", comment: "Row in the site panel's This Site group: whether the site may save files.")
         case .apps: String(localized: "Open apps", comment: "Row in the site panel's This Site group: whether the site's links may open apps on this Mac, like Zoom or the App Store.")
         case .webRTC: String(localized: "WebRTC", comment: "Row in the site panel's This Site group: whether the site may use WebRTC, which calls need, and which can show sites your real IP address. A name: keep it as it is.")
+        case .screen: String(localized: "Screen sharing", comment: "Row in the site panel's This Site group: whether the site may share the screen. macOS still asks which window or display.")
         }
     }
 }
