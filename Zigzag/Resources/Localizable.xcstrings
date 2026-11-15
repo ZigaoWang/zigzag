@@ -2665,6 +2665,17 @@
         }
       }
     },
+    "Allow Once" : {
+      "comment" : "Button in the notice saying a site’s download was blocked: asks the site for the file again and saves it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许一次"
+          }
+        }
+      }
+    },
     "Allow Saving" : {
       "comment" : "Button for a Never Saved site in the Passwords window: offer to save its passwords again.",
       "localizations" : {

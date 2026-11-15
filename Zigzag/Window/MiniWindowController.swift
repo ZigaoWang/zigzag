@@ -1382,9 +1382,6 @@ extension MiniWindowController: PromptHost {
     }
     var promptIsCovered: Bool { commandBar.isVisible }
     var promptAnchor: NSView? { strip }
-    func promptToast(_ text: String, symbol: String, duration: TimeInterval) {
-        Toast.show(text, symbol: symbol, duration: duration, over: overlay, area: overlay.bounds)
-    }
 }
 
 /// The app you were in before Zigzag: where a link for Zigzag Mini came from, to go back to when it closes.

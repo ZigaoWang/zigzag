@@ -143,6 +143,34 @@ import WebKit
         }
     }
 
+    /// Allow Once on a blocked download's notice: the answer is kept for the page, exactly as "This time" is, and
+    /// never for the site.
+    @Test func allowOnceOnANoticeHoldsForThePage() throws {
+        try withDefaults { _ in
+            let tab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: false),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: tab, isPrivate: false)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == false)
+
+            SitePermissions.allowThisDownload(origin: "https://files.example", tab: tab)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == true)
+            #expect(SitePermissions.action(PermissionSubject.downloads, origin: "https://files.example") == nil)
+
+            // A site blocked outright stays blocked: the offer is one file at a time, so the next one is refused again.
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: nil, isPrivate: false)
+            SitePermissions.allowThisDownload(origin: "https://files.example", tab: tab)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == false)
+
+            // With no page to keep it on (a tab already gone) nothing is written, and nothing is said about the site.
+            SitePermissions.remember(nil, subject: PermissionSubject.downloads, origin: "https://files.example")
+            SitePermissions.allowThisDownload(origin: "https://files.example", tab: nil)
+            #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
+        }
+    }
+
     /// "Always" keeps a deny for the site, and a private window keeps nothing whatever the answer says.
     @Test func aDownloadDenyIsKeptForTheSiteAndAPrivateTabKeepsNothing() throws {
         try withDefaults { _ in

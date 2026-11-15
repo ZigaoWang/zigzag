@@ -1492,7 +1492,7 @@ extension Tab: WKNavigationDelegate {
             }
             // No rule took it: whether this site may save files at all is asked once, and remembered per site.
             if policy == .download, let target = navigationAction.request.url,
-               await !mayDownload(target, in: webView) {
+               await !mayDownload(target, in: webView, retry: navigationAction.request) {
                 return (.cancel, preferences)
             }
             if policy == .cancel { refusedDownload(in: webView) }
@@ -1700,27 +1700,52 @@ extension Tab: WKNavigationDelegate {
                 closeIfOnlyADownload(webView)
                 return .cancel
             }
-            // A rule didn't take it, so whether this site may save files at all is what decides.
-            if await !mayDownload(target, in: webView) { return .cancel }
+            // A rule didn't take it, so whether this site may save files at all is what decides. The response is all
+            // there is to ask for again: the request that earned it isn't handed over here.
+            if await !mayDownload(target, in: webView, retry: URLRequest(url: target)) { return .cancel }
         }
         return policy
     }
 
     /// A download the page started on its own, refused: noted, and said where the page is, never silently.
-    private func refusedDownload(in webView: WKWebView, text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click") {
+    private func refusedDownload(in webView: WKWebView, text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click",
+                                 action: (title: String, run: () -> Void)? = nil) {
         Diagnostics.note("Download refused", site: url?.host(), note, isPrivate: isPrivate)
         guard let host = webView.window?.windowController as? PromptHost else { return }
-        host.promptToast(text, symbol: "arrow.down.circle", duration: 3)
+        // A notice with something to offer stays long enough to read and act on, and can be put away; one that only
+        // says what happened goes soon after it has been read.
+        host.promptToast(text, symbol: "arrow.down.circle", duration: action == nil ? 3 : 6,
+                         action: action, closes: action != nil)
     }
 
     /// Whether this site may save a file. False means it may not — said over the page — so the caller cancels the
-    /// download. Asked once per site: "This time" holds for this page, "Always" is kept for the site.
-    private func mayDownload(_ url: URL, in webView: WKWebView) async -> Bool {
+    /// download. Asked once per site: "This time" holds for this page, "Always" is kept for the site. `retry` is the
+    /// request the notice offers to ask for again, where it can be asked for at all.
+    private func mayDownload(_ url: URL, in webView: WKWebView, retry: URLRequest? = nil) async -> Bool {
         // A page with no site of its own (a file on this Mac) has nowhere to keep an answer and nothing to ask about.
         guard let origin = SiteOrigin.of(webView.url ?? url) else { return true }
         let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self)
-        if !allowed { refusedDownload(in: webView, text: DownloadPolicy.blockedText, note: "This site is not allowed to save files") }
+        if !allowed {
+            refusedDownload(in: webView, text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
+                            action: askAgain(origin: origin, request: retry, in: webView))
+        }
         return allowed
+    }
+
+    /// What a blocked download's notice offers. By then the file has been refused and WebKit's own "no" can't be taken
+    /// back, so Allow Once asks for it again — through the tab's own page, which is the session the site expects — and
+    /// keeps that answer for the page, the same as "This time" on the question. What comes back is tracked like any
+    /// other download, so it lands where the rules and the site's own settings say, and shows in the downloads list.
+    private func askAgain(origin: String, request: URLRequest?, in webView: WKWebView) -> (title: String, run: () -> Void)? {
+        guard let request, DownloadPolicy.canBeAskedAgain(request) else { return nil }
+        return (String(localized: "Allow Once", comment: "Button in the notice saying a site’s download was blocked: asks the site for the file again and saves it."),
+                { [weak self, weak webView] in
+                    guard let webView else { return }
+                    SitePermissions.allowThisDownload(origin: origin, tab: self)
+                    webView.startDownload(using: request) { download in
+                        DownloadManager.shared.track(download, window: webView.window)
+                    }
+                })
     }
 
     /// The name in a Content-Disposition header, extended or plain, if it has one.

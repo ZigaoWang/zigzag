@@ -953,7 +953,7 @@ enum Toast {
     }
 
     /// Over the page, or with the desk open, over the desk, clear of its search field.
-    private static func area(in controller: BrowserWindowController) -> NSRect {
+    static func area(in controller: BrowserWindowController) -> NSRect {
         if let desk = controller.desk.toastArea { return desk }
         // Under the bar of an AI app using the page, if there is one.
         var page = controller.root.cardFrame

@@ -378,9 +378,6 @@ extension WebAppWindowController: PromptHost {
     func clearForPrompt() { linkStatus.hide() }
     var promptIsCovered: Bool { false }
     var promptAnchor: NSView? { strip }
-    func promptToast(_ text: String, symbol: String, duration: TimeInterval) {
-        Toast.show(text, symbol: symbol, duration: duration, over: overlay, area: overlay.bounds)
-    }
 }
 // MARK: - The window's content
 
