@@ -76,33 +76,18 @@ enum PopupNotice {
         }
     }
 
-    /// Opens a pop-up where it was answered.
+    /// Opens a pop-up where it was answered. The three places are the same three an Open URL rule can name, so they
+    /// are opened by the one thing that knows what they mean (`OpenInZigzag`).
     static func open(_ url: URL, action: String, from tab: Tab?, in host: PromptHost) {
         switch destination(for: action) {
         case .deny:
             return
         case .thisTab:
-            openInWindow(url, disposition: .currentTab, from: tab, in: host)
+            OpenInZigzag.open(url, at: .thisTab, from: tab, in: host)
         case .newTab:
-            openInWindow(url, disposition: .foregroundTab, from: tab, in: host)
+            OpenInZigzag.open(url, at: .newTab, from: tab, in: host)
         case .viewer:
-            // The small window that shows the pop-up's page: the pop-up viewer.
-            PopupWindowController.viewer(url: url, configuration: tab?.webView?.configuration, parent: host.window)
-        }
-    }
-
-    /// A page's pop-up opened somewhere in a window: in this tab, or a new one. It goes through the asking tab's own
-    /// host, so a browser window, Zigzag Mini and an installed app's window are all served — the hosts of the last two
-    /// are not `BrowserWindowController`s. Where no tab asked (a pop-up window's own child), the window it was asked
-    /// from opens it: a browser window at once, or, for a window with one page of its own and no tabs to name, that
-    /// page's own host — which is what settles what "this tab" and "a new tab" mean inside it.
-    private static func openInWindow(_ url: URL, disposition: OpenDisposition, from tab: Tab?, in host: PromptHost) {
-        if let tab, let opener = tab.host {
-            opener.tab(tab, openURL: url, disposition: disposition)
-        } else if let browser = host as? BrowserWindowController {
-            browser.open(url, disposition: disposition, opener: nil, allowSwitch: false, by: .page)
-        } else if let page = host.promptFrontTab, let opener = page.host {
-            opener.tab(page, openURL: url, disposition: disposition)
+            OpenInZigzag.open(url, at: .mini, from: tab, in: host)
         }
     }
 }

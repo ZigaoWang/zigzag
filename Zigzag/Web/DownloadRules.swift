@@ -291,6 +291,10 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     var appPath = ""
     /// Open URL: the URL to open, with tokens such as `{encoded_link}`.
     var urlTemplate = ""
+    /// Open URL: where a *web* address opens in Zigzag itself. Nil is a rule that has not been told yet — Zigzag asks
+    /// the first time the rule fires and keeps the answer here, so it asks once rather than every time. An address
+    /// that isn't the web's (mpv://, a magnet) belongs to the app that handles it and ignores this.
+    var openIn: OpenInZigzag.Place?
     /// Run Script: the executable, or a `.sh` file run by `/bin/sh`.
     var scriptPath = ""
     /// Run Script: one argv value each. A token is substituted into its own argument, never joined into a shell line.
@@ -377,7 +381,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     init(kind: Kind) { self.kind = kind }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, appPath, urlTemplate, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle, folderPath
+        case kind, appPath, urlTemplate, openIn, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle, folderPath
     }
 
     init(from decoder: Decoder) throws {
@@ -385,6 +389,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         kind = try container.decodeIfPresent(Kind.self, forKey: .kind) ?? .openURL
         appPath = try container.decodeIfPresent(String.self, forKey: .appPath) ?? ""
         urlTemplate = try container.decodeIfPresent(String.self, forKey: .urlTemplate) ?? ""
+        openIn = try container.decodeIfPresent(OpenInZigzag.Place.self, forKey: .openIn)
         scriptPath = try container.decodeIfPresent(String.self, forKey: .scriptPath) ?? ""
         arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
         rpcEndpoint = try container.decodeIfPresent(String.self, forKey: .rpcEndpoint) ?? ""

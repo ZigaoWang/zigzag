@@ -1587,9 +1587,12 @@ extension Tab: WKNavigationDelegate {
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: host?.hostWindow)
+                                              window: host?.hostWindow, tab: self)
         let outcome = await DownloadHandoff.perform(rule, request: handoff)
         if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+        // A rule that was matched but didn't take it — an Open URL rule whose question was put off — leaves the link
+        // or the download as it was, exactly as if no rule had matched.
+        if case .noMatch = outcome { return false }
         // A tab opened just for this link has nothing left to show.
         closeIfOnlyADownload(webView)
         return true
@@ -1858,10 +1861,13 @@ extension Tab: WKUIDelegate {
                                               filename: DownloadTokens.filename(for: url, suggested: ""),
                                               space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: host?.hostWindow)
+                                              window: host?.hostWindow, tab: self)
         Task { @MainActor in
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            // Put off, or nowhere to open it: the link opens the new tab it was going to open anyway, since this
+            // path has already refused the window WebKit asked for.
+            if case .noMatch = outcome { host?.tab(self, openURL: url, disposition: .foregroundTab) }
         }
     }
 

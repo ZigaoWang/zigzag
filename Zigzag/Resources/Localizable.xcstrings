@@ -2042,6 +2042,17 @@
         }
       }
     },
+    "A rule that hasn’t been told asks the first time it fires, and keeps your answer." : {
+      "comment" : "Tooltip on the Open in choice of an Open URL download rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没指定位置的规则会在第一次触发时询问，并记住你的选择。"
+          }
+        }
+      }
+    },
     "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too." : {
       "comment" : "Under the list in Settings › Developer.",
       "localizations" : {
@@ -2132,6 +2143,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你正在看的视频会在页面上方的小播放器里跟着你。也可以在小播放器的右键菜单里关闭。"
+          }
+        }
+      }
+    },
+    "A web address opens in Zigzag. Anything else opens in its own app." : {
+      "comment" : "Under the Open in choice of an Open URL download rule: only the web's own addresses are Zigzag's to open.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页地址在 Zigzag 中打开，其它地址在各自的应用中打开。"
           }
         }
       }
@@ -10869,6 +10891,17 @@
         }
       }
     },
+    "Once" : {
+      "comment" : "Button on a download rule's question: open it where the dropdown says this one time, and ask again next time.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此一次"
+          }
+        }
+      }
+    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES." : {
       "comment" : "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.",
       "localizations" : {
@@ -11294,6 +11327,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在上方打开"
+          }
+        }
+      }
+    },
+    "Open in" : {
+      "comment" : "Label of the choice of where a web address opens, in an Open URL download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开位置"
           }
         }
       }
@@ -19235,6 +19279,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mac 为深色时"
+          }
+        }
+      }
+    },
+    "Where should this open" : {
+      "comment" : "A download rule's question the first time an Open URL rule fires on a web address: which of Zigzag's own places to open it in. The card adds the question mark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要在哪里打开"
           }
         }
       }

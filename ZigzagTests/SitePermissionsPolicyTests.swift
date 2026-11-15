@@ -336,10 +336,10 @@ import WebKit
 /// The tab that asked a pop-up's question, recording what its host was told to open.
 @MainActor
 private final class RecordingTabHost: TabHost {
-    var opened: [(url: String, disposition: String)] = []
+    var opened: [(url: String, disposition: String, sender: Tab.LoadSender)] = []
     var hostWindow: NSWindow? { nil }
-    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
-        opened.append((url.absoluteString, "\(disposition)"))
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender) {
+        opened.append((url.absoluteString, "\(disposition)", sender))
     }
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction,
              features: WKWindowFeatures) -> WKWebView? { nil }

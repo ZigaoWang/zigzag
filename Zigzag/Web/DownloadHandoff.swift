@@ -17,12 +17,16 @@ enum DownloadHandoff {
         var dataStore: WKWebsiteDataStore?
         var isPrivate = false
         var window: NSWindow?
+        /// The tab that asked, where one did: an Open URL rule opening a web address in Zigzag opens it in relation
+        /// to this tab ("This Tab" is this one), and a question about it is asked where this tab's page is.
+        var tab: Tab?
     }
 
     enum Outcome: Equatable {
         /// A rule ran. The navigation is cancelled, and any download WebKit made for it is.
         case handedOff
-        /// No rule wanted it: carry on as if there were none.
+        /// No rule wanted it: carry on as if there were none. Also what an Open URL rule answers when its question was
+        /// put off, so the link loads or the file saves as if the rule had never matched.
         case noMatch
         case failed(String)
     }
@@ -67,7 +71,7 @@ enum DownloadHandoff {
             outcome = await openApp(rule.action, values: values, secret: secret)
             if let cookieFile { removeWhenTheOtherAppHasRead(cookieFile) }
         case .openURL:
-            outcome = openURL(rule.action, values: values, secret: secret)
+            outcome = await openURL(rule.action, values: values, secret: secret, request: request, rule: rule)
             if let cookieFile { removeWhenTheOtherAppHasRead(cookieFile) }
         case .jsonRPC:
             outcome = await callService(rule.action, values: values, secret: secret)
@@ -134,13 +138,55 @@ enum DownloadHandoff {
         return .handedOff
     }
 
-    private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String) -> Outcome {
+    /// An Open URL action. A web address is Zigzag's own: it opens where the rule says, and a rule that hasn't been
+    /// told yet asks once — here, over the page — and keeps the answer on itself, since an automation that asked every
+    /// time wouldn't be one. Any other address (mpv://, a magnet, a mail link) belongs to the app that handles it and
+    /// is handed on exactly as it always was.
+    private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
+                                request: Request, rule: DownloadRule) async -> Outcome {
         let text = DownloadTokens.expand(action.urlTemplate, with: values, secret: secret)
         guard let url = URL(string: text), url.scheme != nil else {
             return .failed(String(localized: "The URL isn’t valid.", comment: "Why a download rule failed: the URL it was told to open can't be made."))
         }
-        return NSWorkspace.shared.open(url) ? .handedOff
+        guard OpenInZigzag.handles(url) else { return openWithTheSystem(url) }
+        var place = action.openIn
+        if place == nil { place = await askWhereToOpen(rule: rule, request: request) }
+        // Put off, or nowhere to ask and nowhere to show it: the link or the file is left as if no rule had it.
+        guard let place, let host = WindowManager.shared.promptHost(for: request.window) else { return .noMatch }
+        OpenInZigzag.open(url, at: place, from: request.tab, in: host)
+        return .handedOff
+    }
+
+    /// An address Zigzag doesn't own, handed to whatever on this Mac does.
+    private static func openWithTheSystem(_ url: URL) -> Outcome {
+        NSWorkspace.shared.open(url) ? .handedOff
             : .failed(String(localized: "No app opens that URL.", comment: "Why a download rule failed: nothing on this Mac handles the URL's scheme."))
+    }
+
+    /// Asks, once, where this rule's web addresses should open, and writes the answer down on the rule. The dropdown
+    /// picks one of the places; the two buttons say whether it lasts — Once, or Always, which keeps it on the rule.
+    private static func askWhereToOpen(rule: DownloadRule, request: Request) async -> OpenInZigzag.Place? {
+        guard let host = WindowManager.shared.promptHost(for: request.window) else { return nil }
+        // The site it's for, not the rule's name: the card names a site the way every other question does, and the
+        // question goes when that site is left behind (never because the *rule's* name isn't the page's host).
+        let origin = SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
+        let answer = await PermissionPrompt.ask(
+            host: SitePermissions.askerName(origin), origin: origin,
+            what: "", // `title` words the question; `what` is only ever its fallback's wording.
+            symbol: "macwindow.badge.plus", in: host, tab: request.tab,
+            title: String(localized: "Where should this open", comment: "A download rule's question the first time an Open URL rule fires on a web address: which of Zigzag's own places to open it in. The card adds the question mark."),
+            actions: [.alternate("once", String(localized: "Once", comment: "Button on a download rule's question: open it where the dropdown says this one time, and ask again next time.")),
+                      .alternate("always", String(localized: "Always", comment: "Button on a download rule's question: open it where the dropdown says, and keep that on the rule, which never asks again."))],
+            chooser: OpenInZigzag.Place.allCases.map { .alternate($0.rawValue, $0.title) },
+            canRemember: false)
+        guard let answer, let place = OpenInZigzag.Place(rawValue: answer.choice ?? "") else { return nil }
+        // "Once" opens it where it was asked for and asks again next time; "Always" writes it on the rule.
+        if answer.action != "once" {
+            var remembered = rule
+            remembered.action.openIn = place
+            DownloadRulesStore.shared.update(remembered)
+        }
+        return place
     }
 
     /// Runs the script with every token as its own argument or environment value. A `.sh` file is run by `/bin/sh`;

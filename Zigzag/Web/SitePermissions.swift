@@ -767,12 +767,17 @@ final class PermissionPrompt: FloatingPanelView {
     /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
     /// `menu` is answers of one kind offered as a single dropdown after the buttons (where a pop-up opens); choosing
     /// one answers the question, and it stands in as the question's own filled answer.
+    /// `chooser` is the other way round: contents of one kind (where a web address opens) that the dropdown only
+    /// *picks*, while the buttons answer. The answer carries the chosen entry as `choice`, and the duration is left
+    /// out — the buttons are what say how long it lasts.
     /// The duration choice is This time unless `canRemember` offers Always on this site. A disabled choice keeps
-    /// `rememberNote` as its explanation. Nil means Not Now.
+    /// `rememberNote` as its explanation. Nil means Not Now. `rememberLabel` words that second choice where the
+    /// answer is kept somewhere else than the site (a download rule keeps its own).
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
-                    canRemember: Bool = true, rememberNote: String? = nil,
+                    chooser: [PermissionAction] = [],
+                    canRemember: Bool = true, rememberNote: String? = nil, rememberLabel: String? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let key = ObjectIdentifier(controller)
         let before = queue[key]
@@ -786,7 +791,9 @@ final class PermissionPrompt: FloatingPanelView {
                 return PermissionAnswer(action: known.action, remember: known.remember && remembers)
             }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."),
-                              symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
+                              symbol: symbol, icon: icon, actions: actions, menu: menu, chooser: chooser,
+                              canRemember: remembers, rememberNote: rememberNote,
+                              rememberLabel: rememberLabel,
                               origin: origin, in: controller, tab: tab)
         }
         queue[key] = task
@@ -802,7 +809,9 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
+                             menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool,
+                             rememberNote: String?, rememberLabel: String?,
+                             origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
@@ -838,6 +847,10 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.badge.color = .clear
             }
             prompt.duration.isEnabled = canRemember
+            // Where the answer is kept somewhere else than the site (a download rule keeps its own), the choice says so.
+            if let rememberLabel {
+                prompt.duration.options[1] = DropdownButton.Option(title: rememberLabel)
+            }
             if !canRemember {
                 prompt.duration.toolTip = rememberNote ?? (controller.promptIsPrivate
                     ? String(localized: "Private windows don’t remember answers.", comment: "Tooltip of the disabled duration dropdown on a permission question in a private window.")
@@ -848,7 +861,8 @@ final class PermissionPrompt: FloatingPanelView {
                 if action.isProminent { button.tint = accent }
                 button.onClick = { [weak prompt] _ in
                     guard let prompt, action.isDeny || prompt.acceptsAllow else { return }
-                    prompt.finish(PermissionAnswer(action: action.id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    prompt.finish(PermissionAnswer(action: action.id, remember: canRemember && prompt.duration.selectedIndex == 1,
+                                                   choice: prompt.chosenChoice))
                 }
                 return button
             }
@@ -869,6 +883,15 @@ final class PermissionPrompt: FloatingPanelView {
                     prompt.finish(PermissionAnswer(action: menu[index].id, remember: canRemember && prompt.duration.selectedIndex == 1))
                 }
                 prompt.addSubview(prompt.answerMenu)
+            }
+            // Contents of one kind (where a web address opens), which the dropdown only picks: the buttons answer, and
+            // the duration goes, since the buttons are what say how long it lasts. Nothing is answered here — the
+            // dropdown keeps the chosen index itself, and `chosenChoice` is read when a button is pressed.
+            if !chooser.isEmpty {
+                prompt.menuChoices = chooser
+                prompt.answerMenu.options = chooser.map { DropdownButton.Option(title: $0.title) }
+                prompt.addSubview(prompt.answerMenu)
+                prompt.duration.isHidden = true
             }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { response in
@@ -996,6 +1019,12 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// The entry a chooser had chosen, read when a button answers. Nil for a question with no such dropdown.
+    var chosenChoice: String? {
+        guard !menuChoices.isEmpty else { return nil }
+        return menuChoices[min(max(0, answerMenu.selectedIndex), menuChoices.count - 1)].id
+    }
 
     private func finish(_ choice: PermissionAnswer?) {
         // The disabled duration control also guards debug answers: a private or one-time question never returns Always.

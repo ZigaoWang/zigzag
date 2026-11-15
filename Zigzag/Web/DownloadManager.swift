@@ -512,7 +512,7 @@ extension DownloadManager: WKDownloadDelegate {
                                                   space: owner.flatMap { Library.shared.space($0.spaceID)?.name } ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
                                                   isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false),
-                                                  window: window)
+                                                  window: window, tab: owner)
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if outcome == .handedOff {
                 items.removeAll { $0.download === download }

@@ -286,6 +286,71 @@ struct DownloadRuleTests {
         #expect(decoded.first?.action.destination == .folder("/Users/me/Downloads/PDFs"))
     }
 
+    // MARK: Where an Open URL rule opens
+
+    /// Which addresses are Zigzag's own to open, and which belong to the app that handles them. Only the web's own
+    /// are Zigzag's: what you build a rule for to reach mpv or IINA must still reach mpv or IINA.
+    @Test func aWebAddressIsZigzagsAndAnythingElseItsAppsOwn() {
+        #expect(OpenInZigzag.handles(URL(string: "https://example.com/a?b=c")!))
+        #expect(OpenInZigzag.handles(URL(string: "http://example.com/a")!))
+        #expect(OpenInZigzag.handles(URL(string: "HTTPS://example.com/a")!))
+        #expect(!OpenInZigzag.handles(URL(string: "mpv://example.com/a")!))
+        #expect(!OpenInZigzag.handles(URL(string: "iina://weblink?url=x")!))
+        #expect(!OpenInZigzag.handles(URL(string: "magnet:?xt=urn:btih:abc")!))
+        #expect(!OpenInZigzag.handles(URL(string: "mailto:someone@example.com")!))
+        #expect(!OpenInZigzag.handles(URL(string: "file:///Users/me/a.pdf")!))
+    }
+
+    /// A rule that hasn't been told where to open keeps nothing, and one that has keeps it across its file. The ids
+    /// are the pop-up question's own ("thisTab", "newTab", "mini"), so an answer that question returns is one a rule
+    /// can be given, and a value from anywhere else is not a place at all.
+    @Test func aRuleRemembersWhereItsWebAddressOpens() throws {
+        var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.action.urlTemplate = "https://mirror.example.com/{filename}"
+        #expect(rule.action.openIn == nil)
+
+        let plain = try JSONEncoder().encode([rule])
+        #expect(!String(decoding: plain, as: UTF8.self).contains("openIn"))
+        let told = try JSONDecoder().decode([DownloadRule].self, from: plain)
+        #expect(told == [rule])
+        #expect(told.first?.action.openIn == nil)
+
+        rule.action.openIn = .mini
+        let data = try JSONEncoder().encode([rule])
+        let again = try JSONDecoder().decode([DownloadRule].self, from: data)
+        #expect(again == [rule])
+        #expect(again.first?.action.openIn == .mini)
+    }
+
+    @Test func everyPlaceIsOneTheQuestionKnows() {
+        #expect(OpenInZigzag.Place.allCases.map(\.rawValue) == ["thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Place(rawValue: "thisTab") == .thisTab)
+        #expect(OpenInZigzag.Place(rawValue: "mini") == .mini)
+        // The pop-up question's "deny", and the viewer it keeps under that name, are not places to open in, so an
+        // answer of those leaves the rule asking rather than taking a value it doesn't know.
+        #expect(OpenInZigzag.Place(rawValue: "deny") == nil)
+        #expect(OpenInZigzag.Place(rawValue: "viewer") == nil)
+        #expect(OpenInZigzag.Place(rawValue: "") == nil)
+        #expect(OpenInZigzag.Place.allCases.allSatisfy { !$0.title.isEmpty })
+    }
+
+    /// An Open URL rule that opens the web's own address still needs nothing but that address: where it opens has an
+    /// answer from the moment the rule exists (Zigzag asks), so it can never hold Add back.
+    @Test func whereAWebAddressOpensNeverHoldsTheRuleBack() {
+        var action = DownloadRuleAction(kind: .openURL)
+        #expect(!action.isComplete)
+        action.urlTemplate = "https://example.com/{filename}"
+        #expect(action.isComplete)
+        #expect(DownloadRuleSheet.actionHoldUp(action) == nil)
+        #expect(action.openIn == nil)
+        // Nothing to answer about where it opens, so the only thing a rule could be held up by is what it catches.
+        var mine = DownloadRule(name: "Mirror", match: .any, action: action)
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
+        mine.action.openIn = .newTab
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
+    }
+
     /// Everything holding a rule's Add button back, in the order the form is filled in: the button's own words and the
     /// fields it marks come from this one list, so the two can never disagree.
     @Test func aRuleSaysEverythingHoldingAddBack() {

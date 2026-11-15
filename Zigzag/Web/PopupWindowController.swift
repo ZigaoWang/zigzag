@@ -395,9 +395,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: parentWindow)
+                                              window: parentWindow, tab: opener)
         let outcome = await DownloadHandoff.perform(rule, request: handoff)
         if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+        // A rule that was matched but didn't take it leaves the pop-up's page as it was.
+        if case .noMatch = outcome { return false }
         return true
     }
 
