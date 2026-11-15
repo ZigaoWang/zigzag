@@ -51,9 +51,9 @@ enum DownloadRuleSheet {
         /// Open URL: where a web address opens in Zigzag, as the dropdown shows it. Nil is the rule that will ask the
         /// first time it fires, so the choices are read with that first entry in mind.
         var openInField: DropdownButton?
-        /// The three places a web address may open, and, before them, the rule that hasn't been told: what each index
-        /// of `openInField` stands for.
-        let openInChoices: [OpenInZigzag.Place?] = [nil] + OpenInZigzag.Place.allCases.map { Optional($0) }
+        /// How an Open URL rule is told where to open, and, before the places, the rule that hasn't been told: what
+        /// each index of `openInField` stands for.
+        let openInChoices: [OpenInAnswer?] = [nil] + OpenInZigzag.Place.allCases.map { .place($0) } + [.never]
         var scriptField: FilledField?
         var argumentView: MultilineField?
         var endpointField: FilledField?
@@ -125,10 +125,12 @@ enum DownloadRuleSheet {
             urlField = field
             actionRows.append(FormSheet.Row(label: String(localized: "URL", comment: "Label of the URL field in a download rule's sheet."), view: field))
             // Where a *web* address opens, inside Zigzag: the same three places a page's pop-up question offers. An
-            // address that isn't the web's (mpv://, a magnet) belongs to its own app, which the note says.
+            // address that isn't the web's (mpv://, a magnet) belongs to its own app, which the note says. Don't Open
+            // is the other answer the question can keep, and lives here too so it can be changed back.
             let place = DropdownButton()
             place.options = [DropdownButton.Option(title: String(localized: "Ask", comment: "Choice in an Open URL download rule's Open in dropdown: the rule asks where to open the first time it fires, and keeps the answer."))]
                 + OpenInZigzag.Place.allCases.map { DropdownButton.Option(title: $0.title) }
+                + [DropdownButton.Option(title: OpenInAnswer.neverTitle)]
             place.selectedIndex = openInChoices.firstIndex(of: action.openIn) ?? 0
             place.toolTip = String(localized: "A rule that hasn’t been told asks the first time it fires, and keeps your answer.", comment: "Tooltip on the Open in choice of an Open URL download rule.")
             openInField = place

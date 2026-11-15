@@ -18,8 +18,8 @@ enum HandoffNotice {
     /// which is nil for a script's answer (see `DownloadHandoff.announce`). They are the same rule for a rule's own
     /// firing, and only an Open URL can tell them apart.
     static func line(for rule: DownloadRule?, askingOn asker: DownloadRule?, action: DownloadRuleAction,
-                     values: HandoffValues, secret: String) -> String? {
-        guard let did = whatItDid(action, askingOn: asker, values: values, secret: secret) else { return nil }
+                     values: HandoffValues, secret: String, request: DownloadHandoff.Request) -> String? {
+        guard let did = whatItDid(action, askingOn: asker, values: values, secret: secret, request: request) else { return nil }
         let named = rule?.name.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         // The rule's own name comes first: a notice you can't put a name to is the one thing it can't be. A rule that
         // was never given one says what happened without inventing a name for it.
@@ -29,7 +29,7 @@ enum HandoffNotice {
 
     /// What one action did, in words. Nil for the actions that say so themselves.
     private static func whatItDid(_ action: DownloadRuleAction, askingOn asker: DownloadRule?,
-                                  values: HandoffValues, secret: String) -> String? {
+                                  values: HandoffValues, secret: String, request: DownloadHandoff.Request) -> String? {
         switch action.kind {
         case .runScript:
             // The card over the page that says "Running script: yt-dlp.sh" *is* the notice; a line beside it would say
@@ -46,10 +46,9 @@ enum HandoffNotice {
                 // An address that isn't the web's belongs to its own app: name the app, as Settings › Downloads does.
                 return String(localized: "handed this link to \(ExternalLinks.appName(forScheme: scheme))", comment: "An automation's notice over the page: what a rule did with the link. The placeholder is the app that opens the address's scheme, like mpv for mpv://.")
             }
-            guard let place = action.place(askingOn: asker) else {
-                // A rule that hasn't been told: opening this asks where, and the question is the sighting. A script's
-                // answer has no rule to ask on — `place` has already decided it opens in a new tab — so it never
-                // reaches here, and the silent new tab it would otherwise open is announced below.
+            // The same decision the action will take, never a guess from the rule alone: a site's answer for this rule
+            // decides it too. Refused means nothing happened, and asking means the question is the sighting.
+            guard case .place(let place) = DownloadHandoff.openInDecision(action, rule: asker, request: request) else {
                 return nil
             }
             switch place {

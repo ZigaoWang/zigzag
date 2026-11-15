@@ -84,4 +84,7 @@ nonisolated enum PermissionSubject {
 
     static func app(_ scheme: String) -> String { "app:\(scheme)" }
     static func handoff(_ rule: UUID) -> String { "handoff:\(rule.uuidString)" }
+    /// Where this rule's web addresses open on one site, when the answer was kept for the site rather than the rule:
+    /// a place's id, or "deny".
+    static func openIn(_ rule: UUID) -> String { "openIn:\(rule.uuidString)" }
 }

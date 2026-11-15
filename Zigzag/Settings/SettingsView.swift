@@ -2932,28 +2932,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 everySite.keywords = Self.handoffAnswerName(own)
                 downloadRulesGroup.add(everySite)
             }
-            // The sites this rule has a standing answer on, grouped by what was answered — handed off, left to the
-            // browser, or refused — so a site the rule was refused on doesn't read like one it was handed off on.
-            // Each can be forgotten on its own, so one site is asked again without touching the others.
-            for group in Self.handoffAnswerGroups(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id))) {
-                let perSite = NSStackView()
-                perSite.orientation = .horizontal
-                perSite.spacing = Tokens.Space.x2
-                perSite.alignment = .centerY
-                for site in group.sites {
-                    let forget = IconButton(symbol: "xmark", size: .compact,
-                                            toolTip: String(localized: "Forget \(SiteOrigin.label(site))", comment: "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name."))
-                    forget.onClick = { [weak self] _ in
-                        SitePermissions.remember(nil, subject: PermissionSubject.handoff(rule.id), origin: site)
-                        self?.reloadDownloadRules()
-                    }
-                    perSite.addArrangedSubview(forget)
-                }
-                let sitesRow = FormRow(title: group.title,
-                                       detail: group.sites.map(SiteOrigin.label).joined(separator: ", "), control: perSite)
-                sitesRow.keywords = group.sites.joined(separator: " ")
-                downloadRulesGroup.add(sitesRow)
-            }
+            // The sites this rule has a standing answer on, each group forgettable site by site: handing off first,
+            // then where its web addresses open.
+            addSiteAnswerRows(for: PermissionSubject.handoff(rule.id), in: ["handOff", "browser", "deny"],
+                              named: Self.handoffAnswerName)
+            addSiteAnswerRows(for: PermissionSubject.openIn(rule.id),
+                              in: OpenInZigzag.Place.allCases.map(\.rawValue) + ["deny"],
+                              named: Self.openInAnswerName)
         }
         // One line under the list, and it's the one thing the list can't show: that dragging changes the order.
         let hint = FormRow(title: String(localized: "Rules run from the top", comment: "In Settings › Downloads, under the rules: the first match wins."),
@@ -2961,6 +2946,31 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                              comment: "Under the download rules in Settings › Downloads, when there is an order to change.") : nil,
                            control: NSView())
         downloadRulesGroup.add(hint)
+    }
+
+    /// One row per answer a rule keeps for a site — grouped by the answer, so a site it was refused on doesn't read
+    /// like one it was handed off on — with each site forgettable on its own, so one is asked again without touching
+    /// the others. The subjects differ (handing off, where a web address opens); the shape is the same.
+    private func addSiteAnswerRows(for subject: String, in order: [String], named: (String) -> String) {
+        for group in Self.answerGroups(SitePermissions.decisions(prefix: subject), in: order, named: named) {
+            let perSite = NSStackView()
+            perSite.orientation = .horizontal
+            perSite.spacing = Tokens.Space.x2
+            perSite.alignment = .centerY
+            for site in group.sites {
+                let forget = IconButton(symbol: "xmark", size: .compact,
+                                        toolTip: String(localized: "Forget \(SiteOrigin.label(site))", comment: "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name."))
+                forget.onClick = { [weak self] _ in
+                    SitePermissions.remember(nil, subject: subject, origin: site)
+                    self?.reloadDownloadRules()
+                }
+                perSite.addArrangedSubview(forget)
+            }
+            let sitesRow = FormRow(title: group.title,
+                                   detail: group.sites.map(SiteOrigin.label).joined(separator: ", "), control: perSite)
+            sitesRow.keywords = group.sites.joined(separator: " ")
+            downloadRulesGroup.add(sitesRow)
+        }
     }
 
     /// The per-extension destinations, one row each, under Save downloads to: the file types a rule names, and where
@@ -3018,10 +3028,23 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// browser, then refused — with only the groups that have sites. So the list reads as the decision it records,
     /// and a site the rule was refused on never looks like one it was handed off on.
     static func handoffAnswerGroups(_ decided: [(origin: String, action: String)]) -> [(title: String, sites: [String])] {
-        ["handOff", "browser", "deny"].compactMap { action in
+        answerGroups(decided, in: ["handOff", "browser", "deny"], named: handoffAnswerName)
+    }
+
+    /// The same list for any subject a rule keeps per site, with the answer named as that subject names it and the
+    /// groups in the order that subject offers them. Only answers the order names are listed, so a value this Zigzag
+    /// doesn't understand is never shown as a group of its own.
+    static func answerGroups(_ decided: [(origin: String, action: String)], in order: [String],
+                             named: (String) -> String) -> [(title: String, sites: [String])] {
+        order.compactMap { action in
             let sites = decided.filter { $0.action == action }.map(\.origin)
-            return sites.isEmpty ? nil : (handoffAnswerName(action), sites)
+            return sites.isEmpty ? nil : (named(action), sites)
         }
+    }
+
+    /// What an Open URL answer is called in that list: the place's own name, or Don't Open.
+    static func openInAnswerName(_ action: String) -> String {
+        OpenInZigzag.Place(rawValue: action)?.title ?? OpenInAnswer.neverTitle
     }
 
     /// What a handoff answer is called in that list: the very words the question's button used.

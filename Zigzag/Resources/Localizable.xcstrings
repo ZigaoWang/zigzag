@@ -6427,6 +6427,17 @@
         }
       }
     },
+    "Don’t Open" : {
+      "comment" : "Choice in an Open URL download rule's Open in dropdown: the rule does not open anything, for any site. It is the answer “Always for this rule” and Don’t Allow keeps.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不打开"
+          }
+        }
+      }
+    },
     "Don’t let this page show more dialogs" : {
       "comment" : "Tooltip of Block Dialogs in a page's JavaScript dialog sheet.",
       "localizations" : {
@@ -11184,17 +11195,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Mac 上"
-          }
-        }
-      }
-    },
-    "Once" : {
-      "comment" : "Button on a download rule's question: open it where the dropdown says this one time, and ask again next time.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅此一次"
           }
         }
       }

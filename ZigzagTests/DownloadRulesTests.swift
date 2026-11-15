@@ -451,11 +451,15 @@ struct DownloadRuleTests {
         #expect(told == [rule])
         #expect(told.first?.action.openIn == nil)
 
-        rule.action.openIn = .mini
+        rule.action.openIn = .place(.mini)
         let data = try JSONEncoder().encode([rule])
         let again = try JSONDecoder().decode([DownloadRule].self, from: data)
         #expect(again == [rule])
-        #expect(again.first?.action.openIn == .mini)
+        #expect(again.first?.action.openIn == .place(.mini))
+
+        // The other answer a rule can keep: not to open at all.
+        rule.action.openIn = .never
+        #expect(try JSONDecoder().decode([DownloadRule].self, from: JSONEncoder().encode([rule])).first?.action.openIn == .never)
     }
 
     @Test func everyPlaceIsOneTheQuestionKnows() {
@@ -482,7 +486,7 @@ struct DownloadRuleTests {
         // Nothing to answer about where it opens, so the only thing a rule could be held up by is what it catches.
         var mine = DownloadRule(name: "Mirror", match: .any, action: action)
         #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
-        mine.action.openIn = .newTab
+        mine.action.openIn = .place(.newTab)
         #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
     }
 
@@ -596,7 +600,7 @@ struct DownloadRuleTests {
         var play = DownloadRuleAction(kind: .openApp)
         play.appPath = "/Applications/mpv.app"
         #expect(action(named: #"{"kind":"openApp","appPath":"/Applications/mpv.app"}"#) == play)
-        #expect(action(named: #"{"kind":"openURL","urlTemplate":"{link}","openIn":"mini"}"#)?.openIn == .mini)
+        #expect(action(named: #"{"kind":"openURL","urlTemplate":"{link}","openIn":"mini"}"#)?.openIn == .place(.mini))
 
         var rpc = DownloadRuleAction(kind: .jsonRPC)
         rpc.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc"
@@ -636,13 +640,15 @@ struct DownloadRuleTests {
         /// A rule's own firing: the rule is both the one the notice names and the one a place would be kept on.
         func line(_ action: DownloadRuleAction, named: String = "Videos") -> String? {
             let rule = DownloadRule(name: named, match: .any, action: action)
-            return HandoffNotice.line(for: rule, askingOn: rule, action: action, values: values, secret: "")
+            return HandoffNotice.line(for: rule, askingOn: rule, action: action, values: values, secret: "",
+                                      request: DownloadHandoff.Request(url: values.link))
         }
 
         /// A script's answer: named for the script's rule, but with no rule to remember a place on.
         func answer(_ action: DownloadRuleAction, of named: String = "Downloads") -> String? {
             let scriptRule = DownloadRule(name: named, match: .any, action: DownloadRuleAction(kind: .runScript))
-            return HandoffNotice.line(for: scriptRule, askingOn: nil, action: action, values: values, secret: "")
+            return HandoffNotice.line(for: scriptRule, askingOn: nil, action: action, values: values, secret: "",
+                                      request: DownloadHandoff.Request(url: values.link))
         }
 
         // An app, and a service: what it did, and the rule it did it.
@@ -658,24 +664,28 @@ struct DownloadRuleTests {
         // A web address with a place already decided says which place.
         var web = DownloadRuleAction(kind: .openURL)
         web.urlTemplate = "{link}"
-        web.openIn = .newTab
+        web.openIn = .place(.newTab)
         #expect(line(web) == "Videos: opened this link in a new tab")
-        web.openIn = .thisTab
+        web.openIn = .place(.thisTab)
         #expect(line(web) == "Videos: opened this link in this tab")
-        web.openIn = .mini
+        web.openIn = .place(.mini)
         #expect(line(web) == "Videos: opened this link in Mini")
 
         // No place yet, and a rule to ask: opening it asks where, and the question is the sighting itself. Once an
         // answer is kept on the rule the question stops, and the line above is what says so in its place.
         web.openIn = nil
         #expect(line(web) == nil)
+        // Told not to open, for every site: nothing happens, so there is nothing to say.
+        web.openIn = .never
+        #expect(line(web) == nil)
 
         // A script's answer is the other half of that, and the one a notice is *most* for: it has no rule to ask on,
         // so it opens in a new tab with nothing else to show for it. Launched by something planted, that is exactly
         // the invisible firing the user's rule is about.
+        web.openIn = nil
         #expect(answer(web) == "Downloads: opened this link in a new tab")
         // Named a place in its own JSON, so it says that place like a rule that was told.
-        web.openIn = .mini
+        web.openIn = .place(.mini)
         #expect(answer(web) == "Downloads: opened this link in Mini")
 
         // A script's card says it is running, and a destination is read where WebKit makes the download, never run as
@@ -705,13 +715,18 @@ struct DownloadRuleTests {
         let rule = DownloadRule(name: "Videos", match: .any, action: web)
 
         // A rule that hasn't been told: nowhere yet — it will ask.
-        #expect(web.place(askingOn: rule) == nil)
+        #expect(web.openInAnswer(askingOn: rule) == nil)
         // Told, and it keeps that.
-        web.openIn = .mini
-        #expect(web.place(askingOn: rule) == .mini)
+        web.openIn = .place(.mini)
+        #expect(web.openInAnswer(askingOn: rule) == .place(.mini))
+        // Told not to open: the other answer, and not the same as never asked.
+        web.openIn = .never
+        #expect(web.openInAnswer(askingOn: rule) == .never)
         // A script's answer: no rule to ask on, so a new tab — or the place the answer itself named.
-        #expect(DownloadRuleAction(kind: .openURL).place(askingOn: nil) == .newTab)
-        #expect(web.place(askingOn: nil) == .mini)
+        web.openIn = nil
+        #expect(DownloadRuleAction(kind: .openURL).openInAnswer(askingOn: nil) == .place(.newTab))
+        web.openIn = .place(.mini)
+        #expect(web.openInAnswer(askingOn: nil) == .place(.mini))
     }
 
     /// A notice said twice while it is still up is one notice with a count, in the diagnostics' own shape — and only
@@ -853,6 +868,76 @@ extension DownloadRuleTests {
                                    action: DownloadRuleAction(kind: .openURL))
         #expect(!DownloadHandoff.alwaysFor(unnamed).contains("“”"))
         #expect(DownloadHandoff.alwaysFor(unnamed) != DownloadHandoff.alwaysFor(named))
+    }
+
+    /// The site's answer for this rule outranks the rule's own, which outranks the page's "this time"; with none of
+    /// them the firing asks. A private window reads the page's and the rule's, not the site's.
+    @MainActor @Test func anOpenInDecisionReadsSiteThenRuleThenPage() async throws {
+        let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let site = "https://site.example"
+        var rule = DownloadRule(name: "Videos", match: .any, action: DownloadRuleAction(kind: .openURL))
+        rule.action.openIn = nil
+        let tab = Tab(url: URL(string: "\(site)/page"), spaceID: UUID())
+        var request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/v.mp4")!,
+                                              referrer: URL(string: "\(site)/page")!, pageOrigin: site)
+        request.tab = tab
+        let subjectForRule = PermissionSubject.openIn(rule.id)
+
+        // Nothing told anywhere: the question, which is the sighting.
+        #expect(DownloadHandoff.openInDecision(rule.action, rule: rule, request: request) == .ask)
+
+        // The rule's own answer stands.
+        rule.action.openIn = .place(.mini)
+        #expect(DownloadHandoff.openInDecision(rule.action, rule: rule, request: request) == .place(.mini))
+
+        // The site's answer, more specific still, wins over it — a refusal included.
+        SitePermissions.remember("newTab", subject: subjectForRule, origin: site)
+        #expect(DownloadHandoff.openInDecision(rule.action, rule: rule, request: request) == .place(.newTab))
+        SitePermissions.remember("deny", subject: subjectForRule, origin: site)
+        #expect(DownloadHandoff.openInDecision(rule.action, rule: rule, request: request) == .refuse)
+
+        // A private window doesn't read the site's answer; the rule's still stands.
+        var privateRequest = request
+        privateRequest.isPrivate = true
+        #expect(DownloadHandoff.openInDecision(rule.action, rule: rule, request: privateRequest) == .place(.mini))
+
+        // The page's own "this time" answer, with the site's forgotten and the rule not told.
+        SitePermissions.remember(nil, subject: subjectForRule, origin: site)
+        tab.permissionAnswers.note("thisTab", key: site, kind: subjectForRule)
+        rule.action.openIn = nil
+        #expect(DownloadHandoff.openInDecision(rule.action, rule: rule, request: request) == .place(.thisTab))
+        // Told never, no page answer brings it back.
+        rule.action.openIn = .never
+        #expect(DownloadHandoff.openInDecision(rule.action, rule: rule, request: request) == .refuse)
+    }
+
+    /// Deleting a rule forgets both kinds of per-site answer it can keep — its handoff, and where its web addresses
+    /// open — so no answer outlives the rule it was about.
+    @MainActor @Test func deletingARuleForgetsBothKindsOfSiteAnswer() throws {
+        let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let id = UUID()
+        SitePermissions.remember("handOff", subject: PermissionSubject.handoff(id), origin: "https://a.example")
+        SitePermissions.remember("mini", subject: PermissionSubject.openIn(id), origin: "https://a.example")
+        #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(id)).count == 1)
+        #expect(SitePermissions.decisions(prefix: PermissionSubject.openIn(id)).count == 1)
+
+        DownloadRulesStore.forgetSiteAnswers(for: id)
+        #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(id)).isEmpty)
+        #expect(SitePermissions.decisions(prefix: PermissionSubject.openIn(id)).isEmpty)
     }
 
     @Test func aHandoffQuestionUsesThePageOrigin() {

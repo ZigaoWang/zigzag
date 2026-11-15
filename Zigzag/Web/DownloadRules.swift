@@ -234,6 +234,48 @@ nonisolated private extension String {
 
 // MARK: - What a rule does
 
+/// What an Open URL rule was told about where a web address opens: one of Zigzag's own places, or nowhere at all — the
+/// answer "Always for this rule" and Don't Allow keeps. One value rather than a place and a flag, so "Mini" and "don't
+/// open" can never both be true. **Nil on the action** is a rule that hasn't been told yet, which is where the
+/// question comes from; it is kept out of the enum so an untold rule still saves no `openIn` key, as it always did.
+nonisolated enum OpenInAnswer: Equatable, Sendable {
+    case place(OpenInZigzag.Place)
+    case never
+
+    /// The place to open, where there is one; nil for the answer that opens nothing.
+    var place: OpenInZigzag.Place? {
+        if case .place(let place) = self { return place }
+        return nil
+    }
+
+    /// What the answer that opens nothing is called, where it is chosen and where it is listed.
+    static var neverTitle: String {
+        String(localized: "Don’t Open", comment: "Choice in an Open URL download rule's Open in dropdown: the rule does not open anything, for any site. It is the answer “Always for this rule” and Don’t Allow keeps.")
+    }
+}
+
+extension OpenInAnswer: Codable {
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let text = try container.decode(String.self)
+        if text == "never" {
+            self = .never
+        } else if let place = OpenInZigzag.Place(rawValue: text) {
+            self = .place(place)
+        } else {
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not an Open URL answer: \(text)")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .never: try container.encode("never")
+        case .place(let place): try container.encode(place.rawValue)
+        }
+    }
+}
+
 /// The action behind a rule. One flat shape with a `kind`, rather than an enum with a payload each, so the file stays
 /// readable, a field a newer Zigzag adds doesn't break an older one, and the editor's fields map one to one.
 nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
@@ -316,9 +358,10 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     /// Open URL: the URL to open, with tokens such as `{encoded_link}`.
     var urlTemplate = ""
     /// Open URL: where a *web* address opens in Zigzag itself. Nil is a rule that has not been told yet — Zigzag asks
-    /// the first time the rule fires and keeps the answer here, so it asks once rather than every time. An address
-    /// that isn't the web's (mpv://, a magnet) belongs to the app that handles it and ignores this.
-    var openIn: OpenInZigzag.Place?
+    /// the first time the rule fires and keeps the answer here, so it asks once rather than every time. `.never` is
+    /// the other answer it can be given: "Always for this rule" and Don't Allow. An address that isn't the web's
+    /// (mpv://, a magnet) belongs to the app that handles it and ignores this.
+    var openIn: OpenInAnswer?
     /// Run Script: the executable, or a `.sh` file run by `/bin/sh`.
     var scriptPath = ""
     /// Run Script: one argv value each. A token is substituted into its own argument, never joined into a shell line.
@@ -413,7 +456,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         kind = try container.decodeIfPresent(Kind.self, forKey: .kind) ?? .openURL
         appPath = try container.decodeIfPresent(String.self, forKey: .appPath) ?? ""
         urlTemplate = try container.decodeIfPresent(String.self, forKey: .urlTemplate) ?? ""
-        openIn = try container.decodeIfPresent(OpenInZigzag.Place.self, forKey: .openIn)
+        openIn = try container.decodeIfPresent(OpenInAnswer.self, forKey: .openIn)
         scriptPath = try container.decodeIfPresent(String.self, forKey: .scriptPath) ?? ""
         arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
         rpcEndpoint = try container.decodeIfPresent(String.self, forKey: .rpcEndpoint) ?? ""
@@ -425,13 +468,15 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
 }
 
 extension DownloadRuleAction {
-    /// Where an Open URL action opens, or nil while there is a rule to ask and it hasn't been told yet — the question
-    /// is then the sighting, not a notice. A script's own answer has no rule to ask on, so its web addresses open in a
-    /// new tab unless the answer itself names a place. **One rule, two callers**: `DownloadHandoff.openURL` opens it
-    /// here, and `HandoffNotice` says what it is about to do from the same answer, so what a rule says can never
-    /// drift from what it does. Only an Open URL has anywhere to decide; every other kind ignores this.
-    func place(askingOn rule: DownloadRule?) -> OpenInZigzag.Place? {
-        openIn ?? (rule == nil ? .newTab : nil)
+    /// What this action itself was told, before any answer a site or a page gave: nil for a rule that hasn't been told
+    /// (which is where the question comes from), and `.never` for one told not to open. A script's own answer has no
+    /// rule to ask on, so its web addresses open in a new tab unless the answer itself names a place.
+    ///
+    /// **One resolver, two callers**: `DownloadHandoff` opens it here and `HandoffNotice` says what it is about to do
+    /// from the same decision, so what a rule says can never drift from what it does. Only an Open URL has anywhere to
+    /// decide; every other kind ignores this.
+    func openInAnswer(askingOn rule: DownloadRule?) -> OpenInAnswer? {
+        openIn ?? (rule == nil ? .place(.newTab) : nil)
     }
 }
 
@@ -790,8 +835,15 @@ final class DownloadRulesStore {
         rules.removeAll { $0.id == id }
         HandoffSecrets.removeSecret(for: id)
         // The sites the rule was decided on keep nothing about it once it is gone.
-        SitePermissions.forgetActions(prefix: PermissionSubject.handoff(id))
+        Self.forgetSiteAnswers(for: id)
         save()
+    }
+
+    /// What a rule kept for individual sites, forgotten: both kinds of answer it can keep — its handoff and where its
+    /// web addresses open. Kept apart from `remove` so a test can prove both are forgotten without a store's file.
+    static func forgetSiteAnswers(for id: UUID) {
+        SitePermissions.forgetActions(prefix: PermissionSubject.handoff(id))
+        SitePermissions.forgetActions(prefix: PermissionSubject.openIn(id))
     }
 
     /// The rules with the one whose `id` this is moved to just before `before` (`nil` puts it last). Kept apart from
