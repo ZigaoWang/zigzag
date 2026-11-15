@@ -83,6 +83,43 @@ struct BrandContrastTests {
         }
     }
 
+    /// `top` (with its alpha, times `alpha`) laid over the opaque `ground`.
+    func over(_ top: NSColor, _ ground: NSColor, alpha: CGFloat = 1) -> NSColor {
+        let a = top.alphaComponent * alpha
+        return NSColor(srgbRed: top.redComponent * a + ground.redComponent * (1 - a), green: top.greenComponent * a + ground.greenComponent * (1 - a),
+                       blue: top.blueComponent * a + ground.blueComponent * (1 - a), alpha: 1)
+    }
+
+    @Test func disabledControlsStillRead() {
+        // A control that can't be used now still says what it is: its words at least 3:1, in light and dark, on a
+        // panel and on a page.
+        for dark in [false, true] {
+            for ground in [Tokens.Color.panelBackground, Tokens.Color.formBackground] {
+                let bg = resolved(ground, dark: dark)
+                // Words alone (a quiet button) take the disabled ink, unfaded.
+                let words = over(resolved(Tokens.Color.textDisabled, dark: dark), bg)
+                #expect(Brand.contrast(words, bg) >= 3, "quiet \(dark) \(bg)")
+                // A button with a fill is faded whole: its words on its fill, both over the ground at `Opacity.disabled`.
+                let fill = over(resolved(Tokens.Color.controlFill, dark: dark), bg)
+                let ink = over(resolved(Tokens.Color.textPrimary, dark: dark), fill)
+                let shownFill = over(fill, bg, alpha: Tokens.Opacity.disabled), shownInk = over(ink, bg, alpha: Tokens.Opacity.disabled)
+                #expect(Brand.contrast(shownInk, shownFill) >= 3, "plain \(dark) \(bg): \(Brand.contrast(shownInk, shownFill))")
+            }
+        }
+        // A quiet button that can't be used takes that ink and isn't faded on top of it.
+        let quiet = PillButton(title: "Use Default Colors", style: .quiet)
+        quiet.isEnabled = false
+        let label = quiet.subviews.compactMap { $0 as? Label }.first
+        for dark in [false, true] {
+            #expect(resolved(label?.textColor ?? .clear, dark: dark) == resolved(Tokens.Color.textDisabled, dark: dark))
+        }
+        #expect(quiet.alphaValue == 1)
+        let text = TextButton(title: "Use Default Colors")
+        text.isEnabled = false
+        #expect(text.alphaValue == 1)
+        #expect(text.subviews.compactMap { $0 as? Label }.allSatisfy { $0.alphaValue == 1 && $0.textColor == Tokens.Color.textDisabled })
+    }
+
     @Test func aTintedButtonsTextReadsOnItsTint() {
         // A prominent button given a tint (a site's question, What's New) takes text that reads on that tint: the
         // space's accent is pale at night, where white on it fell to 2.6:1.

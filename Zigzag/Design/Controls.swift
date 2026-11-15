@@ -1057,10 +1057,10 @@ final class TextButton: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let ink = applyButtonLook(showsFillAtRest ? .secondary : .quiet)
-        // Text alone dims only its words when it can't be used, not the whole button.
+        // Text alone takes the disabled ink when it can't be used, rather than fading past reading.
         if !showsFillAtRest { alphaValue = 1 }
-        label.textColor = textColor ?? ink
-        label.alphaValue = isEnabled || showsFillAtRest ? 1 : Tokens.Opacity.disabled
+        label.textColor = isEnabled || showsFillAtRest ? textColor ?? ink : Tokens.Color.textDisabled
+        label.alphaValue = 1
     }
 
 }

@@ -213,7 +213,7 @@ extension InteractiveView {
             }
         case .quiet:
             fill = isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
-            text = isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            text = !isEnabled ? Tokens.Color.textDisabled : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         }
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         let edged = look == .secondary
@@ -225,7 +225,8 @@ extension InteractiveView {
             layer?.shadowRadius = Tokens.Shadow.controlRadius
             layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.controlDrop : -Tokens.Shadow.controlDrop)
         }
-        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
+        // Words alone can't be faded further and still read: a quiet one takes the disabled ink instead.
+        alphaValue = isEnabled || look == .quiet ? 1 : Tokens.Opacity.disabled
         return text
     }
 
@@ -340,8 +341,9 @@ final class PillButton: InteractiveView {
         case .quiet: ink = applyButtonLook(.quiet)
         }
         let tinted = style == .prominent || customFill != nil
-        label.textColor = isDestructive && !tinted ? Tokens.Color.destructive : ink
-        iconView.contentTintColor = tinted ? ink : isHovered || isSelected || style == .plain ? Tokens.Color.textPrimary : Tokens.Color.icon
+        label.textColor = isDestructive && !tinted && isEnabled ? Tokens.Color.destructive : ink
+        iconView.contentTintColor = tinted ? ink : !isEnabled && style == .quiet ? Tokens.Color.textDisabled
+            : isHovered || isSelected || style == .plain ? Tokens.Color.textPrimary : Tokens.Color.icon
     }
 }
 

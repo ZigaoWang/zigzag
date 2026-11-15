@@ -1092,7 +1092,9 @@ enum Tokens {
     // MARK: - Opacity
 
     enum Opacity {
-        static let disabled: CGFloat = 0.35
+        /// A control that can't be used now, faded whole: its words still at least 3:1 on a panel or page, in light
+        /// and dark. Words alone (a quiet button) take `Color.textDisabled` instead.
+        static let disabled: CGFloat = 0.5
         /// Floor for tabs that have not been looked at in a long time.
         static let fadedFloor: CGFloat = 0.42
         /// What a panel opened over the sidebar (downloads, the site panel) sits on: stepped back, still readable,
@@ -1205,6 +1207,9 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.72), highDark: hex(0xFFFFFF, alpha: 0.80))
         static let textTertiary = dynamic(light: hex(0x000000, alpha: 0.45), dark: hex(0xFFFFFF, alpha: 0.42),
             highLight: hex(0x000000, alpha: 0.64), highDark: hex(0xFFFFFF, alpha: 0.72))
+        /// The words of a quiet control that can't be used now ("Use Default Colors" with nothing to put back): the
+        /// faintest text, at full strength rather than faded, so it still reads at 3:1 on a panel or page.
+        static let textDisabled = textTertiary
 
         static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66),
             highLight: hex(0x000000, alpha: 0.80), highDark: hex(0xFFFFFF, alpha: 0.84))
