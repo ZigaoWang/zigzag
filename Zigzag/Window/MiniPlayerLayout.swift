@@ -449,6 +449,14 @@ nonisolated struct MiniPlayerModel: Equatable {
         return steps
     }
 
+    /// Zigzag went to the background with this tab on screen playing a video (`AutoPictureInPicture`): its video
+    /// goes into the mini player, unless the player shows one already. Back on its tab, `switched` puts it back.
+    mutating func left(_ id: UUID) -> [Step] {
+        guard tab == nil else { return [] }
+        tab = id
+        return [.show(id)]
+    }
+
     /// Its minimize button: the card goes and the video plays on in its tab, out of sight. It comes back only the
     /// next time you leave that tab while it plays: never by itself while you're on other tabs, which would undo
     /// the minimize. The sidebar's now-playing row is the way back to it.

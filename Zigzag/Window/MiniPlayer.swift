@@ -167,6 +167,22 @@ final class MiniPlayer {
         apply(model.lost(id))
     }
 
+    /// Zigzag went to the background with `tab` on screen playing a video you were watching
+    /// (`AutoPictureInPicture`): the video moves into the card and plays on over the app you went to. Not when the card
+    /// shows a video already. Whether it took it.
+    func takeOnLeaving(_ tab: Tab) -> Bool {
+        guard model.tab == nil, card == nil, isOnScreen(tab), follows(tab) else { return false }
+        apply(model.left(tab.id))
+        return holds(tab)
+    }
+
+    /// Back in front of the tab the card took as you left Zigzag, still on screen in its window: its video goes back
+    /// in its page, still playing, as when you go back to a tab.
+    func cameBack() {
+        guard let tab, let manager = controller?.tabManager, let front = manager.selectedTab, isOnScreen(tab) else { return }
+        apply(model.switched(shown: Set(manager.panes(of: front).map(\.id)), playing: nil))
+    }
+
     /// Its close button: the video stops, and the player goes.
     func close() {
         apply(model.close())
@@ -232,6 +248,8 @@ final class MiniPlayer {
         menu.addItem(SidebarMenus.Item(String(localized: "Close", comment: "Tooltip of the mini player's close button: stops the video and closes the player.")) { [weak self] in
             self?.close()
         })
+        // Taken as you left Zigzag, its tab still on screen: that's the other switch in Settings › Tabs, not this one.
+        if let tab, isOnScreen(tab) { return menu }
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item(String(localized: "Turn Off Mini Player", comment: "Item in the mini player's right-click menu: videos stop following you into a mini player when you switch tabs (Settings › Tabs).")) { [weak self] in
             self?.turnOff()
@@ -345,6 +363,9 @@ final class MiniPlayer {
     /// left it; closed, the card fades as it goes. `parking`: minimized, the page stays in the window, out of sight,
     /// so its video plays on even with no sound (`park`).
     private func finish(closing: Bool, parking: Bool = false) {
+        // Taken as you left Zigzag, its tab is still the one on screen: the page goes back in its card, never parked.
+        let onScreen = tab.map(isOnScreen) ?? false
+        let parking = parking && !onScreen
         lostWait?.cancel()
         lostWait = nil
         tokens = []
@@ -400,6 +421,7 @@ final class MiniPlayer {
         frameID = nil
         video = nil
         if keeps, let webView { parkedPageReported(webView) }
+        if onScreen, let webView { controller?.miniPlayerGaveBack(webView) }
         controller?.miniPlayerChanged()
     }
 

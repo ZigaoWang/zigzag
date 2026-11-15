@@ -1899,17 +1899,6 @@
         }
       }
     },
-    "A video you’re watching floats over other apps and desktops when you switch away, and goes back in its page when you come back to it." : {
-      "comment" : "Explanation under “Picture in picture when you leave Zigzag” in Settings › Tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "切到其他 App 或桌面时，你正在看的视频会浮在最上面；回到它的页面时，再回到页面里。"
-          }
-        }
-      }
-    },
     "A video you’re watching follows you in a small player over the page. Its right-click menu can turn this off too." : {
       "comment" : "Explanation under “Show a mini player when you switch tabs” in Settings › Tabs.",
       "localizations" : {
@@ -1917,6 +1906,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你正在看的视频会在页面上方的小播放器里跟着你。也可以在小播放器的右键菜单里关闭。"
+          }
+        }
+      }
+    },
+    "A video you’re watching keeps playing in a small player over other apps and desktops, and goes back in its page when you come back to it." : {
+      "comment" : "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你正在看的视频会在其他 App 和桌面上方的小播放器里继续播放；回到它的页面时，再回到页面里。"
           }
         }
       }
@@ -11614,17 +11614,6 @@
         }
       }
     },
-    "Picture in picture when you leave Zigzag" : {
-      "comment" : "A setting in Settings › Tabs: a playing video floats over other apps when you switch to another app or desktop.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "离开 Zigzag 时自动画中画"
-          }
-        }
-      }
-    },
     "Pin %lld Tabs" : {
       "comment" : "Menu item for several picked tabs",
       "localizations" : {
@@ -14599,6 +14588,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示工具栏"
+          }
+        }
+      }
+    },
+    "Show a mini player when you leave Zigzag" : {
+      "comment" : "A setting in Settings › Tabs, below “Show a mini player when you switch tabs”: a playing video moves into Zigzag's small player, over other apps, when you switch to another app or desktop.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离开 Zigzag 时显示小播放器"
           }
         }
       }
@@ -20087,6 +20087,17 @@
         }
       }
     },
+    "mini player picture in picture pip floating video other app desktop space leave switch away background automatic" : {
+      "comment" : "Words that find the Show a mini player when you leave Zigzag setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "小播放器 画中画 悬浮 视频 其他 App 桌面 离开 切换 后台 自动 mini player picture in picture pip floating video other app desktop space leave switch away background automatic"
+          }
+        }
+      }
+    },
     "muted" : {
       "comment" : "Spoken by VoiceOver after a tab row's name: the tab is muted.",
       "localizations" : {
@@ -20268,17 +20279,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电话"
-          }
-        }
-      }
-    },
-    "picture in picture pip floating video other app desktop space full screen leave switch away automatic" : {
-      "comment" : "Words that find the Picture in picture when you leave Zigzag setting with Find a setting in Settings. Not shown.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画中画 悬浮 视频 其他 App 桌面 全屏 离开 切换 自动 picture in picture pip floating video other app desktop space full screen leave switch away automatic"
           }
         }
       }

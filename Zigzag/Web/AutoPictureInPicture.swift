@@ -1,31 +1,33 @@
 import AppKit
 import WebKit
 
-/// Leave Zigzag while a video plays in the page you're on, for another app or another desktop (a full screen app's
-/// own, too), and the video floats in Picture in Picture over whatever you went to, as Arc does (#238). Come back to
-/// that page and it goes back in. Only what Zigzag floated itself goes back: Picture in Picture you started yourself
-/// stays until you close it. Come back to another tab and it floats on, until you go to its tab. Switching tabs inside
-/// Zigzag is the mini player's (`MiniPlayer`); a video already there stays there, since its panel floats over other
-/// apps and desktops already. It floats through WebKit's own Picture in Picture (`togglePictureInPicture`), which needs
-/// no press on the page; for a video WebKit's own doesn't have yet (one that started by itself, never pressed), the
-/// page's script floats it (`PageVideos`). Settings › Tabs › Picture in picture when you leave Zigzag turns it off.
+/// Leave Zigzag for another app or another desktop while a video plays in the tab you're on, and the video moves into
+/// Zigzag's own mini player (`MiniPlayer`), which floats over other apps and desktops, and plays on there (#238). Come
+/// back to Zigzag and to that tab, and it goes back in its page, as when you go back to a tab the mini player took.
+/// Off unless turned on in Settings › Tabs › Show a mini player when you leave Zigzag.
+///
+/// Only a real switch: Zigzag has to stay in the background for a moment (`AutoPictureInPictureModel.delay`), and for
+/// an app of your own (not a system prompt, Spotlight, a menu bar menu, Notification Center or a Zigzag web app), so a
+/// quick look elsewhere moves nothing. A video that's muted, paused or out of view stays put; so does one in Picture in
+/// Picture or full screen (yours), and nothing replaces a mini player already showing. Where the mini player can't
+/// take the video, nothing happens: Picture in Picture never starts by itself.
 final class AutoPictureInPicture {
     static let shared = AutoPictureInPicture()
 
     private static let key = "PictureInPictureWhenLeaving"
-    /// On unless turned off in Settings.
+    /// Off unless turned on in Settings. The key was only ever written by the switch, so a stored value is a choice.
     static var isOn: Bool {
-        get { UserDefaults.standard.object(forKey: key) as? Bool ?? true }
+        get { UserDefaults.standard.bool(forKey: key) }
         set { UserDefaults.standard.set(newValue, forKey: key) }
     }
 
     private var model = AutoPictureInPictureModel()
-    /// The page Zigzag floated, while it floats.
-    private weak var floated: BrowserWebView?
-    /// WebKit takes a moment to float it: until then it isn't floating yet, rather than stopped.
-    private var enteringUntil = Date.distantPast
-    /// The page in front as Zigzag went to the background, for floating once it's really gone.
-    private weak var leaving: BrowserWebView?
+    /// The tab whose video the mini player took as you left, and its window's.
+    private weak var taken: Tab?
+    private weak var takenBy: BrowserWindowController?
+    /// The tab in front as Zigzag went to the background, for moving once it's really gone.
+    private weak var leaving: Tab?
+    private weak var leavingIn: BrowserWindowController?
     private var leaveWork: DispatchWorkItem?
     private var observers: [NSObjectProtocol] = []
 
@@ -49,176 +51,186 @@ final class AutoPictureInPicture {
 
     // MARK: Leaving
 
-    /// The page you're on in the window in front: the focused half of a split, or Zigzag Mini's page.
-    private static func frontPage() -> BrowserWebView? {
-        guard let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible, !window.isMiniaturized else { return nil }
-        if let controller = window.windowController as? BrowserWindowController { return controller.tabManager.selectedTab?.webView }
-        if let controller = window.windowController as? MiniWindowController { return controller.tab.webView }
-        return nil
+    /// The tab you're on in the browser window in front: the focused half of a split. Zigzag Mini, a web app's window
+    /// and the rest have no mini player: nothing.
+    private static func front() -> (tab: Tab, controller: BrowserWindowController)? {
+        guard let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible, !window.isMiniaturized,
+              let controller = window.windowController as? BrowserWindowController, let tab = controller.tabManager.selectedTab else { return nil }
+        return (tab, controller)
     }
 
     private func appWillResign() {
-        // A moment later, once Zigzag is really in the background: a passing system prompt over it isn't leaving.
-        leaving = Self.frontPage()
-        scheduleLeave { !NSApp.isActive }
+        debugLog("autopip: Zigzag going to the background (on=\(Self.isOn) front=\(Self.front()?.tab.displayTitle ?? "none"))")
+        guard Self.isOn, let (tab, controller) = Self.front() else { return }
+        leaving = tab
+        leavingIn = controller
+        // Still in the background a moment later, with another app of yours in front: you've gone.
+        scheduleLeave { !NSApp.isActive && AutoPictureInPictureModel.isRealSwitch(to: Self.frontApp()) }
     }
 
     /// Another desktop came up while Zigzag stays the active app (one with none of its windows on it).
     private func spaceChanged() {
         guard NSApp.isActive else { return }
-        if let page = Self.frontPage(), let window = page.window, !window.isOnActiveSpace {
-            leaving = page
-            scheduleLeave { [weak page] in NSApp.isActive && page?.window?.isOnActiveSpace == false }
+        if Self.isOn, let (tab, controller) = Self.front(), let window = controller.window, !window.isOnActiveSpace {
+            leaving = tab
+            leavingIn = controller
+            scheduleLeave { [weak window] in NSApp.isActive && window?.isOnActiveSpace == false }
         } else {
             reconsider()
         }
+    }
+
+    /// The app in front now, as `isRealSwitch` sees it.
+    private static func frontApp() -> AutoPictureInPictureModel.FrontApp? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        let own = Bundle.main.bundleIdentifier ?? ""
+        let id = app.bundleIdentifier ?? ""
+        return .init(isZigzag: app.processIdentifier == ProcessInfo.processInfo.processIdentifier,
+                     isZigzagWebApp: !own.isEmpty && id.hasPrefix(own + ".app."), isRegular: app.activationPolicy == .regular)
     }
 
     private func scheduleLeave(while stillAway: @escaping () -> Bool) {
         leaveWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, stillAway(), let page = self.leaving else { return }
+                guard let self else { return }
+                let tab = self.leaving, controller = self.leavingIn
                 self.leaving = nil
-                self.float(page)
+                self.leavingIn = nil
+                guard stillAway(), let tab, let controller else { return }
+                self.take(tab, in: controller)
             }
         }
         leaveWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + AutoPictureInPictureModel.delay, execute: work)
     }
 
-    private func float(_ webView: BrowserWebView) {
-        let tab = webView.owner
-        let followed = PageVideos.shared.followed(in: webView, leavingPage: tab?.isLeavingPage ?? false)
-        let native = webView.canTogglePictureInPicture
-        let page = AutoPictureInPictureModel.Page(canFloat: native || followed != nil, isFloating: Self.isFloating(webView),
-                                                  isFullScreen: webView.fullscreenState != .notInFullscreen, video: followed?.video)
-        guard model.leaving(ObjectIdentifier(webView), page: page, isOn: Self.isOn) else {
-            debugLog("autopip: not floating (on=\(Self.isOn) native=\(native) floating=\(page.isFloating) full=\(page.isFullScreen) video=\(followed != nil) blocks=\(followed?.video.blocksPictureInPicture ?? false))")
+    /// Moves the tab's video into its window's mini player, if it's one to move and the mini player takes it.
+    private func take(_ tab: Tab, in controller: BrowserWindowController) {
+        guard controller.tabManager.selectedTab === tab, let webView = tab.webView else { return }
+        let followed = PageVideos.shared.followed(in: webView, leavingPage: tab.isLeavingPage)
+        let page = AutoPictureInPictureModel.Page(
+            video: followed?.video,
+            isInView: followed.map { MiniPlayerLayout.visibleArea($0.video.rect, viewport: $0.frame.viewport) > 0 } ?? false,
+            isTabMuted: tab.isMuted,
+            isPresentingItself: PageVideos.shared.isPresentingItself(webView),
+            isMiniPlayerBusy: controller.miniPlayer.isShowing)
+        guard model.leaving(tab.id, page: page, isOn: Self.isOn) else {
+            debugLog("autopip: not moving (video=\(followed != nil) inView=\(page.isInView) muted=\(page.video?.isMuted ?? false)/\(page.isTabMuted) presenting=\(page.isPresentingItself) busy=\(page.isMiniPlayerBusy))")
             return
         }
-        floated = webView
-        enteringUntil = Date().addingTimeInterval(1.5)
-        if native {
-            webView.togglePictureInPicture()
-        } else if let followed {
-            // WebKit's own has no video to float until one's been pressed: the page's script floats the one you were
-            // watching, as if pressed (`PageVideos`' float).
-            Task {
-                _ = await PageVideos.shared.run("float", [("i", followed.video.index)], in: followed.frame, of: webView)
-                PictureInPicture.floatSoon()
-            }
+        guard controller.miniPlayer.takeOnLeaving(tab) else {
+            // The mini player couldn't take it: nothing else floats it instead.
+            model.forget()
+            debugLog("autopip: the mini player didn't take \(tab.displayTitle)")
+            return
         }
-        debugLog("autopip: floated \(tab?.displayTitle ?? "?") native=\(native)")
-        // WebKit may decline it after all (the video gone a moment before): then it isn't Zigzag's to end.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self, weak webView] in
-            MainActor.assumeIsolated {
-                guard let self, let webView, self.floated === webView else { return }
-                let floating = Self.isFloating(webView)
-                if !floating { self.model.stopped(ObjectIdentifier(webView)); self.floated = nil }
-                debugLog("autopip: after 1.5s floating=\(floating)")
-            }
-        }
-    }
-
-    /// Whether a video of the page floats in Picture in Picture: WebKit's own, or one the page's script floated.
-    private static func isFloating(_ webView: BrowserWebView) -> Bool {
-        webView.isPictureInPictureActive || PageVideos.shared.frames(in: webView).contains { $0.pictureInPicture }
+        taken = tab
+        takenBy = controller
+        debugLog("autopip: moved \(tab.displayTitle) into the mini player")
     }
 
     // MARK: Coming back
 
     private func cameBack() {
         leaveWork?.cancel()
+        leaveWork = nil
         leaving = nil
+        leavingIn = nil
         // The window you come back to is key a moment after the app is active.
         DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.reconsider() } }
     }
 
-    /// Back in front of the page Zigzag floated (the app active, its window key on this desktop, the page on screen
-    /// in it): its video goes back in. Called as the app comes back, a window becomes key, the desktop changes, and
-    /// a window shows another tab.
+    /// Back in front of the tab whose video the mini player took as you left (the app active, its window key on this
+    /// desktop, the tab on screen in it): the video goes back in its page. Called as the app comes back, a window
+    /// becomes key, the desktop changes, and a window shows another tab.
     func reconsider() {
-        guard let webView = floated else { model.forget(); return }
-        let id = ObjectIdentifier(webView)
-        let floating = Self.isFloating(webView)
-        if !floating, Date() < enteringUntil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in MainActor.assumeIsolated { self?.reconsider() } }
+        guard let tab = taken, let controller = takenBy else { model.forget(); return }
+        let isHeld = controller.miniPlayer.holds(tab)
+        let inFront = NSApp.isActive && Self.isInFront(tab, of: controller)
+        guard model.returning(tab.id, isHeld: isHeld, isInFront: inFront) else {
+            if !model.owns(tab.id) { taken = nil; takenBy = nil }
             return
         }
-        let inFront = NSApp.isActive && Self.isInFront(webView)
-        guard model.returning(id, isFloating: floating, isInFront: inFront) else {
-            if !model.owns(id) { floated = nil }
-            return
-        }
-        floated = nil
-        debugLog("autopip: back, ending")
-        if webView.isPictureInPictureActive {
-            webView.togglePictureInPicture()
-        } else {
-            for frame in PageVideos.shared.frames(in: webView) where frame.pictureInPicture {
-                Task { _ = await PageVideos.shared.run("unfloat", in: frame, of: webView) }
-            }
-        }
+        taken = nil
+        takenBy = nil
+        debugLog("autopip: back, the video goes back in its page")
+        controller.miniPlayer.cameBack()
     }
 
-    /// The page is on screen in the key window, on this desktop: the tab you're on, or beside it in a split.
-    private static func isInFront(_ webView: BrowserWebView) -> Bool {
-        guard let window = NSApp.keyWindow, webView.window === window, window.isOnActiveSpace, !window.isMiniaturized else { return false }
-        if let controller = window.windowController as? BrowserWindowController {
-            guard let tab = webView.owner, let selected = controller.tabManager.selectedTab else { return false }
-            return controller.tabManager.panes(of: selected).contains { $0 === tab }
-        }
-        if let controller = window.windowController as? MiniWindowController { return controller.tab.webView === webView }
-        return false
+    /// The tab is on screen in its window, the key one, on this desktop: the tab you're on, or beside it in a split.
+    private static func isInFront(_ tab: Tab, of controller: BrowserWindowController) -> Bool {
+        guard let window = controller.window, window.isKeyWindow, window.isOnActiveSpace, !window.isMiniaturized,
+              let selected = controller.tabManager.selectedTab else { return false }
+        return controller.tabManager.panes(of: selected).contains { $0 === tab }
     }
 }
 
-/// When Zigzag floats a video as you leave, and when it ends one as you come back: only one it floated itself.
+/// When a video moves into the mini player as you leave Zigzag, and when it goes back as you come back: only one it
+/// moved itself.
 nonisolated struct AutoPictureInPictureModel {
-    /// The page in front as you leave.
+    /// How long Zigzag stays in the background before the video moves: a quick click on another app and back, a
+    /// system prompt, Mission Control passing through, isn't leaving.
+    static let delay: TimeInterval = 0.8
+
+    /// The tab in front as you leave.
     struct Page {
-        /// WebKit's own Picture in Picture has a video in it to float, or the page's script has one.
-        var canFloat: Bool
-        /// It's in Picture in Picture already (you put it there).
-        var isFloating: Bool
-        /// Its video fills the screen: it has a desktop of its own.
-        var isFullScreen: Bool
-        /// The video you were watching (`MiniPlayerLayout.followed`), if any.
+        /// The video you were watching (`MiniPlayerLayout.followed`), if any: playing, not in a link.
         var video: PageVideo?
+        /// Some of that video shows in the page (not scrolled away).
+        var isInView: Bool
+        /// The tab is muted (its speaker in the sidebar).
+        var isTabMuted: Bool
+        /// The page shows a video in Picture in Picture or full screen itself (you put it there).
+        var isPresentingItself: Bool
+        /// The window's mini player shows a video already.
+        var isMiniPlayerBusy: Bool
     }
 
-    /// The page Zigzag floated, while it floats.
-    private(set) var owned: ObjectIdentifier?
-
-    func owns(_ page: ObjectIdentifier) -> Bool { owned == page }
-
-    /// Whether a page floats as you leave Zigzag: the setting on, a video you were watching playing in it, one the
-    /// page lets float, not already floating or in full screen.
-    static func floats(_ page: Page, isOn: Bool) -> Bool {
-        guard isOn, page.canFloat, !page.isFloating, !page.isFullScreen, let video = page.video else { return false }
-        return !video.blocksPictureInPicture
+    /// The app in front after Zigzag went to the background.
+    struct FrontApp {
+        var isZigzag: Bool
+        /// A site installed as an app: a small app that opens its window in Zigzag.
+        var isZigzagWebApp: Bool
+        /// An app with windows and a Dock icon. Spotlight, Notification Center, menu bar items, system prompts and
+        /// the Dock aren't.
+        var isRegular: Bool
     }
 
-    /// You left with `page` in front: whether to float it. If so it's Zigzag's, to end when you're back.
-    mutating func leaving(_ id: ObjectIdentifier, page: Page, isOn: Bool) -> Bool {
-        guard Self.floats(page, isOn: isOn) else { return false }
+    /// The tab whose video the mini player took, while it has it.
+    private(set) var owned: UUID?
+
+    func owns(_ tab: UUID) -> Bool { owned == tab }
+
+    /// Whether Zigzag going to the background is you going to another app: one of your own apps in front, not Zigzag
+    /// itself or one of its web apps.
+    static func isRealSwitch(to app: FrontApp?) -> Bool {
+        guard let app else { return false }
+        return app.isRegular && !app.isZigzag && !app.isZigzagWebApp
+    }
+
+    /// Whether the tab's video moves as you leave: the setting on, a video you were watching playing in view, with
+    /// sound, not shown some other way already, and the mini player free.
+    static func moves(_ page: Page, isOn: Bool) -> Bool {
+        guard isOn, let video = page.video, page.isInView, !page.isTabMuted, !page.isPresentingItself, !page.isMiniPlayerBusy else { return false }
+        return MiniPlayerLayout.follows(video) && !video.isMuted && !video.blocksPictureInPicture
+    }
+
+    /// You left with `page` in front: whether its video moves. If so it's Zigzag's, to give back when you're back.
+    mutating func leaving(_ id: UUID, page: Page, isOn: Bool) -> Bool {
+        guard Self.moves(page, isOn: isOn) else { return false }
         owned = id
         return true
     }
 
-    /// It stopped floating some other way (its own buttons, the page): nothing to end.
-    mutating func stopped(_ id: ObjectIdentifier) {
-        if owned == id { owned = nil }
-    }
-
     mutating func forget() { owned = nil }
 
-    /// Whether to end the page's Picture in Picture now: Zigzag's own, still floating, and you're back in front of
-    /// its page. Not back in front, it floats on.
-    mutating func returning(_ id: ObjectIdentifier, isFloating: Bool, isInFront: Bool) -> Bool {
+    /// Whether to put the video back in its page now: the mini player still has it, and you're back in front of its
+    /// tab. Not back in front, it plays on in the mini player. Gone from the mini player some other way (its close
+    /// button, another tab's video), nothing to do.
+    mutating func returning(_ id: UUID, isHeld: Bool, isInFront: Bool) -> Bool {
         guard owned == id else { return false }
-        guard isFloating else { owned = nil; return false }
+        guard isHeld else { owned = nil; return false }
         guard isInFront else { return false }
         owned = nil
         return true

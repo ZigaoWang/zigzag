@@ -628,7 +628,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showPages()
         // Shown in a pane some other way (split beside the page you're on): the mini player lets it go.
         miniPlayer.tabsChanged()
-        // Back on the tab whose video Zigzag floated as you left: it goes back in its page.
+        // Back on the tab whose video the mini player took as you left Zigzag: it goes back in its page.
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         paintTopBar()
@@ -1259,6 +1259,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// The mini player took a video or let it go: Now Playing keeps its card while a video is there, paused or not.
     func miniPlayerChanged() { updateNowPlaying() }
+
+    /// The mini player let go of the page of a tab still on screen (it took it as you left Zigzag): the card that
+    /// shows that tab takes the page in again.
+    func miniPlayerGaveBack(_ webView: WKWebView) {
+        let cards = root.paneCards.filter { $0.webView === webView }
+        guard !cards.isEmpty else { return }
+        cards.forEach { $0.show(nil) }
+        showPages()
+    }
 
     /// Now Playing's play button and menu item. A video in the mini player plays and pauses there, as its own button
     /// does, so the two never disagree; anything else, through WebKit's media control.

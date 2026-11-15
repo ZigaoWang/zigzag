@@ -1347,10 +1347,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         videoRow.keywords = String(localized: "mini player picture in picture pip floating", comment: "Words that find the Show a mini player setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(videoRow)
         leavePipToggle.onChange = { on in AutoPictureInPicture.isOn = on }
-        let leaveRow = FormRow(title: String(localized: "Picture in picture when you leave Zigzag", comment: "A setting in Settings › Tabs: a playing video floats over other apps when you switch to another app or desktop."),
-                               detail: String(localized: "A video you’re watching floats over other apps and desktops when you switch away, and goes back in its page when you come back to it.", comment: "Explanation under “Picture in picture when you leave Zigzag” in Settings › Tabs."),
+        let leaveRow = FormRow(title: String(localized: "Show a mini player when you leave Zigzag", comment: "A setting in Settings › Tabs, below “Show a mini player when you switch tabs”: a playing video moves into Zigzag's small player, over other apps, when you switch to another app or desktop."),
+                               detail: String(localized: "A video you’re watching keeps playing in a small player over other apps and desktops, and goes back in its page when you come back to it.", comment: "Explanation under “Show a mini player when you leave Zigzag” in Settings › Tabs."),
                                control: leavePipToggle)
-        leaveRow.keywords = String(localized: "picture in picture pip floating video other app desktop space full screen leave switch away automatic", comment: "Words that find the Picture in picture when you leave Zigzag setting with Find a setting in Settings. Not shown.")
+        leaveRow.keywords = String(localized: "mini player picture in picture pip floating video other app desktop space leave switch away background automatic", comment: "Words that find the Show a mini player when you leave Zigzag setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(leaveRow)
         fullScreenFill.options = PageFullScreen.Fill.allCases.map { fill in
             let title = switch fill {
