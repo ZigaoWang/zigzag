@@ -125,29 +125,87 @@ struct UpdateReadyTests {
         """
     }
 
-    private let mac = OperatingSystemVersion(majorVersion: 15, minorVersion: 4, patchVersion: 0)
+    private let mac = UpdateFeed.Host(build: "115", system: OperatingSystemVersion(majorVersion: 15, minorVersion: 4, patchVersion: 0),
+                                      phasedGroup: 3, now: Date(timeIntervalSince1970: 1_800_000_000), isIntel: false)
 
     @Test func theFeedsNewestItemIsByBuild() {
         let data = feed(item("116", "0.9.1") + item("118", "0.9.3") + item("117", "0.9.2"))
-        #expect(UpdateFeed.newest(in: data, system: mac) == .init(build: "118", version: "0.9.3"))
+        #expect(UpdateFeed.newest(in: data, host: mac) == .init(build: "118", version: "0.9.3"))
     }
 
     @Test func theFeedSkipsWhatThisMacCantInstall() {
         // For a newer macOS, for another channel, or with nothing to download.
         let data = feed(item("116", "0.9.1") + item("119", "1.0", minimum: "27.0") + item("118", "0.9.3-x", channel: "nightly")
                         + item("117", "0.9.2-info", enclosure: false))
-        #expect(UpdateFeed.newest(in: data, system: mac) == .init(build: "116", version: "0.9.1"))
+        #expect(UpdateFeed.newest(in: data, host: mac) == .init(build: "116", version: "0.9.1"))
     }
 
     @Test func theFeedReadsVersionsOnTheEnclosureToo() {
         let data = feed("""
         <item><title>0.5.0</title><enclosure url="https://example.com/z.zip" length="1" sparkle:version="80" sparkle:shortVersionString="0.5.0"/></item>
         """)
-        #expect(UpdateFeed.newest(in: data, system: mac) == .init(build: "80", version: "0.5.0"))
+        #expect(UpdateFeed.newest(in: data, host: mac) == .init(build: "80", version: "0.5.0"))
     }
 
     @Test func aFeedThatIsntOneHasNoNewest() {
-        #expect(UpdateFeed.newest(in: Data("<html><body>Not found</body>".utf8), system: mac) == nil)
-        #expect(UpdateFeed.newest(in: feed(""), system: mac) == nil)
+        #expect(UpdateFeed.newest(in: Data("<html><body>Not found</body>".utf8), host: mac) == nil)
+        #expect(UpdateFeed.newest(in: feed(""), host: mac) == nil)
+    }
+
+    /// `item` with more elements before its description.
+    private func item(_ build: String, _ version: String, with extra: String) -> String {
+        item(build, version).replacingOccurrences(of: "<description>", with: extra + "<description>")
+    }
+
+    @Test func theFeedSkipsWhatSparkleWouldntFetchInTheBackground() {
+        // Only a delta, another OS, informational only, a major upgrade, and one that can't update build 115.
+        let delta = """
+        <item><sparkle:version>120</sparkle:version><sparkle:shortVersionString>0.9.6</sparkle:shortVersionString>
+        <sparkle:deltas><enclosure url="https://example.com/d.delta" sparkle:version="120" sparkle:deltaFrom="115" length="1"/></sparkle:deltas></item>
+        """
+        let windows = """
+        <item><sparkle:version>121</sparkle:version><enclosure url="https://example.com/z.msi" sparkle:os="windows" length="1"/></item>
+        """
+        let informational = """
+        <item><sparkle:version>122</sparkle:version><sparkle:informationalUpdate><sparkle:version>1</sparkle:version></sparkle:informationalUpdate>
+        <enclosure url="https://example.com/z.zip" length="1"/></item>
+        """
+        let major = item("123", "1.0", with: "<sparkle:minimumAutoupdateVersion>200</sparkle:minimumAutoupdateVersion>")
+        let notFromHere = item("124", "1.1", with: "<sparkle:minimumUpdateVersion>116</sparkle:minimumUpdateVersion>")
+        let data = feed(item("116", "0.9.1") + delta + windows + informational + major + notFromHere)
+        #expect(UpdateFeed.newest(in: data, host: mac) == .init(build: "116", version: "0.9.1"))
+        // A full enclosure beside the deltas counts, and its version isn't the delta's.
+        let both = delta.replacingOccurrences(of: "</item>", with: "<enclosure url=\"https://example.com/z.zip\" length=\"1\"/></item>")
+        #expect(UpdateFeed.newest(in: feed(item("116", "0.9.1") + both), host: mac) == .init(build: "120", version: "0.9.6"))
+    }
+
+    @Test func aPhasedRolloutCountsOnceItReachesThisMacsGroup() {
+        // Group 3 of a daily rollout: from three days after its date.
+        func newest(daysAgo: Double, group: Int?) -> String? {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US")
+            formatter.dateFormat = "E, dd MMM yyyy HH:mm:ss Z"
+            let date = formatter.string(from: mac.now.addingTimeInterval(-daysAgo * 86_400))
+            let rolling = item("118", "0.9.3", with: "<pubDate>\(date)</pubDate><sparkle:phasedRolloutInterval>86400</sparkle:phasedRolloutInterval>")
+            var host = mac
+            host.phasedGroup = group
+            return UpdateFeed.newest(in: feed(item("116", "0.9.1") + rolling), host: host)?.build
+        }
+        #expect(newest(daysAgo: 2, group: 3) == "116")
+        #expect(newest(daysAgo: 3.1, group: 3) == "118")
+        // No group picked yet: taken as the last, so the newer item waits longest.
+        #expect(newest(daysAgo: 3.1, group: nil) == "116")
+        #expect(newest(daysAgo: 6.1, group: nil) == "118")
+        // A rollout without a date it can read doesn't count.
+        let undated = item("118", "0.9.3", with: "<sparkle:phasedRolloutInterval>86400</sparkle:phasedRolloutInterval>")
+        #expect(UpdateFeed.newest(in: feed(item("116", "0.9.1") + undated), host: mac)?.build == "116")
+    }
+
+    @Test func anIntelMacSkipsAppleSiliconOnlyItems() {
+        var intel = mac
+        intel.isIntel = true
+        let arm = item("118", "0.9.3", with: "<sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>")
+        #expect(UpdateFeed.newest(in: feed(item("116", "0.9.1") + arm), host: intel)?.build == "116")
+        #expect(UpdateFeed.newest(in: feed(item("116", "0.9.1") + arm), host: mac)?.build == "118")
     }
 }

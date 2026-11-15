@@ -80,45 +80,108 @@ nonisolated enum UpdateSchedule {
 
 /// The newest version on an update feed (a Sparkle appcast), read without downloading anything else: only to tell
 /// whether the update Sparkle has staged is still the newest. Sparkle itself does every download, check and install.
+///
+/// A staged update is let go only for one Sparkle will fetch in its place, so an item counts only when Sparkle's own
+/// background check would take it: the filters follow Sparkle's (SUAppcastDriver), and where one can't be told for
+/// sure (a phased rollout without a date it reads), the item doesn't count.
 nonisolated enum UpdateFeed {
     struct Item: Equatable, Sendable {
         var build: String
         var version: String
     }
 
-    /// The newest item this Mac can run: by build, skipping items for another channel, without a download, or for
-    /// a newer or older macOS than `system`.
-    static func newest(in data: Data, system: OperatingSystemVersion = ProcessInfo.processInfo.operatingSystemVersion) -> Item? {
+    /// What Sparkle knows of this copy of Zigzag when it reads the feed in the background.
+    struct Host: Sendable {
+        /// The running build (CFBundleVersion).
+        var build: String
+        var system: OperatingSystemVersion
+        /// Sparkle's phased rollout group, 0 to 6; nil before Sparkle has picked one, taken as the last group.
+        var phasedGroup: Int?
+        var now: Date
+        var isIntel: Bool
+
+        static var current: Host {
+            #if arch(x86_64)
+            let intel = true
+            #else
+            let intel = false
+            #endif
+            // Sparkle keeps its group's seed in the app's defaults, and takes it modulo seven.
+            let seed = UserDefaults.standard.object(forKey: "SUUpdateGroupIdentifier") as? NSNumber
+            return Host(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0",
+                        system: ProcessInfo.processInfo.operatingSystemVersion,
+                        phasedGroup: seed.map { Int($0.uint32Value % 7) }, now: Date(), isIntel: intel)
+        }
+    }
+
+    /// The newest item a background check by Sparkle would offer this Mac, by build. Skipped, as Sparkle skips
+    /// them: items for another channel or OS, with only a delta or nothing to download, informational only, for a
+    /// newer or older macOS, for Apple silicon on an Intel Mac, that can't update this build
+    /// (`minimumUpdateVersion`), a major upgrade Sparkle doesn't fetch by itself (`minimumAutoupdateVersion`), and
+    /// one not yet rolled out to this Mac's phased rollout group.
+    static func newest(in data: Data, host: Host = .current) -> Item? {
         let reader = Reader()
         let parser = XMLParser(data: data)
         parser.shouldProcessNamespaces = false
         parser.delegate = reader
         guard parser.parse() else { return nil }
+        let system = host.system
         let running = "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)"
+        func newer(_ a: String?, than b: String) -> Bool { a.map { UpdateReadiness.isNewer($0, than: b) } ?? false }
         return reader.items
             .filter { item in
-                item.channel == nil && item.hasEnclosure && !item.build.isEmpty
-                    && !(item.minimumSystem.map { UpdateReadiness.isNewer($0, than: running) } ?? false)
+                item.channel == nil && item.hasFullEnclosure && !item.build.isEmpty && !item.informational
+                    && (item.os == nil || item.os == "macos")
+                    && !newer(item.minimumSystem, than: running)
                     && !(item.maximumSystem.map { UpdateReadiness.isNewer(running, than: $0) } ?? false)
+                    && !newer(item.minimumUpdate, than: host.build)
+                    && !newer(item.minimumAutoupdate, than: host.build)
+                    // Sparkle takes macOS 27 and later as Apple silicon only.
+                    && !(host.isIntel && (item.hardware.contains("arm64") || !newer("27", than: item.minimumSystem ?? "0")))
+                    && rolledOut(item, to: host)
             }
             .max { UpdateReadiness.isNewer($1.build, than: $0.build) }
             .map { Item(build: $0.build, version: $0.version.isEmpty ? $0.build : $0.version) }
     }
 
+    /// Sparkle's phased rollout: group n gets an item n intervals after its date.
+    private static func rolledOut(_ item: Reader.Entry, to host: Host) -> Bool {
+        guard let interval = item.phasedInterval else { return true }
+        guard let seconds = TimeInterval(interval), let date = item.date.flatMap({ pubDate.date(from: $0) }) else { return false }
+        return host.now.timeIntervalSince(date) >= seconds * TimeInterval(host.phasedGroup ?? 6)
+    }
+
+    /// The format Sparkle reads pubDate with.
+    private static let pubDate: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.dateFormat = "E, dd MMM yyyy HH:mm:ss Z"
+        return formatter
+    }()
+
     private final class Reader: NSObject, XMLParserDelegate {
         struct Entry {
             var build = "", version = "", channel: String?, minimumSystem: String?, maximumSystem: String?
-            var hasEnclosure = false
+            var minimumUpdate: String?, minimumAutoupdate: String?, phasedInterval: String?, date: String?, os: String?
+            var hardware: Set<String> = []
+            var informational = false
+            /// An enclosure of the whole app, not only a delta from one version.
+            var hasFullEnclosure = false
         }
         var items: [Entry] = []
         private var current: Entry?
         private var text = ""
+        /// Inside sparkle:deltas or sparkle:informationalUpdate, whose contents aren't the item's own.
+        private var nested = false
 
         func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String] = [:]) {
             text = ""
-            if name == "item" { current = Entry() }
-            guard name == "enclosure", current != nil else { return }
-            current?.hasEnclosure = true
+            if name == "item" { current = Entry(); nested = false }
+            if name == "sparkle:deltas" || name == "sparkle:informationalUpdate" { nested = true }
+            if name == "sparkle:informationalUpdate" { current?.informational = true }
+            guard name == "enclosure", current != nil, !nested, attributes["sparkle:deltaFrom"] == nil else { return }
+            current?.hasFullEnclosure = true
+            current?.os = attributes["sparkle:os"]
             // Older feeds put the versions on the enclosure.
             if current?.build.isEmpty == true, let build = attributes["sparkle:version"] { current?.build = build }
             if current?.version.isEmpty == true, let version = attributes["sparkle:shortVersionString"] { current?.version = version }
@@ -130,11 +193,19 @@ nonisolated enum UpdateFeed {
             let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
             switch name {
             case "item": if let current { items.append(current) }; current = nil
+            case "sparkle:deltas", "sparkle:informationalUpdate": nested = false
+            case _ where nested: break
             case "sparkle:version": current?.build = value
             case "sparkle:shortVersionString": current?.version = value
             case "sparkle:channel": current?.channel = value
             case "sparkle:minimumSystemVersion": current?.minimumSystem = value
             case "sparkle:maximumSystemVersion": current?.maximumSystem = value
+            case "sparkle:minimumUpdateVersion": current?.minimumUpdate = value
+            case "sparkle:minimumAutoupdateVersion": current?.minimumAutoupdate = value
+            case "sparkle:phasedRolloutInterval": current?.phasedInterval = value
+            case "sparkle:hardwareRequirements":
+                current?.hardware = Set(value.lowercased().split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init))
+            case "pubDate": current?.date = value
             default: break
             }
             text = ""
