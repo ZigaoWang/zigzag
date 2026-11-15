@@ -46,6 +46,7 @@
 		10ED316D4DDDE144EAA77A5D /* ProxyCheckTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400EEF52096D1DE0A08306FF /* ProxyCheckTests.swift */; };
 		11436BB68F1FE91F774FF4A9 /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7CC06A0253CAF1E0CAEA2F /* Profile.swift */; };
 		116CB32D6BD3C4918FCD3F1C /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F50C552DADDAC51AC86787B /* ImportView.swift */; };
+		123B1C6A2D25518B3E267F8C /* FindMarks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93578FE502EC8C0F2D11346A /* FindMarks.swift */; };
 		1482F4A584F73FF91CA61BE4 /* AddressTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */; };
 		15C8DA6BFFD072C4684902FE /* KeepOnTopTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027487FE51DBB648D6C491C0 /* KeepOnTopTests.swift */; };
 		16533A8F18B300E1F88BEEB7 /* DownloadPlace.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAC9B2535F5F2C950BA4096B /* DownloadPlace.swift */; };
@@ -353,6 +354,7 @@
 		B9743DC3E9D9D646FF523BE8 /* PageSizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14CE333A1E243ADD65395E72 /* PageSizeTests.swift */; };
 		B9BAF8A4CC1907F52C65274B /* Readability-LICENSE.md in Resources */ = {isa = PBXBuildFile; fileRef = 76DB536661E9E732536910C2 /* Readability-LICENSE.md */; };
 		B9C098912B62890DC91E1B7A /* ZigzagPDFRenderer.xpc in CopyFiles */ = {isa = PBXBuildFile; fileRef = 1962E793CA05D990698FC0A2 /* ZigzagPDFRenderer.xpc */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		BC5CC5CE3A1E300D17C62198 /* FindMarksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDDEAD8D5639DB397CB99CB5 /* FindMarksTests.swift */; };
 		BEC7556625226B96D886206F /* SafariImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51CBCCC0F5050F641CEAB31 /* SafariImporter.swift */; };
 		BEF065DF8F5D8B88001B1139 /* autoconsent.info.json in Resources */ = {isa = PBXBuildFile; fileRef = 89A07EB62BF2057B04CDC41A /* autoconsent.info.json */; };
 		C0B6755DFC601C9C358E67DA /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79F70CA73E1EF5C8460E9286 /* TabManager.swift */; };
@@ -795,6 +797,7 @@
 		9272B1C4212C3BF6B875E0DB /* SiteSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteSearch.swift; sourceTree = "<group>"; };
 		928D7647F31AE3EE93056E2F /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
 		9318C9D9C45049E8105EA1CE /* HistoryPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPage.swift; sourceTree = "<group>"; };
+		93578FE502EC8C0F2D11346A /* FindMarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindMarks.swift; sourceTree = "<group>"; };
 		9386D76C86995FCCE7A77BC2 /* PageSizeInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageSizeInputTests.swift; sourceTree = "<group>"; };
 		946C16FE0634A5AE372B5725 /* WebAppInstallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppInstallSheet.swift; sourceTree = "<group>"; };
 		9569CB3512DF9E729E1FDA49 /* PopupNotice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopupNotice.swift; sourceTree = "<group>"; };
@@ -936,6 +939,7 @@
 		DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressDropTests.swift; sourceTree = "<group>"; };
 		DD95FCA35585195612C38204 /* SignInImportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInImportTests.swift; sourceTree = "<group>"; };
 		DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "chrome-local-state.json"; sourceTree = "<group>"; };
+		DDDEAD8D5639DB397CB99CB5 /* FindMarksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindMarksTests.swift; sourceTree = "<group>"; };
 		DE66F1100EDA4A2A65A5DA39 /* CarriedCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedCopy.swift; sourceTree = "<group>"; };
 		DEB39442D06F521CAE1203D0 /* Autofill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Autofill.swift; sourceTree = "<group>"; };
 		DECEDC8885535F130965981A /* SiteData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteData.swift; sourceTree = "<group>"; };
@@ -1350,6 +1354,7 @@
 				059DC09EA2D5589CB98D676B /* ErrorPage.swift */,
 				BD2664CEA2397AB72FA6371E /* ExternalLinks.swift */,
 				D9FAF507728E18C4FC4266C5 /* FaviconStore.swift */,
+				93578FE502EC8C0F2D11346A /* FindMarks.swift */,
 				05040A784BBF98D3612C0A6A /* HistoryClusters.swift */,
 				9318C9D9C45049E8105EA1CE /* HistoryPage.swift */,
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
@@ -1568,6 +1573,7 @@
 				111BB58676C39406F3B81A0E /* FavoriteTests.swift */,
 				90E2676D1635794C7B91868A /* FeatureFlagsTests.swift */,
 				6FCB792604C01E2E8F11B27E /* FindCountTests.swift */,
+				DDDEAD8D5639DB397CB99CB5 /* FindMarksTests.swift */,
 				CFFAB9323B9B8363B22FEE73 /* FolderTests.swift */,
 				C928420068829E660FA04DC9 /* FormSheetTests.swift */,
 				3C753D7948805748B235F981 /* FreezeReportTests.swift */,
@@ -2112,6 +2118,7 @@
 				4134CF49BF66BCD0D556E83A /* FeatureFlags.swift in Sources */,
 				5C65A6AF892576313C6E9F2B /* Feedback.swift in Sources */,
 				99F15C29E28C9FA9B038B3A8 /* FindBar.swift in Sources */,
+				123B1C6A2D25518B3E267F8C /* FindMarks.swift in Sources */,
 				3F44E584CDB22914EEFD966E /* FirefoxImporter.swift in Sources */,
 				AC1B158FB5D979FA4552705A /* FormSheet.swift in Sources */,
 				CFBDBBEF4E9DEF7AA83654FF /* Freezes.swift in Sources */,
@@ -2348,6 +2355,7 @@
 				A09C2F4CA62DE77E8D73B853 /* FavoriteTests.swift in Sources */,
 				B0A9891F04D0F9370624DAAD /* FeatureFlagsTests.swift in Sources */,
 				E3DB108E2FCB680F0EF592AC /* FindCountTests.swift in Sources */,
+				BC5CC5CE3A1E300D17C62198 /* FindMarksTests.swift in Sources */,
 				08FACDB4874ECAC187142B05 /* FolderTests.swift in Sources */,
 				9EBDB7B646861E6CE816243B /* FormSheetTests.swift in Sources */,
 				0C5C2F5738FFF3C9FE3D145D /* FreezeReportTests.swift in Sources */,

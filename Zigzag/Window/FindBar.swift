@@ -112,7 +112,11 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         nextButton.onClick = { [weak self] _ in self?.next(backwards: false) }
         doneButton.onClick = { [weak self] _ in self?.hide() }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
+        ticks.onPick = { [weak self] index in self?.search(backwards: false, toMatch: index) }
     }
+
+    /// A tick for each match along the page's right edge (`FindMarks`).
+    private let ticks = FindMarksView()
 
     /// The page the last search ran in, so its highlight goes when you move to the other pane.
     private weak var searched: WKWebView?
@@ -265,7 +269,8 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
     }
 
-    private func search(backwards: Bool, fromStart: Bool = false) {
+    /// `toMatch`: a tick clicked, the match to go to.
+    private func search(backwards: Bool, fromStart: Bool = false, toMatch: Int? = nil) {
         // A PDF is searched in its own viewer, which knows its pages and counts the matches itself.
         if let pdf = window?.selectedTab?.pdfViewer {
             searched = window?.findableWebView
@@ -303,12 +308,51 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             return
         }
         let asked = query
+        // Every match marked by Zigzag, and the one you're on in the stronger color in place of WebKit's own mark.
+        let marks = FindMarks.isAvailable
         Task { @MainActor [weak self, weak webView] in
-            guard let webView, let result = await PageFind.find(asked, in: webView, backwards: backwards) else { return }
+            guard let webView else { return }
+            if marks, let toMatch {
+                await FindMarks.moveCaret(toMatch: toMatch, in: webView)
+            } else if marks, !fromStart {
+                await FindMarks.prepare(in: webView)
+            }
+            guard let result = await PageFind.find(asked, in: webView, backwards: backwards, showsIndicator: !marks) else { return }
             // Typed on since: the newer search says it.
             guard let self, self.query == asked, self.searched === webView else { return }
             self.show(result)
+            guard marks else { return }
+            // WebKit's own yellow over the match would cover the stronger color.
+            if webView.responds(to: Self.hideFindUI) { webView.perform(Self.hideFindUI) }
+            await self.refreshMarks(in: webView, found: result.count)
         }
+    }
+
+    /// Marks every match on the page and puts a tick for each along its edge. `found`: WebKit's count; with none,
+    /// nothing is marked either, whatever Zigzag's own search would make of the page.
+    private func refreshMarks(in webView: WKWebView, found: Int) async {
+        guard found > 0 else { clearMarks(in: webView); return }
+        let asked = query
+        guard let snapshot = await FindMarks.mark(asked, in: webView), isVisible, query == asked, searched === webView else { return }
+        ticks.attach(to: webView)
+        ticks.snapshot = snapshot
+        // WebKit counts its place on from the last match it found, so after a tick, or a click on the page, it can say
+        // the wrong one. The marks know where the match is among them all: when both counted the same, theirs is said.
+        if let current = snapshot.current, snapshot.count == found, found <= PageFind.maxCount, current != place {
+            show(PageFind.Result(count: found, index: current))
+        }
+        FindMarks.listen(to: webView) { [weak self, weak webView] snapshot in
+            guard let self, let webView, self.isVisible, self.searched === webView, self.query == asked else { return }
+            self.ticks.snapshot = snapshot
+            // The page changed under the count: counted again.
+            self.recount(in: webView, marking: false)
+        }
+    }
+
+    private func clearMarks(in webView: WKWebView?) {
+        if let webView { FindMarks.clear(in: webView) }
+        ticks.snapshot = .empty
+        ticks.removeFromSuperview()
     }
 
     /// The match you're on, from 0, so a recount can keep saying where you are.
@@ -321,13 +365,16 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         searched = webView
         place = nil
         loadingWatch = webView.observe(\.isLoading, options: [.new]) { [weak self] webView, change in
-            guard change.newValue == false else { return }
-            MainActor.assumeIsolated { self?.recount(in: webView) }
+            MainActor.assumeIsolated {
+                // Off to another page: the ticks were the last one's.
+                if change.newValue == true { self?.ticks.snapshot = .empty } else { self?.recount(in: webView) }
+            }
         }
     }
     private var loadingWatch: NSKeyValueObservation?
 
-    private func recount(in webView: WKWebView) {
+    /// `marking`: the matches are marked again too, as on a page that just loaded.
+    private func recount(in webView: WKWebView, marking: Bool = true) {
         guard isVisible, searched === webView, !query.isEmpty, PageFind.isAvailable else { return }
         let asked = query
         Task { @MainActor [weak self, weak webView] in
@@ -335,6 +382,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             guard let self, self.query == asked, self.searched === webView else { return }
             let place = self.place.flatMap { $0 < count ? $0 : nil }
             self.show(PageFind.Result(count: count, index: place))
+            if marking, FindMarks.isAvailable { await self.refreshMarks(in: webView, found: count) }
         }
     }
 
@@ -379,7 +427,9 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         pdfSearch?.cancel()
         (searchedPDF ?? window?.selectedTab?.pdfViewer)?.clearFind()
         searchedPDF = nil
-        if let webView = searched ?? window?.findableWebView {
+        let webView = searched ?? window?.findableWebView
+        clearMarks(in: webView)
+        if let webView {
             webView.runOwnScript("window.getSelection().removeAllRanges()")
             // WebKit draws its own highlight over the match, apart from the selection; it stays until told to go.
             if webView.responds(to: Self.hideFindUI) { webView.perform(Self.hideFindUI) }
