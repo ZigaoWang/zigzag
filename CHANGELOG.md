@@ -5,8 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- The first time a link from another app or a script opens as a new tab, Zigzag offers once to open such links in Zigzag Mini instead. Use Zigzag Mini turns that on and moves the page into a Zigzag Mini window; it's also in Settings › Zigzag Mini. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Find on Page (⌘F) works in Zigzag Mini, with the same bar and marks as in a browser window. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Zigzag Mini opens at the size you last made it. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+
 ### Fixed
 - Translating a page translates a title or short line in Chinese, Japanese, Russian or another script that names something in English, like a GitHub issue titled 类似Little Arc功能, instead of leaving it as it was because it read a little like English.
+- A sign-in page in Zigzag Mini that sends you back to the app that opened it closes once that app opens, and a link that goes straight to an app no longer leaves an empty Zigzag Mini window behind. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 
 ## [0.9.1] - 2026-11-15
 

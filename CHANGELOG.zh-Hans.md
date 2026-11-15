@@ -12,8 +12,14 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 新功能
+- 其他 App 或脚本打开的链接第一次以新标签页打开时，Zigzag 会问一次要不要改为在 Zigzag Mini 中打开这类链接。点“使用 Zigzag Mini”就会打开这个设置，并把这个页面移到 Zigzag Mini 窗口里；“设置 › Zigzag Mini”里也能随时开关。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Zigzag Mini 里也能用“在页面中查找”（⌘F），查找栏和标记都和浏览器窗口里一样。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Zigzag Mini 会按你上次调整的大小打开。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+
 ### 修复
 - 翻译页面时，夹着英文名称的中文、日文、俄文等标题或短句（比如标题为“类似Little Arc功能”的 GitHub 议题）也会被翻译，不再因为看起来有点像英文而保持原样。
+- Zigzag Mini 里的登录页把你送回打开它的 App 后，等那个 App 打开，Zigzag Mini 就会关闭；直接跳到某个 App 的链接也不会再留下一个空的 Zigzag Mini 窗口。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 
 ## [0.9.1] - 2026-11-15
 
