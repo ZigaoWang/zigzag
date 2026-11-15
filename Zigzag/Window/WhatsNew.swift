@@ -436,9 +436,24 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
             return sheet.handle(event)
         }
         // The notes are about the app, not a tab, but they cover the page: another tab or space chosen (from the
-        // menu bar, a link from another app), they go rather than sit over a page they weren't opened on.
-        sheet.tabsToken = controller.tabManager.changed.observe { [weak sheet] change in
-            if change == .selection || change == .space { sheet?.close() }
+        // menu bar, a link from another app), they go rather than sit over a page they weren't opened on. A tab
+        // closing behind, or a split rearranged, says "selection" too while the same tab stays in front: they stay.
+        let tabs = controller.tabManager
+        let openedOn = Front(of: tabs)
+        sheet.tabsToken = tabs.changed.observe { [weak sheet, weak tabs] change in
+            guard let tabs, change == .selection || change == .space else { return }
+            if Front(of: tabs) != openedOn { sheet?.close() }
+        }
+    }
+
+    /// The tab and space in front: the notes stay while these do.
+    struct Front: Equatable {
+        var tab: UUID?
+        var space: UUID
+
+        init(of tabs: TabManager) {
+            tab = tabs.selectedTab?.id
+            space = tabs.currentSpaceID
         }
     }
 

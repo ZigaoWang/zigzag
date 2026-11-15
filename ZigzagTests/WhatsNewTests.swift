@@ -221,6 +221,29 @@ struct WhatsNewTests {
                     "\(version) has other points or issues")
         }
     }
+
+    /// The notes go when another tab or space comes in front, not on every "selection" the tabs send: a split's
+    /// other pane closing behind them keeps the same tab in front.
+    @Test func notesStayWhileTheSameTabIsInFront() {
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        let tabs = (0..<3).map { _ in manager.newTab(url: nil, spaceID: space, select: false) }
+        defer { tabs.forEach { $0.close() }; manager.invalidate() }
+        guard let pair = TabManager.SplitPair(ids: tabs.map(\.id), shape: TileShape(regions: [.left, .topRight, .bottomRight])) else {
+            Issue.record("no group"); return
+        }
+        manager.restoreSplit(pair)
+        manager.select(tabs[0])
+        let opened = WhatsNewSheet.Front(of: manager)
+        var selections = 0
+        let token = manager.changed.observe { if $0 == .selection { selections += 1 } }
+        manager.close(tabs[2])
+        #expect(selections > 0)
+        #expect(WhatsNewSheet.Front(of: manager) == opened)
+        manager.select(tabs[1])
+        #expect(WhatsNewSheet.Front(of: manager) != opened)
+        _ = token
+    }
 }
 
 /// Light or dark text follows what actually reads on a space's colors.
