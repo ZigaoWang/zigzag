@@ -2884,6 +2884,17 @@
         }
       }
     },
+    "As a download" : {
+      "comment" : "Under the test address in Settings › Downloads, before the rule that would take the address if it were a file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作为下载"
+          }
+        }
+      }
+    },
     "As pages open, on every site" : {
       "comment" : "Under Always translate <language> in the site panel's This Site group, while it's on.",
       "localizations" : {

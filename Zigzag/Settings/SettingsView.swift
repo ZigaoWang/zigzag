@@ -2902,20 +2902,26 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     comment: "Explanation under the test address in Settings › Downloads.")
             return
         }
-        let url = URL(string: typed) ?? URL(string: "https://\(typed)")
+        // A typed address with no scheme is the web's, as the address bar treats it: https, not an error.
+        let url = URL(string: typed).flatMap { $0.scheme == nil ? nil : $0 } ?? URL(string: "https://\(typed)")
         guard let url, url.scheme != nil else {
             row.detailText = String(localized: "That isn’t an address.", comment: "Under the test address in Settings › Downloads, when what was typed can't be a URL.")
             return
         }
         let rules = DownloadRulesStore.shared.rules
-        guard let rule = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: true)
-                ?? DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: false) else {
+        let linkMatch = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: true)
+        let downloadMatch = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: false)
+        guard let rule = linkMatch ?? downloadMatch else {
             row.detailText = String(localized: "No rule matches, so Zigzag saves it in Downloads.", comment: "Under the test address in Settings › Downloads, when no rule takes it.")
             return
         }
         let values = HandoffValues(link: url, filename: DownloadTokens.filename(for: url, suggested: ""), space: "")
         let preview = rule.action.textFields.first.map { DownloadTokens.expand($0, with: values) } ?? ""
-        row.detailText = preview.isEmpty ? rule.actionSummary : "\(rule.actionSummary)\n\(preview)"
+        let detail = preview.isEmpty ? rule.actionSummary : "\(rule.actionSummary)\n\(preview)"
+        // A downloads-only rule is what would take this if it arrived as a file; a link it would not catch.
+        row.detailText = linkMatch == nil
+            ? "\(String(localized: "As a download", comment: "Under the test address in Settings › Downloads, before the rule that would take the address if it were a file.")): \(detail)"
+            : detail
     }
 
     /// Add Rule: a plain action, or a preset that fills the fields for aria2, Motrix, rTorrent, yt-dlp, mpv or IINA.
