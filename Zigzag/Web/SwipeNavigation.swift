@@ -236,6 +236,27 @@ final class SwipeNavigator {
         }
     }
 
+    #if DEBUG
+    /// Debug builds: holds a swipe at `progress` of the way to navigating (1 arms it), as fingers resting there would,
+    /// so a test copy can show it without a trackpad (`swipestep back 0.5`). `nil` lets go without navigating.
+    func debugHold(direction wanted: Int, progress value: CGFloat?) {
+        guard let value else {
+            if state == .tracking { cancel() }
+            state = .idle
+            return
+        }
+        if state != .tracking || direction != wanted {
+            if state == .tracking { cancel() }
+            direction = wanted
+            armed = false
+            state = .tracking
+            showArrow()
+        }
+        dx = CGFloat(-wanted) * value * Self.threshold
+        update()
+    }
+    #endif
+
     // MARK: The arrow
 
     private func showArrow() {

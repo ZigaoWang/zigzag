@@ -1970,6 +1970,12 @@ enum DebugBridge {
                let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
                 try? png.write(to: URL(fileURLWithPath: arg))
             }
+        case "swipestep":
+            // swipestep back|forward <0...1> | swipestep off: the page in front held mid-swipe, that far toward going.
+            let f = arg.split(separator: " ")
+            let direction = f.first == "forward" ? 1 : -1
+            let value = f.count > 1 ? Double(f[1]).map { CGFloat($0) } : nil
+            (controller.selectedTab?.webView as? BrowserWebView)?.debugHoldSwipe(direction: direction, progress: value)
         case "swipe":
             // swipe <dx per step>: a synthetic two-finger horizontal swipe over the sidebar.
             guard let window = controller.window else { break }

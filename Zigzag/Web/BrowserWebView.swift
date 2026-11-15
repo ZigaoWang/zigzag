@@ -32,6 +32,8 @@ final class BrowserWebView: WKWebView {
     /// otherwise only bring the window forward.
     nonisolated(unsafe) static var takesFirstMouse = false
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { Self.takesFirstMouse || super.acceptsFirstMouse(for: event) }
+    /// Holds a swipe part of the way (`SwipeNavigator.debugHold`).
+    func debugHoldSwipe(direction: Int, progress: CGFloat?) { swipe.debugHold(direction: direction, progress: progress) }
     #endif
 
     override func viewDidMoveToWindow() {
