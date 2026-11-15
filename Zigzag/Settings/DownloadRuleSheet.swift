@@ -22,9 +22,12 @@ enum DownloadRuleSheet {
         let applies = DropdownButton()
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
         applies.selectedIndex = DownloadRule.Applies.allCases.firstIndex(of: source.applies) ?? 0
+        // The Match dropdown offers the address matches: a file-type rule is a per-extension destination, made and
+        // edited in the panel under Save downloads to, not here. One that arrives anyway keeps what it had.
+        let matchChoices = DownloadRule.Match.allCases.filter { $0 != .fileType }
         let match = DropdownButton()
-        match.options = DownloadRule.Match.allCases.map { DropdownButton.Option(title: $0.title) }
-        match.selectedIndex = DownloadRule.Match.allCases.firstIndex(of: source.match) ?? 1
+        match.options = matchChoices.map { DropdownButton.Option(title: $0.title) }
+        match.selectedIndex = matchChoices.firstIndex(of: source.match) ?? matchChoices.firstIndex(of: .contains) ?? 0
         let caseSensitive = Toggle(isOn: source.isCaseSensitive)
         caseSensitive.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
         let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
@@ -144,11 +147,14 @@ enum DownloadRuleSheet {
                 action.rpcMethod = methodField?.stringValue ?? ""
                 action.rpcParameters = parametersView?.text ?? "[]"
                 action.rpcStyle = DownloadRuleAction.RPCStyle.allCases[stylePicker?.selectedIndex ?? 0]
+            case .saveToFolder, .showInZigzag:
+                // A destination never reaches this sheet; should one, its own fields are left as they were.
+                break
             }
             var rule = existing ?? source
             rule.name = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.applies = DownloadRule.Applies.allCases[applies.selectedIndex]
-            rule.match = DownloadRule.Match.allCases[match.selectedIndex]
+            rule.match = matchChoices.indices.contains(match.selectedIndex) ? matchChoices[match.selectedIndex] : source.match
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.isCaseSensitive = caseSensitive.isOn
             rule.runsInPrivateWindows = runsInPrivate.isOn

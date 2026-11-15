@@ -119,6 +119,23 @@
         }
       }
     },
+    "%@ are saved to %@" : {
+      "comment" : "A download rule in a sentence: what it catches, then the folder it is saved into. The placeholders are the two parts, as in “Files of type pdf” and “Documents”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ are saved to %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@会保存到 %2$@"
+          }
+        }
+      }
+    },
     "%@ at %lld%%" : {
       "comment" : "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.",
       "localizations" : {
@@ -511,6 +528,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@ / %2$@"
+          }
+        }
+      }
+    },
+    "%@ of type %@" : {
+      "comment" : "Part of a download rule's sentence: what it catches by file extension. The first placeholder is “Files” or “Files and links”, the second the extensions, like “pdf, epub”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of type %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型为 %2$@ 的%1$@"
           }
         }
       }
@@ -8901,6 +8935,17 @@
         }
       }
     },
+    "List the file extensions this rule catches, like pdf, epub." : {
+      "comment" : "Tooltip on the extensions field of a download rule with none yet, so its Add button can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列出这条规则要匹配的文件扩展名，例如 pdf、epub。"
+          }
+        }
+      }
+    },
     "Loading…" : {
       "comment" : "In Settings › Privacy › Stored by Websites while the list of sites is read.",
       "localizations" : {
@@ -14237,6 +14282,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要存储密码吗？"
+          }
+        }
+      }
+    },
+    "Save to Folder" : {
+      "comment" : "A destination a file of a given type can have: saved into a folder of its own, instead of the one everything else goes to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存到文件夹"
           }
         }
       }

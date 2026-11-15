@@ -207,6 +207,10 @@ enum DownloadHandoff {
         case .jsonRPC:
             outcome = await callService(rule.action, values: values, secret: secret)
             if let cookieFile { HandoffCookies.removeFile(cookieFile) }
+        case .saveToFolder, .showInZigzag:
+            // A destination, not a handoff: where the file lands is decided when the download is made, and the
+            // download is never cancelled for it — so there is nothing to do here but let it be saved.
+            outcome = .noMatch
         }
         return outcome
     }
