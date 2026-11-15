@@ -236,12 +236,16 @@ final class Updater {
         if manualCheck { sayReady() }
     }
 
+    /// One session for every look at the feed, with no cookies or cache kept: a session made per look is never
+    /// let go of.
+    private static let feedSession = URLSession(configuration: .ephemeral)
+
     /// The newest version on the feed Sparkle reads, or nil when it can't be read.
     private func newestOnFeed(_ done: @escaping (UpdateFeed.Item?) -> Void) {
         guard let url = updater?.feedURL else { done(nil); return }
         let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
         Task {
-            let answer = try? await URLSession(configuration: .ephemeral).data(for: request)
+            let answer = try? await Self.feedSession.data(for: request)
             let ok = (answer?.1 as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
             done(ok ? answer.flatMap { UpdateFeed.newest(in: $0.0) } : nil)
         }
