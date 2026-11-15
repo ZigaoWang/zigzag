@@ -5,17 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- The first time a link from another app or a script opens as a new tab, Zigzag offers once to open such links in Zigzag Mini instead. Use Zigzag Mini turns that on and moves the page into a Zigzag Mini window; it's also in Settings › Zigzag Mini. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
-- Find on Page (⌘F) works in Zigzag Mini, with the same bar and marks as in a browser window. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
-- Zigzag Mini opens at the size you last made it. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
-- An update that's ready shows at the foot of the sidebar, in every window, with its version and a Restart that restarts into it with your windows and tabs as they were. Close it and it waits until Zigzag quits, as before; Zigzag › Check for Updates… reads Restart to Update meanwhile, and Settings › General says the version is ready. Zigzag now looks for updates every few hours and after your Mac wakes, quietly, and when a newer version comes out while one is waiting, the newer one takes its place. Check for Updates… answers in a toast instead of a window.
-
-### Fixed
-- A page saved on your Mac that a script or another app opens, like a chart from Python's `webbrowser.open("file:///…/plot.html")`, opens in Zigzag (or Zigzag Mini) instead of nothing. Only HTML, SVG and PDF files, never folders or other files.
-- Translating a page translates a title or short line in Chinese, Japanese, Russian or another script that names something in English, like a GitHub issue titled 类似Little Arc功能, instead of leaving it as it was because it read a little like English.
-- A sign-in page in Zigzag Mini that sends you back to the app that opened it closes once that app opens, and a link that goes straight to an app no longer leaves an empty Zigzag Mini window behind. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -30,6 +19,10 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - The address bar above the page shows the page's whole address, the site's name dark and the rest gray, as there's room for it; pop-up windows and Zigzag Mini do the same when they're wide enough. The sidebar keeps the site's name alone. A long address loses the end of its path first, never the site's name.
 - The camera and the microphone are two permissions in Site Controls: a site asks for each on its own, one question after the other (a no to the first, or a Block for either, settles it without asking the other), and a call that wants both is allowed only when you've allowed both. Sites you allowed both before keep both. ([#243](https://github.com/ZigaoWang/zigzag/issues/243))
 - Find on Page (⌘F) highlights every match on the page at once, in a soft yellow (amber on a dark page), with the one you're on in a stronger orange. A tick for each match runs along the page's right edge, over the scroll bar, so you can see where they all are; click one to go to that match. The marks follow the page as it changes and go away when you close the bar. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#244](https://github.com/ZigaoWang/zigzag/issues/244))
+- The first time a link from another app or a script opens as a new tab, Zigzag offers once to open such links in Zigzag Mini instead. Use Zigzag Mini turns that on and moves the page into a Zigzag Mini window; it's also in Settings › Zigzag Mini. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Find on Page (⌘F) works in Zigzag Mini, with the same bar and marks as in a browser window. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Zigzag Mini opens at the size you last made it. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- An update that's ready shows at the foot of the sidebar, in every window, with its version and a Restart that restarts into it with your windows and tabs as they were. Close it and it waits until Zigzag quits, as before; Zigzag › Check for Updates… reads Restart to Update meanwhile, and Settings › General says the version is ready. Zigzag now looks for updates every few hours and after your Mac wakes, quietly, and when a newer version comes out while one is waiting, the newer one takes its place. Check for Updates… answers in a toast instead of a window.
 
 ### Fixed
 - Text across Zigzag sits exactly in the middle of its buttons, fields and rows, measured by its capital letters, with icons lined up beside it and even spacing: the sidebar, panels, prompts, toasts, Settings, History and the other windows. Some of it sat up to a point low.
@@ -93,6 +86,9 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Swiping back or forward on a page shows a plain gray backdrop beside it, in light or dark, with a soft shadow along the page's edge, instead of a strip of the page's own colors that could show odd bands. The round arrow stays inside the page's card, never hanging over the sidebar, the next pane or the window's edge.
 - Zigzag no longer asks you to add it in 1Password while 1Password works with it. The note now shows only when 1Password really turns Zigzag away, and not again once 1Password has connected that session.
 - The window's buttons at the top left stay put when you switch tabs or a page loads. The green one could jump up and to the left for a moment.
+- A page saved on your Mac that a script or another app opens, like a chart from Python's `webbrowser.open("file:///…/plot.html")`, opens in Zigzag (or Zigzag Mini) instead of nothing. Only HTML, SVG and PDF files, never folders or other files.
+- Translating a page translates a title or short line in Chinese, Japanese, Russian or another script that names something in English, like a GitHub issue titled 类似Little Arc功能, instead of leaving it as it was because it read a little like English.
+- A sign-in page in Zigzag Mini that sends you back to the app that opened it closes once that app opens, and a link that goes straight to an app no longer leaves an empty Zigzag Mini window behind. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
