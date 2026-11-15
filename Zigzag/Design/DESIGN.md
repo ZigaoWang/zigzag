@@ -449,6 +449,13 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   `panelBackground`: the video live in a 54 by 32 thumbnail, the tab's title, play or pause, and expand; a click
   brings the card back there. The video plays on all the while. (Not the sidebar's Now Playing row: that shows only
   for a tab you can hear, and a silent video plays on too.)
+- **Picture in Picture when you leave** (`AutoPictureInPicture`, #238): leave Zigzag for another app or desktop while
+  the page you're on (the focused half of a split, Zigzag Mini's page, a private window's) plays a video you were
+  watching, and WebKit's own Picture in Picture floats it, no press on the page needed (a video it hasn't taken up,
+  one that started by itself and was never pressed, the page's script floats, `PageVideos`). Back in front of that page,
+  it goes back in; back on another tab, it floats on until you go to its tab. Only what Zigzag floated: one you
+  floated yourself stays. A video the page won't let float (`disablePictureInPicture`), one in full screen, and the
+  mini player's (already floating over everything) are left alone. Settings › Tabs turns it off.
 - **Full screen in the page** (`PageFullScreen`, #168): with Settings › Tabs › Full screen videos fill set to The Page,
   or a site's own Full screen fills the page row in its controls, a page's full screen (a player's button, its key)
   fills the page card, or its pane in a split, in black, the window's chrome as it was. No bar, no note: the player's

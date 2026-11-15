@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Disable Images and Disable Styles, under ⋯ among the developer tools, in View › Developer and the command bar, show how a page in Developer Mode holds up without its pictures or without its CSS. Like the other choices they're that tab's alone. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
+- A video playing in the page you're on floats over everything in Picture in Picture when you switch to another app or desktop, a full screen app's too. Come back to its page and it goes back in; come back to another tab and it floats on until you go to its tab. Picture in Picture you started yourself stays as it is. Settings › Tabs › Picture in picture when you leave Zigzag turns it off. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
 
 ### Fixed
 - A PDF at an address without a file name, like a download link, is called by the name its site gave it, in its tab and in History, or by the site when it gave none, instead of the last part of the address.

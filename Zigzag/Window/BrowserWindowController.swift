@@ -613,6 +613,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showPages()
         // Shown in a pane some other way (split beside the page you're on): the mini player lets it go.
         miniPlayer.tabsChanged()
+        // Back on the tab whose video Zigzag floated as you left: it goes back in its page.
+        AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         paintTopBar()
         // A collapsed pinned section shows the pinned page you're on, so it changes with the selection.

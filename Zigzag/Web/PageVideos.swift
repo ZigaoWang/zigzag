@@ -36,7 +36,7 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
           const r = v.getBoundingClientRect();
           return { i, x: r.left, y: r.top, w: r.width, h: r.height, vw: v.videoWidth, vh: v.videoHeight,
                    playing: !v.paused && !v.ended && v.readyState >= 2, ended: v.ended, muted: v.muted || v.volume === 0,
-                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, user: started.has(v), link: !!v.closest('a[href]'), fit: getComputedStyle(v).objectFit || 'contain',
+                   loop: v.loop, autoplay: v.autoplay, controls: v.controls, user: started.has(v), link: !!v.closest('a[href]'), nopip: !!v.disablePictureInPicture, fit: getComputedStyle(v).objectFit || 'contain',
                    t: v.currentTime || 0, d: isFinite(v.duration) ? v.duration : -1 };
         });
       };
@@ -123,6 +123,22 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
           return true;
         },
         pause: (i) => { if (list[i]) list[i].pause(); return true; },
+        // Picture in Picture for one video, when WebKit's own has no video to float (one that started by itself, never
+        // pressed): not one the page says mustn't float. Run as Zigzag's (as if pressed), from this world, where the
+        // page can't change what it calls.
+        float: (i) => {
+          const v = list[i];
+          if (!v || v.disablePictureInPicture || !v.webkitSupportsPresentationMode || !v.webkitSupportsPresentationMode('picture-in-picture')) return false;
+          v.webkitSetPresentationMode('picture-in-picture');
+          return true;
+        },
+        unfloat: () => {
+          let any = false;
+          for (const v of document.querySelectorAll('video')) {
+            if (v.webkitPresentationMode === 'picture-in-picture') { v.webkitSetPresentationMode('inline'); any = true; }
+          }
+          return any;
+        },
         seek: (i, by) => { const v = list[i]; if (finite(v)) v.currentTime = Math.max(0, Math.min(v.duration, v.currentTime + by)); return true; },
         seekTo: (i, f) => { const v = list[i]; if (finite(v)) v.currentTime = Math.max(0, Math.min(1, f)) * v.duration; return true; },
         // Into view if it's partly out of it (you scrolled on to the comments), where you were kept for coming back.
