@@ -7,6 +7,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Zigzag no longer asks you to add it in 1Password while 1Password works with it. The note now shows only when 1Password really turns Zigzag away, and not again once 1Password has connected that session.
+### New
+- The address bar above the page shows the page's whole address, the site's name dark and the rest gray, as there's room for it; pop-up windows and Zigzag Mini do the same when they're wide enough. The sidebar keeps the site's name alone. A long address loses the end of its path first, never the site's name.
 
 ## [0.9.1] - 2026-11-15
 
