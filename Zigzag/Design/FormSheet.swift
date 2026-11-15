@@ -14,6 +14,10 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         var label: String?
         var view: NSView
         var height: CGFloat = Tokens.Metric.controlHeight
+        /// A row that isn't wanted right now: it takes no room and isn't laid out, and Tab skips it. The form is told
+        /// while it's up with `setHidden(_:forRow:)` — a choice that makes another row pointless (a folder for a
+        /// destination that saves nothing) takes it out rather than leaving it there greyed.
+        var isHidden = false
 
         /// A quiet line of words, wrapped to the form's width.
         static func note(_ text: String) -> Row {
@@ -59,6 +63,8 @@ final class FormSheet: NSView, NSTextFieldDelegate {
             labels.append(label)
             if let label { panel.addSubview(label) }
             panel.addSubview(row.view)
+            row.view.isHidden = row.isHidden
+            label?.isHidden = row.isHidden
             // Typing in any of its fields can change whether it may be confirmed — whether the row is the field
             // itself or holds it beside something else (a path with a Choose… button after it).
             for field in row.view.selfAndDescendants(of: FilledField.self) { field.field.delegate = self }
@@ -116,6 +122,19 @@ final class FormSheet: NSView, NSTextFieldDelegate {
 
     func controlTextDidChange(_ obj: Notification) { revalidate() }
 
+    /// Takes a row out of the form, or puts it back, while the form is up: a choice that makes another row pointless
+    /// hides it, so the form says only what it is asking. The panel is the height the rows that are left need.
+    func setHidden(_ hidden: Bool, forRow index: Int) {
+        guard rows.indices.contains(index), rows[index].isHidden != hidden else { return }
+        rows[index].isHidden = hidden
+        rows[index].view.isHidden = hidden
+        labels[index]?.isHidden = hidden
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        panel.needsLayout = true
+        panel.layoutSubtreeIfNeeded()
+    }
+
     /// What a key does while a form is up.
     enum KeyAction: Equatable {
         case confirm, cancel
@@ -167,7 +186,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     /// and the button follows it), then Cancel and the confirm button. A row of its own that takes the keyboard counts
     /// as its one stop.
     static func focusCandidates(rows: [Row]) -> [NSView] {
-        rows.flatMap { row -> [NSView] in
+        rows.filter { !$0.isHidden }.flatMap { row -> [NSView] in
             if let filled = row.view as? FilledField { return [filled.field] }
             let nested = row.view.selfAndDescendants(of: NSView.self).filter(\.acceptsFirstResponder)
             return nested.isEmpty ? (row.view.acceptsFirstResponder ? [row.view] : []) : nested
@@ -260,7 +279,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         var height = pad + header.height(for: inner)
         if let body { height += Tokens.Space.x2 + body.wrappedHeight(inner) }
         height += Tokens.Dialog.gap
-        for row in rows { height += self.height(of: row, width: inner) + rowGap }
+        for row in rows where !row.isHidden { height += self.height(of: row, width: inner) + rowGap }
         return height - rowGap + Tokens.Dialog.gap + DialogButtons.height + pad
     }
 
@@ -283,6 +302,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         // Labels share a column, so the controls after them line up.
         let labelWidth = labels.compactMap { $0?.intrinsicContentSize.width }.max().map { ceil($0) + Tokens.Space.x3 } ?? 0
         for (row, label) in zip(rows, labels) {
+            if row.isHidden { continue }
             let height = self.height(of: row, width: inner)
             if let label {
                 let lh = ceil(label.intrinsicContentSize.height)

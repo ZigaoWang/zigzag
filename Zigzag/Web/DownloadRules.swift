@@ -749,10 +749,24 @@ final class DownloadRulesStore {
         save()
     }
 
-    func move(from: Int, to: Int) {
-        guard rules.indices.contains(from), to >= 0, to < rules.count, from != to else { return }
-        let rule = rules.remove(at: from)
-        rules.insert(rule, at: to)
+    /// The rules with the one whose `id` this is moved to just before `before` (`nil` puts it last). Kept apart from
+    /// the store so the order a drag produces can be read without one: a list that shows only some of the rules can't
+    /// number a place in the store, so it names the row it was dropped on instead.
+    nonisolated static func moved(_ rules: [DownloadRule], id: UUID, before beforeID: UUID?) -> [DownloadRule] {
+        guard let from = rules.firstIndex(where: { $0.id == id }) else { return rules }
+        var without = rules
+        let rule = without.remove(at: from)
+        let to = beforeID.flatMap { before in without.firstIndex(where: { $0.id == before }) } ?? without.count
+        guard to != from else { return rules }
+        without.insert(rule, at: min(to, without.count))
+        return without
+    }
+
+    /// Moves the rule with `id` to just before the rule with `before` (`nil` puts it last).
+    func move(_ id: UUID, before beforeID: UUID?) {
+        let moved = Self.moved(rules, id: id, before: beforeID)
+        guard moved != rules else { return }
+        rules = moved
         save()
     }
 

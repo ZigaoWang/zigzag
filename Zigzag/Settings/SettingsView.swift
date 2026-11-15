@@ -793,6 +793,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let generalGroup = FormGroup()
     /// Settings › Downloads: where files go, and the rules that hand a download or a link to another app.
     private let downloadPlaceGroup = FormGroup()
+    /// The per-extension destinations, under Save downloads to: what makes a file of one type land somewhere of its
+    /// own. They never cancel a download, so they don't belong with the rules that hand one off.
+    private let downloadTypesGroup = FormGroup()
+    private let addFileTypeButton = PillButton(title: String(localized: "Add File Type…", comment: "Button beside the file types in Settings › Downloads: opens the sheet that makes a per-extension destination."))
     private let downloadPlaceRules = DropdownButton()
     private let downloadRulesGroup = FormGroup()
     private let downloadTestGroup = FormGroup()
@@ -1139,6 +1143,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         rulesPlaceRow.keywords = String(localized: "folder location downloads", comment: "Words that find the Save downloads to setting with Find a setting. Not shown.")
         downloadPlaceGroup.add(rulesPlaceRow)
         addDownloadRuleButton.onClick = { [weak self] _ in self?.showDownloadRuleMenu() }
+        addFileTypeButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            DownloadRuleSheet.show(in: self, kind: .saveToFolder)
+        }
         downloadRulesToken = DownloadRulesStore.shared.changed.observe { [weak self] in
             guard let self else { return }
             self.reloadDownloadRules()
@@ -2483,6 +2491,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var webAppsHeading: String { String(localized: "Installed Apps", comment: "A heading in Settings › General: the sites installed as apps with File › Install as App.") }
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
     private static var downloadRulesHeading: String { String(localized: "Hand Off Downloads and Links", comment: "A heading in Settings › Downloads, over the rules that send a download or a link to another app.") }
+    private static var downloadTypesHeading: String { String(localized: "Save Downloads by Type", comment: "A heading in Settings › Downloads, over the file types saved somewhere of their own instead of the folder above.") }
     private static var downloadTestHeading: String { String(localized: "Test a Rule", comment: "A heading in Settings › Downloads, over the address field that shows which rule would take it.") }
     private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
     private static var localServersHeading: String { String(localized: "Local Servers", comment: "A heading in Settings › Developer: development servers running on this Mac.") }
@@ -2529,7 +2538,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func groups(of pane: SettingsPane) -> [(title: String?, group: FormGroup)] {
         switch pane {
         case .general: [(nil, generalGroup)] + (webAppsGroup.rows.isEmpty ? [] : [(Self.webAppsHeading, webAppsGroup)]) + [(Self.updatesHeading, versionGroup)]
-        case .downloads: [(nil, downloadPlaceGroup), (Self.downloadRulesHeading, downloadRulesGroup), (Self.downloadTestHeading, downloadTestGroup)]
+        case .downloads: [(nil, downloadPlaceGroup), (Self.downloadTypesHeading, downloadTypesGroup), (Self.downloadRulesHeading, downloadRulesGroup), (Self.downloadTestHeading, downloadTestGroup)]
         case .appearance: [(nil, appearanceGroup)]
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
@@ -2686,6 +2695,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         switch pane {
         case .downloads:
             section(nil, downloadPlaceGroup)
+            section(Self.downloadTypesHeading, downloadTypesGroup, accessory: addFileTypeButton)
             section(Self.downloadRulesHeading, downloadRulesGroup, accessory: addDownloadRuleButton)
             section(Self.downloadTestHeading, downloadTestGroup)
         case .general, .appearance, .tabs, .search, .mini, .automation:
@@ -2842,7 +2852,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func reloadDownloadRules() {
         downloadRulesGroup.removeAllRows()
         updateDownloadRuleTest()
-        let rules = DownloadRulesStore.shared.rules
+        reloadDownloadTypes()
+        // The file types have their own list below; what's left here is what hands something off.
+        let rules = DownloadRulesStore.shared.rules.filter { !$0.action.kind.isDestination }
         guard !rules.isEmpty else {
             let empty = FormRow(title: String(localized: "No rules yet", comment: "In Settings › Downloads, when no rule has been made."),
                                 detail: String(localized: "Everything else is saved by Zigzag, as before.", comment: "Under “No rules yet” in Settings › Downloads."),
@@ -2898,6 +2910,57 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         downloadRulesGroup.add(hint)
     }
 
+    /// The per-extension destinations, one row each, under Save downloads to: the file types a rule names, and where
+    /// those files go instead of the folder everything else goes to. Each is a rule like any other — the same switch,
+    /// the same Change and Delete — because that is what it is; only its matcher (the file's own name) and its
+    /// action (a folder, or Zigzag showing it) are its own.
+    private func reloadDownloadTypes() {
+        downloadTypesGroup.removeAllRows()
+        let rules = DownloadRulesStore.shared.rules.filter { $0.action.kind.isDestination }
+        guard !rules.isEmpty else {
+            let empty = FormRow(title: String(localized: "No file types yet", comment: "In Settings › Downloads, when no file type has a destination of its own."),
+                                detail: String(localized: "Every download is saved to the folder above, whatever kind of file it is.",
+                                               comment: "Under “No file types yet” in Settings › Downloads."),
+                                control: NSView())
+            empty.keywords = String(localized: "extension type pdf epub save destination", comment: "Words that find the empty file types list with Find a setting. Not shown.")
+            downloadTypesGroup.add(empty)
+            return
+        }
+        for rule in rules {
+            let types = DownloadRule.Match.extensions(in: rule.pattern).joined(separator: ", ")
+            let toggle = Toggle(isOn: rule.isEnabled)
+            toggle.onChange = { isOn in DownloadRulesStore.shared.setEnabled(isOn, for: rule.id) }
+            toggle.setAccessibilityLabel(String(localized: "Turn \(types) on or off", comment: "A per-extension destination's switch for VoiceOver. The placeholder is the file extensions it names, like pdf, epub."))
+
+            let edit = IconButton(symbol: "slider.horizontal.3", size: .compact,
+                                  toolTip: String(localized: "Change File Type", comment: "Tooltip of the button that changes a per-extension destination."))
+            edit.onClick = { [weak self] _ in
+                guard let self else { return }
+                DownloadRuleSheet.show(in: self, kind: rule.action.kind, rule: rule)
+            }
+            let remove = IconButton(symbol: "trash", size: .compact,
+                                    toolTip: String(localized: "Delete File Type", comment: "Tooltip of the button that deletes a per-extension destination."))
+            remove.onClick = { [weak self] _ in
+                self?.confirm(title: String(localized: "Delete the \(types) file type?", comment: "Title of the sheet that deletes a per-extension destination. The placeholder is the extensions it names, like pdf, epub."),
+                              message: String(localized: "Files of this type are saved to the folder downloads are saved to again, and nothing else changes.",
+                                              comment: "Message of the sheet that deletes a per-extension destination."),
+                              action: String(localized: "Delete", comment: "Button of the sheet that deletes a download rule.")) {
+                    DownloadRulesStore.shared.remove(id: rule.id)
+                }
+            }
+
+            let controls = NSStackView(views: [toggle, edit, remove])
+            controls.orientation = .horizontal
+            controls.spacing = Tokens.Space.x1
+            controls.distribution = .fill
+            controls.alignment = .centerY
+            let content = FormRow(title: types.isEmpty ? String(localized: "Untitled File Type", comment: "A per-extension destination with no extensions yet.") : types,
+                                  detail: rule.summarySentence, control: controls)
+            content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
+            downloadTypesGroup.add(content)
+        }
+    }
+
     /// The test address, as a link and then as a download: the first rule either way, and what its first field becomes.
     private func updateDownloadRuleTest() {
         // A result that wraps takes another line: the page's height follows it.
@@ -2919,7 +2982,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let linkMatch = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: true)
         let downloadMatch = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: false)
         guard let rule = linkMatch ?? downloadMatch else {
-            row.detailText = String(localized: "No rule matches, so Zigzag saves it in Downloads.", comment: "Under the test address in Settings › Downloads, when no rule takes it.")
+            // A per-extension destination matches a file's own name, so the field can answer for one of those too.
+            let name = url.lastPathComponent
+            if !name.isEmpty, let (destination, _) = DownloadRulesStore.destination(in: rules, url: url, filename: name) {
+                row.detailText = destination.destinationSentence
+            } else {
+                row.detailText = String(localized: "No rule matches, so Zigzag saves it in Downloads.", comment: "Under the test address in Settings › Downloads, when no rule takes it.")
+            }
             return
         }
         let values = HandoffValues(link: url, filename: DownloadTokens.filename(for: url, suggested: ""), space: "")

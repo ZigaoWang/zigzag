@@ -2192,6 +2192,17 @@
         }
       }
     },
+    "Add File Type…" : {
+      "comment" : "Button beside the file types in Settings › Downloads: opens the sheet that makes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加文件类型…"
+          }
+        }
+      }
+    },
     "Add Rule…" : {
       "comment" : "Button beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from.",
       "localizations" : {
@@ -2232,6 +2243,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加尺寸…"
+          }
+        }
+      }
+    },
+    "Add a File Type" : {
+      "comment" : "Title of the sheet that makes a per-extension destination in Settings › Downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加文件类型"
           }
         }
       }
@@ -3872,6 +3894,17 @@
         }
       }
     },
+    "Change File Type" : {
+      "comment" : "Tooltip of the button that changes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改文件类型"
+          }
+        }
+      }
+    },
     "Change Icon" : {
       "comment" : "Undo action name, shown in the Edit menu as Undo Change Icon.",
       "localizations" : {
@@ -3901,6 +3934,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更改规则"
+          }
+        }
+      }
+    },
+    "Change This File Type" : {
+      "comment" : "Title of the sheet that changes a per-extension destination in Settings › Downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改此文件类型"
           }
         }
       }
@@ -4110,6 +4154,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取“显示 › 显示所有标签页”"
+          }
+        }
+      }
+    },
+    "Choose a folder…" : {
+      "comment" : "Placeholder of the folder field in a per-extension destination's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择文件夹…"
           }
         }
       }
@@ -5856,6 +5911,17 @@
         }
       }
     },
+    "Delete File Type" : {
+      "comment" : "Tooltip of the button that deletes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除文件类型"
+          }
+        }
+      }
+    },
     "Delete Profile" : {
       "comment" : "Button of the sheet that deletes a profile, and tooltip of the trash button on a profile's row in Settings › Profiles.",
       "localizations" : {
@@ -5900,6 +5966,17 @@
         }
       }
     },
+    "Delete the %@ file type?" : {
+      "comment" : "Title of the sheet that deletes a per-extension destination. The placeholder is the extensions it names, like pdf, epub.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除 %@ 文件类型？"
+          }
+        }
+      }
+    },
     "Delete this profile’s data?" : {
       "comment" : "Title of the sheet that asks before deleting data left by a profile that's no longer listed.",
       "localizations" : {
@@ -5940,6 +6017,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已删除“%@”"
+          }
+        }
+      }
+    },
+    "Destination" : {
+      "comment" : "Label of the choice in a per-extension destination's sheet: a folder of its own, or Zigzag showing the file itself.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目的地"
           }
         }
       }
@@ -6610,6 +6698,17 @@
         }
       }
     },
+    "Every download is saved to the folder above, whatever kind of file it is." : {
+      "comment" : "Under “No file types yet” in Settings › Downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有下载都会保存到上方文件夹，无论文件是什么类型。"
+          }
+        }
+      }
+    },
     "Every flag you changed goes back to WebKit’s default, for pages you open or reload." : {
       "comment" : "Message of the sheet that puts every WebKit feature flag back to its default.",
       "localizations" : {
@@ -6911,7 +7010,72 @@
         }
       }
     },
-    "Fill forms from My Card" : {
+    "File Extension" : {
+      "comment" : "How a download rule matches a file, in its editor: by the extensions of its own name, such as pdf or epub.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件扩展名"
+          }
+        }
+      }
+    },
+    "File Extensions" : {
+      "comment" : "Label of the extensions field in a per-extension destination's sheet, where the types of file are listed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件扩展名"
+          }
+        }
+      }
+    },
+    "Files" : {
+      "comment" : "The subject of a download rule's sentence, for a rule that catches downloads but not links.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件"
+          }
+        }
+      }
+    },
+    "Files and links" : {
+      "comment" : "The subject of a download rule's sentence, for a rule that catches links as well as downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件和链接"
+          }
+        }
+      }
+    },
+    "Files of this type are saved to the folder downloads are saved to again, and nothing else changes." : {
+      "comment" : "Message of the sheet that deletes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此类型文件将重新保存到下载文件夹，其他内容不变。"
+          }
+        }
+      }
+    },
+    "Files of this type skip the folder downloads are saved to, and go where you say instead. The first file type that matches wins." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此类型文件不再保存到下载文件夹，而保存到你指定的位置。最先匹配的文件类型生效。"
+          }
+        }
+      }
+    },    "Fill forms from My Card" : {
       "comment" : "A setting in Settings › Passwords.",
       "localizations" : {
         "zh-Hans" : {
@@ -10153,6 +10317,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "还没有扩展"
+          }
+        }
+      }
+    },
+    "No file types yet" : {
+      "comment" : "In Settings › Downloads, when no file type has a destination of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚无文件类型"
           }
         }
       }
@@ -14231,6 +14406,17 @@
         }
       }
     },
+    "Save Downloads by Type" : {
+      "comment" : "A heading in Settings › Downloads, over the file types saved somewhere of their own instead of the folder above.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按类型保存下载"
+          }
+        }
+      }
+    },
     "Save Page As…" : {
       "comment" : "File menu item.",
       "localizations" : {
@@ -14387,6 +14573,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储的密码会保留。"
+          }
+        }
+      }
+    },
+    "Saved somewhere of its own, instead of with everything else." : {
+      "comment" : "Under the title of the sheet that makes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存到它自己的位置，而不是与其他文件放在一起。"
           }
         }
       }
@@ -18527,6 +18724,17 @@
         }
       }
     },
+    "Untitled File Type" : {
+      "comment" : "A per-extension destination with no extensions yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未命名文件类型"
+          }
+        }
+      }
+    },
     "Untitled Rule" : {
       "comment" : "A download rule with no name yet.",
       "localizations" : {
@@ -20741,6 +20949,17 @@
         }
       }
     },
+    "extension type pdf epub save destination" : {
+      "comment" : "Words that find the empty file types list with Find a setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展名 类型 pdf epub 保存 目的地"
+          }
+        }
+      }
+    },
     "extensions off" : {
       "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
       "localizations" : {
@@ -21519,6 +21738,18 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "笔记本电脑"
+
+          }
+        }
+      }
+    },
+    "pdf, epub" : {
+      "comment" : "Placeholder of the file-extension field in the sheet that makes a per-extension destination: the extensions to list, like pdf, epub.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pdf, epub"
           }
         }
       }
