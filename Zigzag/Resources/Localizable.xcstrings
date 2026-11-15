@@ -14091,6 +14091,17 @@
         }
       }
     },
+    "Save in Zigzag" : {
+      "comment" : "Button that saves a download in Zigzag instead of running a download rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag 中保存"
+          }
+        }
+      }
+    },
     "Save password?" : {
       "comment" : "Title of the save-password prompt.",
       "localizations" : {
@@ -17602,13 +17613,13 @@
         }
       }
     },
-    "Tokens: {link}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}." : {
+    "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}." : {
       "comment" : "The tokens a download rule's fields may use.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "令牌：{link}、{encoded_link}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}。"
+            "value" : "令牌：{link}、{encoded_link}、{host}、{path}、{query}、{referrer}、{cookies}、{cookie_header}、{filename}、{mime}、{space}。"
           }
         }
       }

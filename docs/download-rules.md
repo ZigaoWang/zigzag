@@ -15,6 +15,10 @@ A rule applies to downloads only, or to links and downloads. It matches the addr
 
 With several rules, the first match wins. Whatever no rule matches is saved by Zigzag exactly as before.
 
+The ready-made rules for aria2, Motrix, rTorrent and yt-dlp catch **downloads only**: a file a page sends, or one you
+download, is handed to the service. A link you merely click is not, even if it is a magnet or a video page. Make a
+rule that applies to links and downloads if you want that, and choose what it sends to.
+
 ## What a rule does
 
 - **Open App** opens the link in the app at the path chosen in the rule.
@@ -31,12 +35,15 @@ passes along, but it cannot choose what runs or where the values are sent.
 
 ## Values and tokens
 
-The fields may use:
+An Open URL template, a script's arguments and a service's parameters may use:
 
 | Token | Value |
 | --- | --- |
 | `{link}` | The address the rule caught. |
 | `{encoded_link}` | The same, as one query value. |
+| `{host}` | The address's host, such as `www.google.com`. |
+| `{path}` | Its path, percent-encoded as the address has it. |
+| `{query}` | Its query, without the `?`. |
 | `{referrer}` | The page that linked to it. |
 | `{cookies}` | A `cookies.txt` file written for this one handoff. |
 | `{cookie_header}` | A `Cookie:` header, for a service that takes one. |
@@ -52,15 +59,18 @@ A script also gets `ZIGZAG_LINK`, `ZIGZAG_REFERRER`, `ZIGZAG_FILENAME`, `ZIGZAG_
 A rule that names `{cookies}` or `{cookie_header}` gets the tab's cookies from its own profile, never another
 profile's. They are read for the target only when the target is the page's own site, or when you clicked the link
 that led there. A page that names another site on its own gets none of this site's cookies, whichever rule it names.
+A JSON-RPC or XML-RPC rule also gets them only when its endpoint is on this Mac: a remote service is reached without
+the site's sign-in.
 
 The cookie file is made in a private temporary folder, readable by its owner only, and removed once the app or script
 has had its moment to read it.
 
 ## Before a handoff
 
-A rule asks before it hands anything off: **Hand Off**, **Open in Browser**, or **Don't Allow**, with a close button
-for "not now". The answer holds for the page that asked, so a link and the download it starts ask once. Opening in the
-browser leaves the link or download exactly as it would have been without the rule.
+A rule asks before it hands anything off: **Hand Off**, **Open in Browser** (or **Save in Zigzag** for a download), or
+**Don't Allow**, with a close button for "not now". The answer holds for the page that asked, so a link and the
+download it starts ask once. Open in Browser, or Save in Zigzag, leaves the link or download exactly as it would have
+been without the rule. Don't Allow refuses it: a link goes nowhere, and a download is not saved.
 
 ## Private windows
 

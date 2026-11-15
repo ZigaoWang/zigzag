@@ -125,19 +125,23 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, action
     }
 
-    /// Older files may lack a key a newer Zigzag added: the defaults stand in, so one unreadable rule never throws
-    /// away the whole list.
+    /// Older files may lack a key a newer Zigzag added, and a kind this build doesn't know (a file-type rule from
+    /// another branch) decodes as the nearest ordinary one. A rule is never thrown away for one unknown value.
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
-        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
-        applies = try container.decodeIfPresent(Applies.self, forKey: .applies) ?? .downloads
-        match = try container.decodeIfPresent(Match.self, forKey: .match) ?? .contains
-        pattern = try container.decodeIfPresent(String.self, forKey: .pattern) ?? ""
-        isCaseSensitive = try container.decodeIfPresent(Bool.self, forKey: .isCaseSensitive) ?? false
-        runsInPrivateWindows = try container.decodeIfPresent(Bool.self, forKey: .runsInPrivateWindows) ?? false
-        action = try container.decodeIfPresent(DownloadRuleAction.self, forKey: .action) ?? DownloadRuleAction(kind: .openURL)
+        let container = try? decoder.container(keyedBy: CodingKeys.self)
+        func value<T: Decodable>(_ type: T.Type, _ key: CodingKeys) -> T? {
+            guard let container else { return nil }
+            return try? container.decodeIfPresent(type, forKey: key)
+        }
+        id = value(UUID.self, .id) ?? UUID()
+        name = value(String.self, .name) ?? ""
+        isEnabled = value(Bool.self, .isEnabled) ?? true
+        applies = value(String.self, .applies).flatMap(Applies.init(rawValue:)) ?? .downloads
+        match = value(String.self, .match).flatMap(Match.init(rawValue:)) ?? .contains
+        pattern = value(String.self, .pattern) ?? ""
+        isCaseSensitive = value(Bool.self, .isCaseSensitive) ?? false
+        runsInPrivateWindows = value(Bool.self, .runsInPrivateWindows) ?? false
+        action = value(DownloadRuleAction.self, .action) ?? DownloadRuleAction(kind: .openURL)
     }
 }
 
@@ -264,16 +268,20 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     }
 
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        kind = try container.decodeIfPresent(Kind.self, forKey: .kind) ?? .openURL
-        appPath = try container.decodeIfPresent(String.self, forKey: .appPath) ?? ""
-        urlTemplate = try container.decodeIfPresent(String.self, forKey: .urlTemplate) ?? ""
-        scriptPath = try container.decodeIfPresent(String.self, forKey: .scriptPath) ?? ""
-        arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
-        rpcEndpoint = try container.decodeIfPresent(String.self, forKey: .rpcEndpoint) ?? ""
-        rpcMethod = try container.decodeIfPresent(String.self, forKey: .rpcMethod) ?? ""
-        rpcParameters = try container.decodeIfPresent(String.self, forKey: .rpcParameters) ?? "[]"
-        rpcStyle = try container.decodeIfPresent(RPCStyle.self, forKey: .rpcStyle) ?? .json
+        let container = try? decoder.container(keyedBy: CodingKeys.self)
+        func value<T: Decodable>(_ type: T.Type, _ key: CodingKeys) -> T? {
+            guard let container else { return nil }
+            return try? container.decodeIfPresent(type, forKey: key)
+        }
+        kind = value(String.self, .kind).flatMap(Kind.init(rawValue:)) ?? .openURL
+        appPath = value(String.self, .appPath) ?? ""
+        urlTemplate = value(String.self, .urlTemplate) ?? ""
+        scriptPath = value(String.self, .scriptPath) ?? ""
+        arguments = value([String].self, .arguments) ?? []
+        rpcEndpoint = value(String.self, .rpcEndpoint) ?? ""
+        rpcMethod = value(String.self, .rpcMethod) ?? ""
+        rpcParameters = value(String.self, .rpcParameters) ?? "[]"
+        rpcStyle = value(String.self, .rpcStyle).flatMap(RPCStyle.init(rawValue:)) ?? .json
     }
 }
 
@@ -385,7 +393,9 @@ nonisolated enum DownloadTokens {
             CharacterSet.controlCharacters.contains(scalar) || "/\\:".unicodeScalars.contains(scalar) ? "-" : Character(scalar)
         })
         while name.hasPrefix(".") { name.removeFirst() }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A leading dash would read as an option to a script that parses its argv.
+        if trimmed.hasPrefix("-") { trimmed = "_" + trimmed }
         return trimmed.isEmpty ? "download" : trimmed
     }
 
@@ -395,24 +405,40 @@ nonisolated enum DownloadTokens {
         return String(text.dropFirst().dropLast())
     }
 
-    /// Fills every token in `template`. For JSON-RPC `json` is true: each value is escaped so a quote or backslash in a
-    /// URL, a filename or a cookie can't break the body.
+    /// Fills every token in `template`, in one pass. A value is never scanned again, so a filename or a title that
+    /// happens to read `{secret}` or `{link}` is passed as it is, not turned into another value.
     static func expand(_ template: String, with values: HandoffValues, secret: String = "", json: Bool = false) -> String {
         func value(_ text: String) -> String { json ? jsonEscaped(text) : text }
-        var result = template
-        let replacements: [(String, String)] = [
-            ("{encoded_link}", value(encoded(values.link))),
-            ("{cookie_header}", value(values.cookieHeader)),
-            ("{cookies}", value(values.cookieFile)),
-            ("{referrer}", value(values.referrer?.absoluteString ?? "")),
-            ("{filename}", value(values.filename)),
-            ("{mime}", value(values.mime)),
-            ("{space}", value(values.space)),
-            ("{secret}", value(secret)),
-            ("{link}", value(values.link.absoluteString)),
+        let replacements: [String: String] = [
+            "{encoded_link}": value(encoded(values.link)),
+            "{cookie_header}": value(values.cookieHeader),
+            "{cookies}": value(values.cookieFile),
+            "{referrer}": value(values.referrer?.absoluteString ?? ""),
+            "{filename}": value(values.filename),
+            "{mime}": value(values.mime),
+            "{space}": value(values.space),
+            "{secret}": value(secret),
+            // The link's own parts, so a rule can send an address somewhere else: `https://bing.com{path}` takes a
+            // match on google.com to the same page on bing.com. Both are the address's own, percent-encoded, so what
+            // is put back together is still one valid URL.
+            "{host}": value(values.link.host() ?? ""),
+            "{path}": value(values.link.path(percentEncoded: true)),
+            "{query}": value(values.link.query(percentEncoded: true) ?? ""),
+            "{link}": value(values.link.absoluteString),
         ]
-        for (token, replacement) in replacements {
-            result = result.replacingOccurrences(of: token, with: replacement)
+        var result = ""
+        var index = template.startIndex
+        while index < template.endIndex {
+            if template[index] == "{", let close = template[index...].firstIndex(of: "}") {
+                let token = String(template[index...close])
+                if let replacement = replacements[token] {
+                    result += replacement
+                    index = template.index(after: close)
+                    continue
+                }
+            }
+            result.append(template[index])
+            index = template.index(after: index)
         }
         return result
     }

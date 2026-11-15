@@ -40,7 +40,19 @@ enum DownloadHandoff {
 
     /// The rule that catches `url`, if any, and whether it wants a link (true) or a download (false).
     static func firstMatch(_ url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
-        DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+        guard isHandoffable(url) else { return nil }
+        return DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+    }
+
+    /// Whether a rule may take this address at all. Zigzag's own pages and the certificate warning's proceed link are
+    /// not links a page may hand to an app: a catch-all rule could otherwise turn "Visit this site anyway" into an
+    /// app launch, or send a history page to a script.
+    static func isHandoffable(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        if scheme == HistoryPage.scheme || scheme == CertificateExceptions.scheme { return false }
+        if ["about", "data", "blob", "javascript", "file"].contains(scheme) { return false }
+        if scheme.hasSuffix("-extension") { return false }
+        return true
     }
 
     /// Where a handoff stands: run the rule, leave it in the browser, or cancel the link.
@@ -61,9 +73,10 @@ enum DownloadHandoff {
     /// Asks where a handoff should go, unless this page already answered for this rule. The question asks in the
     /// page's own window; with no window to ask in, nothing is handed off and the link or download stays as it is.
     /// The answer holds for the page: a link that starts a download is one question, not two.
-    static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil) async -> HandoffGate {
+    static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil, forDownload: Bool = false) async -> HandoffGate {
         // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
         guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
+        guard isHandoffable(request.url) else { return .browser }
         let origin = request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
         let kind = handoffKind(rule)
         if let origin, let tab, let kept = tab.permissionAnswers.action(key: origin, kind: kind) {
@@ -77,8 +90,20 @@ enum DownloadHandoff {
             in: controller, tab: tab,
             title: String(localized: "Hand Off \(rule.name)", comment: "A page's question before a download rule handles a link or download. The placeholder is the rule's name."),
             allowTitle: String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."),
-            alternateTitle: String(localized: "Open in Browser", comment: "Button that lets a link or download stay in the browser instead of running a download rule."),
-            denyTitle: String(localized: "Don’t Allow", comment: "Button that refuses a download rule's handoff."))
+            alternateTitle: forDownload
+                ? String(localized: "Save in Zigzag", comment: "Button that saves a download in Zigzag instead of running a download rule.")
+                : String(localized: "Open in Browser", comment: "Button that lets a link stay in the browser instead of running a download rule."),
+            denyTitle: String(localized: "Don’t Allow", comment: "Button that refuses a download rule's handoff."),
+            answered: {
+                // Asked while another question was up: the page may have answered this one in the meantime.
+                guard let origin, let tab else { return nil }
+                switch tab.permissionAnswers.action(key: origin, kind: kind) {
+                case "handOff": return .allow
+                case "browser": return .alternate
+                case "deny": return .deny
+                default: return nil
+                }
+            })
         let action: String
         switch answer {
         case .allow, .always: action = "handOff"
@@ -94,6 +119,13 @@ enum DownloadHandoff {
     /// when you clicked the link that led to it. A page that names another site on its own gets none of its cookies.
     static func maySendCookies(_ request: Request) -> Bool {
         request.wasClicked || (request.pageOrigin != nil && SiteOrigin.of(request.url) == request.pageOrigin)
+    }
+
+    /// Whether a service's endpoint is on this Mac. The cookies a site signs in with are not sent to a host off it,
+    /// however the rule was written: a remote seedbox can be reached without handing it the site's sign-in.
+    static func serviceIsOnThisMac(_ endpoint: String) -> Bool {
+        guard let host = URL(string: endpoint)?.host()?.lowercased() else { return false }
+        return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
     }
 
     @discardableResult
@@ -115,8 +147,12 @@ enum DownloadHandoff {
         var cookieFile: URL?
         // The site's sign-in may go to a target of its own, or to one you clicked through to. A page that names
         // another site on its own gets none of this site's cookies, whichever rule it names.
-        if rule.needsCookies, maySendCookies(request) {
-            let cookies = await cookies(from: request.dataStore, for: request.url)
+        let cookiesMayLeave = maySendCookies(request)
+            && (rule.action.kind != .jsonRPC || serviceIsOnThisMac(rule.action.rpcEndpoint))
+        if rule.needsCookies {
+            // A rule that names the cookie file always gets one, empty where the cookies may not leave: a service or
+            // a script that insists on a jar still runs, and no site's sign-in goes where it shouldn't.
+            let cookies = cookiesMayLeave ? await cookies(from: request.dataStore, for: request.url) : []
             values.cookieHeader = HandoffCookies.header(cookies)
             if rule.usesCookieFile, let file = try? HandoffCookies.writeFile(cookies) {
                 values.cookieFile = file.path

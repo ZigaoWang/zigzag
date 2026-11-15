@@ -87,10 +87,53 @@ struct DownloadRuleTests {
     @Test func filenamesAreSafe() {
         #expect(DownloadTokens.filename(for: file, suggested: "report.pdf") == "report.pdf")
         #expect(DownloadTokens.filename(for: file, suggested: "") == "report.pdf")
-        #expect(DownloadTokens.filename(for: file, suggested: "../evil/name") == "-evil-name")
+        #expect(DownloadTokens.filename(for: file, suggested: "../evil/name") == "_-evil-name")
+        #expect(DownloadTokens.filename(for: file, suggested: "-rf") == "_-rf")
         #expect(DownloadTokens.filename(for: file, suggested: ".hidden") == "hidden")
         #expect(!DownloadTokens.filename(for: file, suggested: "a\u{0}b").contains("\u{0}"))
         #expect(DownloadTokens.filename(for: URL(string: "https://example.com/")!, suggested: "") == "example.com")
+    }
+
+    @Test func aServiceOffThisMacGetsNoCookies() {
+        #expect(DownloadHandoff.serviceIsOnThisMac("http://127.0.0.1:6800/jsonrpc"))
+        #expect(DownloadHandoff.serviceIsOnThisMac("http://localhost:8080/RPC2"))
+        #expect(DownloadHandoff.serviceIsOnThisMac("http://[::1]:6800/jsonrpc"))
+        #expect(!DownloadHandoff.serviceIsOnThisMac("https://seedbox.example/rpc"))
+        #expect(!DownloadHandoff.serviceIsOnThisMac("not a url"))
+    }
+
+    @Test func zigzagsOwnURLsAreNotHandoffs() {
+        #expect(!DownloadHandoff.isHandoffable(URL(string: "zigzag-proceed://example.com")!))
+        #expect(!DownloadHandoff.isHandoffable(URL(string: "zigzag://history")!))
+        #expect(!DownloadHandoff.isHandoffable(URL(string: "file:///Users/me/x")!))
+        #expect(!DownloadHandoff.isHandoffable(URL(string: "chrome-extension://abc/page")!))
+        #expect(DownloadHandoff.isHandoffable(URL(string: "https://example.com/file")!))
+        #expect(DownloadHandoff.isHandoffable(URL(string: "magnet:?xt=urn:btih:abc")!))
+    }
+
+    @Test func anUnknownRuleValueDoesNotThrowAwayTheList() throws {
+        let json = """
+        [
+          {"name":"Known","match":"contains","pattern":"a","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
+          {"name":"Future","match":"fileType","pattern":"pdf","action":{"kind":"saveToFolder","folderPath":"/tmp"}},
+          {"name":"Broken","applies":7,"match":{},"action":{"kind":"nonsense"}}
+        ]
+        """
+        let rules = try JSONDecoder().decode([DownloadRule].self, from: Data(json.utf8))
+        #expect(rules.count == 3)
+        #expect(rules[0].match == .contains)
+        #expect(rules[1].match == .contains)
+        #expect(rules[1].action.kind == .openURL)
+        #expect(rules[2].applies == .downloads)
+        #expect(rules[2].action.kind == .openURL)
+    }
+
+    @Test func aResponseNameKeepsItsCaseAndItsPieces() {
+        #expect(Tab.filename(from: #"attachment; filename="Report.PDF""#) == "Report.PDF")
+        #expect(Tab.filename(from: #"attachment; FILENAME="Report.PDF""#) == "Report.PDF")
+        #expect(Tab.filename(from: "attachment; filename*=UTF-8''two%20words.pdf") == "two words.pdf")
+        #expect(Tab.filename(from: #"attachment; filename="../../Library/x""#) == "../../Library/x")
+        #expect(DownloadTokens.filename(for: file, suggested: Tab.filename(from: #"attachment; filename="../../Library/x""#)!) == "_-..-Library-x")
     }
 
     @Test func everyTokenIsFilledIn() {
@@ -107,6 +150,29 @@ struct DownloadRuleTests {
         #expect(expanded.contains("a=1; b=2"))
         #expect(expanded.contains("/tmp/cookies.txt"))
         #expect(!expanded.contains("{link}"))
+    }
+
+    /// The link's own parts, so a rule can send an address somewhere else: the host, the path and the query on their
+    /// own, exactly as the address has them.
+    @Test func theLinksOwnPartsAreTokensOfTheirOwn() {
+        let values = HandoffValues(link: URL(string: "https://www.google.com/search/deep?a=1&b=two%20words")!)
+        let expanded = DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values)
+        #expect(expanded == "https://www.bing.com/search/deep?a=1&b=two%20words")
+        #expect(DownloadTokens.expand("{host}", with: values) == "www.google.com")
+        #expect(DownloadTokens.expand("{path}", with: values) == "/search/deep")
+        #expect(DownloadTokens.expand("{query}", with: values) == "a=1&b=two%20words")
+
+        let bare = HandoffValues(link: URL(string: "https://example.com")!)
+        #expect(DownloadTokens.expand("{host}|{path}|{query}", with: bare) == "example.com||")
+        let spaced = HandoffValues(link: URL(string: "https://example.com/a%20b/c")!)
+        #expect(DownloadTokens.expand("{path}", with: spaced) == "/a%20b/c")
+    }
+
+    @Test func aValueCannotNameAnotherToken() {
+        let values = HandoffValues(link: file, filename: "{secret}.mp4")
+        #expect(DownloadTokens.expand("{filename}|{secret}", with: values, secret: "tok") == "{secret}.mp4|tok")
+        let linkish = HandoffValues(link: file, filename: "{link}")
+        #expect(DownloadTokens.expand("{filename}", with: linkish) == "{link}")
     }
 
     @Test func jsonTokensAreQuotedForTheBody() {

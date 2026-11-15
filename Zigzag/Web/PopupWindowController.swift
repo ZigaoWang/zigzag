@@ -342,9 +342,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // A file a rule wants never reaches the downloads list.
         if policy == .download, let url = response.url {
             let mime = (response.mimeType ?? "").lowercased()
-            let disposition = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? "").lowercased()
-            let filename = Tab.filename(from: disposition) ?? DownloadTokens.filename(for: url, suggested: "")
-            if await handOffIfWanted(url, request: URLRequest(url: url), appliesToLinks: false, filename: filename, mime: mime) {
+            let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
+            let filename = DownloadTokens.filename(for: url, suggested: Tab.filename(from: disposition) ?? "")
+            if await handOffIfWanted(url, request: URLRequest(url: url), appliesToLinks: false, filename: filename, mime: mime,
+                                     wasClicked: downloads.mainFrameWasClicked && navigationResponse.isForMainFrame) {
                 return .cancel
             }
         }
@@ -376,7 +377,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               mime: mime, space: "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
                                               window: parentWindow, tab: opener, wasClicked: wasClicked)
-        switch await DownloadHandoff.decide(rule, request: handoff, tab: opener) {
+        switch await DownloadHandoff.decide(rule, request: handoff, tab: opener, forDownload: !appliesToLinks) {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
@@ -384,8 +385,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         case .browser:
             return false
         case .cancel:
-            // A link asked for and refused goes nowhere; a download is saved as usual.
-            return appliesToLinks
+            // Don't Allow: a link asked for goes nowhere, and a download is not saved either.
+            return true
         }
     }
 

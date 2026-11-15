@@ -3,13 +3,16 @@ import UniformTypeIdentifiers
 
 /// The sheet that makes or changes one rule: what it's called, what it catches, and where the address goes. The
 /// action kind is chosen before the sheet opens (from Add Rule or a preset), so the fields shown are exactly the ones
-/// that action uses. Tokens are listed under the pattern, and every field can use them.
+/// that action uses. Tokens are listed under the pattern: an Open URL template, a script's arguments and a service's
+/// parameters take them; a path, an endpoint and a method are literal.
 enum DownloadRuleSheet {
     /// Opens the editor for a new rule of `kind`, or for `rule` if one is given.
     static func show(in host: NSView, kind: DownloadRuleAction.Kind, preset: DownloadPreset? = nil, rule existing: DownloadRule? = nil) {
         let source = existing ?? preset?.rule ?? DownloadRule(name: "", action: DownloadRuleAction(kind: kind))
         // A preset's action may differ from the requested kind (the downloader presets are RPC): the action wins.
         let action = existing?.action ?? preset?.rule.action ?? DownloadRuleAction(kind: kind)
+        // Declared before the fields, which hear the sheet and ask it to check them again.
+        var sheetRef: FormSheet?
 
         let name = FilledField(placeholder: String(localized: "Name", comment: "Placeholder of the name field in the sheet that makes a download rule."))
         name.stringValue = source.name
@@ -42,7 +45,10 @@ enum DownloadRuleSheet {
         var stylePicker: DropdownButton?
 
         func choose(_ panel: NSOpenPanel, into field: FilledField) {
-            if panel.runModal() == .OK, let url = panel.url { field.stringValue = url.path }
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            field.stringValue = url.path
+            // A path chosen, not typed: the form doesn't hear a programmatic change, so ask it again by hand.
+            sheetRef?.revalidate()
         }
 
         switch action.kind {
@@ -114,8 +120,7 @@ enum DownloadRuleSheet {
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
         }
 
-        var sheetRef: FormSheet?
-        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
+        let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
                                              comment: "The tokens a download rule's fields may use, listed in its sheet."))
         let matchRows: [FormSheet.Row] = [
             FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
@@ -175,6 +180,7 @@ enum DownloadRuleSheet {
             guard confirmed, let rule = ruleFromFields() else { return }
             if let secret = secretField?.stringValue, action.kind == .jsonRPC { HandoffSecrets.setSecret(secret, for: rule.id) }
             if existing == nil { DownloadRulesStore.shared.add(rule) } else { DownloadRulesStore.shared.update(rule) }
+            sheetRef = nil
         }
         sheetRef = sheet
     }

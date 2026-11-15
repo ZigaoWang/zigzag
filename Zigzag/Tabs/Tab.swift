@@ -1613,8 +1613,8 @@ extension Tab: WKNavigationDelegate {
             pdfResponseURL = mime == "application/pdf" ? response.url : nil
             pdfResponseName = mime == "application/pdf" ? HistoryStore.suggestedName(of: response) : nil
         }
-        let disposition = ((response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? "").lowercased()
-        let policy = downloads.decide(mimeType: mime, contentDisposition: disposition, canShowMIMEType: navigationResponse.canShowMIMEType,
+        let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
+        let policy = downloads.decide(mimeType: mime, contentDisposition: disposition.lowercased(), canShowMIMEType: navigationResponse.canShowMIMEType,
                                       isMainFrame: navigationResponse.isForMainFrame)
         // WebRTC follows the page that's to show, where a redirect took it; one that isn't shown leaves the page
         // that stays as it was.
@@ -1633,9 +1633,10 @@ extension Tab: WKNavigationDelegate {
         // `decide` has already held a frame's file back unless that frame was just clicked, so a `.download` here is
         // the page's own or one a click asked for.
         if policy == .download, let target = response.url {
-            let filename = Self.filename(from: disposition) ?? DownloadTokens.filename(for: target, suggested: "")
+            let filename = DownloadTokens.filename(for: target, suggested: Self.filename(from: disposition) ?? "")
             if await handOffIfWanted(target, request: URLRequest(url: target), appliesToLinks: false, webView: webView,
-                                     filename: filename, mime: mime) {
+                                     filename: filename, mime: mime,
+                                     wasClicked: downloads.mainFrameWasClicked && navigationResponse.isForMainFrame) {
                 closeIfOnlyADownload(webView)
                 return .cancel
             }
@@ -1652,13 +1653,13 @@ extension Tab: WKNavigationDelegate {
 
     /// The name in a Content-Disposition header, extended or plain, if it has one.
     nonisolated static func filename(from disposition: String) -> String? {
-        if let star = disposition.range(of: "filename*=") {
+        if let star = disposition.range(of: "filename*=", options: .caseInsensitive) {
             let rest = disposition[star.upperBound...]
             let value = rest.split(separator: ";", maxSplits: 1).first.map(String.init) ?? ""
             let encoded = value.split(separator: "'", maxSplits: 2).last.map(String.init) ?? value
             return encoded.removingPercentEncoding ?? encoded
         }
-        guard let plain = disposition.range(of: "filename=") else { return nil }
+        guard let plain = disposition.range(of: "filename=", options: .caseInsensitive) else { return nil }
         var value = disposition[plain.upperBound...].split(separator: ";", maxSplits: 1).first.map(String.init) ?? ""
         value = value.trimmingCharacters(in: .whitespaces)
         if value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 { value = String(value.dropFirst().dropLast()) }
@@ -1678,7 +1679,7 @@ extension Tab: WKNavigationDelegate {
                                               mime: mime, space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
                                               window: host?.hostWindow, tab: self, wasClicked: wasClicked)
-        switch await DownloadHandoff.decide(rule, request: handoff, tab: self) {
+        switch await DownloadHandoff.decide(rule, request: handoff, tab: self, forDownload: !appliesToLinks) {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
@@ -1688,8 +1689,8 @@ extension Tab: WKNavigationDelegate {
         case .browser:
             return false
         case .cancel:
-            // A link asked for and refused goes nowhere; a download has nowhere else to go, so it is saved as usual.
-            return appliesToLinks
+            // Don't Allow: a link asked for goes nowhere, and a download is not saved either.
+            return true
         }
     }
 
