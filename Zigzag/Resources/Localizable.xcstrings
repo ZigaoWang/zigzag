@@ -2670,6 +2670,17 @@
         }
       }
     },
+    "Allow downloads from this site" : {
+      "comment" : "A site's permission question, without its question mark. The site is sending a file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许此网站下载文件"
+          }
+        }
+      }
+    },
     "Allow for This Site" : {
       "comment" : "Button on the notice that a site tried to use blocked WebRTC: allows WebRTC for the site and reloads the page.",
       "localizations" : {
@@ -3370,6 +3381,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拦截页面上的内容"
+          }
+        }
+      }
+    },
+    "Blocked a download from this site" : {
+      "comment" : "Toast when a site is not allowed to save files and sends one anyway.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已阻止此网站的下载"
           }
         }
       }

@@ -463,6 +463,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             if policy == .download, let url = navigationAction.request.url,
                await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: false,
                                       wasClicked: PopupNotice.isUserInitiated(navigationAction)) { return .cancel }
+            // No rule took it: whether this site may save files at all is asked once, and remembered per site.
+            if policy == .download, let url = navigationAction.request.url, await !mayDownload(url) { return .cancel }
             if policy == .cancel { refusedDownload() }
             return policy
         }
@@ -528,6 +530,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                      wasClicked: downloads.mainFrameWasClicked && navigationResponse.isForMainFrame) {
                 return .cancel
             }
+            // A rule didn't take it, so whether this site may save files at all is what decides.
+            if await !mayDownload(url) { return .cancel }
         }
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
         // WebRTC follows the page that's to show, where a redirect took it.
@@ -538,11 +542,20 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     /// A download the page started on its own, refused: said over the page, under the header, never silently.
-    private func refusedDownload() {
-        Diagnostics.note("Download refused", site: webView.url?.host(), "A page started another download without a click", isPrivate: isPrivate)
+    private func refusedDownload(text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click") {
+        Diagnostics.note("Download refused", site: webView.url?.host(), note, isPrivate: isPrivate)
         guard let content = window?.contentView, window?.isVisible == true else { return }
         let area = NSRect(x: 0, y: Self.headerHeight, width: content.bounds.width, height: max(0, content.bounds.height - Self.headerHeight))
-        Toast.show(DownloadPolicy.refusedText, symbol: "arrow.down.circle", duration: 3, over: content, area: area)
+        Toast.show(text, symbol: "arrow.down.circle", duration: 3, over: content, area: area)
+    }
+
+    /// Whether this site may save a file, as in a tab: asked once, "This time" for this page and "Always" for the
+    /// site. False means it may not — said over the page — so the caller cancels the download.
+    private func mayDownload(_ url: URL) async -> Bool {
+        guard let origin = SiteOrigin.of(webView.url ?? url) else { return true }
+        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: parentWindow, isPrivate: isPrivate, tab: opener)
+        if !allowed { refusedDownload(text: DownloadPolicy.blockedText, note: "This site is not allowed to save files") }
+        return allowed
     }
 
     /// Runs the first rule that catches `url`. True means the popup's page should not load or download it.

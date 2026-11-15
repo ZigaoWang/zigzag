@@ -352,6 +352,32 @@ enum SitePermissions {
 
     static func setNotifications(_ allowed: Bool?, origin: String) { remember(action(for: allowed), subject: PermissionSubject.notifications, origin: origin) }
 
+    /// Whether a site may save files: Allow or Block kept for it, else the answer given on `tab`'s page ("This time"),
+    /// else nil — nobody has said yet.
+    static func downloads(origin: String, tab: Tab? = nil) -> Bool? {
+        allowed(action(PermissionSubject.downloads, origin: origin))
+            ?? tab?.permissionAnswers.answer(key: origin, kind: PermissionSubject.downloads)
+    }
+
+    /// Whether this site may save a file, asking for a new site's first one and never again after "Always". False
+    /// refuses the download — a question put off refuses what it asked, as every other one does. With nowhere to ask
+    /// (a window that has gone) the file is left as WebKit decided it, rather than silently eaten.
+    static func downloadsAllowed(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool {
+        if let known = downloads(origin: origin, tab: tab) { return known }
+        noteAsked(.downloads, origin: origin, isPrivate: isPrivate)
+        guard let controller = WindowManager.shared.promptHost(for: window) else { return true }
+        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "files",
+                                                symbol: "arrow.down.circle", in: controller, tab: tab,
+                                                title: String(localized: "Allow downloads from this site", comment: "A site's permission question, without its question mark. The site is sending a file."),
+                                                actions: [.deny, .allow], canRemember: true,
+                                                answered: {
+                                                    knownAnswer(site: downloads(origin: origin),
+                                                                page: tab?.permissionAnswers.answer(key: origin, kind: PermissionSubject.downloads))
+                                                })
+        guard let answer else { return false }
+        return rememberAnswer(answer, subject: PermissionSubject.downloads, origin: origin, tab: tab, isPrivate: isPrivate)
+    }
+
     /// Whether a site may open links for another app (zoommtg:, itms-apps:): Allow or Block kept for the site, chosen
     /// in Site Controls or Settings, comes first; else yes for an app it was told Always Open to on its question;
     /// else nil, asked each time.
@@ -705,7 +731,7 @@ enum DisplayCaptureChoice: Int, CaseIterable {
 /// What a site can ask for, as Site Controls has a row for each. The camera and the microphone are separate
 /// permissions, so a call asks for each and can have a row for each.
 enum SitePermission: String, CaseIterable {
-    case camera, microphone, location, notifications, popups, apps, webRTC, screen
+    case camera, microphone, location, notifications, popups, downloads, apps, webRTC, screen
     /// The kinds of answer kept for it.
     var kinds: [String] {
         switch self {
@@ -714,6 +740,7 @@ enum SitePermission: String, CaseIterable {
         case .location: ["location"]
         case .notifications: ["notifications"]
         case .popups: ["popups"]
+        case .downloads: ["downloads"]
         case .apps: ["apps"]
         case .webRTC: ["webRTC"]
         case .screen: ["screen"]
@@ -727,10 +754,10 @@ enum SitePermission: String, CaseIterable {
     /// The one kind a choice made in Site Controls is kept as.
     var primaryKind: String { rawValue }
 
-    /// A private window asks for the camera and the microphone, location and apps to open (and keeps nothing); it
-    /// never shows notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab
-    /// alone.
-    var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .webRTC || self == .screen }
+    /// A private window asks for the camera and the microphone, location, apps to open and files to save (and keeps
+    /// nothing); it never shows notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen
+    /// for the tab alone.
+    var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .downloads || self == .webRTC || self == .screen }
 
     var title: String {
         switch self {
@@ -739,6 +766,7 @@ enum SitePermission: String, CaseIterable {
         case .location: String(localized: "Location", comment: "Row in the site panel's This Site group.")
         case .notifications: String(localized: "Notifications", comment: "Row in the site panel's This Site group.")
         case .popups: String(localized: "Pop-ups", comment: "Row in the site panel's This Site group.")
+        case .downloads: String(localized: "Downloads", comment: "Row in the site panel's This Site group: whether the site may save files.")
         case .apps: String(localized: "Open apps", comment: "Row in the site panel's This Site group: whether the site's links may open apps on this Mac, like Zoom or the App Store.")
         case .webRTC: String(localized: "WebRTC", comment: "Row in the site panel's This Site group: whether the site may use WebRTC, which calls need, and which can show sites your real IP address. A name: keep it as it is.")
         case .screen: String(localized: "Screen sharing", comment: "Row in the site panel's This Site group: whether the site may share the screen. macOS still asks which window or display.")
