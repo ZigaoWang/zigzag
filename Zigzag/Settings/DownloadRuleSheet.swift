@@ -10,13 +10,21 @@ enum DownloadRuleSheet {
         let source = existing ?? preset?.rule ?? DownloadRule(name: "", action: DownloadRuleAction(kind: kind))
         // A preset's action may differ from the requested kind (the downloader presets are RPC): the action wins.
         let action = existing?.action ?? preset?.rule.action ?? DownloadRuleAction(kind: kind)
+        /// Opening this sheet for a destination (Save to Folder, Open in Zigzag) is the panel under Save downloads to
+        /// asking for one file type: the sheet then asks *which type* (its extensions, not an address) and *which of
+        /// the two destinations*, instead of the address matches and the four handoff actions.
+        let isDestination = action.kind.isDestination
+        /// The two destinations, in the order the choice offers them; the action's own kind is the one chosen.
+        let destinationKinds: [DownloadRuleAction.Kind] = [.saveToFolder, .showInZigzag]
         /// The sheet, once it's up, so a value filled in from somewhere other than the keyboard (the open panel's
         /// own answer) can still be followed by the main button.
         var sheetRef: FormSheet?
 
         let name = FilledField(placeholder: String(localized: "Name", comment: "Placeholder of the name field in the sheet that makes a download rule."))
         name.stringValue = source.name
-        let pattern = FilledField(placeholder: String(localized: "example.com/files/", comment: "Placeholder of the pattern field in the sheet that makes a download rule."))
+        let pattern = FilledField(placeholder: isDestination
+            ? String(localized: "pdf, epub", comment: "Placeholder of the file-extension field in the sheet that makes a per-extension destination: the extensions to list, like pdf, epub.")
+            : String(localized: "example.com/files/", comment: "Placeholder of the pattern field in the sheet that makes a download rule."))
         pattern.stringValue = source.pattern
         /// Whether the pointer is over the main button, which asks for the whole answer to "why can't I add this?".
         var addHovered = false
@@ -25,11 +33,12 @@ enum DownloadRuleSheet {
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
         applies.selectedIndex = DownloadRule.Applies.allCases.firstIndex(of: source.applies) ?? 0
         // The Match dropdown offers the address matches: a file-type rule is a per-extension destination, made and
-        // edited in the panel under Save downloads to, not here. One that arrives anyway keeps what it had.
-        let matchChoices = DownloadRule.Match.allCases.filter { $0 != .fileType }
+        // edited in the panel under Save downloads to, not here. One that arrives anyway keeps what it had. A sheet
+        // opened *for* a destination is that panel's own editor, so there the one match it can have is the choice.
+        let matchChoices = isDestination ? [.fileType] : DownloadRule.Match.allCases.filter { $0 != .fileType }
         let match = DropdownButton()
         match.options = matchChoices.map { DropdownButton.Option(title: $0.title) }
-        match.selectedIndex = matchChoices.firstIndex(of: source.match) ?? 1
+        match.selectedIndex = matchChoices.firstIndex(of: source.match) ?? matchChoices.firstIndex(of: .contains) ?? 0
         let matchCase = Toggle(isOn: source.isCaseSensitive)
         matchCase.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
         let stopsThePage = Toggle(isOn: source.stopsThePage)
@@ -57,6 +66,11 @@ enum DownloadRuleSheet {
         var parametersView: MultilineField?
         var secretField: FilledField?
         var stylePicker: DropdownButton?
+        /// A destination's two fields: which of the two it is, and the folder one of them saves into.
+        var destinationField: DropdownButton?
+        var folderField: FilledField?
+        /// Where the folder row sits in `actionRows`, so it can be taken out while the other destination is chosen.
+        var folderActionRow: Int?
 
         func choose(_ panel: NSOpenPanel, into field: FilledField) {
             guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -180,14 +194,40 @@ enum DownloadRuleSheet {
             cookieStatus = status
             actionRows.append(FormSheet.Row(label: nil, view: status, height: Tokens.Metric.controlHeight))
         case .saveToFolder, .showInZigzag:
-            // A destination is made in the panel under Save downloads to, which is where its folder lives: this
-            // sheet is only ever opened for a handoff action.
-            break
+            // A destination's own two things: what happens to a file of this type, and, when it is saved, where.
+            // The row that picks the kind is the one the panel's "Add File Type…" opens on; the folder row is
+            // taken out of the form for Open in Zigzag, where nothing is saved to a folder at all.
+            let whereTo = DropdownButton()
+            whereTo.options = destinationKinds.map { DropdownButton.Option(title: $0.title) }
+            whereTo.selectedIndex = destinationKinds.firstIndex(of: action.kind) ?? 0
+            destinationField = whereTo
+            actionRows.append(FormSheet.Row(label: String(localized: "Destination", comment: "Label of the choice in a per-extension destination's sheet: a folder of its own, or Zigzag showing the file itself."),
+                                            view: whereTo))
+            let folder = FilledField(placeholder: String(localized: "Choose a folder…", comment: "Placeholder of the folder field in a per-extension destination's sheet."))
+            folder.stringValue = action.folderPath
+            folderField = folder
+            let chooseFolder = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
+            chooseFolder.onClick = { _ in
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.prompt = String(localized: "Choose", comment: "Button of the open panel that picks a folder for a download rule.")
+                choose(panel, into: folder)
+            }
+            folderActionRow = actionRows.count
+            actionRows.append(FormSheet.Row(label: String(localized: "Folder", comment: "Label of the folder field in a per-extension destination's sheet: which folder files of this type are saved into."),
+                                            view: stack(folder, chooseFolder)))
         }
 
         let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {host}, {path}, {query}, {encoded_link}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
                                              comment: "The tokens a download rule's fields may use, listed in its sheet."))
-        let matchRows: [FormSheet.Row] = [
+        /// A destination is asked one thing of its own — which types of file — so it drops what only an address rule
+        /// has any use for: what the rule applies to (a type is always a download), how it matches (the type is the
+        /// match), whether case matters and whether the page goes on. An address rule keeps all of them.
+        let matchRows: [FormSheet.Row] = isDestination ? [
+            FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
+            FormSheet.Row(label: String(localized: "File Extensions", comment: "Label of the extensions field in a per-extension destination's sheet, where the types of file are listed."), view: pattern),
+        ] : [
             FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
             FormSheet.Row(label: String(localized: "Applies to", comment: "Label of the choice of what a download rule catches, in its sheet."), view: applies),
             FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
@@ -195,11 +235,15 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
             FormSheet.Row(label: String(localized: "Stop the page", comment: "Label of the switch in a download rule's sheet that keeps the page from loading on after the rule has taken a link."), view: stopsThePage),
         ]
-        let rows = matchRows + actionRows + [
+        let rows = matchRows + actionRows + (isDestination ? [
+            FormSheet.Row.note(String(localized: "Files of this type skip the folder downloads are saved to, and go where you say instead. The first file type that matches wins.",
+                                                 comment: "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.")),
+            tokens,
+        ] : [
             FormSheet.Row.note(String(localized: "Stop the page: a link this rule takes goes no further — nothing else loads, and the page's own redirects don't run the rule again.",
                                                  comment: "Explanation under the stop-the-page switch in a download rule's sheet.")),
             tokens
-        ]
+        ])
 
         func ruleFromFields() -> DownloadRule? {
             var action = action
@@ -217,8 +261,12 @@ enum DownloadRuleSheet {
                 action.rpcParameters = parametersView?.text ?? "[]"
                 action.rpcStyle = DownloadRuleAction.RPCStyle.allCases[stylePicker?.selectedIndex ?? 0]
             case .saveToFolder, .showInZigzag:
-                // A destination never reaches this sheet; should one, its own fields are left as they were.
-                break
+                // Which of the two it is, as the choice says, and the folder one of them saves into (kept even while
+                // the other is chosen, so switching back finds it again).
+                if let index = destinationField?.selectedIndex, destinationKinds.indices.contains(index) {
+                    action.kind = destinationKinds[index]
+                }
+                action.folderPath = folderField?.stringValue ?? ""
             }
             var rule = existing ?? source
             rule.name = name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -259,7 +307,8 @@ enum DownloadRuleSheet {
             // nothing this sheet can show is left unmarked.
             let fields: [HeldField: FilledField?] = [.name: name, .pattern: pattern, .action(.app): appField,
                                                      .action(.url): urlField, .action(.script): scriptField,
-                                                     .action(.endpoint): endpointField, .action(.method): methodField]
+                                                     .action(.endpoint): endpointField, .action(.method): methodField,
+                                                     .action(.folder): folderField]
             for (which, field) in fields {
                 let note = notes[which]
                 field?.isInvalid = note != nil
@@ -276,7 +325,7 @@ enum DownloadRuleSheet {
             let rule = ruleFromFields()
             refreshCookieStatus(rule)
             markHeldUp(rule)
-            guard let rule, !rule.name.isEmpty else { return false }
+            guard let rule, !rule.name.isEmpty || rule.action.kind.isDestination else { return false }
             guard rule.match == .any || !rule.pattern.isEmpty else { return false }
             guard rule.isValidPattern else { return false }
             return rule.action.isComplete
@@ -286,12 +335,26 @@ enum DownloadRuleSheet {
         }
         matchCase.onChange = { _ in sheetRef?.revalidate() }
 
+        // A destination is its own kind of form: a title of its own, and a line saying what it is for.
+        let sheetTitle: String
+        let sheetMessage: String
+        if isDestination {
+            sheetTitle = existing == nil
+                ? String(localized: "Add a File Type", comment: "Title of the sheet that makes a per-extension destination in Settings › Downloads.")
+                : String(localized: "Change This File Type", comment: "Title of the sheet that changes a per-extension destination in Settings › Downloads.")
+            sheetMessage = String(localized: "Saved somewhere of its own, instead of with everything else.",
+                                  comment: "Under the title of the sheet that makes a per-extension destination.")
+        } else {
+            sheetTitle = existing == nil ? String(localized: "Add Download Rule", comment: "Title of the sheet that makes a download rule.")
+                                         : String(localized: "Edit Download Rule", comment: "Title of the sheet that changes a download rule.")
+            sheetMessage = String(localized: "The first rule that matches wins.",
+                                  comment: "Under the title of the sheet that makes a download rule.")
+        }
+
         let sheet = FormSheet.show(in: host,
-                                   title: existing == nil ? String(localized: "Add Download Rule", comment: "Title of the sheet that makes a download rule.")
-                                                          : String(localized: "Edit Download Rule", comment: "Title of the sheet that changes a download rule."),
+                                   title: sheetTitle,
                                    symbol: action.kind.symbol,
-                                   message: String(localized: "The first rule that matches wins.",
-                                                   comment: "Under the title of the sheet that makes a download rule."),
+                                   message: sheetMessage,
                                    rows: rows,
                                    confirmTitle: existing == nil ? String(localized: "Add", comment: "Button of the sheet that makes a download rule.")
                                                                  : String(localized: "Save", comment: "Button of the sheet that changes a download rule."),
@@ -320,6 +383,17 @@ enum DownloadRuleSheet {
             }
         }
         sheetRef = sheet
+        // The folder belongs to one of the two destinations. Choosing the other takes the row out of the form
+        // rather than leaving a field there that would be ignored — and puts it back, with the folder it had.
+        if let whereTo = destinationField, let folderActionRow {
+            let row = matchRows.count + folderActionRow
+            whereTo.onSelect = { [weak sheet, weak whereTo] _ in
+                guard let sheet, let whereTo else { return }
+                sheet.setHidden(destinationKinds.firstIndex(of: .showInZigzag) == whereTo.selectedIndex, forRow: row)
+                sheet.revalidate()
+            }
+            sheet.setHidden(destinationKinds.firstIndex(of: .showInZigzag) == whereTo.selectedIndex, forRow: row)
+        }
         // Hovering the dead Add button marks every field holding it up, and the button says the first of them for
         // itself; leaving it takes the markers back.
         sheet.onConfirmHover = { over in
@@ -355,7 +429,9 @@ enum DownloadRuleSheet {
     /// saying. Empty means Add can be pressed.
     static func heldUp(_ rule: DownloadRule, all: Bool) -> [(field: HeldField, note: String)] {
         var held: [(field: HeldField, note: String)] = []
-        if all, rule.name.isEmpty {
+        // A file type is named by its extensions, so leaving the name empty says nothing less; an address rule still
+        // wants a name before it can be added.
+        if all, rule.name.isEmpty, !rule.action.kind.isDestination {
             held.append((.name, String(localized: "Give the rule a name.", comment: "Tooltip on the name field of a download rule being added without one, so its Add button can't be pressed.")))
         }
         if rule.match != .any, rule.pattern.isEmpty {

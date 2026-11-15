@@ -159,7 +159,8 @@ struct DownloadRuleTests {
         #expect(ScriptNotice(script: "yt-dlp.sh", state: .failed("   \n")).detail == nil)
     }
 
-    /// A rule names a script in its one folder, and the notice names it the way the rule does.
+    /// The parts of a link on their own, as tokens: a rule can build a new address from the old one's host, path or
+    /// query without the whole of it.
     @Test func theLinksOwnPartsAreTokensOfTheirOwn() {
         let values = HandoffValues(link: URL(string: "https://www.google.com/search/deep?a=1&b=two%20words")!)
         let expanded = DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values)
@@ -383,6 +384,33 @@ struct DownloadRuleTests {
         #expect(destination("pdf", .showInZigzag).summarySentence == "Files of type pdf open in Zigzag")
     }
 
+    /// A file type is named by its extensions, so it needs no name of its own — where an address rule has nothing to
+    /// read without one — and only the destination that saves the file needs a folder to save it into.
+    @Test func aFileTypeNeedsItsExtensionsAndOnlyAFolderToSaveInto() {
+        var save = destination("", .saveToFolder, folder: "")
+        #expect(DownloadRuleSheet.heldUp(save, all: true).map(\.field) == [.pattern, .action(.folder)])
+        save.pattern = "pdf, epub"
+        // The folder is what's left holding it, and it is asked for whether or not the pointer is over Add: a folder
+        // you haven't reached is still one the rule can't run without.
+        #expect(DownloadRuleSheet.heldUp(save, all: false).map(\.field) == [.action(.folder)])
+        #expect(DownloadRuleSheet.heldUp(save, all: true).map(\.field) == [.action(.folder)])
+        save.action.folderPath = "/Users/me/Downloads/PDFs"
+        #expect(DownloadRuleSheet.heldUp(save, all: true).isEmpty)
+
+        // Zigzag showing the file needs nothing more than the type.
+        var show = destination("pdf", .showInZigzag)
+        show.name = ""
+        #expect(DownloadRuleSheet.heldUp(show, all: true).isEmpty)
+
+        // An address rule is still held back by an empty name.
+        var address = rule(.contains, "example.com/files")
+        address.name = ""
+        let held = DownloadRuleSheet.heldUp(address, all: true)
+        #expect(held.map(\.field).contains(.name))
+        address.name = "Files"
+        #expect(!DownloadRuleSheet.heldUp(address, all: true).map(\.field).contains(.name))
+    }
+
     @Test func aDestinationSurvivesItsJSON() throws {
         var rule = destination("pdf")
         rule.action.folderPath = "/Users/me/Downloads/PDFs"
@@ -552,6 +580,37 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc)?.field == .method)
         rpc.rpcMethod = "aria2.addUri"
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
+    }
+
+    // MARK: The order the rules are in
+
+    /// A drag in the rules list names the row it was dropped on, not a position, because that list shows only the
+    /// handoffs: its numbering leaves the file types out, so a place in it isn't a place in the store. The rule lands
+    /// just before the one it was dropped on, and everything else stays where it was — a file type between the two,
+    /// included.
+    @Test func aRuleMovesToSitBeforeTheOneItWasDroppedOn() {
+        let a = rule(.any)
+        let b = rule(.any)
+        let c = rule(.any)
+        let type = destination("pdf")
+
+        func order(_ rules: [DownloadRule]) -> [UUID] { rules.map(\.id) }
+        func moved(_ rules: [DownloadRule], _ id: UUID, before: UUID?) -> [UUID] {
+            order(DownloadRulesStore.moved(rules, id: id, before: before))
+        }
+
+        // Down the list, up the list, and to the end.
+        #expect(moved([a, b, c], c.id, before: a.id) == order([c, a, b]))
+        #expect(moved([a, b, c], a.id, before: c.id) == order([b, a, c]))
+        #expect(moved([a, b, c], a.id, before: nil) == order([b, c, a]))
+        // Dropped where it already is, nothing moves: it is already just before that rule.
+        #expect(moved([a, b, c], a.id, before: b.id) == order([a, b, c]))
+        #expect(moved([a, b, c], b.id, before: c.id) == order([a, b, c]))
+        // A file type sitting between them stays where it is: the handoff is placed before its neighbour, not last.
+        #expect(moved([a, type, b], b.id, before: a.id) == order([b, a, type]))
+        // A rule that isn't in the list it was dropped into leaves the order alone.
+        #expect(moved([a, b], c.id, before: a.id) == order([a, b]))
+        #expect(moved([], a.id, before: nil) == [])
     }
 }
 
