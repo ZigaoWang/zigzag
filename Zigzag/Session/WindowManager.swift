@@ -533,10 +533,12 @@ final class WindowManager {
             let f = windowState.frame
             var frame: NSRect? = f.count == 4 ? NSRect(x: f[0], y: f[1], width: f[2], height: f[3]) : nil
             if let rect = frame, !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(rect) }) { frame = nil }
-            let controller = makeController(manager: manager, frame: frame, sidebarVisible: windowState.sidebarVisible,
-                                            sidebarWidth: CGFloat(windowState.sidebarWidth))
+            // The splits and the tab you were on before the window is made, so it's drawn showing them from its very
+            // first frame: made first, it drew a blank address and no page, and showed that for a moment as it opened.
             manager.restoreSplits(windowState.splits ?? [])
             manager.restoreSelection(selection, currentSpaceID: windowState.currentSpaceID)
+            let controller = makeController(manager: manager, frame: frame, sidebarVisible: windowState.sidebarVisible,
+                                            sidebarWidth: CGFloat(windowState.sidebarWidth))
             controller.showWindow(nil)
             if windowState.isFullScreen == true { controller.window?.toggleFullScreen(nil) }
             return allIDs
