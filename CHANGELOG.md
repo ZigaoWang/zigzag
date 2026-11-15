@@ -14,6 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Now Playing in the sidebar shows Pause while its video plays and Play while it's paused, for a muted or silent video in the mini player too, and changes as you play or pause it from the page, the mini player or a media key.
 - Translating a page after closing macOS's Download Languages sheet without downloading now says the language isn't downloaded, with Translate to bring the sheet back, instead of saying to try again in a moment.
 - Password saved stays long enough to see after the Save password? prompt slides away, and toasts with Undo, like Closed 3 tabs, Removed pinned pages or History cleared, stay 7 seconds instead of 4, longer while the pointer is on them.
+- Ad blocking's site filters are built once the filter lists have all downloaded, together with their scriptlets. On a first launch they could be built a moment early, from the lists that had come and the copy of Zigzag's own fixes in the app, and then built again. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
 
 ## [0.9.1] - 2026-11-15
 

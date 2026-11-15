@@ -49,7 +49,8 @@ struct AdFiltersTests {
     // MARK: A server that answers as the publishers do
 
     nonisolated final class Server: URLProtocol, @unchecked Sendable {
-        struct Answer { var status: Int; var body: Data; var headers: [String: String] = [:] }
+        /// `delay`: how long the answer takes, as a slow publisher's does.
+        struct Answer { var status: Int; var body: Data; var headers: [String: String] = [:]; var delay: TimeInterval = 0 }
         nonisolated(unsafe) static var answers: [String: Answer] = [:]
         nonisolated(unsafe) static var asked: [URLRequest] = []
 
@@ -61,9 +62,12 @@ struct AdFiltersTests {
             // A copy that's still current: the publisher's validator came back.
             let current = answer.headers["ETag"].map { $0 == request.value(forHTTPHeaderField: "If-None-Match") } ?? false
             let response = HTTPURLResponse(url: request.url!, statusCode: current ? 304 : answer.status, httpVersion: "HTTP/1.1", headerFields: answer.headers)!
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            if !current { client?.urlProtocol(self, didLoad: answer.body) }
-            client?.urlProtocolDidFinishLoading(self)
+            let answering = { [self] in
+                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                if !current { client?.urlProtocol(self, didLoad: answer.body) }
+                client?.urlProtocolDidFinishLoading(self)
+            }
+            if answer.delay > 0 { DispatchQueue.global().asyncAfter(deadline: .now() + answer.delay, execute: answering) } else { answering() }
         }
         override func stopLoading() {}
     }
@@ -153,6 +157,22 @@ struct AdFiltersTests {
         try await waitUntilReady(again)
         #expect(again.status.builtIn == 0)
         #expect(await again.injection(for: URL(string: "https://www.youtube.com/")!).page.count == 1)
+    }
+
+    /// The scriptlets coming while the lists are still downloading build nothing from the lists half there (the
+    /// downloaded ones with the app's copy of Zigzag's list): the lists and the scriptlets are built once, together.
+    @Test func scriptletsComingMidDownloadWaitForTheLists() async throws {
+        Self.serveEverything()
+        let website = AdFilterSources.zigzagFixes.urls[0].absoluteString
+        Server.answers[website]?.delay = 0.5
+        let (engine, directory) = makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        engine.start()
+        try await waitUntilReady(engine)
+        #expect(engine.status.generation == 1)
+        #expect(engine.status.scriptlets == 54)
+        #expect(await engine.injection(for: URL(string: "https://example.net/")!).page.first?.contains("ours") == true)
+        #expect(await engine.injection(for: URL(string: "https://chat.deepseek.com/")!).isEmpty)
     }
 
     /// The next look sends each list's validator back and keeps what it has when nothing changed.

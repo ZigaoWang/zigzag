@@ -271,6 +271,9 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// The downloaded lists and scriptlets as they are now (Zigzag's own list from the app until it's downloaded), or
     /// nil while a list is missing. Without pinned scriptlets the lists are used with none.
     private func inputs() -> (lists: [String], trusted: [Bool], scriptlets: String, checksum: String)? {
+        // Read as one set: never some lists from a download still being written and some from before it.
+        listFiles.lock()
+        defer { listFiles.unlock() }
         var lists: [String] = []
         var hash = SHA256()
         // How the lists are read, so an engine saved by a release that read them otherwise is built again.
@@ -289,6 +292,15 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// Changed whenever ad-engine.js changes what it keeps of the lists.
     private static let readingRevision = "trusted-lists-1"
 
+    /// Held while the lists on disk are read, or a download's written.
+    private let listFiles = NSLock()
+
+    /// The set of lists in use or being built, by its checksum. A set is taken once: asked for again (the scriptlets
+    /// and the lists coming at about the same time at launch), it isn't built and swapped in again.
+    private let taken = OSAllocatedUnfairLock<String?>(initialState: nil)
+    private func take(_ checksum: String) -> Bool { taken.withLock { if $0 == checksum { return false }; $0 = checksum; return true } }
+    private func release(_ checksum: String) { taken.withLock { if $0 == checksum { $0 = nil } } }
+
     // MARK: Starting
 
     /// Takes the lists Zigzag has, ready-built if this engine built them before, then checks for newer ones.
@@ -300,9 +312,15 @@ nonisolated final class AdEngine: @unchecked Sendable {
             let version = context.evaluateScript("ZigzagAdEngine.version()")?.toInt32() ?? -1
             if let inputs = inputs(), let info = try? Data(contentsOf: engineInfoFile),
                let saved = try? JSONDecoder().decode(EngineInfo.self, from: info),
-               saved.version == version, saved.checksum == inputs.checksum,
-               let bytes = try? Data(contentsOf: engineFile), load(bytes, into: context) {
-                adopt(filters: saved.filters, scriptlets: saved.scriptlets, loadedIn: Date().timeIntervalSince(started), builtIn: nil)
+               saved.version == version, saved.checksum == inputs.checksum {
+                // Being built already (a download came first): that build is the one taken.
+                guard take(inputs.checksum) else { return }
+                if let bytes = try? Data(contentsOf: engineFile), load(bytes, into: context) {
+                    adopt(filters: saved.filters, scriptlets: saved.scriptlets, loadedIn: Date().timeIntervalSince(started), builtIn: nil)
+                } else {
+                    release(inputs.checksum)
+                    rebuild()
+                }
             } else {
                 rebuild()
             }
@@ -351,17 +369,22 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// A set of lists the engine can't take leaves the one in use as it was.
     private func rebuild() {
         building.async { [self] in
-            guard let inputs = inputs(), let builder = makeContext() else { return }
+            guard let inputs = inputs(), take(inputs.checksum) else { return }
+            guard let builder = makeContext() else { release(inputs.checksum); return }
             let started = Date()
             builder.exception = nil
             let api = builder.objectForKeyedSubscript("ZigzagAdEngine")
             let result = api?.invokeMethod("build", withArguments: [inputs.lists, inputs.scriptlets, inputs.checksum, inputs.trusted])?.toString()
             if let error = builder.exception?.toString() {
+                release(inputs.checksum)
                 state.withLock { $0.lastError = "Couldn't build: \(error)" }
                 return
             }
             guard let serialized = api?.invokeMethod("serialize", withArguments: []), let bytes = Self.bytes(of: serialized, in: builder),
-                  let counts = result.flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Int] }) else { return }
+                  let counts = result.flatMap({ try? JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Int] }) else {
+                release(inputs.checksum)
+                return
+            }
             let builtIn = Date().timeIntervalSince(started)
             let version = builder.evaluateScript("ZigzagAdEngine.version()")?.toInt32() ?? -1
             let info = EngineInfo(version: version, checksum: inputs.checksum, filters: counts["filters"] ?? 0, scriptlets: counts["scriptlets"] ?? 0)
@@ -370,7 +393,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
             queue.async { [self] in
                 let loading = Date()
                 if context == nil { context = makeContext() }
-                guard let context, load(bytes, into: context) else { return }
+                guard let context, load(bytes, into: context) else { release(info.checksum); return }
                 adopt(filters: info.filters, scriptlets: info.scriptlets, loadedIn: Date().timeIntervalSince(loading), builtIn: builtIn)
             }
         }
@@ -450,6 +473,8 @@ nonisolated final class AdEngine: @unchecked Sendable {
             guard !force, let last = fetched[id], FileManager.default.fileExists(atPath: file.path) else { return true }
             return now.timeIntervalSince(last.checked) >= last.lifetime
         }
+        // What comes is written once all of it has, together.
+        var downloaded: [(id: String, data: Data)] = []
         for list in AdFilterSources.lists where due(list.id, listFile(list.id)) {
             for url in list.urls {
                 let known = fetched[list.id].flatMap { $0.url == url.absoluteString ? $0 : nil }
@@ -459,18 +484,25 @@ nonisolated final class AdEngine: @unchecked Sendable {
                     break
                 }
                 guard response.statusCode == 200, AdFilterSources.isList(data, minimumSize: list.minimumSize) else { continue }
-                if (try? Data(contentsOf: listFile(list.id))) != data {
-                    guard (try? data.write(to: listFile(list.id), options: .atomic)) != nil else { continue }
-                    changed = true
-                }
+                if (try? Data(contentsOf: listFile(list.id))) != data { downloaded.append((list.id, data)) }
                 fetched[list.id] = Fetched(url: url.absoluteString, etag: response.value(forHTTPHeaderField: "ETag"),
                                            lastModified: response.value(forHTTPHeaderField: "Last-Modified"), checked: now,
                                            lifetime: AdFilterSources.lifetime(of: data))
                 break
             }
         }
-        // Unless they're being asked for already, or will be again shortly (ensureScriptlets).
-        if force || !withRetry({ $0.running || $0.pending != nil }), await updateScriptlets() { changed = true }
+        listFiles.withLock {
+            for (id, data) in downloaded {
+                if (try? data.write(to: listFile(id), options: .atomic)) != nil { changed = true } else { fetched[id] = nil }
+            }
+        }
+        // Being asked for already (at launch, on their own): waited for, so the lists and they are built once, together.
+        // To be asked for again shortly (ensureScriptlets): left to that.
+        if !force, let asking = withRetry({ $0.running ? $0.last : nil }) {
+            if await asking.value { changed = true }
+        } else if force || !withRetry({ $0.pending != nil }), await updateScriptlets() {
+            changed = true
+        }
         writeFetched(fetched)
         if changed { state.withLock { $0.updated = now } }
         return changed
@@ -499,9 +531,13 @@ nonisolated final class AdEngine: @unchecked Sendable {
 
     /// Fetches the pinned scriptlets now if they're missing, and builds with them once they're here.
     func ensureScriptlets() {
-        guard needsScriptlets, withRetry({ state in defer { state.running = true }; return !state.running }) else { return }
+        guard needsScriptlets, let asking = withRetry({ state -> Task<Bool, Never>? in
+            guard !state.running else { return nil }
+            state.running = true
+            return fetch(after: &state)
+        }) else { return }
         Task.detached(priority: .utility) { [self] in
-            if await updateScriptlets() { rebuild() }
+            if await asking.value { rebuild() }
         }
     }
 
@@ -510,16 +546,18 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// that, an older pinned copy stays in use, and it's asked for again: after a while, longer each time, and as
     /// soon as the network comes back.
     func updateScriptlets() async -> Bool {
-        let task = withRetry { state -> Task<Bool, Never> in
-            let previous = state.last
-            let task = Task.detached(priority: .utility) { [self] () -> Bool in
-                _ = await previous?.value
-                return await fetchNewerScriptlets()
-            }
-            state.last = task
-            return task
+        await withRetry { fetch(after: &$0) }.value
+    }
+
+    /// Starts a fetch that follows the one before it, inside `withRetry`.
+    private func fetch(after state: inout Retry) -> Task<Bool, Never> {
+        let previous = state.last
+        let task = Task.detached(priority: .utility) { [self] () -> Bool in
+            _ = await previous?.value
+            return await fetchNewerScriptlets()
         }
-        return await task.value
+        state.last = task
+        return task
     }
 
     private func fetchNewerScriptlets() async -> Bool {
