@@ -20,6 +20,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Ad blocking's site filters are built once the filter lists have all downloaded, together with their scriptlets. On a first launch they could be built a moment early, from the lists that had come and the copy of Zigzag's own fixes in the app, and then built again. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
 - Restart to Update says it couldn't check for updates when Zigzag can't install the update right then, instead of doing nothing.
 - Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
+- A page's preview no longer comes up beside the menu when you right-click it in the sidebar.
 
 ## [0.9.1] - 2026-11-15
 
