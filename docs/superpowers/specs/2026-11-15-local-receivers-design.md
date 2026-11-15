@@ -2,10 +2,14 @@
 
 ## Why
 
-Two user reports, one thing in common: a program running on the Mac that can only be reached over plain HTTP on
-loopback. ZeroWork's editor (a page at `https://creator.zerowork.io`) calls `fetch('http://localhost:9990')` and
-`ws://localhost:9990` to its desktop agent; Downie's companion extension talks to the Downie app the same way. Both
-work in Chrome and Firefox. Neither works in Zigzag.
+Two user reports, and a correction found while checking the artifacts: the loopback case is real, but the two
+reports are not the same case. ZeroWork's editor (a page at `https://creator.zerowork.io`) calls
+`fetch('http://localhost:9990')` and `ws://localhost:9990` to its desktop agent; that works in Chrome and Firefox and
+not in Zigzag. **Downie's current companion extension does not use loopback at all:** its `manifest.json` asks for
+`nativeMessaging`, and its background calls `browser.runtime.sendNativeMessage`. That is a different gap (native
+messaging, not mixed content) and is the owner's; it is not what the extension door below is for. The extension door
+is for extensions that use loopback HTTP or WebSocket, which remains a real class even though Downie's current build
+is not in it.
 
 It is not Zigzag's bug, but it is Zigzag's to fix. **WebKit does not treat loopback as a trustworthy origin**, so a
 secure page — an https site, or an extension's `webkit-extension://` page — reaching for `http://localhost` is mixed
@@ -18,15 +22,23 @@ already uses for extensions, and which needs a way for the person to say yes.
 
 ## The promise
 
-**A page's own scripts — `fetch`, `XMLHttpRequest`, `WebSocket` — can reach a program listening on this Mac, and so
-can an extension's background, when the person has said so for that site or that extension.** Nothing more.
+**An extension's background can reach a program listening on this Mac when the person has turned that on for that
+extension. A page's own scripts — `fetch`, `XMLHttpRequest`, `WebSocket` — can do the same only for a site the person
+has explicitly turned it on for. Nothing more.**
+
+The default is extensions only. Website access is off at two levels: a **global setting** in Settings › Privacy,
+off until the person turns it on after a briefing on what it allows and what it risks; and, with that on, a
+**switch for one origin** in Site Controls. A page can raise neither, and it is never on for "the web".
 
 ## Goals
 
-- ZeroWork's `fetch` and `ws://` to `localhost:9990` work, with the site's consent, from the page as it is written.
-- Downie's extension can talk to the Downie app, with the extension's consent.
-- One mechanism behind both, so the second case is a gate on the first and not a second feature.
-- Both gates are visible, revocable, and off until turned on.
+- ZeroWork's `fetch` and `ws://` to `localhost:9990` work, with the site's explicit opt-in, from the page as it is
+  written.
+- An extension that talks to a program on this Mac over loopback can do so with its own switch. (Downie's current
+  extension is a native-messaging case, not this one — see Why.)
+- One mechanism behind both, so the site case is a gate on the extension case and not a second feature.
+- Both doors are visible, revocable, and off until turned on. The site door needs the global setting first and then
+  the site's own switch; no page can raise either.
 - Nothing about it is silent: a call that goes through Zigzag is a call the person allowed.
 
 ## Non-goals and anti-goals
@@ -114,17 +126,37 @@ runner and two doors:
   in fact 1 above. Off by default; recorded with the extension's other grants; shown and revocable in the extension's
   own page. The runner presents the extension's own origin, as `ExtensionWrite` already does, and is exempt from CORS
   exactly as Chrome exempts an extension with host access.
-- **The site door** is a `SitePermission.localReceivers` answer for the asking site, asked over the page the first
-  time and kept by the **unified permission model** described above — *Allow or Deny, this time or always*, where
-  Always stores whichever action was chosen, **deny included**. So a remembered no is a standing block, a remembered
-  yes is a standing grant, and there is no special case here to invent. The runner presents the site's origin and
-  honours the helper's CORS reply.
+- **The site door** is a `SitePermission.localReceivers` switch for the asking origin, **off by default**, turned on
+  by the person in Site Controls — not by a question over the page. It is reachable only while the **global setting**
+  is on (see below): before that, the row is not offered and a call is refused as it is today. The unified permission
+  model described above stores the answer; a no is a standing block, a yes is a standing grant, and there is no
+  special case here to invent. The runner presents the site's origin and honours the helper's CORS reply.
 
 Everything else — what counts as local, what is refused, how a refusal fails — is the same for both.
 
+## The global setting and its briefing
+
+The site door has a master switch of its own — working words **Allow websites to reach apps on this Mac** — in
+Settings › Privacy beside Site Permissions, **off by default**. Turning it on shows a sheet that says, plainly:
+
+- **What it allows:** a site you then switch on can make `fetch`, `XMLHttpRequest` and `WebSocket` calls to programs
+  on this Mac, over loopback only.
+- **What it does not allow:** the LAN, other machines, subresource loads, or a page granting itself.
+- **The risk:** a local program may not have been written to be reachable by a web page, and a site you grant could
+  use it in ways you did not intend. Only grant sites you trust.
+- **How to undo it:** the per-site switch in Site Controls for one site, and this master switch for all of them.
+
+The sheet needs an explicit acknowledgement ("I understand"), and the setting's row keeps a link that reopens the
+briefing. While the master switch is off, the per-site Local Receivers row is not offered (or is disabled with the
+reason), and a loopback call from a page is refused exactly as it is today — the shim is there, but the door is shut.
+
+This is the user's requirement (2026-11-17): the site door is a deliberate, explained feature, not a checkbox buried
+in a site panel. The extension door is unaffected; it keeps its own per-extension switch.
+
 ## What the helper sees as the caller
 
-This decides the transport, and it is the one thing to verify against a real helper before building.
+This decides the transport. It has been read from ZeroWork's page and its agent (2026-11-17); what remains is an API
+question on Zigzag's side, not a helper question.
 
 In Chrome the helper receives `Origin: https://creator.zerowork.io` and must answer CORS for it (or it would not
 work in Chrome either). So the runner makes a **native request that presents the site's own origin**, and treats the
@@ -135,8 +167,31 @@ helper's CORS reply as binding. That means:
 - and it is **not** used where a helper expects `chrome-extension://<id>` — which is what `ExtensionWrite` already
   manufactures, and what the extension door keeps doing.
 
-**To verify first:** whether the helpers in question reflect the origin or whitelist it, and whether they use one
-request/response per call or hold a connection open (see Risks).
+**What the ZeroWork page actually does** (read from `socket-5aefe823.js` in the editor's own bundle, 2026-11-17):
+
+- it opens a **socket.io WebSocket** at `ws://localhost:9990/ws` with `transports: ["websocket"]` and infinite
+  reconnection — no polling, no SSE and no long-poll;
+- on a reconnect attempt it probes `http://localhost:9990/` with an async `fetch` (`cache: "no-store"`, a 3 s
+  timeout) and reads a JSON `message`, scanning the ports 9990, 14990, 19990, 24990 and 29990;
+- both calls carry the page's own `https://creator.zerowork.io` origin, and the page uses no synchronous XHR.
+
+So the site runner needs both a one-shot HTTP call and a **held WebSocket that pushes back into the page**, and one
+switch for the origin must cover both. The helper's side is now known (ZeroWork Agent 1.1.76, `dist-server/core.js`,
+read from the DMG without installing or running it):
+
+- it binds `127.0.0.1` and tries `9990`, `14990`, `19990`, `24990`, `29990` in turn — the same list the page scans;
+- `GET /` answers JSON `{message: "ZeroWork Agent running", version, port, address}` with
+  `Access-Control-Allow-Origin: *` and no credentials;
+- `/ws` is socket.io with `transports: ["websocket"]`, `allowEIO3`, and an `allowRequest` that accepts **only an exact
+  `Origin`** in `["http://localhost:5173", "https://creator.zerowork.io", "https://creator.dev.zerowork.io"]`; the
+  socket.io CORS setting uses the same list with credentials.
+
+So the helper **whitelists** rather than reflects: the runner must present the page's origin byte for byte, and a
+`webkit-extension://`, `null` or rewritten origin fails the handshake even though the page works in Chrome. Holding
+the socket open is also part of this: the existing 32 MB / 30 s whole-body read cannot serve it.
+
+**To verify first:** that `URLSessionWebSocketTask` will send an `Origin` header chosen by Zigzag. If it refuses
+`Origin` as a reserved header, the WebSocket runner needs its own handshake rather than that API.
 
 ## What counts as local
 
@@ -168,8 +223,11 @@ destination's **port is not restricted** (a helper may listen anywhere), and onl
 3. **Native code decides the asking origin, never the message.** The grant is looked up from the frame's own origin
    (`message.frameInfo.securityOrigin`, resolved by Zigzag), because a page-world shim is the page's to forge. The
    shim may say what it wants; it may not say who it is.
-4. Nothing is caught before the grant is known, so a site is asked the first time it reaches for the Mac, and
-   `PermissionPrompt.queue` holds the rest of the calls while the card is up.
+4. **The switch, not a question, is the opt-in.** A site with no grant is refused at once; the page learns nothing
+   about the shim except that the call failed, as it does today. The person turns the site on in Site Controls ›
+   Local Receivers, for that exact origin, and the next call goes through. A page cannot ask for the grant, queue a
+   card for it, or carry one from another site. One switch covers every call to that origin — HTTP and WebSocket
+   alike.
 5. A denied or failed call must fail the way WebKit's block fails today — `fetch` rejects with a `TypeError`, XHR
    fires `error`, a WebSocket closes — so a refused page behaves exactly as it does now, and no site has to handle
    anything new.
@@ -195,19 +253,22 @@ downloads there); extensions never see a private tab at all, so their door canno
 
 ## What the builder still decides
 
-- The permission's own name (`localReceivers` is the working one), and the exact card and switch wording.
+- The permission's own name (`localReceivers` is the working one), and the exact switch wording.
+- Where the site switch lives — the site's Permissions page in Site Controls, or a Local Receivers row of its own,
+  with the origin it applies to said plainly beside it — and the exact words of the master switch, its row, and the
+  briefing's acknowledgement.
 - Where the extension's switch lives — its row in the Extensions list, or its own page. The row is the more visible.
 - Whether the shim is one script or three, and how the runner is organised.
 - Whether an answered site is keyed by site or by site-and-port. Per site is the default here.
 
 ## Risks, and what to verify first
 
-1. **Verify the transport against a real helper before building the doors.** In order: what `Origin` the helper
-   receives and accepts (whether it reflects or whitelists); whether it is one request/response per call or a held
-   connection — an SSE, long-poll or chunked push **cannot** be delivered by a read that waits for the whole body
-   (the existing read caps at 32 MB and aborts at 30 s, and `bridge.js` declines the native path outright for
-   `text/event-stream` and ndjson), so streaming would need a second transport with its own cookie, origin and abort
-   handling; and whether anything uses synchronous XHR.
+1. **The transport is settled; the API is not.** ZeroWork 1.1.76 whitelists the page's exact origin and holds a
+   socket.io WebSocket, so the runner must do the same (page facts and helper facts above). The remaining risk is
+   whether `URLSessionWebSocketTask` lets Zigzag send that `Origin`; if not, the handshake has to be built rather than
+   borrowed. The held-connection case is real either way, so the site runner's WebSocket shim is not optional for this
+   helper; a read that waits for the whole body (32 MB / 30 s, and `bridge.js` declines `text/event-stream` and
+   ndjson) cannot serve it.
 2. **The shim is the page's.** A page-world patch can be seen, replaced or removed. That is inherent — Chrome's own
    extensions have the same property — and it loses no security here, because a hostile page can hide its own use of a
    grant it holds but cannot obtain one. It does mean "nothing about it is silent" holds for Zigzag's accounting, not
@@ -215,8 +276,13 @@ downloads there); extensions never see a private tab at all, so their door canno
 3. **Adding the gate to `ws://` takes something away.** That path is ungated today (fact 3), so an extension that
    happens to rely on it stops working until the switch is turned on. That is the right direction, and it should be
    said in the release notes rather than discovered.
-4. **Downie's regression belongs to the owner, not to this work.** Keep the two apart in the reports, so a regression
-   is not mistaken for a gap this closes — and if what the owner finds turns out to be this same runner, this should
-   not land as a second one.
+4. **Downie's regression belongs to the owner, not to this work.** Its current extension uses
+   `browser.runtime.sendNativeMessage`, so it is a native-messaging gap rather than a loopback one. Keep the two apart
+   in the reports, so a regression is not mistaken for a gap this closes — and if what the owner finds turns out to
+   be this same runner, this should not land as a second one.
 5. **Confirm no macOS local-network prompt appears.** Loopback should not need it; a prompt here would be wrong, and
    would make the wording above matter more, not less.
+6. **The master switch is the real consent, and the briefing is part of it.** A per-site switch alone would make the
+   feature look like one more site permission; the global setting and its acknowledgement are what make it a
+   deliberate choice. The briefing must not undersell a vulnerable helper: "only grant sites you trust" is the load-
+   bearing sentence, and the extension door's switch should not be described as if it has the same reach.
