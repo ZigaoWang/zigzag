@@ -1826,11 +1826,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateWindowTitle() {
         let tab = tabManager.selectedTab
-        // Each title change makes AppKit relay out the title bar; skip the ones that change nothing.
+        // Each title change makes AppKit relay out the title bar; skip the ones that change nothing. So does setting
+        // `representedURL`, even to the nil it already is, so it's never set: the window has no document icon.
         let title = tab?.displayTitle ?? "Zigzag"
         if window?.title != title { window?.title = title }
         // Lets accessibility clients (1Password, Raycast, Shortcuts) know which page is showing.
-        window?.representedURL = nil
         window?.setAccessibilityDocument(tab?.url?.absoluteString)
     }
 
