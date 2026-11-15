@@ -10,6 +10,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A window Zigzag reopens shows its tab, address and split view from its first frame, instead of a blank address for a moment, and the spaces in Switch Space… (⌥⌘S) have their names in the middle of their rows.
 - Check for Updates… no longer says Checking for updates… for good: it answers, or the toast goes within a minute and a half, and an update that's ready is only let go for a newer one Zigzag will really get. Find on page uses less power on pages that keep changing, like YouTube, X or a live chat, and rests while you're in another window.
 - Titles extensions give their right-click menu items as you select text are no longer saved to disk, nothing from a private window is, and saving the items no longer slows Zigzag down. A page opened from a file loose in your home folder can read only that file, not the files around it.
+- With Reader on, Esc while the ⌃Tab switcher is up puts the switcher away and leaves Reader open, instead of closing Reader under it. The ⌃Tab switcher and Show All Tabs picture a tab in Reader as it shows, the article and not the page under it.
+- Now Playing in the sidebar shows Pause while its video plays and Play while it's paused, for a muted or silent video in the mini player too, and changes as you play or pause it from the page, the mini player or a media key.
+- Translating a page after closing macOS's Download Languages sheet without downloading now says the language isn't downloaded, with Translate to bring the sheet back, instead of saying to try again in a moment.
+- Password saved stays long enough to see after the Save password? prompt slides away, and toasts with Undo, like Closed 3 tabs, Removed pinned pages or History cleared, stay 7 seconds instead of 4, longer while the pointer is on them.
 
 ## [0.9.1] - 2026-11-15
 
