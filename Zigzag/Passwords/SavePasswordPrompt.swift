@@ -273,7 +273,13 @@ final class SavePasswordPrompt: FloatingPanelView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: work)
     }
 
+    /// Set once it starts closing: closing frees the turn for the other questions, which asks this one to follow its
+    /// tab again, and with its tab gone that would close it again, without end.
+    private var isClosing = false
+
     private func close(saved: Bool) {
+        guard !isClosing else { return }
+        isClosing = true
         hideWork?.cancel()
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil

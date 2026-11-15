@@ -112,6 +112,8 @@ extension BrowserWindowController: PromptHost {
     /// under it moves back up.
     static func turnFreed(in host: PromptHost) {
         for view in host.promptOverlay.subviews {
+            // One already sliding out has had its answer.
+            if (view as? FloatingPanelView)?.dismissing == true { continue }
             (view as? PermissionPrompt)?.followTab()
             (view as? SavePasswordPrompt)?.followTab()
         }
