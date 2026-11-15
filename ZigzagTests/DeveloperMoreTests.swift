@@ -230,6 +230,26 @@ struct DeveloperMoreTests {
         }
     }
 
+    @Test func aPageEmptiedOffTheListNoLongerWaitsForTheRule() async throws {
+        try await withDefaultsAsync {
+            let tab = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
+            let webView = tab.ensureWebView()
+            DevelopmentSites.add("emptied.localtest.me")
+            PageImages.sitesChanged()
+            // Images off while the rule for the new list is being made: the page waits for it.
+            tab.developer.imagesOff = true
+            #expect(PageImages.isWaiting(webView))
+            // The list is emptied meanwhile: no rule will come, and nothing waits for one.
+            DevelopmentSites.sites = []
+            PageImages.sitesChanged()
+            #expect(!PageImages.isWaiting(webView))
+            // Nor once the rule being made is done and the list is worked toward again.
+            try await Task.sleep(for: .milliseconds(300))
+            #expect(!PageImages.isWaiting(webView))
+            tab.close()
+        }
+    }
+
     @Test func aPageAnotherOpenedHasPreferencesOfItsOwn() {
         withDefaults {
             // The page that opens it has styles off; WebKit hands over a configuration sharing its preferences.

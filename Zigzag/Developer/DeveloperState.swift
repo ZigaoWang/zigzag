@@ -205,6 +205,9 @@ enum PageImages {
     /// Whether a web view's pages are meant to be without their images.
     static func isOff(in webView: WKWebView) -> Bool { wanting.object(forKey: webView.configuration.userContentController)?.contains(webView) == true }
 
+    /// Whether a web view's page waits for the rule before it loads again (`defersReload`).
+    static func isWaiting(_ webView: WKWebView) -> Bool { waiting.contains(webView) }
+
     /// Whether the rule is on a web view's set of scripts and rules, the one for the list as it is.
     static func isOn(in webView: WKWebView) -> Bool {
         guard let wanted else { return false }
@@ -226,7 +229,7 @@ enum PageImages {
         let now = rules(for: DevelopmentSites.sites).map(identifier(for:))
         guard now != wanted else { return }
         wanted = now
-        if now == nil { list = nil; syncAll() } else if hasWanting { prepare() }
+        if now == nil { list = nil; waiting.removeAllObjects(); syncAll() } else if hasWanting { prepare() }
     }
 
     private static var controllers: [WKUserContentController] {
@@ -253,7 +256,9 @@ enum PageImages {
     /// Looks the rule for the list as it is up, or compiles it; then puts it where it's wanted, in place of the one
     /// before, and loads the pages that waited for it again. A list that changed meanwhile is worked toward next.
     private static func prepare() {
-        guard let rules = rules(for: DevelopmentSites.sites) else { wanted = nil; return }
+        // Nothing listed: no rule will come, so no page waits for one. Each tab, no longer a development tab, loads
+        // again without its choices (`Tab.refreshDevelopment`).
+        guard let rules = rules(for: DevelopmentSites.sites) else { wanted = nil; waiting.removeAllObjects(); return }
         let name = identifier(for: rules)
         wanted = name
         guard list?.identifier != name, preparing != name, let store = WKContentRuleListStore.default() else { return }
