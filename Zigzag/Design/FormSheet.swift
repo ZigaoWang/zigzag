@@ -59,8 +59,9 @@ final class FormSheet: NSView, NSTextFieldDelegate {
             labels.append(label)
             if let label { panel.addSubview(label) }
             panel.addSubview(row.view)
-            // Typing in any of its fields can change whether it may be confirmed.
-            (row.view as? FilledField)?.field.delegate = self
+            // Typing in any of its fields can change whether it may be confirmed — whether the row is the field
+            // itself or holds it beside something else (a path with a Choose… button after it).
+            for field in row.view.selfAndDescendants(of: FilledField.self) { field.field.delegate = self }
         }
         panel.addSubview(buttons)
         buttons.trailing = [cancel, confirm]
@@ -284,5 +285,13 @@ final class FormSheet: NSView, NSTextFieldDelegate {
             y += height + rowGap
         }
         buttons.frame = NSRect(x: pad, y: panel.bounds.height - pad - DialogButtons.height, width: inner, height: DialogButtons.height)
+    }
+}
+
+private extension NSView {
+    /// This view and everything under it of `kind`, outermost first: a form's field is sometimes nested inside the
+    /// row around it (a path with a Choose… button beside it).
+    func selfAndDescendants<T: NSView>(of kind: T.Type) -> [T] {
+        ((self as? T).map { [$0] } ?? []) + subviews.flatMap { $0.selfAndDescendants(of: kind) }
     }
 }

@@ -186,8 +186,14 @@ enum DownloadRuleSheet {
         stack.spacing = Tokens.Space.x2
         stack.distribution = .fill
         stack.alignment = .centerY
+        // The sheet lays its rows out by frame; a stack built from views turns autoresizing off and would ignore it.
+        stack.translatesAutoresizingMaskIntoConstraints = true
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         button.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        // Shrinking is the other half: with both at the default resistance, a row narrower than field + button
+        // lays the button out past the end rather than drawing it inside.
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return stack
     }
 }
