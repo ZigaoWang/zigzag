@@ -56,4 +56,11 @@ struct PageQuestionsTests {
         // Something elsewhere in the window (over another page) leaves this one be.
         #expect(PageQuestions.area(page, below: NSRect(x: 0, y: 52, width: 200, height: 120)) == page)
     }
+
+    @Test func toastsStayLongEnoughToReadAndReach() {
+        // Undo for tabs closed or pins removed: several seconds, as other apps give it, and longer under the pointer.
+        #expect((6...8).contains(Toast.undoDuration))
+        // "Password saved" outlasts the prompt sliding away under it.
+        #expect(Toast.confirmationDuration >= 2.5)
+    }
 }

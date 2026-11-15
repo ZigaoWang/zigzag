@@ -263,7 +263,7 @@ enum HistoryPage {
                    action: (String(localized: "Undo", comment: "Button in the toast after History is cleared."), { [weak controller] in
             guard let undo = controller?.sidebarUndo, undo.canUndo, undo.undoActionName == clearHistory else { return }
             undo.undo()
-        }), duration: 5, in: controller)
+        }), duration: Toast.undoDuration, in: controller)
     }
 
     private static func controller(for webView: WKWebView?) -> BrowserWindowController? {

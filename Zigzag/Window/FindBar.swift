@@ -895,6 +895,13 @@ enum Toast {
     }
     private static var showing: [ObjectIdentifier: Showing] = [:]
 
+    /// How long a toast with Undo stays, for something taken away (tabs closed, pins removed, History cleared): long
+    /// enough to read it and reach Undo. It waits longer while the pointer is on it.
+    static let undoDuration: TimeInterval = 7
+    /// How long a confirmation of something a prompt just did stays ("Password saved"): it comes up as the prompt
+    /// slides away, so it stays long enough to be seen after that.
+    static let confirmationDuration: TimeInterval = 3
+
     /// Whether an action shown at `shownAt` takes a click yet.
     static func acceptsAction(shownAt: Date, now: Date = Date()) -> Bool { now.timeIntervalSince(shownAt) > 0.5 }
 

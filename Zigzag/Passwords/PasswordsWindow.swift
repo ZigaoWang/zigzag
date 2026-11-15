@@ -864,7 +864,7 @@ private final class DetailView: NSView, NSTextFieldDelegate {
                         if let host { Toast.show(String(localized: "Couldn’t put it back", comment: "Toast when undoing a deleted login failed."), symbol: "exclamationmark.triangle", duration: 4, over: host, area: area) }
                     }
                 }
-            }), duration: 6, over: host, area: frame)
+            }), duration: Toast.undoDuration, over: host, area: frame)
         }
     }
 

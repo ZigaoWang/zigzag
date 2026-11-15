@@ -2465,7 +2465,7 @@ extension BrowserWindowController: SidebarDelegate {
         Toast.show(String(localized: "Moved to \(name)", comment: "Toast after a tab moves to another space. The name is the space's."), symbol: "arrow.right.square", action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Move to Space", comment: "Undo action name, shown in the Edit menu as Undo Move to Space.") else { return }
             undo.undo()
-        }), duration: 4, in: self)
+        }), duration: Toast.undoDuration, in: self)
     }
 
     /// Turns a tab into a bookmark, undoably. Half of a split pins the pair.
@@ -2518,7 +2518,7 @@ extension BrowserWindowController: SidebarDelegate {
         Toast.show(String(localized: "Closed \(count) tabs", comment: "Toast after tabs are closed, with Undo."), symbol: "xmark.circle", action: (String(localized: "Undo", comment: "Button in a toast: takes back what was just done."), { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Close Tabs", comment: "Undo action name, shown in the Edit menu as Undo Close Tabs.") else { return }
             undo.undo()
-        }), duration: 4, in: self)
+        }), duration: Toast.undoDuration, in: self)
     }
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         previews.hover(tab, row: row, bookmark: bookmark)

@@ -110,7 +110,7 @@ final class SavePasswordPrompt: FloatingPanelView {
                         await PasswordCapture.dropGenerated(origin: origin, password: password, account: credential.username, in: store)
                         done = String(localized: "Password updated", comment: "Toast after the save-password prompt updated a password.")
                     }
-                    controller.promptToast(done, symbol: "key", duration: 1.6)
+                    controller.promptToast(done, symbol: "key", duration: Toast.confirmationDuration)
                 } catch {
                     controller.promptToast(String(localized: "Couldn’t save the password. Try again from the Passwords window.", comment: "Toast when the save-password prompt couldn't save."), symbol: "exclamationmark.triangle", duration: 3)
                 }

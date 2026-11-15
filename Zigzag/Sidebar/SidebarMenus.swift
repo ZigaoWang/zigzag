@@ -560,7 +560,7 @@ enum SpaceEditor {
         Toast.show(String(localized: "Deleted “\(name)”", comment: "Toast after a space is deleted. The name is the space's."), symbol: "trash", action: (String(localized: "Undo", comment: "Button in a toast: undoes what the toast says happened."), { [weak controller] in
             guard let undo = controller?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Delete Space", comment: "Undo action name, shown in Edit › Undo.") else { return }
             undo.undo()
-        }), duration: 4, in: controller)
+        }), duration: Toast.undoDuration, in: controller)
     }
 }
 
@@ -746,7 +746,7 @@ extension BrowserWindowController {
                    symbol: "arrow.right.square", action: (String(localized: "Undo", comment: "Toast button"), { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.") else { return }
             undo.undo()
-        }), duration: 4, in: self)
+        }), duration: Toast.undoDuration, in: self)
     }
 
     /// Takes pinned pages out of the sidebar, open ones closing first. ⌘Z (or Undo on the toast) puts them back.
@@ -764,7 +764,7 @@ extension BrowserWindowController {
         Toast.show(what, symbol: "pin.slash", action: (String(localized: "Undo", comment: "Toast button"), { [weak self] in
             guard let undo = self?.sidebarUndo, undo.canUndo, undo.undoActionName == String(localized: "Remove Pinned Pages", comment: "Undo action name, shown in Edit › Undo.") else { return }
             undo.undo()
-        }), duration: 4, in: self)
+        }), duration: Toast.undoDuration, in: self)
     }
 
     /// ⌘W on picked rows: what it does to one row, to all of them. Tabs close, with the count and Undo; pinned

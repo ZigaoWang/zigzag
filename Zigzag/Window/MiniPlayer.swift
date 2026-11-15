@@ -271,7 +271,7 @@ final class MiniPlayer {
                        // The player comes back for the video it was showing, not only for the next one.
                        self?.bringBack(id)
                    }),
-                   duration: 5, in: controller)
+                   duration: Toast.undoDuration, in: controller)
     }
 
     private func apply(_ steps: [MiniPlayerModel.Step]) {

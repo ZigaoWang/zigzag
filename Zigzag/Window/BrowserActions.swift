@@ -305,7 +305,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard DeveloperTools.isOn, DevelopmentSites.isOffered(for: url, isPrivate: tabManager.isPrivate),
               DevelopmentSites.covers(url) != on, let change = DevelopmentSites.toggle(for: url) else { return }
         Toast.show(Self.developerModeToast(change), symbol: DeveloperTool.modeSymbol,
-                   action: (String(localized: "Undo", comment: "Button in a toast: undoes what the toast says happened."), { DevelopmentSites.undo(change) }), duration: 4, in: self)
+                   action: (String(localized: "Undo", comment: "Button in a toast: undoes what the toast says happened."), { DevelopmentSites.undo(change) }), duration: Toast.undoDuration, in: self)
     }
 
     /// What the toast after turning Developer Mode on or off says.
