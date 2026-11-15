@@ -411,9 +411,11 @@ private final class PopupWindow: NSWindow {
     }
 }
 
-/// The popup's top strip: traffic lights on the left, the site's full host in the middle.
+/// The popup's top strip: traffic lights on the left, the page's whole address in the middle (`FullAddress`), its
+/// site alone when there isn't room for more.
 final class PopupHeaderView: NSView {
     private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+    private var fullAddress: FullAddress.Parts?
     private let lock = NSImageView()
     /// Room kept clear at the right end for buttons laid over the strip (Zigzag Mini's Open in Zigzag).
     var trailingInset: CGFloat = 0 { didSet { needsLayout = true } }
@@ -435,6 +437,7 @@ final class PopupHeaderView: NSView {
 
     func show(url: URL?, secure: Bool) {
         // An extension's own page: whose it is, not an address no one could read.
+        fullAddress = nil
         if #available(macOS 15.4, *), let ext = ExtensionCenter.webExtension(ofPage: url) {
             label.stringValue = ext.displayName ?? ""
             lock.image = Tokens.Symbol.image("puzzlepiece.extension", size: Tokens.Symbol.inline)
@@ -446,6 +449,7 @@ final class PopupHeaderView: NSView {
         // No site at all (data:): said so, and no lock, which would vouch for a site that isn't there.
         let site = Self.site(of: url)
         label.stringValue = site ?? AddressView.name(of: url)
+        fullAddress = site == nil ? nil : FullAddress.parts(of: url)
         lock.isHidden = site == nil
         // The open padlock the address bar and Site Controls mark a page that isn't secure with.
         lock.image = Tokens.Symbol.image(secure ? "lock" : SitePanel.notSecureSymbol, size: Tokens.Symbol.inline)
@@ -467,15 +471,28 @@ final class PopupHeaderView: NSView {
 
     override func layout() {
         super.layout()
-        let textSize = NSSize(width: label.textWidth, height: label.lineHeight)
         // Without its lock, the name alone is centered.
         let lockWidth = lock.isHidden ? 0 : Tokens.Space.x3
         let gap = lock.isHidden ? 0 : Tokens.Space.x1
+        let leading = Tokens.Space.x16 + Tokens.Space.x4
+        var textWidth = label.textWidth
+        if let fullAddress {
+            // The whole address when it fits; cut at its end when the site and the start of the rest do; else the
+            // site alone, centered as it is.
+            let font = label.font ?? Tokens.Font.body(.medium)
+            func measure(_ text: String) -> CGFloat { ceil((text as NSString).size(withAttributes: [.font: font]).width) }
+            let most = max(0, bounds.width - leading - lockWidth - gap - Tokens.Space.x4 - trailingInset)
+            let pad = Tokens.Space.x2
+            textWidth = FullAddress.shown(fullAddress, room: most - pad, measure: measure) == .host ? measure(fullAddress.host) + pad
+                : min(measure(fullAddress.whole) + pad, most)
+        }
+        let textSize = NSSize(width: textWidth, height: label.lineHeight)
         let total = lockWidth + gap + ceil(textSize.width)
-        let x = max(Tokens.Space.x16 + Tokens.Space.x4, (bounds.width - total) / 2)
+        let x = max(leading, (bounds.width - total) / 2)
         let h = ceil(textSize.height)
         lock.frame = NSRect(x: x, y: 0, width: lockWidth, height: bounds.height)
         label.frame = NSRect(x: lock.frame.maxX + gap, y: (bounds.height - h) / 2, width: max(0, min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4 - trailingInset)), height: h)
+        if let fullAddress { FullAddress.show(fullAddress, in: label, room: label.frame.width - Label.inset * 2) }
     }
 }
 

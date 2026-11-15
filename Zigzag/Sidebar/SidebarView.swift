@@ -442,8 +442,24 @@ final class AddressView: InteractiveView {
         return .byTruncatingMiddle
     }
 
+    /// The page's whole address, where the field has the room for it (`showsFullAddress`); nil for the site alone.
+    private var fullAddress: FullAddress.Parts?
+    /// What the field shows now, to show again when it moves.
+    private var shownPage: (url: URL?, notSecure: Bool) = (nil, false)
+
+    /// In the bar above the page the field is wide: it shows the whole address, the site dark and the rest quiet.
+    /// In the sidebar it's narrow, and shows the site alone.
+    var showsFullAddress: Bool { superview is TopBarView }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        show(url: shownPage.url, notSecure: shownPage.notSecure)
+    }
+
     func show(url: URL?, notSecure: Bool) {
+        shownPage = (url, notSecure)
         label.stringValue = Self.name(of: url)
+        fullAddress = showsFullAddress && !label.stringValue.isEmpty ? FullAddress.parts(of: url) : nil
         label.lineBreakMode = Self.lineBreak(forName: label.stringValue)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
@@ -454,7 +470,8 @@ final class AddressView: InteractiveView {
         lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
         lock.isHidden = !insecure
         lock.toolTip = insecure ? SitePanel.notSecure : nil
-        setAccessibilityLabel(insecure ? String(localized: "\(label.stringValue), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.") : label.stringValue)
+        let spoken = fullAddress?.whole ?? label.stringValue
+        setAccessibilityLabel(insecure ? String(localized: "\(spoken), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.") : spoken)
         reflow(animated: true)
     }
 
@@ -487,7 +504,8 @@ final class AddressView: InteractiveView {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
         let room = bounds.width - x - inset - Tokens.Space.x1
-        let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
+        // The pins make room for the site, never for the rest of a whole address, which is cut first.
+        let text = ((fullAddress?.host ?? label.stringValue) as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
         let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room, text: text)
         // The one furthest from Site Controls gives way first.
         let showing = pinEntries.suffix(fit)
@@ -513,6 +531,7 @@ final class AddressView: InteractiveView {
 
         let h = label.lineHeight
         let labelFrame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: right - Tokens.Space.x1 - x + Label.inset * 2, height: h)
+        if let fullAddress { FullAddress.show(fullAddress, in: label, room: labelFrame.width - Label.inset * 2) }
         // A mark appearing starts in its place rather than flying in from the corner.
         if lock.frame.width == 0 { lock.frame = lockFrame }
         guard label.frame != labelFrame || lock.frame != lockFrame else { return }

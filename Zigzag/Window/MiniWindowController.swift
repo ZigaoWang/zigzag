@@ -955,7 +955,7 @@ final class MiniStripView: NSView {
         // The site stays in the middle of the window, as wide on both sides as the room beside it allows; with too
         // little room it steps aside.
         let half = max(0, min(bounds.midX - spaceChip.frame.maxX, buttons - bounds.midX) - Tokens.Space.x2)
-        var width = min(title.fittingWidth, half * 2)
+        var width = title.width(in: half * 2)
         if width < Tokens.Space.x10 { width = 0 }
         title.frame = NSRect(x: round(bounds.midX - width / 2), y: y, width: width, height: h)
         // Editing the address opens in the room between the space and Site Controls, centered on the window where it
@@ -1078,22 +1078,41 @@ final class MiniTitleView: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// The page's whole address, shown when the strip has the room for it (`FullAddress.shown`), else its site.
+    private var fullAddress: FullAddress.Parts?
+
     func show(_ tab: Tab) {
         let name = AddressView.name(of: tab.url)
         label.stringValue = name.isEmpty ? tab.displayTitle : name
         // A long host loses its start, never the domain that says whose site it is (#189).
         label.lineBreakMode = name.isEmpty ? .byTruncatingTail : AddressView.lineBreak(forName: name)
+        fullAddress = name.isEmpty ? nil : FullAddress.parts(of: tab.url)
         mark.isHidden = !tab.isNotSecure
-        setAccessibilityLabel(mark.isHidden ? label.stringValue
-                              : String(localized: "\(label.stringValue), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure."))
+        let spoken = fullAddress?.whole ?? label.stringValue
+        setAccessibilityLabel(mark.isHidden ? spoken
+                              : String(localized: "\(spoken), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure."))
         needsLayout = true
     }
 
-    /// As wide as the mark and the whole site want, with the field's padding either side.
+    /// As wide as the mark and the whole address want, with the field's padding either side.
     var fittingWidth: CGFloat {
-        var width = Self.pad * 2 + label.inkWidth + 2
-        if !mark.isHidden { width += Tokens.Space.x3 + Tokens.Space.x1 }
-        return width
+        let font = label.font ?? Tokens.Font.body()
+        let ink = fullAddress.map { ceil(($0.whole as NSString).size(withAttributes: [.font: font]).width) } ?? label.inkWidth
+        return chrome + ink
+    }
+
+    /// What the field takes besides its text: the padding, and the not-secure mark when it shows.
+    private var chrome: CGFloat { Self.pad * 2 + 2 + (mark.isHidden ? 0 : Tokens.Space.x3 + Tokens.Space.x1) }
+
+    /// How wide the field is in `available`: as wide as the whole address wants, or, when only its site fits
+    /// (`FullAddress.shown`), as the site alone wants, so the site stays centered with no gap after it.
+    func width(in available: CGFloat) -> CGFloat {
+        let whole = fittingWidth
+        guard let fullAddress, whole > available else { return min(whole, available) }
+        let font = label.font ?? Tokens.Font.body()
+        func measure(_ text: String) -> CGFloat { ceil((text as NSString).size(withAttributes: [.font: font]).width) }
+        guard FullAddress.shown(fullAddress, room: available - chrome, measure: measure) == .host else { return available }
+        return min(chrome + measure(fullAddress.host), available)
     }
 
     override func layout() {
@@ -1105,6 +1124,15 @@ final class MiniTitleView: InteractiveView {
         }
         let h = label.lineHeight
         label.frame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: max(0, bounds.width - Self.pad - x + Label.inset * 2), height: h)
+        showFullAddress()
+    }
+
+    /// The whole address in the label's room, or its site alone when that's all there's room for: the site dark, the
+    /// rest quiet, a step brighter under the pointer.
+    private func showFullAddress() {
+        guard let fullAddress else { return }
+        FullAddress.show(fullAddress, in: label, room: label.frame.width - Label.inset * 2, color: Tokens.Color.textPrimary,
+                         quiet: isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary)
     }
 
     override func stateDidChange(animated: Bool) {
@@ -1112,6 +1140,7 @@ final class MiniTitleView: InteractiveView {
         let fill: NSColor? = isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.fieldFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         label.textColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        showFullAddress()
         mark.contentTintColor = Tokens.Color.textSecondary
     }
 

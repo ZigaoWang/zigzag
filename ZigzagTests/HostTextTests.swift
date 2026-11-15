@@ -153,3 +153,119 @@ struct AddressTextTests {
         }
     }
 }
+
+/// The whole address where there's room (the bar above the page, a pop-up, Zigzag Mini): no scheme, no "www.", the
+/// host as WebKit loads it and never with a user name ahead of it, and the host never cut for the rest's sake.
+@MainActor
+struct FullAddressTests {
+    private func parts(_ text: String) -> FullAddress.Parts? { URL(string: text).flatMap(FullAddress.parts(of:)) }
+
+    @Test func splitsTheHostFromTheRest() {
+        #expect(parts("https://linux.do/t/topic/482293") == .init(host: "linux.do", rest: "/t/topic/482293"))
+        #expect(parts("https://github.com/ZigaoWang/zigzag/issues?q=is%3Aopen#top")
+                == .init(host: "github.com", rest: "/ZigaoWang/zigzag/issues?q=is%3Aopen#top"))
+        #expect(parts("https://example.com/a/b/") == .init(host: "example.com", rest: "/a/b/"))
+        #expect(parts("https://example.com?q=1") == .init(host: "example.com", rest: "/?q=1"))
+        #expect(parts("https://example.com/#f") == .init(host: "example.com", rest: "/#f"))
+    }
+
+    @Test func noSchemeNoWWWNoTrailingSlashOnAFrontPage() {
+        #expect(parts("https://www.linux.do/") == .init(host: "linux.do", rest: ""))
+        #expect(parts("http://www.example.com") == .init(host: "example.com", rest: ""))
+        // Only a leading "www." goes.
+        #expect(parts("https://mail.www.example.com/")?.host == "mail.www.example.com")
+        #expect(parts("https://www2.example.com/")?.host == "www2.example.com")
+    }
+
+    @Test func neverAUserNameAheadOfTheHost() {
+        #expect(parts("https://paypal.com:secret@evil.example/login") == .init(host: "evil.example", rest: "/login"))
+        #expect(parts("https://paypal.com@evil.example/") == .init(host: "evil.example", rest: ""))
+    }
+
+    @Test func internationalNamesShowAsWebKitLoadsThem() {
+        #expect(parts("https://xn--bcher-kva.de/a") == .init(host: "xn--bcher-kva.de", rest: "/a"))
+        #expect(parts("https://bücher.de/")?.host == "xn--bcher-kva.de")
+        #expect(parts("https://xn--80ak6aa92e.com/")?.host == "xn--80ak6aa92e.com")
+        // The rest reads as text, but never with an escape decoded into a separator or an invisible mark.
+        #expect(parts("https://例子.中国/路径")?.rest == "/路径")
+        #expect(parts("https://example.com/a%2Fb%40c")?.rest == "/a%2Fb%40c")
+        #expect(parts("https://example.com/%E2%80%AEtxt.exe")?.rest == "/%E2%80%AEtxt.exe")
+    }
+
+    @Test func addressesAndPorts() {
+        #expect(parts("http://192.168.1.10:80/admin") == .init(host: "192.168.1.10", rest: "/admin"))
+        #expect(parts("https://192.168.1.10:8443/") == .init(host: "192.168.1.10:8443", rest: ""))
+        #expect(parts("http://localhost:3000/app") == .init(host: "localhost:3000", rest: "/app"))
+        #expect(parts("http://[::1]:8080/x") == .init(host: "[::1]:8080", rest: "/x"))
+        #expect(parts("https://example.com:443/") == .init(host: "example.com", rest: ""))
+        #expect(parts("http://example.com:443/") == .init(host: "example.com:443", rest: ""))
+    }
+
+    @Test func pagesWithoutASiteKeepTheirName() {
+        #expect(parts("file:///Users/a/report.pdf") == nil)
+        #expect(parts("data:text/html,hi") == nil)
+        #expect(parts("about:blank") == nil)
+        #expect(parts("blob:https://example.com/1234") == nil)
+        #expect(parts("zigzag://history") == nil)
+        #expect(parts("ftp://example.com/file") == nil)
+        #expect(FullAddress.parts(of: nil) == nil)
+    }
+
+    @Test func aLongRestIsKeptToItsStart() throws {
+        let long = String(repeating: "a", count: 50_000)
+        let full = try #require(parts("https://example.com/\(long)"))
+        #expect(full.host == "example.com")
+        #expect(full.rest.count == FullAddress.longestRest)
+    }
+
+    /// Every character 10 wide.
+    private func shown(_ parts: FullAddress.Parts, _ room: CGFloat) -> FullAddress.Shown {
+        FullAddress.shown(parts, room: room) { CGFloat($0.count) * 10 }
+    }
+
+    @Test func theHostIsNeverSqueezedForTheRest() {
+        let page = FullAddress.Parts(host: "linux.do", rest: "/t/topic/482293")
+        // Whole: 23 characters.
+        #expect(shown(page, 230) == .whole)
+        // The host, four of the rest and "…" (13): the rest is cut at its end.
+        #expect(shown(page, 130) == .whole)
+        // Less than that: the host alone.
+        #expect(shown(page, 129) == .host)
+        #expect(shown(page, 40) == .host)
+        // A front page is the host itself, cut the usual way when it must be.
+        #expect(shown(FullAddress.Parts(host: "linux.do", rest: ""), 10) == .whole)
+        // A short rest that fits whole needs nothing more.
+        #expect(shown(FullAddress.Parts(host: "a.io", rest: "/x"), 60) == .whole)
+    }
+
+    @Test func styledTextIsTheHostDarkAndTheRestQuiet() {
+        let text = FullAddress.styled(.init(host: "linux.do", rest: "/t/1"), font: .systemFont(ofSize: 13))
+        #expect(text.string == "linux.do/t/1")
+        #expect(text.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor == Tokens.Color.textPrimary)
+        #expect(text.attribute(.foregroundColor, at: 8, effectiveRange: nil) as? NSColor == Tokens.Color.textSecondary)
+        let paragraph = text.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        #expect(paragraph?.lineBreakMode == .byTruncatingTail)
+    }
+
+    @Test func aLabelTooNarrowShowsTheHostAlone() {
+        let label = Label("", font: .systemFont(ofSize: 13))
+        let page = FullAddress.Parts(host: "accounts.google.com", rest: "/signin/v2/challenge/pwd")
+        FullAddress.show(page, in: label, room: 1000)
+        #expect(label.stringValue == page.whole)
+        FullAddress.show(page, in: label, room: 60)
+        #expect(label.stringValue == page.host)
+        let paragraph = label.attributedStringValue.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        #expect(paragraph?.lineBreakMode == AddressView.lineBreak(forName: page.host))
+    }
+
+    @Test func onlyTheBarAboveThePageShowsTheWholeAddress() {
+        let address = AddressView()
+        #expect(!address.showsFullAddress)
+        let sidebar = NSView()
+        sidebar.addSubview(address)
+        #expect(!address.showsFullAddress)
+        let bar = TopBarView()
+        bar.addSubview(address)
+        #expect(address.showsFullAddress)
+    }
+}
