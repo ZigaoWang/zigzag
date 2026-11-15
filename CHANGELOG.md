@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A PDF at an address without a file name, like a download link, is called by the name its site gave it, in its tab and in History, or by the site when it gave none, instead of the last part of the address.
 - Sign-in fields no longer show the key icon when Fill saved passwords is off in Settings › Passwords, or when a password manager extension like Bitwarden or 1Password is on, where it sat over the extension's own icon. ([#236](https://github.com/ZigaoWang/zigzag/issues/236))
 - Space icons at the bottom of the sidebar follow Settings › Appearance › Sidebar size at every size, a step bigger than before at Small and Medium, and keep their size when you have many spaces: the row scrolls instead of shrinking them. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
+- DeepSeek no longer asks you to check your browser extensions in a tab that opened before ad blocking had its lists, or beside an ad blocker extension. Its blocked telemetry now always gets an empty answer while blocking is on, so nothing is sent. ([#208](https://github.com/ZigaoWang/zigzag/issues/208))
 
 ## [0.9.1] - 2026-11-15
 

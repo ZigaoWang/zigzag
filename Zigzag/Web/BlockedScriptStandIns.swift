@@ -11,7 +11,8 @@ import WebKit
 /// sees the same browser from visit to visit and learns nothing about the Mac.
 ///
 /// This is for any site, as uBlock Origin's `fingerprint2.js` is. A fix for one site goes in the "Zigzag fixes" list
-/// (AdFilters.swift), not here.
+/// (AdFilters.swift), not here, unless the site breaks on a block the content blocker makes whether or not that list
+/// has reached the page (`siteCalls`).
 enum BlockedScriptStandIns {
     /// The file names EasyPrivacy blocks FingerprintJS 2 by.
     static let fingerprint2Files = #"/(?:fingerprint2(?:\.min)?|fp2\.min|fp2\.compressed|fpt2)\.js(?:[?#]|$)"#
@@ -22,10 +23,62 @@ enum BlockedScriptStandIns {
 
     /// With the content blocker on a page, or not: the stand-ins go with it (ContentBlocker.apply).
     static func apply(_ wanted: Bool, to controller: WKUserContentController) {
-        let has = controller.userScripts.contains(where: isOurs)
-        if wanted, !has { controller.addUserScript(script) }
-        if !wanted, has { OwnScripts.remove(from: controller, where: isOurs) }
+        let has = controller.userScripts.filter(isOurs).map(\.source)
+        if wanted { for script in scripts where !has.contains(script.source) { controller.addUserScript(script) } }
+        if !wanted, !has.isEmpty { OwnScripts.remove(from: controller, where: isOurs) }
     }
+
+    static var scripts: [WKUserScript] { [script, siteCalls] }
+
+    /// A site's own calls the content blocker stops, each on the one host it was seen on, that the site reads as a
+    /// broken network. Their fetch and XMLHttpRequest get an empty answer from the page itself: nothing is sent, as
+    /// with the block.
+    ///
+    /// DeepSeek (chat.deepseek.com) posts its telemetry to /api/v0/telemetry, which EasyPrivacy blocks; after three
+    /// failures in a row, while its other calls go through, it says "Please check your browser extensions" (#208).
+    /// The "Zigzag fixes" list answers it too, but only once uBlock Origin's lists and scriptlets have downloaded, only
+    /// in pages loaded after that (a pinned DeepSeek restored at launch while the lists are rebuilt after an update
+    /// kept failing until it was reloaded), and never beside an ad blocker extension. This block is Zigzag's own and
+    /// always there with it, so its answer is too.
+    static let siteCalls = WKUserScript(source: """
+    \(mark)
+    (() => {
+      const calls = { 'chat.deepseek.com': /^\\/api\\/v0\\/telemetry\\/?$/ };
+      const path = calls[location.hostname];
+      if (!path) return;
+      const answered = (address) => {
+        try {
+          const url = new URL(String(address), location.href);
+          return url.origin === location.origin && path.test(url.pathname);
+        } catch (e) { return false; }
+      };
+      // Proxies, so fetch and XMLHttpRequest still read as the browser's own to the page.
+      window.fetch = new Proxy(window.fetch, {
+        apply(target, self, args) {
+          const input = args[0];
+          if (answered(input instanceof Request ? input.url : input)) return Promise.resolve(new Response('', { status: 200, statusText: 'OK' }));
+          return Reflect.apply(target, self, args);
+        },
+      });
+      const proto = XMLHttpRequest.prototype;
+      const opened = new WeakMap();
+      proto.open = new Proxy(proto.open, {
+        apply(target, self, args) {
+          if (answered(args[1])) opened.set(self, new URL(String(args[1]), location.href).href); else opened.delete(self);
+          return Reflect.apply(target, self, args);
+        },
+      });
+      proto.send = new Proxy(proto.send, {
+        apply(target, self, args) {
+          const url = opened.get(self);
+          if (!url) return Reflect.apply(target, self, args);
+          const answer = { readyState: 4, status: 200, statusText: 'OK', responseText: '', response: '', responseURL: url };
+          for (const [name, value] of Object.entries(answer)) Object.defineProperty(self, name, { value, configurable: true });
+          setTimeout(() => { for (const type of ['readystatechange', 'load', 'loadend']) self.dispatchEvent(new ProgressEvent(type)); });
+        },
+      });
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page)
 
     static let script = WKUserScript(source: """
     \(mark)
