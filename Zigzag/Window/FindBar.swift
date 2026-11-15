@@ -438,6 +438,31 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     private static let hideFindUI = NSSelectorFromString("_hideFindUI")
+
+    #if DEBUG
+    /// The bar, its ticks and what the page's script keeps, as JSON at `path` (`findstate`).
+    func debugState(to path: String) {
+        let webView = searched ?? window?.findableWebView
+        var state: [String: Any] = [
+            "visible": isVisible, "query": query, "count": countLabel.stringValue, "marksAvailable": FindMarks.isAvailable,
+            "ticks": ticks.snapshot.marks.count, "current": ticks.snapshot.current ?? -1, "dark": ticks.snapshot.dark,
+            "ticksShown": ticks.superview != nil && !ticks.isHidden,
+            "ticksFrame": ticks.superview == nil ? "" : NSStringFromRect(ticks.convert(ticks.bounds, to: nil)),
+            "webViewFrame": webView.map { NSStringFromRect($0.convert($0.bounds, to: nil)) } ?? "",
+        ]
+        Task { @MainActor in
+            if let webView, let page = try? await webView.runOwnScript("return globalThis.__zigzagFind ? globalThis.__zigzagFind.state() : null", asFunction: true) {
+                state["page"] = page
+            }
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: URL(fileURLWithPath: path))
+            }
+        }
+    }
+
+    /// As a click on a tick (`findtick`).
+    func debugPickTick(_ index: Int) { search(backwards: false, toMatch: index) }
+    #endif
 }
 
 /// A floating surface (the design's top layer, see Design/DESIGN.md): an opaque surface leaning toward the window's

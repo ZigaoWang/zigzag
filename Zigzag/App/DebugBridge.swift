@@ -1058,6 +1058,12 @@ enum DebugBridge {
             }
         case "find": controller.findBar.show(query: arg)
         case "findclose": controller.findBar.hide()
+        // findnext, findprev: Return and Shift-Return in the bar. findstate <path>: the bar, its ticks and the page's
+        // marks (JSON). findtick <n>: as a click on the nth tick, from 0.
+        case "findnext": controller.findBar.next(backwards: false)
+        case "findprev": controller.findBar.next(backwards: true)
+        case "findstate": controller.findBar.debugState(to: arg)
+        case "findtick": controller.findBar.debugPickTick(Int(arg) ?? 0)
         // motionsheet, motionmenu [close]: a confirmation and a menu to watch show up and go (cancelsheet closes the sheet).
         case "motionsheet":
             if let host = controller.window?.contentView {
