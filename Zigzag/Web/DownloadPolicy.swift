@@ -73,4 +73,10 @@ final class DownloadPolicy {
         String(localized: "Blocked a download the page started on its own",
                comment: "Toast when a page starts a second download within half a minute without a click.")
     }
+
+    /// What a download the site may not make says: the permission's own words, so a click that saves nothing says why.
+    static var blockedText: String {
+        String(localized: "Blocked a download from this site",
+               comment: "Toast when a site is not allowed to save files and sends one anyway.")
+    }
 }

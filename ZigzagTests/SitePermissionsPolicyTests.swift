@@ -17,6 +17,19 @@ import WebKit
         try body(defaults)
     }
 
+    /// The same, for the tests that await the question itself.
+    private func withDefaultsAsync(_ body: (UserDefaults) async throws -> Void) async throws {
+        let suite = "SitePermissionsPolicyTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try await body(defaults)
+    }
+
     @Test func remembersAnActionPerSubjectAndOrigin() throws {
         try withDefaults { _ in
             SitePermissions.remember("mini", subject: PermissionSubject.popups, origin: "https://example.com")
@@ -94,6 +107,85 @@ import WebKit
                                                tab: privateTab, isPrivate: false)
             #expect(SitePermissions.action(PermissionSubject.location, origin: "https://a.com") == nil)
             #expect(privateTab.permissionAnswers.answer(key: "https://a.com", kind: "location") == true)
+        }
+    }
+
+    // MARK: Downloads: whether a site may save files at all
+
+    /// The downloads question is one answer kept like every other, and never asks once it has one.
+    @Test func aStoredDownloadAnswerIsUsedWithoutAskingAnything() async throws {
+        try await withDefaultsAsync { _ in
+            SitePermissions.remember("allow", subject: PermissionSubject.downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == true)
+            #expect(await SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
+
+            SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == false)
+            #expect(await !SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
+
+            // A site nobody has answered for has said nothing, and with nowhere to ask the file is left as WebKit
+            // decided it rather than silently eaten.
+            #expect(SitePermissions.downloads(origin: "https://other.example") == nil)
+            #expect(await SitePermissions.downloadsAllowed(origin: "https://other.example", window: nil, isPrivate: false, tab: nil))
+        }
+    }
+
+    /// "This time" is the page's answer, not the site's: another tab is asked.
+    @Test func thisTimeDownloadAnswerHoldsForThePageNotTheSite() throws {
+        try withDefaults { _ in
+            let tab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: false),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: tab, isPrivate: false)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == true)
+            #expect(SitePermissions.action(PermissionSubject.downloads, origin: "https://files.example") == nil)
+            #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
+        }
+    }
+
+    /// "Always" keeps a deny for the site, and a private window keeps nothing whatever the answer says.
+    @Test func aDownloadDenyIsKeptForTheSiteAndAPrivateTabKeepsNothing() throws {
+        try withDefaults { _ in
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: nil, isPrivate: false)
+            #expect(SitePermissions.downloads(origin: "https://files.example") == false)
+
+            let privateTab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
+            privateTab.privateStore = WKWebsiteDataStore.nonPersistent()
+            SitePermissions.remember(nil, subject: PermissionSubject.downloads, origin: "https://files.example")
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: true),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: privateTab, isPrivate: false)
+            #expect(SitePermissions.action(PermissionSubject.downloads, origin: "https://files.example") == nil)
+            #expect(privateTab.permissionAnswers.answer(key: "https://files.example", kind: "downloads") == true)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: privateTab) == true)
+        }
+    }
+
+    /// One answer, in the two places it is chosen: the question and the site's own row. Allow, Block and Ask in Site
+    /// Controls are the same decision the question makes, so neither can drift from the other.
+    @Test func theSiteControlsDownloadRowIsTheSameAnswerAsTheQuestion() throws {
+        try withDefaults { _ in
+            SitePermissions.setChoice(.block, for: .downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == false)
+            SitePermissions.setChoice(.allow, for: .downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == true)
+            SitePermissions.setChoice(.ask, for: .downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
+        }
+    }
+
+    /// Its row is offered once the site has an answer, in a private window too (which asks and keeps nothing), and it
+    /// offers the same three choices as every other row.
+    @Test func downloadsAreARowInSiteControlsOnceTheSiteHasAnAnswer() throws {
+        #expect(SitePermission.downloads.kinds == ["downloads"])
+        #expect(SitePermission.downloads.choices == PermissionChoice.allCases)
+        #expect(SitePermission.downloads.inPrivate, "a private window still asks")
+        try withDefaults { _ in
+            SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: "https://files.example")
+            #expect(SitePermissions.shown(origin: "https://files.example", isPrivate: false).contains(.downloads))
+            #expect(SitePermissions.shown(origin: "https://files.example", isPrivate: true).contains(.downloads))
         }
     }
 

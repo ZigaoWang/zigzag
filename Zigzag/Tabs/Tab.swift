@@ -1490,6 +1490,11 @@ extension Tab: WKNavigationDelegate {
                                      pageOrigin: askingOrigin(navigationAction, webView: webView)) {
                 return (.cancel, preferences)
             }
+            // No rule took it: whether this site may save files at all is asked once, and remembered per site.
+            if policy == .download, let target = navigationAction.request.url,
+               await !mayDownload(target, in: webView) {
+                return (.cancel, preferences)
+            }
             if policy == .cancel { refusedDownload(in: webView) }
             return (policy, preferences)
         }
@@ -1695,15 +1700,27 @@ extension Tab: WKNavigationDelegate {
                 closeIfOnlyADownload(webView)
                 return .cancel
             }
+            // A rule didn't take it, so whether this site may save files at all is what decides.
+            if await !mayDownload(target, in: webView) { return .cancel }
         }
         return policy
     }
 
     /// A download the page started on its own, refused: noted, and said where the page is, never silently.
-    private func refusedDownload(in webView: WKWebView) {
-        Diagnostics.note("Download refused", site: url?.host(), "A page started another download without a click", isPrivate: isPrivate)
+    private func refusedDownload(in webView: WKWebView, text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click") {
+        Diagnostics.note("Download refused", site: url?.host(), note, isPrivate: isPrivate)
         guard let host = webView.window?.windowController as? PromptHost else { return }
-        host.promptToast(DownloadPolicy.refusedText, symbol: "arrow.down.circle", duration: 3)
+        host.promptToast(text, symbol: "arrow.down.circle", duration: 3)
+    }
+
+    /// Whether this site may save a file. False means it may not — said over the page — so the caller cancels the
+    /// download. Asked once per site: "This time" holds for this page, "Always" is kept for the site.
+    private func mayDownload(_ url: URL, in webView: WKWebView) async -> Bool {
+        // A page with no site of its own (a file on this Mac) has nowhere to keep an answer and nothing to ask about.
+        guard let origin = SiteOrigin.of(webView.url ?? url) else { return true }
+        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self)
+        if !allowed { refusedDownload(in: webView, text: DownloadPolicy.blockedText, note: "This site is not allowed to save files") }
+        return allowed
     }
 
     /// The name in a Content-Disposition header, extended or plain, if it has one.
