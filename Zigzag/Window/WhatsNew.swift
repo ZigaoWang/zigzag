@@ -461,7 +461,9 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     /// window: the notes don't stack on it.
     private static func otherSheetIsUp(in controller: BrowserWindowController) -> Bool {
         let hosts = [controller.window?.contentView, controller.root.overlay].compactMap { $0 }
-        return hosts.contains { $0.subviews.contains { $0 is FormSheet || $0 is ConfirmSheet || $0 is ExtensionSheet || $0 is PageDialogSheet } }
+        // A page's dialog sits over its page, not the window: it's asked for by window.
+        return hosts.contains { $0.subviews.contains { $0 is FormSheet || $0 is ConfirmSheet || $0 is ExtensionSheet } }
+            || PageDialogSheet.isShowing(in: controller.window)
     }
 
     /// Another sheet is coming up in `window`: the notes, which only inform, make way for it rather than sit under it.

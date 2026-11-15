@@ -89,6 +89,11 @@ struct DialogPasswordFixesTests {
         // It sits on its page, not over the window (and so never over the sidebar or another tab's page).
         #expect(page.subviews.contains { $0 is PageDialogSheet })
         #expect(window.contentView?.subviews.contains { $0 is PageDialogSheet } != true)
+        // Out of sight, it isn't up in the window (What's New may show); its page in front, it is.
+        #expect(!PageDialogSheet.isShowing(in: window))
+        window.contentView?.addSubview(page)
+        #expect(PageDialogSheet.isShowing(in: window))
+        #expect(!PageDialogSheet.isShowing(in: NSWindow()))
         // Its tab closing answers it "cancel".
         PageDialogSheet.cancel(for: page)
         let result = await asking.value

@@ -228,6 +228,12 @@ final class PageDialogSheet: NSView {
     }
     #endif
 
+    /// A page's dialog (an alert, a sign-in) is showing in `window`: over the window, or over a page in front there.
+    static func isShowing(in window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        return open.contains { $0.sheet?.superview != nil && $0.sheet?.window === window }
+    }
+
     /// The page closed (its tab, or a new process): its dialogs answer "cancel" and go.
     static func cancel(for page: WKWebView) {
         for box in open where box.sheet?.page === page { box.sheet?.finish(.cancelled) }
