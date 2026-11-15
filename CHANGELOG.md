@@ -5,24 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- A long download name or command bar title no longer cuts shorter when you point at its row or move onto it, and a cut download name shows whole in a tooltip. Not secure in Site Controls and a failed extension install read clearly on light backgrounds, and a profile without extensions no longer says 0 extensions.
-- A window Zigzag reopens shows its tab, address and split view from its first frame, instead of a blank address for a moment.
-- The spaces in Switch Space… (⌥⌘S) have their names in the middle of their rows.
-- Check for Updates… no longer says Checking for updates… for good: it answers, or the toast goes within a minute and a half, and an update that's ready is only let go for a newer one Zigzag will really get.
-- Find on page uses less power on pages that keep changing, like YouTube, X or a live chat, and rests while you're in another window.
-- Titles extensions give their right-click menu items as you select text are no longer saved to disk, nothing from a private window is, and saving the items no longer slows Zigzag down.
-- A page opened from a file loose in your home folder can read only that file, not the files around it.
-- With Reader on, Esc while the ⌃Tab switcher is up puts the switcher away and leaves Reader open, instead of closing Reader under it. The ⌃Tab switcher and Show All Tabs picture a tab in Reader as it shows, the article and not the page under it.
-- Now Playing in the sidebar shows Pause while its video plays and Play while it's paused, for a muted or silent video in the mini player too, and changes as you play or pause it from the page, the mini player or a media key.
-- Translating a page after closing macOS's Download Languages sheet without downloading now says the language isn't downloaded, with Translate to bring the sheet back, instead of saying to try again in a moment.
-- Password saved stays long enough to see after the Save password? prompt slides away, and toasts with Undo, like Closed 3 tabs, Removed pinned pages or History cleared, stay 7 seconds instead of 4, longer while the pointer is on them.
-- Ad blocking's site filters are built once the filter lists have all downloaded, together with their scriptlets. On a first launch they could be built a moment early, from the lists that had come and the copy of Zigzag's own fixes in the app, and then built again. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
-- Restart to Update says it couldn't check for updates when Zigzag can't install the update right then, instead of doing nothing.
-- Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
-- A page's preview no longer comes up beside the menu when you right-click it in the sidebar.
-- ⌘Z after Use Zigzag Mini takes the whole choice back: the page goes back to its tab, and links from other apps open as tabs again.
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -132,6 +114,23 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - PDFs are dark only where web pages would be: with Dark pages in Settings › Appearance or the site's Dark page choice, following the window's own light or dark look. A PDF no longer opens dark in a light window. The moon in the PDF's bar still switches that PDF.
 - Site Controls opened from the sidebar lines up exactly with the address above it, on both sides, so the favorite under it no longer peeks out at its corner.
 - The SHA-256 fingerprint on the certificate page breaks into even lines of pairs, each ending on its colon, so no line starts with one.
+- A long download name or command bar title no longer cuts shorter when you point at its row or move onto it, and a cut download name shows whole in a tooltip. Not secure in Site Controls and a failed extension install read clearly on light backgrounds, and a profile without extensions no longer says 0 extensions.
+- A window Zigzag reopens shows its tab, address and split view from its first frame, instead of a blank address for a moment.
+- The spaces in Switch Space… (⌥⌘S) have their names in the middle of their rows.
+- Check for Updates… no longer says Checking for updates… for good: it answers, or the toast goes within a minute and a half, and an update that's ready is only let go for a newer one Zigzag will really get.
+- Find on page uses less power on pages that keep changing, like YouTube, X or a live chat, and rests while you're in another window.
+- Titles extensions give their right-click menu items as you select text are no longer saved to disk, nothing from a private window is, and saving the items no longer slows Zigzag down.
+- A page opened from a file loose in your home folder can read only that file, not the files around it.
+- With Reader on, Esc while the ⌃Tab switcher is up puts the switcher away and leaves Reader open, instead of closing Reader under it. The ⌃Tab switcher and Show All Tabs picture a tab in Reader as it shows, the article and not the page under it.
+- Now Playing in the sidebar shows Pause while its video plays and Play while it's paused, for a muted or silent video in the mini player too, and changes as you play or pause it from the page, the mini player or a media key.
+- Translating a page after closing macOS's Download Languages sheet without downloading now says the language isn't downloaded, with Translate to bring the sheet back, instead of saying to try again in a moment.
+- Password saved stays long enough to see after the Save password? prompt slides away, and toasts with Undo, like Closed 3 tabs, Removed pinned pages or History cleared, stay 7 seconds instead of 4, longer while the pointer is on them.
+- Ad blocking's site filters are built once the filter lists have all downloaded, together with their scriptlets. On a first launch they could be built a moment early, from the lists that had come and the copy of Zigzag's own fixes in the app, and then built again. ([#129](https://github.com/ZigaoWang/zigzag/issues/129))
+- Restart to Update says it couldn't check for updates when Zigzag can't install the update right then, instead of doing nothing.
+- Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
+- A page's preview no longer comes up beside the menu when you right-click it in the sidebar.
+- ⌘Z after Use Zigzag Mini takes the whole choice back: the page goes back to its tab, and links from other apps open as tabs again.
+
 ## [0.9.0] - 2026-11-14
 
 Split view with up to four pages, sites installed as apps of their own, the sidebar on either side, and tabs that move between windows as they are. Dark pages now use Dark Reader, ad blocking adds uBlock Origin's filter lists, cookie pop-ups are turned down for you, Site Controls is rebuilt, and pictures and PDFs from websites are read in sandboxed helpers.
