@@ -31,7 +31,14 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// ⌘L: the browser window's own command bar, over the page's site.
     private lazy var commandBar = CommandBarController(host: self)
     /// ⌘F: the browser window's own find bar, over the page.
-    private lazy var findBar = FindBarController(window: self)
+    private var findBar: FindBarController {
+        if let madeFindBar { return madeFindBar }
+        let made = FindBarController(window: self)
+        madeFindBar = made
+        return made
+    }
+    /// Made the first time it's asked for: closing a window that never had one doesn't make one to put away.
+    private var madeFindBar: FindBarController?
     private var tokens: [SignalToken] = []
     /// The page went into a browser window: closing this one must leave it alone.
     private var movedOut = false
@@ -593,7 +600,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private func letGo() {
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         movedOut = true
-        findBar.hide()
+        madeFindBar?.hide()
         pageGone.send()
         tokens.removeAll()
         Autofill.shared.forget(windowOf: window)
@@ -708,7 +715,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         returnTo = nil
         isClosing = true
-        findBar.hide()
+        madeFindBar?.hide()
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         pageGone.send()
         linkStatus.hide()
@@ -799,7 +806,7 @@ extension MiniWindowController: NSMenuItemValidation {
         case #selector(goBack(_:)): return tab.canGoBack
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
-        case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)): return !isLeaving && findBar.hasQuery
+        case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)): return !isLeaving && madeFindBar?.hasQuery == true
         default: return !isLeaving
         }
     }
