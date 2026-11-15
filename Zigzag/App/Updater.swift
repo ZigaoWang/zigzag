@@ -105,12 +105,18 @@ final class Updater {
                        comment: "Toast after Check for Updates in a development build."), symbol: "arrow.down.circle")
             return
         }
+        let checking = String(localized: "Checking for updates…", comment: "Toast while Zigzag › Check for Updates… looks for a new version.")
+        // Asked again while the first is under way: the same check goes on.
+        if manualCheck { sayWorking(checking); return }
         manualCheck = true
-        sayWorking(String(localized: "Checking for updates…", comment: "Toast while Zigzag › Check for Updates… looks for a new version."))
+        sayWorking(checking)
         whenSparkleIsFree { [weak self] in
-            guard let self else { return }
+            guard let self, self.manualCheck else { return }
             // A quiet check that was under way may have staged one meanwhile.
             if self.readiness.canRestart { self.sayReady(); self.manualCheck = false; return }
+            // Sparkle still busy after the wait, or not taking checks: it would start nothing, and no answer would
+            // ever come, so say so now.
+            guard updater.canCheckForUpdates else { self.failed(); self.manualCheck = false; return }
             updater.checkForUpdates()
         }
     }
@@ -129,6 +135,8 @@ final class Updater {
         restart = .waiting
         whenSparkleIsFree { [weak self] in
             guard let self, self.restart == .waiting else { return }
+            // Sparkle would start nothing, and the restart would wait for good, holding up every later check.
+            guard updater.canCheckForUpdates else { self.restart = .none; self.failed(); return }
             self.restart = .running
             // The staged update is resumed, as a check you asked for, and installed at once (`found`).
             updater.checkForUpdates()
@@ -213,6 +221,7 @@ final class Updater {
     fileprivate func cycleFinished() {
         // A restart that's running and still here didn't happen; one waiting for this check to end goes on.
         if restart == .running { restart = .none }
+        workingTimeout?.cancel()
         if let window = workingToast { Toast.hide(in: window) }
         manualCheck = false
         workingToast = nil
@@ -245,10 +254,27 @@ final class Updater {
     private func say(_ text: String, symbol: String, action: (title: String, run: () -> Void)? = nil) {
         guard let window = toastWindow else { return }
         workingToast = nil
+        workingTimeout?.cancel()
         Toast.show(text, symbol: symbol, action: action, duration: action == nil ? 3 : 6, in: window)
     }
 
+    /// How long "Checking…" or "Downloading…" stays up when no word comes from Sparkle: then it goes, and the check
+    /// is no longer one you asked for (what it finds still shows in the sidebar).
+    static let workingLimit: TimeInterval = 90
+    private var workingTimeout: DispatchWorkItem?
+
     private func sayWorking(_ text: String) {
+        workingTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if let window = self.workingToast { Toast.hide(in: window) }
+                self.workingToast = nil
+                self.manualCheck = false
+            }
+        }
+        workingTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.workingLimit, execute: timeout)
         guard let window = toastWindow else { return }
         workingToast = window
         Toast.working(text, in: window)
