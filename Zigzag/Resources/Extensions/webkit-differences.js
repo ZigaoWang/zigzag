@@ -625,7 +625,10 @@
     const keptMenus = globalThis.__zigzagContextMenus;
     const menuNames = ['contextMenus', 'menus'].filter((name) => api[name] && typeof api[name].create === 'function');
     if (keptMenus && menuNames.length) {
-      const note = (op, args) => { try { keptMenus.change(op, args).catch(() => {}); } catch (e) {} };
+      // Nothing from a page in a private window is kept: what it makes is for that window, and goes with it.
+      let isPrivate = false;
+      try { isPrivate = !!(api.extension && api.extension.inIncognitoContext); } catch (e) {}
+      const note = (op, args) => { if (isPrivate) return; try { keptMenus.change(op, args).catch(() => {}); } catch (e) {} };
       const createItem = api[menuNames[0]].create.bind(api[menuNames[0]]);
       const wrapped = new WeakSet();
       for (const name of menuNames) {

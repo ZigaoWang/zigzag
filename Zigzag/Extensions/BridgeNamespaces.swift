@@ -254,7 +254,24 @@ final class BridgeContextMenus: BridgeNamespace {
     unowned let host: ExtensionHost
     /// Asked to put its items back since it last started: once per start, so items it removed stay removed.
     private var restored: Set<String> = []
-    init(host: ExtensionHost) { self.host = host }
+    /// What each extension has, read from its file once and kept here: an extension that changes an item on every
+    /// selection never has its file read or written each time.
+    private var cache: [String: Kept] = [:]
+    /// Writes waiting for the extension to stop changing its items for a moment.
+    private var pending: [String: DispatchWorkItem] = [:]
+    private var quitting: NSObjectProtocol?
+    /// Files are written here, never on the main thread.
+    private static let disk = DispatchQueue(label: "app.zigzag.context-menus-kept", qos: .utility)
+    /// How long changes gather before they're written.
+    static let writeDelay: TimeInterval = 1
+
+    init(host: ExtensionHost) {
+        self.host = host
+        // Quitting within the moment after a change still keeps it.
+        quitting = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.flush(waiting: true) }
+        }
+    }
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard let context = host.context(for: extensionID) else { return nil }
@@ -273,7 +290,7 @@ final class BridgeContextMenus: BridgeNamespace {
             let isNewInstall = host.profile.installs.newlyInstalled.contains(extensionID)
             let persistent = context.webExtension.hasPersistentBackgroundContent
             let items = Self.toRestore(kept, version: version, isNewInstall: isNewInstall, persistentBackground: persistent)
-            let neverKept = !FileManager.default.fileExists(atPath: file(for: extensionID).path)
+            let neverKept = pending[extensionID] == nil && !FileManager.default.fileExists(atPath: file(for: extensionID).path)
             if items.isEmpty, kept.version != version { save(Kept(version: version, items: []), for: extensionID) }
             return ["items": items, "browserUpdated": Self.addsItemsAgain(neverKept: neverKept, isNewInstall: isNewInstall, persistentBackground: persistent)]
         default:
@@ -281,10 +298,24 @@ final class BridgeContextMenus: BridgeNamespace {
         }
     }
 
-    func release(_ extensionID: String) { restored.remove(extensionID) }
+    /// Turned off or removed: what's waiting is written now, before its folder can go, and read again next time.
+    func release(_ extensionID: String) {
+        restored.remove(extensionID)
+        flush(extensionID, waiting: true)
+        cache[extensionID] = nil
+    }
 
     /// More than any extension's menu has; past it, new items aren't kept (they still show this session).
     static let maxItems = 500
+    /// The most one item may take as JSON: a bigger one isn't kept (it still shows this session).
+    static let maxItemBytes = 4 * 1024
+    /// The most one extension's file may take: items past it aren't kept.
+    static let maxFileBytes = 256 * 1024
+
+    private static func size(_ item: [String: Any]) -> Int {
+        guard JSONSerialization.isValidJSONObject(item), let data = try? JSONSerialization.data(withJSONObject: item) else { return .max }
+        return data.count
+    }
 
     struct Kept {
         var version: String
@@ -301,7 +332,7 @@ final class BridgeContextMenus: BridgeNamespace {
         }
         switch op {
         case "create":
-            guard let properties = args.first as? [String: Any], let new = id(properties["id"]) else { return items }
+            guard let properties = args.first as? [String: Any], let new = id(properties["id"]), size(properties) <= maxItemBytes else { return items }
             // Made again with the same ID: the newer one stands, where the first was.
             if let index = items.firstIndex(where: { id($0["id"]) == new }) {
                 var items = items
@@ -310,10 +341,16 @@ final class BridgeContextMenus: BridgeNamespace {
             }
             return items.count < maxItems ? items + [properties] : items
         case "update":
+            // Its title stays the one it was made with (with its %s, which the menu fills in with the selection):
+            // a title changed as you go is often about what's on the page or selected ("Search “…”"), and that's
+            // never written to disk. The extension sets it again once it's running.
             guard let target = id(args.first), let changes = args.dropFirst().first as? [String: Any] else { return items }
+            let kept = changes.filter { $0.key != "id" && $0.key != "title" }
+            guard !kept.isEmpty else { return items }
             return items.map { item in
                 guard id(item["id"]) == target else { return item }
-                return item.merging(changes.filter { $0.key != "id" }) { _, new in new }
+                let changed = item.merging(kept) { _, new in new }
+                return size(changed) <= maxItemBytes ? changed : item
             }
         case "remove":
             guard let target = id(args.first) else { return items }
@@ -354,16 +391,51 @@ final class BridgeContextMenus: BridgeNamespace {
     }
 
     private func load(_ extensionID: String) -> Kept {
-        guard let data = try? Data(contentsOf: file(for: extensionID)),
-              let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return Kept(version: "", items: []) }
-        return Kept(version: saved["version"] as? String ?? "", items: saved["items"] as? [[String: Any]] ?? [])
+        if let kept = cache[extensionID] { return kept }
+        var kept = Kept(version: "", items: [])
+        if let data = try? Data(contentsOf: file(for: extensionID)), data.count <= Self.maxFileBytes,
+           let saved = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            kept = Kept(version: saved["version"] as? String ?? "", items: saved["items"] as? [[String: Any]] ?? [])
+        }
+        cache[extensionID] = kept
+        return kept
     }
 
+    /// Kept now, written a moment after the last change.
     private func save(_ kept: Kept, for extensionID: String) {
-        let saved: [String: Any] = ["version": kept.version, "items": kept.items]
-        guard JSONSerialization.isValidJSONObject(saved), let data = try? JSONSerialization.data(withJSONObject: saved) else { return }
-        try? FileManager.default.createDirectory(at: host.profile.installs.folder(for: extensionID), withIntermediateDirectories: true)
-        try? data.write(to: file(for: extensionID), options: .atomic)
+        cache[extensionID] = kept
+        pending[extensionID]?.cancel()
+        let work = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.flush(extensionID) } }
+        pending[extensionID] = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.writeDelay, execute: work)
+    }
+
+    /// Writes what's waiting, for one extension or for all of them. `waiting`: before going on (Zigzag quitting,
+    /// the extension going).
+    private func flush(_ only: String? = nil, waiting: Bool = false) {
+        for (extensionID, work) in pending where only == nil || only == extensionID {
+            work.cancel()
+            pending[extensionID] = nil
+            guard let kept = cache[extensionID], let data = Self.encoded(kept) else { continue }
+            let folder = host.profile.installs.folder(for: extensionID), file = file(for: extensionID)
+            let write: @Sendable () -> Void = {
+                try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try? data.write(to: file, options: .atomic)
+            }
+            if waiting { Self.disk.sync(execute: write) } else { Self.disk.async(execute: write) }
+        }
+    }
+
+    /// The file's contents, as many items as fit in `maxFileBytes`.
+    static func encoded(_ kept: Kept) -> Data? {
+        var items = kept.items
+        while true {
+            let saved: [String: Any] = ["version": kept.version, "items": items]
+            guard JSONSerialization.isValidJSONObject(saved), let data = try? JSONSerialization.data(withJSONObject: saved) else { return nil }
+            if data.count <= maxFileBytes || items.isEmpty { return data }
+            // The last made go first; the menu keeps its top.
+            items.removeLast(max(1, items.count / 10))
+        }
     }
 }
 

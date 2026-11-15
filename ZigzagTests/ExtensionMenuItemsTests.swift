@@ -95,13 +95,43 @@ struct ExtensionMenuItemsTests {
         // Made again with the same ID: the newer one, in the same place.
         items = BridgeContextMenus.apply("create", args: [["id": "open-in-downie", "title": "Send to Downie", "contexts": ["link"]]], to: items)
         #expect(items.first?["title"] as? String == "Send to Downie")
-        items = BridgeContextMenus.apply("update", args: ["mp4", ["title": "MP4 video", "id": "renamed"]], to: items)
-        #expect(items[1]["title"] as? String == "MP4 video")
+        items = BridgeContextMenus.apply("update", args: ["mp4", ["title": "MP4 video", "id": "renamed", "enabled": false]], to: items)
+        // Its title as it was made: one changed as you go can carry what you selected.
+        #expect(items[1]["title"] as? String == "MP4")
+        #expect(items[1]["enabled"] as? Bool == false)
         #expect(items[1]["id"] as? String == "mp4")
         // Removing one takes its own items with it.
         items = BridgeContextMenus.apply("remove", args: ["mp4"], to: items)
         #expect(items.compactMap { $0["id"] as? String } == ["open-in-downie"])
         #expect(BridgeContextMenus.apply("removeAll", args: [], to: items).isEmpty)
+    }
+
+    /// A search item retitled with each selection keeps its %s title on disk, never the text you selected.
+    @available(macOS 15.4, *)
+    @Test func selectedTextIsNeverKept() {
+        var items = BridgeContextMenus.apply("create", args: [["id": "search", "title": "Search “%s”", "contexts": ["selection"]]], to: [])
+        items = BridgeContextMenus.apply("update", args: ["search", ["title": "Search “my bank PIN”"]], to: items)
+        #expect(items.count == 1)
+        #expect(items.first?["title"] as? String == "Search “%s”")
+        let data = try! #require(BridgeContextMenus.encoded(.init(version: "1", items: items)))
+        #expect(!String(decoding: data, as: UTF8.self).contains("bank"))
+    }
+
+    /// One item past 4 KB isn't kept, and the file stays under 256 KB however many items there are.
+    @available(macOS 15.4, *)
+    @Test func keptItemsHaveALimit() {
+        let big = String(repeating: "x", count: BridgeContextMenus.maxItemBytes)
+        #expect(BridgeContextMenus.apply("create", args: [["id": "big", "title": big]], to: []).isEmpty)
+        var items = BridgeContextMenus.apply("create", args: [["id": "a", "title": "A"]], to: [])
+        items = BridgeContextMenus.apply("update", args: ["a", ["documentUrlPatterns": [big]]], to: items)
+        #expect(items.first?["documentUrlPatterns"] == nil)
+        let many = (0..<BridgeContextMenus.maxItems).map { ["id": "item\($0)", "title": String(repeating: "y", count: 1000)] as [String: Any] }
+        let data = try! #require(BridgeContextMenus.encoded(.init(version: "1", items: many)))
+        #expect(data.count <= BridgeContextMenus.maxFileBytes)
+        let saved = try! #require(try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let kept = saved["items"] as? [[String: Any]] ?? []
+        #expect(!kept.isEmpty && kept.count < many.count)
+        #expect(kept.first?["id"] as? String == "item0")
     }
 
     @available(macOS 15.4, *)
