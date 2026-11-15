@@ -790,6 +790,8 @@ final class WhatsNewOffer: FloatingPanelView {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         dismiss()
+        // A toast that went under it moves back up to the top of the page.
+        if let controller { Toast.reposition(in: controller) }
     }
 
     private func layoutContent() {
