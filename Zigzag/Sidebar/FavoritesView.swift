@@ -759,10 +759,12 @@ final class FavoriteTile: InteractiveView {
         closeButton.isHidden = !(isOpen && isHovered) || number != nil
         let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
         for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
-        // A soft tile of the space's own color, a step lighter under the pointer; a fine edge while its page is open,
-        // so you can tell which are loaded. The one you're on is the selected tab's card.
+        // A soft tile of the space's own color, a step lighter under the pointer; brighter, with a fine edge, while its
+        // page is open, so you can tell which are loaded. The one you're on is the selected tab's card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
-            : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
+            : isPressed ? Tokens.Chrome.fieldPressed
+            : isOpen ? (isHovered ? Tokens.Chrome.openTileHover : Tokens.Chrome.openTile)
+            : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered, duration: Tokens.Motion.selection)
         Tokens.Motion.withoutAnimation {
             layer?.borderWidth = isSelected || isOpen ? Tokens.Metric.hairline : 0

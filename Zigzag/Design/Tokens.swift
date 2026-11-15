@@ -1477,6 +1477,12 @@ enum Tokens {
             highLight: white(0.75), highDark: white(0.12))
         static let keyEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: white(0.09),
             highLight: Color.hex(0x000000, alpha: 0.4), highDark: white(0.35))
+        /// A favorite whose page is open: a brighter tile than a closed one, half way to the card you're on, so which
+        /// are open reads at a glance on any color or grain; a step brighter still under the pointer.
+        static let openTile = Color.dynamic(light: white(0.74), dark: white(0.125),
+            highLight: white(0.9), highDark: white(0.19))
+        static let openTileHover = Color.dynamic(light: white(0.84), dark: white(0.15),
+            highLight: white(0.95), highDark: white(0.22))
         /// A favorite whose page is open: a fine edge, the only line on a tile.
         static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16),
             highLight: Color.hex(0x000000, alpha: 0.45), highDark: white(0.45))
