@@ -536,6 +536,9 @@ final class MiniPlayer {
     /// `tab`'s video is the one in the card, playing or paused.
     func holds(_ tab: Tab) -> Bool { self.tab === tab && card != nil }
 
+    /// `tab`'s video is the one in the card, and playing: a muted or silent video plays without making a sound.
+    func isPlaying(_ tab: Tab) -> Bool { holds(tab) && video?.isPlaying == true }
+
     /// Plays or pauses `tab`'s video when it's the one in the card, as the card's own button does. False otherwise.
     func togglePlayback(of tab: Tab) -> Bool {
         guard holds(tab), currentFrame != nil else { return false }
@@ -578,8 +581,11 @@ final class MiniPlayer {
         lostWait?.cancel()
         lostWait = nil
         videoIndex = found.index
+        let wasPlaying = video?.isPlaying
         video = found
         card?.update(found)
+        // Played or paused from the page, the card or a media key: Now Playing's button follows.
+        if wasPlaying != found.isPlaying { controller?.miniPlayerChanged() }
         place()
         isolate()
         // A frame moves with its page: its place is asked again as it reports.

@@ -1254,7 +1254,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Paused as Now Playing shows it: by its own button, or a video stopped in the mini player.
     private func isPausedForNowPlaying(_ tab: Tab) -> Bool {
-        NowPlayingChoice.isPaused(playing: tab.isPlayingAudio, pausedFromCard: tab.isPlaybackPaused, inMiniPlayer: miniPlayer.holds(tab))
+        let playing = NowPlayingChoice.isPlaying(sound: tab.isPlayingAudio, miniPlayerVideo: miniPlayer.holds(tab) ? miniPlayer.isPlaying(tab) : nil)
+        return NowPlayingChoice.isPaused(playing: playing, pausedFromCard: tab.isPlaybackPaused, inMiniPlayer: miniPlayer.holds(tab))
     }
 
     /// The mini player took a video or let it go: Now Playing keeps its card while a video is there, paused or not.

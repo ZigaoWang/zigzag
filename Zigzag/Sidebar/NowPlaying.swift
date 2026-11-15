@@ -138,6 +138,12 @@ struct NowPlayingChoice {
         playing || pausedFromCard || inMiniPlayer
     }
 
+    /// Whether a tab is playing, for the card's button: a video in the mini player by its own state (a muted or silent
+    /// video plays without a sound); anything else by its sound.
+    static func isPlaying(sound: Bool, miniPlayerVideo: Bool?) -> Bool {
+        miniPlayerVideo ?? sound
+    }
+
     /// Whether the card shows it paused, with Play: paused from the card, or stopped in the mini player.
     static func isPaused(playing: Bool, pausedFromCard: Bool, inMiniPlayer: Bool) -> Bool {
         pausedFromCard || (inMiniPlayer && !playing)
