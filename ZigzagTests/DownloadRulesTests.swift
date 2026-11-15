@@ -582,8 +582,50 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
     }
 
-    // MARK: The order the rules are in
+    // MARK: What a script says back
 
+    /// A script's own output names one action to run in the rule's place, written as the rule's own action JSON. One
+    /// level only — a script that named another script would be a way to make one run another — and a destination is
+    /// refused too, since it says where a file lands rather than being an action. A refusal is said, not swallowed.
+    @Test func aScriptsAnswerNamesOneActionAndNeverAnotherScript() {
+        func action(named output: String) -> DownloadRuleAction? {
+            if case .action(let action) = ScriptSays.named(in: output) { return action }
+            return nil
+        }
+
+        var play = DownloadRuleAction(kind: .openApp)
+        play.appPath = "/Applications/mpv.app"
+        #expect(action(named: #"{"kind":"openApp","appPath":"/Applications/mpv.app"}"#) == play)
+        #expect(action(named: #"{"kind":"openURL","urlTemplate":"{link}","openIn":"mini"}"#)?.openIn == .mini)
+
+        var rpc = DownloadRuleAction(kind: .jsonRPC)
+        rpc.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc"
+        rpc.rpcMethod = "aria2.addUri"
+        rpc.rpcParameters = #"[["{link}"]]"#
+        #expect(action(named: #"{"kind":"jsonRPC","rpcEndpoint":"http://127.0.0.1:6800/jsonrpc","rpcMethod":"aria2.addUri","rpcParameters":"[[\"{link}\"]]"}"#) == rpc)
+
+        // The two refusals, each said for its own reason.
+        #expect(ScriptSays.named(in: #"{"kind":"runScript","scriptPath":"again.sh"}"#) == .refused("A script can’t name another script."))
+        #expect(ScriptSays.named(in: #"{"kind":"saveToFolder","folderPath":"/Users/me/Music"}"#) == .refused("A script can’t choose where a download is saved."))
+        #expect(ScriptSays.named(in: #"{"kind":"showInZigzag"}"#) == .refused("A script can’t choose where a download is saved."))
+
+        // Saying nothing, or nothing that names an action the handler knows: nothing happens, and the run stands.
+        #expect(ScriptSays.named(in: "") == .nothing)
+        #expect(ScriptSays.named(in: "downloading…\n   \n") == .nothing)
+        #expect(ScriptSays.named(in: #"{"kind":"log","n":3}"#) == .nothing)
+        #expect(ScriptSays.named(in: #"{"kind":"nonsense"}"#) == .nothing)
+        // A JSON object with no `kind` is not an answer: a script's own JSON must not read as one.
+        #expect(ScriptSays.named(in: #"{"appPath":"/Applications/mpv.app"}"#) == .nothing)
+        #expect(ScriptSays.named(in: "[1,2,3]") == .nothing)
+
+        // A script may log as it likes, and the first line that names an action is the answer — but a line it may not
+        // name ends it there, rather than sliding on to the next one.
+        #expect(action(named: "started\n   \n{\"kind\":\"openURL\",\"urlTemplate\":\"{link}\"}\nand some more\n")?.kind == .openURL)
+        #expect(ScriptSays.named(in: "{\"kind\":\"runScript\"}\n{\"kind\":\"openApp\",\"appPath\":\"/x\"}")
+                == .refused("A script can’t name another script."))
+    }
+
+    // MARK: The order the rules are in
     /// A drag in the rules list names the row it was dropped on, not a position, because that list shows only the
     /// handoffs: its numbering leaves the file types out, so a place in it isn't a place in the store. The rule lands
     /// just before the one it was dropped on, and everything else stays where it was — a file type between the two,

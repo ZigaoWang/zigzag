@@ -2053,6 +2053,28 @@
         }
       }
     },
+    "A script can’t choose where a download is saved." : {
+      "comment" : "Why a download rule failed: the script's own output named a save destination, which is decided where the download is made, so nothing ran.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本不能决定下载的保存位置。"
+          }
+        }
+      }
+    },
+    "A script can’t name another script." : {
+      "comment" : "Why a download rule failed: the script's own output named another script to run, which a script may not name, so nothing ran.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本不能调用另一个脚本。"
+          }
+        }
+      }
+    },
     "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too." : {
       "comment" : "Under the list in Settings › Developer.",
       "localizations" : {
@@ -12804,6 +12826,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "主密码"
+          }
+        }
+      }
+    },
+    "Print one line to hand off again: {\"kind\":\"openApp\",\"appPath\":\"/Applications/mpv.app\"}, or the same with openURL or jsonRPC." : {
+      "comment" : "Under the arguments of a Run Script download rule: how the script's own output names one more action for Zigzag to do, written as the rule's own action JSON.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打印一行即可再次转交：{\"kind\":\"openApp\",\"appPath\":\"/Applications/mpv.app\"}，或将 openApp 换成 openURL 或 jsonRPC。"
           }
         }
       }

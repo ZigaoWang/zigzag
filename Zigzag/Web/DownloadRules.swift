@@ -246,6 +246,18 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         /// made from the per-extension panel, not from Add Rule's Custom… menu.
         var isDestination: Bool { self == .saveToFolder || self == .showInZigzag }
 
+        /// Why a script's own output may not name this kind, or nil when it may. **One level only:** a script that
+        /// could name another script would be a way to make one script run another, and a rule shouldn't be able to
+        /// write a loop. A destination is the other refusal, for a different reason: it says where a file *lands*,
+        /// which is decided where WebKit makes the download, and it is never run as an action at all.
+        var refusesScripts: String? {
+            switch self {
+            case .openApp, .openURL, .jsonRPC: nil
+            case .runScript: String(localized: "A script can’t name another script.", comment: "Why a download rule failed: the script's own output named another script to run, which a script may not name, so nothing ran.")
+            case .saveToFolder, .showInZigzag: String(localized: "A script can’t choose where a download is saved.", comment: "Why a download rule failed: the script's own output named a save destination, which is decided where the download is made, so nothing ran.")
+            }
+        }
+
         var title: String {
             switch self {
             case .openApp: String(localized: "Open App", comment: "An action a download rule can take, in its editor: hand the link to an app.")
@@ -403,6 +415,41 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         rpcParameters = try container.decodeIfPresent(String.self, forKey: .rpcParameters) ?? "[]"
         rpcStyle = try container.decodeIfPresent(RPCStyle.self, forKey: .rpcStyle) ?? .json
         folderPath = try container.decodeIfPresent(String.self, forKey: .folderPath) ?? ""
+    }
+}
+
+// MARK: - What a script says back
+
+/// What a script's own output says for Zigzag to do next. A script is authoritative for everything that isn't the
+/// browser's own business — it has every token as argv and the link in its environment, and needs nothing else to open
+/// an app or call a service of its own. Where the next thing *is* the browser's (opening one of Zigzag's own places,
+/// handing an address on, calling a service with the site's cookies, which only the browser holds), its output names
+/// one of the actions the handler already has and Zigzag runs it in the rule's place.
+nonisolated enum ScriptSays: Equatable {
+    /// One action to run, written as the rule's own action JSON: `{"kind":"openURL","urlTemplate":"…"}`.
+    case action(DownloadRuleAction)
+    /// A line naming something a script may not name, and why. Said out loud rather than passed over: a script told
+    /// to do something it can't must not look like one that did it.
+    case refused(String)
+    /// Nothing to act on, which is the answer to every script that says nothing.
+    case nothing
+
+    /// Reads the first line of `output` that names an action the handler knows. A line that isn't JSON, or that has
+    /// no `kind`, or whose `kind` the handler doesn't know, is passed over — a script may log whatever it likes — and
+    /// the first line that does name one decides, refused or not, so nothing can slip past a refusal on a later line.
+    static func named(in output: String) -> ScriptSays {
+        for line in output.split(whereSeparator: { $0.isNewline }) {
+            let text = line.trimmingCharacters(in: .whitespaces)
+            guard text.hasPrefix("{"), let data = text.data(using: .utf8) else { continue }
+            // The `kind` is looked for twice on purpose: `DownloadRuleAction`'s own decoding answers a missing or
+            // unknown `kind` with a default, which would make any JSON object the script printed look like an answer.
+            guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  object["kind"] is String,
+                  let action = try? JSONDecoder().decode(DownloadRuleAction.self, from: data) else { continue }
+            if let why = action.kind.refusesScripts { return .refused(why) }
+            return .action(action)
+        }
+        return .nothing
     }
 }
 

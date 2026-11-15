@@ -164,6 +164,8 @@ enum DownloadRuleSheet {
                                                                      comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line, since the script is run directly."),
                                                               symbol: "checkmark.shield.fill"),
                                             height: Tokens.Metric.controlHeight))
+            actionRows.append(.note(String(localized: "Print one line to hand off again: {\"kind\":\"openApp\",\"appPath\":\"/Applications/mpv.app\"}, or the same with openURL or jsonRPC.",
+                                                 comment: "Under the arguments of a Run Script download rule: how the script's own output names one more action for Zigzag to do, written as the rule's own action JSON.")))
         case .jsonRPC:
             let endpoint = FilledField(placeholder: "http://127.0.0.1:6800/jsonrpc")
             endpoint.stringValue = action.rpcEndpoint

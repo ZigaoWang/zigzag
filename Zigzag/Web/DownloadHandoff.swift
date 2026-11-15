@@ -143,27 +143,58 @@ enum DownloadHandoff {
                 cookieFile = file
             }
         }
-        let outcome: Outcome
-        switch rule.action.kind {
+        return await run(rule.action, values: values, secret: secret, request: request, rule: rule, cookieFile: cookieFile)
+    }
+
+    /// Runs one action with the values at hand: what `perform` does for a rule, and what a script's own answer is run
+    /// through — the same actions, the same tokens, the same fate for a cookie file. `rule` is the rule the action acts
+    /// **for**, which is what an Open URL action may keep a chosen place on; it is nil for a script's answer, which has
+    /// no rule of its own to keep one on. `cookieFile` is the file this run made, if any, which the action's kind
+    /// decides the life of. Only `perform` and the answer path come through here, and the answer path can never reach
+    /// `runScript` — `ScriptSays` refuses it — so nothing here can set a script running another.
+    private static func run(_ action: DownloadRuleAction, values: HandoffValues, secret: String, request: Request,
+                            rule: DownloadRule?, cookieFile: URL?) async -> Outcome {
+        switch action.kind {
         case .runScript:
-            outcome = runScript(rule.action, values: values, secret: secret, request: request, rule: rule)
+            let outcome = runScript(action, values: values, secret: secret, request: request, rule: rule)
             // A script keeps the file until it exits; one that never started has no use for it.
             if outcome != .handedOff, let cookieFile { HandoffCookies.removeFile(cookieFile) }
+            return outcome
         case .openApp:
-            outcome = await openApp(rule.action, values: values, secret: secret)
+            let outcome = await openApp(action, values: values, secret: secret)
             if let cookieFile { removeWhenTheOtherAppHasRead(cookieFile) }
+            return outcome
         case .openURL:
-            outcome = await openURL(rule.action, values: values, secret: secret, request: request, rule: rule)
+            let outcome = await openURL(action, values: values, secret: secret, request: request, rememberingOn: rule)
             if let cookieFile { removeWhenTheOtherAppHasRead(cookieFile) }
+            return outcome
         case .jsonRPC:
-            outcome = await callService(rule.action, values: values, secret: secret)
+            let outcome = await callService(action, values: values, secret: secret)
             if let cookieFile { HandoffCookies.removeFile(cookieFile) }
+            return outcome
         case .saveToFolder, .showInZigzag:
             // A destination, not a handoff: where the file lands is decided when the download is made, and the
             // download is never cancelled for it — so there is nothing to do here but let it be saved.
-            outcome = .noMatch
+            return .noMatch
         }
-        return outcome
+    }
+
+    /// Runs what a script's own output named, in the rule's place. The values the script was handed are the values its
+    /// answer's tokens mean, so `{link}` in an answer is the link the script was given. A refusal is said the way a
+    /// rule's failure is said, so a script told to do something it can't is never quiet about it.
+    private static func actOnScriptsAnswer(_ named: ScriptSays, request: Request, values: HandoffValues,
+                                           secret: String, rule: DownloadRule?) async {
+        switch named {
+        case .nothing:
+            return
+        case .refused(let why):
+            report(.failed(why), rule: rule, url: values.link, isPrivate: request.isPrivate, window: request.window)
+        case .action(let action):
+            // A script's answer has no rule of its own, so it gets none to remember a place on (`rule: nil`): an Open
+            // URL in it opens in a new tab unless the answer's own JSON names a place.
+            let outcome = await run(action, values: values, secret: secret, request: request, rule: nil, cookieFile: nil)
+            report(outcome, rule: rule, request: request)
+        }
     }
 
     /// A rule that ran, but not: said over the page, and noted without the link, the cookies or the secret.
@@ -224,15 +255,19 @@ enum DownloadHandoff {
     /// told yet asks once — here, over the page — and keeps the answer on itself, since an automation that asked every
     /// time wouldn't be one. Any other address (mpv://, a magnet, a mail link) belongs to the app that handles it and
     /// is handed on exactly as it always was.
+    ///
+    /// `rememberingOn` is the rule an Open URL action keeps a chosen place on, and is nil when there is none — a
+    /// script's own answer, whose web addresses open in a new tab unless the answer's own JSON names a place
+    /// (`"openIn":"mini"`). A rule that hasn't been told yet asks where to open and writes the answer on itself.
     private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
-                                request: Request, rule: DownloadRule) async -> Outcome {
+                                request: Request, rememberingOn rule: DownloadRule?) async -> Outcome {
         let text = DownloadTokens.expand(action.urlTemplate, with: values, secret: secret)
         guard let url = URL(string: text), url.scheme != nil else {
             return .failed(String(localized: "The URL isn’t valid.", comment: "Why a download rule failed: the URL it was told to open can't be made."))
         }
         guard OpenInZigzag.handles(url) else { return openWithTheSystem(url) }
-        var place = action.openIn
-        if place == nil { place = await askWhereToOpen(rule: rule, request: request) }
+        var place = action.openIn ?? (rule == nil ? .newTab : nil)
+        if place == nil, let rule { place = await askWhereToOpen(rule: rule, request: request) }
         // Put off, or nowhere to ask and nowhere to show it: the link or the file is left as if no rule had it.
         guard let place, let host = WindowManager.shared.promptHost(for: request.window) else { return .noMatch }
         OpenInZigzag.open(url, at: place, from: request.tab, in: host)
@@ -271,6 +306,11 @@ enum DownloadHandoff {
         return place
     }
 
+    /// How long a script's own answer is still taken for. It is read the moment it is written, so this only bounds a
+    /// script that says nothing for a long time and then names something: that answer comes too late to act on, and
+    /// the run itself is unaffected — a downloader may take as long as it likes.
+    private static let answerWithin: TimeInterval = 60
+
     /// Runs the script with every token as its own argument or environment value. A `.sh` file is run by `/bin/sh`;
     /// anything else must be executable. Never `/bin/sh -c`, and never a joined command line.
     private static func runScript(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
@@ -303,7 +343,13 @@ enum DownloadHandoff {
         if !values.cookieHeader.isEmpty { environment["ZIGZAG_COOKIE_HEADER"] = values.cookieHeader }
         if !secret.isEmpty { environment["ZIGZAG_SECRET"] = secret }
         process.environment = environment
-        process.standardOutput = FileHandle.nullDevice
+        // Its output is read as it is written, not waited for: a script that says what to do next and then works for
+        // ten minutes still gets its answer at once. Its errors go on being kept for the report at the end.
+        let output = ScriptOutput { named in
+            Task { await actOnScriptsAnswer(named, request: request, values: values, secret: secret, rule: rule) }
+        }
+        let answerPipe = Pipe()
+        process.standardOutput = answerPipe
         let errorPipe = Pipe()
         process.standardError = errorPipe
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
@@ -311,6 +357,13 @@ enum DownloadHandoff {
         errorPipe.fileHandleForReading.readabilityHandler = { handle in
             errors.append(handle.availableData)
         }
+        answerPipe.fileHandleForReading.readabilityHandler = { handle in
+            output.append(handle.availableData)
+        }
+        // An answer that arrives after the wait is not run: a script may work for as long as it likes, but what it
+        // names is taken while it is still the thing that just happened. Held weakly, so a run that is over lets go of
+        // the request it was handed — and its tab — at once rather than when this comes round.
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.answerWithin) { [weak output] in output?.stop() }
         let cookieFile = values.cookieFile
         let link = values.link
         let isPrivate = request.isPrivate
@@ -321,6 +374,10 @@ enum DownloadHandoff {
         process.terminationHandler = { finished in
             errorPipe.fileHandleForReading.readabilityHandler = nil
             errors.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
+            answerPipe.fileHandleForReading.readabilityHandler = nil
+            // Whatever it printed as it went is still read first: an answer written just as it exited is an answer.
+            output.append(answerPipe.fileHandleForReading.readDataToEndOfFile())
+            output.stop()
             if !cookieFile.isEmpty { HandoffCookies.removeFile(URL(fileURLWithPath: cookieFile)) }
             let said = errors.text
             let status = finished.terminationStatus
@@ -460,5 +517,42 @@ private nonisolated final class ScriptErrors: @unchecked Sendable {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .last { !$0.isEmpty }
         return last.map { String($0.prefix(300)) } ?? ""
+    }
+}
+
+/// A script's own output on its way back to the browser. The pipe is read off the main actor; what the script names
+/// is handed to `act` where the request lives, once — the first answer it names is the one that counts, and after
+/// `stop` nothing it says is taken at all. Only the buffer and that one flag are shared, and both are under the lock.
+private nonisolated final class ScriptOutput: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    private var taken = false
+    /// Room for a line's worth of answer, and no more: a script that prints without end must not grow this without end.
+    private let limit = 4_000
+    private let act: @MainActor (ScriptSays) -> Void
+
+    init(act: @escaping @MainActor (ScriptSays) -> Void) { self.act = act }
+
+    /// Everything the script has printed so far, and what it names. Read on each chunk rather than at the end, so an
+    /// answer arrives when it is written.
+    func append(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        lock.lock()
+        data.append(chunk)
+        if data.count > limit { data = Data(data.suffix(limit)) }
+        guard !taken else { lock.unlock(); return }
+        let named = ScriptSays.named(in: String(decoding: data, as: UTF8.self))
+        guard named != .nothing else { lock.unlock(); return }
+        taken = true
+        lock.unlock()
+        let act = self.act
+        Task { @MainActor in act(named) }
+    }
+
+    /// No more answers are taken: the script has exited, or the wait for its answer is over.
+    func stop() {
+        lock.lock()
+        taken = true
+        lock.unlock()
     }
 }
