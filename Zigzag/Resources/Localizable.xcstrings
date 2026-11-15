@@ -612,13 +612,13 @@
         }
       }
     },
-    "%@ open in Zigzag" : {
-      "comment" : "A download rule in a sentence: what it catches, then that Zigzag opens and shows it. The placeholder is what it catches, like “Files of type pdf”.",
+    "%@ open in your Mac’s app" : {
+      "comment" : "A download rule in a sentence: what it catches, then that the Mac's own app for that type opens it. The placeholder is what it catches, like “Files of type pdf”.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@在 Zigzag 中打开"
+            "value" : "%@ 会用 Mac 上对应的 App 打开"
           }
         }
       }
@@ -2941,6 +2941,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "始终深色"
+          }
+        }
+      }
+    },
+    "Always for %@" : {
+      "comment" : "Duration choice on the download question: the answer is kept for this file type. The placeholder is the type, like PDF.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对 %@ 始终有效"
           }
         }
       }
@@ -7262,6 +7273,17 @@
         }
       }
     },
+    "Files of this type are saved to the folder above, or opened in your Mac’s app for them. The first file type that matches wins." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此类型的文件会保存到上面的文件夹，或用 Mac 上对应的 App 打开。最先匹配的文件类型生效。"
+          }
+        }
+      }
+    },
     "Files of this type are saved to the folder downloads are saved to again, and nothing else changes." : {
       "comment" : "Message of the sheet that deletes a per-extension destination.",
       "localizations" : {
@@ -7269,17 +7291,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此类型文件将重新保存到下载文件夹，其他内容不变。"
-          }
-        }
-      }
-    },
-    "Files of this type skip the folder downloads are saved to, and go where you say instead. The first file type that matches wins." : {
-      "comment" : "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此类型文件不再保存到下载文件夹，而保存到你指定的位置。最先匹配的文件类型生效。"
           }
         }
       }
@@ -10352,6 +10363,17 @@
         }
       }
     },
+    "New file types" : {
+      "comment" : "A setting in Settings › Downloads: what happens to a download of a type no rule covers.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新的文件类型"
+          }
+        }
+      }
+    },
     "New tabs open" : {
       "comment" : "A setting in Settings › Tabs: where a new tab goes in the sidebar's list.",
       "localizations" : {
@@ -11782,6 +11804,17 @@
         }
       }
     },
+    "Open this %@" : {
+      "comment" : "The download question, without its question mark: whether this file opens in the Mac's app. The placeholder is the file's type, like PDF.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开这个 %@"
+          }
+        }
+      }
+    },
     "Open ⌘-clicked links under their tab" : {
       "comment" : "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key.",
       "localizations" : {
@@ -12705,28 +12738,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放"
-          }
-        }
-      }
-    },
-    "Play in IINA" : {
-      "comment" : "A preset rule in Settings › Downloads, for the IINA video player.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用 IINA 播放"
-          }
-        }
-      }
-    },
-    "Play in mpv" : {
-      "comment" : "A preset rule in Settings › Downloads, for the mpv video player.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用 mpv 播放"
           }
         }
       }
@@ -14590,17 +14601,6 @@
         }
       }
     },
-    "Save to Folder" : {
-      "comment" : "A destination a file of a given type can have: saved into a folder of its own, instead of the one everything else goes to.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存到文件夹"
-          }
-        }
-      }
-    },
     "Saved" : {
       "comment" : "Toast after changes to a login are saved.",
       "localizations" : {
@@ -14691,17 +14691,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储的密码会保留。"
-          }
-        }
-      }
-    },
-    "Saved somewhere of its own, instead of with everything else." : {
-      "comment" : "Under the title of the sheet that makes a per-extension destination.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存到它自己的位置，而不是与其他文件放在一起。"
           }
         }
       }
@@ -15190,50 +15179,6 @@
         }
       }
     },
-    "Send to Motrix" : {
-      "comment" : "A preset rule in Settings › Downloads, for the Motrix download manager.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送到 Motrix"
-          }
-        }
-      }
-    },
-    "Send to aria2" : {
-      "comment" : "A preset rule in Settings › Downloads, for the aria2 download manager.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送到 aria2"
-          }
-        }
-      }
-    },
-    "Send to rTorrent" : {
-      "comment" : "A preset rule in Settings › Downloads, for rTorrent.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送到 rTorrent"
-          }
-        }
-      }
-    },
-    "Send to yt-dlp" : {
-      "comment" : "A preset rule in Settings › Downloads, for the yt-dlp downloader.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送到 yt-dlp"
-          }
-        }
-      }
-    },
     "Send your browsing through a proxy server" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
       "localizations" : {
@@ -15307,6 +15252,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务器地址"
+          }
+        }
+      }
+    },
+    "Service" : {
+      "comment" : "Label of the service choice in the Torrents preset's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务"
           }
         }
       }
@@ -17738,6 +17694,17 @@
         }
       }
     },
+    "This download" : {
+      "comment" : "Who asks on the download question when the file has no site, like a file on this Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此下载"
+          }
+        }
+      }
+    },
     "This evening" : {
       "comment" : "Name of a History session that began today.",
       "localizations" : {
@@ -18306,6 +18273,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用于构建网站的工具，只在开发者模式中的网站上显示。可以在任一网站的“网站设置”、命令栏或“显示 › 开发者”中为它开⁠启。处于开发者模式的标签页在边栏中带有虚线边框。"
+          }
+        }
+      }
+    },
+    "Torrents" : {
+      "comment" : "The rule name a Torrents preset starts with when its service is left to be filled in by hand.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "种子"
           }
         }
       }
@@ -19668,6 +19646,17 @@
         }
       }
     },
+    "What happens to files of this type." : {
+      "comment" : "Under the title of the sheet that makes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此类型的文件会怎么处理。"
+          }
+        }
+      }
+    },
     "What stopped it is below, with a way to fix it." : {
       "comment" : "Import window when nothing came over because of a problem.",
       "localizations" : {
@@ -19686,6 +19675,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下面列出了其余内容没有导入的原因，以及解决方法。"
+          }
+        }
+      }
+    },
+    "What to do with a download no file type decides." : {
+      "comment" : "Explanation under “New file types” in Settings › Downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有文件类型规则决定的下载该怎么处理。"
           }
         }
       }
@@ -20980,6 +20980,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "devtools web development localhost 开发 开发者 调试 本地"
+          }
+        }
+      }
+    },
+    "download type open save ask" : {
+      "comment" : "Words that find the New file types setting with Find a setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 类型 打开 保存 询问 download type open save ask"
           }
         }
       }

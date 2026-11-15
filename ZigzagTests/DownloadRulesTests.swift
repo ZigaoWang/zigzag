@@ -313,9 +313,9 @@ struct DownloadRuleTests {
     /// handoff rule for the same file is not a destination, so it is left to the handoff path.
     @Test func aDestinationIsTheFirstThatMatches() {
         let pdf = destination("pdf", folder: "/Users/me/Documents")
-        let books = destination("pdf, epub", .showInZigzag)
+        let books = destination("pdf, epub", .openFile)
         #expect(DownloadRulesStore.destination(in: [pdf, books], url: file, filename: "a.pdf")?.destination == .folder("/Users/me/Documents"))
-        #expect(DownloadRulesStore.destination(in: [books, pdf], url: file, filename: "a.pdf")?.destination == .show)
+        #expect(DownloadRulesStore.destination(in: [books, pdf], url: file, filename: "a.pdf")?.destination == .open)
         #expect(DownloadRulesStore.destination(in: [rule(.fileType, "pdf")], url: file, filename: "a.pdf") == nil)
         #expect(DownloadRulesStore.destination(in: [], url: file, filename: "a.pdf") == nil)
         #expect(DownloadRulesStore.destination(in: [destination("pdf")], url: file, filename: "a.epub") == nil)
@@ -333,7 +333,7 @@ struct DownloadRuleTests {
 
         let there = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
         #expect(there?.destination == folder.appendingPathComponent("report.pdf"))
-        #expect(there?.show == false, "a folder destination saves, it never opens")
+        #expect(there?.openWhenFinished == false, "a folder destination saves, it never opens")
 
         // The file's name is made safe, as every download's is.
         #expect(DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "a/b:c.pdf")?.destination
@@ -357,15 +357,18 @@ struct DownloadRuleTests {
         try Data("x".utf8).write(to: aFile)
         #expect(DownloadManager.place(for: .folder(aFile.path), folder: aFile.path, filename: "a.pdf") == nil)
 
-        // Show in Zigzag saves where it would have gone anyway, and says to show it once it's here.
-        let shown = DownloadManager.place(for: .show, folder: "ignored", filename: "report.pdf")
-        #expect(shown?.show == true)
+        // Open saves where it would have gone anyway, and says to open it once it's here.
+        let shown = DownloadManager.place(for: .open, folder: "ignored", filename: "report.pdf")
+        #expect(shown?.openWhenFinished == true)
         #expect(shown?.destination.lastPathComponent == "report.pdf")
+        // A private window keeps the file but never hands it to another app, unless the rule was let in.
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "report.pdf", canOpen: false)?.openWhenFinished == false)
     }
-    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be shown by Zigzag.
+    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be opened by the
+    /// Mac's own app.
     @Test func aDestinationSaysWhatItIsAndNeedsItsFolder() {
         #expect(DownloadRuleAction.Kind.saveToFolder.isDestination)
-        #expect(DownloadRuleAction.Kind.showInZigzag.isDestination)
+        #expect(DownloadRuleAction.Kind.openFile.isDestination)
         #expect(!DownloadRuleAction.Kind.openURL.isDestination)
         #expect(!DownloadRuleAction.Kind.runScript.isDestination)
 
@@ -375,13 +378,46 @@ struct DownloadRuleTests {
         folder.folderPath = "/Users/me/Documents"
         #expect(folder.isComplete)
         #expect(DownloadRuleSheet.actionHoldUp(folder) == nil)
-        #expect(DownloadRuleAction(kind: .showInZigzag).isComplete)
+        #expect(DownloadRuleAction(kind: .openFile).isComplete)
+    }
+
+    /// A rule saved while this action opened a tab still reads: the file is opened, not left sitting in Downloads.
+    @Test func anOldShowInZigzagRuleReadsAsOpen() throws {
+        let action = try JSONDecoder().decode(DownloadRuleAction.self, from: Data(#"{"kind":"showInZigzag"}"#.utf8))
+        #expect(action.kind == .openFile)
+        #expect(action.destination == .open)
+    }
+
+    /// The download question's three durations mean more, not longer: this file, this type, every type — and the type
+    /// is written the way a file-type rule expects it.
+    @Test func aDownloadAnswerKnowsHowFarItReaches() {
+        #expect(DownloadConfirm.label(for: "pdf") == "PDF")
+        #expect(DownloadConfirm.label(for: "  ") == nil)
+        #expect(DownloadConfirm.decision(handling: .open, scope: .once, type: "PDF") == .once(.open))
+        #expect(DownloadConfirm.decision(handling: .save, scope: .site, type: "PDF") == .type(.save, "pdf"))
+        #expect(DownloadConfirm.decision(handling: .open, scope: .rule, type: "PDF") == .everyType(.open))
+    }
+
+    /// A torrent preset catches what it is for — a magnet link, or an address carrying a `.torrent` — and nothing else.
+    /// aria2 and Motrix stay general unless the torrents variant is the one chosen.
+    @Test func aTorrentPresetCatchesTorrentsAndMagnets() {
+        let torrent = DownloadPreset.torrents.rule
+        #expect(torrent.name == "rTorrent")
+        #expect(torrent.matches(URL(string: "magnet:?xt=urn:btih:abc")!))
+        #expect(torrent.matches(URL(string: "https://site.example/file.torrent")!))
+        #expect(!torrent.matches(URL(string: "https://site.example/file.zip")!))
+        #expect(DownloadPreset.aria2.rule.match == .any)
+        // The service dropdown is the whole difference: same catch pattern, another protocol.
+        #expect(TorrentService.rTorrent.style == .xmlrpc)
+        #expect(TorrentService.aria2.style == .json)
+        #expect(TorrentService.motrix.endpoint == "http://127.0.0.1:16800/jsonrpc")
+        #expect(TorrentService.custom.endpoint.isEmpty)
     }
 
     @Test func aDestinationReadsAsASentence() {
         #expect(destination("pdf, epub", folder: "/Users/me/Documents").summarySentence
                 == "Files of type pdf, epub are saved to Documents")
-        #expect(destination("pdf", .showInZigzag).summarySentence == "Files of type pdf open in Zigzag")
+        #expect(destination("pdf", .openFile).summarySentence == "Files of type pdf open in your Mac’s app")
     }
 
     /// A file type is named by its extensions, so it needs no name of its own — where an address rule has nothing to
@@ -397,8 +433,8 @@ struct DownloadRuleTests {
         save.action.folderPath = "/Users/me/Downloads/PDFs"
         #expect(DownloadRuleSheet.heldUp(save, all: true).isEmpty)
 
-        // Zigzag showing the file needs nothing more than the type.
-        var show = destination("pdf", .showInZigzag)
+        // Opening the file needs nothing more than the type.
+        var show = destination("pdf", .openFile)
         show.name = ""
         #expect(DownloadRuleSheet.heldUp(show, all: true).isEmpty)
 
@@ -611,7 +647,7 @@ struct DownloadRuleTests {
         // The two refusals, each said for its own reason.
         #expect(ScriptSays.named(in: #"{"kind":"runScript","scriptPath":"again.sh"}"#) == .refused("A script can’t name another script."))
         #expect(ScriptSays.named(in: #"{"kind":"saveToFolder","folderPath":"/Users/me/Music"}"#) == .refused("A script can’t choose where a download is saved."))
-        #expect(ScriptSays.named(in: #"{"kind":"showInZigzag"}"#) == .refused("A script can’t choose where a download is saved."))
+        #expect(ScriptSays.named(in: #"{"kind":"openFile"}"#) == .refused("A script can’t choose where a download is saved."))
 
         // Saying nothing, or nothing that names an action the handler knows: nothing happens, and the run stands.
         #expect(ScriptSays.named(in: "") == .nothing)
@@ -694,7 +730,7 @@ struct DownloadRuleTests {
         script.scriptPath = "yt-dlp.sh"
         #expect(line(script) == nil)
         #expect(line(DownloadRuleAction(kind: .saveToFolder)) == nil)
-        #expect(line(DownloadRuleAction(kind: .showInZigzag)) == nil)
+        #expect(line(DownloadRuleAction(kind: .openFile)) == nil)
 
         // An address that isn't the web's belongs to its own app: named if this Mac has one for the scheme, the
         // scheme itself if it hasn't. The rule is still what the line starts with.

@@ -984,6 +984,7 @@ final class PermissionPrompt: FloatingPanelView {
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
                     chooser: [PermissionAction] = [],
+                    durations: [(title: String, scope: PermissionScope)]? = nil,
                     canRemember: Bool = true, rememberNote: String? = nil, ruleScope: String? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let key = ObjectIdentifier(controller)
@@ -999,6 +1000,7 @@ final class PermissionPrompt: FloatingPanelView {
             }
             return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."),
                               symbol: symbol, icon: icon, actions: actions, menu: menu, chooser: chooser,
+                              durations: durations,
                               canRemember: remembers, rememberNote: rememberNote,
                               ruleScope: ruleScope,
                               origin: origin, in: controller, tab: tab)
@@ -1016,8 +1018,9 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool,
-                             rememberNote: String?, ruleScope: String?,
+                             menu: [PermissionAction], chooser: [PermissionAction],
+                             durations: [(title: String, scope: PermissionScope)]?,
+                             canRemember: Bool, rememberNote: String?, ruleScope: String?,
                              origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
@@ -1055,8 +1058,12 @@ final class PermissionPrompt: FloatingPanelView {
             }
             prompt.duration.isEnabled = canRemember
             // A question a rule asked gains the third duration: the same shape as every card, with only what "Always"
-            // lasts on changing. Everywhere else the two choices are already right.
-            if let ruleScope {
+            // lasts on changing. Everywhere else the two choices are already right. A caller with its own three (the
+            // download question, where "Always" means a type or every type) brings them with it.
+            if let durations {
+                prompt.duration.options = durations.map { DropdownButton.Option(title: $0.title) }
+                prompt.scopeChoices = durations.map(\.scope)
+            } else if let ruleScope {
                 let choices = Self.durationChoices(ruleScope: ruleScope)
                 prompt.duration.options = choices.map { DropdownButton.Option(title: $0.title) }
                 prompt.scopeChoices = choices.map(\.scope)

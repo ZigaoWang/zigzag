@@ -20,17 +20,39 @@ if no rule existed.
 | **Stop the page** | For a rule that takes links: the page it was on goes no further, so it doesn't load or follow the address it was going to. Off by default, for a rule that catches a whole site's clicks. |
 
 Rules run from the top of the list and the **first match wins**; drag one to reorder it. The switch turns a rule off
-without deleting it. A new rule can start from a preset — Send to aria2, Motrix or rTorrent, Send to yt-dlp, Play in mpv
-or IINA — or from Custom.
+without deleting it. A new rule can start from a preset — aria2, Motrix, **Torrents**, yt-dlp, mpv, IINA — or from
+Custom. Torrents starts on rTorrent, with a pattern that catches `.torrent` addresses and `magnet:` links, and its
+**Service** dropdown points the same rule at aria2, Motrix, or a service of your own.
 
 **Private windows are left alone.** A rule doesn't run there unless **Run in private windows** in its sheet is on: no
 question, no script, and the link or download carries on as if no rule had matched. A handoff can give another app a
 private window's address — and its cookies, when the rule names them — which is why it's off until you say otherwise.
-Destinations aren't handoffs, so a private download still goes to the folder its type says.
+A file type that saves is not a handoff, so a private download still goes to the folder its type says; a file type
+that opens obeys the switch, and while it is off the file is saved and not opened.
 
-**Destinations** are the other kind of rule in the same list: *Save to Folder* and *Open in Zigzag*. They never take a
-download away from Zigzag. They decide where a file of a given type lands, or that Zigzag opens and shows it, when
-WebKit makes the download. They're listed under Save downloads to, and they don't ask a question.
+**File types** are the other kind of rule in the same list: **Save** and **Open**. They never take a download away from
+Zigzag: they decide what happens to a file of a given type when WebKit makes the download — saved into the folder the
+rule names, which starts as the folder downloads go to and can be changed, or saved and then opened in the Mac's own
+app for that type. They're listed under Save downloads to, and they don't ask a question of their own.
+
+## The question about a new file type
+
+The first time a file of a type no rule covers arrives — a PDF, a ZIP, an EPUB — Zigzag asks, in the page's own window,
+whether to open it or keep it:
+
+> **Open this PDF?**
+> Save · Open
+
+Beside the buttons, one duration says how far the answer reaches:
+
+| Duration | What it covers |
+|---|---|
+| **This time** | That one file. The next PDF asks again. |
+| **Always for PDF** | The type, written as a file type rule you can change or delete. |
+| **Always** | Every download no rule covers, whatever its type. A file type's own rule still wins. |
+
+*Always* is kept in **Settings › Downloads** under **New file types**, where it can be set back to *Ask each time*.
+A private window never asks: the file is saved, and nothing is opened.
 
 ## The question before a rule runs
 

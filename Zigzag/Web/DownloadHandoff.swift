@@ -249,7 +249,7 @@ enum DownloadHandoff {
             let outcome = await callService(action, values: values, secret: secret)
             if let cookieFile { HandoffCookies.removeFile(cookieFile) }
             return outcome
-        case .saveToFolder, .showInZigzag:
+        case .saveToFolder, .openFile:
             // A destination, not a handoff: where the file lands is decided when the download is made, and the
             // download is never cancelled for it — so there is nothing to do here but let it be saved.
             return .noMatch

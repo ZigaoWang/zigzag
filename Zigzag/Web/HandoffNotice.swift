@@ -56,7 +56,7 @@ enum HandoffNotice {
             case .newTab: return String(localized: "opened this link in a new tab", comment: "An automation's notice over the page: the rule opened the link in a tab of its own.")
             case .mini: return String(localized: "opened this link in Mini", comment: "An automation's notice over the page: the rule opened the link in Zigzag Mini.")
             }
-        case .saveToFolder, .showInZigzag:
+        case .saveToFolder, .openFile:
             // A destination never runs as an action: it is read where WebKit makes the download, and a file landing in
             // a folder already shows in the downloads list. Announcing it is a deliberate later step, not an oversight.
             return nil
