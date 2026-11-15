@@ -136,7 +136,7 @@ final class Updater {
         whenSparkleIsFree { [weak self] in
             guard let self, self.restart == .waiting else { return }
             // Sparkle would start nothing, and the restart would wait for good, holding up every later check.
-            guard updater.canCheckForUpdates else { self.restart = .none; self.failed(); return }
+            guard updater.canCheckForUpdates else { self.failed(); self.restart = .none; return }
             self.restart = .running
             // The staged update is resumed, as a check you asked for, and installed at once (`found`).
             updater.checkForUpdates()
