@@ -27,14 +27,12 @@ cloning and after adding, removing or renaming files, and change build settings 
 ## Tests
 
 ```sh
-TEST_RUNNER_ZIGZAG_TEST_VAULT=memory xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag \
-  -skip-testing:ZigzagTests/SettingsLayoutTests/fitsThePageItIsGivenInsideAnAnimation\(\)
+TEST_RUNNER_ZIGZAG_TEST_VAULT=memory xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 ```
 
 The tests run inside a Debug build of Zigzag. `ZIGZAG_TEST_VAULT=memory`, which xcodebuild passes on through its
 `TEST_RUNNER_` prefix, gives that build a password vault held in memory for the run, so it never reads, writes or
-asks for passwords in your keychain. It works the same when you launch a Debug build by hand. The skipped test,
-Settings' layout inside an animation, can hang the run; run it on its own if you change Settings' layout.
+asks for passwords in your keychain. It works the same when you launch a Debug build by hand.
 
 Logic you add or change needs tests in `ZigzagTests`, especially importing, passwords, extensions and anything
 that parses data from outside. Test fixtures must be made up: never commit real logins, browsing data or

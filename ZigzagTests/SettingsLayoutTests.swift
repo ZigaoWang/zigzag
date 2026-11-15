@@ -15,15 +15,19 @@ struct SettingsLayoutTests {
         window.contentView?.addSubview(settings)
         settings.layoutSubtreeIfNeeded()
 
-        // Checked once the animation is over: until then the views here answer with their old frames too.
-        await withCheckedContinuation { done in
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.05
-                context.allowsImplicitAnimation = true
-                settings.frame = NSRect(x: 0, y: 0, width: 1032, height: 760)
-                settings.layoutSubtreeIfNeeded()
-            }, completionHandler: { done.resume() })
-        }
+        // Checked once the animation is over: until then the views here answer with their old frames too. Waited for
+        // with a deadline, so an animation that never reports back fails the test instead of holding up the run.
+        final class Over: @unchecked Sendable { var yes = false }
+        let over = Over()
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.05
+            context.allowsImplicitAnimation = true
+            settings.frame = NSRect(x: 0, y: 0, width: 1032, height: 760)
+            settings.layoutSubtreeIfNeeded()
+        }, completionHandler: { MainActor.assumeIsolated { over.yes = true } })
+        let deadline = Date().addingTimeInterval(5)
+        while !over.yes, Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(over.yes, "the animation never finished")
 
         let scrolls = settings.subviews.compactMap { $0 as? NSScrollView }
         let sections = try #require(scrolls.first?.documentView), pane = try #require(scrolls.last?.documentView)
