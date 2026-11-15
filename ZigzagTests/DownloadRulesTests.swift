@@ -344,6 +344,159 @@ struct DownloadRuleTests {
         #expect(body.contains("<string></string>"))
     }
 
+    // MARK: Per-extension destinations
+
+    /// A per-extension destination as the panel makes one: a download rule whose match is the file's type, and an
+    /// action that says where a file of it lands.
+    private func destination(_ extensions: String, _ kind: DownloadRuleAction.Kind = .saveToFolder,
+                             folder: String = "/Users/me/Documents", enabled: Bool = true) -> DownloadRule {
+        var action = DownloadRuleAction(kind: kind)
+        action.folderPath = kind == .saveToFolder ? folder : ""
+        var rule = DownloadRule(name: "", applies: .downloads, match: .fileType, pattern: extensions, action: action)
+        rule.isEnabled = enabled
+        return rule
+    }
+
+    /// A file's type is its own name, never the address: that is what lets a per-extension destination be written as
+    /// an ordinary rule and still read the right thing.
+    @Test func aFileTypeMatchesByNameAndNeverByAddress() {
+        let type = rule(.fileType, "pdf, epub")
+        #expect(type.matches(filename: "report.pdf"))
+        #expect(type.matches(filename: "report.PDF"))
+        #expect(type.matches(filename: "book.EPUB"))
+        #expect(!type.matches(filename: "report.txt"))
+        // An address on its own is never a file's name, so a type rule catches nothing without one.
+        #expect(!type.matches(file))
+        #expect(!type.matches(file, filename: ""))
+    }
+
+    @Test func aFileTypeTakesADotAndTwoParts() {
+        #expect(rule(.fileType, ".pdf").matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "pdf").matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "pdf,epub").matches(filename: "b.epub"))
+        #expect(rule(.fileType, "tar.gz").matches(filename: "backup.tar.gz"))
+        #expect(!rule(.fileType, "gz").matches(filename: "backup.tar.xz"))
+        // The dot is what makes an extension an extension.
+        #expect(!rule(.fileType, "pdf").matches(filename: "pdf"))
+        #expect(!rule(.fileType, "").matches(filename: "a.pdf"))
+        #expect(!rule(.fileType, "pdf", enabled: false).matches(filename: "a.pdf"))
+    }
+
+    @Test func aFileTypeFollowsTheCaseSwitch() {
+        #expect(rule(.fileType, "PDF", caseSensitive: true).matches(filename: "a.PDF"))
+        #expect(!rule(.fileType, "PDF", caseSensitive: true).matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "PDF", caseSensitive: false).matches(filename: "a.pdf"))
+    }
+
+    /// The download path reads the file's name, so a type rule catches its download — and, since a link has no name,
+    /// never a link.
+    @Test func aDownloadIsCaughtByItsTypeAndALinkIsNot() {
+        let type = rule(.fileType, "pdf")
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: false)?.id == type.id)
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "", appliesToLinks: false) == nil)
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: true) == nil)
+    }
+
+    /// Where a download lands is the first destination that matches, in the same order a handoff is tried — and a
+    /// handoff rule for the same file is not a destination, so it is left to the handoff path.
+    @Test func aDestinationIsTheFirstThatMatches() {
+        let pdf = destination("pdf", folder: "/Users/me/Documents")
+        let books = destination("pdf, epub", .showInZigzag)
+        #expect(DownloadRulesStore.destination(in: [pdf, books], url: file, filename: "a.pdf")?.destination == .folder("/Users/me/Documents"))
+        #expect(DownloadRulesStore.destination(in: [books, pdf], url: file, filename: "a.pdf")?.destination == .show)
+        #expect(DownloadRulesStore.destination(in: [rule(.fileType, "pdf")], url: file, filename: "a.pdf") == nil)
+        #expect(DownloadRulesStore.destination(in: [], url: file, filename: "a.pdf") == nil)
+        #expect(DownloadRulesStore.destination(in: [destination("pdf")], url: file, filename: "a.epub") == nil)
+        #expect(DownloadRulesStore.destination(in: [destination("pdf", enabled: false)], url: file, filename: "a.pdf") == nil)
+    }
+
+    // MARK: Where a destination puts the file
+
+    /// A folder destination saves into the folder the rule names, under the file's own name; there is nothing to
+    /// decide when the folder is empty or has gone, and Zigzag's own showing saves where it always would.
+    @Test func aDestinationIsReadAsAPlaceToSave() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zz-dest-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let there = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
+        #expect(there?.destination == folder.appendingPathComponent("report.pdf"))
+        #expect(there?.show == false, "a folder destination saves, it never opens")
+
+        // The file's name is made safe, as every download's is.
+        #expect(DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "a/b:c.pdf")?.destination
+                == folder.appendingPathComponent("a-b-c.pdf"))
+
+        // A name already taken there is not overwritten.
+        let taken = folder.appendingPathComponent("report.pdf")
+        try Data("one".utf8).write(to: taken)
+        let second = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
+        #expect(second?.destination == folder.appendingPathComponent("report 2.pdf"))
+
+        // A folder still being downloaded into is not chosen either.
+        let busy = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf",
+                                         avoiding: [folder.appendingPathComponent("report 2.pdf").path])
+        #expect(busy?.destination == folder.appendingPathComponent("report 3.pdf"))
+
+        // Nothing to decide: no folder named, one that doesn't exist, and one that is really a file.
+        #expect(DownloadManager.place(for: .folder(""), folder: "", filename: "a.pdf") == nil)
+        #expect(DownloadManager.place(for: .folder("/no/such/folder"), folder: "/no/such/folder", filename: "a.pdf") == nil)
+        let aFile = folder.appendingPathComponent("notafolder")
+        try Data("x".utf8).write(to: aFile)
+        #expect(DownloadManager.place(for: .folder(aFile.path), folder: aFile.path, filename: "a.pdf") == nil)
+
+        // Show in Zigzag saves where it would have gone anyway, and says to show it once it's here.
+        let shown = DownloadManager.place(for: .show, folder: "ignored", filename: "report.pdf")
+        #expect(shown?.show == true)
+        #expect(shown?.destination.lastPathComponent == "report.pdf")
+    }
+    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be shown by Zigzag.
+    @Test func aDestinationSaysWhatItIsAndNeedsItsFolder() {
+        #expect(DownloadRuleAction.Kind.saveToFolder.isDestination)
+        #expect(DownloadRuleAction.Kind.showInZigzag.isDestination)
+        #expect(!DownloadRuleAction.Kind.openURL.isDestination)
+        #expect(!DownloadRuleAction.Kind.runScript.isDestination)
+
+        var folder = DownloadRuleAction(kind: .saveToFolder)
+        #expect(!folder.isComplete)
+        folder.folderPath = "/Users/me/Documents"
+        #expect(folder.isComplete)
+        #expect(DownloadRuleAction(kind: .showInZigzag).isComplete)
+    }
+
+    @Test func aDestinationReadsAsASentence() {
+        #expect(destination("pdf, epub", folder: "/Users/me/Documents").summarySentence
+                == "Files of type pdf, epub are saved to Documents")
+        #expect(destination("pdf", .showInZigzag).summarySentence == "Files of type pdf open in Zigzag")
+    }
+
+    /// A file type is named by its extensions, so it needs no name of its own — where an address rule has nothing to
+    /// read without one — and only the destination that saves the file needs a folder to save it into.
+    @Test func aFileTypeNeedsItsExtensionsAndOnlyAFolderToSaveInto() {
+        var save = destination("", .saveToFolder, folder: "")
+        #expect(save.pattern.isEmpty)
+        #expect(!save.action.isComplete)
+        save.pattern = "pdf, epub"
+        #expect(!save.action.isComplete)
+        save.action.folderPath = "/Users/me/Downloads/PDFs"
+        #expect(save.action.isComplete)
+
+        var show = destination("pdf", .showInZigzag)
+        show.name = ""
+        #expect(show.action.isComplete)
+        #expect(show.name.isEmpty)
+    }
+
+    @Test func aDestinationSurvivesItsJSON() throws {
+        var rule = destination("pdf")
+        rule.action.folderPath = "/Users/me/Downloads/PDFs"
+        let data = try JSONEncoder().encode([rule])
+        let decoded = try JSONDecoder().decode([DownloadRule].self, from: data)
+        #expect(decoded == [rule])
+        #expect(decoded.first?.action.kind == .saveToFolder)
+        #expect(decoded.first?.action.destination == .folder("/Users/me/Downloads/PDFs"))
+    }
+
     // MARK: The file a rule is saved in
 
     @Test func aRuleSurvivesItsJSON() throws {
