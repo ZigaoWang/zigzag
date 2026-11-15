@@ -126,8 +126,11 @@ struct DeveloperMoreTests {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.setURLSchemeHandler(OnePixel(), forURLScheme: "zztest")
-        let list = try #require(try await WKContentRuleListStore.default().compileContentRuleList(
-            forIdentifier: "zigzag-test-images-\(UUID().uuidString)", encodedContentRuleList: rules))
+        let store = try #require(WKContentRuleListStore.default())
+        let name = "zigzag-test-images-\(UUID().uuidString)"
+        let list = try #require(try await store.compileContentRuleList(forIdentifier: name, encodedContentRuleList: rules))
+        // Compiled into the app's own store: gone again once the page has said what it got.
+        defer { store.removeContentRuleList(forIdentifier: name) { _ in } }
         configuration.userContentController.add(list)
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 200, height: 200), configuration: configuration)
         webView.loadHTMLString("<img src='zztest://pixel.png' onload='window.settled=1' onerror='window.settled=1'>", baseURL: URL(string: base))
@@ -139,7 +142,14 @@ struct DeveloperMoreTests {
         return try await webView.evaluateJavaScript("document.images[0].naturalWidth") as? Int ?? -1
     }
 
+    /// The test lists compiled into the app's store.
+    private func testLists() async -> Set<String> {
+        let all = await WKContentRuleListStore.default().availableIdentifiers() ?? []
+        return Set(all.filter { $0.hasPrefix("zigzag-test-images-") })
+    }
+
     @Test func webKitBlocksTheImagesOnAListedSitesPagesOnly() async throws {
+        let before = await testLists()
         let rules = try #require(PageImages.rules(for: ["localhost", "127.0.0.1", "::1"]))
         #expect(try await imageWidth(at: "http://localhost:3000/", rules: rules) == 0)
         #expect(try await imageWidth(at: "http://app.localhost/", rules: rules) == 0)
@@ -148,6 +158,9 @@ struct DeveloperMoreTests {
         // Any other site's page has its images, whatever it shares the rule with.
         #expect(try await imageWidth(at: "https://example.com/", rules: rules) == 1)
         #expect(try await imageWidth(at: "https://notlocalhost.com/", rules: rules) == 1)
+        // Each page's list leaves the store with it: none of this run's stays behind.
+        for _ in 0..<100 where await !testLists().isSubset(of: before) { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(await testLists().isSubset(of: before))
     }
 
     /// Waits for the rule on `webView`'s scripts and rules to be `on`, as it's compiled or looked up.
