@@ -5,12 +5,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- Zigzag no longer asks you to add it in 1Password while 1Password works with it. The note now shows only when 1Password really turns Zigzag away, and not again once 1Password has connected that session.
-- The window's buttons at the top left stay put when you switch tabs or a page loads. The green one could jump up and to the left for a moment.
 ### New
 - The camera and the microphone are two permissions in Site Controls: a site asks for each on its own, one question after the other, and a call that wants both is allowed only when you've allowed both. Sites you allowed both before keep both. ([#243](https://github.com/ZigaoWang/zigzag/issues/243))
-- The address bar above the page shows the page's whole address, the site's name dark and the rest gray, as there's room for it; pop-up windows and Zigzag Mini do the same when they're wide enough. The sidebar keeps the site's name alone. A long address loses the end of its path first, never the site's name.
 
 ## [0.9.1] - 2026-11-15
 
@@ -23,6 +19,7 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - A video playing in the page you're on floats over everything in Picture in Picture when you switch to another app or desktop, a full screen app's too. Come back to its page and it goes back in; come back to another tab and it floats on until you go to its tab. Picture in Picture you started yourself stays as it is. Settings › Tabs › Picture in picture when you leave Zigzag turns it off. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
 - Groups of tabs: pick some tabs (⌘-click or ⇧-click their rows) and choose Group Tabs, or New Group with Tab on one tab, and they become a folder in the Tabs part of the sidebar, as pinned tabs have. It opens and closes with a click, renames from its menu, and keeps its tabs together: drag tabs onto it or among its tabs to put them in, drag them out to take them out, or drag the whole group somewhere else. Its menu also has Ungroup, Move to Space and Close Group, which closes its tabs, with Undo. Groups come back when you open Zigzag again, Clear keeps or closes a group as one, split views work inside one, and a group with no tabs left goes. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#209](https://github.com/ZigaoWang/zigzag/issues/209))
 - A new tab comes into the sidebar the way a closed one leaves it: the tabs below glide down to make room and its row opens as it fades in, whether you opened it with the keyboard, the pointer or a link. The same goes for a tab moved in and for a folder or group opening. With Reduce Motion it only fades in.
+- The address bar above the page shows the page's whole address, the site's name dark and the rest gray, as there's room for it; pop-up windows and Zigzag Mini do the same when they're wide enough. The sidebar keeps the site's name alone. A long address loses the end of its path first, never the site's name.
 
 ### Fixed
 - Text across Zigzag sits exactly in the middle of its buttons, fields and rows, measured by its capital letters, with icons lined up beside it and even spacing: the sidebar, panels, prompts, toasts, Settings, History and the other windows. Some of it sat up to a point low.
@@ -84,6 +81,8 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Downie and other extensions that add their right-click menu items once, when they're installed, keep them after you quit and reopen Zigzag, as in Chrome. Clicking Downie's button sends the page to Downie, asking first, instead of opening the extension's settings, and the question comes from the site you're on, so Always Open works there. ([#239](https://github.com/ZigaoWang/zigzag/issues/239))
 - Protect IP address from WebRTC asks a site about calls only once: Don't Allow is kept as the site's Block, and a question you put away isn't asked again in any tab until Zigzag reopens. The switch stays in Site Controls.
 - Swiping back or forward on a page shows a plain gray backdrop beside it, in light or dark, with a soft shadow along the page's edge, instead of a strip of the page's own colors that could show odd bands. The round arrow stays inside the page's card, never hanging over the sidebar, the next pane or the window's edge.
+- Zigzag no longer asks you to add it in 1Password while 1Password works with it. The note now shows only when 1Password really turns Zigzag away, and not again once 1Password has connected that session.
+- The window's buttons at the top left stay put when you switch tabs or a page loads. The green one could jump up and to the left for a moment.
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
