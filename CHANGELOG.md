@@ -5,18 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Disable Images and Disable Styles, under ⋯ among the developer tools, in View › Developer and the command bar, show how a page in Developer Mode holds up without its pictures or without its CSS. Like the other choices they're that tab's alone, except that a tab a page opens shares Disable Images with it: turned on or off in either, it is in both, and ⋯ shows it in each. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
-- A video playing in the page you're on floats over everything in Picture in Picture when you switch to another app or desktop, a full screen app's too. Come back to its page and it goes back in; come back to another tab and it floats on until you go to its tab. Picture in Picture you started yourself stays as it is. Settings › Tabs › Picture in picture when you leave Zigzag turns it off. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
-
-### Fixed
-- A PDF at an address without a file name, like a download link, is called by the name its site gave it, in its tab and in History, or by the site when it gave none, instead of the last part of the address.
-- A favorite or pinned tab made while its page was still loading, like en.wikipedia.org on its way to its Main Page, no longer shows as moved on from its page once it gets there. A favorite that did move on shows its own icon until the new page's icon is known, instead of a placeholder.
-- Sign-in fields no longer show the key icon when Fill saved passwords is off in Settings › Passwords, or when a password manager extension like Bitwarden or 1Password is on, where it sat over the extension's own icon. ([#236](https://github.com/ZigaoWang/zigzag/issues/236))
-- Space icons at the bottom of the sidebar follow Settings › Appearance › Sidebar size at every size, a step bigger than before at Small and Medium, and keep their size when you have many spaces: the row scrolls instead of shrinking them. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
-- DeepSeek no longer asks you to check your browser extensions in a tab that opened before ad blocking had its lists, or beside an ad blocker extension. Its blocked telemetry now always gets an empty answer while blocking is on, so nothing is sent. ([#208](https://github.com/ZigaoWang/zigzag/issues/208))
-- Backspace no longer takes a page back when no text field has the focus, as in Safari and Chrome. It still removes the rows you've picked in the sidebar.
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -24,6 +12,8 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 ### New
 - Protect IP address from WebRTC, in Settings › Privacy, keeps sites from learning your real IP address through WebRTC while you use a proxy or VPN. When it's on, WebRTC is off except on sites you allow: Site Controls › Permissions has a WebRTC row on every site, and a site that starts a call without it asks to Allow and Reload. Calls on Meet, Zoom, Teams or Discord work once the site is allowed. It's off unless you turn it on, and a private window follows it without remembering what you allow there. ([#229](https://github.com/ZigaoWang/zigzag/issues/229))
 - Right-clicking selected text that's a web address but not a link, like example.com in a post, offers Open and Open in New Tab, as Chrome's Go to does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#234](https://github.com/ZigaoWang/zigzag/issues/234))
+- Disable Images and Disable Styles, under ⋯ among the developer tools, in View › Developer and the command bar, show how a page in Developer Mode holds up without its pictures or without its CSS. Like the other choices they're that tab's alone, except that a tab a page opens shares Disable Images with it: turned on or off in either, it is in both, and ⋯ shows it in each. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
+- A video playing in the page you're on floats over everything in Picture in Picture when you switch to another app or desktop, a full screen app's too. Come back to its page and it goes back in; come back to another tab and it floats on until you go to its tab. Picture in Picture you started yourself stays as it is. Settings › Tabs › Picture in picture when you leave Zigzag turns it off. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
 
 ### Fixed
 - Text across Zigzag sits exactly in the middle of its buttons, fields and rows, measured by its capital letters, with icons lined up beside it and even spacing: the sidebar, panels, prompts, toasts, Settings, History and the other windows. Some of it sat up to a point low.
@@ -74,6 +64,12 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - A tab showing an error page, like a certificate warning, shows a warning icon instead of the icon of the page before it.
 - Buttons that can't be used yet, like Use Default Colors in the space editor, keep their text readable.
 - History lists a PDF by its file name instead of its site.
+- A PDF at an address without a file name, like a download link, is called by the name its site gave it, in its tab and in History, or by the site when it gave none, instead of the last part of the address.
+- A favorite or pinned tab made while its page was still loading, like en.wikipedia.org on its way to its Main Page, no longer shows as moved on from its page once it gets there. A favorite that did move on shows its own icon until the new page's icon is known, instead of a placeholder.
+- Sign-in fields no longer show the key icon when Fill saved passwords is off in Settings › Passwords, or when a password manager extension like Bitwarden or 1Password is on, where it sat over the extension's own icon. ([#236](https://github.com/ZigaoWang/zigzag/issues/236))
+- Space icons at the bottom of the sidebar follow Settings › Appearance › Sidebar size at every size, a step bigger than before at Small and Medium, and keep their size when you have many spaces: the row scrolls instead of shrinking them. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
+- DeepSeek no longer asks you to check your browser extensions in a tab that opened before ad blocking had its lists, or beside an ad blocker extension. Its blocked telemetry now always gets an empty answer while blocking is on, so nothing is sent. ([#208](https://github.com/ZigaoWang/zigzag/issues/208))
+- Backspace no longer takes a page back when no text field has the focus, as in Safari and Chrome. It still removes the rows you've picked in the sidebar.
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
