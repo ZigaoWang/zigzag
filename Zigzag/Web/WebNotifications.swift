@@ -89,10 +89,10 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
             // Only right after a click or key: the page's own word for it isn't enough, as a script can say anything.
             let clicked = body["gesture"] as? Bool == true && Date().timeIntervalSince(UndoClock.lastPageInput) < 5
             guard state == "default", clicked, !putOff.contains("\(tab.id)|\(origin)") else { return (state, nil) }
-            let answer = await SitePermissions.requestNotifications(origin: origin, window: tab.host?.hostWindow, isPrivate: tab.isPrivate, tab: tab)
-            if answer == nil { putOff.insert("\(tab.id)|\(origin)") }
+            let place = await SitePermissions.requestNotifications(origin: origin, window: tab.host?.hostWindow, isPrivate: tab.isPrivate, tab: tab)
+            if place == nil { putOff.insert("\(tab.id)|\(origin)") }
             // A private window asks, so the page isn't left waiting, but it still never shows one.
-            return (answer.map { $0 && !tab.isPrivate ? "granted" : "denied" } ?? "default", nil)
+            return (place.map { $0 != .blocked && !tab.isPrivate ? "granted" : "denied" } ?? "default", nil)
         case "show":
             guard permission(origin: origin, tab: tab) == "granted", let id = body["id"] as? String, let title = body["title"] as? String else { return (false, nil) }
             let shown = await show(id: id, title: title, body: body["body"] as? String ?? "", tag: body["tag"] as? String ?? "",
@@ -110,8 +110,13 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     }
 
     private func permission(origin: String, tab: Tab) -> String {
-        if tab.isPrivate { return "denied" }
-        return SitePermissions.notifications(origin: origin, tab: tab).map { $0 ? "granted" : "denied" } ?? "default"
+        guard let place = place(origin: origin, tab: tab) else { return "default" }
+        return place == .blocked ? "denied" : "granted"
+    }
+
+    /// Where this site's notifications go, as its answer says: nowhere in a private window, whatever is kept for it.
+    private func place(origin: String, tab: Tab) -> NotificationPlace? {
+        tab.isPrivate ? .blocked : SitePermissions.notificationPlace(origin: origin, tab: tab)
     }
 
     /// The frame's origin when it may use notifications: https (or http on this Mac), the page itself or a frame
@@ -126,15 +131,72 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
 
     // MARK: Showing
 
+    /// A site's notification, shown where its answer says it should be. A private window, a site with no answer and a
+    /// blocked site all end here as "no".
     private func show(id: String, title: String, body: String, tag: String, icon: URL?, silent: Bool,
                       origin: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) async -> Bool {
         guard !AppDelegate.isHostingTests else { return false }
         // The tab you're looking at already shows what it would say, as in Safari.
-        if NSApp.isActive, let controller = WindowManager.shared.keyController, controller.window?.isKeyWindow == true,
-           let shown = controller.tabManager.selectedTab, controller.tabManager.panes(of: shown).contains(where: { $0 === tab }) {
-            return true
+        if isTheOneInFront(tab) { return true }
+        switch place(origin: origin, tab: tab) {
+        case .inZigzag:
+            return showInZigzag(id: id, title: title, body: body, tab: tab, webView: webView, frame: frame)
+        case .onTheMac:
+            // The Mac's own switch is the Mac's business, not the site's: with it off, the notification shows in
+            // Zigzag rather than nowhere, which is where a site's notification used to go.
+            guard await authorize() else {
+                return showInZigzag(id: id, title: title, body: body, tab: tab, webView: webView, frame: frame)
+            }
+            return await showOnTheMac(id: id, title: title, body: body, tag: tag, icon: icon, silent: silent,
+                                      origin: origin, tab: tab, webView: webView, frame: frame)
+        case .blocked, nil:
+            return false
         }
-        guard await authorize() else { return false }
+    }
+
+    /// Whether this tab's page is the one you're looking at in the front window: what it has to say is already on
+    /// screen, so nothing is shown for it.
+    private func isTheOneInFront(_ tab: Tab) -> Bool {
+        guard NSApp.isActive, let controller = WindowManager.shared.keyController, controller.window?.isKeyWindow == true,
+              let shown = controller.tabManager.selectedTab else { return false }
+        return controller.tabManager.panes(of: shown).contains { $0 === tab }
+    }
+
+    /// A site's notification as a notice in Zigzag, for a site whose answer is "In Zigzag" — or one the Mac wouldn't
+    /// show. It goes in the window its tab is in, so a notification from a background window doesn't appear over the
+    /// page you're reading. Show brings that tab forward and tells the page it was clicked, as a Mac notification does;
+    /// × takes it away.
+    private func showInZigzag(id: String, title: String, body: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) -> Bool {
+        guard let controller = WindowManager.shared.promptHost(holding: tab) ?? WindowManager.shared.promptHost(for: tab.host?.hostWindow)
+        else { return false }
+        // A notification's body is its own second sentence; a long one is cut the way a banner's is.
+        let said = body.isEmpty ? title : String(localized: "\(title) — \(body)", comment: "A site's notification shown as a notice in Zigzag: what it says, then its body, with a dash between them. Both are the site's own words.")
+        controller.promptToast(String(said.prefix(300)), symbol: "bell.fill", image: tab.favicon, duration: 8,
+                              action: (String(localized: "Show", comment: "Button on a site's notification shown in Zigzag: brings its tab forward."),
+                                       { [weak tab, weak webView] in
+                                           if let tab { self.bringForward(tab) }
+                                           guard let webView else { return }
+                                           webView.callAsyncJavaScript("window.__zigzagNotification && window.__zigzagNotification(id, type)",
+                                                                       arguments: ["id": id, "type": "click"], in: frame, in: .page,
+                                                                       completionHandler: nil)
+                                       }),
+                              closes: true)
+        return true
+    }
+
+    /// Brings the tab a notification belongs to into the front window, wherever it is.
+    private func bringForward(_ tab: Tab) {
+        NSApp.activate()
+        guard let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.tab(with: tab.id) != nil })
+        else { return }
+        if controller.window?.isMiniaturized == true { controller.window?.deminiaturize(nil) }
+        controller.window?.makeKeyAndOrderFront(nil)
+        controller.tabManager.select(tab)
+    }
+
+    /// The Mac's own notification, in Notification Center, as every other app's is.
+    private func showOnTheMac(id: String, title: String, body: String, tag: String, icon: URL?, silent: Bool,
+                              origin: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) async -> Bool {
         let content = UNMutableNotificationContent()
         content.title = String(title.prefix(200))
         content.subtitle = SiteOrigin.label(origin)
@@ -280,13 +342,9 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         let entry = entries[key]
         entries[key] = nil
         if !dismissed {
-            NSApp.activate()
             let tabID = entry?.tabID ?? key.split(separator: "|").first.flatMap { UUID(uuidString: String($0)) }
-            if let tabID, let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.tab(with: tabID) != nil }),
-               let tab = controller.tabManager.tab(with: tabID) {
-                if controller.window?.isMiniaturized == true { controller.window?.deminiaturize(nil) }
-                controller.window?.makeKeyAndOrderFront(nil)
-                controller.tabManager.select(tab)
+            if let tabID, let tab = WindowManager.shared.controllers.compactMap({ $0.tabManager.tab(with: tabID) }).first {
+                bringForward(tab)
             }
         }
         guard let entry, let webView = entry.webView else { return }

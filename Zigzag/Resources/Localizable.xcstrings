@@ -8209,6 +8209,17 @@
         }
       }
     },
+    "In Zigzag" : {
+      "comment" : "A choice in the Notifications dropdown in Site Controls: the site's notifications show as a notice in Zigzag itself.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Zigzag 中"
+          }
+        }
+      }
+    },
     "In points, from %@ to %@." : {
       "comment" : "Note under the width and height fields in the sheet that asks for a page's size: the least and the most a side can be.",
       "localizations" : {
@@ -10942,6 +10953,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已为此网站打开"
+          }
+        }
+      }
+    },
+    "On the Mac" : {
+      "comment" : "A choice in the Notifications dropdown in Site Controls: the site's notifications show in the Mac's Notification Center.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Mac 上"
           }
         }
       }

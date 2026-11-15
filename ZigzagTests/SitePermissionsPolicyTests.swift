@@ -209,7 +209,7 @@ import WebKit
     /// offers the same three choices as every other row.
     @Test func downloadsAreARowInSiteControlsOnceTheSiteHasAnAnswer() throws {
         #expect(SitePermission.downloads.kinds == ["downloads"])
-        #expect(SitePermission.downloads.choices == PermissionChoice.allCases)
+        #expect(SitePermission.downloads.choices == PermissionChoice.ordinary)
         #expect(SitePermission.downloads.inPrivate, "a private window still asks")
         try withDefaults { _ in
             SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: "https://files.example")

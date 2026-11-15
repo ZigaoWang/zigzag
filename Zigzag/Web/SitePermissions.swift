@@ -298,7 +298,7 @@ enum SitePermissions {
     }
 
     /// Notifications: nil until the site has asked and you've answered.
-    static func notifications(origin: String) -> Bool? { allowed(action(PermissionSubject.notifications, origin: origin)) }
+    static func notifications(origin: String) -> Bool? { notificationPlace(origin: origin).map { $0 != .blocked } }
 
     static func setNotifications(_ allowed: Bool?, origin: String) { remember(action(for: allowed), subject: PermissionSubject.notifications, origin: origin) }
 
@@ -399,8 +399,15 @@ enum SitePermissions {
     /// WebRTC is never Ask: with nothing kept it's what the setting says (`WebRTCProtection`).
     static func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
         if permission == .webRTC { return WebRTCProtection.choice(origin: origin, in: nil) }
+        if permission == .notifications { return notificationChoice(origin: origin) }
         let now = stored
         return PermissionChoice(answers: keys(for: permission, on: origin).compactMap { allowed(now[$0]) })
+    }
+
+    /// Where this site's notifications show, as its row reads it. "allow" is what Zigzag saved before there were two
+    /// places, and meant the Mac's Notification Center; "toast" is a notice in Zigzag. Anything else is blocked.
+    static func notificationChoice(origin: String) -> PermissionChoice {
+        NotificationPlace(action: action(PermissionSubject.notifications, origin: origin)).map { $0.choice } ?? .ask
     }
 
     /// Ask forgets every answer kept for it on the site's page, its frames' too. Allow or Block is kept for the site,
@@ -413,10 +420,11 @@ enum SitePermissions {
             let action = allowed && permission == .popups ? "mini" : action(for: allowed)
             // Frames from elsewhere keep a key of their own; the site's own answer is one key for the permission.
             for k in existing where k.hasPrefix(origin + "|embed:") { now[k] = action }
-            now["\(origin)|\(permission.primaryKind)"] = action
+            now["\(origin)|\(permission.primaryKind)"] = permission == .notifications ? (choice.notificationPlace?.action ?? action) : action
         }
         stored = now
-        if permission == .notifications, choice != .allow { WebNotifications.shared.removeAll(origin: origin) }
+        // Turning notifications off, or moving them into Zigzag, takes down the ones the Mac is still showing.
+        if permission == .notifications, !choice.showsOnTheMac { WebNotifications.shared.removeAll(origin: origin) }
         if permission == .apps { ExternalLinks.forgetAnswers(origin: origin) }
     }
 
@@ -469,22 +477,36 @@ enum SitePermissions {
     /// The site's notification answer on `tab`'s page: Allow or Block kept for the site, else the answer given on
     /// this page.
     static func notifications(origin: String, tab: Tab?) -> Bool? {
-        notifications(origin: origin) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
+        notificationPlace(origin: origin, tab: tab).map { $0 != .blocked }
     }
 
-    /// Asked like the camera, the answer kept for the page that asked. A private window never shows them anyway.
-    static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
-        if let known = notifications(origin: origin, tab: tab) { return known }
+    /// Where a site's notifications show: what Site Controls keeps for it, else what this page was answered.
+    static func notificationPlace(origin: String, tab: Tab? = nil) -> NotificationPlace? {
+        NotificationPlace(action: action(PermissionSubject.notifications, origin: origin))
+            ?? tab.flatMap { NotificationPlace(action: $0.permissionAnswers.action(key: origin, kind: PermissionSubject.notifications)) }
+    }
+
+    /// Asked like the camera, and the answer is kept for the page. Not "this time" against "always": where a site's
+    /// notifications show is a setting rather than a grant, so the card offers no duration and the two places are
+    /// picked from its own dropdown — and Site Controls changes it afterwards, or does without it. A private window
+    /// never shows them anyway.
+    static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> NotificationPlace? {
+        if let known = notificationPlace(origin: origin, tab: tab) { return known }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
-                                                actions: [.deny, .allow], canRemember: true,
+                                                actions: [.deny, .allow], chooser: PermissionChoice.notificationPlaces, canRemember: false,
                                                 answered: {
                                                     knownAnswer(site: notifications(origin: origin),
-                                                                page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
+                                                                page: tab?.permissionAnswers.answer(key: origin, kind: PermissionSubject.notifications))
                                                 })
         guard let answer else { return nil }
-        return rememberAnswer(answer, subject: PermissionSubject.notifications, origin: origin, tab: tab, isPrivate: isPrivate)
+        // Where they show is what the dropdown picked; nothing picked (a debug answer, an older caller) is the quiet
+        // one, in Zigzag. The page keeps the answer so the rest of its own notifications go the same way.
+        let place: NotificationPlace = answer.action == "deny" ? .blocked : (NotificationPlace(action: answer.choice) ?? .inZigzag)
+        _ = rememberAnswer(PermissionAnswer(action: place.action, remember: false), subject: PermissionSubject.notifications,
+                           origin: origin, tab: tab, isPrivate: isPrivate)
+        return place
     }
 
     /// The location answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on this page.
@@ -616,8 +638,15 @@ enum SitePermission: String, CaseIterable {
     }
 
     /// What its dropdown offers. WebRTC is never asked about first: a page has it as it loads or not at all, so it's
-    /// Allow or Block, and with nothing chosen, what the setting says.
-    var choices: [PermissionChoice] { self == .webRTC ? [.allow, .block] : PermissionChoice.allCases }
+    /// Allow or Block, and with nothing chosen, what the setting says. Notifications offer the two places they can
+    /// show, since that is the whole answer rather than a duration.
+    var choices: [PermissionChoice] {
+        switch self {
+        case .webRTC: [.allow, .block]
+        case .notifications: [.ask, .inZigzag, .onTheMac, .block]
+        default: PermissionChoice.ordinary
+        }
+    }
 
     /// The one kind a choice made in Site Controls is kept as.
     var primaryKind: String { self == .cameraAndMicrophone ? "cameraAndMicrophone" : rawValue }
@@ -639,10 +668,57 @@ enum SitePermission: String, CaseIterable {
     }
 }
 
+/// Where a site's notifications show, once it may show them at all.
+nonisolated enum NotificationPlace: String, Sendable {
+    /// Not at all.
+    case blocked
+    /// As a notice in Zigzag itself, over the page it came from.
+    case inZigzag
+    /// In the Mac's Notification Center, as every other app's do.
+    case onTheMac
+
+    /// What it's kept as, in the same place every other permission answer is kept. "allow" is what Zigzag saved
+    /// before there were two places, and meant the Mac; both are read here, so nothing already answered changes.
+    var action: String {
+        switch self {
+        case .blocked: "deny"
+        case .inZigzag: "toast"
+        case .onTheMac: "system"
+        }
+    }
+
+    /// The answer this was kept as, or nil where nothing has been kept.
+    init?(action: String?) {
+        switch action {
+        case "toast": self = .inZigzag
+        case "allow", "system": self = .onTheMac
+        case "deny": self = .blocked
+        default: return nil
+        }
+    }
+
+    /// The same, as the dropdown in Site Controls reads it.
+    var choice: PermissionChoice {
+        switch self {
+        case .blocked: .block
+        case .inZigzag: .inZigzag
+        case .onTheMac: .onTheMac
+        }
+    }
+}
+
 /// A site's answer for one permission, as Site Controls' dropdown offers it: ask each time (nothing kept), allow, or
-/// block.
+/// block. Notifications have two kinds of yes — a notice in Zigzag, or the Mac's Notification Center — so the two sit
+/// beside Allow for that one permission and nowhere else.
 enum PermissionChoice: CaseIterable {
     case ask, allow, block
+    /// A notification shown in Zigzag itself, over the page it came from.
+    case inZigzag
+    /// A notification shown by the Mac, in Notification Center.
+    case onTheMac
+
+    /// What a permission's dropdown offers by default: ask, allow, block. Notifications add the two places.
+    static let ordinary: [PermissionChoice] = [.ask, .allow, .block]
 
     /// From the answers kept: none is Ask, all yes is Allow, and any no is Block.
     init(answers: [Bool]) {
@@ -653,15 +729,43 @@ enum PermissionChoice: CaseIterable {
     var allowed: Bool? {
         switch self {
         case .ask: nil
-        case .allow: true
+        case .allow, .inZigzag, .onTheMac: true
         case .block: false
+        }
+    }
+
+    /// Whether this choice lets the site do it, whichever way it means it: what the Permissions row counts as allowed.
+    var permits: Bool { allowed == true }
+
+    /// Whether the Mac shows this site's notifications, which is what delivering them there needs. Allow counts: a
+    /// site allowed before there were two places meant the Mac's.
+    var showsOnTheMac: Bool { notificationPlace == .onTheMac }
+
+    /// The place this choice means for a site's notifications: nil where the choice isn't about places at all (Ask).
+    /// Allow and On the Mac are the same thing: a site allowed before there were two places meant the Mac's.
+    var notificationPlace: NotificationPlace? {
+        switch self {
+        case .inZigzag: .inZigzag
+        case .onTheMac, .allow: .onTheMac
+        case .block: .blocked
+        case .ask: nil
+        }
+    }
+
+    /// The question's own dropdown for a site's notifications: the two places, worded as the row words them, each
+    /// carrying the answer it is kept as.
+    static var notificationPlaces: [PermissionAction] {
+        let places: [PermissionChoice] = [.inZigzag, .onTheMac]
+        return places.compactMap { choice in
+            guard let place = choice.notificationPlace else { return nil }
+            return PermissionAction.alternate(place.action, choice.title)
         }
     }
 
     /// A site's permissions in a few words, for the Permissions row: "2 allowed", "1 blocked", "2 allowed, 1 blocked",
     /// or Ask when nothing's decided.
     static func summary(_ choices: [PermissionChoice]) -> String {
-        let allowed = choices.filter { $0 == .allow }.count, blocked = choices.filter { $0 == .block }.count
+        let allowed = choices.filter(\.permits).count, blocked = choices.filter { $0 == .block }.count
         let allowedText = String(localized: "\(allowed) allowed", comment: "On the Permissions row of the site panel: how many permissions the site has been allowed.")
         let blockedText = String(localized: "\(blocked) blocked", comment: "On the Permissions row of the site panel: how many permissions the site has been blocked from.")
         switch (allowed > 0, blocked > 0) {
@@ -684,6 +788,8 @@ enum PermissionChoice: CaseIterable {
         case .ask: String(localized: "Ask", comment: "A choice in a permission's dropdown in Site Controls: the site asks each time.")
         case .allow: String(localized: "Allow", comment: "A choice in a permission's dropdown in Site Controls: the site may use it.")
         case .block: String(localized: "Block", comment: "A choice in a permission's dropdown in Site Controls: the site may not use it, and isn't asked about.")
+        case .inZigzag: String(localized: "In Zigzag", comment: "A choice in the Notifications dropdown in Site Controls: the site's notifications show as a notice in Zigzag itself.")
+        case .onTheMac: String(localized: "On the Mac", comment: "A choice in the Notifications dropdown in Site Controls: the site's notifications show in the Mac's Notification Center.")
         }
     }
 }

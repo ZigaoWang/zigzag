@@ -217,7 +217,7 @@ enum DebugBridge {
             let window = mini?.window ?? browser?.window
             Task {
                 let answer = await SitePermissions.requestNotifications(origin: origin, window: window, isPrivate: tab.isPrivate, tab: tab)
-                debugLog("miniask \(arg): \(answer.map { $0 ? "allowed" : "not allowed" } ?? "put off")")
+                debugLog("miniask \(arg): \(answer.map { $0 == .blocked ? "not allowed" : "allowed" } ?? "put off")")
             }
         case "minianswer":
             guard let host: PromptHost = mini ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { break }
