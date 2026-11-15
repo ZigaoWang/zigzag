@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// A page hears shortcuts before Zigzag's menus, as in Safari and Chrome, except the browser's own: tabs, windows, the
@@ -67,5 +68,18 @@ import Testing
         }
         #expect(!BrowserWindow.browserActions.contains("savePageAs:"))
         #expect(!BrowserWindow.browserActions.contains("selectAll:"))
+    }
+
+    /// WKWebView goes Back on ⌫ (Forward on ⇧⌫) when no field has the focus, as Safari did years ago; every page's
+    /// preferences have that turned off.
+    @Test func backspaceNeverGoesBack() {
+        let key = "backspaceKeyNavigationEnabled"
+        let preferences = WKPreferences()
+        // WebKit's own default, so this checks the key WebKit reads.
+        #expect(preferences.value(forKey: key) as? Bool == true)
+        WebKitSetup.turnOffBackspaceNavigation(preferences)
+        #expect(preferences.value(forKey: key) as? Bool == false)
+        // A page's new window gets a copy of its opener's preferences.
+        #expect((preferences.copy() as? WKPreferences)?.value(forKey: key) as? Bool == false)
     }
 }

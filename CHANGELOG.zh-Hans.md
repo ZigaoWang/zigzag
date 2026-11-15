@@ -21,6 +21,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “设置 › 密码”里关闭“填写存储的密码”后，或者开着 Bitwarden、1Password 这类密码管理器扩展时，登录输入框里不再显示钥匙图标，它之前会盖住扩展自己的图标。([#236](https://github.com/ZigaoWang/zigzag/issues/236))
 - 边栏底部的空间图标在每种“边栏大小”下都会跟着变，“小”和“中”都比以前大一点；空间很多时图标也保持这个大小，放不下就左右滚动，不再缩小。感谢 [alextend](https://github.com/alextend)。([#238](https://github.com/ZigaoWang/zigzag/issues/238))
 - DeepSeek 不会再让你检查浏览器插件了，包括广告拦截还没拿到规则列表时就打开的标签页，以及装了广告拦截扩展的情况。拦截开着时，它被拦下的遥测请求总会得到一个空回应，什么都不会发出去。([#208](https://github.com/ZigaoWang/zigzag/issues/208))
+- 没有选中输入框时按删除键，页面不会再后退了，和 Safari、Chrome 一样。在侧边栏选中多行时，删除键仍会移除这些行。
 
 ## [0.9.1] - 2026-11-15
 

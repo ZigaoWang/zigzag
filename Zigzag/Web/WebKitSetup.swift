@@ -49,6 +49,12 @@ enum WebKitSetup {
         WKPreferences.instancesRespond(to: NSSelectorFromString("_set" + key.prefix(1).uppercased() + key.dropFirst() + ":"))
     }
 
+    /// WKWebView still goes Back on ⌫ (and Forward on ⇧⌫) when no field has the focus; Safari and Chrome dropped that
+    /// years ago, so a ⌫ that misses a text box would leave the page you were on.
+    static func turnOffBackspaceNavigation(_ preferences: WKPreferences) {
+        setIfAvailable(false, key: "backspaceKeyNavigationEnabled", in: preferences)
+    }
+
     /// Applies our defaults. Popup configurations handed to us by WebKit already carry most of these.
     static func configure(_ configuration: WKWebViewConfiguration, for profile: Profile) {
         configuration.websiteDataStore = profile.store
@@ -66,6 +72,7 @@ enum WebKitSetup {
         // Bilibili say they "don't support it" and View › Picture in Picture finds nothing to float. Pages still need
         // a click to float a video.
         setIfAvailable(true, key: "allowsPictureInPictureMediaPlayback", in: configuration.preferences)
+        turnOffBackspaceNavigation(configuration.preferences)
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.upgradeKnownHostsToHTTPS = true
         configuration.preferences.setValue(true, forKey: "developerExtrasEnabled")

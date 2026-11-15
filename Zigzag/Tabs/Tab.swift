@@ -462,6 +462,7 @@ final class Tab: NSObject {
         if fromWebKit { WebKitSetup.separatePreferences(of: configuration) }
         if extensionConfiguration != nil {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
+            WebKitSetup.turnOffBackspaceNavigation(configuration.preferences)
         } else if !fromWebKit {
             WebKitSetup.configure(configuration, for: profile)
             WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
