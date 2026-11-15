@@ -143,7 +143,24 @@ enum DownloadHandoff {
                 cookieFile = file
             }
         }
+        announce(rule, askingOn: rule, action: rule.action, values: values, secret: secret, request: request)
         return await run(rule.action, values: values, secret: secret, request: request, rule: rule, cookieFile: cookieFile)
+    }
+
+    /// Says what a rule is about to do, where its tab is — in the window holding it, so a rule that fires in a
+    /// background tab says so there rather than in the one you are looking at. Before the action runs, because what
+    /// the notice needs to know is what is *about* to happen, and because a slow action shouldn't hold the notice back.
+    /// Nothing is said where the firing shows something of its own (see `HandoffNotice.line`).
+    ///
+    /// `named` is the rule the notice puts a name to; `askingOn` is the rule an Open URL would keep a chosen place on,
+    /// which is the same rule for a rule's own firing and **nil** for a script's answer. They part company exactly
+    /// there, and it matters: an answer's Open URL with no place opens in a new tab and must be announced, where a
+    /// rule's would ask, and the question is then the sighting.
+    private static func announce(_ named: DownloadRule?, askingOn rule: DownloadRule?, action: DownloadRuleAction,
+                                values: HandoffValues, secret: String, request: Request) {
+        guard let line = HandoffNotice.line(for: named, askingOn: rule, action: action, values: values, secret: secret),
+              let host = handoffHost(for: request) else { return }
+        host.promptAutomation(line, symbol: action.kind.symbol)
     }
 
     /// Runs one action with the values at hand: what `perform` does for a rule, and what a script's own answer is run
@@ -190,8 +207,11 @@ enum DownloadHandoff {
         case .refused(let why):
             report(.failed(why), rule: rule, url: values.link, isPrivate: request.isPrivate, window: request.window)
         case .action(let action):
-            // A script's answer has no rule of its own, so it gets none to remember a place on (`rule: nil`): an Open
-            // URL in it opens in a new tab unless the answer's own JSON names a place.
+            // An answer is a firing like any other, and announced the same way — the rule named is the script's, since
+            // that is the rule that acted. It has no rule to remember a place on (`askingOn: nil`, and `rule: nil` to
+            // `run`): a script's answer can't keep a choice on a rule that didn't make it, so an Open URL in it opens
+            // in a new tab unless its own JSON names a place.
+            announce(rule, askingOn: nil, action: action, values: values, secret: secret, request: request)
             let outcome = await run(action, values: values, secret: secret, request: request, rule: nil, cookieFile: nil)
             report(outcome, rule: rule, request: request)
         }
@@ -266,7 +286,7 @@ enum DownloadHandoff {
             return .failed(String(localized: "The URL isn’t valid.", comment: "Why a download rule failed: the URL it was told to open can't be made."))
         }
         guard OpenInZigzag.handles(url) else { return openWithTheSystem(url) }
-        var place = action.openIn ?? (rule == nil ? .newTab : nil)
+        var place = action.place(askingOn: rule)
         if place == nil, let rule { place = await askWhereToOpen(rule: rule, request: request) }
         // Put off, or nowhere to ask and nowhere to show it: the link or the file is left as if no rule had it.
         guard let place, let host = WindowManager.shared.promptHost(for: request.window) else { return .noMatch }
