@@ -1645,8 +1645,8 @@ extension Tab: WKNavigationDelegate {
                 changed.send(.favicon)
             }
             committedURL = url
-            // What the developer tools put into a page itself (its outlines) goes into the new one, now that the
-            // tab knows whether this is a development page.
+            // How the developer tools have a page drawn (its styles, its outlines) goes to the new one, now that the
+            // tab knows whether this is a development page: never to the one it left while this was on its way.
             if !developer.isUnchanged { applyDeveloperStateToPage() }
             // A private window's zoom isn't saved for the site, so it lasts while you stay on that site in this tab.
             let host = HistoryStore.normalizedHost(url)

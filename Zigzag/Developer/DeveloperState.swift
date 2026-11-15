@@ -90,26 +90,29 @@ extension Tab {
         return developerInEffect(at: url).appearance.name
     }
 
-    /// Puts the choices in effect on the page: when one changes, when the web view's address does, when the tab
-    /// becomes or stops being a development tab, and for a new web view. One path for all of them, so the page is
-    /// never left with a choice nothing shows.
+    /// Puts the choices in effect on the page that loads: when one changes, when the web view's address does, when
+    /// the tab becomes or stops being a development tab, and for a new web view. What it's told and given as it loads
+    /// (its user agent, its images), and the look it's asked for. One path for all of them, so the page is never left
+    /// with a choice nothing shows.
     func applyDeveloperState() {
         guard let webView else { return }
         let state = developerInEffect(at: webView.url ?? url)
-        let media: String? = state.printStyles ? "print" : nil
-        if webView.mediaType != media { webView.mediaType = media }
         if (webView.customUserAgent ?? "") != (state.userAgent.string ?? "") { webView.customUserAgent = state.userAgent.string }
-        PageStyles.set(!state.stylesOff, in: webView.configuration.preferences)
         PageImages.set(state.imagesOff, in: webView)
         DarkPages.lookChanged(for: webView)
     }
 
-    /// Puts into the page that's here what the developer tools put into a page itself (its outlines): once it has
-    /// arrived, and when the choice changes. Never by the address a web view is going to: the page still showing
-    /// would get it.
+    /// Puts on the page that's here how the developer tools have it drawn (its styles, for print or none, and its
+    /// outlines): once it has arrived (`didCommit`), and when a choice changes or the tab becomes or stops being a
+    /// development tab. Never by the address a web view is going to: the page still showing would be drawn as the
+    /// next one, without its styles while it waits.
     func applyDeveloperStateToPage() {
         guard let webView else { return }
-        PageOutlines.set(developerInEffect.outlines, in: webView)
+        let state = developerInEffect
+        let media: String? = state.printStyles ? "print" : nil
+        if webView.mediaType != media { webView.mediaType = media }
+        PageStyles.set(!state.stylesOff, in: webView.configuration.preferences)
+        PageOutlines.set(state.outlines, in: webView)
     }
 
     /// Whether a page being gone to has to be asked for again: the web view asked for it as the browser the page
@@ -129,7 +132,7 @@ extension Tab {
 /// (`authorAndUserStylesEnabled`, unpublished, so offered only where this WebKit has it). It takes every author style
 /// with it, the ones Zigzag puts in a page included, and goes and comes back at once. WebKit lists it as the app's own
 /// to set (an "embedder" feature), so Settings' Feature Flags never shows or sets it. It's the tab's web view's
-/// (`Tab.applyDeveloperState`); no other page shares them, not even one this page opened
+/// (`Tab.applyDeveloperStateToPage`, as each page arrives); no other page shares them, not even one this page opened
 /// (`WebKitSetup.separatePreferences`).
 enum PageStyles {
     static let key = "authorAndUserStylesEnabled"

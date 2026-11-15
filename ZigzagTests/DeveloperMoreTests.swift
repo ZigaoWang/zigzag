@@ -250,6 +250,26 @@ struct DeveloperMoreTests {
         }
     }
 
+    @Test func stylesGoWithThePageThatArrivesNotTheAddressOnItsWay() {
+        withDefaults {
+            let tab = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
+            let webView = tab.ensureWebView()
+            let preferences = webView.configuration.preferences
+            tab.developer.stylesOff = true
+            tab.developer.printStyles = true
+            #expect(preferences.value(forKey: PageStyles.key) as? Bool == false && webView.mediaType == "print")
+            // The address the web view goes to is off the list, as when you leave for another site: the page still
+            // showing stays as it's drawn until the new one comes.
+            DevelopmentSites.sites = ["127.0.0.1"]
+            tab.applyDeveloperState()
+            #expect(preferences.value(forKey: PageStyles.key) as? Bool == false && webView.mediaType == "print")
+            // The new page arrives, off the list: it has its styles.
+            tab.refreshDevelopment()
+            #expect(preferences.value(forKey: PageStyles.key) as? Bool == true && webView.mediaType == nil)
+            tab.close()
+        }
+    }
+
     @Test func aPageAnotherOpenedHasPreferencesOfItsOwn() {
         withDefaults {
             // The page that opens it has styles off; WebKit hands over a configuration sharing its preferences.
