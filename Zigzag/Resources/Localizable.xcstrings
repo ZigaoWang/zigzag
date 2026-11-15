@@ -16109,6 +16109,28 @@
         }
       }
     },
+    "Stop the page" : {
+      "comment" : "Label of the switch in a download rule's sheet that keeps the page from loading on after the rule has taken a link.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止页面"
+          }
+        }
+      }
+    },
+    "Stop the page: a link this rule takes goes no further — nothing else loads, and the page's own redirects don't run the rule again." : {
+      "comment" : "Explanation under the stop-the-page switch in a download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止页面：此规则接管的链接不会继续，其他内容不再加载，页面自身的重定向也不会再次触发规则。"
+          }
+        }
+      }
+    },
     "Stored by Websites" : {
       "comment" : "A heading in Settings › Privacy: what each site keeps on this Mac, with a Remove button each.",
       "localizations" : {

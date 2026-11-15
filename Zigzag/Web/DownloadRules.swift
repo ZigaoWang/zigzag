@@ -66,6 +66,11 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     var pattern = ""
     /// Regex and text both follow the case switch. A host is case-insensitive, so a rule for YouTube needn't say so.
     var isCaseSensitive = false
+    /// When this rule takes a link, the page it was on goes no further: the tab doesn't load or follow the address
+    /// it was going to. Off (the default) means the link carries on where the rule let it — in the browser, or
+    /// nowhere at all where the rule handed it off. On is for a rule that catches a whole site's clicks, where the
+    /// page's own loads and redirects would otherwise keep matching it.
+    var stopsThePage = false
     var action: DownloadRuleAction
 
     /// A regex that doesn't compile is kept as typed but never matches, so a half-written rule can't catch anything.
@@ -188,7 +193,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, action
+        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, stopsThePage, action
     }
 
     /// Older files may lack a key a newer Zigzag added: the defaults stand in, so one unreadable rule never throws
@@ -202,6 +207,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         match = try container.decodeIfPresent(Match.self, forKey: .match) ?? .contains
         pattern = try container.decodeIfPresent(String.self, forKey: .pattern) ?? ""
         isCaseSensitive = try container.decodeIfPresent(Bool.self, forKey: .isCaseSensitive) ?? false
+        stopsThePage = try container.decodeIfPresent(Bool.self, forKey: .stopsThePage) ?? false
         action = try container.decodeIfPresent(DownloadRuleAction.self, forKey: .action) ?? DownloadRuleAction(kind: .openURL)
     }
 }
