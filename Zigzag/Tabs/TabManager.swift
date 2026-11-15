@@ -12,10 +12,11 @@ final class TabManager {
         case content
     }
 
-    private(set) var tabsBySpace: [UUID: [Tab]] = [:]
-    private(set) var bookmarkTabs: [UUID: Tab] = [:]
+    // What extensions are told of the tabs is worked out from these three (`extensionList`): any change starts it over.
+    private(set) var tabsBySpace: [UUID: [Tab]] = [:] { didSet { extensionLists.removeAll() } }
+    private(set) var bookmarkTabs: [UUID: Tab] = [:] { didSet { extensionLists.removeAll() } }
     private var selectedBySpace: [UUID: UUID] = [:]
-    private(set) var currentSpaceID: UUID
+    private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll() } }
     /// Most recently used first. Drives Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
     private var closedTabs: [ClosedTab] = []
@@ -97,7 +98,7 @@ final class TabManager {
         currentSpaceID = requested ?? Library.shared.spaces[0].id
         libraryToken = Library.shared.changed.observe { [weak self] in
             // Favorites and pinned pages count among the navigable tabs.
-            self?.extensionPlaces.removeAll()
+            self?.extensionLists.removeAll()
             self?.libraryDidChange()
             Brand.libraryChanged()
         }
@@ -518,23 +519,38 @@ final class TabManager {
         return favoriteLive + bookmarkLive + currentTabs
     }
 
-    /// Each tab's place among the navigable tabs one set of extensions sees, for `indexInWindow`: WebKit asks it of
-    /// every tab each time an extension lists tabs, and each answer went through the whole list again (#89). Worked
-    /// out once for the burst: kept until the turn of the run loop ends or anything here changes.
-    private var extensionPlaces: [ObjectIdentifier: [ObjectIdentifier: Int]] = [:]
+    /// The navigable tabs one set of extensions sees, and each one's place among them, for `tabs(for:)` and
+    /// `indexInWindow`: WebKit asks for them with every message an extension sends from a page, and of every tab each
+    /// time an extension lists tabs, and each answer went through the whole list again (#89). Worked out once and kept
+    /// until anything here or in the library changes, or `extensionListLifetime` passes: a loop of messages (thousands
+    /// a second) asked each time.
+    private var extensionLists: [ObjectIdentifier: (tabs: [Tab], places: [ObjectIdentifier: Int])] = [:]
+    private var extensionListsMade: TimeInterval = 0
     private var placesToken: SignalToken?
+    /// How long a worked-out list stands with no change heard: a backstop for one that isn't announced, short enough
+    /// that an extension never sees an old order for long.
+    static let extensionListLifetime: TimeInterval = 1
+
+    private func extensionList(seenBy key: ObjectIdentifier, isSeen: (Tab) -> Bool) -> (tabs: [Tab], places: [ObjectIdentifier: Int]) {
+        let now = ProcessInfo.processInfo.systemUptime
+        if now - extensionListsMade > Self.extensionListLifetime { extensionLists.removeAll() }
+        if extensionLists.isEmpty {
+            placesToken = placesToken ?? changed.observe { [weak self] _ in self?.extensionLists.removeAll() }
+            extensionListsMade = now
+        }
+        if let list = extensionLists[key] { return list }
+        let tabs = navigableTabs.filter(isSeen)
+        let list = (tabs, Self.places(tabs))
+        extensionLists[key] = list
+        return list
+    }
 
     func extensionPlace(of tab: Tab, seenBy key: ObjectIdentifier, isSeen: (Tab) -> Bool) -> Int? {
-        if extensionPlaces.isEmpty {
-            placesToken = placesToken ?? changed.observe { [weak self] _ in self?.extensionPlaces.removeAll() }
-            DispatchQueue.main.async { [weak self] in
-                MainActor.assumeIsolated { self?.extensionPlaces.removeAll() }
-            }
-        }
-        if let places = extensionPlaces[key] { return places[ObjectIdentifier(tab)] }
-        let places = Self.places(navigableTabs.filter(isSeen))
-        extensionPlaces[key] = places
-        return places[ObjectIdentifier(tab)]
+        extensionList(seenBy: key, isSeen: isSeen).places[ObjectIdentifier(tab)]
+    }
+
+    func extensionTabs(seenBy key: ObjectIdentifier, isSeen: (Tab) -> Bool) -> [Tab] {
+        extensionList(seenBy: key, isSeen: isSeen).tabs
     }
 
     /// Where each item is in the list: its first place, as `firstIndex` would say.
