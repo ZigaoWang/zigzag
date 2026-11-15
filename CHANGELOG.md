@@ -9,6 +9,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Groups of tabs: pick some tabs (⌘-click or ⇧-click their rows) and choose Group Tabs, or New Group with Tab on one tab, and they become a folder in the Tabs part of the sidebar, as pinned tabs have. It opens and closes with a click, renames from its menu, and keeps its tabs together: drag tabs onto it or among its tabs to put them in, drag them out to take them out, or drag the whole group somewhere else. Its menu also has Ungroup, Move to Space and Close Group, which closes its tabs, with Undo. Groups come back when you open Zigzag again, Clear keeps or closes a group as one, split views work inside one, and a group with no tabs left goes. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#209](https://github.com/ZigaoWang/zigzag/issues/209))
 - A new tab comes into the sidebar the way a closed one leaves it: the tabs below glide down to make room and its row opens as it fades in, whether you opened it with the keyboard, the pointer or a link. The same goes for a tab moved in and for a folder or group opening. With Reduce Motion it only fades in.
 
+### Fixed
+- Panels, menus, toasts, sheets and a site's dialogs come and go with one calm, consistent motion. A page's dialog fades in and out like the other sheets, the dimming behind a sheet or a peek fades with it, a tab's preview and the password menu grow out of what they belong to, a click right after closing one reaches what's under it, and Reduce Motion is respected.
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.

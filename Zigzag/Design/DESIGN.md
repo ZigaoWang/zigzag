@@ -253,8 +253,10 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
 - Showing up and going: one vocabulary, `Motion.present(_:from:entering:)`, and `FloatingPanelView.present` and
   `dismiss` on it. Where a thing lives decides where it comes from (`Motion.Origin`):
   - `.point`: a menu, popover or panel grows out of the control that opened it (`growsFrom`), from `enterScale`
-    (0.96) with a fade, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). A sheet grows from a little
-    below its middle (`sheetOrigin`), its scrim fading in `enter` and out in `exit`.
+    (0.96) with a fade, in `enter` (180ms) on the house ease-out (0.23, 1, 0.32, 1). A field's menu grows from its
+    edge facing the field (`grow(from:)`), a tab's hover preview from its side facing the sidebar, at the row's
+    height. A sheet, a page's dialog too, grows from a little below its middle (`sheetOrigin`), its scrim fading in
+    `enter` and out in `exit` (`Motion.fadeBackdrop`); the dimming under a peek fades with its card the same way.
   - `.edge`: a bar that hangs from an edge slides `edgeOffset` (6pt) in from it: the find bar (⌘F) and a toast
     from the page's top, the Desk's and a PDF's bars from the bottom.
   - `.offstage`: a notice from outside (a site's question, Save password?, an offer) comes down from beyond the
@@ -262,6 +264,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   - `.inPlace`: what stands in for something under it (the address being edited) only fades.
   Leaving is quicker and subtler, two thirds to three quarters: `exit` (120ms) toward 0.98, or half the edge offset.
   The fade runs a touch quicker than the movement coming in, so it's solid before it settles.
+  Whatever is on its way out (a panel, a menu, a toast, a sheet and its scrim) takes no more clicks: they reach
+  what's under it at once, so a quick click after closing never lands on something already leaving.
 - The selected tab's card slides: picking another row with the pointer, the card travels there from the row it was
   on (`SelectionCardView`, `Motion.selection`, eased out), and the new row takes it over when it lands. A click
   mid-slide carries on from where the card is. From the keyboard, with Reduce Motion or while dragging, it lands.
