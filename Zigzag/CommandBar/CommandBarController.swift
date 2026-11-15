@@ -68,11 +68,13 @@ final class CommandRowView: InteractiveView {
         let side = Tokens.Metric.favicon
         icon.frame = NSRect(x: inset, y: (bounds.height - side) / 2, width: side, height: side)
         symbolView.frame = icon.frame
-        let showAction = isSelected && !action.stringValue.isEmpty
-        action.isHidden = !showAction
-        returnKey.isHidden = !showAction
+        let hasAction = !action.stringValue.isEmpty
+        action.isHidden = !(isSelected && hasAction)
+        returnKey.isHidden = action.isHidden
         var right = bounds.width - inset
-        if showAction {
+        // The action shows on the chosen row only, but its room is kept on every row that has one: the title and
+        // what's beside it never cut shorter as the choice moves onto them.
+        if hasAction {
             let kw = returnKey.width, kh = Tokens.Metric.keyCapHeight
             returnKey.frame = NSRect(x: right - kw, y: round((bounds.height - kh) / 2), width: kw, height: kh)
             let w = action.textWidth
