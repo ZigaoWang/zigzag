@@ -184,6 +184,8 @@ final class ExtensionHost: NSObject {
     let changed = Signal<Void>()
     /// Answers the Chrome APIs WebKit doesn't have, for this profile's extensions.
     private(set) lazy var bridge = ExtensionBridge(host: self)
+    /// Content scripts held back for reconnecting in a loop (ConnectGuard).
+    private(set) lazy var storms = ExtensionStorms(host: self)
     /// Passes its two signals on to the ones views watch for any profile (ExtensionCenter).
     private var forwarding: [SignalToken] = []
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
