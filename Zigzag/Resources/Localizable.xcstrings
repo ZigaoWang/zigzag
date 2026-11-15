@@ -3821,6 +3821,17 @@
         }
       }
     },
+    "Checking for updates…" : {
+      "comment" : "Toast while Zigzag › Check for Updates… looks for a new version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在检查更新…"
+          }
+        }
+      }
+    },
     "Checking…" : {
       "comment" : "On the certificate page of the site panel, while the certificate is read.",
       "localizations" : {
@@ -5101,6 +5112,17 @@
         }
       }
     },
+    "Couldn’t check for updates. Try again later." : {
+      "comment" : "Toast when Check for Updates… or Restart to Update can't reach the update feed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法检查更新，请稍后再试。"
+          }
+        }
+      }
+    },
     "Couldn’t delete it. Try again." : {
       "comment" : "Toast in the Passwords window when a login couldn't be deleted.",
       "localizations" : {
@@ -5933,6 +5955,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已下载“%@”"
+          }
+        }
+      }
+    },
+    "Downloading Zigzag %@…" : {
+      "comment" : "Toast while Check for Updates… downloads a new version. The placeholder is the version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载 Zigzag %@…"
           }
         }
       }
@@ -9843,7 +9876,7 @@
       }
     },
     "Not Now" : {
-      "comment" : "Answer in the welcome window’s default browser step.\nButton in the Import window: close it without importing.\nButton in the note shown after an update: puts it away.\nButton in the save-password prompt.\nButton that leaves an extension's update waiting.\nTooltip of the close button on a toast that offers something, like translating the page.\nTooltip of the close button on the bar over a Chrome Web Store page.\nTooltip of the × on a site's permission question.",
+      "comment" : "Answer in the welcome window’s default browser step.\nButton in the Import window: close it without importing.\nButton in the note shown after an update: puts it away.\nButton in the save-password prompt.\nButton that leaves an extension's update waiting.\nTooltip and VoiceOver action of the close button on the sidebar's update card: puts the card away; the update installs when Zigzag quits.\nTooltip of the close button on a toast that offers something, like translating the page.\nTooltip of the close button on the bar over a Chrome Web Store page.\nTooltip of the × on a site's permission question.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13112,6 +13145,17 @@
         }
       }
     },
+    "Restart" : {
+      "comment" : "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动"
+          }
+        }
+      }
+    },
     "Restart Now" : {
       "comment" : "Button of the sheet after picking a language in Settings › General.",
       "localizations" : {
@@ -13130,6 +13174,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要以%@重新启动 Zigzag 吗？"
+          }
+        }
+      }
+    },
+    "Restart to Update" : {
+      "comment" : "Zigzag menu item in place of Check for Updates… while an update is ready: restarts Zigzag into it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动以更新"
           }
         }
       }
@@ -17419,6 +17474,17 @@
         }
       }
     },
+    "Update ready" : {
+      "comment" : "The sidebar's card for an update that's downloaded and ready: Restart installs it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新已就绪"
+          }
+        }
+      }
+    },
     "Update wants more access" : {
       "comment" : "Under an extension's name in Settings › Extensions.",
       "localizations" : {
@@ -17861,6 +17927,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "版本 %1$@（%2$@）"
+          }
+        }
+      }
+    },
+    "Version %@ is ready to install. You have %@." : {
+      "comment" : "Under Zigzag's name in Settings › General while an update is ready, beside Restart. The placeholders are the new version and the one running.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ is ready to install. You have %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本 %1$@ 已可安装，当前是 %2$@。"
           }
         }
       }
@@ -18696,6 +18779,28 @@
         }
       }
     },
+    "Zigzag %@ is ready." : {
+      "comment" : "Toast after Check for Updates… has downloaded a new version. The placeholder is the version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag %@ 已就绪。"
+          }
+        }
+      }
+    },
+    "Zigzag %@ is ready. Restart to update." : {
+      "comment" : "Tooltip and VoiceOver label of the sidebar's update card. The placeholder is the version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag %@ 已就绪，重新启动即可更新。"
+          }
+        }
+      }
+    },
     "Zigzag Mini" : {
       "comment" : "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.",
       "localizations" : {
@@ -18900,6 +19005,17 @@
         }
       }
     },
+    "Zigzag is up to date." : {
+      "comment" : "Toast after Check for Updates… finds no newer version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 已是最新版本。"
+          }
+        }
+      }
+    },
     "Zigzag is your default browser" : {
       "comment" : "In Settings › General, in place of Set as Default once it's done.",
       "localizations" : {
@@ -18973,6 +19089,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 不会打开此端口"
+          }
+        }
+      }
+    },
+    "Zigzag would restart into %@ now." : {
+      "comment" : "Debug builds only: toast after Restart on a pretend update. The placeholder is its version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 现在会重新启动到 %@。"
           }
         }
       }

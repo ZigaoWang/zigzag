@@ -188,6 +188,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.nowPlaying.onHide = { [weak self] in self?.hideNowPlaying() }
         sidebar.nowPlaying.onRightClick = { [weak self] _ in self?.nowPlayingMenu() }
+        // An update that's ready shows in every window's sidebar, private ones too: it's for all of Zigzag, and
+        // restarting closes a private window as quitting does.
+        sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
+        sidebar.updateCard.onHide = { Updater.shared.dismissCard() }
+        sidebar.setUpdateReady(Updater.shared.readiness.showsCard ? Updater.shared.readiness.staged?.version : nil)
+        tokens.append(Updater.changed.observe { [weak self] in
+            guard let self else { return }
+            let readiness = Updater.shared.readiness
+            // Closed in this window: it goes as a closed card does; in the others it fades.
+            let hiding = readiness.staged != nil && !readiness.showsCard && self.window?.isKeyWindow == true
+            self.sidebar.setUpdateReady(readiness.showsCard ? readiness.staged?.version : nil, hiding: hiding)
+        })
         sidebar.reloadButton.onClick = { [weak self] _ in
             guard let tab = self?.tabManager.selectedTab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()

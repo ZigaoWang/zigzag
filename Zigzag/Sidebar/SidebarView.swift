@@ -778,6 +778,8 @@ final class SidebarView: NSView {
     /// the space you're in in view, with their ends faded.
     private let dotStrip = DotStrip()
     let nowPlaying = NowPlayingView()
+    /// An update that's ready, right above the dots: Restart restarts into it.
+    let updateCard = UpdateCard()
 
     /// A circle with an arrow, drawn in code so the progress ring lies exactly on the circle: one center, one size.
     let downloadsButton: IconButton = {
@@ -908,6 +910,8 @@ final class SidebarView: NSView {
 
         nowPlaying.isHidden = true
         addSubview(nowPlaying)
+        updateCard.isHidden = true
+        addSubview(updateCard)
 
         bottomBar.addSubview(dotStrip)
         bottomBar.addSubview(downloadsButton)
@@ -1053,6 +1057,7 @@ final class SidebarView: NSView {
             : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         let frames = bottomFrames()
         nowPlaying.frame = frames.nowPlaying
+        updateCard.frame = frames.update
         let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
         updateTopSeparator()
@@ -1358,15 +1363,54 @@ final class SidebarView: NSView {
     var newSpaceAnchor: NSView { newSpaceButton }
     var onEditSpace: ((UUID) -> Void)?
 
-    /// The bottom stack: the now-playing control sits above the dots.
-    private func bottomFrames() -> (nowPlaying: NSRect, listBottom: CGFloat) {
+    /// The bottom stack: an update that's ready sits right above the dots, where it stays put, and the now-playing
+    /// control, which comes and goes more often, above that.
+    private func bottomFrames() -> (nowPlaying: NSRect, update: NSRect, listBottom: CGFloat) {
         let pad = Tokens.Sidebar.edge
         var bottom = bottomBar.frame.minY
+        let updateHeight = Tokens.Sidebar.nowPlayingHeight
+        let update = NSRect(x: pad, y: bottom - (updateCard.isHidden ? 0 : updateHeight), width: bounds.width - pad * 2, height: updateHeight)
+        if !updateCard.isHidden { bottom = update.minY - Tokens.Space.x1 }
         let playingHeight = Tokens.Sidebar.nowPlayingHeight
         let playing = NSRect(x: pad, y: bottom - (nowPlaying.isHidden ? 0 : playingHeight), width: bounds.width - pad * 2, height: playingHeight)
         if !nowPlaying.isHidden { bottom = playing.minY - Tokens.Space.x1 }
-        return (playing, bottom)
+        return (playing, update, bottom)
     }
+
+    /// Shows the update card for the version that's ready, or puts it away (nil); `hiding`: you closed it, so it goes
+    /// as a closed Now Playing card does.
+    func setUpdateReady(_ version: String?, hiding: Bool = false) {
+        if let version { updateCard.show(version: version) }
+        let show = version != nil
+        guard show == (updateCard.isHidden || updateCardFadingOut) else { return }
+        updateCardFadingOut = false
+        if show {
+            Tokens.Motion.settle(updateCard)
+            updateCard.isHidden = false
+            needsLayout = true
+            updateCard.alphaValue = 0
+            Tokens.Motion.animate(Tokens.Motion.change) { self.updateCard.animator().alphaValue = 1 }
+            return
+        }
+        updateCardFadingOut = true
+        let done: @MainActor () -> Void = {
+            guard self.updateCardFadingOut else { return }
+            self.updateCardFadingOut = false
+            self.updateCard.isHidden = true
+            self.updateCard.isHovered = false
+            Tokens.Motion.settle(self.updateCard)
+            self.updateCard.alphaValue = 1
+            self.needsLayout = true
+        }
+        if hiding {
+            if Tokens.Motion.isFromKey { done(); return }
+            Tokens.Motion.present(updateCard, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: false) { MainActor.assumeIsolated { done() } }
+            return
+        }
+        Tokens.Motion.animate(Tokens.Motion.leaving, { self.updateCard.animator().alphaValue = 0 }, completion: done)
+    }
+
+    private var updateCardFadingOut = false
 
     /// Shows (or hides) the now-playing control, making room above the dots. `hiding`: you hid it, so it's put away,
     /// a touch smaller as it fades (the present role going; with Reduce Motion only the fade, from a key at once).

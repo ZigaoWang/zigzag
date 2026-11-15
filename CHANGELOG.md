@@ -9,6 +9,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The first time a link from another app or a script opens as a new tab, Zigzag offers once to open such links in Zigzag Mini instead. Use Zigzag Mini turns that on and moves the page into a Zigzag Mini window; it's also in Settings › Zigzag Mini. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 - Find on Page (⌘F) works in Zigzag Mini, with the same bar and marks as in a browser window. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 - Zigzag Mini opens at the size you last made it. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- An update that's ready shows at the foot of the sidebar, in every window, with its version and a Restart that restarts into it with your windows and tabs as they were. Close it and it waits until Zigzag quits, as before; Zigzag › Check for Updates… reads Restart to Update meanwhile, and Settings › General says the version is ready. Zigzag now looks for updates every few hours and after your Mac wakes, quietly, and when a newer version comes out while one is waiting, the newer one takes its place. Check for Updates… answers in a toast instead of a window.
 
 ### Fixed
 - A page saved on your Mac that a script or another app opens, like a chart from Python's `webbrowser.open("file:///…/plot.html")`, opens in Zigzag (or Zigzag Mini) instead of nothing. Only HTML, SVG and PDF files, never folders or other files.

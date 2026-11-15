@@ -455,6 +455,8 @@ extension AppDelegate: NSMenuItemValidation {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
         // Zigzag Mini names it Open in Zigzag while it's in front; anywhere else it's itself again.
         if menuItem.action == #selector(openDocument(_:)) { menuItem.title = BrowserWindowController.openFileTitle }
+        // Restart to Update while an update is ready, which it then does.
+        if menuItem.action == #selector(checkForUpdates(_:)) { menuItem.title = Updater.shared.menuTitle }
         if menuItem.action == #selector(reopenClosedTab(_:)) {
             let manager = (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first)?.tabManager
             return manager?.canReopenClosedTab ?? WindowManager.shared.canReopenClosedWindow

@@ -16,6 +16,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 其他 App 或脚本打开的链接第一次以新标签页打开时，Zigzag 会问一次要不要改为在 Zigzag Mini 中打开这类链接。点“使用 Zigzag Mini”就会打开这个设置，并把这个页面移到 Zigzag Mini 窗口里；“设置 › Zigzag Mini”里也能随时开关。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 - Zigzag Mini 里也能用“在页面中查找”（⌘F），查找栏和标记都和浏览器窗口里一样。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 - Zigzag Mini 会按你上次调整的大小打开。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- 更新下载好后，每个窗口的边栏底部都会显示“更新已就绪”和版本号，点“重新启动”就会更新，窗口和标签页都原样回来。关掉它的话，更新会像以前一样在退出 Zigzag 时安装；这期间“Zigzag › 检查更新…”会变成“重新启动以更新”，“设置 › 通用”里也会显示新版本已可安装。Zigzag 现在每隔几小时、以及 Mac 唤醒后都会悄悄检查更新；等待安装期间如果又出了更新的版本，会换成更新的那个。“检查更新…”的结果改用提示条显示，不再弹窗。
 
 ### 修复
 - 脚本或其他 App 打开 Mac 上保存的网页（比如 Python 用 `webbrowser.open("file:///…/plot.html")` 打开的图表）时，会在 Zigzag（或 Zigzag Mini）里打开，不再没反应。只限 HTML、SVG 和 PDF 文件，不会打开文件夹或其他文件。

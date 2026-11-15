@@ -335,14 +335,35 @@ final class FormRow: NSView, SettingsSearchable {
 /// The version of Zigzag you have, at the end of General: a quiet row like the rest, so the page's one brand moment
 /// is the wordmark by its title.
 enum SettingsVersionRow {
+    /// Says when an update is ready, with Restart in place of Check for Updates…, as it comes and goes.
     static func make() -> FormRow {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-        let update = PillButton(title: String(localized: "Check for Updates…", comment: "Button in Settings › General, beside Zigzag's version."))
+        let update = PillButton(title: checkTitle)
         update.onClick = { _ in Updater.shared.checkForUpdates() }
-        let row = FormRow(title: "Zigzag", detail: String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General."), control: update)
+        let row = FormRow(title: "Zigzag", detail: "", control: update)
         row.keywords = String(localized: "check for updates", comment: "Words that find the version row with Find a setting in Settings. Not shown.")
+        let refresh = { [weak row, weak update] in
+            guard let row, let update else { return }
+            let ready = Updater.shared.readiness.staged?.version
+            row.detailText = detail(ready: ready)
+            update.title = ready == nil ? checkTitle
+                : String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General.")
+        }
+        refresh()
+        // Kept with the row, for as long as Settings keeps it.
+        objc_setAssociatedObject(row, &watchKey, Updater.changed.observe { refresh() }, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         return row
     }
+
+    /// What's under Zigzag's name: its version, and the one that's ready when there is one.
+    static func detail(ready: String?) -> String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        guard let ready else { return String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General.") }
+        return String(localized: "Version \(ready) is ready to install. You have \(version).",
+                      comment: "Under Zigzag's name in Settings › General while an update is ready, beside Restart. The placeholders are the new version and the one running.")
+    }
+
+    private static var checkTitle: String { String(localized: "Check for Updates…", comment: "Button in Settings › General, beside Zigzag's version.") }
+    private static var watchKey = 0
 
     /// Betas first, for those who want to try new versions on their own tabs and data.
     static func betas() -> FormRow {

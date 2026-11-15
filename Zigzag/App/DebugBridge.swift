@@ -525,6 +525,18 @@ enum DebugBridge {
         if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         if name == "pageprobe" { pageProbe(arg); return }
+        // updateready <version>|off: the sidebar's update card, Restart to Update and Settings' row for a pretend
+        // update (Restart only says what it would do); updatedismiss: the card's close button; updatestate <path>:
+        // the menu item's title and what's staged (JSON).
+        if name == "updateready" { Updater.shared.debugStage(arg == "off" || arg.isEmpty ? nil : arg); return }
+        if name == "updatedismiss" { Updater.shared.dismissCard(); return }
+        if name == "updatestate" {
+            let readiness = Updater.shared.readiness
+            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard,
+                                        "shown": !controller.sidebar.updateCard.isHidden, "frame": NSStringFromRect(controller.sidebar.updateCard.frame)]
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
+            return
+        }
         if name == "speval" {
             // speval <path> <script>: the script's result in the side panel's page, which it may await, written to
             // the file with the panel's address; without bringing the window forward.
