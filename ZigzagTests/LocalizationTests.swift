@@ -54,6 +54,31 @@ struct LocalizationTests {
         #expect(stale.isEmpty, "Stale in the catalog, run scripts/sync-strings.sh: \(stale.sorted().prefix(20))")
     }
 
+    /// Simplified Chinese puts a space between Chinese characters and Latin letters or digits ("Zigzag 里", "2019 的
+    /// Mac"), never next to full-width punctuation, as Apple's own Chinese does. Placeholders are left as they are,
+    /// since what fills them may be Chinese.
+    @Test func chineseSpacesLatinAndDigits() throws {
+        let strings = try Self.catalog()
+        let gap = try NSRegularExpression(pattern: #"[\u4E00-\u9FFF][A-Za-z0-9]|[A-Za-z0-9][\u4E00-\u9FFF]"#)
+        let placeholder = try NSRegularExpression(pattern: #"%(\d+\$)?(lld|ld|d|@|f|\.\d+f|#@[A-Za-z]+@)"#)
+        func values(_ any: Any?) -> [String] {
+            guard let dict = any as? [String: Any] else { return [] }
+            var out: [String] = []
+            if let unit = dict["stringUnit"] as? [String: Any], let value = unit["value"] as? String { out.append(value) }
+            for (_, nested) in dict where nested is [String: Any] { out += values(nested) }
+            return out
+        }
+        var missing: [String] = []
+        for (_, entry) in strings {
+            let zh = ((entry as? [String: Any])?["localizations"] as? [String: Any])?["zh-Hans"]
+            for value in values(zh) {
+                let plain = placeholder.stringByReplacingMatches(in: value, range: NSRange(value.startIndex..., in: value), withTemplate: "§")
+                if gap.firstMatch(in: plain, range: NSRange(plain.startIndex..., in: plain)) != nil { missing.append(value) }
+            }
+        }
+        #expect(missing.isEmpty, "Chinese without a space beside Latin letters or digits: \(missing.prefix(10))")
+    }
+
     /// No control, menu item, tooltip or accessibility label is set from a bare English literal: each goes through
     /// String(localized:). Debug-only code is left out.
     @Test func noBareStringsInControls() {
