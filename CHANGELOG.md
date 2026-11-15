@@ -21,6 +21,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Restart to Update says it couldn't check for updates when Zigzag can't install the update right then, instead of doing nothing.
 - Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
 - A page's preview no longer comes up beside the menu when you right-click it in the sidebar.
+- ⌘Z after Use Zigzag Mini takes the whole choice back: the page goes back to its tab, and links from other apps open as tabs again.
 
 ## [0.9.1] - 2026-11-15
 
