@@ -86,6 +86,7 @@ Zigzag connects to on its own.
 | **Site Controls** | One panel per site: zoom, permissions, the certificate, extensions, and switches for dark pages, ad blocking and cookie pop-ups. |
 | **Extensions** | From the Chrome Web Store, where the store's own button reads Add to Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
 | **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen and Orion. |
+| **Download rules** | Hand a link or a download to an app, a script, or a download manager, by what it matches — after asking once per site. See [docs/download-rules.md](docs/download-rules.md). |
 | **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
 | **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
 | **Languages** | English and Simplified Chinese. |
