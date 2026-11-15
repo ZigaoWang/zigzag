@@ -2075,8 +2075,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             stack.spacing = Tokens.Space.x2
             let spaces = library.spaces(in: profile.id).count
             let extensions = Profiles.shared.profile(profile.id).installs.installedIDs.count
-            let detail = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it."),
-                                     String(localized: "\(extensions) extensions", comment: "Under a profile's name in Settings › Profiles: how many extensions it has.")])
+            // No "0 extensions": a profile without any says only its spaces.
+            let detail = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it.")]
+                                    + (extensions == 0 ? [] : [String(localized: "\(extensions) extensions", comment: "Under a profile's name in Settings › Profiles: how many extensions it has.")]))
             let row = FormRow(title: profile.displayName, detail: detail, icon: ProfileSheets.tile(for: profile), control: stack)
             if let trash { row.revealsOnHover(trash) }
             profilesGroup.add(row)
