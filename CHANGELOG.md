@@ -5,13 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Groups of tabs: pick some tabs (⌘-click or ⇧-click their rows) and choose Group Tabs, or New Group with Tab on one tab, and they become a folder in the Tabs part of the sidebar, as pinned tabs have. It opens and closes with a click, renames from its menu, and keeps its tabs together: drag tabs onto it or among its tabs to put them in, drag them out to take them out, or drag the whole group somewhere else. Its menu also has Ungroup, Move to Space and Close Group, which closes its tabs, with Undo. Groups come back when you open Zigzag again, Clear keeps or closes a group as one, split views work inside one, and a group with no tabs left goes. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#209](https://github.com/ZigaoWang/zigzag/issues/209))
-- A new tab comes into the sidebar the way a closed one leaves it: the tabs below glide down to make room and its row opens as it fades in, whether you opened it with the keyboard, the pointer or a link. The same goes for a tab moved in and for a folder or group opening. With Reduce Motion it only fades in.
-
-### Fixed
-- Panels, menus, toasts, sheets and a site's dialogs come and go with one calm, consistent motion. A page's dialog fades in and out like the other sheets, the dimming behind a sheet or a peek fades with it, a tab's preview and the password menu grow out of what they belong to, a click right after closing one reaches what's under it, and Reduce Motion is respected.
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -21,6 +14,8 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Right-clicking selected text that's a web address but not a link, like example.com in a post, offers Open and Open in New Tab, as Chrome's Go to does. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#234](https://github.com/ZigaoWang/zigzag/issues/234))
 - Disable Images and Disable Styles, under ⋯ among the developer tools, in View › Developer and the command bar, show how a page in Developer Mode holds up without its pictures or without its CSS. Like the other choices they're that tab's alone, except that a tab a page opens shares Disable Images with it: turned on or off in either, it is in both, and ⋯ shows it in each. ([#141](https://github.com/ZigaoWang/zigzag/issues/141))
 - A video playing in the page you're on floats over everything in Picture in Picture when you switch to another app or desktop, a full screen app's too. Come back to its page and it goes back in; come back to another tab and it floats on until you go to its tab. Picture in Picture you started yourself stays as it is. Settings › Tabs › Picture in picture when you leave Zigzag turns it off. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
+- Groups of tabs: pick some tabs (⌘-click or ⇧-click their rows) and choose Group Tabs, or New Group with Tab on one tab, and they become a folder in the Tabs part of the sidebar, as pinned tabs have. It opens and closes with a click, renames from its menu, and keeps its tabs together: drag tabs onto it or among its tabs to put them in, drag them out to take them out, or drag the whole group somewhere else. Its menu also has Ungroup, Move to Space and Close Group, which closes its tabs, with Undo. Groups come back when you open Zigzag again, Clear keeps or closes a group as one, split views work inside one, and a group with no tabs left goes. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#209](https://github.com/ZigaoWang/zigzag/issues/209))
+- A new tab comes into the sidebar the way a closed one leaves it: the tabs below glide down to make room and its row opens as it fades in, whether you opened it with the keyboard, the pointer or a link. The same goes for a tab moved in and for a folder or group opening. With Reduce Motion it only fades in.
 
 ### Fixed
 - Text across Zigzag sits exactly in the middle of its buttons, fields and rows, measured by its capital letters, with icons lined up beside it and even spacing: the sidebar, panels, prompts, toasts, Settings, History and the other windows. Some of it sat up to a point low.
@@ -77,6 +72,7 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Space icons at the bottom of the sidebar follow Settings › Appearance › Sidebar size at every size, a step bigger than before at Small and Medium, and keep their size when you have many spaces: the row scrolls instead of shrinking them. Thanks to [alextend](https://github.com/alextend). ([#238](https://github.com/ZigaoWang/zigzag/issues/238))
 - DeepSeek no longer asks you to check your browser extensions in a tab that opened before ad blocking had its lists, or beside an ad blocker extension. Its blocked telemetry now always gets an empty answer while blocking is on, so nothing is sent. ([#208](https://github.com/ZigaoWang/zigzag/issues/208))
 - Backspace no longer takes a page back when no text field has the focus, as in Safari and Chrome. It still removes the rows you've picked in the sidebar.
+- Panels, menus, toasts, sheets and a site's dialogs come and go with one calm, consistent motion. A page's dialog fades in and out like the other sheets, the dimming behind a sheet or a peek fades with it, a tab's preview and the password menu grow out of what they belong to, a click right after closing one reaches what's under it, and Reduce Motion is respected.
 
 - A one-page PDF stays in the middle with Two Pages on, instead of sitting alone on the right like a book's first page.
 - A strong password from Use Strong Password stays in Passwords until a newer one for the same account takes its place, however long the site takes to confirm it. Unconfirmed ones are no longer deleted after two weeks.
