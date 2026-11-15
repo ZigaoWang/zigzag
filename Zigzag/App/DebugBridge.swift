@@ -249,8 +249,10 @@ enum DebugBridge {
             guard let item = NSApp.mainMenu.flatMap(find(in:)), let action = item.action else { debugLog("minimenu \(arg): no item"); break }
             var responder: NSResponder? = window.firstResponder ?? window
             while let r = responder, !r.responds(to: action) { responder = r.nextResponder }
-            let target: AnyObject? = responder ?? (NSApp.responds(to: action) ? NSApp : NSApp.delegate as AnyObject?)
-            let enabled = (target as? NSMenuItemValidation)?.validateMenuItem(item) ?? true
+            let delegate = (NSApp.delegate as AnyObject?).flatMap { $0.responds(to: action) ? $0 : nil }
+            let target: AnyObject? = responder ?? (NSApp.responds(to: action) ? NSApp : delegate)
+            // Nothing takes it: the menu item is dimmed, as it would be for a real key.
+            let enabled = target != nil && ((target as? NSMenuItemValidation)?.validateMenuItem(item) ?? true)
             if enabled { NSApp.sendAction(action, to: target, from: item) }
             debugLog("minimenu \(arg): item=\(item.title) target=\(target.map { "\(type(of: $0))" } ?? "nil") enabled=\(enabled)")
         case "ministate":
