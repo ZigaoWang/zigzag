@@ -254,6 +254,46 @@ struct DownloadRuleTests {
         #expect(DownloadRulesStore.destination(in: [destination("pdf", enabled: false)], url: file, filename: "a.pdf") == nil)
     }
 
+    // MARK: Where a destination puts the file
+
+    /// A folder destination saves into the folder the rule names, under the file's own name; there is nothing to
+    /// decide when the folder is empty or has gone, and Zigzag's own showing saves where it always would.
+    @Test func aDestinationIsReadAsAPlaceToSave() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zz-dest-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let there = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
+        #expect(there?.destination == folder.appendingPathComponent("report.pdf"))
+        #expect(there?.show == false, "a folder destination saves, it never opens")
+
+        // The file's name is made safe, as every download's is.
+        #expect(DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "a/b:c.pdf")?.destination
+                == folder.appendingPathComponent("a-b-c.pdf"))
+
+        // A name already taken there is not overwritten.
+        let taken = folder.appendingPathComponent("report.pdf")
+        try Data("one".utf8).write(to: taken)
+        let second = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
+        #expect(second?.destination == folder.appendingPathComponent("report 2.pdf"))
+
+        // A folder still being downloaded into is not chosen either.
+        let busy = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf",
+                                         avoiding: [folder.appendingPathComponent("report 2.pdf").path])
+        #expect(busy?.destination == folder.appendingPathComponent("report 3.pdf"))
+
+        // Nothing to decide: no folder named, one that doesn't exist, and one that is really a file.
+        #expect(DownloadManager.place(for: .folder(""), folder: "", filename: "a.pdf") == nil)
+        #expect(DownloadManager.place(for: .folder("/no/such/folder"), folder: "/no/such/folder", filename: "a.pdf") == nil)
+        let aFile = folder.appendingPathComponent("notafolder")
+        try Data("x".utf8).write(to: aFile)
+        #expect(DownloadManager.place(for: .folder(aFile.path), folder: aFile.path, filename: "a.pdf") == nil)
+
+        // Show in Zigzag saves where it would have gone anyway, and says to show it once it's here.
+        let shown = DownloadManager.place(for: .show, folder: "ignored", filename: "report.pdf")
+        #expect(shown?.show == true)
+        #expect(shown?.destination.lastPathComponent == "report.pdf")
+    }
     /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be shown by Zigzag.
     @Test func aDestinationSaysWhatItIsAndNeedsItsFolder() {
         #expect(DownloadRuleAction.Kind.saveToFolder.isDestination)
