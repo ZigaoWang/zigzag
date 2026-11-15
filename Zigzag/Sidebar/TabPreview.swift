@@ -160,11 +160,29 @@ final class TabPreviewController {
     weak var debugRow: NSView?
     #endif
 
-    init(controller: BrowserWindowController) { self.controller = controller }
+    /// A menu is open (a row's right-click menu, or the menu bar): no preview beside it, half under it.
+    private var menuOpen = false
+    // Set once in init and only let go in deinit.
+    nonisolated(unsafe) private var menuTokens: [NSObjectProtocol] = []
+
+    init(controller: BrowserWindowController) {
+        self.controller = controller
+        let center = NotificationCenter.default
+        menuTokens = [
+            center.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.menuOpen = true; self?.hide() }
+            },
+            center.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.menuOpen = false }
+            },
+        ]
+    }
+
+    deinit { menuTokens.forEach(NotificationCenter.default.removeObserver) }
 
     func hover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
-        // No preview over an open panel, or for a tab under the mini player while you point at it or drag it.
-        guard controller?.hasFloatingPanel != true, controller?.miniPlayer.isUnderPointer != true, let row, tab != nil || bookmark != nil else {
+        // No preview over an open panel or menu, or for a tab under the mini player while you point at it or drag it.
+        guard !menuOpen, controller?.hasFloatingPanel != true, controller?.miniPlayer.isUnderPointer != true, let row, tab != nil || bookmark != nil else {
             // One about to appear doesn't: leaving the row, or starting to drag it, means you've moved on.
             showWork?.cancel()
             showWork = nil
@@ -185,7 +203,7 @@ final class TabPreviewController {
             let work = DispatchWorkItem { [weak self, weak row] in
                 MainActor.assumeIsolated {
                     // Pressed meanwhile (a click or the start of a drag): no preview.
-                    guard let self, let row, self.isPointer(over: row), NSEvent.pressedMouseButtons == 0,
+                    guard let self, let row, !self.menuOpen, self.isPointer(over: row), NSEvent.pressedMouseButtons == 0,
                           self.controller?.miniPlayer.isUnderPointer != true else { return }
                     self.present(tab, bookmark: bookmark, row: row)
                 }
