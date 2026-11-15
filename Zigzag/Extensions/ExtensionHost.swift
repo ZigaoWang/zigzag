@@ -110,17 +110,25 @@ struct KeepAlivePorts<Port: AnyObject> {
 /// The helper turns a browser away with a `BrowserVerificationFailed` reply, but not only when you haven't added it:
 /// it also says so when the 1Password app is slow to check Zigzag's signature (starting up, waking, locked), and a
 /// one-off message can be turned away while the connection beside it works. So a turn-away only counts when nothing
-/// gets through for a few seconds after it, and never once anything has: 1Password working, with Zigzag in its
-/// browser list, kept showing the note to add Zigzag.
+/// gets through for a few seconds after it: 1Password working, with Zigzag in its browser list, kept showing the
+/// note to add Zigzag. Only replies a trusted browser hears count as getting through; a type Zigzag doesn't know
+/// proves nothing either way.
 struct OnePasswordTrust {
     enum Reply: Equatable {
         /// Turned away: Zigzag may not be in 1Password's list of browsers.
         case turnedAway
         /// Something only a trusted browser hears (the app's lock state, a new client, autofill).
         case connected
-        /// Said either way: the app quit, went offline, or couldn't be reached.
+        /// Said either way (the app quit, went offline, or couldn't be reached), or a reply Zigzag doesn't know.
         case other
     }
+
+    /// The replies the helper sends only to a browser it trusts, as 1Password's helper has been seen to send them.
+    static let trustedTypes: Set<String> = ["Success", "ClientCreated", "LockStateChanged", "AutofillChangeEvent",
+                                            "AutofillItemUpdated", "SecurityReviewEligibility"]
+    /// The replies said whether or not the app trusts Zigzag.
+    static let neutralTypes: Set<String> = ["Offline", "AppQuit", "BrowserHelperNotRegistered", "MainAppNotRunning", "MainAppOpenTimeout",
+                                            "CannotOpenMainApp", "LostConnectionToApp", "Error", "Failure"]
 
     /// How long a turn-away waits for another connection to get through before it's shown.
     static let grace: TimeInterval = 5
@@ -132,15 +140,18 @@ struct OnePasswordTrust {
     }
 
     static func reply(_ type: String) -> Reply {
-        switch type {
-        case "BrowserVerificationFailed": .turnedAway
-        case "Offline", "AppQuit", "BrowserHelperNotRegistered", "MainAppNotRunning", "MainAppOpenTimeout",
-             "CannotOpenMainApp", "LostConnectionToApp", "Error", "Failure": .other
-        default: .connected
-        }
+        if type == "BrowserVerificationFailed" { return .turnedAway }
+        return trustedTypes.contains(type) ? .connected : .other
     }
 
-    /// Something got through this session.
+    /// A type neither trusted nor neutral, heard for the first time this session: worth a line in the log.
+    mutating func isNewUnknown(_ type: String) -> Bool {
+        guard type != "BrowserVerificationFailed", !Self.trustedTypes.contains(type), !Self.neutralTypes.contains(type) else { return false }
+        return unknownTypes.insert(String(type.prefix(64))).inserted
+    }
+    private var unknownTypes: Set<String> = []
+
+    /// Something got through, and nothing's been turned away since.
     private(set) var connected = false
     /// When it was first turned away, with nothing through since.
     private(set) var turnedAwayAt: Date?
@@ -152,7 +163,9 @@ struct OnePasswordTrust {
             connected = true
             turnedAwayAt = nil
         case .turnedAway:
-            if !connected, turnedAwayAt == nil { turnedAwayAt = now }
+            // Even after a connection: if nothing gets through within `grace`, 1Password stopped trusting Zigzag.
+            connected = false
+            if turnedAwayAt == nil { turnedAwayAt = now }
         case .other:
             break
         }
@@ -160,7 +173,7 @@ struct OnePasswordTrust {
 
     /// Whether Zigzag needs adding in 1Password: turned away at least `grace` ago, and nothing through since.
     func needsAdding(at now: Date = Date()) -> Bool {
-        guard !connected, let turnedAwayAt else { return false }
+        guard let turnedAwayAt else { return false }
         return now.timeIntervalSince(turnedAwayAt) >= Self.grace
     }
 
@@ -1037,21 +1050,19 @@ final class ExtensionHost: NSObject {
     fileprivate func nativeHostReplied(_ message: Any, for id: String) {
         guard id == ExtensionStore.onePasswordID, let type = OnePasswordTrust.type(of: message) else { return }
         if type != "Success" { ExtensionLog.write("1Password app replied: \(type)") }
+        if Self.onePasswordTrust.isNewUnknown(type) { ExtensionLog.write("1Password reply type \(type) isn't known; not taken as trusted") }
         let reply = OnePasswordTrust.reply(type)
         let wasConnected = Self.onePasswordTrust.connected
         Self.onePasswordTrust.heard(reply)
         switch reply {
         case .connected:
-            // It trusts Zigzag: no note about adding it, in any profile, for the rest of the session.
+            // It trusts Zigzag: no note about adding it, in any profile, unless it turns Zigzag away again.
             guard !wasConnected else { return }
             for profile in Profiles.shared.all {
                 profile.startedExtensions?.setAttention(nil, for: id)
             }
         case .turnedAway:
-            if wasConnected {
-                ExtensionLog.write("1Password turned one connection away after another got through; not asking to add Zigzag")
-                return
-            }
+            if wasConnected { ExtensionLog.write("1Password turned a connection away after another got through; asking only if nothing gets through") }
             // Given a moment: another connection getting through means this was the app being slow, not untrusting.
             DispatchQueue.main.asyncAfter(deadline: .now() + OnePasswordTrust.grace + 0.1) { [weak self] in
                 self?.askToAddIfStillTurnedAway(for: id)

@@ -3,8 +3,8 @@ import Testing
 @testable import Zigzag
 
 /// The note to add Zigzag in 1Password shows only when the 1Password app really turns Zigzag away: not when one
-/// connection is turned away while another works, not when a later one gets through, and never again in a session
-/// once one has.
+/// connection is turned away while another works, not when a later one gets through, and after one has, only when
+/// nothing gets through again. A reply Zigzag doesn't know proves nothing.
 struct OnePasswordTrustTests {
     private static func message(_ type: String) -> [String: Any] {
         ["callbackId": 1, "content": ["content": ["type": type, "content": [String: Any]()]]]
@@ -21,7 +21,7 @@ struct OnePasswordTrustTests {
 
     @Test func onlyTheVerificationFailureTurnsAway() {
         #expect(OnePasswordTrust.reply("BrowserVerificationFailed") == .turnedAway)
-        for type in ["Success", "ClientCreated", "LockStateChanged", "AutofillChangeEvent", "SecurityReviewEligibility"] {
+        for type in ["Success", "ClientCreated", "LockStateChanged", "AutofillChangeEvent", "AutofillItemUpdated", "SecurityReviewEligibility"] {
             #expect(OnePasswordTrust.reply(type) == .connected)
         }
         // Said whether or not the app trusts Zigzag: neither proves it.
@@ -54,14 +54,40 @@ struct OnePasswordTrustTests {
         do { let told = trust.tell(at: start.addingTimeInterval(60)); #expect(!told) }
     }
 
-    /// Once anything got through, no turn-away later in the session asks again.
-    @Test func neverAsksAfterAConnection() {
+    /// After a connection, a turn-away that something gets through right after doesn't ask.
+    @Test func aTurnAwayAfterAConnectionWithAnotherThroughDoesntAsk() {
         var trust = OnePasswordTrust()
         trust.heard(.connected, at: start)
         trust.heard(.turnedAway, at: start.addingTimeInterval(3600))
+        trust.heard(.connected, at: start.addingTimeInterval(3603))
         #expect(trust.connected)
         #expect(!trust.needsAdding(at: start.addingTimeInterval(7200)))
         do { let told = trust.tell(at: start.addingTimeInterval(7200)); #expect(!told) }
+    }
+
+    /// After a connection, a turn-away with nothing through for the whole grace: 1Password stopped trusting Zigzag.
+    @Test func aTurnAwayAfterAConnectionWithNothingThroughAsks() {
+        var trust = OnePasswordTrust()
+        trust.heard(.connected, at: start)
+        trust.heard(.turnedAway, at: start.addingTimeInterval(3600))
+        #expect(!trust.connected)
+        #expect(!trust.needsAdding(at: start.addingTimeInterval(3603)))
+        // Something only said either way doesn't stop it.
+        trust.heard(.other, at: start.addingTimeInterval(3602))
+        #expect(trust.needsAdding(at: start.addingTimeInterval(3600 + OnePasswordTrust.grace)))
+    }
+
+    /// A reply type Zigzag doesn't know, heard before a turn-away (a handshake), proves nothing: the note still shows.
+    @Test func anUnknownReplyIsntTrust() {
+        #expect(OnePasswordTrust.reply("HelloThere") == .other)
+        var trust = OnePasswordTrust()
+        trust.heard(OnePasswordTrust.reply("Handshake"), at: start)
+        #expect(!trust.connected)
+        trust.heard(.turnedAway, at: start.addingTimeInterval(1))
+        #expect(trust.needsAdding(at: start.addingTimeInterval(1 + OnePasswordTrust.grace)))
+        // Logged once a session, and never for a type that's known.
+        let logged = ["Handshake", "Handshake", "LockStateChanged", "Offline", "BrowserVerificationFailed"].map { trust.isNewUnknown($0) }
+        #expect(logged == [true, false, false, false, false])
     }
 
     /// Added in 1Password after being turned away: the next connection clears the note.
