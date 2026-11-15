@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A long download name or command bar title no longer cuts shorter when you point at its row or move onto it, and a cut download name shows whole in a tooltip. Not secure in Site Controls and a failed extension install read clearly on light backgrounds, and a profile without extensions no longer says 0 extensions.
+- A window Zigzag reopens shows its tab, address and split view from its first frame, instead of a blank address for a moment, and the spaces in Switch Space… (⌥⌘S) have their names in the middle of their rows.
 
 ## [0.9.1] - 2026-11-15
 
