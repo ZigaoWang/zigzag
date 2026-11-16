@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- In full screen, the close, minimize and full screen buttons that come down with the menu bar have a bar behind them again, instead of floating over the page when the sidebar is hidden.
+
 ## [0.9.1] - 2026-11-16
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.

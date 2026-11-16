@@ -2091,6 +2091,24 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
+    /// The bar behind the traffic lights when they come down with the menu bar in full screen. AppKit's own title bar
+    /// draws nothing there for a window whose page runs up under it, so without this the lights floated over the page
+    /// with the sidebar hidden. The title bar's material, blurring the page under it, as Safari's toolbar does.
+    private var fullScreenBar: NSVisualEffectView?
+
+    private func showFullScreenBar(_ on: Bool) {
+        fullScreenBar?.removeFromSuperview()
+        fullScreenBar = nil
+        guard on, let titlebar = browserWindow.standardWindowButton(.closeButton)?.superview else { return }
+        let bar = NSVisualEffectView(frame: titlebar.bounds)
+        bar.material = .titlebar
+        bar.blendingMode = .behindWindow
+        bar.state = .followsWindowActiveState
+        bar.autoresizingMask = [.width, .height]
+        titlebar.addSubview(bar, positioned: .below, relativeTo: nil)
+        fullScreenBar = bar
+    }
+
     /// The window's place before it went full screen: what's saved, so leaving full screen after a relaunch gives
     /// back the window you had, not one the size of the screen.
     private(set) var windowedFrame: NSRect?
@@ -2104,13 +2122,18 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidEnterFullScreen(_ notification: Notification) {
         browserWindow.titlebarAppearsTransparent = false
+        showFullScreenBar(true)
         layoutTrafficLights()
         root.needsLayout = true
     }
 
-    func windowWillExitFullScreen(_ notification: Notification) { browserWindow.titlebarAppearsTransparent = true }
+    func windowWillExitFullScreen(_ notification: Notification) {
+        showFullScreenBar(false)
+        browserWindow.titlebarAppearsTransparent = true
+    }
 
     func windowDidExitFullScreen(_ notification: Notification) {
+        showFullScreenBar(false)
         browserWindow.titlebarAppearsTransparent = true
         windowedFrame = nil
         layoutTrafficLights()
