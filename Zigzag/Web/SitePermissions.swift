@@ -1145,9 +1145,16 @@ final class PermissionPrompt: FloatingPanelView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// The answer a card returns: the action and its scope, with Remember kept only when the duration control is
+    /// enabled (a private or one-time question never returns Always). Kept apart from the view so the mapping, and the
+    /// scope the download question relies on, can be tested without a window.
+    nonisolated static func keptAnswer(_ choice: PermissionAnswer?, durationEnabled: Bool) -> PermissionAnswer? {
+        choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && durationEnabled,
+                                      scopeIndex: $0.scopeIndex) }
+    }
+
     private func finish(_ choice: PermissionAnswer?) {
-        // The disabled duration control also guards debug answers: a private or one-time question never returns Always.
-        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled) }
+        let choice = Self.keptAnswer(choice, durationEnabled: duration.isEnabled)
         stopListening()
         let answer = self.answer
         self.answer = nil

@@ -807,6 +807,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var downloadRuleTestRow: FormRow?
     private let addDownloadRuleButton = PillButton(title: String(localized: "Add Rule…", comment: "Button beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from."))
     private var downloadRulesToken: SignalToken?
+    private var everyTypeToken: SignalToken?
     /// Sites installed as apps, each with Remove. Only there when there's one.
     private let webAppsGroup = FormGroup()
     private var webAppsToken: SignalToken?
@@ -1150,11 +1151,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             DropdownButton.Option(title: String(localized: "Open", comment: "A choice for what a download of a new file type does: open it in the Mac's app.")),
             DropdownButton.Option(title: String(localized: "Save", comment: "A choice for what a download of a new file type does: save it."))
         ]
-        downloadEveryType.selectedIndex = switch DownloadManager.handlesEveryType {
-        case nil: 0
-        case .open: 1
-        case .save: 2
-        }
+        refreshEveryTypeChoice()
         downloadEveryType.onSelect = { index in
             DownloadManager.handlesEveryType = switch index {
             case 1: .open
@@ -1178,6 +1175,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if self.pane == .downloads || self.isSearching { self.layoutDocument() }
         }
         refreshDownloadPlaceRules()
+        everyTypeToken = DownloadManager.handlesEveryTypeChanged.observe { [weak self] in self?.refreshEveryTypeChoice() }
         downloadRuleTest.field.delegate = self
         let testRow = FormRow(title: String(localized: "Test an address", comment: "A setting in Settings › Downloads: a field to type an address and see which rule takes it."),
                               detail: String(localized: "Type a link or a file’s address to see which rule takes it, and what it would do.",
@@ -2516,7 +2514,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var webAppsHeading: String { String(localized: "Installed Apps", comment: "A heading in Settings › General: the sites installed as apps with File › Install as App.") }
     private static var updatesHeading: String { String(localized: "Updates", comment: "A heading in Settings › General: Zigzag's version and how it updates.") }
     private static var downloadRulesHeading: String { String(localized: "Hand Off Downloads and Links", comment: "A heading in Settings › Downloads, over the rules that send a download or a link to another app.") }
-    private static var downloadTypesHeading: String { String(localized: "Save Downloads by Type", comment: "A heading in Settings › Downloads, over the file types saved somewhere of their own instead of the folder above.") }
+    private static var downloadTypesHeading: String { String(localized: "File Types", comment: "A heading in Settings › Downloads, over the file types and where their downloads go.") }
     private static var downloadTestHeading: String { String(localized: "Test a Rule", comment: "A heading in Settings › Downloads, over the address field that shows which rule would take it.") }
     private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
     private static var localServersHeading: String { String(localized: "Local Servers", comment: "A heading in Settings › Developer: development servers running on this Mac.") }
@@ -2871,6 +2869,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func refreshDownloadPlaceRules() { DownloadPlace.configure(downloadPlaceRules) }
 
+    /// What a download of a type no rule covers does, as the card's "Always" answer left it.
+    private func refreshEveryTypeChoice() {
+        downloadEveryType.selectedIndex = switch DownloadManager.handlesEveryType {
+        case nil: 0
+        case .open: 1
+        case .save: 2
+        }
+    }
+
     // MARK: Download rules
 
     /// The rules, top to bottom. Each row switches one on or off, moves it, changes it, or deletes it.
@@ -2893,14 +2900,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             toggle.onChange = { isOn in DownloadRulesStore.shared.setEnabled(isOn, for: rule.id) }
             toggle.setAccessibilityLabel(String(localized: "Turn \(rule.name) on or off", comment: "A download rule's switch for VoiceOver. The placeholder is the rule's name."))
 
+            // The list shows only handoff rules, so its places are not the store's: move by the neighbouring rule's
+            // id, not by the row's number.
+            let previous = index > 0 ? rules[index - 1].id : nil
+            let next = index < rules.count - 1 ? rules[index + 1].id : nil
             let up = IconButton(symbol: "chevron.up", size: .compact,
                                 toolTip: String(localized: "Move Up", comment: "Tooltip of the button that moves a download rule up the list."))
-            up.isEnabled = index > 0
-            up.onClick = { _ in DownloadRulesStore.shared.move(from: index, to: index - 1) }
+            up.isEnabled = previous != nil
+            up.onClick = { _ in if let previous { DownloadRulesStore.shared.move(rule.id, before: previous) } }
             let down = IconButton(symbol: "chevron.down", size: .compact,
                                   toolTip: String(localized: "Move Down", comment: "Tooltip of the button that moves a download rule down the list."))
-            down.isEnabled = index < rules.count - 1
-            down.onClick = { _ in DownloadRulesStore.shared.move(from: index, to: index + 1) }
+            down.isEnabled = next != nil
+            down.onClick = { _ in if let next { DownloadRulesStore.shared.move(next, before: rule.id) } }
             let edit = IconButton(symbol: "slider.horizontal.3", size: .compact,
                                   toolTip: String(localized: "Change Rule", comment: "Tooltip of the button that changes a download rule."))
             edit.onClick = { [weak self] _ in
@@ -2951,11 +2962,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             downloadTypesGroup.add(empty)
             return
         }
-        for rule in rules {
+        for (index, rule) in rules.enumerated() {
             let types = DownloadRule.Match.extensions(in: rule.pattern).joined(separator: ", ")
             let toggle = Toggle(isOn: rule.isEnabled)
             toggle.onChange = { isOn in DownloadRulesStore.shared.setEnabled(isOn, for: rule.id) }
             toggle.setAccessibilityLabel(String(localized: "Turn \(types) on or off", comment: "A per-extension destination's switch for VoiceOver. The placeholder is the file extensions it names, like pdf, epub."))
+
+            let previous = index > 0 ? rules[index - 1].id : nil
+            let next = index < rules.count - 1 ? rules[index + 1].id : nil
+            let up = IconButton(symbol: "chevron.up", size: .compact,
+                                toolTip: String(localized: "Move Up", comment: "Tooltip of the button that moves a download rule up the list."))
+            up.isEnabled = previous != nil
+            up.onClick = { _ in if let previous { DownloadRulesStore.shared.move(rule.id, before: previous) } }
+            let down = IconButton(symbol: "chevron.down", size: .compact,
+                                  toolTip: String(localized: "Move Down", comment: "Tooltip of the button that moves a download rule down the list."))
+            down.isEnabled = next != nil
+            down.onClick = { _ in if let next { DownloadRulesStore.shared.move(next, before: rule.id) } }
 
             let edit = IconButton(symbol: "slider.horizontal.3", size: .compact,
                                   toolTip: String(localized: "Change File Type", comment: "Tooltip of the button that changes a per-extension destination."))
@@ -2967,14 +2989,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     toolTip: String(localized: "Delete File Type", comment: "Tooltip of the button that deletes a per-extension destination."))
             remove.onClick = { [weak self] _ in
                 self?.confirm(title: String(localized: "Delete the \(types) file type?", comment: "Title of the sheet that deletes a per-extension destination. The placeholder is the extensions it names, like pdf, epub."),
-                              message: String(localized: "Files of this type are saved to the folder downloads are saved to again, and nothing else changes.",
+                              message: String(localized: "Files of this type are saved where downloads go again.",
                                               comment: "Message of the sheet that deletes a per-extension destination."),
                               action: String(localized: "Delete", comment: "Button of the sheet that deletes a download rule.")) {
                     DownloadRulesStore.shared.remove(id: rule.id)
                 }
             }
 
-            let controls = NSStackView(views: [toggle, edit, remove])
+            let controls = NSStackView(views: [toggle, up, down, edit, remove])
             controls.orientation = .horizontal
             controls.spacing = Tokens.Space.x1
             controls.distribution = .fill
@@ -3027,7 +3049,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Add Rule: a plain action, or a preset that fills the fields for aria2, Motrix, rTorrent, yt-dlp, mpv or IINA.
     private func showDownloadRuleMenu() {
-        var entries: [MenuPanel.Entry] = DownloadRuleAction.Kind.allCases.map { kind in
+        // A destination is made from Add File Type, under Save downloads to, not from a handoff rule's menu.
+        var entries: [MenuPanel.Entry] = DownloadRuleAction.Kind.allCases.filter { !$0.isDestination }.map { kind in
             .item(MenuPanel.Item(title: kind.title, symbol: kind.symbol) { [weak self] in
                 guard let self else { return }
                 DownloadRuleSheet.show(in: self, kind: kind)

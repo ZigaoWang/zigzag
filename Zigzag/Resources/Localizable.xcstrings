@@ -119,23 +119,6 @@
         }
       }
     },
-    "%@ are saved to %@" : {
-      "comment" : "A download rule in a sentence: what it catches, then the folder it is saved into. The placeholders are the two parts, as in “Files of type pdf” and “Documents”.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ are saved to %2$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@会保存到 %2$@"
-          }
-        }
-      }
-    },
     "%@ at %lld%%" : {
       "comment" : "Beside Page Size among the developer tools above the page, while a page larger than the window is shown smaller to fit: its size, then how large it's shown, like “1440 × 900 at 72%”.",
       "localizations" : {
@@ -2755,6 +2738,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在此网站上始终允许"
+          }
+        }
+      }
+    },
+    "Always for %@" : {
+      "comment" : "Duration choice on the download question: the answer is kept for this file type. The placeholder is the type, like PDF.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对 %@ 始终如此"
           }
         }
       }
@@ -7043,6 +7037,28 @@
         }
       }
     },
+    "file type" : {
+      "comment" : "A rule's kind, in its row in Settings › Downloads: it catches a file by its extension.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件类型"
+          }
+        }
+      }
+    },
+    "File Types" : {
+      "comment" : "A heading in Settings › Downloads, over the file types and where their downloads go.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件类型"
+          }
+        }
+      }
+    },
     "Files" : {
       "comment" : "The subject of a download rule's sentence, for a rule that catches downloads but not links.",
       "localizations" : {
@@ -7065,35 +7081,35 @@
         }
       }
     },
-    "Files of this type are saved to the folder above, or opened in your Mac’s app for them. The first file type that matches wins." : {
-      "comment" : "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此类型的文件会保存到上面的文件夹，或用 Mac 上对应的 App 打开。最先匹配的文件类型生效。"
-          }
-        }
-      }
-    },
-    "Files of this type are saved to the folder downloads are saved to again, and nothing else changes." : {
+    "Files of this type are saved where downloads go again." : {
       "comment" : "Message of the sheet that deletes a per-extension destination.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此类型文件将重新保存到下载文件夹，其他内容不变。"
+            "value" : "此类型的文件会重新存储到下载位置。"
           }
         }
       }
     },
-    "Files of this type skip the folder downloads are saved to, and go where you say instead. The first file type that matches wins." : {
-      "comment" : "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.",
+    "Files of type %@ are saved to %@" : {
+      "comment" : "A file-type destination in a sentence: the extensions it names, then the folder they are saved into.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此类型文件不再保存到下载文件夹，而保存到你指定的位置。最先匹配的文件类型生效。"
+            "value" : "类型为 %@ 的文件会存储到 %@"
+          }
+        }
+      }
+    },
+    "Files of type %@ open in your Mac’s app" : {
+      "comment" : "A file-type destination in a sentence: the extensions it names, then that the Mac's own app opens them.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型为 %@ 的文件会在 Mac 上的 App 中打开"
           }
         }
       }
@@ -14274,6 +14290,17 @@
         }
       }
     },
+    "Run in private windows affects Open. A file type that saves still saves there." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“在无痕浏览窗口中运行”只影响“打开”。设为存储的文件类型仍会存储到那里。"
+          }
+        }
+      }
+    },
     "Run Script" : {
       "comment" : "An action a download rule can take, in its editor: run an executable with the link as an argument.",
       "localizations" : {
@@ -14450,17 +14477,6 @@
         }
       }
     },
-    "Save Downloads by Type" : {
-      "comment" : "A heading in Settings › Downloads, over the file types saved somewhere of their own instead of the folder above.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按类型保存下载"
-          }
-        }
-      }
-    },
     "Save Page As…" : {
       "comment" : "File menu item.",
       "localizations" : {
@@ -14512,6 +14528,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要存储密码吗？"
+          }
+        }
+      }
+    },
+    "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“存储”会把此类型的文件写入文件夹；“打开”会把它们存储到下载位置，并在 Mac 上的 App 中打开。第一个匹配的文件类型生效。"
           }
         }
       }
@@ -15167,17 +15194,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务器地址"
-          }
-        }
-      }
-    },
-    "Service" : {
-      "comment" : "Label of the service choice in the Torrents preset's sheet.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "服务"
           }
         }
       }
@@ -16916,6 +16932,17 @@
         }
       }
     },
+    "The first rule that matches wins." : {
+      "comment" : "Under the title of the sheet that makes a download rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一条匹配的规则生效。"
+          }
+        }
+      }
+    },
     "The Last Hour…" : {
       "comment" : "Item in the Clear History menu on the History page.",
       "localizations" : {
@@ -18155,17 +18182,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用于构建网站的工具，只在开发者模式中的网站上显示。可以在任一网站的“网站设置”、命令栏或“显示 › 开发者”中为它开⁠启。处于开发者模式的标签页在边栏中带有虚线边框。"
-          }
-        }
-      }
-    },
-    "Torrents" : {
-      "comment" : "The rule name a Torrents preset starts with when its service is left to be filled in by hand.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "种子"
           }
         }
       }

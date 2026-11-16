@@ -23,7 +23,8 @@ enum DownloadConfirm {
     /// Whether the question may offer Open for this type. An app, a script, an installer or an archive is saved
     /// without asking: the Mac's app for it would run or mount what the page sent.
     nonisolated static func canOpen(_ type: String) -> Bool {
-        !DownloadOpening.isRefused(type)
+        // As a pattern, so an extension carrying a comma cannot smuggle a second, refused type into the rule.
+        !DownloadOpening.isRefused(pattern: type)
     }
 
     /// The type as the question names it: PDF, ZIP, EPUB. Nil when there is no extension to name.
@@ -73,12 +74,26 @@ enum DownloadConfirm {
         case .type(let handling, let type):
             // An answer that somehow asks to open a refused type is written as Save: the rule must be safe whatever
             // the card offered.
-            let handling = handling == .open && DownloadOpening.isRefused(type) ? .save : handling
+            let handling = handling == .open && DownloadOpening.isRefused(pattern: type) ? .save : handling
             var action = DownloadRuleAction(kind: handling == .open ? .openFile : .saveToFolder)
             if handling == .save { action.folderPath = DownloadManager.folder.path }
             let rule = DownloadRule(name: label, applies: .downloads, match: .fileType, pattern: type, action: action)
-            // In front: the answer just given is the one that should decide the next file of this type.
-            DownloadRulesStore.shared.add(rule, at: 0)
+            // The same type answered twice (two downloads of it were asked together) keeps one rule: update the one
+            // already there instead of adding a duplicate in front of it.
+            if let existing = DownloadRulesStore.shared.rules.first(where: {
+                $0.match == .fileType
+                    && DownloadRule.Match.extensions(in: $0.pattern).map({ $0.lowercased() }) == [type]
+                    && $0.action.destination != nil
+            }) {
+                var updated = existing
+                updated.name = label
+                updated.action = action
+                updated.isEnabled = true
+                DownloadRulesStore.shared.update(updated)
+            } else {
+                // In front: the answer just given is the one that should decide the next file of this type.
+                DownloadRulesStore.shared.add(rule, at: 0)
+            }
         case .everyType(let handling):
             DownloadManager.handlesEveryType = handling
         }

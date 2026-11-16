@@ -19,11 +19,20 @@ nonisolated enum DownloadDestination: Equatable, Sendable {
 /// not make. A type may still be **saved**; the clamp is on Open only.
 nonisolated enum DownloadOpening {
     /// Lowercase extensions, without a leading dot. Scripts are included because the Mac's default app for one may
-    /// run it, and archives because opening one can hand out an app the archive carries.
+    /// run it; installers and disk images because opening one mounts or runs what the page sent; archives because
+    /// opening one can hand out an app the archive carries.
     static let refused: Set<String> = [
-        "app", "pkg", "dmg", "zip", "mobileconfig",
-        "command", "terminal", "sh", "bash", "zsh", "fish", "csh", "ksh",
-        "py", "rb", "pl", "php", "jar", "scpt", "applescript", "workflow"
+        // Apps and bundles.
+        "app", "prefpane", "kext",
+        // Installers and disk images.
+        "pkg", "mpkg", "xip", "dmg", "iso", "img", "msi", "cab",
+        // Archives.
+        "zip", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "7z", "rar", "zst", "lz", "lzma", "jar",
+        // Scripts and automation.
+        "command", "terminal", "sh", "bash", "zsh", "fish", "csh", "ksh", "py", "rb", "pl", "php",
+        "scpt", "applescript", "workflow", "action",
+        // Configuration profiles.
+        "mobileconfig"
     ]
 
     static func isRefused(_ type: String) -> Bool {
@@ -31,13 +40,19 @@ nonisolated enum DownloadOpening {
         // No extension is no type to vouch for: an extensionless file can be a script or a binary, and Open is for a
         // type, not for "whatever this is". It is saved like any other download.
         guard !trimmed.isEmpty else { return true }
-        return refused.contains(trimmed)
+        // A compound type is refused when any part of it is: `tar.gz` is an archive because `tar` and `gz` are.
+        return trimmed.split(separator: ".").contains { refused.contains(String($0)) }
     }
 
     /// Whether any extension a file-type pattern names is one an Open must refuse. An Open rule for one of them could
     /// otherwise arrive from an older build or a hand-edited rules file.
     static func isRefused(pattern: String) -> Bool {
-        DownloadRule.Match.extensions(in: pattern).contains { isRefused($0) }
+        let extensions = DownloadRule.Match.extensions(in: pattern)
+        // No extension at all is no type to vouch for, just as an extensionless file is not.
+        guard !extensions.isEmpty else { return true }
+        return extensions.contains { extensionName in
+            extensionName.split(separator: ".").contains { refused.contains(String($0).lowercased()) }
+        }
     }
 }
 
@@ -448,30 +463,21 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
 /// The arrangements most people want, so a rule for aria2 or mpv is a menu choice and a look at the fields rather
 /// than a JSON lesson.
 nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
-    case aria2, motrix, torrents, ytdlp, mpv, iina
+    case aria2, motrix, rTorrent, ytdlp, mpv, iina
 
-    /// What a torrent preset starts with: a magnet link, or an address that carries a `.torrent` file. One rule can
-    /// only read one of the two, and this reads the address, which both a magnet link and a torrent's URL have.
-    static let torrentPattern = #"^magnet:|\.torrent"#
-
-    var title: String { ruleName }
-
-    /// The name the rule it makes carries: the service or the app itself, so the rule reads as a sentence —
-    /// "Files matching … go to rTorrent".
-    var ruleName: String {
+    var title: String {
         switch self {
-        case .aria2: "aria2"
-        case .motrix: "Motrix"
-        case .torrents: TorrentService.rTorrent.ruleName
-        case .ytdlp: "yt-dlp"
-        case .mpv: "mpv"
-        case .iina: "IINA"
+        case .aria2: String(localized: "Send to aria2", comment: "A preset rule in Settings › Downloads, for the aria2 download manager.")
+        case .motrix: String(localized: "Send to Motrix", comment: "A preset rule in Settings › Downloads, for the Motrix download manager.")
+        case .rTorrent: String(localized: "Send to rTorrent", comment: "A preset rule in Settings › Downloads, for rTorrent.")
+        case .ytdlp: String(localized: "Send to yt-dlp", comment: "A preset rule in Settings › Downloads, for the yt-dlp downloader.")
+        case .mpv: String(localized: "Play in mpv", comment: "A preset rule in Settings › Downloads, for the mpv video player.")
+        case .iina: String(localized: "Play in IINA", comment: "A preset rule in Settings › Downloads, for the IINA video player.")
         }
     }
 
-    /// The rule a preset starts from: a media site for the players, a magnet or link for the downloaders. Torrents
-    /// starts on rTorrent; the sheet's Service dropdown points it at another one.
-var rule: DownloadRule {
+    /// The rule a preset starts from: a media site for the players, a magnet or link for the downloaders.
+    var rule: DownloadRule {
         switch self {
         case .aria2, .motrix:
             var action = DownloadRuleAction(kind: .jsonRPC)
@@ -482,15 +488,15 @@ var rule: DownloadRule {
             """
             // A download manager takes downloads only: a link you click stays a link unless it is itself a file.
             return DownloadRule(name: title, applies: .downloads, match: .any, action: action)
-        case .torrents:
-            let service = TorrentService.rTorrent
+        case .rTorrent:
             var action = DownloadRuleAction(kind: .jsonRPC)
-            action.rpcEndpoint = service.endpoint
-            action.rpcMethod = service.method
-            action.rpcParameters = service.parameters
-            action.rpcStyle = service.style
-            // A download service catches files, not links: a magnet is left to the browser unless it arrives as one.
-            return DownloadRule(name: title, applies: .downloads, match: .regex, pattern: Self.torrentPattern, action: action)
+            action.rpcEndpoint = "http://127.0.0.1:8080/RPC2"
+            action.rpcMethod = "load.start"
+            action.rpcParameters = """
+            ["", "{link}"]
+            """
+            action.rpcStyle = .xmlrpc
+            return DownloadRule(name: title, applies: .downloads, match: .any, action: action)
         case .ytdlp:
             var action = DownloadRuleAction(kind: .runScript)
             // Through env, so it's found under either Homebrew prefix, and anywhere else on PATH.
@@ -506,63 +512,6 @@ var rule: DownloadRule {
             action.urlTemplate = "iina://weblink?url={encoded_link}"
             return DownloadRule(name: title, applies: .linksAndDownloads, match: .contains, pattern: "youtube.com/watch", action: action)
         }
-    }
-}
-
-/// The services a torrent rule can be pointed at. The protocol is the only thing that differs, so the Torrents
-/// preset offers them as one dropdown and fills the rule's fields in.
-nonisolated enum TorrentService: String, CaseIterable, Sendable {
-    case rTorrent, aria2, motrix, custom
-
-    var title: String {
-        switch self {
-        case .rTorrent: "rTorrent"
-        case .aria2: "aria2"
-        case .motrix: "Motrix"
-        case .custom: String(localized: "Custom…", comment: "A choice of torrent service in the Torrents preset's sheet: fill the endpoint and method in by hand.")
-        }
-    }
-
-    var ruleName: String {
-        switch self {
-        case .rTorrent: "rTorrent"
-        case .aria2: "aria2"
-        case .motrix: "Motrix"
-        case .custom: String(localized: "Torrents", comment: "The rule name a Torrents preset starts with when its service is left to be filled in by hand.")
-        }
-    }
-
-    var endpoint: String {
-        switch self {
-        case .rTorrent: "http://127.0.0.1:8080/RPC2"
-        case .aria2: "http://127.0.0.1:6800/jsonrpc"
-        case .motrix: "http://127.0.0.1:16800/jsonrpc"
-        case .custom: ""
-        }
-    }
-
-    var method: String {
-        switch self {
-        case .rTorrent: "load.start"
-        case .aria2, .motrix: "aria2.addUri"
-        case .custom: ""
-        }
-    }
-
-    var parameters: String {
-        switch self {
-        case .rTorrent: """
-        ["", "{link}"]
-        """
-        case .aria2, .motrix: """
-        [["{link}"], {"header": ["Cookie: {cookie_header}", "Referer: {referrer}"], "out": "{filename}"}]
-        """
-        case .custom: "[]"
-        }
-    }
-
-    var style: DownloadRuleAction.RPCStyle {
-        self == .rTorrent ? .xmlrpc : .json
     }
 }
 
@@ -826,6 +775,29 @@ final class DownloadRulesStore {
             guard !isPrivate || rule.runsInPrivateWindows else { return false }
             return rule.matches(url, filename: filename)
         }
+    }
+
+    /// The first handoff rule that catches a download, if no earlier rule decides where the file lands. A destination
+    /// earlier in the list wins: the list has one order, and a later catch-all handoff must not take a file a type
+    /// rule has already claimed. An Open that the type clamp refuses is treated as no match, so a later Save or
+    /// handoff can still decide, just as it would if that rule were absent.
+    func firstHandoffMatch(url: URL, filename: String, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        Self.firstHandoffMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+    }
+
+    nonisolated static func firstHandoffMatch(in rules: [DownloadRule], url: URL, filename: String = "",
+                                              appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        for rule in rules {
+            guard rule.applies == .linksAndDownloads || !appliesToLinks else { continue }
+            guard !isPrivate || rule.runsInPrivateWindows else { continue }
+            guard rule.matches(url, filename: filename) else { continue }
+            if let destination = rule.action.destination {
+                if destination == .open, DownloadOpening.isRefused((filename as NSString).pathExtension) { continue }
+                return nil
+            }
+            return rule
+        }
+        return nil
     }
 
     /// The first rule whose destination is this download's, if any: the entry that decides where the file lands. Only

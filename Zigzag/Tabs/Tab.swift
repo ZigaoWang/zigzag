@@ -1734,7 +1734,11 @@ extension Tab: WKNavigationDelegate {
                                  pageOrigin: String? = nil) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
-        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: isPrivate) else { return false }
+        // A link has no file name; a download's own name is what an earlier file-type destination matches, so the
+        // handoff scan must see it and stand aside for that destination.
+        let handoffName = appliesToLinks ? "" : (filename ?? DownloadTokens.filename(for: url, suggested: ""))
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
+                                                    isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
         let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),

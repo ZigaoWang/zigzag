@@ -22,7 +22,7 @@ final class DownloadItem {
     /// A rule's "Open" chose this download: once the file is here, it goes to the Mac's own app for its type. Never
     /// saved with the item — it is about this download, not about the file.
     fileprivate var opensWhenFinished = false
-let sourceURL: URL?
+    let sourceURL: URL?
     /// Bytes a second, smoothed over the last few seconds, for "time left".
     fileprivate(set) var speed: Double = 0
     fileprivate var lastSample: (at: Date, bytes: Int64)?
@@ -169,8 +169,14 @@ final class DownloadManager: NSObject {
     /// asks one type at a time. A rule for a type always wins over it.
     static var handlesEveryType: DownloadConfirm.Handling? {
         get { UserDefaults.standard.string(forKey: "DownloadsHandleEveryType").flatMap(DownloadConfirm.Handling.init(rawValue:)) }
-        set { UserDefaults.standard.set(newValue?.rawValue, forKey: "DownloadsHandleEveryType") }
+        set {
+            UserDefaults.standard.set(newValue?.rawValue, forKey: "DownloadsHandleEveryType")
+            handlesEveryTypeChanged.send(())
+        }
     }
+
+    /// The card's "Always" answer for every type, so Settings shows it without being reopened.
+    static let handlesEveryTypeChanged = Signal<Void>()
 
     /// A download got its file and is under way: the window it came from shows it leaving for Downloads.
     let started = Signal<(DownloadItem, NSWindow?)>()
@@ -192,7 +198,10 @@ final class DownloadManager: NSObject {
     /// The extension a download's own name carries, lowercased, or nil when it has none to ask about.
     private static func fileType(of name: String) -> String? {
         let type = (name as NSString).pathExtension.lowercased()
-        return type.isEmpty ? nil : type
+        // One extension, not a list: a page controls the suggested name, and a comma would let it write a rule for
+        // several types from one answer.
+        guard !type.isEmpty, !type.contains(","), !type.contains(where: { $0.isWhitespace }) else { return nil }
+        return type
     }
 
 @discardableResult
@@ -572,7 +581,7 @@ extension DownloadManager: WKDownloadDelegate {
         let owner = (download.webView as? BrowserWebView)?.owner
         if let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
-           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false,
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false, filename: name,
                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {
             let handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
                                                   pageOrigin: startedAt ?? SiteOrigin.of(owner.url ?? download.webView?.url),
@@ -580,7 +589,7 @@ extension DownloadManager: WKDownloadDelegate {
                                                   space: Library.shared.space(owner.spaceID)?.name ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
                                                   isPrivate: Self.isPrivate(download),
-window: window, tab: owner)
+                                                  window: window, tab: owner)
             switch await DownloadHandoff.decide(rule, request: handoff, tab: owner, forDownload: true) {
             case .handOff:
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
@@ -634,7 +643,7 @@ window: window, tab: owner)
                     opensWhenFinished = handling == .open
                 }
             }
-} else if Self.asksWhereToSave {
+        } else if Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
                 items.removeAll { $0.download === download }
@@ -654,7 +663,7 @@ window: window, tab: owner)
             item.replaces = replacing
             item.destination = destination
             item.opensWhenFinished = opensWhenFinished
-changed.send(item)
+            changed.send(item)
             started.send((item, window))
         }
         return destination

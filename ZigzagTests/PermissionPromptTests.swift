@@ -4,6 +4,19 @@ import Testing
 
 @MainActor
 struct PermissionPromptTests {
+
+    /// The download question's three durations are only useful if the card carries the chosen one back. The ordinary
+    /// two-choice card still returns scope 0, and a disabled duration still withholds Remember.
+    @Test func aKeptAnswerCarriesItsScope() {
+        let answer = PermissionAnswer(action: "open", remember: true, scopeIndex: 2)
+        let kept = PermissionPrompt.keptAnswer(answer, durationEnabled: true)
+        #expect(kept?.scopeIndex == 2)
+        #expect(kept?.remember == true)
+        let oneTime = PermissionPrompt.keptAnswer(answer, durationEnabled: false)
+        #expect(oneTime?.scopeIndex == 2)
+        #expect(oneTime?.remember == false)
+        #expect(PermissionPrompt.keptAnswer(nil, durationEnabled: true) == nil)
+    }
     @Test func denyComesFirstAndTheProminentYesLast() {
         let ordered = PermissionPrompt.actions(for: [.allow, .alternate("browser", "Open in Browser"), .deny])
         #expect(ordered.map(\.id) == ["deny", "browser", "allow"])
