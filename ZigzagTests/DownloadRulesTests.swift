@@ -119,11 +119,13 @@ struct DownloadRuleTests {
         [
           {"name":"Known","match":"contains","pattern":"a","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
           {"name":"Future","match":"fileType","pattern":"pdf","action":{"kind":"saveToFolder","folderPath":"/tmp"}},
-          {"name":"Broken","applies":7,"match":{},"action":{"kind":"nonsense"}}
+          {"name":"Broken","applies":7,"match":{},"action":{"kind":"nonsense"}},
+          {"name":"WrongMatch","match":7,"pattern":"","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
+          {"name":"WrongKind","match":"contains","pattern":"x","action":{"kind":7}}
         ]
         """
         let rules = try JSONDecoder().decode([DownloadRule].self, from: Data(json.utf8))
-        #expect(rules.count == 3)
+        #expect(rules.count == 5)
         #expect(rules[0].match == .contains)
         #expect(rules[1].match == .contains)
         #expect(rules[1].action.kind == .openURL)
@@ -131,6 +133,9 @@ struct DownloadRuleTests {
         #expect(rules[2].applies == .downloads)
         #expect(rules[2].action.kind == .openURL)
         #expect(!rules[2].isEnabled)
+        // A field of the wrong type is not a rule either: `.contains` with no pattern would catch every address.
+        #expect(!rules[3].isEnabled)
+        #expect(!rules[4].isEnabled)
     }
 
     @Test func aResponseNameKeepsItsCaseAndItsPieces() {
@@ -171,6 +176,18 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.expand("{host}|{path}|{query}", with: bare) == "example.com||")
         let spaced = HandoffValues(link: URL(string: "https://example.com/a%20b/c")!)
         #expect(DownloadTokens.expand("{path}", with: spaced) == "/a%20b/c")
+    }
+
+    @Test func aQuestionIsOnlyAskedWhereItCanBeSeen() {
+        #expect(DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: true, windowIsKey: true))
+        #expect(DownloadHandoff.questionCanShow(tabIsInFront: nil, windowIsVisible: true, windowIsKey: true))
+        // A background tab, a window behind another, or Zigzag in the background holds the question unseen.
+        #expect(!DownloadHandoff.questionCanShow(tabIsInFront: false, windowIsVisible: true, windowIsKey: true))
+        #expect(!DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: false, windowIsKey: true))
+        #expect(!DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: true, windowIsKey: false))
+        // A pop-up is key while its opener's window is not: its own links wait for a window that can ask.
+        #expect(!DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: true, windowIsKey: false))
+        #expect(!DownloadHandoff.questionCanShow(tabIsInFront: nil, windowIsVisible: true, windowIsKey: false))
     }
 
     @Test func aValueCannotNameAnotherToken() {

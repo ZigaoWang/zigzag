@@ -677,6 +677,7 @@ extension DownloadManager: WKDownloadDelegate {
         // The destination decision never runs for a download that fails or is cancelled first; its state goes now.
         origins.removeValue(forKey: ObjectIdentifier(download))
         windows.removeValue(forKey: ObjectIdentifier(download))
+        chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
         guard let item = item(for: download) else { return }
         // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
         if item.state == .paused { return }

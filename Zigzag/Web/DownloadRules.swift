@@ -133,6 +133,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             guard let container else { return nil }
             return try? container.decodeIfPresent(type, forKey: key)
         }
+        func wasSet(_ key: CodingKeys) -> Bool { container?.contains(key) ?? false }
         id = value(UUID.self, .id) ?? UUID()
         name = value(String.self, .name) ?? ""
         isEnabled = value(Bool.self, .isEnabled) ?? true
@@ -140,7 +141,9 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         if let rawMatch = value(String.self, .match) {
             if let known = Match(rawValue: rawMatch) { match = known } else { match = .contains; isEnabled = false }
         } else {
+            // A value of another type is not a match either: a `.contains` with no pattern would catch everything.
             match = .contains
+            if wasSet(.match) { isEnabled = false }
         }
         pattern = value(String.self, .pattern) ?? ""
         isCaseSensitive = value(Bool.self, .isCaseSensitive) ?? false
@@ -283,10 +286,12 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             guard let container else { return nil }
             return try? container.decodeIfPresent(type, forKey: key)
         }
+        func wasSet(_ key: CodingKeys) -> Bool { container?.contains(key) ?? false }
         if let rawKind = value(String.self, .kind) {
             if let known = Kind(rawValue: rawKind) { kind = known } else { kind = .openURL; wasDecodedFromUnknownKind = true }
         } else {
             kind = .openURL
+            if wasSet(.kind) { wasDecodedFromUnknownKind = true }
         }
         appPath = value(String.self, .appPath) ?? ""
         urlTemplate = value(String.self, .urlTemplate) ?? ""

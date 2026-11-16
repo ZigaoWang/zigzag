@@ -37,6 +37,23 @@ struct FormSheetTests {
         for key in ["a", "c", "v", "x", "z"] { #expect(action(0, .command, key) == .pass) }
     }
 
+    @Test func tabReachesAFieldNestedBesideItsButton() {
+        // The App and Script rows put their field in a stack with a Choose… button, so the field is not the row
+        // itself; Tab has to find it there all the same.
+        let field = FilledField(placeholder: "App")
+        let stack = NSStackView(views: [field, PillButton(title: "Choose…")])
+        let row = FormSheet.Row(label: "App", view: stack)
+        let cancel = PillButton(title: "Cancel", style: .plain)
+        let confirm = PillButton(title: "Add", style: .prominent)
+        let candidates = FormSheet.focusCandidates(rows: [row])
+        #expect(candidates.contains { $0 === field.field })
+        // One field, one stop: the row does not also count as itself.
+        #expect(candidates.filter { $0 === stack }.isEmpty)
+        // The buttons are stops too, after the rows; a view outside a window cannot report `canBecomeKeyView`, so the
+        // candidates are what this pins.
+        #expect(!FormSheet.focusStops(rows: [], cancel: cancel, confirm: confirm).contains { $0 === field.field })
+    }
+
     @Test func otherShortcutsStopAtTheForm() {
         #expect(action(13, .command, "w") == .swallow)
         #expect(action(17, .command, "t") == .swallow)

@@ -163,15 +163,25 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         return nil
     }
 
+    /// The views Tab moves through, in order: each row's field (a field beside a Choose… button is nested in the row,
+    /// and the button follows it), then Cancel and the confirm button. A row of its own that takes the keyboard counts
+    /// as its one stop.
+    static func focusCandidates(rows: [Row]) -> [NSView] {
+        rows.flatMap { row -> [NSView] in
+            if let filled = row.view as? FilledField { return [filled.field] }
+            let nested = row.view.selfAndDescendants(of: NSView.self).filter(\.acceptsFirstResponder)
+            return nested.isEmpty ? (row.view.acceptsFirstResponder ? [row.view] : []) : nested
+        }
+    }
+
+    static func focusStops(rows: [Row], cancel: NSView, confirm: NSView) -> [NSView] {
+        focusCandidates(rows: rows).filter(\.canBecomeKeyView) + [cancel, confirm].filter(\.canBecomeKeyView)
+    }
+
     /// Tab goes round the form's fields, then whichever of its controls and buttons take the keyboard (with Full
     /// Keyboard Access off, only the fields do), and never leaves it.
     private func moveFocus(backward: Bool, in window: NSWindow) {
-        let stops: [NSView] = rows.flatMap { row -> [NSView] in
-            if let filled = row.view as? FilledField { return [filled.field] }
-            // A field beside a Choose… button is nested in the row; both take the keyboard, in the order drawn.
-            let nested = row.view.selfAndDescendants(of: NSView.self).filter(\.canBecomeKeyView)
-            return nested.isEmpty ? (row.view.canBecomeKeyView ? [row.view] : []) : nested
-        } + [cancel, confirm].filter(\.canBecomeKeyView)
+        let stops = Self.focusStops(rows: rows, cancel: cancel, confirm: confirm)
         guard !stops.isEmpty else { return }
         // A field being typed in has the keyboard through its editor.
         var responder = window.firstResponder as? NSView

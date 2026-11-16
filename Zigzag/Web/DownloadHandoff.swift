@@ -56,6 +56,12 @@ enum DownloadHandoff {
         return true
     }
 
+    /// Whether a new question can be seen before it is put: the page in front (or no page named, for a window of its
+    /// own), and the window visible and key. A kept page answer doesn't need this.
+    static func questionCanShow(tabIsInFront: Bool?, windowIsVisible: Bool, windowIsKey: Bool) -> Bool {
+        (tabIsInFront ?? true) && windowIsVisible && windowIsKey
+    }
+
     /// Where a handoff stands: run the rule, leave it in the browser, or cancel the link.
     enum HandoffGate: Equatable { case handOff, browser, cancel }
 
@@ -78,20 +84,22 @@ enum DownloadHandoff {
         // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
         guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
         guard isHandoffable(request.url) else { return .browser }
-        // A question has to be able to show: a background tab, a window behind another, or Zigzag in the background
-        // would hold it with nothing to see. The download or link carries on as if no rule had matched.
-        if let tab, let host = WindowManager.shared.promptHost(holding: tab),
-           !host.promptShows(tab) || host.window?.isVisible != true || host.window?.isKeyWindow != true {
-            return .browser
-        }
         let origin = request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
         let kind = handoffKind(rule)
+        // What this page already answered holds wherever the page is: it was given for this question, and asking again
+        // from a background tab would only lose the answer.
         if let origin, let tab, let kept = tab.permissionAnswers.action(key: origin, kind: kind) {
             return gate(stored: kept)
         }
         guard let controller = tab.flatMap({ WindowManager.shared.promptHost(holding: $0) })
                 ?? WindowManager.shared.promptHost(for: request.window)
                 ?? WindowManager.shared.promptHost(for: NSApp.keyWindow) else { return .browser }
+        // A new question has to be able to show: a background tab, a window behind another, a pop-up's own window (not
+        // a prompt host yet) or Zigzag in the background would hold it with nothing to see. The download or link
+        // carries on as if no rule had matched.
+        let inFront = tab.map { controller.promptShows($0) }
+        guard questionCanShow(tabIsInFront: inFront, windowIsVisible: controller.window?.isVisible == true,
+                              windowIsKey: controller.window?.isKeyWindow == true) else { return .browser }
         let answer = await PermissionPrompt.ask(
             host: SitePermissions.askerName(origin), origin: origin, what: rule.name, symbol: "arrow.up.forward.app",
             in: controller, tab: tab,
