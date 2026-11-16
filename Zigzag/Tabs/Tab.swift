@@ -1586,8 +1586,9 @@ extension Tab: WKNavigationDelegate {
             if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
             // WebRTC on or off for where it's going, before its page is made (`WebRTCProtection`).
             WebRTCProtection.apply(to: webView, for: url, in: self)
-            // Back, Forward and Reload go to pages you've had; anything else the page started waits to show.
-            addressWaitsForCommit = openedByPage || (!ownLoad && ![.backForward, .reload].contains(navigationAction.navigationType))
+            // Back and Forward go to pages you've had; anything else the page started waits to show. A reload waits
+            // too: one can be redirected elsewhere, and a site's that never arrives mustn't put that name over this page.
+            addressWaitsForCommit = openedByPage || (!ownLoad && navigationAction.navigationType != .backForward)
         }
         // The community lists' scriptlets for the document's site, in place before it starts (a frame's follow the
         // page it's in, as the blocklist does).
