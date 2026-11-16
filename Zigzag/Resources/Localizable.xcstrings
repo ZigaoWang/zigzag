@@ -21617,6 +21617,17 @@
           }
         }
       }
+    },
+    "Custom…" : {
+      "comment" : "An item in the Add Rule menu of Settings › Downloads: the actions that aren't a ready-made rule — an app, a URL, a script or a JSON-RPC service.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义…"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
