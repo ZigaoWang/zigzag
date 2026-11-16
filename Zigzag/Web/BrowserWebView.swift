@@ -234,19 +234,19 @@ final class BrowserWebView: WKWebView {
         guard menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierSearchWeb" }),
               !menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }),
               WindowManager.shared.controller(for: window) != nil,
-              let text = selectedText(in: menu), let url = CommandRanker.url(fromSelection: text) else { return }
-        let items = [Self.openSelectionItem(String(localized: "Open", comment: "Item in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab."), url: url, target: self, action: #selector(openSelection(_:))),
-                     Self.openSelectionItem(String(localized: "Open in New Tab", comment: "Item in a page's right-click menu over selected text that's a web address, not a link: opens it in a new tab."), url: url, target: self, action: #selector(openSelectionInNewTab(_:)))]
+              let text = selectedText(in: menu), let destination = CommandRanker.destination(fromSelection: text) else { return }
+        let items = [Self.openSelectionItem(String(localized: "Open", comment: "Item in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab."), destination: destination, target: self, action: #selector(openSelection(_:))),
+                     Self.openSelectionItem(String(localized: "Open in New Tab", comment: "Item in a page's right-click menu over selected text that's a web address, not a link: opens it in a new tab."), destination: destination, target: self, action: #selector(openSelectionInNewTab(_:)))]
         for (index, item) in items.enumerated() { menu.insertItem(item, at: index) }
         if menu.items.count > items.count, !menu.items[items.count].isSeparatorItem { menu.insertItem(.separator(), at: items.count) }
     }
 
-    private static func openSelectionItem(_ title: String, url: URL, target: AnyObject, action: Selector) -> NSMenuItem {
+    private static func openSelectionItem(_ title: String, destination: CommandRanker.Destination, target: AnyObject, action: Selector) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = target
-        item.representedObject = url
+        item.representedObject = destination
         item.identifier = NSUserInterfaceItemIdentifier(openSelectionIdentifier)
-        item.toolTip = url.absoluteString
+        item.toolTip = destination.url.absoluteString
         return item
     }
 
@@ -271,13 +271,13 @@ final class BrowserWebView: WKWebView {
     }
 
     @objc private func openSelection(_ sender: NSMenuItem) {
-        guard let url = sender.representedObject as? URL, let owner else { return }
-        owner.load(url, by: .page)
+        guard let destination = sender.representedObject as? CommandRanker.Destination, let owner else { return }
+        owner.load(destination.url, by: .page, httpFallback: destination.httpFallback)
     }
 
     @objc private func openSelectionInNewTab(_ sender: NSMenuItem) {
-        guard let url = sender.representedObject as? URL, let controller = WindowManager.shared.controller(for: window) else { return }
-        controller.open(url, disposition: .backgroundTab, opener: owner, allowSwitch: false, by: .page)
+        guard let destination = sender.representedObject as? CommandRanker.Destination, let controller = WindowManager.shared.controller(for: window) else { return }
+        controller.open(destination.url, disposition: .backgroundTab, opener: owner, allowSwitch: false, by: .page, httpFallback: destination.httpFallback)
     }
 
     #if DEBUG

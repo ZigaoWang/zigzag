@@ -3,7 +3,9 @@ import AppKit
 /// One line in the command bar.
 struct CommandResult: Equatable {
     enum Kind: Equatable {
-        case open(URL)
+        /// `httpFallback`: an address typed without a scheme, tried over http if https can't reach it
+        /// (`CommandRanker.Destination`).
+        case open(URL, httpFallback: Bool = false)
         case search(String)
         /// A search on one site, from the address bar's site search.
         case searchOn(URL)
@@ -108,9 +110,6 @@ enum CommandRanker {
 
     /// The web address some selected text is, when it's only that (#234): "example.com", or a whole https address,
     /// the quotes, brackets or full stop around it in a sentence left off. Only the web: never a file or about: page.
-    static func url(fromSelection text: String) -> URL? { destination(fromSelection: text)?.url }
-
-    /// Where the selected text goes when it's a web address (`url(fromSelection:)`), with its fallback over http.
     static func destination(fromSelection text: String) -> Destination? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 2048, !trimmed.contains(where: \.isNewline) else { return nil }
@@ -440,8 +439,10 @@ enum CommandRanker {
             }
         }
         if !historyOnly {
-            if let url = url(from: query) {
-                add(CommandResult(kind: .open(url), title: displayURL(url), detail: "", icon: FaviconStore.shared.cachedIcon(for: url), symbol: "globe"),
+            if let destination = destination(from: query) {
+                let url = destination.url
+                add(CommandResult(kind: .open(url, httpFallback: destination.httpFallback), title: displayURL(url), detail: "",
+                                  icon: FaviconStore.shared.cachedIcon(for: url), symbol: "globe"),
                     key: TabManager.normalize(url))
             } else {
                 add(CommandResult(kind: .search(query), title: query, detail: engine.name, symbol: "magnifyingglass"), key: "search:\(query)")

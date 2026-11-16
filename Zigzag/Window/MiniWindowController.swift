@@ -101,9 +101,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     static var openingSize: NSSize { size(remembered: rememberedSize) }
 
     /// Opens one on `url`. `origin`: where on screen it grows from (the quick open bar it came out of); without
-    /// one it takes the middle of the screen, a step down from any already there.
+    /// one it takes the middle of the screen, a step down from any already there. `httpFallback`: `url` is https
+    /// chosen for an address given without a scheme, tried over http if it can't be reached (`CommandRanker.Destination`).
     @discardableResult
-    static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil, overFullScreen: Bool? = nil, fromAnotherApp: Bool = false) -> MiniWindowController {
+    static func open(url: URL, isSearch: Bool = false, from origin: NSRect? = nil, overFullScreen: Bool? = nil, fromAnotherApp: Bool = false,
+                     httpFallback: Bool = false) -> MiniWindowController {
         let screen = origin.flatMap { o in NSScreen.screens.first { $0.frame.intersects(o) } } ?? NSApp.keyWindow?.screen ?? NSScreen.main
         let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
         let size = openingSize
@@ -111,6 +113,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             ?? Self.frame(size: size, in: area, taken: Self.all.compactMap { $0.window?.frame })
         let tab = Tab(url: url, spaceID: MiniQuickOpen.space.id)
         tab.isSearchTab = isSearch
+        // Before the window is made: it loads the page as it's set up.
+        tab.firstLoad.httpFallback = httpFallback
         let controller = MiniWindowController(tab: tab, frame: frame, overFullScreen: overFullScreen ?? (NSApp.keyWindow?.styleMask.contains(.fullScreen) == true))
         all.append(controller)
         Diagnostics.note("Zigzag Mini opened", site: url.host())
@@ -200,9 +204,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
         strip.openButton.onClick = { [weak self] _ in self?.openInZigzag() }
         strip.title.onClick = { [weak self] _ in self?.openLocation(nil) }
-        strip.title.drop.onDrop = { [weak self] url in
+        strip.title.drop.onDrop = { [weak self] destination in
             guard let self else { return false }
-            self.tab.load(url)
+            self.tab.load(destination.url, httpFallback: destination.httpFallback)
             return true
         }
         strip.copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
@@ -862,9 +866,9 @@ extension MiniWindowController: CommandBarHost {
     /// What you choose opens here, in place of this page; an open tab is gone to in its browser window.
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool {
         if MiniQuickOpen.switchToTab(kind) { return true }
-        guard let (url, search) = MiniQuickOpen.page(for: kind) else { return true }
-        tab.isSearchTab = search
-        tab.load(url, by: .you)
+        guard let page = MiniQuickOpen.page(for: kind) else { return true }
+        tab.isSearchTab = page.search
+        tab.load(page.url, by: .you, httpFallback: page.httpFallback)
         strip.title.isHidden = false
         commandBarRestoreFocus()
         return true

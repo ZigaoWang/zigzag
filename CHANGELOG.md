@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- An address typed without http:// or https://, like localtest.me:3000 for a development server, opens over http when the site can't be reached securely, as in Chrome, Safari and Firefox. Zigzag still tries https first, and goes to http only when nothing answers securely: never past a certificate warning, and never for a site that asked to be reached only securely. The same goes for an address you paste, drop on the address bar or open from selected text. ([#252](https://github.com/ZigaoWang/zigzag/issues/252))
+
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.

@@ -84,9 +84,9 @@ final class PaneHeaderView: NSView {
             guard let self, let tab = self.tab else { return }
             self.onEditAddress?(tab)
         }
-        address.drop.onDrop = { [weak self] url in
+        address.drop.onDrop = { [weak self] destination in
             guard let tab = self?.tab else { return false }
-            tab.load(url)
+            tab.load(destination.url, httpFallback: destination.httpFallback)
             return true
         }
         address.siteControls.onClick = { [weak self] _ in self?.openSiteControls() }

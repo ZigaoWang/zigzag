@@ -132,8 +132,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
         // A link or words dropped on the address: the page you're on goes there (#182).
-        sidebar.address.drop.onDrop = { [weak self] url in
-            self?.open(url, disposition: .currentTab)
+        sidebar.address.drop.onDrop = { [weak self] destination in
+            self?.open(destination.url, disposition: .currentTab, httpFallback: destination.httpFallback)
             return self != nil
         }
         // The address stands for the tab you're on: a middle-click closes it, as on the tab's own row.
@@ -2159,7 +2159,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Opens a URL the way the user asked, switching to an existing tab when the page is already open.
     /// `sender`: who gave the address. A page's link (⌘-click, a link in Reader) is the page's doing, never yours.
-    func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true, by sender: Tab.LoadSender = .zigzag) {
+    /// `httpFallback`: `url` is https chosen for an address given without a scheme, so a tab tries it over http if
+    /// it can't be reached (`CommandRanker.Destination`); Peek and a new window load the address alone.
+    func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true, by sender: Tab.LoadSender = .zigzag,
+              httpFallback: Bool = false) {
         // A page that comes to the front, say a link from Mail, isn't left under the command bar the empty window opened with.
         if disposition == .foregroundTab || disposition == .currentTab, commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
         if allowSwitch, disposition == .foregroundTab, let existing = tabManager.existingTab(for: url) {
@@ -2168,11 +2171,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         switch disposition {
         case .currentTab:
-            if let tab = tabManager.selectedTab { tab.load(url, by: sender) } else { tabManager.newTab(url: url, by: sender) }
+            if let tab = tabManager.selectedTab {
+                tab.load(url, by: sender, httpFallback: httpFallback)
+            } else {
+                tabManager.newTab(url: url, by: sender, httpFallback: httpFallback)
+            }
         case .foregroundTab:
-            tabManager.newTab(url: url, opener: opener, by: sender)
+            tabManager.newTab(url: url, opener: opener, by: sender, httpFallback: httpFallback)
         case .backgroundTab:
-            tabManager.newTab(url: url, select: false, opener: opener, by: sender)
+            tabManager.newTab(url: url, select: false, opener: opener, by: sender, httpFallback: httpFallback)
         case .peek:
             showPeek(url: url, configuration: nil, by: sender)
         case .newWindow:

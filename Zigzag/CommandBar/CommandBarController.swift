@@ -216,12 +216,13 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         field.pasteMenuItems = { [weak self] in
             guard let self, let text = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !text.isEmpty, !text.contains("\n") else { return [] }
-            let url = CommandRanker.url(from: text)
-            let title = url != nil ? String(localized: "Paste and Go", comment: "Item in the command bar field's right-click menu: opens the copied address.")
+            let destination = CommandRanker.destination(from: text)
+            let title = destination != nil ? String(localized: "Paste and Go", comment: "Item in the command bar field's right-click menu: opens the copied address.")
                                 : String(localized: "Paste and Search", comment: "Item in the command bar field's right-click menu: searches for the copied text.")
             return [SidebarMenus.Item(title) { [weak self] in
                 // Straight to the page or the search, never a suggestion listed for what was typed before.
-                self?.activate(CommandResult(kind: url.map { .open($0) } ?? .search(text), title: "", detail: ""), modifiers: [])
+                self?.activate(CommandResult(kind: destination.map { .open($0.url, httpFallback: $0.httpFallback) } ?? .search(text),
+                                             title: "", detail: ""), modifiers: [])
             }]
         }
         fieldIcon.image = Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.title)
@@ -933,8 +934,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if results.indices.contains(selectedIndex) {
             guard results[selectedIndex].isActionable else { return }
             activate(results[selectedIndex], modifiers: modifiers)
-        } else if let url = CommandRanker.url(from: field.stringValue) {
-            activate(CommandResult(kind: .open(url), title: "", detail: ""), modifiers: modifiers)
+        } else if let destination = CommandRanker.destination(from: field.stringValue) {
+            activate(CommandResult(kind: .open(destination.url, httpFallback: destination.httpFallback), title: "", detail: ""), modifiers: modifiers)
         } else if mode == .editCurrent, let tab = host?.commandBarTab, field.stringValue == tab.url?.absoluteString {
             tab.reload()
             dismiss()
@@ -953,20 +954,23 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // ⌥↩ on Switch to Tab: a second copy of that page in a new tab instead.
         let forceNew = modifiers.contains(.option)
         let inCurrent = editing
-        func open(_ url: URL, search: Bool = false) {
+        func open(_ url: URL, search: Bool = false, httpFallback: Bool = false) {
             if !inCurrent { Tutorial.complete("newTab") }
             // Typed or chosen here: yours, so an app's link you typed opens without asking (the site's Block still holds).
             if inCurrent {
-                manager.selectedTab?.load(url, by: .you)
+                manager.selectedTab?.load(url, by: .you, httpFallback: httpFallback)
                 manager.selectedTab?.isSearchTab = search
             } else {
-                let tab = manager.newTab(url: url, select: !inBackground, by: .you)
+                let tab = manager.newTab(url: url, select: !inBackground, by: .you, httpFallback: httpFallback)
                 tab.isSearchTab = search
             }
         }
         switch result.kind {
-        case .open(let url), .history(let url):
+        case .open(let url, let httpFallback):
             // Back from the archive: it's a tab again, so it leaves the archive.
+            TabArchive.shared.remove(url: url)
+            open(url, httpFallback: httpFallback)
+        case .history(let url):
             TabArchive.shared.remove(url: url)
             open(url)
         case .search(let query), .suggestion(let query):

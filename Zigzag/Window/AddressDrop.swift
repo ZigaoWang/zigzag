@@ -8,20 +8,20 @@ import AppKit
 final class AddressDrop {
     /// What a drop carries, as Zigzag goes to it: the first link (a page on the web or a file), else the text as an
     /// address when it reads as one, else a search for it. Nil for nothing usable (an empty string, a link of another
-    /// kind, like `javascript:`).
-    static func destination(urls: [URL], text: String?, engine: SearchEngine) -> URL? {
-        if let url = urls.first(where: { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }) { return url }
+    /// kind, like `javascript:`). Text that's an address without a scheme carries its fallback over http, as typed.
+    static func destination(urls: [URL], text: String?, engine: SearchEngine) -> CommandRanker.Destination? {
+        if let url = urls.first(where: { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }) { return .init(url: url) }
         guard urls.isEmpty, let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
         // Text broken over lines is one search, words apart.
         let words = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " ")
-        if let url = CommandRanker.url(from: words) {
-            return ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") ? url : nil
+        if let destination = CommandRanker.destination(from: words) {
+            return ["http", "https", "file"].contains(destination.url.scheme?.lowercased() ?? "") ? destination : nil
         }
-        return engine.searchURL(words)
+        return .init(url: engine.searchURL(words))
     }
 
     /// Where a drag would go: what its pasteboard carries.
-    static func destination(of info: NSDraggingInfo) -> URL? {
+    static func destination(of info: NSDraggingInfo) -> CommandRanker.Destination? {
         let board = info.draggingPasteboard
         let urls = board.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] ?? []
         return destination(urls: urls, text: board.string(forType: .string), engine: Library.shared.searchEngine)
@@ -32,7 +32,7 @@ final class AddressDrop {
     private weak var view: NSView?
     private let ring = CALayer()
     /// Goes to the dropped address in the field's page; false when there's no page to load it in.
-    var onDrop: ((URL) -> Bool)?
+    var onDrop: ((CommandRanker.Destination) -> Bool)?
 
     init(_ view: NSView) {
         self.view = view
@@ -53,8 +53,8 @@ final class AddressDrop {
 
     func perform(_ info: NSDraggingInfo) -> Bool {
         show(false)
-        guard let url = Self.destination(of: info) else { return false }
-        return onDrop?(url) ?? false
+        guard let destination = Self.destination(of: info) else { return false }
+        return onDrop?(destination) ?? false
     }
 
     #if DEBUG
@@ -62,9 +62,9 @@ final class AddressDrop {
     func debugHold(_ on: Bool) { show(on) }
     func debugDrop(_ text: String) -> Bool {
         show(false)
-        guard let url = Self.destination(urls: URL(string: text).map { $0.scheme == "http" || $0.scheme == "https" ? [$0] : [] } ?? [],
-                                         text: text, engine: Library.shared.searchEngine) else { return false }
-        return onDrop?(url) ?? false
+        guard let destination = Self.destination(urls: URL(string: text).map { $0.scheme == "http" || $0.scheme == "https" ? [$0] : [] } ?? [],
+                                                 text: text, engine: Library.shared.searchEngine) else { return false }
+        return onDrop?(destination) ?? false
     }
     #endif
 
