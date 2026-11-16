@@ -195,6 +195,8 @@ final class WindowManager {
     }
 
     func windowBecameKey(_ controller: BrowserWindowController) {
+        // AI apps' window in the background, shown to watch them: never taken for one of yours.
+        guard controllers.contains(where: { $0 === controller }) else { return }
         lastKey = controller
         if #available(macOS 15.4, *) { ExtensionCenter.windowFocused(controller) }
     }

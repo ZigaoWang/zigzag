@@ -2427,6 +2427,17 @@
         }
       }
     },
+    "AI apps are using this window. Closing it hides it again while they work." : {
+      "comment" : "Toast in the window AI apps use in the background, when you show it (Show AI Apps Window).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用正在使用此窗口。在它们工作期间，关闭它只会再次隐藏它。"
+          }
+        }
+      }
+    },
     "Add Space Rule" : {
       "comment" : "Title of the sheet that creates a space rule.",
       "localizations" : {
@@ -18466,6 +18477,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "再显示 %lld 个"
+          }
+        }
+      }
+    },
+    "Show AI Apps Window" : {
+      "comment" : "Menu item and command bar command: brings the window AI apps use in the background on screen, to watch them work. AI Apps is the name of their profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 AI 应用窗口"
           }
         }
       }

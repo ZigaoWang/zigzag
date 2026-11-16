@@ -106,6 +106,64 @@ struct HeadlessTests {
     }
 }
 
+/// Show Headless Window: their window on screen and back out of sight, with the same tabs, so what AI apps were doing
+/// goes on. Never shown for real here: that would bring the test run forward.
+@MainActor
+struct ShowHeadlessWindowTests {
+    @Test func outAndBackWithTheSameTabs() throws {
+        let opened = Headless.openWindow()
+        defer { Headless.closeWindow() }
+        let profile = try #require(Library.shared.directory.headless)
+        let tab = opened.tabManager.newTab(url: nil, select: true)
+        let window = try #require(opened.window as? BrowserWindow)
+        Headless.unpark(opened)
+        #expect(!window.isParked && window.canBecomeKey && window.alphaValue == 1 && !window.ignoresMouseEvents)
+        // On screen, the tab that's up is seen like any window's: it's no longer one that may sleep unseen.
+        #expect(!opened.isOutOfSight)
+        #expect(window.frame.origin != Headless.parkedOrigin)
+        // Never one of your windows, even on screen.
+        #expect(WindowManager.shared.keyController !== opened)
+        // To watch, not to keep: no full screen, no minimizing (it would stop counting as on screen).
+        #expect(window.collectionBehavior.contains(.fullScreenNone) && !window.styleMask.contains(.miniaturizable))
+        Headless.park(opened)
+        #expect(window.isParked && window.frame.origin == Headless.parkedOrigin && opened.isOutOfSight)
+        // Hidden again, it never holds the keyboard.
+        #expect(!window.isKeyWindow && !window.isMainWindow)
+        #expect(Headless.window === opened && Headless.owns(tab) && opened.tabManager.allTabs.contains { $0 === tab })
+        // While AI apps aren't working in the background, closing it closes it.
+        #expect(!Headless.parksInsteadOfClosing(opened))
+        Headless.closeWindow()
+        #expect(Library.shared.removeProfile(profile.id))
+        Library.shared.finishedRemovingProfile(profile.id)
+    }
+
+    /// You've come to look: the tab in front wakes if it slept there, as coming to any window's tab wakes it.
+    @Test func showingItWakesTheTabInFront() async throws {
+        let opened = Headless.openWindow()
+        defer { Headless.closeWindow() }
+        let profile = try #require(Library.shared.directory.headless)
+        let tab = opened.tabManager.newTab(url: URL(string: "about:blank"), select: true)
+        let page = tab.ensureWebView()
+        // A page isn't put to sleep while it's still loading.
+        for _ in 0..<100 where page.isLoading { try await Task.sleep(for: .milliseconds(50)) }
+        tab.suspend(because: "test")
+        for _ in 0..<100 where !tab.isSuspended { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(tab.isSuspended)
+        Headless.unpark(opened)
+        #expect(!tab.isSuspended && tab.webView?.window === opened.window)
+        Headless.closeWindow()
+        #expect(Library.shared.removeProfile(profile.id))
+        Library.shared.finishedRemovingProfile(profile.id)
+    }
+
+    @Test func offeredOnlyWhileAIAppsWorkInTheBackground() {
+        var context = CommandRanker.Context()
+        #expect(!CommandRanker.contextActions(context).contains { $0.id == "show-headless" })
+        context.aiAppsInBackground = true
+        #expect(CommandRanker.contextActions(context).contains { $0.id == "show-headless" && $0.title == Headless.showTitle })
+    }
+}
+
 /// What a page asks of a person in the window AI apps work in, where no one is there: answered no, and the AI app
 /// is told with its next answer.
 @MainActor

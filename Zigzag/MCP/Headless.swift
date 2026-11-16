@@ -228,6 +228,46 @@ enum Headless {
         return made
     }
 
+    /// Show Headless Window: their window comes on screen, to watch them work, made first if it isn't open. They go on
+    /// as they were, in the same tabs, with the same refs. Zigzag is then yours too, Dock icon and all; your own
+    /// windows come when you ask for them.
+    static func showWindow() {
+        guard isActive else { return }
+        let controller = openWindow()
+        becomeRegular()
+        unpark(controller)
+        controller.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        Toast.show(String(localized: "AI apps are using this window. Closing it hides it again while they work.", comment: "Toast in the window AI apps use in the background, when you show it (Show AI Apps Window)."),
+                   symbol: "sparkles", duration: 6, in: controller)
+    }
+
+    /// Back on screen as a browser window is, in the middle of the screen.
+    static func unpark(_ controller: BrowserWindowController) {
+        guard let window = controller.window as? BrowserWindow, window.isParked else { return }
+        window.isParked = false
+        window.alphaValue = 1
+        window.ignoresMouseEvents = false
+        window.isExcludedFromWindowsMenu = false
+        window.hasShadow = true
+        // A window to watch them in, not to keep: full screen and the Dock aren't for it. Minimized, it would stop
+        // counting as on screen, and a page's picture couldn't be taken.
+        window.collectionBehavior = [.fullScreenNone]
+        window.styleMask.remove(.miniaturizable)
+        window.setFrame(BrowserWindowController.defaultFrame(), display: true)
+        // You've come to look: the tab in front wakes if it slept, as coming to any window's tab wakes it.
+        let manager = controller.tabManager
+        manager.selectedTab.map { manager.panes(of: $0) }?.forEach { _ = $0.ensureWebView() }
+    }
+
+    /// Their window, closed while they work: it's hidden again rather than closed, so their tabs stay. False when it
+    /// may close.
+    static func parksInsteadOfClosing(_ controller: BrowserWindowController) -> Bool {
+        guard controller === self.controller, isActive else { return false }
+        park(controller)
+        return true
+    }
+
     /// Whether macOS is kept from napping Zigzag, for their pages' sake.
     static var holdsOffAppNap: Bool { activity != nil }
 
@@ -274,6 +314,8 @@ enum Headless {
     /// by the mouse, Mission Control and ⌘`. It still counts as shown, so its pages run and draw as if seen.
     static func park(_ controller: BrowserWindowController) {
         guard let window = controller.window as? BrowserWindow else { return }
+        // Never left holding the keyboard out of sight: taken off the screen first, the next window of yours has it.
+        if window.isKeyWindow || window.isMainWindow { window.orderOut(nil) }
         window.isParked = true
         window.alphaValue = 0
         window.ignoresMouseEvents = true
@@ -282,6 +324,11 @@ enum Headless {
         window.collectionBehavior = [.transient, .ignoresCycle, .fullScreenNone, .stationary]
         window.setFrame(NSRect(origin: parkedOrigin, size: parkedSize), display: false)
         window.orderBack(nil)
+    }
+
+    /// Where it's offered: the menu bar item, the Window menu and the command bar.
+    static var showTitle: String {
+        String(localized: "Show AI Apps Window", comment: "Menu item and command bar command: brings the window AI apps use in the background on screen, to watch them work. AI Apps is the name of their profile.")
     }
 
     static let parkedOrigin = NSPoint(x: -20000, y: -20000)
@@ -348,6 +395,9 @@ enum Headless {
             guard let item else { return }
             let menu = NSMenu()
             menu.addItem(.sectionHeader(title: String(localized: "AI Apps in the Background", comment: "Heading of the menu bar item's menu while AI apps use Zigzag in the background.")))
+            let show = NSMenuItem(title: Headless.showTitle, action: #selector(Actions.show(_:)), keyEquivalent: "")
+            show.target = Actions.shared
+            menu.addItem(show)
             let stop = NSMenuItem(title: String(localized: "Stop AI Apps", comment: "Menu bar item's menu while AI apps use Zigzag in the background: cuts every AI app off, as Stop on a tab's bar does."),
                                   action: #selector(Actions.stop(_:)), keyEquivalent: "")
             stop.target = Actions.shared
@@ -364,6 +414,7 @@ enum Headless {
 
     private final class Actions: NSObject {
         static let shared = Actions()
+        @objc func show(_ sender: Any?) { MainActor.assumeIsolated { Headless.showWindow() } }
         @objc func stop(_ sender: Any?) { MainActor.assumeIsolated { MCPService.stopAccess() } }
         @objc func quit(_ sender: Any?) { MainActor.assumeIsolated { Headless.quit() } }
     }

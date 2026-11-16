@@ -2340,6 +2340,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         WindowManager.shared.windowBecameKey(self)
     }
 
+    /// AI apps' window in the background, shown and closed while they work: hidden again instead (Headless).
+    func windowShouldClose(_ sender: NSWindow) -> Bool { !Headless.parksInsteadOfClosing(self) }
+
     func windowWillClose(_ notification: Notification) {
         fadeTimer?.invalidate()
         numberHints?.stop()

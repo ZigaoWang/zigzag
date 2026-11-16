@@ -476,6 +476,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
 
+    /// Window › Show Headless Window: the window AI apps use in the background, on screen (Headless).
+    @objc func showHeadlessWindow(_ sender: Any?) { Headless.showWindow() }
+
     /// Settings opens as a tab in the front window, as History does.
     @objc func showSettings(_ sender: Any?) { frontBrowserWindow().map { SettingsPage.open(in: $0) } }
     /// Help › Keyboard Shortcuts: every shortcut, where you can change them.
@@ -500,6 +503,11 @@ extension AppDelegate: NSMenuItemValidation {
     /// Reopen Closed Window is dimmed when there's nothing to bring back; Set as Default Browser hides once it is.
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
+        // Only while AI apps work in the background.
+        if menuItem.action == #selector(showHeadlessWindow(_:)) {
+            menuItem.isHidden = !Headless.isActive
+            return Headless.isActive
+        }
         // Zigzag Mini names it Open in Zigzag while it's in front; anywhere else it's itself again.
         if menuItem.action == #selector(openDocument(_:)) { menuItem.title = BrowserWindowController.openFileTitle }
         // Shows Restart to Update while an update is ready.
