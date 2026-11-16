@@ -681,6 +681,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             only.state = listed ? .on : .off
             menu.addItem(.separator())
             menu.addItem(only)
+            // Turned off here from the notice that it used a lot of energy: choosing it turns it back on here.
+            if installs.offSites(id).contains(site) {
+                let off = SidebarMenus.Item(String(localized: "Off on \(site)", comment: "Site Access choice, checked: the extension is turned off on this site. Choosing it turns it back on there. The site is a domain.")) {
+                    installs.setOff(id, on: site, false)
+                    tab?.reload()
+                }
+                off.state = .on
+                menu.addItem(off)
+            }
             if access == .sites {
                 for other in sites where other != site {
                     let entry = SidebarMenus.Item(String(localized: "On \(other)", comment: "Site Access choice: the extension works on this site, one of the sites listed for it. The site is a domain.")) { installs.setSiteAccess(id, .sites, sites: sites.filter { $0 != other }) }

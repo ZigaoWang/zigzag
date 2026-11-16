@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - In full screen, the close, minimize and full screen buttons that come down with the menu bar have a bar behind them again, instead of floating over the page when the sidebar is hidden.
 - An address typed without http:// or https://, like localtest.me:3000 for a development server, opens over http when the site can't be reached securely, as in Chrome, Safari and Firefox. Zigzag still tries https first, and goes to http only when nothing answers securely: never past a certificate warning, and never for a site that asked to be reached only securely. The same goes for an address you paste, drop on the address bar or open from selected text. ([#252](https://github.com/ZigaoWang/zigzag/issues/252))
 - Security hardening: a page a site sends as a download is always saved, never shown as one of its pages; an extension can replace only files it downloaded itself, and a replaced file goes to the Trash; and the address keeps showing the page you're on while a reload is redirected elsewhere.
+- An extension that reconnects to itself in a loop on every page, as two Sound Booster extensions did, no longer keeps Zigzag busy. After a few seconds of it, Zigzag lets it try only now and then on that page, notes it once in the extensions log, and says which extension it is, with Turn Off… to turn it off on that site or everywhere. Other extensions, and the same one on other pages, aren't affected.
 
 ## [0.9.1] - 2026-11-16
 

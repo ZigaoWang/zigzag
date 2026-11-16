@@ -198,6 +198,8 @@ final class ExtensionHost: NSObject {
     let changed = Signal<Void>()
     /// Answers the Chrome APIs WebKit doesn't have, for this profile's extensions.
     private(set) lazy var bridge = ExtensionBridge(host: self)
+    /// Content scripts held back for reconnecting in a loop (ConnectGuard).
+    private(set) lazy var storms = ExtensionStorms(host: self)
     /// Passes its two signals on to the ones views watch for any profile (ExtensionCenter).
     private var forwarding: [SignalToken] = []
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
@@ -710,7 +712,7 @@ final class ExtensionHost: NSObject {
                 for pattern in Self.patterns(for: site) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
             }
         }
-        for site in ExtensionStore.extensionsOffSites {
+        for site in ExtensionStore.extensionsOffSites.union(profile.installs.offSites(id)) {
             for pattern in Self.patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
     }
@@ -1629,9 +1631,11 @@ extension Tab: WKWebExtensionTab {
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
-        // Which tabs a context sees depends only on whose extensions it runs with.
-        let key = context.webExtensionController.map(ObjectIdentifier.init) ?? ObjectIdentifier(context)
-        return windowController?.tabManager.extensionPlace(of: self, seenBy: key) { $0.isSeen(by: context) } ?? 0
+        windowController?.tabManager.extensionPlace(of: self, seenBy: Tab.seers(context)) { $0.isSeen(by: context) } ?? 0
+    }
+    /// Whose extensions a context runs with: which tabs it sees depends only on that.
+    static func seers(_ context: WKWebExtensionContext) -> ObjectIdentifier {
+        context.webExtensionController.map(ObjectIdentifier.init) ?? ObjectIdentifier(context)
     }
     // A private tab that reaches an extension anyway (none should) tells it nothing: no page, title or address.
     // Nor does a tab on another profile: its page isn't one this context's extensions may reach.
@@ -1700,7 +1704,7 @@ extension BrowserWindowController: WKWebExtensionWindow {
     // A private window is never listed, but should one be reached anyway, its tabs stay unseen.
     // An extension sees the tabs of its own profile: the window may be showing a space on another.
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {
-        tabManager.isPrivate ? [] : tabManager.navigableTabs.filter { $0.isSeen(by: context) }
+        tabManager.isPrivate ? [] : tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) }
     }
 
     /// The tab you're on if it's on the extension's profile; else the one you left selected in a space that is,

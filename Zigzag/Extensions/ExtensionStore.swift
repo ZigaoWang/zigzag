@@ -1377,7 +1377,7 @@ extension ExtensionStore {
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(in: folder, version: state.version)
         // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
-        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill
+        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill + ConnectGuard.source
         // Asked for twice at once (a profile's extensions starting as one is added): made once.
         if let making = overlaysMaking[overlay.path] { return await making.value }
         let fill = fills
@@ -1547,6 +1547,9 @@ extension ExtensionStore {
         // lacks. Real native hosts stay out of reach unless the extension asked for them itself (ExtensionHost).
         var permissions = manifest["permissions"] as? [String] ?? []
         if !permissions.contains("nativeMessaging") { permissions.append("nativeMessaging") }
+        // Its content scripts run after the guard that holds back a reconnect loop (ConnectGuard).
+        let scripts = manifest["content_scripts"] as? [[String: Any]]
+        if let scripts { manifest["content_scripts"] = ConnectGuard.guarding(scripts) }
         // User scripts are WebKit content scripts the extension registers (BridgeUserScripts), which takes "scripting";
         // Chrome's userScripts doesn't, so an extension that asked for userScripts may not have asked for it.
         if permissions.contains("userScripts"), !permissions.contains("scripting") { permissions.append("scripting") }
@@ -1556,6 +1559,7 @@ extension ExtensionStore {
             try out.write(to: overlay.appendingPathComponent("manifest.json"))
             try entry.write(to: overlay.appendingPathComponent("zigzag-entry.js"), atomically: true, encoding: .utf8)
             try prelude.write(to: overlay.appendingPathComponent("zigzag-prelude.js"), atomically: true, encoding: .utf8)
+            if scripts != nil { try ConnectGuard.source.write(to: overlay.appendingPathComponent(ConnectGuard.file), atomically: true, encoding: .utf8) }
             return true
         } catch {
             return false

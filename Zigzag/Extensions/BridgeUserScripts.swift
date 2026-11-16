@@ -275,7 +275,10 @@ final class BridgeUserScripts: BridgeNamespace {
         var scripts: [WKUserScript] = [], handlers: [(world: WKContentWorld, name: String)] = []
         var usesPage = false
         for id in host.profile.installs.installedIDs {
-            guard let context = host.context(for: id), ExtensionBridge.allows(Self.permission, for: context) else { continue }
+            guard let context = host.context(for: id) else { continue }
+            // Any extension's content-script world may say its connects were held back (ConnectGuard).
+            handlers.append((Self.contentScriptWorld(id), ConnectGuard.handlerName))
+            guard ExtensionBridge.allows(Self.permission, for: context) else { continue }
             let registry = registry(for: id)
             handlers.append((Self.contentScriptWorld(id), Self.relayHandler))
             let access = Self.siteAccess(of: context)
@@ -578,6 +581,10 @@ final class BridgeUserScripts: BridgeNamespace {
 
     /// A message from a user-script world (`world`) or from the extension's content-script world in that frame.
     fileprivate func receive(_ message: WKScriptMessage) async -> (Any?, String?) {
+        if message.name == ConnectGuard.handlerName {
+            host.storms.receive(message)
+            return (nil, nil)
+        }
         guard let webView = message.webView, let body = message.body as? [String: Any], let kind = body.string("kind") else { return (nil, "Unknown message") }
         let frame = message.frameInfo
         if message.name == Self.relayHandler {
