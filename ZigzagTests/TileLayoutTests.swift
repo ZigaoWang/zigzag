@@ -10,6 +10,15 @@ struct TileLayoutTests {
 
     // MARK: Places
 
+    /// A tab dropped on a split's row in the sidebar joins it: a quarter of the half on its side, then the last half.
+    @Test func aTabJoinsASplitFromTheSidebar() {
+        #expect(TileShape.joining([.left, .right], onRight: true) == .place(region: .bottomRight, regions: [.left, .topRight]))
+        #expect(TileShape.joining([.left, .right], onRight: false) == .place(region: .bottomLeft, regions: [.topLeft, .right]))
+        #expect(TileShape.joining([.left, .topRight, .bottomRight], onRight: true) == .place(region: .bottomLeft, regions: [.topLeft, .topRight, .bottomRight]))
+        #expect(TileShape.joining([.top, .bottom], onRight: true) == .place(region: .bottomRight, regions: [.top, .bottomLeft]))
+        #expect(TileShape.joining([.topLeft, .topRight, .bottomLeft, .bottomRight], onRight: true) == nil)
+    }
+
     @Test func everyRegionIsItsCells() {
         for region in TileRegion.allCases { #expect(TileRegion(cells: region.cells) == region) }
         #expect(TileRegion(cells: 0b0111) == nil)

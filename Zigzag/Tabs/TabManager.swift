@@ -1498,6 +1498,13 @@ final class TabManager {
         return tab.bookmarkID == nil && panes.count == pair.count && panes.allSatisfy { $0.bookmarkID == nil && $0.spaceID == current.spaceID }
     }
 
+    /// How `tab` joins the split `target` is in, dropped on that split's row in the sidebar (`onRight`: the row's
+    /// right half); nil when it can't (not in a split, the split full, or a page that can't tile in).
+    func joining(_ tab: Tab, onto target: Tab, onRight: Bool) -> TileDrop.Kind? {
+        guard let pair = split(for: target), canTile(tab, beside: target) else { return nil }
+        return TileShape.joining(pair.shape.regions, onRight: onRight)
+    }
+
     /// `tab` into the group on screen with `current`, where `drop` puts it (`TileDrop`): beside a page alone, the two
     /// make a split. A page it takes the place of goes back to being a tab of its own, where it is in the list.
     func tile(_ tab: Tab, beside current: Tab, _ drop: TileDrop.Kind) {

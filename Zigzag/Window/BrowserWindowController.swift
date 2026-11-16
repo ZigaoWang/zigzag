@@ -2901,6 +2901,12 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
+    func listJoinSplit(_ tab: Tab, onto other: Tab, onRight: Bool) {
+        guard let kind = tabManager.joining(tab, onto: other, onRight: onRight) else { return }
+        pageChange(String(localized: "Split View", comment: "Undo action name, shown in the Edit menu as Undo Split View.")) { [tabManager] in
+            tabManager.tile(tab, beside: other, kind)
+        }
+    }
     func listZoomPane(_ tab: Tab) { toggleZoom(tab) }
 
     func listDragOverPage(at windowPoint: NSPoint?, item: SidebarItem) {
