@@ -22,7 +22,7 @@ final class DownloadItem {
     /// A rule's "Open" chose this download: once the file is here, it goes to the Mac's own app for its type. Never
     /// saved with the item — it is about this download, not about the file.
     fileprivate var opensWhenFinished = false
-let sourceURL: URL?
+    let sourceURL: URL?
     /// Bytes a second, smoothed over the last few seconds, for "time left".
     fileprivate(set) var speed: Double = 0
     fileprivate var lastSample: (at: Date, bytes: Int64)?
@@ -559,7 +559,7 @@ extension DownloadManager: WKDownloadDelegate {
         let owner = (download.webView as? BrowserWebView)?.owner
         if let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
-           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false,
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false, filename: name,
                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {
             let handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
                                                   pageOrigin: startedAt ?? SiteOrigin.of(owner.url ?? download.webView?.url),
@@ -567,7 +567,7 @@ extension DownloadManager: WKDownloadDelegate {
                                                   space: Library.shared.space(owner.spaceID)?.name ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
                                                   isPrivate: Self.isPrivate(download),
-window: window, tab: owner)
+                                                  window: window, tab: owner)
             switch await DownloadHandoff.decide(rule, request: handoff, tab: owner, forDownload: true) {
             case .handOff:
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
@@ -627,7 +627,7 @@ window: window, tab: owner)
             item.replaces = replacing
             item.destination = destination
             item.opensWhenFinished = opensWhenFinished
-changed.send(item)
+            changed.send(item)
             started.send((item, window))
         }
         return destination

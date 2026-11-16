@@ -334,7 +334,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
                 // A control keeps its own width at the row's end, as Settings' rows do; anything else fills the row.
                 let fitting = (row.view as? DropdownButton)?.intrinsicContentSize.width
                 let width = min(fitting ?? inner - labelWidth, inner - labelWidth)
-                row.view.frame = NSRect(x: pad + inner - width, y: y, width: width, height: height)
+                row.view.frame = NSRect(x: inner - width, y: rowY, width: width, height: height)
             } else {
                 row.view.frame = NSRect(x: 0, y: rowY, width: inner, height: height)
             }

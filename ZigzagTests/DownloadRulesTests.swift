@@ -467,22 +467,6 @@ struct DownloadRuleTests {
         #expect(DownloadRuleAction(kind: .openFile).isComplete)
     }
 
-    /// A torrent preset catches what it is for — a magnet link, or an address carrying a `.torrent` — and nothing else.
-    /// aria2 and Motrix stay general unless the torrents variant is the one chosen.
-    @Test func aTorrentPresetCatchesTorrentsAndMagnets() {
-        let torrent = DownloadPreset.torrents.rule
-        #expect(torrent.name == "rTorrent")
-        #expect(torrent.matches(URL(string: "magnet:?xt=urn:btih:abc")!))
-        #expect(torrent.matches(URL(string: "https://site.example/file.torrent")!))
-        #expect(!torrent.matches(URL(string: "https://site.example/file.zip")!))
-        #expect(DownloadPreset.aria2.rule.match == .any)
-        // The service dropdown is the whole difference: same catch pattern, another protocol.
-        #expect(TorrentService.rTorrent.style == .xmlrpc)
-        #expect(TorrentService.aria2.style == .json)
-        #expect(TorrentService.motrix.endpoint == "http://127.0.0.1:16800/jsonrpc")
-        #expect(TorrentService.custom.endpoint.isEmpty)
-    }
-
     @Test func aDestinationReadsAsASentence() {
         #expect(destination("pdf, epub", folder: "/Users/me/Documents").destinationSentence
                 == "Files of type pdf, epub are saved to Documents")
@@ -494,9 +478,16 @@ struct DownloadRuleTests {
     @Test func anOpenNeverTakesAnAppScriptOrArchive() {
         #expect(DownloadOpening.isRefused("dmg"))
         #expect(DownloadOpening.isRefused("APP"))
+        #expect(DownloadOpening.isRefused("mpkg"))
+        #expect(DownloadOpening.isRefused("iso"))
+        #expect(DownloadOpening.isRefused("xip"))
+        #expect(DownloadOpening.isRefused("tar.gz"))
         #expect(DownloadOpening.isRefused(""))
         #expect(!DownloadOpening.isRefused("pdf"))
+        #expect(DownloadOpening.isRefused(pattern: "pdf, tar.gz"))
+        #expect(DownloadOpening.isRefused("report.pdf,dmg"))
         #expect(DownloadOpening.isRefused(pattern: "pdf, dmg"))
+        #expect(!DownloadOpening.isRefused("pdf"))
 
         let url = URL(string: "https://example.com/tool.dmg")!
         var open = destination("dmg", .openFile)
@@ -508,6 +499,44 @@ struct DownloadRuleTests {
         let found = DownloadRulesStore.destination(in: [open, save], url: url, filename: "tool.dmg")
         #expect(found?.rule.name == "Save")
         #expect(found?.destination == .folder("/tmp"))
+
+        // The same for an installer and a compound archive, both of which the card would otherwise offer.
+        let installer = URL(string: "https://example.com/tool.mpkg")!
+        let installerOpen = destination("mpkg", .openFile)
+        #expect(DownloadRulesStore.destination(in: [installerOpen], url: installer, filename: "tool.mpkg") == nil)
+        let archive = URL(string: "https://example.com/bundle.tar.gz")!
+        let archiveOpen = destination("tar.gz", .openFile)
+        #expect(DownloadRulesStore.destination(in: [archiveOpen], url: archive, filename: "bundle.tar.gz") == nil)
+    }
+
+    /// The list has one order: a file type before a catch-all handoff decides, and a refused Open is no match, so a
+    /// handoff behind it can still take the file.
+    @Test func aTypeRuleBeforeACatchAllHandoffWins() {
+        var type = destination("pdf", .saveToFolder, folder: "/tmp")
+        type.name = "Type"
+        var catchAll = rule(.any)
+        catchAll.name = "Catch-all"
+        let url = URL(string: "https://example.com/file.pdf")!
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [type, catchAll], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false) == nil)
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [catchAll, type], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false)?.name == "Catch-all")
+
+        var refused = destination("dmg", .openFile)
+        refused.name = "Open DMG"
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [refused, catchAll],
+                                                     url: URL(string: "https://example.com/x.dmg")!, filename: "x.dmg",
+                                                     appliesToLinks: false)?.name == "Catch-all")
+    }
+
+    /// The last word on Open: an app, a script, an installer, an archive or a file with no type is saved, while a PDF
+    /// may open.
+    @MainActor @Test func placingAnOpenNeverOpensARefusedType() {
+        let unique = UUID().uuidString
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique).pdf")?.openWhenFinished == true)
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique).dmg")?.openWhenFinished == false)
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique).mpkg")?.openWhenFinished == false)
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique)")?.openWhenFinished == false)
     }
 
     /// A file type is named by its extensions, so it needs no name of its own — where an address rule has nothing to
@@ -563,7 +592,7 @@ struct DownloadRuleTests {
     // MARK: The handoff question
 
     @Test func downloadServicesTakeDownloadsOnly() {
-        for preset in [DownloadPreset.aria2, .motrix, .torrents, .ytdlp] {
+        for preset in [DownloadPreset.aria2, .motrix, .rTorrent, .ytdlp] {
             #expect(preset.rule.applies == .downloads)
         }
         // A player is for the links you click, and for files that turn out to be media.

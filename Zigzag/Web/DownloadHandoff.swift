@@ -43,9 +43,10 @@ enum DownloadHandoff {
     }
 
     /// The rule that catches `url`, if any, and whether it wants a link (true) or a download (false).
-    static func firstMatch(_ url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+    static func firstMatch(_ url: URL, appliesToLinks: Bool, filename: String = "", isPrivate: Bool = false) -> DownloadRule? {
         guard isHandoffable(url) else { return nil }
-        return DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+        return DownloadRulesStore.shared.firstHandoffMatch(url: url, filename: filename, appliesToLinks: appliesToLinks,
+                                                           isPrivate: isPrivate)
     }
 
     /// Whether a rule may take this address at all. Zigzag's own pages and the certificate warning's proceed link are
