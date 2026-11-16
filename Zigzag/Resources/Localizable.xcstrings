@@ -4256,6 +4256,17 @@
         }
       }
     },
+    "Choose the app this rule opens the link with." : {
+      "comment" : "Tooltip on the app field of a download rule whose action has no app yet, so its Add button is greyed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择这条规则用来打开链接的应用。"
+          }
+        }
+      }
+    },
     "Choose the folder that contains the extension’s manifest.json." : {
       "comment" : "Message of the panel that loads an unpacked extension. manifest.json is a file name.",
       "localizations" : {
@@ -4263,6 +4274,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取包含该扩展 manifest.json 的文件夹。"
+          }
+        }
+      }
+    },
+    "Choose the script this rule runs." : {
+      "comment" : "Tooltip on the script field of a download rule whose action has no script yet, so its Add button is greyed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择这条规则运行的脚本。"
           }
         }
       }
@@ -7785,6 +7807,17 @@
         }
       }
     },
+    "Give the rule a name." : {
+      "comment" : "Tooltip on the name field of a download rule being added without one, so its Add button can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给这条规则起个名字。"
+          }
+        }
+      }
+    },
     "Glass" : {
       "comment" : "A row in the space editor's Effects, for a see-through space: clear or frosted glass.\nTooltip and accessibility label of a preset look in the space editor. Clear, see-through glass.",
       "localizations" : {
@@ -10020,6 +10053,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "给它起个名字，再选一个颜色"
+          }
+        }
+      }
+    },
+    "Name the method to call on the service." : {
+      "comment" : "Tooltip on the method field of a JSON-RPC download rule that names no method, so its Add button is greyed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填写要在该服务上调用的方法名。"
           }
         }
       }
@@ -14383,6 +14427,17 @@
         }
       }
     },
+    "Run directly, never through a shell" : {
+      "comment" : "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line, since the script is run directly.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "直接运行，不经过 shell"
+          }
+        }
+      }
+    },
     "Run hidden pages of its own in the background" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings: the offscreen permission, for pages you never see that can play sound or use the clipboard.",
       "localizations" : {
@@ -17619,6 +17674,17 @@
         }
       }
     },
+    "This address needs a scheme, like “mpv://” or “https://”." : {
+      "comment" : "Tooltip on the address field of a download rule whose address has no scheme, so nothing could open it and its Add button is greyed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个地址需要有协议前缀，比如“mpv://”或“https://”。"
+          }
+        }
+      }
+    },
     "This afternoon" : {
       "comment" : "Name of a History session that began today.",
       "localizations" : {
@@ -18572,6 +18638,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "键入任意网站的名称，再按 Tab 键，即可在该网站中搜索"
+          }
+        }
+      }
+    },
+    "Type the address of the JSON-RPC service, like http://127.0.0.1:6800/jsonrpc." : {
+      "comment" : "Tooltip on the endpoint field of a JSON-RPC download rule that has none, or one that has a scheme missing or no address at all, so its Add button is greyed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填写 JSON-RPC 服务的地址，例如 http://127.0.0.1:6800/jsonrpc。"
+          }
+        }
+      }
+    },
+    "Type the address this rule sends the link to." : {
+      "comment" : "Tooltip on the address field of a download rule whose action has no address yet, so its Add button is greyed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填写这条规则把链接发送到的地址。"
+          }
+        }
+      }
+    },
+    "Type what this rule catches." : {
+      "comment" : "Tooltip on the address field of a download rule with no pattern yet, so its Add button can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填写这条规则要匹配的内容。"
           }
         }
       }

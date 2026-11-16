@@ -465,6 +465,14 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
     }
 
+    /// Whether the service's endpoint is an address it could be reached at: it needs a scheme. `URL(string:)` is
+    /// forgiving — it parses `bing.com`, and a bare word — so scheme-less text is not an address a request could go
+    /// to, and a rule that couldn't work is never saved quietly.
+    var endpointIsUsable: Bool {
+        guard let url = URL(string: rpcEndpoint), let scheme = url.scheme, !scheme.isEmpty else { return false }
+        return true
+    }
+
     /// Whether the action has what it needs to run.
     var isComplete: Bool {
         switch kind {
@@ -477,7 +485,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .runScript:
             return !scriptPath.isEmpty
         case .jsonRPC:
-            return !rpcEndpoint.isEmpty && URL(string: rpcEndpoint) != nil && !rpcMethod.isEmpty
+            return endpointIsUsable && !rpcMethod.isEmpty
         case .saveToFolder:
             return !folderPath.isEmpty
         case .openFile:

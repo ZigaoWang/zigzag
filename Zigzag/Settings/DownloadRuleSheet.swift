@@ -26,6 +26,8 @@ enum DownloadRuleSheet {
             ? String(localized: "pdf, epub", comment: "Placeholder of the file-extension field in the sheet that makes a per-extension destination: the extensions to list, like pdf, epub.")
             : String(localized: "example.com/files/", comment: "Placeholder of the pattern field in the sheet that makes a download rule."))
         pattern.stringValue = source.pattern
+        /// Whether the pointer is over the main button, which asks for the whole answer to "why can't I add this?".
+        var addHovered = false
 
         let applies = DropdownButton()
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
@@ -154,8 +156,8 @@ enum DownloadRuleSheet {
             actionRows.append(.note(String(localized: "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES.",
                                            comment: "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.")))
             actionRows.append(FormSheet.Row(label: nil,
-                                            view: StatusLabel(String(localized: "Not run through a shell",
-                                                                     comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line."),
+                                            view: StatusLabel(String(localized: "Run directly, never through a shell",
+                                                                     comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line, since the script is run directly."),
                                                               symbol: "checkmark.shield.fill"),
                                             height: Tokens.Metric.controlHeight))
         case .jsonRPC:
@@ -302,32 +304,38 @@ enum DownloadRuleSheet {
                        color: offThisMac ? Tokens.Color.warning : nil)
         }
 
-        func isValid(_ rule: DownloadRule) -> Bool {
-            guard !rule.name.isEmpty || rule.action.kind.isDestination else { return false }
-            guard rule.match == .any || !rule.pattern.isEmpty else { return false }
-            guard rule.isValidPattern else { return false }
-            if rule.action.kind.isDestination {
-                // An extension list is what a type rule reads: a comma with nothing between is not one.
-                guard !DownloadRule.Match.extensions(in: rule.pattern).isEmpty else { return false }
+        /// Mark the fields holding Add back: the pattern, and the action's own field. `all` also marks the two you
+        /// may simply not have reached yet — a name and a pattern that is still empty — which is what the pointer over
+        /// the dead button asks for. One list serves the markers, the tooltips and the button's own answer, so the
+        /// three can never disagree.
+        func markHeldUp(_ rule: DownloadRule?) {
+            let held = rule.map { Self.heldUp($0, all: addHovered) } ?? []
+            let notes = Dictionary(held.map { ($0.field, $0.note) }, uniquingKeysWith: { first, _ in first })
+            // The fields this sheet holds. Every one this sheet can show is marked.
+            let fields: [HeldField: FilledField?] = [.name: name, .pattern: pattern, .action(.app): appField,
+                                                     .action(.url): urlField, .action(.script): scriptField,
+                                                     .action(.endpoint): endpointField, .action(.method): methodField,
+                                                     .action(.folder): folderField]
+            for (which, field) in fields {
+                let note = notes[which]
+                field?.isInvalid = note != nil
+                field?.toolTip = note
             }
-            if rule.action.kind == .saveToFolder, !rule.action.folderPath.contains("{") {
-                // A folder that has gone, or is a file, would silently fall back to the ordinary downloads folder. A
-                // path with tokens is checked when it is expanded for the download, since it names no one folder yet.
-                let path = (rule.action.folderPath as NSString).expandingTildeInPath
-                var isDirectory: ObjCBool = false
-                guard !path.isEmpty,
-                      FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
-                      isDirectory.boolValue else { return false }
-            }
-            // Open is not offered for an app, a script, an installer or an archive: such a rule could only be saved
-            // and then refused, so the sheet asks for Save instead.
-            guard !(rule.action.kind == .openFile && DownloadOpening.isRefused(pattern: rule.pattern)) else { return false }
-            return rule.action.isComplete
         }
+
+        /// What the dead Add button says for itself: the first thing to fix, in the order the form is filled in.
+        func heldUpNote() -> String? {
+            ruleFromFields().flatMap { Self.heldUp($0, all: true).first?.note }
+        }
+
+        /// A rule is ready when nothing is holding it up: the same list the fields and the button are told from.
+        func isValid(_ rule: DownloadRule) -> Bool { Self.heldUp(rule, all: true).isEmpty }
+
         let valid = {
             let rule = ruleFromFields()
             // Where the cookies would go is said as the endpoint is written, whether or not the rule is ready.
             refreshCookieStatus(rule)
+            markHeldUp(rule)
             return rule.map(isValid) ?? false
         }
         for picker in [applies, match] + [stylePicker].compactMap({ $0 }) {
@@ -390,6 +398,13 @@ enum DownloadRuleSheet {
             }
         }
         sheetRef = sheet
+        // Hovering the dead Add button marks every field holding it up, and the button says the first of them for
+        // itself; leaving it takes the markers back.
+        sheet.onConfirmHover = { over in
+            addHovered = over
+            sheetRef?.revalidate()
+        }
+        sheet.heldUpNote = { heldUpNote() }
         // The folder belongs to one of the two destinations. Choosing the other takes the row out of the form
         // rather than leaving a field there that would be ignored — and puts it back, with the folder it had.
         if let whereTo = destinationField, let folderActionRow {
@@ -403,22 +418,110 @@ enum DownloadRuleSheet {
         }
     }
 
-    /// A field with a button at its end, both stretched across the form's row.
-    private static func stack(_ field: NSView, _ button: NSView) -> NSStackView {
+    /// A field with a button beside it (a path and Choose…). The sheet lays its rows out by frame, and
+    /// `NSStackView(views:)` turns autoresizing off, so without this the stack would size to its content — the field's
+    /// own width plus the button — and the button would be drawn past the row's end, unseen. The field is what gives
+    /// way when the row is narrower than the two together; the button keeps its own width.
+    static func stack(_ field: NSView, _ button: NSView) -> NSStackView {
         let stack = NSStackView(views: [field, button])
         stack.orientation = .horizontal
         stack.spacing = Tokens.Space.x2
         stack.distribution = .fill
         stack.alignment = .centerY
-        // The sheet lays its rows out by frame; a stack built from views turns autoresizing off and would ignore it.
         stack.translatesAutoresizingMaskIntoConstraints = true
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         button.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        // Shrinking is the other half: with both at the default resistance, a row narrower than field + button
-        // lays the button out past the end rather than drawing it inside.
+        // Shrinking is the other half of it: with both at the default resistance, a row narrower than field + button
+        // can't be resolved and the stack lays the button out past the end rather than drawing it inside.
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return stack
+    }
+
+    /// Everything holding a rule's Add button back, in the order the form is filled in: the name, what it matches,
+    /// then the action's own field. `all` adds the two you may simply not have reached yet — an empty name and an
+    /// empty pattern — which is what the pointer over the dead button asks for; a broken expression is always worth
+    /// saying. Empty means Add can be pressed, so this is also what a rule's readiness means.
+    static func heldUp(_ rule: DownloadRule, all: Bool) -> [(field: HeldField, note: String)] {
+        var held: [(field: HeldField, note: String)] = []
+        // A name is for the list's own reading; a per-extension destination is named by its extensions.
+        if all, rule.name.isEmpty, !rule.action.kind.isDestination {
+            held.append((.name, String(localized: "Give the rule a name.", comment: "Tooltip on the name field of a download rule being added without one, so its Add button can't be pressed.")))
+        }
+        if rule.match == .fileType {
+            // An extension list is what a type rule reads: a comma with nothing between is not one.
+            if DownloadRule.Match.extensions(in: rule.pattern).isEmpty {
+                if all || !rule.pattern.isEmpty {
+                    held.append((.pattern, String(localized: "List the file extensions this rule catches, like pdf, epub.", comment: "Tooltip on the extensions field of a per-extension destination that names none, so its Add button can't be pressed.")))
+                }
+            } else if rule.action.kind == .openFile, DownloadOpening.isRefused(pattern: rule.pattern) {
+                held.append((.pattern, String(localized: "Apps, scripts, installers and archives are always saved, never opened.", comment: "Tooltip on the extensions field of a per-extension destination that Open refuses, so its Add button can't be pressed.")))
+            }
+        } else if rule.match != .any, rule.pattern.isEmpty {
+            if all {
+                held.append((.pattern, String(localized: "Type what this rule catches.", comment: "Tooltip on the address field of a download rule with no pattern yet, so its Add button can't be pressed.")))
+            }
+        } else if !rule.isValidPattern {
+            held.append((.pattern, String(localized: "That isn’t a working regular expression. Zigzag saves nothing it can’t read.", comment: "Tooltip on the address field of a download rule whose regular expression doesn't compile.")))
+        }
+        if let action = actionHoldUp(rule.action) { held.append((.action(action.field), action.note)) }
+        return held
+    }
+
+    /// Which of the sheet's fields something can be said about.
+    enum HeldField: Hashable {
+        case name
+        case pattern
+        case action(ActionField)
+    }
+
+    /// Which of a rule action's own fields is holding its Add button back, if one is.
+    enum ActionField: Hashable { case app, url, script, endpoint, method, folder }
+
+    /// The field a rule's action still needs something in, and what to say about it: nil when the action can run.
+    /// Kept out of the sheet so the one thing that decides it — `isComplete` — is tested against every kind, and so a
+    /// greyed Add button never leaves the person guessing which field to fill. An address with no scheme (`bing.com`)
+    /// is complete's own case, and its own words.
+    static func actionHoldUp(_ action: DownloadRuleAction) -> (field: ActionField, note: String)? {
+        switch action.kind {
+        case .openApp:
+            return action.appPath.isEmpty
+                ? (.app, String(localized: "Choose the app this rule opens the link with.", comment: "Tooltip on the app field of a download rule whose action has no app yet, so its Add button is greyed."))
+                : nil
+        case .openURL:
+            if action.urlTemplate.isEmpty {
+                return (.url, String(localized: "Type the address this rule sends the link to.", comment: "Tooltip on the address field of a download rule whose action has no address yet, so its Add button is greyed."))
+            }
+            return action.isComplete ? nil
+                : (.url, String(localized: "This address needs a scheme, like “mpv://” or “https://”.", comment: "Tooltip on the address field of a download rule whose address has no scheme, so nothing could open it and its Add button is greyed."))
+        case .runScript:
+            return action.scriptPath.isEmpty
+                ? (.script, String(localized: "Choose the script this rule runs.", comment: "Tooltip on the script field of a download rule whose action has no script yet, so its Add button is greyed."))
+                : nil
+        case .jsonRPC:
+            if !action.endpointIsUsable {
+                return (.endpoint, String(localized: "Type the address of the JSON-RPC service, like http://127.0.0.1:6800/jsonrpc.", comment: "Tooltip on the endpoint field of a JSON-RPC download rule that has none, or one that has a scheme missing or no address at all, so its Add button is greyed."))
+            }
+            return action.rpcMethod.isEmpty
+                ? (.method, String(localized: "Name the method to call on the service.", comment: "Tooltip on the method field of a JSON-RPC download rule that names no method, so its Add button is greyed."))
+                : nil
+        case .saveToFolder:
+            if action.folderPath.isEmpty {
+                return (.folder, String(localized: "Choose the folder this type is saved into.", comment: "Tooltip on the folder field of a per-extension destination that saves files with no folder chosen, so its Add button is greyed."))
+            }
+            // A folder that has gone, or is a file, would silently fall back to the ordinary downloads folder. A path
+            // with tokens is checked when it is expanded for the download, since it names no one folder yet.
+            guard action.folderPath.contains("{") else {
+                let path = (action.folderPath as NSString).expandingTildeInPath
+                var isDirectory: ObjCBool = false
+                let exists = !path.isEmpty && FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
+                return exists ? nil
+                    : (.folder, String(localized: "That folder isn’t there. Choose one that is.", comment: "Tooltip on the folder field of a per-extension destination whose folder has gone or is a file, so its Add button is greyed."))
+            }
+            return nil
+        case .openFile:
+            return nil
+        }
     }
 }
 
