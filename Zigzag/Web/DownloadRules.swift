@@ -115,6 +115,11 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// or its cookies, to another app or script is exactly what could break that promise. A private window runs no
     /// rule that hasn't been let in, and the link or download carries on as if no rule had matched.
     var runsInPrivateWindows = false
+    /// When this rule takes a link, the page it was on goes no further: the tab doesn't load or follow the address
+    /// it was going to. Off (the default) means the link carries on where the rule let it — in the browser, or
+    /// nowhere at all where the rule handed it off. On is for a rule that catches a whole site's clicks, where the
+    /// page's own loads and redirects would otherwise keep matching it.
+    var stopsThePage = false
     var action: DownloadRuleAction
 
     /// A regex that doesn't compile is kept as typed but never matches, so a half-written rule can't catch anything.
@@ -251,7 +256,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, action
+        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, stopsThePage, action
     }
 
     /// Older files may lack a key a newer Zigzag added, and a kind this build doesn't know (a file-type rule from
@@ -277,6 +282,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         pattern = value(String.self, .pattern) ?? ""
         isCaseSensitive = value(Bool.self, .isCaseSensitive) ?? false
         runsInPrivateWindows = value(Bool.self, .runsInPrivateWindows) ?? false
+        stopsThePage = value(Bool.self, .stopsThePage) ?? false
         action = value(DownloadRuleAction.self, .action) ?? DownloadRuleAction(kind: .openURL)
         // A rule that isn't an object, has no action, or names a kind this build doesn't know is kept, but not run:
         // it could not do what it says, and a prompt for it would be a question with no true answer. A `.contains`

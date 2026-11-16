@@ -485,11 +485,13 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-            // A rule that was matched but didn't take it leaves the pop-up's page as it was.
-            if case .noMatch = outcome { return false }
+            // A rule that was matched but didn't take it leaves the pop-up's page as it was — unless the rule is set
+            // to stop the page, which keeps a link here from loading on and matching the rule again. A download has
+            // nowhere to go on to.
+            if case .noMatch = outcome { return appliesToLinks && rule.stopsThePage }
             return true
         case .browser:
-            return false
+            return appliesToLinks && rule.stopsThePage
         case .cancel:
             // Don't Allow: a link asked for goes nowhere, and a download is not saved either.
             return true

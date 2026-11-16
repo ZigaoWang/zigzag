@@ -43,6 +43,8 @@ enum DownloadRuleSheet {
         matchCase.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
         let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
         runsInPrivate.setAccessibilityLabel(String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
+        let stopsThePage = Toggle(isOn: source.stopsThePage)
+        stopsThePage.setAccessibilityLabel(String(localized: "Stop the page", comment: "Label of the switch in a download rule's sheet that keeps the page from loading on after the rule has taken a link."))
 
         // The action's own fields, one set per kind.
         var actionRows: [FormSheet.Row] = []
@@ -220,8 +222,11 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet."), view: pattern),
             FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
             FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
+            FormSheet.Row(label: String(localized: "Stop the page", comment: "Label of the switch in a download rule's sheet that keeps the page from loading on after the rule has taken a link."), view: stopsThePage),
         ]
         // A destination adds what it does; an address rule lists its tokens, unless its path is literal (Open App).
+        let stopPageNote = FormSheet.Row.note(String(localized: "Stop the page: a link this rule takes goes no further — nothing else loads, and the page’s own redirects don’t run the rule again.",
+                                                     comment: "Explanation under the stop-the-page switch in a download rule's sheet."))
         let rows = matchRows + actionRows + (isDestination ? [
             FormSheet.Row.note(String(localized: "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins.",
                                                  comment: "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.")),
@@ -230,7 +235,7 @@ enum DownloadRuleSheet {
             FormSheet.Row.note(String(localized: "Apps, scripts, installers, archives and .mobileconfig files are always saved, never opened.",
                                       comment: "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.")),
             tokens,
-        ] : (action.kind == .openApp ? [] : [tokens]))
+        ] : [stopPageNote] + (action.kind == .openApp ? [] : [tokens]))
 
         func ruleFromFields() -> DownloadRule? {
             var action = action
@@ -262,6 +267,7 @@ enum DownloadRuleSheet {
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             rule.isCaseSensitive = matchCase.isOn
             rule.runsInPrivateWindows = runsInPrivate.isOn
+            rule.stopsThePage = stopsThePage.isOn
             rule.action = action
             return rule
         }
