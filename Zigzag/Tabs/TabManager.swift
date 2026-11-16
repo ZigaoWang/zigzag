@@ -265,7 +265,7 @@ final class TabManager {
         let space = spaceID ?? (configuration != nil ? opener?.spaceID : nil) ?? made.flatMap { self.space(for: $0) } ?? currentSpaceID
         let tab = Tab(url: url, title: title, spaceID: space, configuration: configuration)
         // Whoever gave the address loads it: a page's link in a new tab is the page's doing, a typed one yours.
-        tab.firstLoadSender = sender
+        tab.firstLoad.sender = sender
         tab.host = host
         watch(tab)
         tab.opener = opener

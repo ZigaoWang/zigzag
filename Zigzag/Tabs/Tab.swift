@@ -734,13 +734,17 @@ final class Tab: NSObject {
         changed.send(.language)
     }
 
-    func load(_ url: URL, by sender: LoadSender = .zigzag) {
+    /// `httpFallback`: `url` is https Zigzag chose for an address given without a scheme, so if it can't be reached
+    /// the same address goes over http, once (`CommandRanker.Destination`).
+    func load(_ url: URL, by sender: LoadSender = .zigzag, httpFallback: Bool = false) {
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
         if let webView, Self.isExtensionPage(url) != showsExtensionPage {
             self.url = url
             changed.send(.url)
             tearDown(webView)
+            // The new web view loads it as its first load, for whoever sent it.
+            firstLoad = FirstLoad(sender: sender, httpFallback: httpFallback)
             ensureWebView()
             return
         }
@@ -751,7 +755,7 @@ final class Tab: NSObject {
             changed.send(.url)
         }
         let webView = ensureWebView()
-        load(url, in: webView, by: sender)
+        load(url, in: webView, by: sender, httpFallback: httpFallback)
         refreshSettingsPage()
     }
 
@@ -819,8 +823,27 @@ final class Tab: NSObject {
         let sender: LoadSender
         let url: URL
     }
-    /// Who the address this tab was made with came from, for its first load (a link a page opened in a new tab).
-    var firstLoadSender: LoadSender = .zigzag
+    /// How the address this tab was made with is loaded when its web view is: who it came from (a link a page opened
+    /// in a new tab is the page's), and whether it may go over http if https can't reach it.
+    var firstLoad = FirstLoad()
+    struct FirstLoad: Equatable {
+        var sender: LoadSender = .zigzag
+        /// An address given without a scheme (`CommandRanker.Destination`).
+        var httpFallback = false
+    }
+    /// The address over http this tab tries once if the one it's loading over https can't be reached, for an address
+    /// you gave Zigzag without a scheme (`CommandRanker.Destination`), as other browsers do. It belongs to that
+    /// address: a load of another one, the main frame's next decision for another one (a redirect, a page's own
+    /// navigation, Back), or a page arriving ends it, so it never stands in for a navigation it wasn't given for.
+    private var pendingHTTPFallback: HTTPFallback?
+    struct HTTPFallback: Equatable {
+        /// The address tried first.
+        let secure: URL
+        /// The same address over http.
+        let plain: URL
+        /// Who sent the load, who sends the one over http too.
+        let sender: LoadSender
+    }
     /// Where Zigzag itself is taking this tab back or forward (its buttons, a swipe, the keyboard, restored history):
     /// the only Back or Forward that may land on one of Zigzag's own pages. A page's history.back() may not.
     private var ownHistoryTarget: URL?
@@ -875,8 +898,16 @@ final class Tab: NSObject {
     }
 
     /// Loads a page in this tab's web view for `sender`: only Zigzag's own loads, and yours, count as its own.
-    private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender) {
+    /// `httpFallback`: try the same address over http once if this one, over https, can't be reached. Without it, a
+    /// fallback already pending holds only for the same address (loaded again: asked for as another browser, after
+    /// a crash).
+    private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender, httpFallback: Bool = false) {
         ownLoadPending = sender == .page ? nil : OwnLoad(sender: sender, url: url)
+        if httpFallback {
+            pendingHTTPFallback = Self.overHTTP(url).map { HTTPFallback(secure: url, plain: $0, sender: sender) }
+        } else if let pending = pendingHTTPFallback, !Self.sameAddress(pending.secure, url) {
+            pendingHTTPFallback = nil
+        }
         Self.load(url, in: webView)
     }
 
@@ -886,6 +917,23 @@ final class Tab: NSObject {
     static func ownSender(of pending: OwnLoad?, for request: URL?) -> LoadSender? {
         guard let pending, let request else { return nil }
         return sameAddress(pending.url, request) ? pending.sender : nil
+    }
+
+    /// The address over http to go to instead, when the load `pending` was for failed the way a server that doesn't
+    /// speak https fails (`ErrorPage.fallsBackToHTTP`): at the address it was for (WebKit may have tidied it), never
+    /// after a redirect elsewhere, and never for a site that asked to be reached only securely (HSTS), which WebKit
+    /// would take back to https anyway. Nil otherwise, and the error page shows.
+    static func fallbackURL(for pending: HTTPFallback?, after error: NSError, failing: URL?, strictTransport: Bool) -> URL? {
+        guard let pending, let failing, failing.scheme?.lowercased() == "https", sameAddress(pending.secure, failing), !strictTransport,
+              ErrorPage.fallsBackToHTTP(ErrorPage.kind(of: error, url: failing)) else { return nil }
+        return pending.plain
+    }
+
+    /// An https address as http, the rest of it as it was (port, path, query, fragment); nil for any other.
+    static func overHTTP(_ url: URL) -> URL? {
+        guard url.scheme?.lowercased() == "https", var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        parts.scheme = "http"
+        return parts.url
     }
 
     nonisolated static func sameAddress(_ a: URL, _ b: URL) -> Bool {
@@ -927,9 +975,9 @@ final class Tab: NSObject {
 
     /// The first load of a tab made with an address, as whoever gave it.
     private func loadFirst(_ url: URL, in webView: WKWebView) {
-        let sender = firstLoadSender
-        firstLoadSender = .zigzag
-        load(url, in: webView, by: sender)
+        let first = firstLoad
+        firstLoad = FirstLoad()
+        load(url, in: webView, by: first.sender, httpFallback: first.httpFallback)
     }
 
     /// Local files need read access granted to their folder; everything else is a plain request.
@@ -1425,6 +1473,10 @@ extension Tab: WKNavigationDelegate {
         if decidesMainFrame {
             ownLoadPending = nil
             ownHistoryTarget = nil
+            // A fallback over http is for the address it was given for: any other the main frame goes to ends it.
+            if let pending = pendingHTTPFallback, !(navigationAction.request.url.map { Self.sameAddress(pending.secure, $0) } ?? false) {
+                pendingHTTPFallback = nil
+            }
         }
         // A download link you click saves. One a script starts on its own saves too (an export that's ready), but not
         // a stream of them (`DownloadPolicy`, the same as a pop-up window's). A click inside a frame lets that frame
@@ -1648,6 +1700,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
+        // A page arrived: nothing is left to fall back from.
+        pendingHTTPFallback = nil
         forgetPageErrors()
         // The new page is here: its address shows.
         addressWaitsForCommit = false
@@ -1777,18 +1831,46 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLeavingPage = false
-        // It never came: the address goes back to the page still showing.
         addressWaitsForCommit = false
+        // Over http instead: the address stays as you gave it until that load shows its own.
+        if fallBackToHTTP(after: error as NSError, in: webView) { return }
+        // It never came: the address goes back to the page still showing.
         if webView.url != url { followAddress(of: webView) }
         handle(error, in: webView)
     }
 
+    /// Cancelled loads, frame-load-interrupted (downloads, policy changes) and media WebKit plays itself (a direct
+    /// .mp4 or .mp3 link, reported as "plug-in handled load") are not failures.
+    private static func isFailure(_ error: NSError) -> Bool {
+        !(error.code == NSURLErrorCancelled || (error.domain == "WebKitErrorDomain" && [102, 204].contains(error.code)))
+    }
+
+    /// The address a load failed at: the error's, else the tab's.
+    private func failingURL(of error: NSError) -> URL? {
+        (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
+    }
+
+    /// An address you gave without a scheme that https couldn't reach (`Tab.fallbackURL`): the same address over
+    /// http, once, in place of the error page, as other browsers do, started once WebKit is done with this failure.
+    /// Any other failure ends the fallback; one that isn't a failure (the ask-again cancels by policy) leaves it.
+    private func fallBackToHTTP(after error: NSError, in webView: WKWebView) -> Bool {
+        guard let pending = pendingHTTPFallback, Self.isFailure(error) else { return false }
+        pendingHTTPFallback = nil
+        let failing = failingURL(of: error)
+        let strict = failing?.host().map { StrictTransport.isKnown($0.lowercased(), in: webView.configuration.websiteDataStore) } ?? false
+        guard let plain = Self.fallbackURL(for: pending, after: error, failing: failing, strictTransport: strict) else { return false }
+        Diagnostics.note("Opened over http", site: failing?.host(), "https: \(Diagnostics.describe(error))", isPrivate: isPrivate)
+        DispatchQueue.main.async { [weak self, weak webView] in
+            guard let self, let webView, self.webView === webView else { return }
+            self.load(plain, by: pending.sender)
+        }
+        return true
+    }
+
     private func handle(_ error: Error, in webView: WKWebView) {
         let nsError = error as NSError
-        // Cancelled loads, frame-load-interrupted (downloads, policy changes) and media WebKit plays itself (a direct
-        // .mp4 or .mp3 link, reported as "plug-in handled load") are not failures.
-        if nsError.code == NSURLErrorCancelled || (nsError.domain == "WebKitErrorDomain" && [102, 204].contains(nsError.code)) { return }
-        let failingURL = (nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
+        guard Self.isFailure(nsError) else { return }
+        let failingURL = failingURL(of: nsError)
         // "Visit anyway" only with the very certificate it trusts in hand, and never for a site that asked to be
         // reached only securely (HSTS): then the warning says why there's no way past.
         let failingHost = failingURL?.host()?.lowercased()

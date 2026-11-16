@@ -128,6 +128,15 @@ enum ErrorPage {
         return [.secureFailed, .refused, .timedOut, .broken].contains(kind)
     }
 
+    /// The kinds an address tried over https gets from a server that only speaks http, so the same address over http
+    /// is tried next (`Tab.fallbackURL`): no secure connection could be made (what answered doesn't speak it), or
+    /// nothing answered on that port. Never a certificate's warning, which keeps its own way past, nor a timeout,
+    /// which would wait a minute first and which anyone between you and the site can cause; offline or not found,
+    /// http gets no further.
+    static func fallsBackToHTTP(_ kind: Kind) -> Bool {
+        [.secureFailed, .refused].contains(kind)
+    }
+
     static func kind(of error: NSError, url: URL) -> Kind {
         // An extension's own page, from an extension that's been removed or turned off.
         if url.scheme == "webkit-extension" { return .extensionGone }

@@ -138,7 +138,7 @@ final class PeekController {
         tab.host = controller
         tab.opener = opener
         tab.isPeek = true
-        tab.firstLoadSender = sender
+        tab.firstLoad.sender = sender
         self.tab = tab
         token = tab.changed.observe { [weak self] change in self?.tabChanged(change) }
         let webView = tab.ensureWebView()

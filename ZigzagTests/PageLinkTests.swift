@@ -83,6 +83,39 @@ struct PageLinkTests {
         #expect(Tab.withoutDotSegments("/a/b/c/./../../g") == "/a/g")
         #expect(Tab.withoutDotSegments("mid/content=5/../6") == "mid/6")
     }
+
+    /// An address typed without a scheme that https couldn't reach goes over http once, at that very address, only for
+    /// a server that doesn't speak https or nothing on the port, never for a site that asked to be reached securely.
+    @Test func aTypedAddressFallsBackToHTTPOnlyWhereHTTPSCantBeReached() throws {
+        let secure = try #require(URL(string: "https://LocalTest.me:3600"))
+        let plain = try #require(URL(string: "http://LocalTest.me:3600"))
+        let pending = Tab.HTTPFallback(secure: secure, plain: plain, sender: .you)
+        func error(_ code: Int) -> NSError { NSError(domain: NSURLErrorDomain, code: code) }
+        // WebKit's tidied address is the same one.
+        let failing = URL(string: "https://localtest.me:3600/")
+        #expect(Tab.fallbackURL(for: pending, after: error(NSURLErrorSecureConnectionFailed), failing: failing, strictTransport: false) == plain)
+        #expect(Tab.fallbackURL(for: pending, after: error(NSURLErrorCannotConnectToHost), failing: secure, strictTransport: false) == plain)
+        // A certificate keeps its warning; a timeout, a lost connection or an unknown name would fare no better over http.
+        for code in [NSURLErrorServerCertificateUntrusted, NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorCannotFindHost] {
+            #expect(Tab.fallbackURL(for: pending, after: error(code), failing: secure, strictTransport: false) == nil, "\(code)")
+        }
+        let refused = error(NSURLErrorSecureConnectionFailed)
+        // Only at the address it was for: not after a redirect elsewhere, nor when the http one itself failed.
+        #expect(Tab.fallbackURL(for: pending, after: refused, failing: URL(string: "https://localtest.me:3600/login"), strictTransport: false) == nil)
+        #expect(Tab.fallbackURL(for: pending, after: refused, failing: plain, strictTransport: false) == nil)
+        #expect(Tab.fallbackURL(for: pending, after: refused, failing: nil, strictTransport: false) == nil)
+        #expect(Tab.fallbackURL(for: nil, after: refused, failing: secure, strictTransport: false) == nil)
+        // A site that asked to be reached only securely (HSTS) never is over http.
+        #expect(Tab.fallbackURL(for: pending, after: refused, failing: secure, strictTransport: true) == nil)
+    }
+
+    /// The address over http is the same address: port, path, query and fragment kept, only the scheme changed.
+    @Test func theAddressOverHTTPIsTheSameAddress() {
+        #expect(Tab.overHTTP(URL(string: "https://localtest.me:3600/x?y=1#/login")!)?.absoluteString == "http://localtest.me:3600/x?y=1#/login")
+        #expect(Tab.overHTTP(URL(string: "HTTPS://example.com")!)?.absoluteString == "http://example.com")
+        #expect(Tab.overHTTP(URL(string: "http://example.com")!) == nil)
+        #expect(Tab.overHTTP(URL(string: "file:///tmp/a.html")!) == nil)
+    }
 }
 
 /// When a page's link for another app may put its question up again.
