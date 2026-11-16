@@ -169,6 +169,9 @@ enum DownloadHandoff {
             let text = DownloadTokens.expand(action.urlTemplate, with: values, query: true)
             guard let url = URL(string: text), let scheme = url.scheme?.lowercased() else { return false }
             return (scheme != "http" && scheme != "https") || serviceIsOnThisMac(text)
+        case .saveToFolder, .openFile:
+            // A destination is not a handoff: it is where the file lands, and it never carries cookies anywhere.
+            return false
         }
     }
 
@@ -207,7 +210,7 @@ enum DownloadHandoff {
         case .jsonRPC:
             outcome = await callService(rule.action, values: values, secret: secret)
             if let cookieFile { HandoffCookies.removeFile(cookieFile) }
-        case .saveToFolder, .showInZigzag:
+        case .saveToFolder, .openFile:
             // A destination, not a handoff: where the file lands is decided when the download is made, and the
             // download is never cancelled for it — so there is nothing to do here but let it be saved.
             outcome = .noMatch

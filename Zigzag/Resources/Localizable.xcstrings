@@ -2946,6 +2946,17 @@
         }
       }
     },
+    "Apps, scripts, installers, archives and configuration profiles are always saved, never opened." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App、脚本、安装器、压缩包和配置描述文件始终只会保存，绝不会打开。"
+          }
+        }
+      }
+    },
     "Archive tabs you haven’t used" : {
       "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
@@ -7054,6 +7065,17 @@
         }
       }
     },
+    "Files of this type are saved to the folder above, or opened in your Mac’s app for them. The first file type that matches wins." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此类型的文件会保存到上面的文件夹，或用 Mac 上对应的 App 打开。最先匹配的文件类型生效。"
+          }
+        }
+      }
+    },
     "Files of this type are saved to the folder downloads are saved to again, and nothing else changes." : {
       "comment" : "Message of the sheet that deletes a per-extension destination.",
       "localizations" : {
@@ -7075,7 +7097,8 @@
           }
         }
       }
-    },    "Fill forms from My Card" : {
+    },
+    "Fill forms from My Card" : {
       "comment" : "A setting in Settings › Passwords.",
       "localizations" : {
         "zh-Hans" : {
@@ -10178,6 +10201,17 @@
         }
       }
     },
+    "New file types" : {
+      "comment" : "A setting in Settings › Downloads: what happens to a download of a type no rule covers.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新的文件类型"
+          }
+        }
+      }
+    },
     "New tabs open" : {
       "comment" : "A setting in Settings › Tabs: where a new tab goes in the sidebar's list.",
       "localizations" : {
@@ -11630,6 +11664,17 @@
         }
       }
     },
+    "Open this %@" : {
+      "comment" : "The download question, without its question mark: whether this file opens in the Mac's app. The placeholder is the file's type, like PDF.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开这个 %@"
+          }
+        }
+      }
+    },
     "Open ⌘-clicked links under their tab" : {
       "comment" : "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key.",
       "localizations" : {
@@ -11784,7 +11829,6 @@
         }
       }
     },
-
     "Outline Every Element" : {
       "comment" : "View › Developer menu item and command, on a development site, checked while on: draws a line around each element of the page.",
       "localizations" : {
@@ -14472,17 +14516,6 @@
         }
       }
     },
-    "Save to Folder" : {
-      "comment" : "A destination a file of a given type can have: saved into a folder of its own, instead of the one everything else goes to.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存到文件夹"
-          }
-        }
-      }
-    },
     "Saved" : {
       "comment" : "Toast after changes to a login are saved.",
       "localizations" : {
@@ -14573,17 +14606,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "存储的密码会保留。"
-          }
-        }
-      }
-    },
-    "Saved somewhere of its own, instead of with everything else." : {
-      "comment" : "Under the title of the sheet that makes a per-extension destination.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存到它自己的位置，而不是与其他文件放在一起。"
           }
         }
       }
@@ -15145,6 +15167,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务器地址"
+          }
+        }
+      }
+    },
+    "Service" : {
+      "comment" : "Label of the service choice in the Torrents preset's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务"
           }
         }
       }
@@ -17543,6 +17576,17 @@
         }
       }
     },
+    "This download" : {
+      "comment" : "Who asks on the download question when the file has no site, like a file on this Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此下载"
+          }
+        }
+      }
+    },
     "This evening" : {
       "comment" : "Name of a History session that began today.",
       "localizations" : {
@@ -18111,6 +18155,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用于构建网站的工具，只在开发者模式中的网站上显示。可以在任一网站的“网站设置”、命令栏或“显示 › 开发者”中为它开⁠启。处于开发者模式的标签页在边栏中带有虚线边框。"
+          }
+        }
+      }
+    },
+    "Torrents" : {
+      "comment" : "The rule name a Torrents preset starts with when its service is left to be filled in by hand.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "种子"
           }
         }
       }
@@ -19523,6 +19578,17 @@
         }
       }
     },
+    "What happens to files of this type." : {
+      "comment" : "Under the title of the sheet that makes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此类型的文件会怎么处理。"
+          }
+        }
+      }
+    },
     "What stopped it is below, with a way to fix it." : {
       "comment" : "Import window when nothing came over because of a problem.",
       "localizations" : {
@@ -19541,6 +19607,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下面列出了其余内容没有导入的原因，以及解决方法。"
+          }
+        }
+      }
+    },
+    "What to do with a download no file type decides." : {
+      "comment" : "Explanation under “New file types” in Settings › Downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有文件类型规则决定的下载该怎么处理。"
           }
         }
       }
@@ -20901,6 +20978,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "双击 新建 标签页 空白 缩放"
+          }
+        }
+      }
+    },
+    "download type open save ask" : {
+      "comment" : "Words that find the New file types setting with Find a setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 类型 打开 保存 询问 download type open save ask"
           }
         }
       }

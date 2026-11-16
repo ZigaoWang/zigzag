@@ -31,6 +31,9 @@ nonisolated struct PermissionAction {
 nonisolated struct PermissionAnswer {
     let action: String
     let remember: Bool
+    /// Which of a caller's own durations was chosen: 0 for the ordinary This time / Always, or the index in the
+    /// list a question brought with it (the download question's this file, this type, every download).
+    var scopeIndex = 0
 }
 
 /// Stable identifiers under which permission actions are remembered.

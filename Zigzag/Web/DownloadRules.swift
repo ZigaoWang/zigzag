@@ -10,8 +10,31 @@ import WebKit
 nonisolated enum DownloadDestination: Equatable, Sendable {
     /// Save into this folder, as chosen in the panel. Empty asks for the default, which is nothing to decide.
     case folder(String)
-    /// Zigzag opens and shows the file where it can, and saves it where it can't.
-    case show
+    /// Save it where downloads go, then hand it to the Mac's own app for its type.
+    case open
+}
+
+/// The file types a file-type **Open** never offers or performs. Each can run code, mount an installer, or hand the
+/// Mac's app an archive or a configuration profile that does: opening one from a download is a double-click you did
+/// not make. A type may still be **saved**; the clamp is on Open only.
+nonisolated enum DownloadOpening {
+    /// Lowercase extensions, without a leading dot. Scripts are included because the Mac's default app for one may
+    /// run it, and archives because opening one can hand out an app the archive carries.
+    static let refused: Set<String> = [
+        "app", "pkg", "dmg", "zip", "mobileconfig",
+        "command", "terminal", "sh", "bash", "zsh", "fish", "csh", "ksh",
+        "py", "rb", "pl", "php", "jar", "scpt", "applescript", "workflow"
+    ]
+
+    static func isRefused(_ type: String) -> Bool {
+        refused.contains(type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
+    /// Whether any extension a file-type pattern names is one an Open must refuse. An Open rule for one of them could
+    /// otherwise arrive from an older build or a hand-edited rules file.
+    static func isRefused(pattern: String) -> Bool {
+        DownloadRule.Match.extensions(in: pattern).contains { isRefused($0) }
+    }
 }
 
 /// One thing Zigzag hands to another app: a link you click, or a download a page starts, whose address matches.
@@ -142,6 +165,19 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// What the row says it does, in a few words.
     var actionSummary: String { action.summary }
 
+    /// What a file-type destination's row says it does: the types it names, and where they go.
+    var destinationSentence: String {
+        let types = Match.extensions(in: pattern).joined(separator: ", ")
+        switch action.kind {
+        case .saveToFolder:
+            return String(localized: "Files of type \(types) are saved to \(action.summary)", comment: "A file-type destination in a sentence: the extensions it names, then the folder they are saved into.")
+        case .openFile:
+            return String(localized: "Files of type \(types) open in your Mac’s app", comment: "A file-type destination in a sentence: the extensions it names, then that the Mac's own app opens them.")
+        default:
+            return action.summary
+        }
+    }
+
     /// What the row says it catches.
     var matchSummary: String {
         switch match {
@@ -228,12 +264,14 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         /// A per-extension destination, not a handoff: the file is saved as it always was, into a folder of its own.
         /// It is decided when WebKit makes the download (`DownloadDestination`), never run from the handoff path.
         case saveToFolder
-        /// The other per-extension destination: Zigzag shows the file itself instead of saving it, where it can.
-        case showInZigzag
+        /// The other per-extension destination: the file is saved where downloads go and then handed to the Mac's own
+        /// app for its type — the one a double-click in Finder would open. Never a chosen app: choosing one is a
+        /// handoff, and a handoff is a different question.
+        case openFile
 
         /// Whether this kind is a destination rather than a handoff action: it never cancels the download, so it is
         /// made from the per-extension panel, not from Add Rule's Custom… menu.
-        var isDestination: Bool { self == .saveToFolder || self == .showInZigzag }
+        var isDestination: Bool { self == .saveToFolder || self == .openFile }
 
         var title: String {
             switch self {
@@ -241,8 +279,8 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             case .openURL: String(localized: "Open URL", comment: "An action a download rule can take, in its editor: open a URL, which may point at another app.")
             case .runScript: String(localized: "Run Script", comment: "An action a download rule can take, in its editor: run an executable with the link as an argument.")
             case .jsonRPC: String(localized: "JSON-RPC", comment: "An action a download rule can take, in its editor: send the link to a service such as aria2 or rTorrent.")
-            case .saveToFolder: String(localized: "Save to Folder", comment: "A destination a file of a given type can have: saved into a folder of its own, instead of the one everything else goes to.")
-            case .showInZigzag: String(localized: "Open in Zigzag", comment: "A destination a file of a given type can have: Zigzag opens and shows the file itself instead of saving it.")
+            case .saveToFolder: String(localized: "Save", comment: "A destination a file of a given type can have: saved into a folder, which starts as the one downloads already go to.")
+            case .openFile: String(localized: "Open", comment: "A destination a file of a given type can have: saved where downloads go, then opened in the Mac's own app for that type.")
             }
         }
 
@@ -253,8 +291,20 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             case .runScript: "terminal"
             case .jsonRPC: "network"
             case .saveToFolder: "folder"
-            case .showInZigzag: "eye"
+            case .openFile: "arrow.up.forward.app"
             }
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            // "showInZigzag" was this case while it opened the file in a tab. It opens the Mac's app instead now, and
+            // a rule saved then still reads as the nearest thing: open it, not save it and say nothing.
+            if raw == "showInZigzag" { self = .openFile; return }
+            guard let kind = Kind(rawValue: raw) else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown download rule action \(raw).")
+            }
+            self = kind
         }
     }
 
@@ -277,7 +327,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     var destination: DownloadDestination? {
         switch kind {
         case .saveToFolder: .folder(folderPath)
-        case .showInZigzag: .show
+        case .openFile: .open
         case .openApp, .openURL, .runScript, .jsonRPC: nil
         }
     }
@@ -311,7 +361,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .runScript: arguments
         case .jsonRPC: [rpcParameters]
         case .saveToFolder: []
-        case .showInZigzag: []
+        case .openFile: []
         }
     }
 
@@ -332,8 +382,8 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .saveToFolder:
             let name = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath).lastPathComponent
             return name.isEmpty ? Kind.saveToFolder.title : name
-        case .showInZigzag:
-            return Kind.showInZigzag.title
+        case .openFile:
+            return Kind.openFile.title
         }
     }
 
@@ -352,7 +402,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             return !rpcEndpoint.isEmpty && URL(string: rpcEndpoint) != nil && !rpcMethod.isEmpty
         case .saveToFolder:
             return !folderPath.isEmpty
-        case .showInZigzag:
+        case .openFile:
             return true
         }
     }
@@ -394,21 +444,30 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
 /// The arrangements most people want, so a rule for aria2 or mpv is a menu choice and a look at the fields rather
 /// than a JSON lesson.
 nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
-    case aria2, motrix, rTorrent, ytdlp, mpv, iina
+    case aria2, motrix, torrents, ytdlp, mpv, iina
 
-    var title: String {
+    /// What a torrent preset starts with: a magnet link, or an address that carries a `.torrent` file. One rule can
+    /// only read one of the two, and this reads the address, which both a magnet link and a torrent's URL have.
+    static let torrentPattern = #"^magnet:|\.torrent"#
+
+    var title: String { ruleName }
+
+    /// The name the rule it makes carries: the service or the app itself, so the rule reads as a sentence —
+    /// "Files matching … go to rTorrent".
+    var ruleName: String {
         switch self {
-        case .aria2: String(localized: "Send to aria2", comment: "A preset rule in Settings › Downloads, for the aria2 download manager.")
-        case .motrix: String(localized: "Send to Motrix", comment: "A preset rule in Settings › Downloads, for the Motrix download manager.")
-        case .rTorrent: String(localized: "Send to rTorrent", comment: "A preset rule in Settings › Downloads, for rTorrent.")
-        case .ytdlp: String(localized: "Send to yt-dlp", comment: "A preset rule in Settings › Downloads, for the yt-dlp downloader.")
-        case .mpv: String(localized: "Play in mpv", comment: "A preset rule in Settings › Downloads, for the mpv video player.")
-        case .iina: String(localized: "Play in IINA", comment: "A preset rule in Settings › Downloads, for the IINA video player.")
+        case .aria2: "aria2"
+        case .motrix: "Motrix"
+        case .torrents: TorrentService.rTorrent.ruleName
+        case .ytdlp: "yt-dlp"
+        case .mpv: "mpv"
+        case .iina: "IINA"
         }
     }
 
-    /// The rule a preset starts from: a media site for the players, a magnet or link for the downloaders.
-    var rule: DownloadRule {
+    /// The rule a preset starts from: a media site for the players, a magnet or link for the downloaders. Torrents
+    /// starts on rTorrent; the sheet's Service dropdown points it at another one.
+var rule: DownloadRule {
         switch self {
         case .aria2, .motrix:
             var action = DownloadRuleAction(kind: .jsonRPC)
@@ -419,15 +478,15 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
             """
             // A download manager takes downloads only: a link you click stays a link unless it is itself a file.
             return DownloadRule(name: title, applies: .downloads, match: .any, action: action)
-        case .rTorrent:
+        case .torrents:
+            let service = TorrentService.rTorrent
             var action = DownloadRuleAction(kind: .jsonRPC)
-            action.rpcEndpoint = "http://127.0.0.1:8080/RPC2"
-            action.rpcMethod = "load.start"
-            action.rpcParameters = """
-            ["", "{link}"]
-            """
-            action.rpcStyle = .xmlrpc
-            return DownloadRule(name: title, applies: .downloads, match: .any, action: action)
+            action.rpcEndpoint = service.endpoint
+            action.rpcMethod = service.method
+            action.rpcParameters = service.parameters
+            action.rpcStyle = service.style
+            // A download service catches files, not links: a magnet is left to the browser unless it arrives as one.
+            return DownloadRule(name: title, applies: .downloads, match: .regex, pattern: Self.torrentPattern, action: action)
         case .ytdlp:
             var action = DownloadRuleAction(kind: .runScript)
             // Through env, so it's found under either Homebrew prefix, and anywhere else on PATH.
@@ -443,6 +502,63 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
             action.urlTemplate = "iina://weblink?url={encoded_link}"
             return DownloadRule(name: title, applies: .linksAndDownloads, match: .contains, pattern: "youtube.com/watch", action: action)
         }
+    }
+}
+
+/// The services a torrent rule can be pointed at. The protocol is the only thing that differs, so the Torrents
+/// preset offers them as one dropdown and fills the rule's fields in.
+nonisolated enum TorrentService: String, CaseIterable, Sendable {
+    case rTorrent, aria2, motrix, custom
+
+    var title: String {
+        switch self {
+        case .rTorrent: "rTorrent"
+        case .aria2: "aria2"
+        case .motrix: "Motrix"
+        case .custom: String(localized: "Custom…", comment: "A choice of torrent service in the Torrents preset's sheet: fill the endpoint and method in by hand.")
+        }
+    }
+
+    var ruleName: String {
+        switch self {
+        case .rTorrent: "rTorrent"
+        case .aria2: "aria2"
+        case .motrix: "Motrix"
+        case .custom: String(localized: "Torrents", comment: "The rule name a Torrents preset starts with when its service is left to be filled in by hand.")
+        }
+    }
+
+    var endpoint: String {
+        switch self {
+        case .rTorrent: "http://127.0.0.1:8080/RPC2"
+        case .aria2: "http://127.0.0.1:6800/jsonrpc"
+        case .motrix: "http://127.0.0.1:16800/jsonrpc"
+        case .custom: ""
+        }
+    }
+
+    var method: String {
+        switch self {
+        case .rTorrent: "load.start"
+        case .aria2, .motrix: "aria2.addUri"
+        case .custom: ""
+        }
+    }
+
+    var parameters: String {
+        switch self {
+        case .rTorrent: """
+        ["", "{link}"]
+        """
+        case .aria2, .motrix: """
+        [["{link}"], {"header": ["Cookie: {cookie_header}", "Referer: {referrer}"], "out": "{filename}"}]
+        """
+        case .custom: "[]"
+        }
+    }
+
+    var style: DownloadRuleAction.RPCStyle {
+        self == .rTorrent ? .xmlrpc : .json
     }
 }
 
@@ -709,7 +825,7 @@ final class DownloadRulesStore {
     }
 
     /// The first rule whose destination is this download's, if any: the entry that decides where the file lands. Only
-    /// a rule that *is* a destination (`saveToFolder`, `showInZigzag`) is looked at, so a handoff rule for the same
+    /// a rule that *is* a destination (`saveToFolder`, `openFile`) is looked at, so a handoff rule for the same
     /// name is left for the handoff path to run. First match wins, exactly as it does for handoffs.
     func destination(for url: URL, filename: String) -> (rule: DownloadRule, destination: DownloadDestination)? {
         Self.destination(in: rules, url: url, filename: filename)
@@ -721,6 +837,9 @@ final class DownloadRulesStore {
         for rule in rules {
             guard rule.applies == .downloads, rule.isEnabled, let destination = rule.action.destination,
                   rule.matches(url, filename: filename) else { continue }
+            // An Open for an app, a script, an installer or an archive is never performed, even if one was saved by an
+            // older build: the file is saved as if this rule had not matched, and a later Save rule may still take it.
+            if destination == .open, DownloadOpening.isRefused((filename as NSString).pathExtension) { continue }
             return (rule, destination)
         }
         return nil
@@ -760,6 +879,14 @@ final class DownloadRulesStore {
         guard to != from else { return rules }
         without.insert(rule, at: min(to, without.count))
         return without
+    }
+
+    /// Moves the rule at one place in the list to another, as the Up and Down buttons do.
+    func move(from: Int, to: Int) {
+        guard rules.indices.contains(from), rules.indices.contains(to), from != to else { return }
+        let rule = rules.remove(at: from)
+        rules.insert(rule, at: to)
+        save()
     }
 
     /// Moves the rule with `id` to just before the rule with `before` (`nil` puts it last).

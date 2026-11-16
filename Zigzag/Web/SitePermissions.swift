@@ -885,13 +885,14 @@ final class PermissionPrompt: FloatingPanelView {
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
+                    durations: [String]? = nil,
                     canRemember: Bool = true, rememberNote: String? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         // A private window never offers or returns Always.
         let remembers = canRemember && !controller.promptIsPrivate
         // Answered already: nothing to show, and nothing to mark.
         if let known = answered() {
-            return PermissionAnswer(action: known.action, remember: known.remember && remembers)
+            return PermissionAnswer(action: known.action, remember: known.remember && remembers, scopeIndex: known.scopeIndex)
         }
         let request = title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.")
         // The same question, asked again while its card is up: wait for that one answer instead of stacking a second
@@ -899,7 +900,7 @@ final class PermissionPrompt: FloatingPanelView {
         let questionKey = "\(origin ?? host)|\(request)"
         if let before = inFlight[questionKey] {
             let known = await before.task.value
-            return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers) }
+            return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers, scopeIndex: $0.scopeIndex) }
         }
         // One of the window's waiting questions from the moment it is asked, even if it cannot be shown yet: the tab
         // wears the marker, the card that is up counts it, and another tab's question is not held behind this one.
@@ -913,7 +914,8 @@ final class PermissionPrompt: FloatingPanelView {
             }
             setWaiting(questionsWaiting(in: controller) + 1, in: controller)
             let answer = await show(host: host, request: request,
-                                  symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
+                                  symbol: symbol, icon: icon, actions: actions, menu: menu, durations: durations,
+                                  canRemember: remembers, rememberNote: rememberNote,
                                   origin: origin, in: controller, tab: tab, answered: answered)
             // Answered or put off: it is no longer one of the window's waiting questions.
             PendingQuestions.answer(questionID)
@@ -931,7 +933,8 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?,
+                             menu: [PermissionAction], durations: [String]? = nil,
+                             canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?,
                              answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
@@ -964,8 +967,12 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.contentTintColor = Tokens.Color.textPrimary
                 prompt.badge.color = .clear
             }
-            prompt.duration.isEnabled = canRemember
-            if !canRemember {
+            prompt.duration.isEnabled = canRemember || durations != nil
+            if let durations {
+                prompt.duration.options = durations.map { DropdownButton.Option(title: $0) }
+                prompt.duration.selectedIndex = 0
+            }
+            if !canRemember, durations == nil {
                 prompt.duration.toolTip = rememberNote ?? (controller.promptIsPrivate
                     ? String(localized: "Private windows don’t remember answers.", comment: "Tooltip of the disabled duration dropdown on a permission question in a private window.")
                     : String(localized: "This site can’t remember this answer.", comment: "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept."))
@@ -975,7 +982,9 @@ final class PermissionPrompt: FloatingPanelView {
                 if action.isProminent { button.tint = accent }
                 button.onClick = { [weak prompt] _ in
                     guard let prompt, action.isDeny || prompt.acceptsAllow else { return }
-                    prompt.finish(PermissionAnswer(action: action.id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
+                    let remembered = canRemember && (durations == nil ? prompt.duration.selectedIndex == 1 : scope > 0)
+                    prompt.finish(PermissionAnswer(action: action.id, remember: remembered, scopeIndex: scope))
                 }
                 return button
             }
@@ -993,7 +1002,9 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.answerMenu.tint = accent
                 prompt.answerMenu.onSelect = { [weak prompt] index in
                     guard let prompt, prompt.acceptsAllow, menu.indices.contains(index) else { return }
-                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
+                    let remembered = canRemember && (durations == nil ? prompt.duration.selectedIndex == 1 : scope > 0)
+                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: remembered, scopeIndex: scope))
                 }
                 prompt.addSubview(prompt.answerMenu)
             }

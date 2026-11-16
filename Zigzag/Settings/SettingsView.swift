@@ -798,6 +798,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let downloadTypesGroup = FormGroup()
     private let addFileTypeButton = PillButton(title: String(localized: "Add File Type…", comment: "Button beside the file types in Settings › Downloads: opens the sheet that makes a per-extension destination."))
     private let downloadPlaceRules = DropdownButton()
+    /// What a download of a type no rule covers does: ask, open it in the Mac's app, or save it. This is the "Always"
+    /// answer on the download question, kept where it can be changed again.
+    private let downloadEveryType = DropdownButton()
     private let downloadRulesGroup = FormGroup()
     private let downloadTestGroup = FormGroup()
     private let downloadRuleTest = FilledField(placeholder: String(localized: "https://example.com/file.zip", comment: "Placeholder of the test address in Settings › Downloads: an address to see which rule takes it."))
@@ -1142,6 +1145,28 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                     control: downloadPlaceRules)
         rulesPlaceRow.keywords = String(localized: "folder location downloads", comment: "Words that find the Save downloads to setting with Find a setting. Not shown.")
         downloadPlaceGroup.add(rulesPlaceRow)
+        downloadEveryType.options = [
+            DropdownButton.Option(title: String(localized: "Ask Each Time", comment: "A choice for what a download of a new file type does: ask.")),
+            DropdownButton.Option(title: String(localized: "Open", comment: "A choice for what a download of a new file type does: open it in the Mac's app.")),
+            DropdownButton.Option(title: String(localized: "Save", comment: "A choice for what a download of a new file type does: save it."))
+        ]
+        downloadEveryType.selectedIndex = switch DownloadManager.handlesEveryType {
+        case nil: 0
+        case .open: 1
+        case .save: 2
+        }
+        downloadEveryType.onSelect = { index in
+            DownloadManager.handlesEveryType = switch index {
+            case 1: .open
+            case 2: .save
+            default: nil
+            }
+        }
+        let everyTypeRow = FormRow(title: String(localized: "New file types", comment: "A setting in Settings › Downloads: what happens to a download of a type no rule covers."),
+                                   detail: String(localized: "What to do with a download no file type decides.", comment: "Explanation under “New file types” in Settings › Downloads."),
+                                   control: downloadEveryType)
+        everyTypeRow.keywords = String(localized: "download type open save ask", comment: "Words that find the New file types setting with Find a setting. Not shown.")
+        downloadPlaceGroup.add(everyTypeRow)
         addDownloadRuleButton.onClick = { [weak self] _ in self?.showDownloadRuleMenu() }
         addFileTypeButton.onClick = { [weak self] _ in
             guard let self else { return }
@@ -2955,7 +2980,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             controls.distribution = .fill
             controls.alignment = .centerY
             let content = FormRow(title: types.isEmpty ? String(localized: "Untitled File Type", comment: "A per-extension destination with no extensions yet.") : types,
-                                  detail: rule.summarySentence, control: controls)
+                                  detail: rule.destinationSentence, control: controls)
             content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
             downloadTypesGroup.add(content)
         }

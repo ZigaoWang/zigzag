@@ -27,6 +27,10 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     }
 
     private let panel = FloatingPanelView()
+    private let scroll = NSScrollView()
+    /// The rows live in here, not on the panel: a form taller than the screen keeps its heading and its buttons in
+    /// place and scrolls what is between them, instead of running off both ends.
+    private let content = FlippedView()
     private let header: DialogHeader
     private let body: NSTextField?
     private var rows: [Row]
@@ -57,12 +61,18 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         if let symbol { header.setSymbol(symbol, tint: destructive ? Tokens.Color.destructive : Tokens.Color.icon) }
         addSubview(panel)
         panel.addSubview(header)
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        scroll.documentView = content
+        panel.addSubview(scroll)
         if let body { panel.addSubview(body) }
         for row in rows {
             let label = row.label.map { Label($0, font: Tokens.Font.body(), color: Tokens.Color.textPrimary) }
             labels.append(label)
-            if let label { panel.addSubview(label) }
-            panel.addSubview(row.view)
+            if let label { content.addSubview(label) }
+            content.addSubview(row.view)
             row.view.isHidden = row.isHidden
             label?.isHidden = row.isHidden
             // Typing in any of its fields can change whether it may be confirmed — whether the row is the field
@@ -274,18 +284,26 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         return (row.view as? NSTextField)?.wrappedHeight(width) ?? Tokens.Metric.controlHeight
     }
 
+    /// What the rows themselves need, apart from the heading, the message and the buttons.
+    private func rowsHeight(width: CGFloat) -> CGFloat {
+        var height: CGFloat = 0
+        for row in rows where !row.isHidden { height += self.height(of: row, width: width) + rowGap }
+        return max(0, height - rowGap)
+    }
+
     private func height(for width: CGFloat) -> CGFloat {
         let pad = Tokens.Dialog.padding, inner = width - pad * 2
         var height = pad + header.height(for: inner)
         if let body { height += Tokens.Space.x2 + body.wrappedHeight(inner) }
         height += Tokens.Dialog.gap
-        for row in rows where !row.isHidden { height += self.height(of: row, width: inner) + rowGap }
-        return height - rowGap + Tokens.Dialog.gap + DialogButtons.height + pad
+        height += rowsHeight(width: inner)
+        return height + Tokens.Dialog.gap + DialogButtons.height + pad
     }
 
     override func layout() {
         super.layout()
-        let height = height(for: width)
+        // A form never grows past the window: what doesn't fit scrolls, so its heading and its buttons stay put.
+        let height = min(height(for: width), max(Tokens.Metric.controlHeight * 4, bounds.height - Tokens.Space.x6))
         panel.frame = NSRect(x: round((bounds.width - width) / 2), y: round((bounds.height - height) / 2.4), width: width, height: height)
     }
 
@@ -299,24 +317,30 @@ final class FormSheet: NSView, NSTextFieldDelegate {
             y = body.frame.maxY
         }
         y += Tokens.Dialog.gap
+        let buttonsTop = panel.bounds.height - pad - DialogButtons.height
+        let viewport = max(0, buttonsTop - Tokens.Dialog.gap - y)
+        let rowsHeight = self.rowsHeight(width: inner)
+        scroll.frame = NSRect(x: pad, y: y, width: inner, height: viewport)
+        content.frame = NSRect(x: 0, y: 0, width: inner, height: max(rowsHeight, viewport))
         // Labels share a column, so the controls after them line up.
         let labelWidth = labels.compactMap { $0?.intrinsicContentSize.width }.max().map { ceil($0) + Tokens.Space.x3 } ?? 0
+        var rowY: CGFloat = 0
         for (row, label) in zip(rows, labels) {
             if row.isHidden { continue }
             let height = self.height(of: row, width: inner)
             if let label {
                 let lh = ceil(label.intrinsicContentSize.height)
-                label.frame = NSRect(x: pad, y: y + round((height - lh) / 2), width: labelWidth, height: lh)
+                label.frame = NSRect(x: 0, y: rowY + round((height - lh) / 2), width: labelWidth, height: lh)
                 // A control keeps its own width at the row's end, as Settings' rows do; anything else fills the row.
                 let fitting = (row.view as? DropdownButton)?.intrinsicContentSize.width
                 let width = min(fitting ?? inner - labelWidth, inner - labelWidth)
                 row.view.frame = NSRect(x: pad + inner - width, y: y, width: width, height: height)
             } else {
-                row.view.frame = NSRect(x: pad, y: y, width: inner, height: height)
+                row.view.frame = NSRect(x: 0, y: rowY, width: inner, height: height)
             }
-            y += height + rowGap
+            rowY += height + rowGap
         }
-        buttons.frame = NSRect(x: pad, y: panel.bounds.height - pad - DialogButtons.height, width: inner, height: DialogButtons.height)
+        buttons.frame = NSRect(x: pad, y: buttonsTop, width: inner, height: DialogButtons.height)
     }
 }
 

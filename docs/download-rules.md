@@ -19,6 +19,22 @@ The ready-made rules for aria2, Motrix, rTorrent and yt-dlp catch **downloads on
 download, is handed to the service. A link you merely click is not, even if it is a magnet or a video page. Make a
 rule that applies to links and downloads if you want that, and choose what it sends to.
 
+## File types
+
+The same list also holds **file types**: a destination for a download of a given type, rather than a handoff. A file
+type matches the file's own extension, not the address, and applies to downloads only. It never takes a download away
+from Zigzag:
+
+- **Save** writes the file into the folder the type names. It starts as the folder downloads go to and can be changed.
+- **Open** writes the file where downloads go and opens it in the Mac's own app for its type, as a double-click in
+  Finder would.
+
+Open is never offered for an app, a script, an installer, an archive or a configuration profile: those are always
+saved, so a download cannot run or mount itself.
+
+A file type is tried with the other rules, top to bottom, and the first match wins. It is listed under **Save downloads
+to**, where **Add File Type…** makes one for a set of extensions.
+
 ## What a rule does
 
 - **Open App** opens the link in the app at the path chosen in the rule.
@@ -80,8 +96,25 @@ question is not asked there, and the link or download carries on as if no rule h
 pop-up is always handled by Zigzag itself, whichever window is in front, until the permission card gives pop-ups their
 own place to ask.
 
+## The first download of a type
+
+The first time a file arrives whose type no rule covers, Zigzag asks in the page's own window: **Open this PDF?** with
+**Save** and **Open**. One duration says how far the answer reaches:
+
+| Duration | What it covers |
+| --- | --- |
+| **This time** | That one file. The next PDF asks again. |
+| **Always for PDF** | The type, written as a file type rule you can change or delete. |
+| **Always** | Every download no rule covers, whatever its type. A file type's own rule still wins. |
+
+**Always** is kept in Settings › Downloads under **New file types**, where it can be set back to asking. A private
+window never asks: the file is saved, and nothing is opened.
+
 ## Private windows
 
 A rule stays out of private windows unless **Run in private windows** is turned on in its own sheet. Off, a private
 window never asks and never runs the rule; the link or download carries on as if no rule had matched. A private
 window's address, and the cookies a rule names, are what that promise protects.
+
+A file type that saves is not a handoff, so a private download still goes to the folder its type says. A file type
+that opens obeys the same switch: while it is off, the file is saved and not opened.
