@@ -2742,17 +2742,6 @@
         }
       }
     },
-    "Always Allow" : {
-      "comment" : "Button in the toast when Zigzag blocks a page's pop-up: allows the site's pop-ups from now on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "始终允许"
-          }
-        }
-      }
-    },
     "Always Allow on This Site" : {
       "comment" : "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking.",
       "localizations" : {
@@ -2771,17 +2760,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "对 %@ 始终如此"
-          }
-        }
-      }
-    },
-    "Always Open" : {
-      "comment" : "Button on a page's question to open an app: opens it, and the site may open this app without asking from now on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "始终打开"
           }
         }
       }
@@ -6290,17 +6268,6 @@
         }
       }
     },
-    "Don’t Open" : {
-      "comment" : "Button on a page's question to open an app.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不打开"
-          }
-        }
-      }
-    },
     "Don’t let this page show more dialogs" : {
       "comment" : "Tooltip of Block Dialogs in a page's JavaScript dialog sheet.",
       "localizations" : {
@@ -7954,17 +7921,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "转交"
-          }
-        }
-      }
-    },
-    "Hand Off %@" : {
-      "comment" : "A page's question before a download rule handles a link or download. The placeholder is the rule's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "转交 %@"
           }
         }
       }
@@ -11670,7 +11626,7 @@
       }
     },
     "Open in New Tab" : {
-      "comment" : "Button in the toast when Zigzag blocks a page's pop-up: opens it as a tab instead.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in a new tab.",
+      "comment" : "Item in a page's right-click menu over selected text that's a web address, not a link: opens it in a new tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12805,17 +12761,6 @@
         }
       }
     },
-    "Pop-up blocked" : {
-      "comment" : "Toast when Zigzag blocks a page's pop-up window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已阻止弹出式窗口"
-          }
-        }
-      }
-    },
     "Pop-ups" : {
       "comment" : "Row in the site panel's This Site group.",
       "localizations" : {
@@ -12823,17 +12768,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "弹出式窗口"
-          }
-        }
-      }
-    },
-    "Pop-ups allowed. Click the button again." : {
-      "comment" : "Toast after allowing a site's pop-ups.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已允许弹出式窗口。请再点按一次按钮。"
           }
         }
       }
