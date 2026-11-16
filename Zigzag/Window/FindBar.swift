@@ -894,6 +894,10 @@ enum Toast {
         weak var owner: AnyObject?
         /// Where it sits, so a resize puts it back in the same place.
         var placement: Placement = .topCenter
+        /// The automation notice this toast is, when it is one, and how many times the same one has been said while it
+        /// has been up: what makes a repeat of it a repeat rather than another notice.
+        var notice: String?
+        var noticeTimes = 1
     }
     private static var showing: [ObjectIdentifier: Showing] = [:]
 
@@ -979,6 +983,34 @@ enum Toast {
     static func working(_ text: String, in controller: BrowserWindowController) {
         show(text, duration: .greatestFiniteMagnitude, over: controller.root.overlay, area: area(in: controller), busy: true)
     }
+
+    /// An automation's own notice: what a rule just did, said over the page it was handed. The same notice said again
+    /// while it is still up is **one** notice with a count — `Handed this link to mpv (×3)` — the way the diagnostics
+    /// count a repeat in a row, rather than a rule that fires on every page load burying the page in them.
+    ///
+    /// `over` and `area` are the same place `promptToast` uses, so every window says one the same way.
+    static func notice(_ text: String, symbol: String, over host: NSView, area: NSRect) {
+        let state = state(for: host)
+        let again = isRepeat(text, of: state.notice, whileUp: state.toast?.superview === host && state.toast?.dismissing == false)
+        let times = again ? state.noticeTimes + 1 : 1
+        show(counted(text, times: times), symbol: symbol, duration: noticeDuration, over: host, area: area)
+        // After `show`, which clears these for anything that isn't a notice.
+        state.notice = text
+        state.noticeTimes = times
+    }
+
+    /// Whether a notice is the same one as the notice already up, and so counts rather than adds. Both halves matter:
+    /// a different notice is a different notice, and the same one after the first has gone is a new one, not a fourth.
+    static func isRepeat(_ text: String, of showing: String?, whileUp up: Bool) -> Bool { up && showing == text }
+
+    /// A notice with its count, when there is one, in the diagnostics' own shape.
+    static func counted(_ text: String, times: Int) -> String {
+        times > 1 ? "\(text) (×\(times))" : text
+    }
+
+    /// How long a notice stays: long enough to read, and long enough that a rule firing a few times over is counted
+    /// rather than repeated. Longer than a confirmation from a key, shorter than a failure.
+    private static let noticeDuration: TimeInterval = 4
 
     /// Where a toast of `size` sits in `area`. Kept separate from the view so the side case can be checked without a
     /// window: a site's notification has to land at the edge, not in the middle of the page.
@@ -1088,6 +1120,9 @@ enum Toast {
         state.toast = toast
         state.owner = nil
         state.placement = placement
+        // Anything else being said ends a run of the same automation notice: the next one is the first of its own.
+        state.notice = nil
+        state.noticeTimes = 1
         state.hideWork?.cancel()
         // Toasts with an action wait for the pointer to leave before going, however long it stays, so Undo never
         // slips away from under it.

@@ -521,6 +521,17 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     }
 }
 
+extension DownloadRuleAction {
+    /// Where an Open URL action opens, or nil while there is a rule to ask and it hasn't been told yet — the question
+    /// is then the sighting, not a notice. A script's own answer has no rule to ask on, so its web addresses open in a
+    /// new tab unless the answer itself names a place. **One rule, two callers**: `DownloadHandoff.openURL` opens it
+    /// here, and `HandoffNotice` says what it is about to do from the same answer, so what a rule says can never
+    /// drift from what it does. Only an Open URL has anywhere to decide; every other kind ignores this.
+    func place(askingOn rule: DownloadRule?) -> OpenInZigzag.Place? {
+        openIn ?? (rule == nil ? .newTab : nil)
+    }
+}
+
 // MARK: - Presets
 
 /// The arrangements most people want, so a rule for aria2 or mpv is a menu choice and a look at the fields rather

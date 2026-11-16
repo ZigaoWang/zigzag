@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9C5F1E4D6A7B8C9203B4D5E6 /* HandoffNotice.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD602F5E7B8C9DA31425B6C7 /* HandoffNotice.swift */; };
 		7A3F9C2D4E5B6A708192A3B4 /* NoticeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B4E0D3C5F6A7B8192A3C4D5 /* NoticeCard.swift */; };
 		002274F2A1CF4A93D4ADCC4D /* PageLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C44F4A7AED8299B48EF5D9D5 /* PageLinkTests.swift */; };
 		0100CD43A4B713911A1FC04E /* BrowserWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A6A928496FC897893B22DF7 /* BrowserWebView.swift */; };
@@ -554,6 +555,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AD602F5E7B8C9DA31425B6C7 /* HandoffNotice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HandoffNotice.swift; sourceTree = "<group>"; };
 		8B4E0D3C5F6A7B8192A3C4D5 /* NoticeCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoticeCard.swift; sourceTree = "<group>"; };
 		0012A8BD741BA157B4BB07F0 /* PaneHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneHeader.swift; sourceTree = "<group>"; };
 		012184AB9B6339550C39951A /* Zigzag.sdef */ = {isa = PBXFileReference; path = Zigzag.sdef; sourceTree = "<group>"; };
@@ -1394,6 +1396,7 @@
 				6E41E2FFAB5C045AC7D0D6C2 /* DarkReaderFixes.swift */,
 				A69950C3F8014CFB7FAB861A /* DarkSeen.swift */,
 				79CD40A1F162A94D5678E5FE /* DownloadHandoff.swift */,
+				AD602F5E7B8C9DA31425B6C7 /* HandoffNotice.swift */,
 				8B4E0D3C5F6A7B8192A3C4D5 /* NoticeCard.swift */,
 				CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */,
 				DAC9B2535F5F2C950BA4096B /* DownloadPlace.swift */,
@@ -2155,6 +2158,7 @@
 				9D77B51AB8E43E0CD839E867 /* Diagnostics.swift in Sources */,
 				65BFE923B15D9B75D0349C50 /* DockProgress.swift in Sources */,
 				FB3B815BBF654594C6051CD3 /* DownloadHandoff.swift in Sources */,
+				9C5F1E4D6A7B8C9203B4D5E6 /* HandoffNotice.swift in Sources */,
 				7A3F9C2D4E5B6A708192A3B4 /* NoticeCard.swift in Sources */,
 				A297D44BA6B37496BC5287EC /* DownloadManager.swift in Sources */,
 				16533A8F18B300E1F88BEEB7 /* DownloadPlace.swift in Sources */,

@@ -53,6 +53,15 @@ extension PromptHost {
         Toast.show(text, symbol: symbol, image: image, action: action, duration: duration, closes: closes,
                    over: place.over, area: place.area, placement: placement)
     }
+
+    /// An automation's own notice, in the same place and the same shape every other notice over a page has — a browser
+    /// window, Zigzag Mini and an installed app's window alike, which is what lets a rule that fires in a background
+    /// tab say so in *its* window rather than in the one you are looking at. Repeats of the same notice collapse into
+    /// one with a count while it is up.
+    func promptAutomation(_ text: String, symbol: String) {
+        let place = promptToastPlace
+        Toast.notice(text, symbol: symbol, over: place.over, area: place.area)
+    }
 }
 
 extension WindowManager {

@@ -2907,6 +2907,28 @@
         }
       }
     },
+    "Always for “%@”" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终为“%@”"
+          }
+        }
+      }
+    },
+    "Always for this rule" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The rule has no name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终适用于此规则"
+          }
+        }
+      }
+    },
     "Always on this site" : {
       "comment" : "Duration choice on a site's permission question: the answer is remembered for this site.",
       "localizations" : {
@@ -6956,6 +6978,17 @@
         }
       }
     },
+    "Every site" : {
+      "comment" : "Under a download rule in Settings › Downloads: the answer beside it was given for every site, not just one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有站点"
+          }
+        }
+      }
+    },
     "Every tab, at a glance" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -7649,6 +7682,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "忘记"
+          }
+        }
+      }
+    },
+    "Forget the answer for every site" : {
+      "comment" : "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忘记适用于所有站点的答案"
+          }
+        }
+      }
+    },
+    "Forget %@" : {
+      "comment" : "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忘记 %@"
           }
         }
       }
@@ -21602,6 +21657,17 @@
         }
       }
     },
+    "handed this link to %@" : {
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder is the app's own name, like mpv.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将链接交给 %@"
+          }
+        }
+      }
+    },
     "history" : {
       "comment" : "Item in the short list of what a browser holds, in the Import window: its browsing history.",
       "localizations" : {
@@ -22210,6 +22276,39 @@
         }
       }
     },
+    "opened this link in Mini" : {
+      "comment" : "An automation's notice over the page: the rule opened the link in Zigzag Mini.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在 Mini 中打开这个链接"
+          }
+        }
+      }
+    },
+    "opened this link in a new tab" : {
+      "comment" : "An automation's notice over the page: the rule opened the link in a tab of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在新标签页中打开这个链接"
+          }
+        }
+      }
+    },
+    "opened this link in this tab" : {
+      "comment" : "An automation's notice over the page: the rule opened the link where you already are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在此标签页中打开这个链接"
+          }
+        }
+      }
+    },
     "opens %@" : {
       "comment" : "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name.",
       "localizations" : {
@@ -22327,6 +22426,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已选中"
+          }
+        }
+      }
+    },
+    "sent this link to %@" : {
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将链接发送到 %@"
           }
         }
       }
