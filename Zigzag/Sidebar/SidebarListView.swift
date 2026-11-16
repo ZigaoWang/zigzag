@@ -437,6 +437,28 @@ final class SidebarListView: NSView {
             if animated, let id = pageID(item) { departing[id] = view.frame }
         }
 
+        // Rows leaving one after another (a folder's pages as it closes) fold away as one block, like an accordion: each
+        // glides up as the rows above it in the block close, so the block's foot stays on the rows below as they slide
+        // up, and none slides over another. The block closes onto the row above it, wherever that row goes.
+        var foldTo: [ObjectIdentifier: CGFloat] = [:]
+        if animated, !Tokens.Motion.reduceMotion {
+            var above: (item: SidebarItem, oldMaxY: CGFloat)?
+            var anchor: CGFloat?
+            // The space's name is left out: it's pinned to the top while the list is scrolled, away from its place.
+            for (item, view) in rows.sorted(by: { $0.value.frame.minY < $1.value.frame.minY }) where view !== drag?.view && item != .header {
+                if visible.contains(item) {
+                    above = (item, view.frame.maxY)
+                    anchor = nil
+                    continue
+                }
+                if anchor == nil {
+                    let top = view.frame.minY
+                    if let above, let now = shownFrames[above.item] { anchor = now.maxY + (top - above.oldMaxY) } else { anchor = top }
+                }
+                foldTo[ObjectIdentifier(view)] = anchor
+            }
+        }
+
         // Leaving rows fade out where they are; out of sight, they simply go.
         for (item, view) in rows where !visible.contains(item) && view !== drag?.view {
             rows[item] = nil
@@ -445,6 +467,9 @@ final class SidebarListView: NSView {
                 continue
             }
             if animated, Self.overlaps(view.frame, near) {
+                if let y = foldTo[ObjectIdentifier(view)], abs(y - view.frame.minY) > 0.5 {
+                    Tokens.Motion.glide(view, to: NSRect(origin: NSPoint(x: view.frame.minX, y: y), size: view.frame.size))
+                }
                 collapse(view)
             } else {
                 view.removeFromSuperview()
