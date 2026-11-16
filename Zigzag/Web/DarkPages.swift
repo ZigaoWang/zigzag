@@ -235,12 +235,19 @@ enum DarkPages {
 
     /// Sites seen dark in a profile (`nativeScope`), as given to its pages.
     static func nativeSites(in scope: String?) -> Set<String> {
-        Set(DarkSeen.sites(in: scope).keys)
+        Set(DarkSeen.sites(in: scope).filter(\.value.isNative).keys)
     }
 
     /// What's kept for the site a page at `url` in this store is going to, if it was seen dark there.
     static func seen(for store: WKWebsiteDataStore?, url: URL?) -> DarkSeen.Site? {
-        DarkSeen.site(site(of: url), in: nativeScope(of: store))
+        DarkSeen.site(site(of: url), in: nativeScope(of: store)).flatMap { $0.isNative ? $0 : nil }
+    }
+
+    /// The dark the site a page at `url` in this store is going to drew itself in, in this look, where dark pages left
+    /// it alone (`DarkSeen.Site.looks`); nil if it wasn't seen dark in it.
+    static func ownLook(for store: WKWebsiteDataStore?, url: URL?, look: NSAppearance.Name) -> NSColor? {
+        let kept = DarkSeen.site(site(of: url), in: nativeScope(of: store))?.looks?[look.rawValue]
+        return kept.flatMap(color(hex:)).flatMap { isDark($0) ? $0 : nil }
     }
 
     /// What a page's script is given from it: its dark and its mark, not when it was seen.
@@ -463,18 +470,21 @@ enum DarkPages {
         // Not wanted here, the page isn't darkened any more: until its script says how it looks on its own, the bar
         // above it doesn't keep Zigzag's dark. What it said of its own dark stays (#134).
         if !wanted, let tab, let state = tab.darkPage, state.darkened {
-            tab.darkPageChanged(State(darkened: false, native: false, color: nil, site: site(of: url) ?? ""))
+            tab.darkPageChanged(State(darkened: false, native: false, color: nil, site: site(of: url) ?? "", looked: false))
         }
         let store = webView.configuration.websiteDataStore
         // A site seen dark on its own starts on its own dark; any other on the dark its white will be. A page that's
         // dark on its own shows its own dark past its edges, the one the bar above it takes (#134): WebKit's own color
         // there is the page's root's, which can be white under a dark page.
         let ground = seen(for: store, url: url)?.color.flatMap(color(hex:)).flatMap { isDark($0) ? $0 : nil } ?? background(black: pureBlack)
-        webView.underPageBackgroundColor = wanted ? underPage(tab?.darkPage, site: site(of: url), ground: ground) : nil
+        // Where they aren't wanted, a site seen dark on its own in this look loads on that dark, and the bar above it
+        // takes it, rather than WebKit's white (#250): a dark site turned Off flashed white as it came.
+        let backdrop = wanted ? nil : loadingGround(tab?.darkPage, site: site(of: url), seen: ownLook(for: store, url: url, look: look))
+        webView.underPageBackgroundColor = wanted ? underPage(tab?.darkPage, site: site(of: url), ground: ground) : backdrop
         // No white of WebKit's own under the page (#134): a new web view's first frame, or one bringing back a tab that
         // slept, was drawn on it before the page came, and stayed on screen until the page had drawn itself, since
         // WebKit holds what's shown while a page is on its way. Clear instead, the dark of the card shows there.
-        let draws = !wanted
+        let draws = !wanted && backdrop == nil
         if webView.value(forKey: "drawsBackground") as? Bool != draws { webView.setValue(draws, forKey: "drawsBackground") }
     }
 
@@ -530,6 +540,16 @@ enum DarkPages {
     static func underPage(_ state: State?, site: String?, ground: NSColor) -> NSColor? {
         guard let state, state.native, !state.darkened, state.site == site else { return ground }
         return state.color
+    }
+
+    /// Behind a page where dark pages aren't wanted, for a site seen dark on its own in the look it's asked for
+    /// (`seen`, `ownLook`): that dark until the page has been looked at, then its own dark as the page script saw it,
+    /// or WebKit's own (nil) once it's found light. Nil for any other site, which is left to WebKit as it always was.
+    static func loadingGround(_ state: State?, site: String?, seen: NSColor?) -> NSColor? {
+        guard let seen else { return nil }
+        guard let state, state.looked, state.site == site else { return seen }
+        guard state.native, !state.darkened, let color = state.color, isDark(color) else { return nil }
+        return color
     }
 
     /// For what turns a page's own background on or off for a while (Peek): back to how dark pages want it.
@@ -597,6 +617,8 @@ enum DarkPages {
         /// The mark the page's own dark look set on its root by script (`DarkSeen.Site.marker`): "" for none, nil when
         /// the page didn't say.
         var marker: String? = nil
+        /// The page has been looked at; false while it's still coming in, when nothing it says of how it looks holds yet.
+        var looked: Bool = true
     }
 
     /// What a page in this store found: a site it saw dark, or saw light, joins or leaves its profile's list, with
@@ -608,6 +630,7 @@ enum DarkPages {
         var after: DarkSeen.Site?
         if state.native {
             var site = before ?? DarkSeen.Site(color: nil, marker: nil, date: Date())
+            site.onlyLooks = nil
             // Its own look only: a page forced dark is drawn in Zigzag's.
             if !state.darkened {
                 if let color = state.color, isDark(color) { site.color = hex(color) }
@@ -616,12 +639,39 @@ enum DarkPages {
             if let before, site != before { site.date = Date() }
             after = site
         } else if state.darkened {
-            after = nil
+            // Seen light, it's no longer one seen dark; what it draws itself in where dark pages leave it alone stays.
+            if let before, before.onlyLooks == true {
+                after = before
+            } else {
+                after = before?.looks.map { DarkSeen.Site(color: nil, marker: nil, looks: $0, onlyLooks: true, date: Date()) }
+            }
         } else {
             after = before
         }
         if after != before { DarkSeen.set(state.site, after, in: scope) }
-        return (before == nil) != (after == nil)
+        return (before?.isNative == true) != (after?.isNative == true)
+    }
+
+    /// What a page in this store found where dark pages left it alone, asked for `look`: a site that drew itself dark
+    /// in it is kept with that dark for the look (`DarkSeen.Site.looks`), one that drew itself light lets it go (#250).
+    /// Only once the page has been looked at, and never from a private window.
+    static func learnLook(_ state: State, look: NSAppearance.Name, in scope: String?) {
+        guard let scope, !state.site.isEmpty, state.looked, !state.darkened else { return }
+        let before = DarkSeen.site(state.site, in: scope)
+        var looks = before?.looks ?? [:]
+        if !state.native {
+            looks[look.rawValue] = nil
+        } else if let color = state.color, isDark(color) {
+            looks[look.rawValue] = hex(color)
+        } else {
+            return
+        }
+        guard looks != before?.looks ?? [:] else { return }
+        var site = before ?? DarkSeen.Site(color: nil, marker: nil, onlyLooks: true, date: Date())
+        site.looks = looks.isEmpty ? nil : looks
+        site.date = Date()
+        // Kept for its looks alone, it goes with the last of them.
+        DarkSeen.set(state.site, site.onlyLooks == true && site.looks == nil ? nil : site, in: scope)
     }
 
     /// `wanted`: dark pages are at work on the page (not the plain script): only then is its site learned dark or light.
@@ -637,6 +687,10 @@ enum DarkPages {
             generation += 1
             install(in: webView)
         }
+        // Left alone, how the site draws itself in the look it was asked for, for its next page to load on (#250).
+        if !wanted, !standsBack(for: webView), isUntouched(webView), let look = webView.appearance?.name {
+            learnLook(state, look: look, in: nativeScope(of: webView.configuration.websiteDataStore))
+        }
         if let tab = (webView as? BrowserWebView)?.owner { tab.darkPageChanged(state) }
         applyLook(to: webView)
     }
@@ -649,7 +703,7 @@ enum DarkPages {
             guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any], let webView = message.webView else { return }
             let state = State(darkened: body["darkened"] as? Bool ?? false, native: body["native"] as? Bool ?? false,
                               color: (body["color"] as? String).flatMap(DarkPages.color(hex:)), site: body["site"] as? String ?? "",
-                              marker: (body["marker"] as? String).flatMap(DarkPages.marker(_:)))
+                              marker: (body["marker"] as? String).flatMap(DarkPages.marker(_:)), looked: body["looked"] as? Bool ?? true)
             DarkPages.received(state, wanted: body["wanted"] as? Bool ?? true, from: webView)
         }
     }

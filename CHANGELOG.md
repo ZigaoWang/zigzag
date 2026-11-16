@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A folder in the sidebar closes like an accordion, its pages folding up together, instead of the rows below it sliding over them as they fade.
+- A site with a dark design of its own whose Dark page you set to Off no longer flashes white while it loads, with the bar above it white until the page draws: once Zigzag has seen it dark, it loads on its own dark. A light site still loads as it did. ([#250](https://github.com/ZigaoWang/zigzag/issues/250))
 
 ## [0.9.1] - 2026-11-15
 

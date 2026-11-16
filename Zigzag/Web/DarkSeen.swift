@@ -8,6 +8,8 @@ import WebKit
 /// For each site: the dark its page was drawn on, which a page of it starts on until it's looked at, and the mark its
 /// own dark look sets on the page's root by script (a class of "dark", or data-theme="dark"), if it sets one, so its
 /// dark style applies from the first sheet. Only a mark the site was seen setting itself is kept, never one it doesn't use.
+/// And where dark pages leave a site alone, the dark it drew itself in for each look it was asked for (`Site.looks`),
+/// which a page of it loads on (#250).
 ///
 /// It's a list of sites you've been to, so it goes with them: clearing a site's cache or cookies takes it, clearing all
 /// of either or all of History takes them all, and clearing History since a time takes the ones seen since. Never for
@@ -19,8 +21,19 @@ enum DarkSeen {
         var color: String?
         /// The mark its dark look puts on the root (`mark` in dark-pages.js): "class:dark", "attr:data-theme=dark".
         var marker: String?
+        /// The page's own dark in each look it was asked for (an appearance's name) and drew itself dark in, seen
+        /// where dark pages left it alone (#250), "NSAppearanceNameAqua": "#0d1117". A page of it going to a look kept
+        /// here loads on that dark rather than WebKit's white. Only the look it was seen in: a site that follows
+        /// the system's light or dark is light in the other, and would flash dark there.
+        var looks: [String: String]? = nil
+        /// Kept for `looks` alone: never seen dark where dark pages were at work, so not one of the sites seen dark
+        /// (`isNative`). Nil in the lists from before there were looks, which kept only those.
+        var onlyLooks: Bool? = nil
         /// When it was first seen dark, or last changed.
         var date: Date
+
+        /// Seen dark on its own where dark pages were at work: a page of it starts on its own dark there.
+        var isNative: Bool { onlyLooks != true }
     }
 
     static let fileName = "Seen Dark.plist"

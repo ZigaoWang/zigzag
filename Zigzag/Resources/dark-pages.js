@@ -420,7 +420,8 @@
   // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {
     if (!isTop || retired) return;
-    const message = { darkened, native: native === true, color: colorOf(), site, wanted };
+    // `looked`: whether it's been looked at yet, before which `native` says nothing.
+    const message = { darkened, native: native === true, color: colorOf(), site, wanted, looked: native !== null };
     if (native === true && !darkened) { const mark = markNow(); if (mark !== undefined) message.marker = mark; }
     const key = JSON.stringify(message);
     if (key === lastSent) return;
