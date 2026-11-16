@@ -534,6 +534,13 @@ struct DownloadRuleTests {
         privateCatchAll.runsInPrivateWindows = true
         #expect(DownloadRulesStore.firstHandoffMatch(in: [type, privateCatchAll], url: url, filename: "file.pdf",
                                                      appliesToLinks: false, isPrivate: true) == nil)
+
+        // A hand-edited links-and-downloads destination is not a download destination, so it cannot block a handoff.
+        var linkDestination = destination("pdf", .saveToFolder, folder: "/tmp")
+        linkDestination.applies = .linksAndDownloads
+        linkDestination.name = "Link destination"
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [linkDestination, catchAll], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false)?.name == "Catch-all")
     }
 
     /// The last word on Open: an app, a script, an installer, an archive or a file with no type is saved, while a PDF

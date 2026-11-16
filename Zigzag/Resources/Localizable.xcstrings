@@ -2918,6 +2918,17 @@
         }
       }
     },
+    "Apps, scripts, installers, archives and .mobileconfig files are always saved, never opened." : {
+      "comment" : "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App、脚本、安装器、压缩包和 .mobileconfig 文件始终只会存储，绝不会打开。"
+          }
+        }
+      }
+    },
     "Archive tabs you haven’t used" : {
       "comment" : "A setting in Settings › Tabs.",
       "localizations" : {

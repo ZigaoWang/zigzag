@@ -2995,10 +2995,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let rules = DownloadRulesStore.shared.rules
         let linkMatch = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: true)
-        let downloadMatch = DownloadRulesStore.firstMatch(in: rules, url: url, appliesToLinks: false)
+        // As a download, the answer is the list's one order: an earlier file type stands before a later handoff.
+        let name = url.lastPathComponent
+        let downloadMatch = DownloadRulesStore.firstHandoffMatch(in: rules, url: url, filename: name, appliesToLinks: false)
         guard let rule = linkMatch ?? downloadMatch else {
             // A per-extension destination matches a file's own name, so the field can answer for one of those too.
-            let name = url.lastPathComponent
             if !name.isEmpty, let (destination, _) = DownloadRulesStore.destination(in: rules, url: url, filename: name) {
                 row.detailText = destination.destinationSentence
             } else {
