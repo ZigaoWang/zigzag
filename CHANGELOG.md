@@ -5,10 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### Fixed
-- A folder in the sidebar opens and closes like an accordion, its pages unfolding and folding together, instead of the rows below it sliding over them.
-- A site with a dark design of its own whose Dark page you set to Off no longer flashes white while it loads, with the bar above it white until the page draws: once Zigzag has seen it dark, it loads on its own dark. A light site still loads as it did. ([#250](https://github.com/ZigaoWang/zigzag/issues/250))
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
@@ -134,6 +130,8 @@ Protection for your IP address from WebRTC, a smarter Clear that keeps split vie
 - Find on page marks the matches in text that shows up as you open a section, like an accordion or Show more, not only in text a page adds.
 - A page's preview no longer comes up beside the menu when you right-click it in the sidebar.
 - ⌘Z after Use Zigzag Mini takes the whole choice back: the page goes back to its tab, and links from other apps open as tabs again.
+- A folder in the sidebar opens and closes like an accordion, its pages unfolding and folding together, instead of the rows below it sliding over them.
+- A site with a dark design of its own whose Dark page you set to Off no longer flashes white while it loads, with the bar above it white until the page draws: once Zigzag has seen it dark, it loads on its own dark. A light site still loads as it did. ([#250](https://github.com/ZigaoWang/zigzag/issues/250))
 
 ## [0.9.0] - 2026-11-14
 
