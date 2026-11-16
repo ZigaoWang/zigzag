@@ -40,8 +40,11 @@ nonisolated enum DownloadOpening {
         // No extension is no type to vouch for: an extensionless file can be a script or a binary, and Open is for a
         // type, not for "whatever this is". It is saved like any other download.
         guard !trimmed.isEmpty else { return true }
-        // A compound type is refused when any part of it is: `tar.gz` is an archive because `tar` and `gz` are.
-        return trimmed.split(separator: ".").contains { refused.contains(String($0)) }
+        // A compound or comma-carrying type is refused when any part of it is: `tar.gz` is an archive because `tar`
+        // and `gz` are, and a page-supplied `pdf,dmg` cannot smuggle the second one past this check.
+        return trimmed.split(whereSeparator: { $0 == "." || $0 == "," })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .contains { refused.contains($0) }
     }
 
     /// Whether any extension a file-type pattern names is one an Open must refuse. An Open rule for one of them could
@@ -789,12 +792,15 @@ final class DownloadRulesStore {
                                               appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
         for rule in rules {
             guard rule.applies == .linksAndDownloads || !appliesToLinks else { continue }
-            guard !isPrivate || rule.runsInPrivateWindows else { continue }
             guard rule.matches(url, filename: filename) else { continue }
             if let destination = rule.action.destination {
+                // A Save destination is not a handoff: it still applies in a private window, switch or no switch.
+                // An Open needs the rule's switch, and stands aside while it is off.
+                if isPrivate, !rule.runsInPrivateWindows, destination == .open { continue }
                 if destination == .open, DownloadOpening.isRefused((filename as NSString).pathExtension) { continue }
                 return nil
             }
+            guard !isPrivate || rule.runsInPrivateWindows else { continue }
             return rule
         }
         return nil
