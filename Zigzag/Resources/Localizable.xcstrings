@@ -11553,6 +11553,18 @@
         }
       }
     },
+    "Other questions in this window: %lld" : {
+      "comment" : "A line on a site's permission question when another question is also about in the same window, on this page or another pane of a split.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此窗口中还有其他 %lld 个问题"
+          }
+        }
+      }
+    },
+
     "Outline Every Element" : {
       "comment" : "View › Developer menu item and command, on a development site, checked while on: draws a line around each element of the page.",
       "localizations" : {
@@ -12762,17 +12774,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "地址的二维码"
-          }
-        }
-      }
-    },
-    "Questions still waiting: %lld" : {
-      "comment" : "A line on a site's permission question when more than one question is waiting in the same window: how many are still behind the one on screen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "还有 %lld 个问题等待回答"
           }
         }
       }

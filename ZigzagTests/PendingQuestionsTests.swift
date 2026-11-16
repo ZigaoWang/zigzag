@@ -44,17 +44,6 @@ import Testing
         #expect(PendingQuestions.canShow(isFront: false, windowVisible: true) == false)
     }
 
-    /// A tab that closes leaves nothing waiting for it, and another tab's question is untouched.
-    @Test func aClosedTabLeavesNothingWaiting() {
-        PendingQuestions.forgetAll()
-        let closed = UUID(), other = UUID()
-        PendingQuestions.enqueue(.init(id: UUID(), tabID: closed, origin: "https://a.com", title: "Open mpv"))
-        PendingQuestions.enqueue(.init(id: UUID(), tabID: other, origin: "https://b.com", title: "Use your camera"))
-        PendingQuestions.forget(tabID: closed)
-        #expect(PendingQuestions.hasPending(tabID: closed) == false)
-        #expect(PendingQuestions.pending(tabID: other).count == 1)
-    }
-
     /// The same question is never counted twice, however often the prompt machinery reports it.
     @Test func aQuestionIsCountedOnce() {
         PendingQuestions.forgetAll()

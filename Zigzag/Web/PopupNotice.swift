@@ -52,6 +52,12 @@ enum PopupNotice {
     }
 
     /// The question was put off (Esc, or its window closed): not straight back up.
+    /// The site's answers were forgotten: its throttle goes too, so the next pop-up asks as if it had never asked.
+    static func forgetAnswers(origin: String) {
+        lastAsked[origin] = nil
+        setAside[origin] = nil
+    }
+
     static func noteSetAside(origin: String?, now: Date = Date()) {
         guard let origin else { return }
         setAside[origin] = now.addingTimeInterval(putOffGap)
@@ -67,17 +73,18 @@ enum PopupNotice {
                     configuration: WKWebViewConfiguration? = nil) {
         let origin = SiteOrigin.of(page)
         let frameOrigin = SiteOrigin.of(action.sourceFrame.securityOrigin)
-        // A frame from another origin may ask this time, but the answer is the page's to keep, not the frame's: an
-        // embedded frame must not be able to choose where the page's pop-ups go for good.
-        let foreign = frameOrigin != nil && frameOrigin != origin
+        // Only the page's own frame may choose where the page's pop-ups go for good. A frame from another origin —
+        // and an opaque frame, whose origin cannot be named — may ask this time, and its answer stays that frame's.
+        let sameFrame = frameOrigin != nil && frameOrigin == origin
+        let key = SitePermissions.answerKey(frame: frameOrigin, page: origin)
         // Answers are kept for sites only where the page itself is secure: an allow on an http page would be a
         // standing answer anyone on the network could have written.
         let secure = page?.scheme?.lowercased() == "https"
         let url = action.request.url
         guard let host, let url else { return }
-        // What this page already answered "this time" holds, so a page that asks again on its own (a second
+        // What this frame already answered "this time" holds, so a page that asks again on its own (a second
         // `window.open` while the first is still loading, a retry) is not asked twice.
-        if let kept = pageAction(tab: tab, origin: origin, isPrivate: isPrivate) {
+        if let kept = pageAction(tab: tab, origin: key, isPrivate: isPrivate) {
             open(url, action: kept, from: tab, in: host, configuration: configuration)
             return
         }
@@ -87,17 +94,28 @@ enum PopupNotice {
         let target = SiteOrigin.of(url).map(SiteOrigin.label) ?? url.absoluteString
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(
-                host: SitePermissions.askerName(frame: frameOrigin, page: origin), origin: origin, what: target, symbol: "macwindow.badge.plus",
+                host: SitePermissions.askerName(frame: frameOrigin ?? origin, page: origin), origin: origin, what: target, symbol: "macwindow.badge.plus",
                 in: host, tab: tab,
                 title: String(localized: "Open \(target) in a new window", comment: "A page's question before Zigzag opens the pop-up window it asked for. The placeholder is the address it wants to open, like meet.example.com."),
                 actions: [.deny],
                 menu: [.alternate("thisTab", String(localized: "This Tab", comment: "Choice in the pop-up question's menu: loads the pop-up's page in the tab you are in.")),
                        .alternate("newTab", String(localized: "New Tab", comment: "Choice in the pop-up question's menu: opens the pop-up's page in a new tab.")),
                        .alternate("mini", String(localized: "Mini", comment: "Choice in the pop-up question's menu: opens the pop-up's page in the small pop-up viewer window."))],
-                canRemember: !isPrivate && origin != nil && secure && !foreign)
+                canRemember: !isPrivate && origin != nil && secure && sameFrame,
+                answered: {
+                    // A queued question may have been answered meanwhile: the same frame's This-time choice, or a
+                    // destination the page kept for the site.
+                    if let key, let kept = pageAction(tab: tab, origin: key, isPrivate: isPrivate) {
+                        return PermissionAnswer(action: kept, remember: false)
+                    }
+                    if !isPrivate, let kept = storedAction(origin: origin) {
+                        return PermissionAnswer(action: kept, remember: true)
+                    }
+                    return nil
+                })
             guard let answer else { noteSetAside(origin: origin); return }
-            if let origin {
-                SitePermissions.rememberAnswer(answer, subject: PermissionSubject.popups, origin: origin, tab: tab, isPrivate: isPrivate)
+            if let key {
+                SitePermissions.rememberAnswer(answer, subject: PermissionSubject.popups, origin: key, tab: tab, isPrivate: isPrivate)
             }
             open(url, action: answer.action, from: tab, in: host, configuration: configuration)
         }

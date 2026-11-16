@@ -807,20 +807,22 @@ final class PermissionPrompt: FloatingPanelView {
     /// How many questions are waiting in this window, this one counted, as last read.
     private var questionsWaiting = 1
 
-    /// How many questions come after the one on screen, or nothing when this is the only one in the window.
+    /// How many other questions are about in this window, or nothing when this is the only one.
     static func waitingBehind(questionsWaiting: Int) -> Int? {
         questionsWaiting > 1 ? questionsWaiting - 1 : nil
     }
 
-    /// What the card says under its answers while other questions wait their turn in the same window: how many
-    /// come after this one. Nothing while this is the only one, since there is nothing to wait for.
+    /// What the card says under its answers while other questions are about in the same window. "Other" rather than
+    /// "behind": two panes of a split can show a card each, and neither is waiting behind the other.
     static func waitingLine(questionsWaiting: Int) -> String? {
         guard let behind = waitingBehind(questionsWaiting: questionsWaiting) else { return nil }
-        return String(localized: "Questions still waiting: \(behind)", comment: "A line on a site's permission question when more than one question is waiting in the same window: how many are still behind the one on screen.")
+        return String(localized: "Other questions in this window: \(behind)", comment: "A line on a site's permission question when another question is also about in the same window, on this page or another pane of a split.")
     }
 
     /// The question on screen in each window, so it can follow the sidebar.
     private static var shown: [ObjectIdentifier: PermissionPrompt] = [:]
+    /// Questions being asked right now, by page and request, so the same one asked twice waits for the first answer.
+    private static var inFlight: [String: (id: UUID, task: Task<PermissionAnswer?, Never>)] = [:]
     /// Questions asked in each window that have not been answered yet: one is on screen, the rest wait their turn.
     /// A question is asked one at a time in a window (see `ask`'s chain), so the card that is up can say how many
     /// are behind it instead of stacking a card each.
@@ -891,22 +893,36 @@ final class PermissionPrompt: FloatingPanelView {
         if let known = answered() {
             return PermissionAnswer(action: known.action, remember: known.remember && remembers)
         }
+        let request = title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.")
+        // The same question, asked again while its card is up: wait for that one answer instead of stacking a second
+        // card. A page that asks twice gets one question, and both callers go on with the same answer.
+        let questionKey = "\(origin ?? host)|\(request)"
+        if let before = inFlight[questionKey] {
+            let known = await before.task.value
+            return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers) }
+        }
         // One of the window's waiting questions from the moment it is asked, even if it cannot be shown yet: the tab
         // wears the marker, the card that is up counts it, and another tab's question is not held behind this one.
         // The cards themselves take turns where they would be seen (`PageQuestions`), so no second queue is needed.
-        let questionID = UUID()
-        let request = title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.")
-        let asking = tab ?? controller.promptFrontTab
-        if let asking {
-            PendingQuestions.enqueue(.init(id: questionID, tabID: asking.id, origin: origin, title: request))
+        let token = UUID()
+        let task = Task<PermissionAnswer?, Never> { @MainActor in
+            let questionID = UUID()
+            let asking = tab ?? controller.promptFrontTab
+            if let asking {
+                PendingQuestions.enqueue(.init(id: questionID, tabID: asking.id, origin: origin, title: request))
+            }
+            setWaiting(questionsWaiting(in: controller) + 1, in: controller)
+            let answer = await show(host: host, request: request,
+                                  symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
+                                  origin: origin, in: controller, tab: tab, answered: answered)
+            // Answered or put off: it is no longer one of the window's waiting questions.
+            PendingQuestions.answer(questionID)
+            setWaiting(max(0, questionsWaiting(in: controller) - 1), in: controller)
+            return answer
         }
-        setWaiting(questionsWaiting(in: controller) + 1, in: controller)
-        let answer = await show(host: host, request: request,
-                              symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
-                              origin: origin, in: controller, tab: tab, answered: answered)
-        // Answered or put off: it is no longer one of the window's waiting questions.
-        PendingQuestions.answer(questionID)
-        setWaiting(max(0, questionsWaiting(in: controller) - 1), in: controller)
+        inFlight[questionKey] = (token, task)
+        let answer = await task.value
+        if inFlight[questionKey]?.id == token { inFlight[questionKey] = nil }
         let said = if let answer {
             answer.action == "deny" ? "not allowed" : answer.remember ? "always allowed" : answer.action == "allow" ? "allowed" : "allowed the other way"
         } else { "put off" }
@@ -992,7 +1008,6 @@ final class PermissionPrompt: FloatingPanelView {
             // one is up waits its turn behind it, and the card says so rather than stacking a card of its own.
             prompt.questionsWaiting = Self.questionsWaiting(in: controller)
             prompt.waitingToken = Self.waitingChanged.observe { [weak prompt] in prompt?.refreshWaiting() }
-            shown[ObjectIdentifier(controller)] = prompt
             controller.promptOverlay.addSubview(prompt)
             prompt.isHidden = true
             prompt.tabsToken = controller.observePromptTabs { [weak prompt] in prompt?.followTab() }

@@ -45,14 +45,6 @@ enum PendingQuestions {
         hasPending(tabID: tabID) && !canShow(isFront: isFront, windowVisible: windowVisible)
     }
 
-    /// The tab closed, or left for another site: nothing is waiting for it any more.
-    static func forget(tabID: UUID) {
-        let left = waiting.filter { $0.tabID == tabID }
-        guard !left.isEmpty else { return }
-        waiting.removeAll { $0.tabID == tabID }
-        changed.send(waiting.count)
-    }
-
     static var total: Int { waiting.count }
 
     #if DEBUG

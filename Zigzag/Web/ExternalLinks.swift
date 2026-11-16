@@ -78,8 +78,9 @@ enum ExternalLinks {
         // A background tab has no window, and a popup's isn't a browser window: ask in the tab's own window, or the
         // front one, so the link never just does nothing.
         let popup = PopupWindowController.all.first { $0.webView === webView }
+        let owner = (webView as? BrowserWebView)?.owner
         let controller = WindowManager.shared.controller(for: webView.window)
-            ?? ((webView as? BrowserWebView)?.owner?.host as? BrowserWindowController)
+            ?? (owner?.host as? BrowserWindowController)
             ?? popup.flatMap { p in WindowManager.shared.controller(for: p.parentWindow) }
             ?? WindowManager.shared.keyController
         guard let app = NSWorkspace.shared.urlForApplication(toOpen: url) else {
@@ -136,11 +137,10 @@ enum ExternalLinks {
         // asked every time: it's you asking, and the click that dismissed the last question (claude.ai asks on load,
         // and its Open Claude button asks again) must not be what silences this one. A Deny holds on the page that
         // gave it (its `stored` above), so a page cannot ask again for an answer you already refused.
-        // A background tab has no window of its own, but its question still belongs to it: ask in the tab's own
-        // window (or the front one), where `PermissionPrompt` holds it and marks the tab until it can be shown.
-        // The page's own window: a web view that has lost its window (an orphaned pop-up) must not put a question up
-        // in whatever window happens to be in front.
-        guard let controller, webView.window != nil,
+        // A background tab's page has no window attached, but its question still belongs to it: ask in the tab's own
+        // host, where `PermissionPrompt` holds it and marks the tab until it can be shown. A web view with neither a
+        // window nor a tab (an orphaned pop-up) must not put a question up in whatever window happens to be in front.
+        guard let controller, webView.window != nil || owner?.host != nil,
               asked.mayAsk(key, page: pageOrigin ?? pageHost, clickedHere: clickedHere, linkClick: linkClick ?? isClick) else { return }
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
@@ -152,7 +152,10 @@ enum ExternalLinks {
         asked.asking.insert(key)
         // Asked where the page is: in Zigzag Mini or an installed app's window, over its own page, not in a browser
         // window behind it, where it couldn't be seen (a report: claude.ai's Open Claude did nothing in Mini).
-        let promptHost: PromptHost = (webView.window?.windowController as? PromptHost).flatMap { $0 is BrowserWindowController ? nil : $0 } ?? controller
+        let promptHost: PromptHost = (webView.window?.windowController as? PromptHost)
+            .flatMap { $0 is BrowserWindowController ? nil : $0 }
+            ?? (owner?.host as? PromptHost).flatMap { $0 is BrowserWindowController ? nil : $0 }
+            ?? controller
         // Asked from a popup: its browser window comes forward, so the question isn't hidden behind the popup.
         if popup != nil { controller.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
@@ -290,6 +293,9 @@ enum ExternalLinks {
     static func forgetAnswers(origin: String) {
         asked.declined = asked.declined.filter { !$0.hasPrefix(origin + "|") }
         asked.putOff = asked.putOff.filter { !$0.key.hasPrefix(origin + "|") }
+        // The ask-on-its-own gap too, so a site forgotten is asked at once rather than after its few seconds.
+        asked.lastOnItsOwn[origin] = nil
+        if let host = URL(string: origin)?.host() { asked.lastOnItsOwn[host] = nil }
     }
 
     /// "Tencent Meeting" for the app that opens a scheme, as Finder names it.
