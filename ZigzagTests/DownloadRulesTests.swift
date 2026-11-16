@@ -482,6 +482,7 @@ struct DownloadRuleTests {
         #expect(DownloadOpening.isRefused("iso"))
         #expect(DownloadOpening.isRefused("xip"))
         #expect(DownloadOpening.isRefused("tar.gz"))
+        #expect(DownloadOpening.isRefused("pdf,dmg"))
         #expect(DownloadOpening.isRefused(""))
         #expect(!DownloadOpening.isRefused("pdf"))
         #expect(DownloadOpening.isRefused(pattern: "pdf, tar.gz"))
@@ -527,6 +528,12 @@ struct DownloadRuleTests {
         #expect(DownloadRulesStore.firstHandoffMatch(in: [refused, catchAll],
                                                      url: URL(string: "https://example.com/x.dmg")!, filename: "x.dmg",
                                                      appliesToLinks: false)?.name == "Catch-all")
+
+        // A Save destination still stands in a private window even with its switch off: only Open and handoffs need it.
+        var privateCatchAll = catchAll
+        privateCatchAll.runsInPrivateWindows = true
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [type, privateCatchAll], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false, isPrivate: true) == nil)
     }
 
     /// The last word on Open: an app, a script, an installer, an archive or a file with no type is saved, while a PDF
