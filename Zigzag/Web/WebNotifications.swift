@@ -30,14 +30,14 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     private var started = false
 
     /// Adds the page script, plus site answers in Zigzag's own world, so `Notification.permission` is right before
-    /// page scripts run. The page only learns its own answer, never the list. Per web view, since private windows
-    /// always deny.
-    static func attach(to configuration: WKWebViewConfiguration, isPrivate: Bool) {
+    /// page scripts run. The page only learns its own answer, never the list. Per web view: `alwaysDenies` for a page
+    /// that may never show one (`alwaysDenies(_:)`).
+    static func attach(to configuration: WKWebViewConfiguration, alwaysDenies: Bool) {
         let controller = configuration.userContentController
         guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return }
-        let decisions = isPrivate ? [:] : SitePermissions.notificationDecisions
+        let decisions = alwaysDenies ? [:] : SitePermissions.notificationDecisions
         controller.addUserScript(WKUserScript(source: answerSource(decisions: decisions), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world))
-        controller.addUserScript(WKUserScript(source: pageSource(isPrivate: isPrivate), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
+        controller.addUserScript(WKUserScript(source: pageSource(alwaysDenies: alwaysDenies), injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
         controller.addScriptMessageHandler(shared, contentWorld: .page, name: messageName)
     }
 
@@ -46,8 +46,8 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     static let world = WKContentWorld.world(name: "zigzag-notifications")
 
     /// Replaces `window.Notification`.
-    static func pageSource(isPrivate: Bool) -> String {
-        marker + "\n" + shim.replacingOccurrences(of: "__PRIVATE__", with: isPrivate ? "true" : "false")
+    static func pageSource(alwaysDenies: Bool) -> String {
+        marker + "\n" + shim.replacingOccurrences(of: "__DENIED__", with: alwaysDenies ? "true" : "false")
     }
 
     /// Sends the page script its own origin's answer (granted, denied or default) as an event when it asks.
@@ -91,7 +91,7 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
             let answer = await SitePermissions.requestNotifications(origin: origin, window: tab.host?.hostWindow, isPrivate: tab.isPrivate, tab: tab)
             if answer == nil { putOff.insert("\(tab.id)|\(origin)") }
             // A private window asks, so the page isn't left waiting, but it still never shows one.
-            return (answer.map { $0 && !tab.isPrivate ? "granted" : "denied" } ?? "default", nil)
+            return (answer.map { $0 && !Self.alwaysDenies(tab) ? "granted" : "denied" } ?? "default", nil)
         case "show":
             guard permission(origin: origin, tab: tab) == "granted", let id = body["id"] as? String, let title = body["title"] as? String else { return (false, nil) }
             let shown = await show(id: id, title: title, body: body["body"] as? String ?? "", tag: body["tag"] as? String ?? "",
@@ -108,8 +108,12 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         }
     }
 
+    /// A page that may never show one: in a private window, which leaves no trace, and in AI apps' profile, where no
+    /// one would see it but it would come up on your screen.
+    static func alwaysDenies(_ tab: Tab) -> Bool { tab.isPrivate || !tab.profile.getsYourData }
+
     private func permission(origin: String, tab: Tab) -> String {
-        if tab.isPrivate { return "denied" }
+        if Self.alwaysDenies(tab) { return "denied" }
         return SitePermissions.notifications(origin: origin, tab: tab).map { $0 ? "granted" : "denied" } ?? "default"
     }
 
@@ -316,17 +320,17 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
       // A frame written with document.open() (Cloudflare's Turnstile does) gets a new document in the same window,
       // and WebKit runs this again there: what's set up already stays, since setting it up again throws.
       if (window.__zigzagNotification) return;
-      const isPrivate = __PRIVATE__;
+      const denied = __DENIED__;
       const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
       let sameSite = window === window.top;
       if (!sameSite) { try { sameSite = window.top.location.origin === location.origin; } catch (e) {} }
       const usable = sameSite && (location.protocol === 'https:' || (location.protocol === 'http:' && local));
       // Per origin (scheme, host, port); only this origin's answer is sent, from Zigzag's world, before page scripts
       // run (WebNotifications.answerSource).
-      let permission = !usable || isPrivate ? 'denied' : 'default';
+      let permission = !usable || denied ? 'denied' : 'default';
       const listen = EventTarget.prototype.addEventListener, tell = EventTarget.prototype.dispatchEvent, NativeEvent = Event;
       for (const state of ['granted', 'denied', 'default']) {
-        listen.call(window, 'zigzag-notification-' + state, () => { if (usable && !isPrivate) permission = state; }, true);
+        listen.call(window, 'zigzag-notification-' + state, () => { if (usable && !denied) permission = state; }, true);
       }
       tell.call(window, new NativeEvent('zigzag-notification-ask'));
       // A question only follows a click or a key: a page can't ask the moment it opens.

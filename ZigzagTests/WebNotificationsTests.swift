@@ -20,7 +20,7 @@ struct WebNotificationsTests {
     private func page(_ html: String) async -> (WKWebView, Loading) {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.addUserScript(Self.errors)
-        WebNotifications.attach(to: configuration, isPrivate: false)
+        WebNotifications.attach(to: configuration, alwaysDenies: false)
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)
         let loading = Loading()
         webView.navigationDelegate = loading
@@ -51,12 +51,12 @@ struct WebNotificationsTests {
     /// A page knows its own answer before scripts run, and nothing about other sites; answers stay in Zigzag's content world.
     @Test func aPageKnowsOnlyItsOwnAnswer() async throws {
         let decisions = ["https://example.com": true, "https://secret.example": true, "https://blocked.example": false]
-        #expect(!WebNotifications.pageSource(isPrivate: false).contains("secret.example"))
+        #expect(!WebNotifications.pageSource(alwaysDenies: false).contains("secret.example"))
         let configuration = WKWebViewConfiguration()
         let controller = configuration.userContentController
         controller.addUserScript(WKUserScript(source: WebNotifications.answerSource(decisions: decisions), injectionTime: .atDocumentStart,
                                               forMainFrameOnly: false, in: WebNotifications.world))
-        controller.addUserScript(WKUserScript(source: WebNotifications.pageSource(isPrivate: false), injectionTime: .atDocumentStart,
+        controller.addUserScript(WKUserScript(source: WebNotifications.pageSource(alwaysDenies: false), injectionTime: .atDocumentStart,
                                               forMainFrameOnly: false, in: .page))
         controller.addScriptMessageHandler(WebNotifications.shared, contentWorld: .page, name: WebNotifications.messageName)
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 800, height: 600), configuration: configuration)

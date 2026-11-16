@@ -2662,14 +2662,22 @@ final class TabManager {
         }
     }
 
+    /// The tabs the archive may take, space by space, and counts toward offering it. Never a private window's, nor
+    /// those in a space whose profile isn't given your data (AI apps', `Profile.getsYourData`): the Archive is yours.
+    var archivableTabs: [[Tab]] {
+        guard !isPrivate else { return [] }
+        return tabsBySpace.filter { Profiles.shared.profile(forSpace: $0.key).getsYourData }.map(\.value)
+    }
+
     /// Ordinary tabs unseen for longer than the setting move to the archive. Never pinned pages or favorites,
     /// what's on screen, a split, anything playing or in a call, a site that sends notifications, one with something you
-    /// typed still in it, or a private window's tabs.
+    /// typed still in it, or what `archivableTabs` leaves out.
     private func archiveStaleTabs(keeping onScreen: Set<UUID>) {
-        if !isPrivate { TabArchive.offerIfCrowded(tabCount: tabsBySpace.values.map(\.count).max() ?? 0) }
-        guard !isPrivate, let limit = TabArchive.after.interval else { return }
+        let lists = archivableTabs
+        TabArchive.offerIfCrowded(tabCount: lists.map(\.count).max() ?? 0)
+        guard let limit = TabArchive.after.interval else { return }
         let now = Date()
-        let stale = tabsBySpace.values.flatMap { $0 }.filter {
+        let stale = lists.flatMap { $0 }.filter {
             $0.bookmarkID == nil && !onScreen.contains($0.id) && split(for: $0) == nil && !$0.isPlayingAudio && !$0.isInUse && !$0.notifiesUser
                 && $0.pageState?.hasTypedText != true && now.timeIntervalSince($0.lastActivated) > limit && $0.url != nil
         }

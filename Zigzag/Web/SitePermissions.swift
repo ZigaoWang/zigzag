@@ -544,7 +544,13 @@ enum SitePermissions {
     /// The site's notification answer on `tab`'s page: Allow or Block kept for the site, else the answer given on
     /// this page.
     static func notifications(origin: String, tab: Tab?) -> Bool? {
-        notifications(origin: origin) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
+        kept(notifications(origin: origin), for: tab) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
+    }
+
+    /// What you kept for a site (Allow or Block), for a page in `tab`: none in AI apps' profile, which is given
+    /// nothing of yours (`Profile.getsYourData`). There the page is asked, and with no one to answer, refused.
+    static func kept<Answer>(_ answer: @autoclosure () -> Answer?, for tab: Tab?) -> Answer? {
+        tab?.profile.getsYourData == false ? nil : answer()
     }
 
     /// Asked like the camera, Remember checked to start. A private window never shows them anyway.
@@ -556,7 +562,7 @@ enum SitePermissions {
                                                 actions: [.deny, .allow], canRemember: true,
                                                 remembersByDefault: remembersByDefault(PermissionSubject.notifications),
                                                 answered: {
-                                                    knownAnswer(site: notifications(origin: origin),
+                                                    knownAnswer(site: kept(notifications(origin: origin), for: tab),
                                                                 page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
                                                 })
         guard let answer else { return nil }
@@ -565,13 +571,13 @@ enum SitePermissions {
 
     /// The location answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on this page.
     private static func location(key: String, tab: Tab?) -> Bool? {
-        location(origin: key) ?? tab?.permissionAnswers.answer(key: key, kind: "location")
+        kept(location(origin: key), for: tab) ?? tab?.permissionAnswers.answer(key: key, kind: "location")
     }
 
     /// The camera or microphone answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on
     /// this page.
     private static func decision(key: String, type: WKMediaCaptureType, tab: Tab?) -> Bool? {
-        decision(origin: key, type: type) ?? tab?.permissionAnswers.answer(key: key, kind: kind(type))
+        kept(decision(origin: key, type: type), for: tab) ?? tab?.permissionAnswers.answer(key: key, kind: kind(type))
     }
 
     /// Location, asked the same way as the camera. A page with no origin to keep it under (file:) is asked every time.
@@ -588,7 +594,7 @@ enum SitePermissions {
                                                 remembersByDefault: remembersByDefault(PermissionSubject.location),
                                                 answered: {
                                                     key.flatMap { key in
-                                                        knownAnswer(site: location(origin: key),
+                                                        knownAnswer(site: kept(location(origin: key), for: tab),
                                                                     page: tab?.permissionAnswers.answer(key: key, kind: "location"))
                                                     }
                                                 })
@@ -638,7 +644,7 @@ enum SitePermissions {
                                                     remembersByDefault: remembersByDefault(PermissionSubject.media(type)),
                                                     answered: {
                                                         key.flatMap { key in
-                                                            knownAnswer(site: decision(origin: key, type: type),
+                                                            knownAnswer(site: kept(decision(origin: key, type: type), for: tab),
                                                                         page: tab?.permissionAnswers.answer(key: key, kind: kind(type)))
                                                         }
                                                     })
@@ -688,8 +694,8 @@ enum SitePermissions {
 
     /// The site's kept choice, then the page's.
     private static func screenAnswer(key: String, tab: Tab?) -> PermissionAnswer? {
-        if let kept = DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: key)) {
-            return PermissionAnswer(action: kept.action, remember: true)
+        if let site = kept(DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: key)), for: tab) {
+            return PermissionAnswer(action: site.action, remember: true)
         }
         if let page = tab?.permissionAnswers.action(key: key, kind: PermissionSubject.screen),
            let kept = DisplayCaptureChoice(action: page) {

@@ -42,10 +42,10 @@ enum DownloadHandoff {
     }
 
     /// The matching rule, if any. `appliesToLinks` is true for links, false for downloads.
-    static func firstMatch(_ url: URL, appliesToLinks: Bool, filename: String = "", isPrivate: Bool = false) -> DownloadRule? {
+    static func firstMatch(_ url: URL, appliesToLinks: Bool, filename: String = "", isPrivate: Bool = false, in profile: Profile?) -> DownloadRule? {
         guard isHandoffable(url) else { return nil }
         return DownloadRulesStore.shared.firstHandoffMatch(url: url, filename: filename, appliesToLinks: appliesToLinks,
-                                                           isPrivate: isPrivate)
+                                                           isPrivate: isPrivate, in: profile)
     }
 
     /// Zigzag's own pages and the certificate warning's proceed link are never handed off; a catch-all rule could

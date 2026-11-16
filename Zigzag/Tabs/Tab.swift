@@ -248,7 +248,7 @@ final class Tab: NSObject {
     var javaScriptHere: [String: Bool] = [:]
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
-        guard !isPrivate, let origin = SiteOrigin.of(url) else { return false }
+        guard !WebNotifications.alwaysDenies(self), let origin = SiteOrigin.of(url) else { return false }
         return SitePermissions.notifications(origin: origin) == true
     }
     /// The tab that opened this one, so closing it can return there.
@@ -332,7 +332,11 @@ final class Tab: NSObject {
         self.title = title ?? (SettingsPage.isSettings(self.url) ? String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") : self.url?.host() ?? String(localized: "New Tab", comment: "The name of a tab with no page yet."))
         self.spaceID = spaceID
         // A page WebKit made for another page's new window is in that page's profile, whatever space it lands in.
-        self.profile = configuration.flatMap { Profiles.shared.profile(ofStore: $0.websiteDataStore) } ?? Profiles.shared.profile(forSpace: spaceID)
+        let profile = configuration.flatMap { Profiles.shared.profile(ofStore: $0.websiteDataStore) } ?? Profiles.shared.profile(forSpace: spaceID)
+        self.profile = profile
+        // AI apps' pages play to no one: muted from the start, until you unmute one in their window. Each page the
+        // tab loads is muted with it (`ensureWebView`).
+        self.isMuted = profile.isHeadless
         self.pendingConfiguration = configuration
         self.pendingInteractionState = interactionState
         self.lastActivated = lastActivated
@@ -526,7 +530,7 @@ final class Tab: NSObject {
             WebKitSetup.turnOffBackspaceNavigation(configuration.preferences)
         } else if !fromWebKit {
             WebKitSetup.configure(configuration, for: profile)
-            WebNotifications.attach(to: configuration, isPrivate: privateStore != nil)
+            WebNotifications.attach(to: configuration, alwaysDenies: WebNotifications.alwaysDenies(self))
             Passkeys.attach(to: configuration, isPrivate: privateStore != nil, profile: profile)
             HistoryPage.attach(to: configuration)
             WebRTCProtection.attach(to: configuration)
@@ -2050,7 +2054,7 @@ extension Tab: WKNavigationDelegate {
         // Links have no filename; a download's name lets an earlier file-type destination match first.
         let handoffName = appliesToLinks ? "" : (filename ?? DownloadTokens.filename(for: url, suggested: ""))
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
-                                                    isPrivate: isPrivate) else { return false }
+                                                    isPrivate: isPrivate, in: profile) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
         var handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
                                               filename: DownloadTokens.filename(for: url, suggested: ""),
@@ -2457,7 +2461,7 @@ extension Tab: WKUIDelegate {
         // opens.
         if BrowserWebView.pendingDisposition(for: webView) == nil,
            let url = navigationAction.request.url, PopupNotice.isUserInitiated(navigationAction),
-           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true, isPrivate: isPrivate) {
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true, isPrivate: isPrivate, in: profile) {
             _ = BrowserWebView.takePendingDisposition(for: webView)
             handOffInNewWindow(rule, url: url, request: navigationAction.request, webView: webView,
                                pageOrigin: askingOrigin(navigationAction, webView: webView),

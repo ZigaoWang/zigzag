@@ -30,10 +30,18 @@ enum Passkeys {
         if !controller.userScripts.contains(where: { ($0.source as NSString).hasPrefix(keeperMarker) }) {
             controller.addUserScript(WKUserScript(source: keeper, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
         }
-        guard !available else { return }
-        if isPrivate { install(in: controller); return }
-        controllers.setObject(profile, forKey: controller)
-        if !passwordManagerOn(in: profile) { install(in: controller) }
+        let forAIApps = !profile.getsYourData
+        // Where a password manager turning on or off changes the answer, it's followed (`refresh`).
+        if !available, !isPrivate, !forAIApps { controllers.setObject(profile, forKey: controller) }
+        if isShimmed(available: available, isPrivate: isPrivate, forAIApps: forAIApps, managerOn: !isPrivate && passwordManagerOn(in: profile)) {
+            install(in: controller)
+        }
+    }
+
+    /// Whether pages are told there are no passkeys: without the entitlement, unless a password manager brings its
+    /// own (a private window has none). Always in AI apps' profile: a passkey needs you there to confirm it.
+    nonisolated static func isShimmed(available: Bool, isPrivate: Bool, forAIApps: Bool, managerOn: Bool) -> Bool {
+        forAIApps || (!available && (isPrivate || !managerOn))
     }
 
     /// Puts the shim in or takes it out after a password manager is turned on or off. Pages see it from their next load.
@@ -41,7 +49,7 @@ enum Passkeys {
         guard !available else { return }
         for controller in controllers.keyEnumerator().allObjects.compactMap({ $0 as? WKUserContentController }) {
             guard let profile = controllers.object(forKey: controller) else { continue }
-            let wanted = !passwordManagerOn(in: profile)
+            let wanted = isShimmed(available: available, isPrivate: false, forAIApps: false, managerOn: passwordManagerOn(in: profile))
             guard has(controller) != wanted else { continue }
             if wanted {
                 install(in: controller)

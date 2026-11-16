@@ -14,9 +14,9 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     static let messageName = "zigzagPassword"
 
     /// Offer to save passwords, chosen for each profile. On by default, unless a password-manager extension is
-    /// handling them there.
+    /// handling them there. Never where the profile isn't given your data (`Profile.getsYourData`).
     static func offersToSave(in profile: Profile) -> Bool {
-        PasswordManagers.zigzagHandles(chosen: ProfileKey.offersToSavePasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil)
+        profile.getsYourData && PasswordManagers.zigzagHandles(chosen: ProfileKey.offersToSavePasswords.choice(in: profile.id), managerOn: PasswordManagers.active(in: profile) != nil)
     }
 
     static func setOffersToSave(_ on: Bool, in profile: Profile) {

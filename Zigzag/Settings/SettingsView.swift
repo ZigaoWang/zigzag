@@ -2585,8 +2585,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let spaces = library.spaces(in: profile.id).count
             let extensions = Profiles.shared.profile(profile.id).installs.installedIDs.count
             // No "0 extensions": a profile without any lists only its spaces.
-            let detail = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it.")]
+            let counts = Words.list([String(localized: "\(spaces) spaces", comment: "Under a profile's name in Settings › Profiles: how many spaces are on it.")]
                                     + (extensions == 0 ? [] : [String(localized: "\(extensions) extensions", comment: "Under a profile's name in Settings › Profiles: how many extensions it has.")]))
+            let detail = profile.isHeadless
+                ? Words.sentences(String(localized: "For AI apps in the background.", comment: "Under the name of the profile AI apps use in the background (AI Apps) in Settings › Profiles: what it's for."), counts)
+                : counts
             let row = FormRow(title: profile.displayName, detail: detail, icon: ProfileSheets.tile(for: profile), control: stack)
             if let trash { row.revealsOnHover(trash) }
             profilesGroup.add(row)
@@ -2805,6 +2808,30 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         passwordsWindowGroup.removeAllRows()
         // Saving and filling are chosen for each profile: a password manager is an extension, and those are a profile's.
         let profile = profile
+        // AI apps' profile is given nothing of yours (`Profile.getsYourData`): there's nothing to choose there.
+        if !profile.getsYourData {
+            passwordsGroup.add(FormRow(title: String(localized: "Not used in this profile", comment: "A row in Settings › Passwords, in place of the password settings, with the profile AI apps use in the background chosen."),
+                                       detail: String(localized: "AI apps work in it. Zigzag never saves or fills passwords here, nor fills forms from your card.", comment: "Explanation under “Not used in this profile” in Settings › Passwords, with the profile AI apps use in the background chosen."),
+                                       control: NSView()))
+        } else {
+            addSavingAndFilling(in: profile)
+        }
+        cardToggle.isOn = ContactCard.isOn
+        cardToggle.onChange = { on in ContactCard.isOn = on }
+        // Not a profile's: with more than one, it stands apart from the two that are.
+        (hasManyProfiles ? cardGroup : passwordsGroup).add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
+                                   detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
+                                   control: cardToggle))
+        let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
+        open.onClick = { _ in PasswordsWindowController.show() }
+        // Importing is in General and in the Passwords window itself; once here would be a third time.
+        passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
+                                         detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
+                                         control: open))
+    }
+
+    /// Who saves and fills passwords in `profile`, and whether Zigzag offers to save and fill them.
+    private func addSavingAndFilling(in profile: Profile) {
         let saves = PasswordCapture.offersToSave(in: profile), fills = Autofill.isOn(in: profile)
         saveToggle.isOn = saves
         fillToggle.isOn = fills
@@ -2854,18 +2881,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                        detail: fillNote,
                                        control: fillToggle))
         }
-        cardToggle.isOn = ContactCard.isOn
-        cardToggle.onChange = { on in ContactCard.isOn = on }
-        // Not a profile's: with more than one, it stands apart from the two that are.
-        (hasManyProfiles ? cardGroup : passwordsGroup).add(FormRow(title: String(localized: "Fill forms from My Card", comment: "A setting in Settings › Passwords."),
-                                   detail: String(localized: "Your name, email, phone and address, from your own card in Contacts.", comment: "Explanation under “Fill forms from My Card” in Settings › Passwords."),
-                                   control: cardToggle))
-        let open = PillButton(title: String(localized: "Open Passwords", comment: "Button in Settings › Passwords that opens the Passwords window."))
-        open.onClick = { _ in PasswordsWindowController.show() }
-        // Importing is in General and in the Passwords window itself; once here would be a third time.
-        passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
-                                         detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
-                                         control: open))
     }
 
     private static var iCloudPasswordsName: String {

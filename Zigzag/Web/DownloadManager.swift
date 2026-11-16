@@ -537,8 +537,9 @@ final class DownloadManager: NSObject {
     /// decides.
     private static func rulePlace(url: URL, filename: String, response: URLResponse, download: WKDownload,
                                   avoiding taken: Set<String>) -> (destination: URL, openWhenFinished: Bool)? {
-        guard let (rule, wanted) = DownloadRulesStore.shared.destination(for: url, filename: filename) else { return nil }
         let owner = (download.webView as? BrowserWebView)?.owner
+        guard let (rule, wanted) = DownloadRulesStore.shared.destination(for: url, filename: filename,
+                                                                          in: download.webView.map { Profiles.shared.profile(ofPage: $0) }) else { return nil }
         let values = HandoffValues(link: url,
                                    referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
                                    filename: filename, mime: response.mimeType ?? "",
@@ -603,7 +604,7 @@ extension DownloadManager: WKDownloadDelegate {
         if ruleMayAsk, let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false, filename: name,
-                                                 isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {
+                                                 isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false), in: owner.profile) {
             var handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
                                                   pageOrigin: startedAt ?? SiteOrigin.of(owner.url ?? download.webView?.url),
                                                   filename: DownloadTokens.filename(for: url, suggested: name),
