@@ -20,4 +20,20 @@ struct DownloadReplaceTests {
         #expect(!DownloadManager.isPlainFile(link))
         #expect(!DownloadManager.isPlainFile(dir.appendingPathComponent("missing")))
     }
+
+    /// An extension's "overwrite" never takes a file of yours: only an empty name, or a file it saved itself.
+    @available(macOS 15.4, *)
+    @Test func anExtensionOverwritesOnlyItsOwnFiles() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("zz-overwrite-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let yours = dir.appendingPathComponent("taxes.pdf")
+        try Data("x".utf8).write(to: yours)
+        let its = dir.appendingPathComponent("export.csv")
+        try Data("y".utf8).write(to: its)
+        let saved: Set<String> = [its.standardizedFileURL.path]
+        #expect(!BridgeDownloads.mayOverwrite(yours, savedBefore: saved))
+        #expect(BridgeDownloads.mayOverwrite(its, savedBefore: saved))
+        #expect(BridgeDownloads.mayOverwrite(dir.appendingPathComponent("new.txt"), savedBefore: []))
+    }
 }

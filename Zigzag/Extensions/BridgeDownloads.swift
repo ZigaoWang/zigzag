@@ -25,7 +25,7 @@ final class BridgeDownloads: BridgeNamespace {
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
         case "download":
-            return try await start(args.object(0))
+            return try await start(args.object(0), extensionID: extensionID)
         case "search":
             return try await search(args.object(0)).map(describe)
         case "pause", "resume", "cancel":
@@ -74,22 +74,35 @@ final class BridgeDownloads: BridgeNamespace {
 
     // MARK: Starting
 
-    private func start(_ options: [String: Any]) async throws -> Int {
+    /// The files each extension saved this session, by the name it chose: the only ones its "overwrite" may replace.
+    private var savedByExtension: [String: Set<String>] = [:]
+
+    /// Whether an extension's "overwrite" may take `target`: nothing is there, or it's a file the extension saved
+    /// there itself this session (`savedBefore`, standardized paths). Anything else there is yours.
+    nonisolated static func mayOverwrite(_ target: URL, savedBefore: Set<String>) -> Bool {
+        !FileManager.default.fileExists(atPath: target.path) || savedBefore.contains(target.standardizedFileURL.path)
+    }
+
+    private func start(_ options: [String: Any], extensionID: String) async throws -> Int {
         guard let text = options.string("url"), let url = URL(string: text), let scheme = url.scheme?.lowercased(),
               ["http", "https", "data", "blob"].contains(scheme) else { throw BridgeError("Invalid URL") }
         var request = URLRequest(url: url)
         request.httpMethod = (options.string("method") ?? "GET").uppercased() == "POST" ? "POST" : "GET"
         if let body = options.string("body") { request.httpBody = Data(body.utf8) }
         for header in options["headers"] as? [[String: Any]] ?? [] {
-            guard let name = header.string("name"), let value = header.string("value"), !Self.forbiddenHeaders.contains(name.lowercased()) else { continue }
+            guard let name = header.string("name"), let value = header.string("value"), !Self.forbiddenHeaders.contains(name.lowercased()),
+                  ExtensionWrite.mayBeSet(name, value) else { continue }
             request.setValue(value, forHTTPHeaderField: name)
         }
         // A name the extension gave: only a file name, inside Downloads (its folders, if it names some, are flattened).
+        // "overwrite" replaces only a file this extension saved there itself; any other file of that name is yours,
+        // so the download takes a new name beside it, as with "uniquify".
         var destination: URL?
         if let name = options.string("filename").map(Self.safeName), !name.isEmpty {
-            destination = options.string("conflictAction") == "overwrite"
-                ? DownloadManager.folder.appendingPathComponent(name)
-                : DownloadManager.uniqueDestination(for: name)
+            let target = DownloadManager.folder.appendingPathComponent(name)
+            let overwrite = options.string("conflictAction") == "overwrite" && Self.mayOverwrite(target, savedBefore: savedByExtension[extensionID, default: []])
+            destination = overwrite ? target : DownloadManager.uniqueDestination(for: name)
+            if let destination { savedByExtension[extensionID, default: []].insert(destination.standardizedFileURL.path) }
         }
         if options["saveAs"] as? Bool == true, let window = WindowManager.shared.keyController?.window {
             let panel = NSSavePanel()

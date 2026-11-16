@@ -590,7 +590,16 @@ extension DownloadManager: WKDownloadDelegate {
         // Done: now it takes the place of the file it replaces.
         if let target = item.replaces, let temporary = item.destination {
             // Checked again: what's there now may have changed while the download ran.
-            if Self.isPlainFile(target), (try? FileManager.default.replaceItemAt(target, withItemAt: temporary)) != nil { item.destination = target }
+            // The file it replaces goes to the Trash, so it can still be put back. Anything in the way, and the
+            // download takes a name of its own beside it rather than staying under its hidden one.
+            let fileManager = FileManager.default
+            if Self.isPlainFile(target), (try? fileManager.trashItem(at: target, resultingItemURL: nil)) != nil,
+               (try? fileManager.moveItem(at: temporary, to: target)) != nil {
+                item.destination = target
+            } else {
+                let beside = Self.uniqueDestination(for: target.lastPathComponent)
+                if (try? fileManager.moveItem(at: temporary, to: beside)) != nil { item.destination = beside }
+            }
             item.replaces = nil
         }
         item.state = .finished
