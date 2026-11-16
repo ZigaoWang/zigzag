@@ -36,8 +36,10 @@ protocol PromptHost: AnyObject {
 }
 
 extension PromptHost {
-    /// Where a notice goes by default: over the pages, edge to edge.
-    var promptToastPlace: (over: NSView, area: NSRect) { (promptOverlay, promptOverlay.bounds) }
+    /// Where a notice goes by default: over the pages, edge to edge, under a question that is already there.
+    var promptToastPlace: (over: NSView, area: NSRect) {
+        (promptOverlay, PageQuestions.area(promptOverlay.bounds, below: PageQuestions.occupied(in: promptOverlay)))
+    }
 
     /// A short notice over the page. `action` adds a button — a title and what pressing it does — for a notice with
     /// something to offer (Allow Once, Try Again); one of those stays long enough to read and act on, and a `closes`
@@ -135,9 +137,14 @@ extension BrowserWindowController: PromptHost {
 
     /// A question came up: the update note, which only informs, makes way for it, and a toast showing moves under it.
     static func cameUp(in host: PromptHost) {
-        guard let controller = host as? BrowserWindowController else { return }
-        WhatsNewOffer.close(in: controller)
-        Toast.reposition(in: controller)
+        if let controller = host as? BrowserWindowController {
+            WhatsNewOffer.close(in: controller)
+            Toast.reposition(in: controller)
+        } else {
+            // Zigzag Mini and an installed app's window have no desk or agent bar, but their notice still moves under
+            // the question rather than sitting over it.
+            Toast.reposition(in: host)
+        }
     }
 
     /// A question went, or stepped aside for another tab: the oldest one waiting for this page comes up, and a toast
@@ -150,5 +157,6 @@ extension BrowserWindowController: PromptHost {
             (view as? SavePasswordPrompt)?.followTab()
         }
         if let controller = host as? BrowserWindowController { Toast.reposition(in: controller) }
+        else { Toast.reposition(in: host) }
     }
 }
