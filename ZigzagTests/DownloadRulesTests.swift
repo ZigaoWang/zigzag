@@ -481,4 +481,27 @@ struct DownloadRuleTests {
         tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
         #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .cancel)
     }
+
+    // MARK: The App field's menu
+
+    /// The App field lists what's in the Applications folders, **one level deep**: bundles only, each once, in the
+    /// order a person expects. Anything else stays one Choose an App… away.
+    @Test func theAppMenuListsApplicationsOneLevelDeep() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("apps-\(UUID().uuidString)")
+        let mac = root.appendingPathComponent("Mac"), mine = root.appendingPathComponent("Mine")
+        try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: mine.appendingPathComponent("Alpha.app"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // Not a bundle: never offered.
+        try Data().write(to: mine.appendingPathComponent("notes.txt"))
+        // A bundle inside a bundle: this reads one level, never into Contents.
+        try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app/Contents/PlugIns/Inner.app"),
+                                                withIntermediateDirectories: true)
+
+        // The same folder twice is still one entry, and the order is the names'.
+        let named = Applications.named(in: [mac.path, mine.path, mine.path])
+        #expect(named.map(\.name) == ["Alpha", "Zeta"])
+        #expect(named.first?.path == mine.appendingPathComponent("Alpha.app").path)
+    }
+
 }
