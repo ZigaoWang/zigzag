@@ -887,7 +887,7 @@ final class MiniPlayerView: NSView {
     private static let idleHide: TimeInterval = 2.5
 
     /// A white glyph on the picture, a step bolder than the window's own, on a soft shadow so it reads on white too.
-    private static func overlayButton(_ symbol: String, side: CGFloat, glyph: CGFloat, tip: String) -> IconButton {
+    static func overlayButton(_ symbol: String, side: CGFloat, glyph: CGFloat, tip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: side, symbolSize: glyph, toolTip: tip)
         button.isOverMedia = true
         setGlyph(symbol, size: glyph, on: button)

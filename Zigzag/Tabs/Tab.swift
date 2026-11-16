@@ -214,7 +214,13 @@ final class Tab: NSObject {
     var isInMiniPlayer = false
     /// Its page fills the page's area with something in full screen, as Settings › Tabs › Full screen videos fill
     /// The Page has it (PageFullScreen), so Esc in the window leaves it.
-    var isInPageFullScreen = false
+    var isInPageFullScreen = false {
+        didSet {
+            guard isInPageFullScreen != oldValue else { return }
+            pageHolder?.onExpand = { [weak self] in self.map(PageFullScreen.expand) }
+            pageHolder?.showsExpand = isInPageFullScreen
+        }
+    }
     /// What you answered the page's questions (camera, location, notifications) while it's open: asked again once
     /// it loads another page or reloads, as a site set to Ask is.
     var permissionAnswers = PagePermissionAnswers()

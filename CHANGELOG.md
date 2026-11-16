@@ -8,6 +8,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Download rules, in Settings › Downloads, hand a download or a link to another app, a script or a download manager like aria2, Motrix or yt-dlp, by what its address matches. Zigzag asks before it hands anything off, and whatever no rule matches is saved as before. See [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md). Thanks to [Lakeland97](https://github.com/Lakeland97). ([#191](https://github.com/ZigaoWang/zigzag/issues/191))
 - Double-clicking the empty space below your tabs opens a new tab, as in Arc. The top of the sidebar still works like a title bar, and Settings › Appearance › Double-click the sidebar for a new tab turns it off. ([#262](https://github.com/ZigaoWang/zigzag/issues/262))
+- With Full screen videos fill set to The Page, a video filling the page shows a button at its top corner, while the pointer moves, that takes it into the screen's own full screen. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#257](https://github.com/ZigaoWang/zigzag/issues/257))
 
 ### Fixed
 - In full screen, the close, minimize and full screen buttons that come down with the menu bar have a bar behind them again, instead of floating over the page when the sidebar is hidden.
