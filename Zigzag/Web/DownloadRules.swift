@@ -27,7 +27,11 @@ nonisolated enum DownloadOpening {
     ]
 
     static func isRefused(_ type: String) -> Bool {
-        refused.contains(type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        let trimmed = type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // No extension is no type to vouch for: an extensionless file can be a script or a binary, and Open is for a
+        // type, not for "whatever this is". It is saved like any other download.
+        guard !trimmed.isEmpty else { return true }
+        return refused.contains(trimmed)
     }
 
     /// Whether any extension a file-type pattern names is one an Open must refuse. An Open rule for one of them could
