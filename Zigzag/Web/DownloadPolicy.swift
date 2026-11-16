@@ -53,8 +53,9 @@ final class DownloadPolicy {
         // A web page is shown, always. WebKit can briefly say it can't show HTML (a response handed over by a
         // service worker, as YouTube's first load does), and a page saved as "youtube.com.html" is never right.
         let isWebPage = mime.isEmpty || ["text/html", "application/xhtml+xml", "text/plain", "application/json", "text/xml", "application/xml"].contains(mime)
-        // Sent as an attachment: saved, a web page too when it names its file (a site's uploads served as text/html).
-        let isAttachment = disposition.hasPrefix("attachment") && (!isWebPage || disposition.contains("filename"))
+        // Sent as an attachment: saved, a web page too, with a name or without, as in Chrome and Safari. Sites serve
+        // their users' uploads that way so the upload never runs as one of the site's own pages.
+        let isAttachment = disposition.hasPrefix("attachment")
         return isAttachment || !(isWebPage || canShowMIMEType)
     }
 

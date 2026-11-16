@@ -32,6 +32,9 @@ struct DownloadPolicyTests {
         _ = policy.decide(shouldDownload: false, clicked: true, isMainFrame: true)
         // An upload a site serves as a page, sent as an attachment with its name: saved, in a pop-up as in a tab.
         #expect(policy.decide(mimeType: "text/html", contentDisposition: "attachment; filename=\"page.html\"", canShowMIMEType: true, isMainFrame: true) == .download)
+        // Without a name too: never shown as the site's own page.
+        #expect(policy.decide(mimeType: "text/html", contentDisposition: "attachment", canShowMIMEType: true, isMainFrame: true) == .download)
+        #expect(DownloadPolicy.downloads(mimeType: "text/html", contentDisposition: " Attachment ", canShowMIMEType: true))
         #expect(policy.decide(mimeType: "image/svg+xml", contentDisposition: "Attachment", canShowMIMEType: true, isMainFrame: true) == .download)
         // A page is shown, and so is anything WebKit can show that isn't an attachment.
         #expect(policy.decide(mimeType: "text/html", contentDisposition: nil, canShowMIMEType: true, isMainFrame: true) == .allow)
