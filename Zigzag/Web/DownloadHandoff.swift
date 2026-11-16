@@ -297,6 +297,7 @@ enum DownloadHandoff {
                 cookieFile = file
             }
         }
+        announce(rule, askingOn: rule, action: rule.action, values: values, secret: secret, request: request)
         let outcome: Outcome
         switch rule.action.kind {
         case .runScript:
@@ -318,6 +319,20 @@ enum DownloadHandoff {
             outcome = .noMatch
         }
         return outcome
+    }
+
+    /// Says what a rule is about to do, where its tab is — in the window holding it, so a rule that fires in a
+    /// background tab says so there rather than in the one you are looking at. Before the action runs, because what
+    /// the notice needs to know is what is *about* to happen, and because a slow action shouldn't hold the notice back.
+    /// Nothing is said where the firing shows something of its own (see `HandoffNotice.line`).
+    ///
+    /// `named` is the rule the notice puts a name to; `askingOn` is the rule an Open URL would keep a chosen place on.
+    /// They are the same rule for a rule's own firing, and only an Open URL can tell them apart.
+    private static func announce(_ named: DownloadRule?, askingOn rule: DownloadRule?, action: DownloadRuleAction,
+                                values: HandoffValues, secret: String, request: Request) {
+        guard let line = HandoffNotice.line(for: named, askingOn: rule, action: action, values: values, secret: secret),
+              let host = handoffHost(for: request) else { return }
+        host.promptAutomation(line, symbol: action.kind.symbol)
     }
 
     /// A rule that ran, but not: said over the page, and noted without the link, the cookies or the secret.
