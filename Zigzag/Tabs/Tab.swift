@@ -1507,9 +1507,10 @@ extension Tab: WKNavigationDelegate {
                                      pageOrigin: askingOrigin(navigationAction, webView: webView)) {
                 return (.cancel, preferences)
             }
-            // No rule took it: whether this site may save files at all is asked once, and remembered per site.
+            // No rule took it: whether this site may save files at all is asked once, and remembered per site. A
+            // download the page started on its own never asks, though a stored answer still decides it.
             if policy == .download, let target = navigationAction.request.url,
-               await !mayDownload(target, in: webView, retry: navigationAction.request) {
+               await !mayDownload(target, in: webView, retry: navigationAction.request, asking: userInitiated || ownLoad) {
                 return (.cancel, preferences)
             }
             if policy == .cancel {
@@ -1725,16 +1726,17 @@ extension Tab: WKNavigationDelegate {
         // the page's own or one a click asked for.
         if policy == .download, let target = response.url {
             let filename = DownloadTokens.filename(for: target, suggested: Self.filename(from: disposition) ?? "")
+            let wasClicked = downloads.mainFrameWasClicked && navigationResponse.isForMainFrame
             if await handOffIfWanted(target, request: URLRequest(url: target), appliesToLinks: false, webView: webView,
                                      filename: filename, mime: mime,
-                                     wasClicked: downloads.mainFrameWasClicked && navigationResponse.isForMainFrame) {
+                                     wasClicked: wasClicked) {
                 closeIfOnlyADownload(webView)
                 return .cancel
             }
             // A rule didn't take it, so whether this site may save files at all is what decides. The request that
             // earned the response is not handed over here, and guessing one would turn a form's POST into a GET, so
-            // this path says what happened without offering to ask again.
-            if await !mayDownload(target, in: webView) { return .cancel }
+            // this path says what happened without offering to ask again. A response nobody clicked for never asks.
+            if await !mayDownload(target, in: webView, asking: wasClicked) { return .cancel }
         }
         return policy
     }
@@ -1753,7 +1755,7 @@ extension Tab: WKNavigationDelegate {
     /// Whether this site may save a file. False means it may not — said over the page — so the caller cancels the
     /// download. Asked once per site: "This time" holds for this page, "Always" is kept for the site. `retry` is the
     /// request the notice offers to ask for again, where it can be asked for at all.
-    private func mayDownload(_ url: URL, in webView: WKWebView, retry: URLRequest? = nil) async -> Bool {
+    private func mayDownload(_ url: URL, in webView: WKWebView, retry: URLRequest? = nil, asking: Bool = true) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
             // A file on this Mac has no site to ask about and nowhere to keep an answer. A page a site made
             // (about:blank, data:) has an origin it cannot name, so it is not allowed to save what it was given.
@@ -1762,7 +1764,8 @@ extension Tab: WKNavigationDelegate {
                             note: "A page with no site of its own tried to save a file")
             return false
         }
-        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self)
+        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self,
+                                                             asking: asking)
         if !allowed {
             refusedDownload(in: webView, text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
                             action: askAgain(origin: origin, request: retry, in: webView))

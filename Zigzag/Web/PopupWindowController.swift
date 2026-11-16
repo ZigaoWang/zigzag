@@ -457,15 +457,17 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             return .cancel
         }
         // Downloads as a tab's are: a stream of them nobody clicked for is refused.
-        if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: PopupNotice.isUserInitiated(navigationAction),
+        let clicked = PopupNotice.isUserInitiated(navigationAction)
+        if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: clicked,
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
             // A rule for downloads may take it instead: then WebKit makes no download at all.
             if policy == .download, let url = navigationAction.request.url,
                await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: false,
-                                      wasClicked: PopupNotice.isUserInitiated(navigationAction)) { return .cancel }
-            // No rule took it: whether this site may save files at all is asked once, and remembered per site.
+                                      wasClicked: clicked) { return .cancel }
+            // No rule took it: whether this site may save files at all is asked once, and remembered per site. A
+            // download the page started on its own never asks, though a stored answer still decides it.
             if policy == .download, let url = navigationAction.request.url,
-               await !mayDownload(url, request: navigationAction.request) { return .cancel }
+               await !mayDownload(url, request: navigationAction.request, asking: clicked) { return .cancel }
             if policy == .cancel {
                 // The page started this one on its own. Allow Once asks again from the same page — the gesture the
                 // flow policy wanted — and a request that can't be asked for again leaves the notice as it was.
@@ -534,12 +536,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             let mime = (response.mimeType ?? "").lowercased()
             let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
             let filename = DownloadTokens.filename(for: url, suggested: Tab.filename(from: disposition) ?? "")
+            let wasClicked = downloads.mainFrameWasClicked && navigationResponse.isForMainFrame
             if await handOffIfWanted(url, request: URLRequest(url: url), appliesToLinks: false, filename: filename, mime: mime,
-                                     wasClicked: downloads.mainFrameWasClicked && navigationResponse.isForMainFrame) {
+                                     wasClicked: wasClicked) {
                 return .cancel
             }
-            // A rule didn't take it, so whether this site may save files at all is what decides.
-            if await !mayDownload(url) { return .cancel }
+            // A rule didn't take it, so whether this site may save files at all is what decides. A response nobody
+            // clicked for never asks, though a stored answer still decides it.
+            if await !mayDownload(url, asking: wasClicked) { return .cancel }
         }
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
         // WebRTC follows the page that's to show, where a redirect took it.
@@ -580,7 +584,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     /// Whether this site may save a file, as in a tab: asked once, "This time" for this page and "Always" for the
     /// site. False means it may not — said over the page — so the caller cancels the download.
-    private func mayDownload(_ url: URL, request: URLRequest? = nil) async -> Bool {
+    private func mayDownload(_ url: URL, request: URLRequest? = nil, asking: Bool = true) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
             // A file on this Mac has no site to ask about. A page a site made (about:blank, data:) has an origin it
             // cannot name, so it is not allowed to save what it was given.
@@ -598,8 +602,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         }
         // Only a site that has not answered needs the question brought forward; a later download is decided without
         // pulling the window in front of the page the person is using.
-        if SitePermissions.downloads(origin: origin, tab: opener) == nil { window.makeKeyAndOrderFront(nil) }
-        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: window, isPrivate: isPrivate, tab: opener)
+        if SitePermissions.asksBeforeDownloads, SitePermissions.downloads(origin: origin, tab: opener) == nil {
+            window.makeKeyAndOrderFront(nil)
+        }
+        let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: window, isPrivate: isPrivate, tab: opener,
+                                                             asking: asking)
         if !allowed {
             refusedDownload(text: DownloadPolicy.blockedText, note: "This site is not allowed to save files",
                             action: askAgain(origin: origin, request: request))

@@ -352,6 +352,17 @@ enum SitePermissions {
 
     static func setNotifications(_ allowed: Bool?, origin: String) { remember(action(for: allowed), subject: PermissionSubject.notifications, origin: origin) }
 
+    /// Whether a site is asked before its first download unless Settings says otherwise. Chrome, Arc and Edge don't
+    /// ask on a site's first download, and neither does Zigzag; this one value is the factory answer, so turning the
+    /// default on is a one-line change.
+    static let asksBeforeDownloadsByDefault = false
+
+    /// Whether a site is asked before its first download, as Settings › Privacy says.
+    static var asksBeforeDownloads: Bool {
+        get { defaults.object(forKey: "SiteAsksBeforeDownloads") as? Bool ?? asksBeforeDownloadsByDefault }
+        set { defaults.set(newValue, forKey: "SiteAsksBeforeDownloads") }
+    }
+
     /// Whether a site may save files: Allow or Block kept for it, else the answer given on `tab`'s page ("This time"),
     /// else nil — nobody has said yet.
     static func downloads(origin: String, tab: Tab? = nil) -> Bool? {
@@ -368,9 +379,17 @@ enum SitePermissions {
 
     /// Whether this site may save a file, asking for a new site's first one and never again after "Always". False
     /// refuses the download — a question put off refuses what it asked, as every other one does. With nowhere to ask
-    /// (a window that has gone) the file is refused rather than saved unasked; there is no card to answer.
-    static func downloadsAllowed(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool {
+    /// (a window that has gone) the file is refused rather than saved unasked; there is no card to answer. Asking can
+    /// be turned off in Settings › Privacy: then a site nobody has answered for saves files as it always did, while a
+    /// Block kept for it still refuses. `asking` is false for a download the page started on its own: it never gets a
+    /// question, though a site's own answer still decides it.
+    static func downloadsAllowed(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil,
+                                 asking: Bool = true) async -> Bool {
         if let known = downloads(origin: origin, tab: tab) { return known }
+        // A page-started download keeps today's rule: no answer to read and no question to put, so it saves.
+        guard asking else { return true }
+        // Off by choice: no card, exactly the behavior before sites were asked. A stored Block above still wins.
+        guard asksBeforeDownloads else { return true }
         noteAsked(.downloads, origin: origin, isPrivate: isPrivate)
         guard let controller = WindowManager.shared.promptHost(for: window) else { return false }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "files",
