@@ -192,7 +192,7 @@ enum DownloadRuleSheet {
                                                  comment: "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.")),
             FormSheet.Row.note(String(localized: "Run in private windows affects Open. A file type that saves still saves there.",
                                       comment: "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.")),
-            FormSheet.Row.note(String(localized: "Apps, scripts, installers, archives and configuration profiles are always saved, never opened.",
+            FormSheet.Row.note(String(localized: "Apps, scripts, installers, archives and .mobileconfig files are always saved, never opened.",
                                       comment: "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.")),
             tokens,
         ] : (action.kind == .openApp ? [] : [tokens]))
@@ -237,8 +237,9 @@ enum DownloadRuleSheet {
                 // An extension list is what a type rule reads: a comma with nothing between is not one.
                 guard !DownloadRule.Match.extensions(in: rule.pattern).isEmpty else { return false }
             }
-            if rule.action.kind == .saveToFolder {
-                // A folder that has gone, or is a file, would silently fall back to the ordinary downloads folder.
+            if rule.action.kind == .saveToFolder, !rule.action.folderPath.contains("{") {
+                // A folder that has gone, or is a file, would silently fall back to the ordinary downloads folder. A
+                // path with tokens is checked when it is expanded for the download, since it names no one folder yet.
                 let path = (rule.action.folderPath as NSString).expandingTildeInPath
                 var isDirectory: ObjCBool = false
                 guard !path.isEmpty,

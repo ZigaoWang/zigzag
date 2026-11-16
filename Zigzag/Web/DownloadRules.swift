@@ -794,6 +794,9 @@ final class DownloadRulesStore {
             guard rule.applies == .linksAndDownloads || !appliesToLinks else { continue }
             guard rule.matches(url, filename: filename) else { continue }
             if let destination = rule.action.destination {
+                // A destination only decides downloads; a hand-edited links-and-downloads one is not one, as
+                // `destination(in:)` also says.
+                guard rule.applies == .downloads else { continue }
                 // A Save destination is not a handoff: it still applies in a private window, switch or no switch.
                 // An Open needs the rule's switch, and stands aside while it is off.
                 if isPrivate, !rule.runsInPrivateWindows, destination == .open { continue }
