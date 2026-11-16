@@ -2983,6 +2983,46 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             downloadRulesGroup.add(row)
             downloadRuleRows.append((rule.id, row))
+            // The rule's own answer, for every site: the third scope its question offers, kept on the rule itself, so
+            // it travels with the rule and is forgotten here rather than in a site's row.
+            if let own = rule.handoffAnswer {
+                let forget = IconButton(symbol: "xmark", size: .compact,
+                                        toolTip: String(localized: "Forget the answer for every site", comment: "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site."))
+                forget.onClick = { [weak self] _ in
+                    var remembered = rule
+                    remembered.handoffAnswer = nil
+                    DownloadRulesStore.shared.update(remembered)
+                    self?.reloadDownloadRules()
+                }
+                let everySite = FormRow(title: Self.handoffAnswerName(own),
+                                        detail: String(localized: "Every site", comment: "Under a download rule in Settings › Downloads: the answer beside it was given for every site, not just one."),
+                                        control: forget)
+                everySite.keywords = Self.handoffAnswerName(own)
+                downloadRulesGroup.add(everySite)
+            }
+            // The sites this rule has a standing answer on, grouped by what was answered — handed off, left to the
+            // browser, or refused — so a site the rule was refused on doesn't read like one it was handed off on.
+            // Each can be forgotten on its own, so one site is asked again without touching the others.
+            for group in Self.handoffAnswerGroups(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id))) {
+                let perSite = NSStackView()
+                perSite.orientation = .horizontal
+                perSite.spacing = Tokens.Space.x2
+                perSite.alignment = .centerY
+                for site in group.sites {
+                    let forget = IconButton(symbol: "xmark", size: .compact,
+                                            toolTip: String(localized: "Forget \(SiteOrigin.label(site))", comment: "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name."))
+                    forget.onClick = { [weak self] _ in
+                        guard let remembered = DownloadRulesStore.shared.rules.first(where: { $0.id == rule.id }) else { return }
+                        SitePermissions.forgetActions(prefix: PermissionSubject.handoff(remembered.id))
+                        self?.reloadDownloadRules()
+                    }
+                    perSite.addArrangedSubview(forget)
+                }
+                let sitesRow = FormRow(title: group.title,
+                                       detail: group.sites.map(SiteOrigin.label).joined(separator: ", "), control: perSite)
+                sitesRow.keywords = group.sites.joined(separator: " ")
+                downloadRulesGroup.add(sitesRow)
+            }
         }
         // One line under the list, and it's the one thing the list can't show: that dragging changes the order.
         let hint = FormRow(title: String(localized: "Rules run from the top", comment: "In Settings › Downloads, under the rules: the first match wins."),
@@ -2990,6 +3030,25 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                              comment: "Under the download rules in Settings › Downloads, when there is an order to change.") : nil,
                            control: NSView())
         downloadRulesGroup.add(hint)
+    }
+
+    /// A rule's answered sites, grouped by the answer in the order the question offers them — handed off, left to the
+    /// browser, then refused — with only the groups that have sites. So the list reads as the decision it records,
+    /// and a site the rule was refused on never looks like one it was handed off on.
+    static func handoffAnswerGroups(_ decided: [(origin: String, action: String)]) -> [(title: String, sites: [String])] {
+        ["handOff", "browser", "deny"].compactMap { action in
+            let sites = decided.filter { $0.action == action }.map(\.origin)
+            return sites.isEmpty ? nil : (handoffAnswerName(action), sites)
+        }
+    }
+
+    /// What a handoff answer is called in that list: the very words the question's button used.
+    static func handoffAnswerName(_ action: String) -> String {
+        switch action {
+        case "handOff": String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download.")
+        case "browser": String(localized: "Open in Browser", comment: "Button that lets a link or download stay in the browser instead of running a download rule.")
+        default: String(localized: "Don’t Allow", comment: "Button on a site's permission question.")
+        }
     }
 
     /// The per-extension destinations, one row each, under Save downloads to: the file types a rule names, and where

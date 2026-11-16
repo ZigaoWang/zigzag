@@ -8145,17 +8145,6 @@
         }
       }
     },
-    "Hand Off Downloads and Links" : {
-      "comment" : "A heading in Settings › Downloads, over the rules that send a download or a link to another app.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "转交下载和链接"
-          }
-        }
-      }
-    },
     "Hand Off %@" : {
       "comment" : "A page's question before a download rule handles a link or download. The placeholder is the rule's name.",
       "localizations" : {
@@ -8163,6 +8152,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "转交 %@"
+          }
+        }
+      }
+    },
+    "Hand Off Downloads and Links" : {
+      "comment" : "A heading in Settings › Downloads, over the rules that send a download or a link to another app.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转交下载和链接"
           }
         }
       }

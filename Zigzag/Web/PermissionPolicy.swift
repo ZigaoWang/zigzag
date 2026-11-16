@@ -59,4 +59,6 @@ nonisolated enum PermissionSubject {
     }
 
     static func app(_ scheme: String) -> String { "app:\(scheme)" }
+    /// A handoff rule's standing answers, kept per site under the rule's own id.
+    static func handoff(_ rule: UUID) -> String { "handoff:\(rule.uuidString)" }
 }

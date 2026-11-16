@@ -446,6 +446,25 @@ import WebKit
         #expect(PopupNotice.pageAction(tab: tab, origin: nil, isPrivate: false) == nil)
         #expect(PopupNotice.pageAction(tab: nil, origin: origin, isPrivate: false) == nil)
     }
+
+    /// Settings › Downloads groups a rule's answered sites by what was answered, so a refused site does not read like
+    /// a handed-off one; the groups come in the question's own order and only when they have sites.
+    @Test func theDownloadsListGroupsSitesByTheirAnswer() throws {
+        try withDefaults { _ in
+            let rule = UUID()
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://a.com")
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule), origin: "https://b.com")
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://c.com")
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule), origin: "https://d.com")
+            let decided = SitePermissions.decisions(prefix: PermissionSubject.handoff(rule))
+            #expect(decided.map(\.origin) == ["https://a.com", "https://b.com", "https://c.com", "https://d.com"])
+            let groups = SettingsView.handoffAnswerGroups(decided)
+            #expect(groups.map(\.sites) == [["https://a.com", "https://c.com"], ["https://d.com"], ["https://b.com"]])
+            // The row's title is the very word the question's button used.
+            #expect(groups.map(\.title) == ["Hand Off", "Open in Browser", "Don’t Allow"])
+            #expect(SettingsView.handoffAnswerGroups([]).isEmpty)
+        }
+    }
 }
 
 /// The tab that asked a pop-up's question, recording what its host was told to open.

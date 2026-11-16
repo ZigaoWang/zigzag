@@ -157,6 +157,30 @@ enum SitePermissions {
         return found
     }
 
+    /// Forgets every answer under a subject's id, wherever it is keyed — a plain origin, or a frame-scoped
+    /// `"page|embed:frame"`. Deliberately matches anywhere (`|` + prefix), unlike `decisions(prefix:)`, which lists
+    /// only plain origins: a listing names a site to show and to forget on its own, while this forgets all of them.
+    static func forgetActions(prefix: String) {
+        var now = stored
+        for key in now.keys where key.contains("|" + prefix) { now[key] = nil }
+        stored = now
+    }
+
+    /// The origins that hold an answer under a subject's own id (`"handoff:<rule UUID>"`), for listing, per rule, the
+    /// sites a handoff rule was decided on. Sorted, so a list built from it doesn't shuffle.
+    static func sites(prefix: String) -> [String] { decisions(prefix: prefix).map(\.origin) }
+
+    /// The same sites, each with what it answered (`"handOff"`, `"browser"`, `"deny"`), so a list can show a rule's
+    /// sites by their decision rather than in one undifferentiated run where a refused site reads like a handed-off
+    /// one. Sorted by origin. The one place the key is split, so a caller can't drift from it.
+    static func decisions(prefix: String) -> [(origin: String, action: String)] {
+        stored.compactMap { key, action in
+            let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[1].hasPrefix(prefix) else { return nil }
+            return (String(parts[0]), action)
+        }.sorted { $0.origin < $1.origin }
+    }
+
     private static func allowed(_ action: String?) -> Bool? { action.map { $0 != "deny" } }
     static func kind(_ type: WKMediaCaptureType) -> String {
         switch type {

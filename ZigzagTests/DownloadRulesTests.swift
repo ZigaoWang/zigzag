@@ -852,3 +852,133 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
     }
 }
+
+extension DownloadRuleTests {
+    @Test func storedHandoffAnswersMapToGates() {
+        #expect(DownloadHandoff.gate(stored: "handOff") == .handOff)
+        #expect(DownloadHandoff.gate(stored: "browser") == .browser)
+        #expect(DownloadHandoff.gate(stored: "deny") == .cancel)
+        #expect(DownloadHandoff.gate(stored: nil) == .browser)
+    }
+
+    /// A handoff answered "Always on this site" is kept for the site and read back without asking again, in any page
+    /// of that site. The rule's own answer travels with the rule, so a private window still reads it.
+    @MainActor @Test func aSitesHandoffAnswerStandsForEveryPageOfIt() async throws {
+        let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule.id), origin: "https://site.example")
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/other")!,
+                                              pageOrigin: "https://site.example")
+        #expect(await DownloadHandoff.decide(rule, request: request) == .cancel)
+
+        var privateRequest = request
+        privateRequest.isPrivate = true
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest) == .browser,
+                "a private window is not the site the answer was given to")
+    }
+
+    /// The third scope: a rule answered for itself stands for every site, and a private window still reads it because
+    /// it belongs to the rule rather than to the site this session is on.
+    @MainActor @Test func aRulesOwnAnswerStandsForEverySite() async {
+        var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        // Never told: with no window to ask in, the rule simply doesn't run.
+        #expect(await DownloadHandoff.decide(rule, request: request) == .browser)
+
+        rule.handoffAnswer = "handOff"
+        #expect(await DownloadHandoff.decide(rule, request: request) == .handOff)
+        rule.handoffAnswer = "deny"
+        #expect(await DownloadHandoff.decide(rule, request: request) == .cancel)
+
+        var privateRequest = request
+        privateRequest.isPrivate = true
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest) == .cancel)
+        rule.handoffAnswer = "handOff"
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest) == .handOff)
+    }
+
+    /// The site's answer is the more specific one, so it outranks the rule's own; the rule's is still saved with the
+    /// rule, so it travels with it.
+    @MainActor @Test func aSitesAnswerOutranksTheRulesOwn() async throws {
+        let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.handoffAnswer = "handOff"
+        SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule.id), origin: "https://site.example")
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(await DownloadHandoff.decide(rule, request: request) == .cancel)
+    }
+
+    /// The rule's own answer is saved with the rule, so it travels with it; a rule with none reads as none.
+    @Test func aRulesOwnAnswerSurvivesItsJSON() throws {
+        var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        #expect(try JSONDecoder().decode(DownloadRule.self, from: JSONEncoder().encode(rule)).handoffAnswer == nil)
+        rule.handoffAnswer = "handOff"
+        let read = try JSONDecoder().decode(DownloadRule.self, from: JSONEncoder().encode(rule))
+        #expect(read.handoffAnswer == "handOff")
+    }
+
+    /// The third duration choice names the rule, and says "this rule" where the rule has no name rather than "".
+    @Test func theThirdDurationChoiceNamesTheRule() {
+        let named = DownloadRule(name: "YouTube", applies: .downloads, match: .contains, pattern: "youtube",
+                                 action: DownloadRuleAction(kind: .openURL))
+        #expect(DownloadHandoff.alwaysFor(named).contains("YouTube"))
+        let unnamed = DownloadRule(name: "   ", applies: .downloads, match: .contains, pattern: "youtube",
+                                   action: DownloadRuleAction(kind: .openURL))
+        #expect(!DownloadHandoff.alwaysFor(unnamed).contains("“”"))
+        #expect(DownloadHandoff.alwaysFor(unnamed) != DownloadHandoff.alwaysFor(named))
+    }
+
+    @Test func aHandoffQuestionUsesThePageOrigin() {
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(DownloadHandoff.questionOrigin(for: request) == "https://site.example")
+    }
+
+    @Test func aHandoffQuestionFallsBackToTheReferrerThenTheTarget() {
+        let referred = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                               referrer: URL(string: "https://site.example/page")!)
+        #expect(DownloadHandoff.questionOrigin(for: referred) == "https://site.example")
+        let bare = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!)
+        #expect(DownloadHandoff.questionOrigin(for: bare) == "https://cdn.example")
+    }
+}
+
+extension DownloadRuleTests {
+    /// A handoff answered "Open in Browser" this time holds for the page, so the download the same page starts is not
+    /// asked the same question again.
+    @MainActor @Test func aHandoffAnsweredThisTimeIsNotAskedAgain() async {
+        let rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        let tab = Tab(url: URL(string: "https://site.example/page"), spaceID: UUID())
+        tab.permissionAnswers.note("browser", key: "https://site.example", kind: DownloadHandoff.handoffKind(rule))
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab) == .browser)
+        #expect(DownloadHandoff.handoffKind(rule) == "handoff:\(rule.id.uuidString)")
+    }
+}
