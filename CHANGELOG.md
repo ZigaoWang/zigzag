@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Double-clicking the empty space below your tabs opens a new tab, as in Arc. The top of the sidebar still works like a title bar, and Settings › Appearance › Double-click the sidebar for a new tab turns it off. ([#262](https://github.com/ZigaoWang/zigzag/issues/262))
+
 ### Fixed
 - In full screen, the close, minimize and full screen buttons that come down with the menu bar have a bar behind them again, instead of floating over the page when the sidebar is hidden.
 

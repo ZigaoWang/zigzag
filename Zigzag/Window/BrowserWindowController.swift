@@ -2993,6 +2993,8 @@ extension BrowserWindowController: SidebarDelegate {
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
     func sidebarAddMenu() -> [MenuPanel.Entry] { SidebarMenus.addPanel(controller: self) }
     func sidebarBlankMenu() -> [MenuPanel.Entry] { SidebarMenus.blankPanel(controller: self) }
+    /// As ⌘T: the command bar for a new tab, or the new tab page an extension gives.
+    func sidebarDoubleClickedBlank() { if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) } }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
         let menu = SidebarMenus.spaceMenu(for: id, controller: self)

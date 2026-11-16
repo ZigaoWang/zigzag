@@ -927,6 +927,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let borderlessToggle = Toggle()
     private let addressAboveToggle = Toggle()
     private let sidebarRightToggle = Toggle()
+    private let doubleClickTabToggle = Toggle()
     private var sideToken: NSObjectProtocol?
     private let largeNamesToggle = Toggle()
     private let quitToggle = Toggle()
@@ -1241,6 +1242,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sideRow.keywords = String(localized: "sidebar right left side position move", comment: "Words that find the Sidebar on the right setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sideRow)
+        doubleClickTabToggle.onChange = { on in SidebarView.doubleClickOpensNewTab = on }
+        let doubleClickRow = FormRow(title: String(localized: "Double-click the sidebar for a new tab", comment: "A setting in Settings › Appearance."),
+                                     detail: String(localized: "A double-click on the empty space below your tabs opens a new tab. Turned off, it zooms the window, as a title bar does.", comment: "Explanation under “Double-click the sidebar for a new tab” in Settings › Appearance."),
+                                     control: doubleClickTabToggle)
+        doubleClickRow.keywords = String(localized: "double click new tab empty space zoom", comment: "Words that find the Double-click the sidebar for a new tab setting with Find a setting in Settings. Not shown.") + " 侧边栏 双击"
+        appearanceGroup.add(doubleClickRow)
         // The View menu moves it too, with Settings open.
         sideToken = NotificationCenter.default.addObserver(forName: BrowserRootView.sidebarSideChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight }
@@ -2901,6 +2908,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         borderlessToggle.isOn = BrowserRootView.isBorderless
         addressAboveToggle.isOn = BrowserRootView.addressAbovePage
         sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight
+        doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting
         scriptJavaScriptToggle.isOn = Scripting.allowsJavaScript

@@ -7,6 +7,8 @@ protocol SidebarDelegate: SidebarListDelegate {
     func sidebarAddMenu() -> [MenuPanel.Entry]
     /// Right-click on the sidebar where there's no row or button of its own.
     func sidebarBlankMenu() -> [MenuPanel.Entry]
+    /// A double-click on the empty space among the tabs (`SidebarView.doubleClickOpensNewTab`).
+    func sidebarDoubleClickedBlank()
     func sidebarShowDownloads(from view: NSView)
     func sidebarSpaceMenu(for id: UUID) -> NSMenu?
 }
@@ -967,10 +969,27 @@ final class SidebarView: NSView {
     }
 
     /// The sidebar is the window's title bar: drag it to move the window, and double-click it to zoom (or
-    /// whatever the Mac's title bar double-click is set to do). A Control-click is a right-click.
+    /// whatever the Mac's title bar double-click is set to do). A Control-click is a right-click. A double-click in
+    /// the empty space among and below the tabs opens a new tab instead, as in Arc (#262), unless that's turned off.
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control), showBlankMenu(for: event) { return }
+        if event.clickCount == 2, Self.doubleClickOpensNewTab, isInList(event) {
+            delegate?.sidebarDoubleClickedBlank()
+            return
+        }
         window?.titleBarMouseDown(event)
+    }
+
+    /// Settings › Appearance › Double-click the sidebar for a new tab. On unless turned off.
+    static var doubleClickOpensNewTab: Bool {
+        get { UserDefaults.standard.object(forKey: "sidebarDoubleClickNewTab") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "sidebarDoubleClickNewTab") }
+    }
+
+    /// A press in the tab list's own area: a row would have taken it, so it's the empty space there. Not the top row
+    /// with the traffic lights, the address or the bar at the bottom, which stay the title bar.
+    private func isInList(_ event: NSEvent) -> Bool {
+        !scrollView.isHidden && scrollView.frame.contains(convert(event.locationInWindow, from: nil))
     }
 
     @objc private func listScrolled() {

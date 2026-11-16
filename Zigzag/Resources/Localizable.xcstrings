@@ -1750,6 +1750,17 @@
         }
       }
     },
+    "A double-click on the empty space below your tabs opens a new tab. Turned off, it zooms the window, as a title bar does." : {
+      "comment" : "Explanation under “Double-click the sidebar for a new tab” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在标签页下方的空白处双击会新建标签页。关闭后，双击会像标题栏一样缩放窗口。"
+          }
+        }
+      }
+    },
     "A few of your sign-ins from %@ couldn’t come over, so some sites may ask you to sign in again." : {
       "comment" : "Problem in the Import window. The placeholder is a browser's name, like Chrome. Sign-ins are the sites a browser keeps you signed in to.",
       "localizations" : {
@@ -5911,6 +5922,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不再让此页面显示对话框"
+          }
+        }
+      }
+    },
+    "Double-click the sidebar for a new tab" : {
+      "comment" : "A setting in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双击边栏新建标签页"
           }
         }
       }
@@ -19519,6 +19541,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "devtools web development localhost 开发 开发者 调试 本地"
+          }
+        }
+      }
+    },
+    "double click new tab empty space zoom" : {
+      "comment" : "Words that find the Double-click the sidebar for a new tab setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双击 新建 标签页 空白 缩放"
           }
         }
       }
