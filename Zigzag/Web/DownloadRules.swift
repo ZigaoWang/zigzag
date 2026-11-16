@@ -646,8 +646,6 @@ final class DownloadRulesStore {
     func remove(id: UUID) {
         rules.removeAll { $0.id == id }
         HandoffSecrets.removeSecret(for: id)
-        // The sites the rule was decided on keep nothing about it once it is gone.
-        SitePermissions.forgetActions(prefix: PermissionSubject.handoff(id))
         save()
     }
 

@@ -30,34 +30,76 @@ enum PopupNotice {
         return [.leftMouseUp, .leftMouseDown, .otherMouseUp, .keyDown].contains(event.type)
     }
 
+    /// A page that asks again on its own is held to one question per site every few seconds, and a question that was
+    /// put off is not put straight back up: the same guard the app question uses, for the same reason.
+    private static var lastAsked: [String: Date] = [:]
+    private static var setAside: [String: Date] = [:]
+    static let unaskedGap: TimeInterval = 10
+    static let putOffGap: TimeInterval = 60
+
+    static func mayAsk(origin: String?, now: Date = Date()) -> Bool {
+        guard let origin else { return true }
+        if let until = setAside[origin], now < until { return false }
+        guard let last = lastAsked[origin] else { return true }
+        return now.timeIntervalSince(last) >= unaskedGap
+    }
+
+    /// The question went up: another page asking on its own doesn't put it up again for a few seconds.
+    static func noteAsked(origin: String?, now: Date = Date()) {
+        guard let origin else { return }
+        lastAsked[origin] = now
+        if lastAsked.count > 200 { lastAsked = lastAsked.filter { now.timeIntervalSince($0.value) < 600 } }
+    }
+
+    /// The question was put off (Esc, or its window closed): not straight back up.
+    static func noteSetAside(origin: String?, now: Date = Date()) {
+        guard let origin else { return }
+        setAside[origin] = now.addingTimeInterval(putOffGap)
+        if setAside.count > 200 { setAside = setAside.filter { now < $0.value } }
+    }
+
     /// Asks, in the page's own window, where a pop-up should go, and opens it there. WebKit has already been told no,
     /// so nothing appears while the question waits; putting the question off (or Esc) opens nothing, and the page's
-    /// next attempt asks again.
-    static func ask(_ action: WKNavigationAction, from page: URL?, isPrivate: Bool, tab: Tab?, in host: PromptHost?) {
+    /// next attempt asks again once the site's few seconds are up.
+    /// `configuration` is the pop-up's own configuration where the page is inside a pop-up window: the viewer must
+    /// use the same data store as the page that asked, or a private pop-up's child would open a lasting window.
+    static func ask(_ action: WKNavigationAction, from page: URL?, isPrivate: Bool, tab: Tab?, in host: PromptHost?,
+                    configuration: WKWebViewConfiguration? = nil) {
         let origin = SiteOrigin.of(page)
+        let frameOrigin = SiteOrigin.of(action.sourceFrame.securityOrigin)
+        // A frame from another origin may ask this time, but the answer is the page's to keep, not the frame's: an
+        // embedded frame must not be able to choose where the page's pop-ups go for good.
+        let foreign = frameOrigin != nil && frameOrigin != origin
+        // Answers are kept for sites only where the page itself is secure: an allow on an http page would be a
+        // standing answer anyone on the network could have written.
+        let secure = page?.scheme?.lowercased() == "https"
         let url = action.request.url
         guard let host, let url else { return }
         // What this page already answered "this time" holds, so a page that asks again on its own (a second
         // `window.open` while the first is still loading, a retry) is not asked twice.
         if let kept = pageAction(tab: tab, origin: origin, isPrivate: isPrivate) {
-            open(url, action: kept, from: tab, in: host)
+            open(url, action: kept, from: tab, in: host, configuration: configuration)
             return
         }
+        guard mayAsk(origin: origin) else { return }
+        noteAsked(origin: origin)
+        SitePermissions.noteAsked(.popups, origin: origin, isPrivate: isPrivate)
+        let target = SiteOrigin.of(url).map(SiteOrigin.label) ?? url.absoluteString
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(
-                host: SitePermissions.askerName(origin), origin: origin, what: SiteOrigin.of(url).map(SiteOrigin.label) ?? "", symbol: "macwindow.badge.plus",
+                host: SitePermissions.askerName(frame: frameOrigin, page: origin), origin: origin, what: target, symbol: "macwindow.badge.plus",
                 in: host, tab: tab,
-                title: String(localized: "A page wants to open a new window", comment: "A page's question before Zigzag opens the pop-up window it asked for."),
+                title: String(localized: "Open \(target) in a new window", comment: "A page's question before Zigzag opens the pop-up window it asked for. The placeholder is the address it wants to open, like meet.example.com."),
                 actions: [.deny],
                 menu: [.alternate("thisTab", String(localized: "This Tab", comment: "Choice in the pop-up question's menu: loads the pop-up's page in the tab you are in.")),
                        .alternate("newTab", String(localized: "New Tab", comment: "Choice in the pop-up question's menu: opens the pop-up's page in a new tab.")),
                        .alternate("mini", String(localized: "Mini", comment: "Choice in the pop-up question's menu: opens the pop-up's page in the small pop-up viewer window."))],
-                canRemember: !isPrivate && origin != nil)
-            guard let answer else { return }
+                canRemember: !isPrivate && origin != nil && secure && !foreign)
+            guard let answer else { noteSetAside(origin: origin); return }
             if let origin {
                 SitePermissions.rememberAnswer(answer, subject: PermissionSubject.popups, origin: origin, tab: tab, isPrivate: isPrivate)
             }
-            open(url, action: answer.action, from: tab, in: host)
+            open(url, action: answer.action, from: tab, in: host, configuration: configuration)
         }
     }
 
@@ -77,7 +119,8 @@ enum PopupNotice {
     }
 
     /// Opens a pop-up where it was answered.
-    static func open(_ url: URL, action: String, from tab: Tab?, in host: PromptHost) {
+    static func open(_ url: URL, action: String, from tab: Tab?, in host: PromptHost,
+                     configuration: WKWebViewConfiguration? = nil) {
         switch destination(for: action) {
         case .deny:
             return
@@ -86,8 +129,10 @@ enum PopupNotice {
         case .newTab:
             openInWindow(url, disposition: .foregroundTab, from: tab, in: host)
         case .viewer:
-            // The small window that shows the pop-up's page: the pop-up viewer.
-            PopupWindowController.viewer(url: url, configuration: tab?.webView?.configuration, parent: host.window)
+            // The small window that shows the pop-up's page: the pop-up viewer. The page's own configuration, so the
+            // viewer is on the same data store — a private pop-up's child must not outlive it in a persistent one.
+            guard let configuration = configuration ?? tab?.webView?.configuration else { return }
+            PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window)
         }
     }
 

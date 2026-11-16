@@ -84,8 +84,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     /// A page's pop-up opened later, from the question about it (or from its remembered destination): a small window
     /// of its own showing `url`, on the page's own data store where one is given, so it is still signed in.
-    static func viewer(url: URL, configuration: WKWebViewConfiguration?, parent: NSWindow?) -> PopupWindowController {
-        let controller = PopupWindowController(configuration: configuration ?? WKWebViewConfiguration(),
+    static func viewer(url: URL, configuration: WKWebViewConfiguration, parent: NSWindow?) -> PopupWindowController {
+        let controller = PopupWindowController(configuration: configuration,
                                                pageSize: Tokens.Metric.popupDefaultSize, origin: nil, parent: parent)
         Self.open.insert(controller)
         controller.webView.load(URLRequest(url: url))
@@ -264,7 +264,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             // The window this pop-up came from, of any kind. A page inside Zigzag Mini or an installed app's window
             // asks there too; with a browser window's controller alone, that lookup found nothing, so a pop-up a page
             // inside one of them opened on its own was dropped with nothing said.
-            let parent = WindowManager.shared.promptHost(for: parentWindow)
+            let parent = WindowManager.shared.promptHost(for: parentWindow) ?? (opener?.host as? PromptHost)
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
                 switch PopupNotice.destination(for: stored) {
                 case .deny:
@@ -272,11 +272,17 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                 case .viewer:
                     return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window, opener: opener)
                 case .thisTab, .newTab:
-                    if let url = navigationAction.request.url, let parent { PopupNotice.open(url, action: stored, from: nil, in: parent) }
+                    if let url = navigationAction.request.url, let parent {
+                        PopupNotice.open(url, action: stored, from: opener, in: parent, configuration: configuration)
+                    }
                     return nil
                 }
             }
-            PopupNotice.ask(navigationAction, from: webView.url, isPrivate: isPrivate, tab: nil, in: parent)
+            // The question belongs to the tab whose page opened this pop-up, shown in that tab's window, which comes
+            // forward so the card isn't left behind the pop-up that asked.
+            parent?.window?.makeKeyAndOrderFront(nil)
+            PopupNotice.ask(navigationAction, from: webView.url, isPrivate: isPrivate, tab: opener, in: parent,
+                            configuration: configuration)
             return nil
         }
         // A plain link (a help page, the terms) opens as a tab in the browser window, brought forward, as a

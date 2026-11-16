@@ -88,15 +88,16 @@ as today. A question that arrives for a background tab, a hidden window, a pop-u
 described below. The banner asks the moment that tab is brought forward. A held question is never dropped and never
 auto-allowed. When more than one question is waiting, the banner says how many.
 
-**Several questions at once are stacked, and the stack is capped.** A site can ask for the camera and then location and
-then to open an app, and serialising those silently makes each one a surprise after the last answer. So each question
-gets its own banner card, up to two visible at a time, oldest on top and newest beneath, each with its own dropdown and
-buttons. Anything past two waits behind a line on the newest card — "2 more waiting" — and takes a card as soon as one
-is answered. The cap is deliberate: a third full-width card would cover the page and make the wrong click likely.
-Every card keeps the half-second guard on Allow, and answering a card never answers another.
+**Several questions wait their turn per page.** A site can ask for the camera and then location and then to open an
+app, and serialising those silently makes each one a surprise after the last answer. So each question gets its own
+banner card, and cards over the same page take turns (`PageQuestions.mayShow`); a split view can show one on each
+pane. A question waiting behind another says so on the card that is up — “Questions still waiting: 2” — and comes up
+as soon as the one before it is answered. The cap is deliberate: a second full-width card over the same page would
+cover it and make the wrong click likely. Every card keeps the half-second guard on Allow, and answering a card never
+answers another.
 
-The sheet still queues one question per window, still returns `.notNow` when the window closes or the tab moves to
-another site, and still records `SitePermissions.noteAsked`.
+The card still returns `.notNow` when the window closes or the tab moves to another site, and still records
+`SitePermissions.noteAsked`.
 
 `PermissionPrompt.ask` returns `PermissionAnswer` instead of `Answer`. Its callers map the answer onto their own
 behaviour; `.notNow` stays a separate outcome for "the question never got an answer".
@@ -131,7 +132,7 @@ A private window asks but stores nothing, as today. A frame from another site ke
 | Camera / microphone | Deny / Allow | refuse; grant capture |
 | Location | Deny / Allow | refuse; grant |
 | Notifications | Deny / Allow | refuse; show them |
-| Screen sharing | Deny / Share Screen / Share Window | refuse; macOS's picker for a display or a window (asked every time, nothing kept) |
+| Screen sharing | Deny / Share Screen / Share Window | refuse; macOS's picker for a display or a window (the site's answer is kept like every other question; macOS still picks the window or display) |
 | Pop-ups | Deny / This Tab / New Tab / Mini | block it; load its address in this tab, a new tab, or the Mini pop-up viewer |
 | App launch (`ExternalLinks`) | Deny / Open | nothing; `NSWorkspace.open` |
 | Handoff rule | Deny / Open in Browser / Hand Off | cancel the navigation or ignore the download; load it normally; run the rule |
@@ -193,7 +194,8 @@ asks in `DownloadHandoff.perform`'s callers (or in `perform` itself) before any 
 - Site Controls keeps its three choices (Ask Each Time / Allow / Block) because "Ask" is still meaningful as a stored
   state of "nothing kept".
 - Settings › Downloads shows, under each rule, the sites it is allowed or denied on, with a way to forget them. This is
-  the smallest surface that makes the new decisions visible outside Site Controls.
+  the smallest surface that makes the new decisions visible outside Site Controls. (It arrives in a later pull request
+  than the permission card itself.)
 
 ## Waiting for an answer
 

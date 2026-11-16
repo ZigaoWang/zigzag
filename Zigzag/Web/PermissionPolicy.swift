@@ -48,5 +48,4 @@ nonisolated enum PermissionSubject {
     }
 
     static func app(_ scheme: String) -> String { "app:\(scheme)" }
-    static func handoff(_ rule: UUID) -> String { "handoff:\(rule.uuidString)" }
 }

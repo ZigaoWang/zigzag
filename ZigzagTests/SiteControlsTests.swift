@@ -308,21 +308,44 @@ struct SiteControlsPermissionTests {
         try withDefaults {
             let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
             SitePermissions.setChoice(.allow, for: .apps, origin: site)
-            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "zoommtg",
-                                                  foreign: false, tab: tab) == "allow")
-            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "itms-apps",
-                                                  foreign: false, tab: tab) == "allow")
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg",
+                                                  foreign: false, tab: tab)?.action == "allow")
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
+                                                  foreign: false, tab: tab)?.action == "allow")
             // A foreign frame never gets the page's site-wide Allow.
-            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "zoommtg",
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg",
                                                   foreign: true, tab: tab) == nil)
             // The page's own answer this time, with nothing kept for the site.
             SitePermissions.setChoice(.ask, for: .apps, origin: site)
             SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: false),
                                            subject: PermissionSubject.app("zoommtg"), origin: site, tab: tab, isPrivate: false)
-            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "zoommtg",
-                                                  foreign: false, tab: tab) == "deny")
-            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "itms-apps",
+            let pageAnswer = ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg",
+                                                           foreign: false, tab: tab)
+            #expect(pageAnswer?.action == "deny")
+            // Given on this page only: it must never be returned as an answer to keep for the site.
+            #expect(pageAnswer?.remember == false)
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
                                                   foreign: false, tab: tab) == nil)
+        }
+    }
+
+    /// A page's This-time app answer must never be read back as one to keep: the card would write it down as the
+    /// site's Always, and the same app would open without asking on every page of the site.
+    @Test func aThisTimeAppAnswerNeverBecomesTheSitesAlways() throws {
+        try withDefaults {
+            let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
+            SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: false),
+                                           subject: PermissionSubject.app("zoommtg"), origin: site, tab: tab, isPrivate: false)
+            let kept = ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg", foreign: false, tab: tab)
+            #expect(kept?.action == "allow")
+            #expect(kept?.remember == false)
+            // Handing it back to the card as if it were an answer to keep still stays on the page.
+            if let kept {
+                _ = SitePermissions.rememberAnswer(PermissionAnswer(action: kept.action, remember: kept.remember),
+                                                   subject: PermissionSubject.app("zoommtg"), origin: site, tab: tab, isPrivate: false)
+            }
+            #expect(SitePermissions.action(PermissionSubject.app("zoommtg"), origin: site) == nil)
+            #expect(tab.permissionAnswers.action(key: site, kind: PermissionSubject.app("zoommtg")) == "allow")
         }
     }
 
@@ -344,20 +367,20 @@ struct SiteControlsPermissionTests {
             #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == false)
             #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == false)
             #expect(SitePermissions.choice(.apps, origin: site) == .block)
-            #expect(ExternalLinks.storedAppAction(pageOrigin: site, origin: site, scheme: "itms-apps",
-                                                  foreign: false, tab: tab) == "deny")
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
+                                                  foreign: false, tab: tab)?.action == "deny")
         }
     }
 
     /// A page with no site (about:blank its opener wrote) is held by the opener's Block, never let in by its Allow.
     @Test func aPageWithNoSiteKeepsItsOpenersBlock() throws {
         try withDefaults {
-            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
             SitePermissions.setChoice(.allow, for: .apps, origin: site)
-            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
             SitePermissions.setChoice(.block, for: .apps, origin: site)
-            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == "deny")
-            #expect(ExternalLinks.storedAppAction(pageOrigin: nil, standIns: [], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil)?.action == "deny")
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: nil, standIns: [], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
         }
     }
 

@@ -23,7 +23,7 @@ import Testing
         PendingQuestions.forgetAll()
         let tabID = UUID(), id = UUID()
         PendingQuestions.enqueue(.init(id: id, tabID: tabID, origin: "https://a.com", title: "Open mpv"))
-        PendingQuestions.answer(id, .init(action: "deny", remember: false))
+        PendingQuestions.answer(id)
         #expect(PendingQuestions.hasPending(tabID: tabID) == false)
         #expect(PendingQuestions.total == 0)
     }

@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-14-unified-site-permissions-design.md`
 
+> **Shipped in the permission-card pull request:** one card per page pane, the tab marker and the held question, screen
+> answers kept like every other question, and the app question's https/foreign-frame gate. The Settings › Downloads
+> per-rule site list and the sidebar-edge glow are later pull requests.
+
 ## Global Constraints
 
 - `SWIFT_VERSION: "6.0"`, `SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor`, deployment target macOS 15.4.
@@ -234,7 +238,7 @@ click monitor, `followTab`, debug hooks and `.notNow` behaviour.
 
 - [ ] **Step 4: Update the four existing callers to pass actions**
 
-Screen sharing: `[.deny, .alternate("screen", "Share Screen…"), .allow]` with `canRemember: false`.
+Screen sharing: `[.deny, .alternate("screen", "Share Screen…"), .allow]`, rememberable like the others.
 Notifications: `[.deny, .allow]`, rememberable. Camera/mic and location: `[.deny, .allow]`, rememberable.
 App launches: `[.deny, .allow]`, rememberable subject to Task 4's gates.
 
@@ -513,8 +517,8 @@ CI compile failure: `PendingQuestions` does not exist.
 A question that cannot be shown (`canShow` false: window hidden or tab not front) is enqueued instead of resolved; the
 awaiting WebKit decision stays suspended. When the tab becomes front (`Tab.changed == .url` / selection change), the
 earliest question for that tab is shown. `answer` resolves the continuation with the answer, or `nil` when Not Now.
-No more than two questions are shown at once in a window; the rest wait behind "N more waiting" and take a card as
-one is answered.
+One card shows per page at a time (`PageQuestions.mayShow`), so a split view can show one on each pane; the rest wait
+behind “Questions still waiting: N” and take a card as one is answered.
 
 - [ ] **Step 4: Implement the markers**
 

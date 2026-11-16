@@ -80,13 +80,12 @@ import WebKit
     /// it is private.
     @Test func thisTimeHoldsForThePageAndAPrivateTabKeepsNothing() throws {
         try withDefaults { _ in
-            let rule = UUID()
             let tab = Tab(url: URL(string: "https://a.com"), spaceID: UUID())
-            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "browser", remember: false),
-                                               subject: PermissionSubject.handoff(rule), origin: "https://a.com",
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "screen", remember: false),
+                                               subject: PermissionSubject.screen, origin: "https://a.com",
                                                tab: tab, isPrivate: false)
-            #expect(tab.permissionAnswers.action(key: "https://a.com", kind: "handoff:\(rule.uuidString)") == "browser")
-            #expect(SitePermissions.action(PermissionSubject.handoff(rule), origin: "https://a.com") == nil)
+            #expect(tab.permissionAnswers.action(key: "https://a.com", kind: PermissionSubject.screen) == "screen")
+            #expect(SitePermissions.action(PermissionSubject.screen, origin: "https://a.com") == nil)
 
             let privateTab = Tab(url: URL(string: "https://a.com"), spaceID: UUID())
             privateTab.privateStore = WKWebsiteDataStore.nonPersistent()
@@ -98,7 +97,8 @@ import WebKit
         }
     }
 
-    @Test func alwaysStoresADenyToo() throws {        try withDefaults { _ in
+    @Test func alwaysStoresADenyToo() throws {
+        try withDefaults { _ in
             let remembers = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
                                                            subject: PermissionSubject.media(.camera), origin: "https://a.com",
                                                            tab: nil, isPrivate: false)
@@ -165,17 +165,6 @@ import WebKit
         page.forget()
         #expect(page.isEmpty)
         #expect(page.action(key: "https://a.com", kind: kind) == nil)
-    }
-
-    @Test func deletingARuleForgetsItsHandoffAnswers() throws {
-        try withDefaults { _ in
-            let rule = UUID()
-            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://a.com")
-            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule), origin: "https://b.com")
-            SitePermissions.forgetActions(prefix: "handoff:\(rule.uuidString)")
-            #expect(SitePermissions.actions(origin: "https://a.com").isEmpty)
-            #expect(SitePermissions.actions(origin: "https://b.com").isEmpty)
-        }
     }
 
     /// An app answer is kept only for a secure page, and never for a frame from another site.
@@ -267,18 +256,6 @@ import WebKit
             #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == "mini")
             SitePermissions.setChoice(.ask, for: .popups, origin: "https://a.com")
             #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == nil)
-        }
-    }
-
-    /// Settings › Downloads lists the sites a rule was decided on, per rule.
-    @Test func settingsListsTheSitesARuleWasDecidedOn() throws {
-        try withDefaults { _ in
-            let rule = UUID()
-            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://b.com")
-            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule), origin: "https://a.com")
-            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(UUID()), origin: "https://c.com")
-            #expect(SitePermissions.sites(prefix: PermissionSubject.handoff(rule)) == ["https://a.com", "https://b.com"])
-            #expect(SitePermissions.sites(prefix: "handoff:") == ["https://a.com", "https://b.com", "https://c.com"])
         }
     }
 

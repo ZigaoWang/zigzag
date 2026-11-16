@@ -26,7 +26,7 @@ enum PendingQuestions {
     }
 
     /// The question was answered, or put off: it is no longer waiting.
-    static func answer(_ id: UUID, _ answer: PermissionAnswer?) {
+    static func answer(_ id: UUID) {
         guard let index = waiting.firstIndex(where: { $0.id == id }) else { return }
         waiting.remove(at: index)
         changed.send(waiting.count)

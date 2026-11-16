@@ -110,10 +110,10 @@ enum ExternalLinks {
         // asks again on its own (a redirect on load, the same link fired twice) is not asked twice for the same app.
         let openerOrigin = (webView as? BrowserWebView)?.owner?.opener.flatMap { SiteOrigin.of($0.url) }
         let standIns = pageOrigin == nil ? [asker.flatMap { SiteOrigin.of($0) }, openerOrigin].compactMap { $0 } : []
-        let stored: () -> String? = {
-            let found = Self.storedAppAction(pageOrigin: pageOrigin, standIns: standIns, origin: origin, scheme: scheme,
+        let stored: () -> KeptAppAnswer? = {
+            let found = Self.storedAppAnswer(pageOrigin: pageOrigin, standIns: standIns, origin: origin, scheme: scheme,
                                              foreign: foreign, tab: tab)
-            return fromPDF && found == "allow" ? nil : found
+            return fromPDF && found?.action == "allow" ? nil : found
         }
         let clickedHere = isClick && isMainFrame && webView.window != nil
         let everydayClick = isEverydayClick(clickedHere: clickedHere, linkClick: linkClick ?? isClick, sourceIsMainFrame: sourceIsMainFrame, fromPDF: fromPDF)
@@ -122,7 +122,7 @@ enum ExternalLinks {
             // A sign-in page in Zigzag Mini sending you back to the app that asked: that window's done (#246).
             MiniWindowController.pageOpenedApp(webView, isMainFrame: isMainFrame, linkClick: linkClick ?? isClick)
         }
-        switch verdict(byYou: byYou, clickedHere: everydayClick, scheme: scheme, stored: stored()) {
+        switch verdict(byYou: byYou, clickedHere: everydayClick, scheme: scheme, stored: stored()?.action) {
         case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
@@ -138,7 +138,9 @@ enum ExternalLinks {
         // gave it (its `stored` above), so a page cannot ask again for an answer you already refused.
         // A background tab has no window of its own, but its question still belongs to it: ask in the tab's own
         // window (or the front one), where `PermissionPrompt` holds it and marks the tab until it can be shown.
-        guard let controller,
+        // The page's own window: a web view that has lost its window (an orphaned pop-up) must not put a question up
+        // in whatever window happens to be in front.
+        guard let controller, webView.window != nil,
               asked.mayAsk(key, page: pageOrigin ?? pageHost, clickedHere: clickedHere, linkClick: linkClick ?? isClick) else { return }
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
@@ -158,7 +160,9 @@ enum ExternalLinks {
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: promptHost,
                                                     tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
                                                     actions: [.deny, .allow], canRemember: saves,
-                                                    answered: { stored().map { PermissionAnswer(action: $0, remember: true) } })
+                                                    answered: {
+                                                        stored().map { PermissionAnswer(action: $0.action, remember: $0.remember) }
+                                                    })
             asked.asking.remove(key)
             guard let answer else {
                 asked.putOff[key] = Date().addingTimeInterval(60)
@@ -241,24 +245,35 @@ enum ExternalLinks {
         return foreign ? nil : stored
     }
 
+    /// What a page opening an app is held to, and whether that answer was kept for the site rather than given on this
+    /// page. The page's own This-time answer must never be returned as something to keep (`PermissionAnswer.remember`),
+    /// or the question machinery would write it down as the site's Always.
+    struct KeptAppAnswer: Equatable {
+        let action: String
+        /// True only for an answer kept for the site; false for the page's own answer this time.
+        let remember: Bool
+    }
+
     /// What a page opening an app is held to, in one place: the site's own Allow or Block (the one "Open apps" row,
     /// which means every app), then the app told Always Allow, then the page's own answer this time. The site-wide
     /// row is read before the app's own key — a site-wide Allow covers every app, exactly as it always did. A page
     /// with no site of its own (`pageOrigin` nil) is held to the Block of the sites standing in for it. Nil asks.
-    static func storedAppAction(pageOrigin: String?, standIns: [String] = [], origin: String?, scheme: String, foreign: Bool, tab: Tab?) -> String? {
+    static func storedAppAnswer(pageOrigin: String?, standIns: [String] = [], origin: String?, scheme: String, foreign: Bool, tab: Tab?) -> KeptAppAnswer? {
         let siteWide = pageOrigin.flatMap { SitePermissions.action(PermissionSubject.apps, origin: $0) }
         let perApp = pageOrigin.flatMap { SitePermissions.action(PermissionSubject.app(scheme), origin: $0) }
-        if let kept = decision(page: pageOrigin, foreign: foreign, stored: siteWide ?? perApp) { return kept }
+        if let kept = decision(page: pageOrigin, foreign: foreign, stored: siteWide ?? perApp) {
+            return KeptAppAnswer(action: kept, remember: true)
+        }
         if pageOrigin == nil {
             let blocked = standIns.contains { standIn in
                 let wide = SitePermissions.action(PermissionSubject.apps, origin: standIn)
                 let app = SitePermissions.action(PermissionSubject.app(scheme), origin: standIn)
                 return decision(page: standIn, foreign: true, stored: wide ?? app) == "deny"
             }
-            if blocked { return "deny" }
+            if blocked { return KeptAppAnswer(action: "deny", remember: true) }
         }
-        guard let origin else { return nil }
-        return tab?.permissionAnswers.action(key: origin, kind: PermissionSubject.app(scheme))
+        guard let origin, let page = tab?.permissionAnswers.action(key: origin, kind: PermissionSubject.app(scheme)) else { return nil }
+        return KeptAppAnswer(action: page, remember: false)
     }
 
     /// Whether the frame that asked is someone other than the page: another site, or a frame with no host of its own

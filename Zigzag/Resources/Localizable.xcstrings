@@ -2736,6 +2736,17 @@
         }
       }
     },
+    "Always on this site" : {
+      "comment" : "Duration choice on a site's permission question: the answer is remembered for this site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此网站上始终允许"
+          }
+        }
+      }
+    },
     "Always translate %@" : {
       "comment" : "Row in the site panel's This Site group: pages in this language are translated as they open, on every site. The name is a language's, like English.",
       "localizations" : {
@@ -9110,6 +9121,17 @@
         }
       }
     },
+    "Mini" : {
+      "comment" : "Choice in the pop-up question's menu: opens the pop-up's page in the small pop-up viewer window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "迷你窗口"
+          }
+        }
+      }
+    },
     "Mini player is off. Turn it on again in Settings › Tabs." : {
       "comment" : "Toast after turning off the mini player from its menu. Settings › Tabs is where its setting is.",
       "localizations" : {
@@ -10882,6 +10904,17 @@
         }
       }
     },
+    "Open %@ in a new window" : {
+      "comment" : "A page's question before Zigzag opens the pop-up window it asked for. The placeholder is the address it wants to open, like meet.example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在新窗口中打开 %@"
+          }
+        }
+      }
+    },
     "Open 1Password" : {
       "comment" : "Button that opens the 1Password app. 1Password is a product name.",
       "localizations" : {
@@ -12568,6 +12601,17 @@
         }
       }
     },
+    "Private windows don’t remember answers." : {
+      "comment" : "Tooltip of the disabled duration dropdown on a permission question in a private window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私窗口不会记住回答。"
+          }
+        }
+      }
+    },
     "Private windows don’t save new passwords" : {
       "comment" : "Under the dimmed row saying a private window offers no strong password, in the fill-password menu.",
       "localizations" : {
@@ -12718,6 +12762,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "地址的二维码"
+          }
+        }
+      }
+    },
+    "Questions still waiting: %lld" : {
+      "comment" : "A line on a site's permission question when more than one question is waiting in the same window: how many are still behind the one on screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有 %lld 个问题等待回答"
           }
         }
       }
@@ -17179,6 +17234,17 @@
         }
       }
     },
+    "This Tab" : {
+      "comment" : "Choice in the pop-up question's menu: loads the pop-up's page in the tab you are in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此标签页"
+          }
+        }
+      }
+    },
     "This afternoon" : {
       "comment" : "Name of a History session that began today.",
       "localizations" : {
@@ -17366,6 +17432,17 @@
         }
       }
     },
+    "This page has no site to remember the answer for." : {
+      "comment" : "Tooltip of the disabled duration dropdown on a question for a page with no site to keep the answer under.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此页面没有可记住答案的网站。"
+          }
+        }
+      }
+    },
     "This page is in %@" : {
       "comment" : "Toast offering to translate a page. The language is its name, like French.",
       "localizations" : {
@@ -17476,6 +17553,17 @@
         }
       }
     },
+    "This site can’t remember this answer." : {
+      "comment" : "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站无法记住此回答。"
+          }
+        }
+      }
+    },
     "This site hasn’t asked for anything yet." : {
       "comment" : "On a site's Permissions page in the site panel when the site hasn't asked for the camera, location, notifications or anything else.",
       "localizations" : {
@@ -17549,6 +17637,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此网站的密码规则不接受强密码。请自己键入一个。"
+          }
+        }
+      }
+    },
+    "This time" : {
+      "comment" : "Duration choice on a site's permission question: the answer applies only to this page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此一次"
           }
         }
       }
@@ -21189,6 +21288,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已静音"
+          }
+        }
+      }
+    },
+    "needs your answer" : {
+      "comment" : "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要你的回答"
           }
         }
       }

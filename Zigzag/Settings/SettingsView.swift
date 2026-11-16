@@ -2890,28 +2890,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               detail: "\(rule.matchSummary) · \(rule.actionSummary)", control: controls)
             row.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
             downloadRulesGroup.add(row)
-            // The sites this rule has a standing answer on: each can be forgotten on its own, so one site is asked
-            // again without touching the others.
-            let decided = SitePermissions.sites(prefix: PermissionSubject.handoff(rule.id))
-            if !decided.isEmpty {
-                let perSite = NSStackView()
-                perSite.orientation = .horizontal
-                perSite.spacing = Tokens.Space.x2
-                perSite.alignment = .centerY
-                for site in decided {
-                    let forget = IconButton(symbol: "xmark", size: .compact,
-                                            toolTip: String(localized: "Forget \(SiteOrigin.label(site))", comment: "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name."))
-                    forget.onClick = { [weak self] _ in
-                        SitePermissions.remember(nil, subject: PermissionSubject.handoff(rule.id), origin: site)
-                        self?.reloadDownloadRules()
-                    }
-                    perSite.addArrangedSubview(forget)
-                }
-                let sitesRow = FormRow(title: String(localized: "Sites answered", comment: "In Settings › Downloads, under a rule: the sites you answered the rule's question on."),
-                                       detail: decided.map(SiteOrigin.label).joined(separator: ", "), control: perSite)
-                sitesRow.keywords = decided.joined(separator: " ")
-                downloadRulesGroup.add(sitesRow)
-            }
         }
         let hint = FormRow(title: String(localized: "Rules run from the top", comment: "In Settings › Downloads, under the rules: the first match wins."),
                            detail: String(localized: "The first rule that matches an address wins. A download no rule matches is saved by Zigzag.",
@@ -3372,6 +3350,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             forget.onClick = { [weak self] _ in
                 if let origin {
                     SitePermissions.forgetEverything(origin: origin)
+                    // Session answers the card reads (a put-off or denied app, the rows Site Controls lists) go too.
+                    ExternalLinks.forgetAnswers(origin: origin)
                     WebNotifications.shared.removeAll(origin: origin)
                 }
                 ContentBlocker.allowedSites.remove(site)

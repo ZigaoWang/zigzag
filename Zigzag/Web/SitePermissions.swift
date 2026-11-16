@@ -157,12 +157,6 @@ enum SitePermissions {
         return found
     }
 
-    static func forgetActions(prefix: String) {
-        var now = stored
-        for key in now.keys where key.contains("|" + prefix) { now[key] = nil }
-        stored = now
-    }
-
     private static func allowed(_ action: String?) -> Bool? { action.map { $0 != "deny" } }
     static func kind(_ type: WKMediaCaptureType) -> String {
         switch type {
@@ -293,21 +287,12 @@ enum SitePermissions {
         var now = stored
         for k in now.keys where k.hasPrefix(origin + "|") { now[k] = nil }
         stored = now
+        asked = asked.filter { !$0.hasPrefix(origin + "|") }
     }
 
     /// Sites (origins) with a remembered choice of any kind.
     static var sites: Set<String> {
         Set(stored.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
-    }
-
-    /// The origins that hold an answer under a subject's own id (`"handoff:<rule UUID>"`), for listing, per rule, the
-    /// sites a handoff rule was decided on. Sorted, so a list built from it doesn't shuffle.
-    static func sites(prefix: String) -> [String] {
-        stored.keys.compactMap { key in
-            let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
-            guard parts.count == 2, parts[1].hasPrefix(prefix) else { return nil }
-            return String(parts[0])
-        }.sorted()
     }
 
     static func forgetAll() { defaults.removeObject(forKey: key) }
@@ -574,7 +559,8 @@ enum SitePermissions {
             if !isAllowed { return .deny }
             allowed = allowed && isAllowed
         }
-        return allowed ? .grant : .deny    }
+        return allowed ? .grant : .deny
+    }
 
     /// Screen sharing (getDisplayMedia): Don't Allow, Share Screen…, then Share Window… filled, as Safari offers them;
     /// either share hands over to macOS's own picker (ScreenCaptureKit's) for a window or a display, where you pick
@@ -584,26 +570,49 @@ enum SitePermissions {
     /// the page.** It used to be asked every single time with nothing kept, which made it the one card where the same
     /// two answers meant something different from every other card's.
     static func requestDisplayCapture(origin securityOrigin: WKSecurityOrigin, window: NSWindow?, tab: Tab?) async -> DisplayCaptureChoice {
-        guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
-        let site = SiteOrigin.of(securityOrigin)
-        // Already answered for the site, or for this page: go the same way without asking again.
-        if let site, let kept = DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) {
-            return kept
+        let frame = SiteOrigin.of(securityOrigin), page = page(of: tab, frame: frame)
+        // Kept under the same key every other question uses: the page's own site, or a frame from another site
+        // scoped to that page — never the frame's origin on its own, which would follow it to every page.
+        let key = answerKey(frame: frame, page: page)
+        let isPrivate = tab?.isPrivate ?? false
+        guard let controller = WindowManager.shared.promptHost(for: window) else {
+            noteAsked(.screen, origin: page, isPrivate: isPrivate)
+            return .deny
         }
-        if let site, let page = tab?.permissionAnswers.action(key: site, kind: PermissionSubject.screen),
-           let kept = DisplayCaptureChoice(action: page) {
-            return kept
+        // Already answered for the site, or for this frame on this page: go the same way without asking again.
+        if let key, let kept = screenAnswer(key: key, tab: tab) {
+            return DisplayCaptureChoice(kept)
         }
-        let answer = await PermissionPrompt.ask(host: askerName(site), origin: site, what: "your screen", symbol: "rectangle.on.rectangle",
+        noteAsked(.screen, origin: page, isPrivate: isPrivate)
+        // Only a secure page can keep an answer, and only its own origin: a frame from another site may ask this
+        // time, but where its page's screen sharing goes is the page's to keep, not the frame's.
+        let canRemember = key != nil && frame == page && page?.hasPrefix("https://") == true
+        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your screen", symbol: "rectangle.on.rectangle",
                                                 in: controller, tab: tab, title: DisplayCaptureChoice.title,
-                                                actions: DisplayCaptureChoice.actions, canRemember: site != nil)
+                                                actions: DisplayCaptureChoice.actions, canRemember: canRemember,
+                                                answered: {
+                                                    key.flatMap { screenAnswer(key: $0, tab: tab) }
+                                                })
+        guard let answer else { return .deny }
         let choice = DisplayCaptureChoice(answer)
-        if let site {
-            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: choice.action, remember: answer?.remember ?? false),
-                                              subject: PermissionSubject.screen, origin: site, tab: tab,
-                                              isPrivate: tab?.isPrivate ?? false)
+        if let key {
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: choice.action, remember: answer.remember),
+                                              subject: PermissionSubject.screen, origin: key, tab: tab,
+                                              isPrivate: isPrivate)
         }
         return choice
+    }
+
+    /// A screen-sharing answer already given, for a question to skip itself: the site's kept choice, then the page's.
+    private static func screenAnswer(key: String, tab: Tab?) -> PermissionAnswer? {
+        if let kept = DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: key)) {
+            return PermissionAnswer(action: kept.action, remember: true)
+        }
+        if let page = tab?.permissionAnswers.action(key: key, kind: PermissionSubject.screen),
+           let kept = DisplayCaptureChoice(action: page) {
+            return PermissionAnswer(action: kept.action, remember: false)
+        }
+        return nil
     }
 }
 
@@ -787,6 +796,9 @@ final class PermissionPrompt: FloatingPanelView {
     private var monitor: Any?
     /// The tab whose page asked, and the window it's in.
     private weak var askingTab: Tab?
+    /// Asked once more just before the card comes up: while it waited behind another, the page may have been answered,
+    /// and an answer already given is not asked for twice.
+    var recheck: (() -> PermissionAnswer?)?
     private weak var controller: PromptHost?
     private var tabsToken: SignalToken?
     private var waitingToken: SignalToken?
@@ -804,10 +816,9 @@ final class PermissionPrompt: FloatingPanelView {
     /// come after this one. Nothing while this is the only one, since there is nothing to wait for.
     static func waitingLine(questionsWaiting: Int) -> String? {
         guard let behind = waitingBehind(questionsWaiting: questionsWaiting) else { return nil }
-        return String(localized: "\(behind) more questions waiting", comment: "A line on a site's permission question when more than one question is waiting in the same window: how many are still behind the one on screen.")
+        return String(localized: "Questions still waiting: \(behind)", comment: "A line on a site's permission question when more than one question is waiting in the same window: how many are still behind the one on screen.")
     }
 
-    private static var queue: [ObjectIdentifier: Task<PermissionAnswer?, Never>] = [:]
     /// The question on screen in each window, so it can follow the sidebar.
     private static var shown: [ObjectIdentifier: PermissionPrompt] = [:]
     /// Questions asked in each window that have not been answered yet: one is on screen, the rest wait their turn.
@@ -874,49 +885,49 @@ final class PermissionPrompt: FloatingPanelView {
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
                     canRemember: Bool = true, rememberNote: String? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
-        let key = ObjectIdentifier(controller)
-        let before = queue[key]
-        // This question is one more waiting in the window: on screen now, or behind the one that is up.
-        setWaiting(questionsWaiting(in: controller) + 1, in: controller)
-        // A private window never offers or returns Always, including an answer found while this question waited.
+        // A private window never offers or returns Always.
         let remembers = canRemember && !controller.promptIsPrivate
-        let task = Task<PermissionAnswer?, Never> { @MainActor in
-            _ = await before?.value
-            if let known = answered() {
-                return PermissionAnswer(action: known.action, remember: known.remember && remembers)
-            }
-            return await show(host: host, request: title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English."),
-                              symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
-                              origin: origin, in: controller, tab: tab)
+        // Answered already: nothing to show, and nothing to mark.
+        if let known = answered() {
+            return PermissionAnswer(action: known.action, remember: known.remember && remembers)
         }
-        queue[key] = task
-        let answer = await task.value
+        // One of the window's waiting questions from the moment it is asked, even if it cannot be shown yet: the tab
+        // wears the marker, the card that is up counts it, and another tab's question is not held behind this one.
+        // The cards themselves take turns where they would be seen (`PageQuestions`), so no second queue is needed.
+        let questionID = UUID()
+        let request = title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.")
+        let asking = tab ?? controller.promptFrontTab
+        if let asking {
+            PendingQuestions.enqueue(.init(id: questionID, tabID: asking.id, origin: origin, title: request))
+        }
+        setWaiting(questionsWaiting(in: controller) + 1, in: controller)
+        let answer = await show(host: host, request: request,
+                              symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
+                              origin: origin, in: controller, tab: tab, answered: answered)
         // Answered or put off: it is no longer one of the window's waiting questions.
+        PendingQuestions.answer(questionID)
         setWaiting(max(0, questionsWaiting(in: controller) - 1), in: controller)
         let said = if let answer {
             answer.action == "deny" ? "not allowed" : answer.remember ? "always allowed" : answer.action == "allow" ? "allowed" : "allowed the other way"
         } else { "put off" }
         Diagnostics.note("Asked: \(title ?? "Use \(what)")", site: host, said, isPrivate: controller.promptIsPrivate)
-        if queue[key] == task { queue[key] = nil }
         return answer
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?) async -> PermissionAnswer? {
+                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?,
+                             answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
         }
-        guard controller.window?.isVisible == true else { return nil }
+        // The window is gone (its tab with it): there is nowhere this question could ever be shown. A window that is
+        // only hidden, minimised or on another Space still holds its question: the card is put up there, and is
+        // waiting when the window comes back. Nothing is denied just because it could not be seen this second.
+        guard controller.window != nil else { return nil }
         // The asking tab closed while an earlier question waited.
         if let tab, tab.isClosed { return nil }
         let asking = tab ?? controller.promptFrontTab
-        // A question that cannot be shown yet is held — WebKit's request keeps waiting — and the tab wears a marker
-        // until it is answered, so nothing is asked and lost in a background tab.
-        let questionID = UUID()
-        if let asking {
-            PendingQuestions.enqueue(.init(id: questionID, tabID: asking.id, origin: origin, title: request))
-        }
         // In the space's own color, like every other button in the window.
         let accent = controller.promptAccent
         return await withCheckedContinuation { continuation in
@@ -972,10 +983,10 @@ final class PermissionPrompt: FloatingPanelView {
             }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { response in
-                PendingQuestions.answer(questionID, response)
                 continuation.resume(returning: response)
             }
             prompt.askingTab = asking
+            prompt.recheck = answered
             prompt.controller = controller
             // How many are waiting in this window, and told again whenever that changes: a question asked while this
             // one is up waits its turn behind it, and the card says so rather than stacking a card of its own.
@@ -1042,11 +1053,16 @@ final class PermissionPrompt: FloatingPanelView {
         guard let tab = askingTab, !tab.isClosed, controller.promptHolds(tab) else { finish(nil); return }
         let inFront = controller.promptShows(tab)
         if inFront, isHidden {
+            // While it waited, the page may have been answered another way: an answer already given is not asked
+            // for twice.
+            if let known = recheck?() { finish(known); return }
             // Placed first, hidden still: a question over another pane of a split doesn't hold it up (`PageQuestions`).
             place(in: controller)
             guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
             controller.clearForPrompt()
             isHidden = false
+            // The question the window is showing, for anything that asks it (`isShowing`, the debug bridge).
+            Self.shown[ObjectIdentifier(controller)] = self
             slideIn()
             PageQuestions.cameUp(in: controller)
         } else if !inFront, !isHidden {
@@ -1132,7 +1148,12 @@ final class PermissionPrompt: FloatingPanelView {
         clickMonitor = nil
         tabsToken = nil
         urlToken = nil
-        if let controller, Self.shown[ObjectIdentifier(controller)] === self { Self.shown[ObjectIdentifier(controller)] = nil }
+        if let controller, Self.shown[ObjectIdentifier(controller)] === self {
+            // Another question may still be up in this window: the slot names the one that is, not the one that went.
+            Self.shown[ObjectIdentifier(controller)] = controller.promptOverlay.subviews
+                .compactMap { $0 as? PermissionPrompt }
+                .first { !$0.isHidden && $0 !== self }
+        }
     }
 
     #if DEBUG

@@ -595,8 +595,8 @@ final class BrowserRootView: SpaceFrameView {
                 }
             }
         }
-        // A question arriving (or being answered) can bring the edge glow on, or take it away.
-        resizeHandle.onBegin = { [weak self] in            guard let self else { return }
+        resizeHandle.onBegin = { [weak self] in
+            guard let self else { return }
             self.widthBeforeDrag = self.sidebarWidth
             self.isDraggingSidebarEdge = true
         }

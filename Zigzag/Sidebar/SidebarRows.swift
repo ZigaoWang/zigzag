@@ -831,7 +831,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return PendingQuestions.waits(tabID: page.id, isFront: front, windowVisible: window?.isVisible == true)
     }
 
-    private func layoutRenameField() {        guard let field = renameField else { return }
+    private func layoutRenameField() {
+        guard let field = renameField else { return }
         let height = ceil(field.intrinsicContentSize.height)
         let y = (bounds.height - height) / 2
         guard isSplit else {

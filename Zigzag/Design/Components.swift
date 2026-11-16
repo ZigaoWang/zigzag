@@ -217,7 +217,8 @@ extension InteractiveView {
         case .quiet:
             // Disabled, it doesn't answer the pointer: no wash that would say it can be clicked.
             fill = !isEnabled ? nil : isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
-            text = !isEnabled ? Tokens.Color.textDisabled : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary        }
+            text = !isEnabled ? Tokens.Color.textDisabled : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+        }
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
         let edged = look == .secondary
         Tokens.Motion.withoutAnimation {
