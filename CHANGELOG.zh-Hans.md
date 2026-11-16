@@ -13,7 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
-- 下载规则：在“设置 › 下载”里，可以按网址匹配，把下载或链接交给其他 App、脚本或 aria2、Motrix、yt-dlp 这样的下载工具。交出去之前 Zigzag 会先问你，没有规则匹配的照常保存。详见 [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md)。感谢 [Lakeland97](https://github.com/Lakeland97)。([#191](https://github.com/ZigaoWang/zigzag/issues/191))
+- 下载规则：在“设置 › 下载”里，可以按网址匹配，把下载或链接交给其他 App、脚本或 aria2、Motrix、yt-dlp 这样的下载工具。“添加规则”会先列出现成的规则，“App”一栏会列出你的应用，脚本也可以统一放在一个“Scripts”文件夹里。交出去之前 Zigzag 会先问你，没有规则匹配的照常保存。详见 [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md)。感谢 [Lakeland97](https://github.com/Lakeland97)。([#191](https://github.com/ZigaoWang/zigzag/issues/191))
 - 在标签页下方的空白处双击会新建标签页，和 Arc 一样。边栏顶部仍然像标题栏一样，可以在“设置 › 外观 › 双击边栏新建标签页”里关掉。([#262](https://github.com/ZigaoWang/zigzag/issues/262))
 - “全屏视频填满”设为“网页”时，填满网页的视频在指针移动时会在右上角显示一个按钮，点一下就进入真正的全屏。感谢 [Lakeland97](https://github.com/Lakeland97)。([#257](https://github.com/ZigaoWang/zigzag/issues/257))
 - 把标签页拖到边栏里分屏那一行上，就能加成第三、第四个页面，就像把一个标签页拖到另一个上面会分屏一样。它会占你放下那一侧的四分之一，四个就是田字格。⌘Z 可以撤销。

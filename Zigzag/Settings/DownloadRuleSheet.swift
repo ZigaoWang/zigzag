@@ -42,13 +42,6 @@ enum DownloadRuleSheet {
         var secretField: FilledField?
         var stylePicker: DropdownButton?
 
-        func choose(_ panel: NSOpenPanel, into field: FilledField) {
-            guard panel.runModal() == .OK, let url = panel.url else { return }
-            field.stringValue = url.path
-            // A path chosen, not typed: the form doesn't hear a programmatic change, so ask it again by hand.
-            sheetRef?.revalidate()
-        }
-
         switch action.kind {
         case .openApp:
             let field = FilledField(placeholder: String(localized: "Choose an app…", comment: "Placeholder of the app field in a download rule's sheet."))
@@ -72,7 +65,7 @@ enum DownloadRuleSheet {
             button.onClick = { [weak button] _ in
                 guard let button else { return }
                 var entries: [MenuPanel.Entry] = Applications.named().map { app in
-                    .item(MenuPanel.Item(title: app.name, symbol: "app") {
+                    .item(MenuPanel.Item(title: app.name, image: Applications.icon(app.path)) {
                         field.stringValue = app.path
                         sheetRef?.revalidate()
                     })
@@ -132,8 +125,6 @@ enum DownloadRuleSheet {
             }
             actionRows.append(FormSheet.Row(label: String(localized: "Script", comment: "Label of the script field in a download rule's sheet."),
                                             view: stack(field, button)))
-            actionRows.append(.note(String(localized: "Scripts live in Documents/Zigzag/Scripts.",
-                                           comment: "Under the script field of a Run Script download rule: where a script named by its file name is looked for.")))
             let args = MultilineField(text: action.arguments.joined(separator: "\n"))
             argumentView = args
             actionRows.append(FormSheet.Row(label: String(localized: "Arguments", comment: "Label of the arguments field in a download rule's sheet: one argument a line."),
@@ -269,9 +260,17 @@ enum Applications {
             for item in (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? [] where item.hasSuffix(".app") {
                 let path = (folder as NSString).appendingPathComponent(item)
                 guard seen.insert(path).inserted else { continue }
-                found.append((name: (item as NSString).deletingPathExtension, path: path))
+                // The name Finder shows: localized ("计算器" for Calculator.app) and without .app.
+                found.append((name: FileManager.default.displayName(atPath: path).replacingOccurrences(of: ".app", with: "", options: [.anchored, .backwards]), path: path))
             }
         }
         return found.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// The app's own icon at menu size, as Finder draws it.
+    static func icon(_ path: String) -> NSImage {
+        let image = NSWorkspace.shared.icon(forFile: path)
+        image.size = NSSize(width: 16, height: 16)
+        return image
     }
 }

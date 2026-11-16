@@ -100,9 +100,7 @@ struct DownloadRuleTests {
     /// is what makes them findable, and a script kept elsewhere is still reachable by its own path.
     @Test func aRuleNamesAScriptInItsOneFolder() {
         let folder = Paths.scripts.standardizedFileURL
-        #expect(folder.deletingLastPathComponent().lastPathComponent == "Zigzag")
-        #expect(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "Documents")
-        #expect(folder.lastPathComponent == "Scripts")
+        #expect(folder == Paths.support.appendingPathComponent("Scripts", isDirectory: true).standardizedFileURL)
 
         // A bare name is in the folder; a path of its own is taken as it stands, `~` and all.
         #expect(Paths.script(named: "yt-dlp.sh").standardizedFileURL == folder.appendingPathComponent("yt-dlp.sh"))
