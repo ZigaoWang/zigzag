@@ -5,7 +5,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-## [0.9.1] - 2026-11-15
+## [0.9.1] - 2026-11-16
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
 
@@ -1262,8 +1262,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...HEAD
-[0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/ZigaoWang/zigzag/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/ZigaoWang/zigzag/compare/v0.8.4...v0.8.5
