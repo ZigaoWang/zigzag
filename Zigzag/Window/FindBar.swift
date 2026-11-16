@@ -1029,7 +1029,7 @@ enum Toast {
         let spot = host.promptToastPlace
         guard let state = showing[ObjectIdentifier(spot.over)], let toast = state.toast,
               toast.superview === spot.over, !toast.dismissing else { return }
-        place(toast, in: spot.area)
+        place(toast, in: spot.area, placement: state.placement)
     }
 
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
