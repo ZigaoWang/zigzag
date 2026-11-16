@@ -44,11 +44,12 @@ extension PromptHost {
     /// A short notice over the page. `action` adds a button — a title and what pressing it does — for a notice with
     /// something to offer (Allow Once, Try Again); one of those stays long enough to read and act on, and a `closes`
     /// × for an offer you may want gone before it goes on its own. The button takes no click for its first half
-    /// second, so a click meant for the page can't land on it.
-    func promptToast(_ text: String, symbol: String, duration: TimeInterval,
+    /// second, so a click meant for the page can't land on it. `image` stands in for a symbol where the picture is
+    /// something's own (a site's icon, on a notification).
+    func promptToast(_ text: String, symbol: String, image: NSImage? = nil, duration: TimeInterval,
                      action: (title: String, run: () -> Void)? = nil, closes: Bool = false) {
         let place = promptToastPlace
-        Toast.show(text, symbol: symbol, action: action, duration: duration, closes: closes,
+        Toast.show(text, symbol: symbol, image: image, action: action, duration: duration, closes: closes,
                    over: place.over, area: place.area)
     }
 }

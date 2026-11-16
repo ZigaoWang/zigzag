@@ -64,7 +64,7 @@ struct WebRTCProtectionTests {
         guard WebRTCProtection.isAvailable else { return }
         try await withDefaults {
             #expect(SitePermission.webRTC.choices == [.allow, .block])
-            #expect(SitePermission.camera.choices == PermissionChoice.allCases)
+            #expect(SitePermission.camera.choices == PermissionChoice.ordinary)
             // While it's on, every site has the row, Block until allowed.
             WebRTCProtection.isOn = true
             #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])

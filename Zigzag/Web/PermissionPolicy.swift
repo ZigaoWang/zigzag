@@ -34,6 +34,10 @@ nonisolated struct PermissionAnswer {
     /// Which of a caller's own durations was chosen: 0 for the ordinary This time / Always, or the index in the
     /// list a question brought with it (the download question's this file, this type, every download).
     var scopeIndex = 0
+    /// The entry a question's own dropdown had picked, where it offers one to choose rather than to answer itself:
+    /// a site's notifications pick a place, then the buttons say whether to show them. Nil for a question with no
+    /// such dropdown, and for the answers that are the dropdown's own (a pop-up's destination).
+    var choice: String? = nil
 }
 
 /// Stable identifiers under which permission actions are remembered.

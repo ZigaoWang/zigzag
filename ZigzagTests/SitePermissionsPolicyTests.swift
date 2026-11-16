@@ -110,6 +110,28 @@ import WebKit
         }
     }
 
+    // MARK: Notifications: where a site's answer says they show
+
+    /// A notification's yes is a place: each is kept under its own action, and what Zigzag saved before there were
+    /// two places still reads as the Mac's.
+    @Test func aNotificationsPlaceIsKeptAsItsAction() {
+        #expect(NotificationPlace.blocked.action == "deny")
+        #expect(NotificationPlace.inZigzag.action == "toast")
+        #expect(NotificationPlace.onTheMac.action == "system")
+        #expect(NotificationPlace(action: "deny") == .blocked)
+        #expect(NotificationPlace(action: "toast") == .inZigzag)
+        #expect(NotificationPlace(action: "system") == .onTheMac)
+        // Allow is what Zigzag saved before there were two places, and it meant the Mac.
+        #expect(NotificationPlace(action: "allow") == .onTheMac)
+        #expect(NotificationPlace(action: nil) == nil)
+        #expect(NotificationPlace(action: "something else") == nil)
+        #expect(PermissionChoice.inZigzag.notificationPlace == .inZigzag)
+        #expect(PermissionChoice.onTheMac.notificationPlace == .onTheMac)
+        #expect(PermissionChoice.allow.notificationPlace == .onTheMac)
+        #expect(PermissionChoice.block.notificationPlace == .blocked)
+        #expect(PermissionChoice.ask.notificationPlace == nil)
+    }
+
     // MARK: Downloads: whether a site may save files at all
 
     /// The downloads question is one answer kept like every other, and never asks once it has one.
@@ -205,10 +227,10 @@ import WebKit
     }
 
     /// Its row is offered once the site has an answer, in a private window too (which asks and keeps nothing), and it
-    /// offers the same three choices as every other row.
+    /// offers the same three choices as every other row but notifications.
     @Test func downloadsAreARowInSiteControlsOnceTheSiteHasAnAnswer() throws {
         #expect(SitePermission.downloads.kinds == ["downloads"])
-        #expect(SitePermission.downloads.choices == PermissionChoice.allCases)
+        #expect(SitePermission.downloads.choices == PermissionChoice.ordinary)
         #expect(SitePermission.downloads.inPrivate, "a private window still asks")
         try withDefaults { _ in
             SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: "https://files.example")

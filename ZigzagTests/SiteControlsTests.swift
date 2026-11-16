@@ -61,6 +61,72 @@ struct SiteControlsPermissionTests {
         }
     }
 
+    /// Notifications are the one permission whose yes has two places: a notice in Zigzag, or the Mac's Notification
+    /// Center. The row offers them, reading back what's kept, and an answer saved before there were two places means
+    /// the Mac's, so nothing anyone has already answered changes.
+    @Test func aNotificationsAnswerIsThePlaceItShowsIn() throws {
+        try withDefaults {
+            #expect(SitePermission.notifications.choices == [.ask, .inZigzag, .onTheMac, .block])
+            // Every other permission keeps the three it always had.
+            #expect(SitePermission.location.choices == [.ask, .allow, .block])
+            #expect(SitePermission.webRTC.choices == [.allow, .block])
+
+            #expect(SitePermissions.choice(.notifications, origin: site) == .ask)
+
+            SitePermissions.setChoice(.inZigzag, for: .notifications, origin: site)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .inZigzag)
+
+            SitePermissions.setChoice(.onTheMac, for: .notifications, origin: site)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .onTheMac)
+
+            // An answer saved by an older Zigzag, when Allow meant the Mac.
+            SitePermissions.remember("allow", subject: PermissionSubject.notifications, origin: site)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .onTheMac)
+
+            SitePermissions.setChoice(.block, for: .notifications, origin: site)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .block)
+
+            // Ask forgets it, and the row goes back to asking.
+            SitePermissions.setChoice(.ask, for: .notifications, origin: site)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .ask)
+            #expect(SitePermissions.action(PermissionSubject.notifications, origin: site) == nil)
+        }
+    }
+
+    /// Both places are a yes: the Permissions row counts them as allowed, and only Block as blocked.
+    @Test func bothPlacesCountAsAllowed() {
+        #expect(PermissionChoice.inZigzag.permits)
+        #expect(PermissionChoice.onTheMac.permits)
+        #expect(PermissionChoice.allow.permits)
+        #expect(!PermissionChoice.block.permits)
+        #expect(!PermissionChoice.ask.permits)
+        #expect(PermissionChoice.summary([.inZigzag, .block]) == "1 allowed, 1 blocked")
+    }
+
+    /// A notification's answer is kept like every other one: "Always" stores it for the site — a no included — and
+    /// "This time" leaves the site asking. The card keeps its place for the page now, but the stored answer still
+    /// reads back as Block rather than being forgotten with the page.
+    @Test func aNotificationsAnswerCanBeKeptForTheSite() throws {
+        try withDefaults {
+            #expect(SitePermissions.choice(.notifications, origin: site) == .ask)
+
+            // "This time": nothing is kept for the site, so it still asks.
+            let thisTime = SitePermissions.rememberAnswer(
+                PermissionAnswer(action: NotificationPlace.blocked.action, remember: false),
+                subject: PermissionSubject.notifications, origin: site, tab: nil, isPrivate: false)
+            #expect(!thisTime)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .ask)
+
+            // "Always": Block for the site, exactly as choosing Block in Site Controls would keep it.
+            let always = SitePermissions.rememberAnswer(
+                PermissionAnswer(action: NotificationPlace.blocked.action, remember: true),
+                subject: PermissionSubject.notifications, origin: site, tab: nil, isPrivate: false)
+            #expect(!always)
+            #expect(SitePermissions.choice(.notifications, origin: site) == .block)
+            #expect(SitePermissions.action(PermissionSubject.notifications, origin: site) == "deny")
+        }
+    }
+
     @Test func noRowUntilTheSiteAsks() throws {
         try withDefaults {
             #expect(SitePermissions.shown(origin: site, isPrivate: false).isEmpty)
@@ -87,7 +153,8 @@ struct SiteControlsPermissionTests {
             SitePermissions.setNotifications(true, origin: site)
             SitePermissions.remember(false, origin: site, type: .camera)
             #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.camera, .notifications])
-            #expect(SitePermissions.choice(.notifications, origin: site) == .allow)
+            // A notification's yes is a place, so a plain allow saved by an older Zigzag reads as the Mac's.
+            #expect(SitePermissions.choice(.notifications, origin: site) == .onTheMac)
             #expect(SitePermissions.choice(.camera, origin: site) == .block)
             // A private window has no notifications or pop-ups to offer.
             #expect(SitePermissions.shown(origin: site, isPrivate: true) == [.camera])
@@ -141,8 +208,10 @@ struct SiteControlsPermissionTests {
     @Test func allowAndBlockAreKeptAndAskForgets() throws {
         try withDefaults {
             for permission in SitePermission.allCases {
-                SitePermissions.setChoice(.allow, for: permission, origin: site)
-                #expect(SitePermissions.choice(permission, origin: site) == .allow)
+                // A notification's yes is a *place*, so its plain yes is the Mac's — what the row reads back as that.
+                let yes: PermissionChoice = permission == .notifications ? .onTheMac : .allow
+                SitePermissions.setChoice(yes, for: permission, origin: site)
+                #expect(SitePermissions.choice(permission, origin: site) == yes)
                 SitePermissions.setChoice(.block, for: permission, origin: site)
                 #expect(SitePermissions.choice(permission, origin: site) == .block)
                 SitePermissions.setChoice(.ask, for: permission, origin: site)

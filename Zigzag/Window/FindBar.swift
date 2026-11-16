@@ -946,9 +946,9 @@ enum Toast {
 
     /// `closes` adds a close button, for an offer you may want gone before it goes on its own. `owner`: what it's
     /// about, for `hide(for:in:)`.
-    static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
+    static func show(_ text: String, symbol: String? = nil, image: NSImage? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller))
+        show(text, symbol: symbol, image: image, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller))
         state(for: controller.root.overlay).owner = owner
     }
 
@@ -1007,7 +1007,7 @@ enum Toast {
     }
 
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
-    static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
+    static func show(_ text: String, symbol: String? = nil, image: NSImage? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false) {
         let state = state(for: host)
         let toast: ToastView
@@ -1024,7 +1024,7 @@ enum Toast {
         toast.label.stringValue = text
         Announcement.post(text, priority: action == nil ? .medium : .high)
         // Busy: an empty picture keeps the icon's place for the spinner.
-        toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }
+        toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : image ?? symbol.map { Tokens.Symbol.image($0) }
         busy ? toast.spinner.startAnimation(nil) : toast.spinner.stopAnimation(nil)
         toast.actionButton.isHidden = action == nil
         if let action {
