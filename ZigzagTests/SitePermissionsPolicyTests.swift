@@ -157,10 +157,10 @@ import WebKit
         #expect(page.action(key: "https://a.com", kind: "location") == "allow")
         #expect(page.answer(key: "https://a.com", kind: "location") == true)
 
-        // One answer to camera and microphone at once answers either of them.
+        // An answer given to both at once, from before the split, is not read as either.
         page.note("deny", key: "https://a.com", kind: "cameraAndMicrophone")
-        #expect(page.answer(key: "https://a.com", kind: "camera") == false)
-        #expect(page.answer(key: "https://a.com", kind: "microphone") == false)
+        #expect(page.answer(key: "https://a.com", kind: "camera") == nil)
+        #expect(page.answer(key: "https://a.com", kind: "microphone") == nil)
 
         page.forget()
         #expect(page.isEmpty)
@@ -282,25 +282,6 @@ import WebKit
         }
     }
 
-    /// Settings › Downloads groups a rule's answered sites by what was answered, so a refused site does not read like
-    /// a handed-off one; the groups come in the question's own order and only when they have sites.
-    @Test func theDownloadsListGroupsSitesByTheirAnswer() throws {
-        try withDefaults { _ in
-            let rule = UUID()
-            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://a.com")
-            SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule), origin: "https://b.com")
-            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://c.com")
-            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule), origin: "https://d.com")
-            let decided = SitePermissions.decisions(prefix: PermissionSubject.handoff(rule))
-            #expect(decided.map(\.origin) == ["https://a.com", "https://b.com", "https://c.com", "https://d.com"])
-            let groups = SettingsView.handoffAnswerGroups(decided)
-            #expect(groups.map(\.sites) == [["https://a.com", "https://c.com"], ["https://d.com"], ["https://b.com"]])
-            // The row's title is the very word the question's button used.
-            #expect(groups.map(\.title) == ["Hand Off", "Open in Browser", "Don’t Allow"])
-            #expect(SettingsView.handoffAnswerGroups([]).isEmpty)
-        }
-    }
-
     /// A page's own pop-up answered "This Tab" or "New Tab" is opened by the tab that asked, through that tab's own
     /// host: Zigzag Mini's and an installed app's windows are not `BrowserWindowController`s, and casting to one was
     /// how their pop-ups used to vanish. A host that is not a browser window still routes correctly, and "Don't
@@ -377,3 +358,4 @@ private final class QuestionHostStub: PromptHost {
     var promptIsCovered: Bool { false }
     var promptAnchor: NSView? { nil }
     func promptToast(_ text: String, symbol: String, duration: TimeInterval) {}
+}

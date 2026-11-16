@@ -96,7 +96,8 @@ enum ExternalLinks {
         // Always Open is kept for secure pages only. Choices are kept per origin, so one for https://zoom.us is not
         // one for http://zoom.us or https://zoom.us:8443.
         let pageOrigin = SiteOrigin.of(pageURL)
-        let canRemember = !foreign && pageURL?.scheme?.lowercased() == "https"        let host = foreign ? askerHost : pageHost
+        let canRemember = !foreign && pageURL?.scheme?.lowercased() == "https"
+        let host = foreign ? askerHost : pageHost
         let origin = foreign ? asker.flatMap { SiteOrigin.of($0) } : pageOrigin
         let key = "\(origin ?? host)|\(scheme)"
         let tab = (webView as? BrowserWebView)?.owner
@@ -122,6 +123,7 @@ enum ExternalLinks {
             MiniWindowController.pageOpenedApp(webView, isMainFrame: isMainFrame, linkClick: linkClick ?? isClick)
         }
         switch verdict(byYou: byYou, clickedHere: everydayClick, scheme: scheme, stored: stored()) {
+        case .block:
             Diagnostics.note("Blocked opening an app", site: host, "\(scheme):", isPrivate: !webView.configuration.websiteDataStore.isPersistent)
             return
         case .open:
@@ -175,8 +177,6 @@ enum ExternalLinks {
             } else {
                 openApp()
             }
-            }
-            if answer.action == "allow" { NSWorkspace.shared.open(url) }
         }
     }
 

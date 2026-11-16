@@ -113,27 +113,30 @@ enum DownloadHandoff {
             host: SitePermissions.askerName(origin), origin: origin, what: rule.name, symbol: "arrow.up.forward.app",
             in: controller, tab: tab,
             title: String(localized: "Hand Off \(rule.name)", comment: "A page's question before a download rule handles a link or download. The placeholder is the rule's name."),
-            allowTitle: String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."),
-            alternateTitle: forDownload
-                ? String(localized: "Save in Zigzag", comment: "Button that saves a download in Zigzag instead of running a download rule.")
-                : String(localized: "Open in Browser", comment: "Button that lets a link stay in the browser instead of running a download rule."),
-            denyTitle: String(localized: "Don’t Allow", comment: "Button that refuses a download rule's handoff."),
+            actions: [
+                .deny,
+                .alternate("browser", forDownload
+                    ? String(localized: "Save in Zigzag", comment: "Button that saves a download in Zigzag instead of running a download rule.")
+                    : String(localized: "Open in Browser", comment: "Button that lets a link stay in the browser instead of running a download rule.")),
+                PermissionAction(id: "handOff", title: String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."), isDeny: false, isProminent: true)
+            ],
+            canRemember: false,
             answered: {
                 // Asked while another question was up: the page may have answered this one in the meantime.
                 guard let pageOrigin, let tab else { return nil }
                 switch tab.permissionAnswers.action(key: pageOrigin, kind: kind) {
-                case "handOff": return .allow
-                case "browser": return .alternate
-                case "deny": return .deny
+                case "handOff": return PermissionAnswer(action: "handOff", remember: false)
+                case "browser": return PermissionAnswer(action: "browser", remember: false)
+                case "deny": return PermissionAnswer(action: "deny", remember: false)
                 default: return nil
                 }
             })
+        guard let answer else { return .browser }
         let action: String
-        switch answer {
-        case .allow, .always: action = "handOff"
-        case .alternate: action = "browser"
-        case .deny: action = "deny"
-        case .notNow: return .browser
+        switch answer.action {
+        case "handOff": action = "handOff"
+        case "browser": action = "browser"
+        default: action = "deny"
         }
         if let pageOrigin, let tab { tab.permissionAnswers.note(action, key: pageOrigin, kind: kind) }
         return gate(stored: action)

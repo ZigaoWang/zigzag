@@ -307,9 +307,10 @@ struct SiteOriginPermissionTests {
                           "https://kept.com|camera": true, "https://example.com|notifications": true], forKey: "SitePermissions")
             defaults.set(true, forKey: "UnrelatedSetting")
             SitePermissions.migrateHostOnlyAnswers()
-            let now = defaults.dictionary(forKey: "SitePermissions") as? [String: Bool]
-            // An answer already kept for the origin stays as it was.
-            #expect(now == ["https://localhost|camera": false, "https://kept.com|camera": true, "https://example.com|notifications": true])
+            let now = defaults.dictionary(forKey: "SitePermissions") as? [String: String]
+            // An answer already kept for the origin stays as it was; a denial given to a host on its own is kept for
+            // its https site, and an allow given that way is not.
+            #expect(now == ["https://localhost|camera": "deny", "https://kept.com|camera": "allow", "https://example.com|notifications": "allow"])
             #expect(SitePermissions.decision(origin: "http://localhost", type: .microphone) == nil)
             #expect(SitePermissions.decision(origin: "https://localhost", type: .microphone) == nil)
             #expect(SitePermissions.decision(origin: "http://localhost", type: .camera) == nil)
@@ -319,7 +320,7 @@ struct SiteOriginPermissionTests {
             #expect(defaults.bool(forKey: "UnrelatedSetting"))
             // Once is enough: again, nothing changes.
             SitePermissions.migrateHostOnlyAnswers()
-            #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] == now)
+            #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: String] == now)
         }
     }
 

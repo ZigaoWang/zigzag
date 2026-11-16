@@ -69,9 +69,7 @@ struct PagePermissionAnswers {
 
     mutating func forget() { answers = [:] }
 
-    mutating func forget() { answers = [:]; actions = [:] }
-
-    var isEmpty: Bool { answers.isEmpty && actions.isEmpty }
+    var isEmpty: Bool { answers.isEmpty }
 }
 
 /// Camera, microphone, location, notification, pop-up and open-an-app decisions, remembered per origin (see
@@ -200,18 +198,18 @@ enum SitePermissions {
     /// never the other way round, and a kind's own answer wins. Runs at launch after `migrateHostOnlyAnswers`;
     /// running again on a key that somehow survives finds nothing to do.
     static func migrateMediaAnswers() {
-        var now = all
+        var now = stored
         let legacy = now.keys.filter { $0.hasSuffix("|cameraAndMicrophone") }
         guard !legacy.isEmpty else { return }
         for key in legacy {
             let origin = String(key.dropLast("|cameraAndMicrophone".count))
-            let allowed = now[key] ?? false
+            let action = now[key]
             for kind in ["camera", "microphone"] where now["\(origin)|\(kind)"] == nil {
-                now["\(origin)|\(kind)"] = allowed
+                now["\(origin)|\(kind)"] = action
             }
             now[key] = nil
         }
-        all = now
+        stored = now
     }
 
     /// What an answer is kept under. A frame from the page's own origin asks as the page. One from elsewhere (a call
@@ -474,13 +472,19 @@ enum SitePermissions {
         notifications(origin: origin) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
     }
 
-    case camera, microphone, location, notifications, popups, apps, webRTC, screen
+    /// Asked like the camera, the answer kept for the page that asked. A private window never shows them anyway.
+    static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
+        if let known = notifications(origin: origin, tab: tab) { return known }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
+        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
+                                                title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
+                                                actions: [.deny, .allow], canRemember: true,
                                                 answered: {
                                                     knownAnswer(site: notifications(origin: origin),
                                                                 page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
                                                 })
         guard let answer else { return nil }
-    var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .webRTC || self == .screen }
+        return rememberAnswer(answer, subject: PermissionSubject.notifications, origin: origin, tab: tab, isPrivate: isPrivate)
     }
 
     /// The location answer for `key` on `tab`'s page: Allow or Block kept, else the answer given on this page.
@@ -659,7 +663,7 @@ enum DisplayCaptureChoice: Int, CaseIterable {
 /// What a site can ask for, as Site Controls has a row for each. The camera and the microphone are separate
 /// permissions, so a call asks for each and can have a row for each.
 enum SitePermission: String, CaseIterable {
-    case camera, microphone, location, notifications, popups, apps, webRTC
+    case camera, microphone, location, notifications, popups, apps, webRTC, screen
     /// The kinds of answer kept for it.
     var kinds: [String] {
         switch self {
@@ -684,7 +688,8 @@ enum SitePermission: String, CaseIterable {
     /// A private window asks for the camera and the microphone, location and apps to open (and keeps nothing); it
     /// never shows notifications or opens pop-ups on its own. WebRTC follows the setting there, chosen for the tab
     /// alone.
-    var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .webRTC }
+    var inPrivate: Bool { self == .camera || self == .microphone || self == .location || self == .apps || self == .webRTC || self == .screen }
+
     var title: String {
         switch self {
         case .camera: String(localized: "Camera", comment: "Row in the site panel's This Site group.")
