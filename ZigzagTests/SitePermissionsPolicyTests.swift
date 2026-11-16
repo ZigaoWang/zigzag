@@ -18,7 +18,7 @@ import WebKit
     }
 
     /// The same, for the tests that await the question itself.
-    private func withDefaultsAsync(_ body: (UserDefaults) async throws -> Void) async throws {
+    private func withDefaultsAsync(_ body: () async throws -> Void) async throws {
         let suite = "SitePermissionsPolicyTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         let before = SitePermissions.defaults
@@ -27,7 +27,7 @@ import WebKit
             SitePermissions.defaults = before
             defaults.removePersistentDomain(forName: suite)
         }
-        try await body(defaults)
+        try await body()
     }
 
     @Test func remembersAnActionPerSubjectAndOrigin() throws {
@@ -114,7 +114,7 @@ import WebKit
 
     /// The downloads question is one answer kept like every other, and never asks once it has one.
     @Test func aStoredDownloadAnswerIsUsedWithoutAskingAnything() async throws {
-        try await withDefaultsAsync { _ in
+        try await withDefaultsAsync {
             SitePermissions.remember("allow", subject: PermissionSubject.downloads, origin: "https://files.example")
             #expect(SitePermissions.downloads(origin: "https://files.example") == true)
             #expect(await SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
