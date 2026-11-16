@@ -79,6 +79,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.peek.reposition()
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
+            NoticeCard.reposition(in: self)
             Toast.reposition(in: self)
             self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
@@ -91,6 +92,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             guard let self else { return }
             self.sidebarSliding(duration)
             PermissionPrompt.reposition(in: self, slide: duration, timing: timing)
+            NoticeCard.reposition(in: self, slide: duration, timing: timing)
             Toast.reposition(in: self, slide: duration, timing: timing)
             self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
