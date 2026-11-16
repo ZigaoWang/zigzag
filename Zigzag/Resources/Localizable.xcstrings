@@ -21628,6 +21628,39 @@
           }
         }
       }
+    },
+    "Show Scripts Folder" : {
+      "comment" : "Item in the menu beside a Run Script rule's script field: opens the folder the scripts live in, in Finder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示脚本文件夹"
+          }
+        }
+      }
+    },
+    "Choose a Script…" : {
+      "comment" : "Item in the menu beside a Run Script rule's script field: picks a script kept outside the scripts folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取脚本…"
+          }
+        }
+      }
+    },
+    "Scripts live in Documents/Zigzag/Scripts." : {
+      "comment" : "Under the script field of a Run Script download rule: where a script named by its file name is looked for.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本存放在“文稿/Zigzag/Scripts”。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
