@@ -47,6 +47,31 @@ struct PermissionPromptTests {
         #expect(answer?.remember == false)
     }
 
+    /// Two tabs of one site, a page's two frames, a private window and the window itself each ask for themselves: only
+    /// the same tab, frame and privacy's repeated question shares one card.
+    @Test func twoAskersShareOnlyTheSameQuestion() {
+        // Held, not temporaries: a freed object's address can be reused by the next one.
+        let firstWindow = NSObject(), secondWindow = NSObject()
+        let window = ObjectIdentifier(firstWindow), otherWindow = ObjectIdentifier(secondWindow)
+        let tab = UUID(), otherTab = UUID()
+        let request = "Use your camera?"
+        let key = PermissionPrompt.questionKey(origin: "https://example.com", answerKey: "https://example.com",
+                                               tabID: tab, isPrivate: false, window: window, request: request)
+        #expect(key == PermissionPrompt.questionKey(origin: "https://example.com", answerKey: "https://example.com",
+                                                    tabID: tab, isPrivate: false, window: window, request: request))
+        #expect(key != PermissionPrompt.questionKey(origin: "https://example.com", answerKey: "https://example.com",
+                                                    tabID: otherTab, isPrivate: false, window: window, request: request))
+        #expect(key != PermissionPrompt.questionKey(origin: "https://example.com",
+                                                    answerKey: "https://example.com|embed:https://call.example.net",
+                                                    tabID: tab, isPrivate: false, window: window, request: request))
+        #expect(key != PermissionPrompt.questionKey(origin: "https://example.com", answerKey: "https://example.com",
+                                                    tabID: tab, isPrivate: true, window: window, request: request))
+        #expect(key != PermissionPrompt.questionKey(origin: "https://example.com", answerKey: "https://example.com",
+                                                    tabID: tab, isPrivate: false, window: otherWindow, request: request))
+        #expect(key != PermissionPrompt.questionKey(origin: "https://example.com", answerKey: "https://example.com",
+                                                    tabID: tab, isPrivate: false, window: window, request: "Use your microphone?"))
+    }
+
     @Test func aDisabledDropdownDimsAndKeepsItsExplanation() {
         let dropdown = DropdownButton()
         dropdown.options = [DropdownButton.Option(title: "This time"), DropdownButton.Option(title: "Always on this site")]

@@ -110,7 +110,7 @@ enum DownloadHandoff {
         guard questionCanShow(tabIsInFront: inFront, windowIsVisible: controller.window?.isVisible == true,
                               windowIsKey: controller.window?.isKeyWindow == true) else { return .browser }
         let answer = await PermissionPrompt.ask(
-            host: SitePermissions.askerName(origin), origin: origin, what: rule.name, symbol: "arrow.up.forward.app",
+            host: SitePermissions.askerName(origin), origin: origin, answerKey: pageOrigin, what: rule.name, symbol: "arrow.up.forward.app",
             in: controller, tab: tab,
             title: String(localized: "Hand Off \(rule.name)", comment: "A page's question before a download rule handles a link or download. The placeholder is the rule's name."),
             actions: [

@@ -174,7 +174,7 @@ import WebKit
         #expect(ExternalLinks.canRemember(url: URL(string: "https://example.com"), foreign: true) == false)
     }
 
-    /// A kept answer is honoured as it stands — the site's Allow opens, its Block stops, and nothing asks again.
+    /// A kept answer is honored as it stands — the site's Allow opens, its Block stops, and nothing asks again.
     /// Whether an answer *may* be written is a separate gate (`saves`), so `verdict` never second-guesses a stored
     /// Allow: an http origin's Allow can only have been chosen in Site Controls, and it must be respected.
     @Test func aStoredAllowSkipsTheQuestionAndABlockStopsIt() {
@@ -207,35 +207,49 @@ import WebKit
     }
 
     /// Every stored or answered pop-up value has a destination, and an unknown one — an older build's "allow", from
-    /// when Always Allow meant an everyday pop-up — reads as the viewer, the ordinary yes, rather than opening
-    /// nothing at all and leaving the page's pop-up unseen.
+    /// when Always Allow meant an everyday pop-up — reads as the ordinary routing, rather than opening nothing at all
+    /// and leaving the page's pop-up unseen.
     @Test func everyPopupValueHasADestination() {
         #expect(PopupNotice.destination(for: "deny") == .deny)
         #expect(PopupNotice.destination(for: "thisTab") == .thisTab)
         #expect(PopupNotice.destination(for: "newTab") == .newTab)
         #expect(PopupNotice.destination(for: "mini") == .viewer)
-        #expect(PopupNotice.destination(for: "allow") == .viewer)
+        #expect(PopupNotice.destination(for: "automatic") == .automatic)
+        #expect(PopupNotice.destination(for: "allow") == .automatic)
         #expect(PopupNotice.destination(for: "") == .viewer)
     }
 
-    /// A legacy `true` for a site's pop-ups becomes the destination it means, the viewer — not a bare "allow", which
-    /// is no destination and would have dropped every pop-up on a site the user had already allowed. Every other
-    /// subject's `true` is a plain "allow".
-    @Test func aLegacyPopupYesMeansTheViewer() throws {
+    /// What happens to the pop-up WebKit offered once the answer is in. Mini keeps that very window, so a sign-in
+    /// can hand its result back; This Tab and New Tab close it and open their own; the ordinary yes keeps it only
+    /// where it is a real pop-up anyway — a plain window.open still opens a tab, as it did before the card.
+    @Test func theOfferedPopUpIsKeptForMiniAndDroppedOtherwise() {
+        #expect(PopupNotice.heldOutcome(for: "mini", sized: true) == .reveal)
+        #expect(PopupNotice.heldOutcome(for: "mini", sized: false) == .reveal)
+        #expect(PopupNotice.heldOutcome(for: "automatic", sized: true) == .reveal)
+        #expect(PopupNotice.heldOutcome(for: "automatic", sized: false) == .discardAndOpen)
+        #expect(PopupNotice.heldOutcome(for: "thisTab", sized: true) == .discardAndOpen)
+        #expect(PopupNotice.heldOutcome(for: "newTab", sized: true) == .discardAndOpen)
+        #expect(PopupNotice.heldOutcome(for: "deny", sized: true) == .discard)
+    }
+
+    /// A legacy `true` for a site's pop-ups meant the routing it had before the card — a plain window.open opened a
+    /// real tab, a sized one a real pop-up — so it becomes "automatic", not the viewer, which would have made every
+    /// pop-up a small window. Every other subject's `true` is a plain "allow".
+    @Test func aLegacyPopupYesKeepsTheOrdinaryRouting() throws {
         try withDefaults { defaults in
             defaults.set(["https://example.com|popups": true, "https://example.com|camera": true], forKey: "SitePermissions")
             SitePermissions.migrateAnswersToActions()
-            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "mini")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "automatic")
             #expect(SitePermissions.action(PermissionSubject.media(.camera), origin: "https://example.com") == "allow")
         }
     }
 
-    /// Whether a site's pop-ups were allowed is kept as the destination it means, so neither Site Controls nor the
-    /// debug bridge can write a bare "allow" that opens nothing.
-    @Test func allowingPopupsKeepsTheViewer() throws {
+    /// Whether a site's pop-ups were allowed is kept as the routing it means, so neither Site Controls nor the debug
+    /// bridge can write a bare "allow" that opens nothing.
+    @Test func allowingPopupsKeepsTheOrdinaryRouting() throws {
         try withDefaults { _ in
             SitePermissions.setPopups(true, origin: "https://example.com")
-            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "mini")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "automatic")
             #expect(SitePermissions.popups(origin: "https://example.com") == true)
             SitePermissions.setPopups(false, origin: "https://example.com")
             #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == "deny")
@@ -244,8 +258,8 @@ import WebKit
         }
     }
 
-    /// Site Controls keeps working on the unified store: its Allow is the permission's own ordinary yes (Mini for
-    /// pop-ups), its Block is a deny, and Ask removes the answer.
+    /// Site Controls keeps working on the unified store: its Allow is the permission's own ordinary yes (the ordinary
+    /// pop-up routing for pop-ups), its Block is a deny, and Ask removes the answer.
     @Test func siteControlsStillReadTheUnifiedAnswers() throws {
         try withDefaults { _ in
             SitePermissions.remember("newTab", subject: PermissionSubject.popups, origin: "https://a.com")
@@ -253,7 +267,7 @@ import WebKit
             SitePermissions.setChoice(.block, for: .popups, origin: "https://a.com")
             #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == "deny")
             SitePermissions.setChoice(.allow, for: .popups, origin: "https://a.com")
-            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == "mini")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == "automatic")
             SitePermissions.setChoice(.ask, for: .popups, origin: "https://a.com")
             #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://a.com") == nil)
         }
@@ -271,8 +285,8 @@ import WebKit
         let popup = URL(string: "https://example.com/pop-up")!
 
         PopupNotice.open(popup, action: "thisTab", from: tab, in: host)
-        #expect(recorder.opened.map { $0.url } == [popup.absoluteString])
-        #expect(recorder.opened.map { $0.disposition } == ["currentTab"])
+        #expect(recorder.opened.isEmpty, "the asking tab loads it, not the window's selected tab")
+        #expect(tab.url == popup)
 
         recorder.opened.removeAll()
         PopupNotice.open(popup, action: "newTab", from: tab, in: host)
@@ -283,20 +297,121 @@ import WebKit
         #expect(recorder.opened.isEmpty, "a refused pop-up opens nowhere")
     }
 
-    /// A page that asks again on its own is held to the answer it already gave "this time" — no second question — and
-    /// nothing is read back in a private window or with no site to key the answer to, where nothing is kept.
+    /// A page that asks again on its own for the same address is held to the answer it already gave "this time" — no
+    /// second question — and nothing is read back in a private window or with no site to key the answer to, where
+    /// nothing is kept.
     @Test func aPagesOwnThisTimePopUpAnswerIsReadBack() {
         let origin = "https://example.com"
         let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
-        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: false) == nil, "nothing answered yet")
-        tab.permissionAnswers.note("mini", key: origin, kind: PermissionSubject.popups)
-        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: false) == "mini")
+        let popup = URL(string: "https://example.com/pop-up")!
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: popup, isPrivate: false) == nil, "nothing answered yet")
+        tab.permissionAnswers.note("mini", key: origin, kind: PopupNotice.requestKind(popup))
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: popup, isPrivate: false) == "mini")
         // The answer is the page's own: another site on it is asked separately.
-        #expect(PopupNotice.pageAction(tab: tab, origin: "https://other.com", isPrivate: false) == nil)
+        #expect(PopupNotice.pageAction(tab: tab, origin: "https://other.com", url: popup, isPrivate: false) == nil)
         // A private window keeps nothing, and neither does a page with no site or no tab.
-        #expect(PopupNotice.pageAction(tab: tab, origin: origin, isPrivate: true) == nil)
-        #expect(PopupNotice.pageAction(tab: tab, origin: nil, isPrivate: false) == nil)
-        #expect(PopupNotice.pageAction(tab: nil, origin: origin, isPrivate: false) == nil)
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: popup, isPrivate: true) == nil)
+        #expect(PopupNotice.pageAction(tab: tab, origin: nil, url: popup, isPrivate: false) == nil)
+        #expect(PopupNotice.pageAction(tab: nil, origin: origin, url: popup, isPrivate: false) == nil)
+    }
+
+    /// "This time" answers the request it was given for, not the whole page: after one window.open is answered, a
+    /// pop-up to another address is its own question rather than opening unseen.
+    @Test func aThisTimePopUpAnswerCoversOneRequest() {
+        let origin = "https://example.com"
+        let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
+        let first = URL(string: "https://example.com/first")!
+        let second = URL(string: "https://example.com/second")!
+        tab.permissionAnswers.note("newTab", key: origin, kind: PopupNotice.requestKind(first))
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: first, isPrivate: false) == "newTab")
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: second, isPrivate: false) == nil)
+        // The same address still has its answer later, so a retry need not ask again.
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: first, isPrivate: false) == "newTab")
+    }
+
+    /// A page's own pop-up may be asked about only from its main frame and only for a web address or about:blank.
+    /// A frame's pop-up is blocked quietly, and so is a data: page, a script, a file or a blob.
+    @Test func onlyThePagesOwnWebPopupIsAskedAbout() {
+        #expect(PopupNotice.mayAsk(url: URL(string: "https://example.com/x"), fromMainFrame: true))
+        #expect(PopupNotice.mayAsk(url: URL(string: "http://example.com/x"), fromMainFrame: true))
+        #expect(PopupNotice.mayAsk(url: URL(string: "about:blank"), fromMainFrame: true))
+        #expect(PopupNotice.mayAsk(url: URL(string: "https://example.com/x"), fromMainFrame: false) == false)
+        #expect(PopupNotice.mayAsk(url: URL(string: "about:blank"), fromMainFrame: false) == false)
+        #expect(PopupNotice.mayAsk(url: URL(string: "data:text/html,<p>hi</p>"), fromMainFrame: true) == false)
+        #expect(PopupNotice.mayAsk(url: URL(string: "javascript:alert(1)"), fromMainFrame: true) == false)
+        #expect(PopupNotice.mayAsk(url: URL(string: "file:///tmp/index.html"), fromMainFrame: true) == false)
+        #expect(PopupNotice.mayAsk(url: URL(string: "blob:https://example.com/abc"), fromMainFrame: true) == false)
+        #expect(PopupNotice.mayAsk(url: nil, fromMainFrame: true) == false)
+
+        // The routing a kept destination is held to is the same: a web address opens, an app's asks, the rest goes
+        // nowhere.
+        #expect(PopupNotice.route(URL(string: "https://example.com/x")!, from: nil) == .open)
+        #expect(PopupNotice.route(URL(string: "about:blank")!, from: nil) == .open)
+        #expect(PopupNotice.route(URL(string: "zoommtg://zoom.us/join")!, from: nil) == .app)
+        #expect(PopupNotice.route(URL(string: "data:text/html,<p>hi</p>")!, from: nil) == .refuse)
+        #expect(PopupNotice.route(URL(string: "file:///tmp/index.html")!, from: nil) == .refuse)
+        #expect(PopupNotice.route(URL(string: "file:///tmp/index.html")!, from: URL(string: "file:///tmp/page.html")) == .open)
+    }
+
+    /// A plain yes or no is written as the Bool an older build reads, so going back to one keeps every permission;
+    /// an action id only this build understands stays a string. A store of nothing but yeses and nos is a
+    /// [String: Bool] whole, which is exactly what the old build casts the entry to.
+    @Test func simpleAnswersStayReadableToAnOlderBuild() throws {
+        try withDefaults { defaults in
+            SitePermissions.remember("allow", subject: PermissionSubject.media(.camera), origin: "https://a.com")
+            SitePermissions.remember("deny", subject: PermissionSubject.location, origin: "https://a.com")
+            SitePermissions.setPopups(true, origin: "https://a.com")
+            let raw = try #require(defaults.dictionary(forKey: "SitePermissions"))
+            #expect(raw["https://a.com|camera"] as? Bool == true)
+            #expect(raw["https://a.com|location"] as? Bool == false)
+            #expect(raw["https://a.com|popups"] as? Bool == true)
+            #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] ==
+                    ["https://a.com|camera": true, "https://a.com|location": false, "https://a.com|popups": true])
+
+            // A destination or a handoff's choice is not a yes or no: it keeps its id.
+            SitePermissions.remember("mini", subject: PermissionSubject.popups, origin: "https://b.com")
+            SitePermissions.remember("handOff", subject: "handoff:\(UUID().uuidString)", origin: "https://b.com")
+            let mixed = try #require(defaults.dictionary(forKey: "SitePermissions"))
+            #expect(mixed["https://b.com|popups"] as? String == "mini")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://b.com") == "mini")
+            #expect(SitePermissions.action(PermissionSubject.media(.camera), origin: "https://a.com") == "allow")
+            #expect(SitePermissions.action(PermissionSubject.location, origin: "https://a.com") == "deny")
+        }
+    }
+
+    /// A page's own "this time" app answer covers one launch: a script firing the same link again a moment later is
+    /// held to the same few seconds a question is, rather than setting the app going over and over.
+    @Test func aPagesAppAnswerSpeedsNoRunOfLaunches() {
+        var asked = ExternalLinks.Asked()
+        let key = "https://zoom.us|zoommtg"
+        let now = Date()
+        let first = asked.mayOpenAgain(key, now: now)
+        #expect(first)
+        let secondsLater = asked.mayOpenAgain(key, now: now.addingTimeInterval(1))
+        #expect(secondsLater == false)
+        let justBefore = asked.mayOpenAgain(key, now: now.addingTimeInterval(ExternalLinks.Asked.repeatGap - 1))
+        #expect(justBefore == false)
+        let afterTheGap = asked.mayOpenAgain(key, now: now.addingTimeInterval(ExternalLinks.Asked.repeatGap))
+        #expect(afterTheGap)
+        // Another site's launch isn't held up by this one.
+        let elsewhere = asked.mayOpenAgain("https://meet.example|zoommtg", now: now.addingTimeInterval(1))
+        #expect(elsewhere)
+    }
+
+    /// A page's pop-up questions keep the same few seconds: a page that asks again on its own right after a question
+    /// went up doesn't get a second card, and a question put off isn't put straight back.
+    @Test func aPageAskingAgainIsHeldToItsFewSeconds() {
+        let origin = "https://example.com"
+        let now = Date()
+        PopupNotice.forgetAnswers(origin: origin)
+        #expect(PopupNotice.mayAsk(origin: origin, now: now))
+        PopupNotice.noteAsked(origin: origin, now: now)
+        #expect(PopupNotice.mayAsk(origin: origin, now: now.addingTimeInterval(1)) == false)
+        #expect(PopupNotice.mayAsk(origin: origin, now: now.addingTimeInterval(PopupNotice.unaskedGap)))
+        PopupNotice.noteSetAside(origin: origin, now: now)
+        #expect(PopupNotice.mayAsk(origin: origin, now: now.addingTimeInterval(PopupNotice.unaskedGap)) == false)
+        #expect(PopupNotice.mayAsk(origin: origin, now: now.addingTimeInterval(PopupNotice.putOffGap)))
+        PopupNotice.forgetAnswers(origin: origin)
     }
 }
 

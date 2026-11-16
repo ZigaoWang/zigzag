@@ -90,7 +90,21 @@ enum SitePermissions {
             }
             return actions
         }
-        set { defaults.set(newValue, forKey: key) }
+        set {
+            // A plain yes or no is written the way builds before the card read it, a Bool, so going back to one
+            // loses no permission. Every other answer is an action id that only this build understands, and stays
+            // a string. A store of nothing but yeses and nos is therefore a [String: Bool] an older build reads whole.
+            var values: [String: Any] = [:]
+            for (key, action) in newValue {
+                switch action {
+                case "allow": values[key] = true
+                case "deny": values[key] = false
+                case "automatic" where key.hasSuffix("|" + PermissionSubject.popups): values[key] = true
+                default: values[key] = action
+                }
+            }
+            defaults.set(values, forKey: key)
+        }
     }
 
     /// The kinds a request is kept under, in the order they are asked: a call's camera and microphone is two
@@ -104,10 +118,11 @@ enum SitePermissions {
     }
 
     /// A legacy `true` becomes the subject's ordinary yes, which is not "allow" for every subject: the answer a site's
-    /// pop-ups are kept under is a destination ("mini", "thisTab", "newTab") or "deny", never "allow", and the design
-    /// says an old `true` there means the pop-up viewer. Everywhere else a yes is "allow".
+    /// pop-ups are kept under is a destination ("automatic", "mini", "thisTab", "newTab") or "deny", never "allow".
+    /// An old `true` there meant pop-ups opened as they always had, a real tab for a plain `window.open` and a real
+    /// pop-up for a sized one, which is "automatic". Everywhere else a yes is "allow".
     private static func legacyYes(forKey key: String) -> String {
-        key.hasSuffix("|" + PermissionSubject.popups) ? "mini" : "allow"
+        key.hasSuffix("|" + PermissionSubject.popups) ? "automatic" : "allow"
     }
 
     /// Converts any answers written by the old Bool store in place, and the old combined camera-and-microphone key
@@ -123,7 +138,7 @@ enum SitePermissions {
             }
             now[key] = nil
         }
-        defaults.set(now, forKey: key)
+        stored = now
     }
     static func action(_ subject: String, origin: String) -> String? {
         let now = stored
@@ -335,11 +350,12 @@ enum SitePermissions {
     static func allowOpeningApp(origin: String, scheme: String) { remember("allow", subject: PermissionSubject.app(scheme), origin: origin) }
 
     /// Pop-ups a site opens on its own: allowed once you've said Always Allow, blocked (nil or false) otherwise. The
-    /// yes is kept as the destination it means — the pop-up viewer — not as a bare "allow", which is no destination.
+    /// yes is kept as the destination it means — "automatic", the ordinary pop-up routing of a real tab or a real
+    /// window — not as a bare "allow", which is no destination. The card's own answers name This Tab, New Tab or Mini.
     static func popups(origin: String) -> Bool { allowed(action(PermissionSubject.popups, origin: origin)) == true }
 
     static func setPopups(_ allowed: Bool?, origin: String) {
-        remember(allowed.map { $0 ? "mini" : "deny" }, subject: PermissionSubject.popups, origin: origin)
+        remember(allowed.map { $0 ? "automatic" : "deny" }, subject: PermissionSubject.popups, origin: origin)
     }
 
     /// WebRTC (`WebRTCProtection`): Allow or Block kept for the site, nil to follow the setting.
@@ -395,7 +411,7 @@ enum SitePermissions {
         let existing = keys(for: permission, on: origin)
         for k in existing { now[k] = nil }
         if let allowed = choice.allowed {
-            let action = allowed && permission == .popups ? "mini" : action(for: allowed)
+            let action = allowed && permission == .popups ? "automatic" : action(for: allowed)
             // Frames from elsewhere keep a key of their own; the site's own answer is one key for the permission.
             for k in existing where k.hasPrefix(origin + "|embed:") { now[k] = action }
             now["\(origin)|\(permission.primaryKind)"] = action
@@ -446,7 +462,7 @@ enum SitePermissions {
         origin.map(SiteOrigin.label) ?? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.")
     }
 
-    /// Why a question's duration control is greyed when there is no site to keep an answer under.
+    /// Why a question's duration control is dimmed when there is no site to keep an answer under.
     private static var noSiteNote: String {
         String(localized: "This page has no site to remember the answer for.", comment: "Tooltip of the disabled duration dropdown on a permission question asked by a page with no site, like a local file.")
     }
@@ -461,7 +477,7 @@ enum SitePermissions {
     static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
         if let known = notifications(origin: origin, tab: tab) { return known }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
-        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
+        let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, answerKey: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 actions: [.deny, .allow], canRemember: true,
                                                 answered: {
@@ -490,7 +506,7 @@ enum SitePermissions {
         if let key, let known = location(key: key, tab: tab) { return known ? .grant : .deny }
         noteAsked(.location, origin: page, isPrivate: isPrivate)
         guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
-        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your location",
+        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
                                                 actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
@@ -542,7 +558,7 @@ enum SitePermissions {
             }
             // The two questions in a row take their turns like any others (`PageQuestions`): the second comes up only
             // after the first has gone.
-            let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: what,
+            let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: what,
                                                     symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
                                                     actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
                                                     answered: {
@@ -587,7 +603,7 @@ enum SitePermissions {
         // Only a secure page can keep an answer, and only its own origin: a frame from another site may ask this
         // time, but where its page's screen sharing goes is the page's to keep, not the frame's.
         let canRemember = key != nil && frame == page && page?.hasPrefix("https://") == true
-        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, what: "your screen", symbol: "rectangle.on.rectangle",
+        let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: "your screen", symbol: "rectangle.on.rectangle",
                                                 in: controller, tab: tab, title: DisplayCaptureChoice.title,
                                                 actions: DisplayCaptureChoice.actions, canRemember: canRemember,
                                                 answered: {
@@ -878,11 +894,13 @@ final class PermissionPrompt: FloatingPanelView {
     /// `answered` is checked once it's this request's turn: the same question may have been answered meanwhile.
     /// `tab` is the tab whose page asked; without one, it's the tab in front when the question comes up.
     /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
+    /// `answerKey`, when the asker has one, is the frame-and-page key its answer is kept under (`SitePermissions.answerKey`):
+    /// two frames on one page are two askers.
     /// `menu` is answers of one kind offered as a single dropdown after the buttons (where a pop-up opens); choosing
     /// one answers the question, and it stands in as the question's own filled answer.
     /// The duration choice is This time unless `canRemember` offers Always on this site. A disabled choice keeps
     /// `rememberNote` as its explanation. Nil means Not Now.
-    static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
+    static func ask(host: String, origin: String? = nil, answerKey: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
                     canRemember: Bool = true, rememberNote: String? = nil,
@@ -894,10 +912,14 @@ final class PermissionPrompt: FloatingPanelView {
             return PermissionAnswer(action: known.action, remember: known.remember && remembers)
         }
         let request = title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.")
+        let asking = tab ?? controller.promptFrontTab
         // The same question, asked again while its card is up: wait for that one answer instead of stacking a second
-        // card. A page that asks twice gets one question, and both callers go on with the same answer.
-        let questionKey = "\(origin ?? host)|\(request)"
-        if let before = inFlight[questionKey] {
+        // card. Only the same tab and frame's, though: another tab of the site, a frame from elsewhere on the page,
+        // or a private window asks for itself rather than taking an answer meant for someone else.
+        let sharedKey = Self.questionKey(origin: origin, answerKey: answerKey, tabID: asking?.id,
+                                         isPrivate: tab?.isPrivate ?? controller.promptIsPrivate,
+                                         window: ObjectIdentifier(controller), request: request)
+        if let before = inFlight[sharedKey] {
             let known = await before.task.value
             return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers) }
         }
@@ -907,7 +929,6 @@ final class PermissionPrompt: FloatingPanelView {
         let token = UUID()
         let task = Task<PermissionAnswer?, Never> { @MainActor in
             let questionID = UUID()
-            let asking = tab ?? controller.promptFrontTab
             if let asking {
                 PendingQuestions.enqueue(.init(id: questionID, tabID: asking.id, origin: origin, title: request))
             }
@@ -920,14 +941,22 @@ final class PermissionPrompt: FloatingPanelView {
             setWaiting(max(0, questionsWaiting(in: controller) - 1), in: controller)
             return answer
         }
-        inFlight[questionKey] = (token, task)
+        inFlight[sharedKey] = (token, task)
         let answer = await task.value
-        if inFlight[questionKey]?.id == token { inFlight[questionKey] = nil }
+        if inFlight[sharedKey]?.id == token { inFlight[sharedKey] = nil }
         let said = if let answer {
             answer.action == "deny" ? "not allowed" : answer.remember ? "always allowed" : answer.action == "allow" ? "allowed" : "allowed the other way"
         } else { "put off" }
         Diagnostics.note("Asked: \(title ?? "Use \(what)")", site: host, said, isPrivate: controller.promptIsPrivate)
         return answer
+    }
+
+    /// What makes two questions the same one. The window and the tab keep one tab's question from answering another's;
+    /// the frame's own answer key keeps two frames on a page, or two sites in one tab, apart; privacy keeps a private
+    /// window's question its own. The request itself is last, so two different questions in one frame still stack.
+    static func questionKey(origin: String?, answerKey: String?, tabID: UUID?, isPrivate: Bool,
+                            window: ObjectIdentifier, request: String) -> String {
+        "\(window)|\(tabID?.uuidString ?? "no tab")|\(isPrivate ? "private" : "shared")|\(answerKey ?? origin ?? "no site")|\(request)"
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
@@ -938,7 +967,7 @@ final class PermissionPrompt: FloatingPanelView {
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
         }
         // The window is gone (its tab with it): there is nowhere this question could ever be shown. A window that is
-        // only hidden, minimised or on another Space still holds its question: the card is put up there, and is
+        // only hidden, minimized or on another Space still holds its question: the card is put up there, and is
         // waiting when the window comes back. Nothing is denied just because it could not be seen this second.
         guard controller.window != nil else { return nil }
         // The asking tab closed while an earlier question waited.

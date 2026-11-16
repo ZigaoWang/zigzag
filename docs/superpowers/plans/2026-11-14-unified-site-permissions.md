@@ -604,7 +604,7 @@ git commit -m "feat: show the new answers where a site's choices are listed"
 - [ ] **Step 1: Add the new strings to the catalog**
 
 Add entries for "This time", "Always on this site", "This Tab", "New Tab", "Mini", "Open in Browser", "Hand Off",
-"needs your answer", "\(n) more waiting". Keep the existing camera/location/notification copy.
+"needs your answer", "Other questions in this window: \(n)". Keep the existing camera/location/notification copy.
 
 - [ ] **Step 2: Extend the CI test step**
 

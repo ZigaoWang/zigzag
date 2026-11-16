@@ -2025,23 +2025,47 @@ extension Tab: WKUIDelegate {
             // A page's own pop-up: a destination remembered for the site opens there with no question, otherwise the
             // banner asks and nothing opens now. Zigzag's own pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
+            // Only the page itself asks. A frame's pop-up — an ad in an iframe, say — is blocked without a word, as
+            // it was before the card, rather than putting a question up every few seconds over the page it's in.
+            guard navigationAction.sourceFrame.isMainFrame else {
+                Diagnostics.note("Blocked a frame's pop-up", site: url?.host(),
+                                 "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                return nil
+            }
+            // A page's pop-up is a page link like any other, kept answer or not: an app's address asks its own
+            // question, and anything the web may not open top-level (data:, a script, a file) opens nowhere.
+            guard let target = navigationAction.request.url else { return nil }
+            switch PopupNotice.route(target, from: url) {
+            case .refuse:
+                Diagnostics.note("Refused a page's pop-up", site: url?.host(), "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                return nil
+            case .app:
+                openFromPage(target, isClick: false, asker: navigationAction.sourceFrame.securityOrigin)
+                return nil
+            case .open:
+                break
+            }
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(url)) {
                 switch PopupNotice.destination(for: stored) {
                 case .deny:
                     return nil
+                case .automatic:
+                    // A legacy allow, or Allow in Site Controls: a plain window.open opens a real tab and a sized one
+                    // a real pop-up, exactly as a site that was allowed pop-ups opened them before the card.
+                    return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
                 case .viewer:
                     // WebKit is still offering the pop-up here, so it is made the real thing: `window.opener` and
                     // everything the page does with the new window keep working.
                     return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: webView.window, opener: self)
                 case .thisTab, .newTab:
-                    if let target = navigationAction.request.url, let promptHost = host as? PromptHost {
+                    if let promptHost = host as? PromptHost {
                         PopupNotice.open(target, action: stored, from: self, in: promptHost)
                     }
                     return nil
                 }
             }
-            PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost)
-            return nil
+            return PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost,
+                                   configuration: configuration, features: windowFeatures)
         }
         // Zigzag's own pages never open as a page's new window: Settings would show over it before anything loaded.
         guard Self.mayOpenInNewWebView(navigationAction.request.url) else {

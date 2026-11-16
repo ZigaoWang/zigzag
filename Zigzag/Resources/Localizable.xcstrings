@@ -12619,7 +12619,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隐私窗口不会记住回答。"
+            "value" : "无痕浏览窗口不会记住回答。"
           }
         }
       }

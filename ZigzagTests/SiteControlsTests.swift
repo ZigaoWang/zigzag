@@ -199,14 +199,15 @@ struct SiteControlsPermissionTests {
                                           "https://other.example|cameraAndMicrophone": false,
                                           "https://meet.example.com|camera": false], forKey: "SitePermissions")
             SitePermissions.migrateMediaAnswers()
-            let now = SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: String]
-            #expect(now == ["https://meet.example.com|camera": "deny",
-                            "https://meet.example.com|microphone": "allow",
-                            "https://other.example|camera": "deny",
-                            "https://other.example|microphone": "deny"])
+            // Written as the Bool an older build reads: a deny is false, a yes true.
+            let now = SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: Bool]
+            #expect(now == ["https://meet.example.com|camera": false,
+                            "https://meet.example.com|microphone": true,
+                            "https://other.example|camera": false,
+                            "https://other.example|microphone": false])
             // Once is enough: again, nothing changes.
             SitePermissions.migrateMediaAnswers()
-            #expect(SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: String] == now)
+            #expect(SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] == now)
         }
     }
 
@@ -349,26 +350,29 @@ struct SiteControlsPermissionTests {
         }
     }
 
-    /// "Always / Don't Allow" is kept for the whole site, the key Site Controls and Settings show, so the row and the
-    /// browser agree and no other app on the site asks again; "Always Allow" stays that one app's. It goes through the
-    /// same `storageSubject` the question itself uses, so reverting that choice fails this test.
-    @Test func anAnsweredDenyIsKeptForTheWholeSite() throws {
+    /// "Don't Allow" is kept for that one app, not the whole site: refusing the App Store link on a site must not
+    /// also block its Zoom link there. Site Controls still writes the site-wide "Open apps" row, and that Block wins.
+    @Test func anAnsweredDenyStaysWithItsApp() throws {
         try withDefaults {
             let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
             let deny = PermissionAnswer(action: "deny", remember: true)
-            #expect(ExternalLinks.storageSubject(for: deny, scheme: "zoommtg") == PermissionSubject.apps)
+            #expect(ExternalLinks.storageSubject(for: deny, scheme: "zoommtg") == PermissionSubject.app("zoommtg"))
             #expect(ExternalLinks.storageSubject(for: PermissionAnswer(action: "allow", remember: true),
                                                  scheme: "zoommtg") == PermissionSubject.app("zoommtg"))
             #expect(ExternalLinks.storageSubject(for: PermissionAnswer(action: "deny", remember: false),
                                                  scheme: "zoommtg") == PermissionSubject.app("zoommtg"))
             SitePermissions.rememberAnswer(deny, subject: ExternalLinks.storageSubject(for: deny, scheme: "zoommtg"),
                                            origin: site, tab: tab, isPrivate: false)
-            // The site's row, and the next app the page opens, both read the deny.
+            // That app is refused, and the next app the page opens asks on its own.
             #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == false)
-            #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == false)
-            #expect(SitePermissions.choice(.apps, origin: site) == .block)
-            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
+            #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == nil)
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg",
                                                   foreign: false, tab: tab)?.action == "deny")
+            #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
+                                                  foreign: false, tab: tab) == nil)
+            // A Block chosen for the site in Site Controls still covers every app.
+            SitePermissions.setChoice(.block, for: .apps, origin: site)
+            #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == false)
         }
     }
 

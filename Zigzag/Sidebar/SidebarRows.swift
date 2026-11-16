@@ -169,6 +169,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private(set) var tab: Tab?
     private var token: SignalToken?
     private var attentionToken: SignalToken?
+    /// How many questions were waiting for this row's pages when it last drew its dots, so one arriving for another
+    /// row doesn't refresh every row in the sidebar.
+    private var waitingQuestions = 0
     let closeButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
     /// The speaker beside the page that's playing (or muted): this row's own, and in a split, its partner's beside
     /// the partner's half. Clicking one mutes or unmutes that page.
@@ -684,8 +687,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         guard tab !== self.tab || token == nil else { refresh(); return }
         self.tab = tab
         token = tab?.changed.observe { [weak self] change in self?.tabChanged(change) }
-        // A question arriving for a page (or being answered) marks or unmarks its icon.
-        if attentionToken == nil { attentionToken = PendingQuestions.changed.observe { [weak self] _ in self?.refresh() } }
+        // A question arriving for one of this row's pages (or being answered) marks or unmarks its icon; a question
+        // for another row leaves this one alone, however many there are.
+        if attentionToken == nil {
+            attentionToken = PendingQuestions.changed.observe { [weak self] _ in
+                guard let self, self.pendingForRow != self.waitingQuestions else { return }
+                self.refresh()
+            }
+        }
         refresh()
     }
 
@@ -822,6 +831,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             }
             view.attentionColor = accent
         }
+        waitingQuestions = pendingForRow
+    }
+
+    /// How many questions are waiting for this row's pages, whether they can be shown or not: the count its dots
+    /// follow, so a question for another row never draws this one again.
+    private var pendingForRow: Int {
+        pages.reduce(0) { $0 + PendingQuestions.count(tabID: $1.id) }
     }
 
     /// A question is waiting for `page` and nothing is showing it: a tab that isn't in front, or a hidden window.

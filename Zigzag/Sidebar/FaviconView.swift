@@ -65,8 +65,8 @@ final class FaviconView: NSView {
     /// The globe a site without an icon shows, for a badge.
     static var globeIcon: NSImage { globe }
     /// A question is waiting for this page that cannot be shown yet (it is in a background tab, or the window is
-    /// hidden): a filled dot in this color at the developer chip's place, with nothing cut out of the icon for it.
-    /// One dot per page, however many questions are waiting.
+    /// hidden): a filled dot in this color at the developer chip's place, or the icon's top corner while the chip is
+    /// there too, with nothing cut out of the icon for it. One dot per page, however many questions are waiting.
     var attentionColor: NSColor? {
         didSet {
             guard oldValue !== attentionColor else { return }
@@ -83,6 +83,14 @@ final class FaviconView: NSView {
         let chip = (side * Tokens.Sidebar.developerBadgeShare * 2).rounded() / 2
         let out = (chip * Tokens.Sidebar.developerBadgeOverhang * 2).rounded() / 2
         return CGRect(x: side + out - chip, y: -out, width: chip, height: chip)
+    }
+
+    /// Where the waiting dot sits: the chip's own corner, or, while the chip is showing too, the icon's other top
+    /// corner, so the two never draw over each other.
+    static func attentionFrame(side: CGFloat, overBadge: Bool) -> CGRect {
+        let frame = badgeFrame(side: side)
+        guard overBadge else { return frame }
+        return CGRect(x: frame.minX, y: side - frame.minY - frame.height, width: frame.width, height: frame.height)
     }
 
     /// The sleeping mark's look, as Chrome marks a tab it let go: a hairline ring of short even dashes in a quiet
@@ -223,10 +231,11 @@ final class FaviconView: NSView {
         return context.makeImage()
     }
 
-    /// The dot a page wears when a question is waiting for it that can't be shown yet, at the chip's own place.
+    /// The dot a page wears when a question is waiting for it that can't be shown yet, at the chip's own place, or
+    /// the icon's other top corner while the chip is there too.
     private func layoutAttention() {
         guard let color = attentionColor, bounds.width > 0 else { return }
-        let frame = Self.badgeFrame(side: bounds.width)
+        let frame = Self.attentionFrame(side: bounds.width, overBadge: developerBadge != nil || originalIcon != nil)
         attentionDot.frame = frame
         let scale = window?.backingScaleFactor ?? 2
         var resolved = color.cgColor

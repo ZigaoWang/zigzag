@@ -47,16 +47,15 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// The strip at the top with the traffic lights and whose page it is.
     static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
     private var lastCrash: Date?
+    /// A pop-up WebKit has handed over before its address is decided: the window exists, so `window.opener` works,
+    /// but nothing is fetched until the person answers. True only until the answer; a denied pop-up makes no request
+    /// at all, which is what blocking is for.
+    private var isHoldingFirstLoad = false
+    /// What the pop-up asked for, held back while `isHoldingFirstLoad`, and loaded once the answer is Mini.
+    private var heldRequest: URLRequest?
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?, opener: Tab?) -> WKWebView {
-        let size = NSSize(width: features.width.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.width,
-                          height: features.height.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.height)
-        // A page's screenX and screenY count from the top left of the main display.
-        var origin: NSPoint?
-        if let x = features.x, let y = features.y, let top = NSScreen.screens.first?.frame.maxY {
-            origin = NSPoint(x: CGFloat(x.doubleValue), y: top - CGFloat(y.doubleValue) - size.height)
-        }
-        let controller = PopupWindowController(configuration: configuration, pageSize: size, origin: origin, parent: parent, opener: opener)
+        let controller = makeController(configuration: configuration, features: features, parent: parent, opener: opener)
         Self.open.insert(controller)
         // Sign-ins and payments run through these: which site opened one is often the clue.
         let opener = WindowManager.shared.controller(for: parent)?.tabManager.selectedTab?.url?.host()
@@ -64,6 +63,52 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         controller.showWindow(nil)
         if #available(macOS 15.4, *), !controller.isPrivate { ExtensionCenter.popupOpened(controller) }
         return controller.webView
+    }
+
+    /// The pop-up a page asked for, made before its address is decided, so the answer can be Mini and still give the
+    /// page a real window it can script (`window.opener`). The window stays off screen and the address is held until
+    /// `revealHeldPage()`; `discardHeldPage()` closes it without a request. Nothing here shows or fetches anything.
+    static func asking(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?, opener: Tab?) -> PopupWindowController {
+        let controller = makeController(configuration: configuration, features: features, parent: parent, opener: opener)
+        Self.open.insert(controller)
+        controller.isHoldingFirstLoad = true
+        return controller
+    }
+
+    /// The answer was Mini (or the ordinary yes, for a pop-up with a size): show the window and let its address load.
+    /// Returns false when the window is gone, so the caller can open its own viewer instead.
+    @discardableResult
+    func revealHeldPage() -> Bool {
+        guard window != nil else { return false }
+        isHoldingFirstLoad = false
+        showWindow(nil)
+        if let heldRequest {
+            self.heldRequest = nil
+            webView.load(heldRequest)
+        }
+        if #available(macOS 15.4, *), !isPrivate { ExtensionCenter.popupOpened(self) }
+        return true
+    }
+
+    /// The answer was anything but Mini: the window goes without the address ever being fetched.
+    func discardHeldPage() {
+        isHoldingFirstLoad = false
+        heldRequest = nil
+        close()
+        // A window that was never on screen may not report its closing; the controller is let go here either way.
+        Self.open.remove(self)
+    }
+
+    private static func makeController(configuration: WKWebViewConfiguration, features: WKWindowFeatures,
+                                       parent: NSWindow?, opener: Tab?) -> PopupWindowController {
+        let size = NSSize(width: features.width.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.width,
+                          height: features.height.map { CGFloat($0.doubleValue) } ?? Tokens.Metric.popupDefaultSize.height)
+        // A page's screenX and screenY count from the top left of the main display.
+        var origin: NSPoint?
+        if let x = features.x, let y = features.y, let top = NSScreen.screens.first?.frame.maxY {
+            origin = NSPoint(x: CGFloat(x.doubleValue), y: top - CGFloat(y.doubleValue) - size.height)
+        }
+        return PopupWindowController(configuration: configuration, pageSize: size, origin: origin, parent: parent, opener: opener)
     }
 
     /// An extension's own small window (`chrome.windows.create({ type: "popup" })`): a volume control, a recorder.
@@ -261,10 +306,30 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         guard Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
         // A pop-up a page inside this one opened on its own: only a remembered destination opens it, or it asks.
         if !PopupNotice.isUserInitiated(navigationAction) {
+            // Only the page itself asks, never a frame in it: a frame's pop-up is blocked quietly here too.
+            guard navigationAction.sourceFrame.isMainFrame else {
+                Diagnostics.note("Blocked a frame's pop-up", site: webView.url?.host(),
+                                 "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                return nil
+            }
             // The window this pop-up came from, of any kind. A page inside Zigzag Mini or an installed app's window
             // asks there too; with a browser window's controller alone, that lookup found nothing, so a pop-up a page
             // inside one of them opened on its own was dropped with nothing said.
             let parent = WindowManager.shared.promptHost(for: parentWindow) ?? (opener?.host as? PromptHost)
+            // The same routing as any other page link, kept answer or not: an app's address asks its own question, and
+            // anything the web may not open top-level opens nowhere.
+            guard let target = navigationAction.request.url else { return nil }
+            switch PopupNotice.route(target, from: webView.url) {
+            case .refuse:
+                Diagnostics.note("Refused a page's pop-up", site: webView.url?.host(), "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                return nil
+            case .app:
+                opener?.openFromPage(target, isClick: false, asker: navigationAction.sourceFrame.securityOrigin)
+                return nil
+            case .open:
+                break
+            }
+            var automatic = false
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
                 switch PopupNotice.destination(for: stored) {
                 case .deny:
@@ -272,18 +337,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                 case .viewer:
                     return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: window, opener: opener)
                 case .thisTab, .newTab:
-                    if let url = navigationAction.request.url, let parent {
-                        PopupNotice.open(url, action: stored, from: opener, in: parent, configuration: configuration)
+                    if let parent {
+                        PopupNotice.open(target, action: stored, from: opener, in: parent, configuration: configuration)
                     }
                     return nil
+                case .automatic:
+                    // A legacy allow: the routing below, which is what a page's own mouse-click would get.
+                    automatic = true
                 }
             }
-            // The question belongs to the tab whose page opened this pop-up, shown in that tab's window, which comes
-            // forward so the card isn't left behind the pop-up that asked.
-            parent?.window?.makeKeyAndOrderFront(nil)
-            PopupNotice.ask(navigationAction, from: webView.url, isPrivate: isPrivate, tab: opener, in: parent,
-                            configuration: configuration)
-            return nil
+            guard automatic else {
+                // The question belongs to the tab whose page opened this pop-up, shown in that tab's window, which
+                // comes forward so the card isn't left behind the pop-up that asked.
+                parent?.window?.makeKeyAndOrderFront(nil)
+                return PopupNotice.ask(navigationAction, from: webView.url, isPrivate: isPrivate, tab: opener, in: parent,
+                                       configuration: configuration, features: windowFeatures)
+            }
         }
         // A plain link (a help page, the terms) opens as a tab in the browser window, brought forward, as a
         // browser would; only another sized window.open() is a popup of its own.
@@ -313,6 +382,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+        // A pop-up waiting on its answer: the address is kept, never fetched. WebKit loads the request into the view
+        // it was handed before anyone has answered, and a denied pop-up must not have asked for its page.
+        if isHoldingFirstLoad {
+            heldRequest = navigationAction.request
+            return .cancel
+        }
         // Downloads as a tab's are: a stream of them nobody clicked for is refused.
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: PopupNotice.isUserInitiated(navigationAction),
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
