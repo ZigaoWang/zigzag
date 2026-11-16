@@ -51,6 +51,9 @@ enum SiteOrigin {
 /// Allow and Block are what's kept for the site, chosen in Site Controls or Settings › Privacy.
 struct PagePermissionAnswers {
     private var answers: [String: Bool] = [:]
+    /// Answers that name an action rather than yes or no: where a handoff goes, and how long it lasts. Kept apart from
+    /// the yes-or-no answers so the older questions read exactly as they did.
+    private var actions: [String: String] = [:]
 
     /// `key` is what the answer is for (`SitePermissions.answerKey`), `kind` what was asked ("camera", "location"…).
     mutating func note(_ allowed: Bool, key: String, kind: String) { answers["\(key)|\(kind)"] = allowed }
@@ -59,9 +62,13 @@ struct PagePermissionAnswers {
     /// answer given to both at once, from before the split, is not read as either.
     func answer(key: String, kind: String) -> Bool? { answers["\(key)|\(kind)"] }
 
-    mutating func forget() { answers = [:] }
+    /// An answer that names what to do, for a question with more than two answers, such as a handoff's.
+    mutating func note(_ action: String, key: String, kind: String) { actions["\(key)|\(kind)"] = action }
+    func action(key: String, kind: String) -> String? { actions["\(key)|\(kind)"] }
 
-    var isEmpty: Bool { answers.isEmpty }
+    mutating func forget() { answers = [:]; actions = [:] }
+
+    var isEmpty: Bool { answers.isEmpty && actions.isEmpty }
 }
 
 /// Camera, microphone, location, notification, pop-up and open-an-app decisions, remembered per origin (see

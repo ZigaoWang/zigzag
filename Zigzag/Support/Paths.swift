@@ -27,6 +27,7 @@ nonisolated enum Paths {
     static let profiles = file("Profiles.json")
     static let session = file("Session.json")
     static let downloads = file("Downloads.json")
+    static let downloadRules = file("DownloadRules.json")
     static let history = file("History.sqlite")
     static let favicons = directory("Favicons")
     /// Icons that clearing history set aside, so ⌘Z can put them back. Emptied when Zigzag starts.

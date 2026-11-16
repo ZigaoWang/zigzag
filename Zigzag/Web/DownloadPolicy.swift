@@ -24,6 +24,8 @@ final class DownloadPolicy {
     private var frameClickedAt: Date?
     /// Whether the main frame's navigation now on its way was started by you (a click, a key, the address bar).
     private var mainFrameClicked = false
+    /// Whether the last main-frame navigation was one you started, for a response that turns out to be a file.
+    var mainFrameWasClicked: Bool { mainFrameClicked }
 
     /// Takes note of a navigation and decides it if it's a download WebKit was asked for (a link with `download`):
     /// `.download`, or `.cancel` for another one nobody clicked for too soon. nil: it isn't one, decided as usual.

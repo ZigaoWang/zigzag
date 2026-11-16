@@ -39,6 +39,9 @@ struct AccessibilityTests {
         var problems: [String] = []
         let pressable: Set<NSAccessibility.Role> = [.button, .checkBox, .radioButton, .popUpButton, .menuButton, .disclosureTriangle, .row, .cell]
         for object in elements(under: root) {
+            // The system draws an overlay scroll view's scrollers as accessibility buttons; they are chrome, not the
+            // pane's own controls, and AppKit names them itself.
+            if String(describing: type(of: object)).contains("ScrollerPart") { continue }
             guard let role = role(object) else { continue }
             let said = name(object)
             if pressable.contains(role), said.isEmpty { problems.append("unnamed \(role.rawValue): \(type(of: object))") }
@@ -190,7 +193,7 @@ struct AccessibilityTests {
     }
 
     @Test func aSettingsPanesControlsAreNamed() {
-        for pane in [SettingsPane.general, .appearance] {
+        for pane in [SettingsPane.general, .appearance, .downloads] {
             let settings = SettingsView(pane: pane)
             settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
             settings.layoutSubtreeIfNeeded()

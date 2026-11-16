@@ -165,6 +165,9 @@ final class DownloadManager: NSObject {
     /// A download got its file and is under way: the window it came from shows it leaving for Downloads.
     let started = Signal<(DownloadItem, NSWindow?)>()
     private var windows: [ObjectIdentifier: NSWindow] = [:]
+    /// The page a download started from, taken when it started: the tab may have gone elsewhere by the time the
+    /// destination is decided, and the answer decides whether the site's cookies may go with it.
+    private var origins: [ObjectIdentifier: String] = [:]
     /// The folder the last save sheet was pointed at, to start there next time.
     private var lastFolder: URL?
 
@@ -176,6 +179,8 @@ final class DownloadManager: NSObject {
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
         download.delegate = self
         if let window { windows[ObjectIdentifier(download)] = window }
+        let referrer = download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) }
+        origins[ObjectIdentifier(download)] = SiteOrigin.of(referrer) ?? SiteOrigin.of(download.webView?.url)
         let isPrivate = download.webView.map { !$0.configuration.websiteDataStore.isPersistent } ?? false
         let item = DownloadItem(filename: download.originalRequest?.url?.lastPathComponent ?? "Download", sourceURL: download.originalRequest?.url,
                                 isPrivate: isPrivate, profile: Profiles.shared.profile(ofPage: download.webView).id)
@@ -457,17 +462,7 @@ final class DownloadManager: NSObject {
     /// invisible ones that reorder or hide text (a right-to-left override makes "invoice\u{202E}fdp.exe" read as
     /// "invoiceexe.pdf"; a zero-width space hides between letters). Never hidden by a leading dot, never empty.
     nonisolated static func safeFilename(_ filename: String) -> String {
-        var scalars = String.UnicodeScalarView()
-        for scalar in filename.unicodeScalars {
-            switch scalar.properties.generalCategory {
-            case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate, .unassigned: continue
-            default: break
-            }
-            scalars.append(scalar == "/" || scalar == ":" ? "-" : scalar)
-        }
-        var name = String(scalars).trimmingCharacters(in: .whitespaces)
-        while name.hasPrefix(".") { name.removeFirst() }
-        name = name.trimmingCharacters(in: .whitespaces)
+        let name = DownloadTokens.safeName(filename)
         return name.isEmpty ? "Download" : name
     }
 
@@ -495,10 +490,49 @@ extension DownloadManager: WKDownloadDelegate {
         let name = suggestedFilename.isEmpty ? "Download" : suggestedFilename
         var destination = Self.uniqueDestination(for: name, avoiding: inProgress)
         let window = windows.removeValue(forKey: ObjectIdentifier(download))
+        let startedAt = origins.removeValue(forKey: ObjectIdentifier(download))
         if let url = download.originalRequest?.url, let earlier = restarts.removeValue(forKey: url) {
             // A paused download started over: it replaces its own partial file.
             try? FileManager.default.removeItem(at: earlier)
             return earlier
+        }
+        // A rule for downloads that the navigation never got to see: a context-menu Download Linked File, or a page's
+        // own startDownload. A Save Page As chose its file already and is left alone. Handing it off cancels WebKit's
+        // copy and takes its row out of the list.
+        // Only a download WebKit made for a page can be handed off: a pop-up and an extension have no page of their
+        // own to answer the question, so their downloads stay Zigzag's, as they did before rules existed.
+        let owner = (download.webView as? BrowserWebView)?.owner
+        if let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
+           let url = download.originalRequest?.url,
+           let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false,
+                                                 isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {
+            let handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
+                                                  pageOrigin: startedAt ?? SiteOrigin.of(owner.url ?? download.webView?.url),
+                                                  filename: DownloadTokens.filename(for: url, suggested: name),
+                                                  space: Library.shared.space(owner.spaceID)?.name ?? "",
+                                                  dataStore: download.webView?.configuration.websiteDataStore,
+                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false),
+                                                  window: window, tab: owner)
+            switch await DownloadHandoff.decide(rule, request: handoff, tab: owner, forDownload: true) {
+            case .handOff:
+                let outcome = await DownloadHandoff.perform(rule, request: handoff)
+                if outcome == .handedOff {
+                    items.removeAll { $0.download === download }
+                    changed.send(nil)
+                    download.cancel { _ in }
+                    return nil
+                }
+                if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            case .browser:
+                // Left to Zigzag: WebKit's download goes on and is saved as usual.
+                break
+            case .cancel:
+                // Don't Allow: nothing is saved, and the row goes with it.
+                items.removeAll { $0.download === download }
+                changed.send(nil)
+                download.cancel { _ in }
+                return nil
+            }
         }
         var replacing: URL?
         if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
@@ -647,6 +681,10 @@ extension DownloadManager: WKDownloadDelegate {
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        // The destination decision never runs for a download that fails or is cancelled first; its state goes now.
+        origins.removeValue(forKey: ObjectIdentifier(download))
+        windows.removeValue(forKey: ObjectIdentifier(download))
+        chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
         guard let item = item(for: download) else { return }
         // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
         if item.state == .paused { return }
