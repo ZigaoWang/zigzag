@@ -12,12 +12,12 @@ enum DownloadRuleSheet {
         // A preset's action may differ from the requested kind (the downloader presets are RPC): the action wins.
         let action = existing?.action ?? preset?.rule.action ?? DownloadRuleAction(kind: kind)
         // Declared before the fields, which hear the sheet and ask it to check them again.
-        /// Opening this sheet for a destination (Save to Folder, Open in Zigzag) is the panel under Save downloads to
-        /// asking for one file type: the sheet then asks *which type* (its extensions, not an address) and *which of
-        /// the two destinations*, instead of the address matches and the four handoff actions.
+        /// Opening this sheet for a destination (Open, Save) is the panel under Save downloads to asking for one file
+        /// type: the sheet then asks *which type* (its extensions, not an address) and what happens to it, instead of
+        /// the address matches and the four handoff actions.
         let isDestination = action.kind.isDestination
         /// The two destinations, in the order the choice offers them; the action's own kind is the one chosen.
-        let destinationKinds: [DownloadRuleAction.Kind] = [.saveToFolder, .showInZigzag]
+        let destinationKinds: [DownloadRuleAction.Kind] = [.openFile, .saveToFolder]
         var sheetRef: FormSheet?
 
         let name = FilledField(placeholder: String(localized: "Name", comment: "Placeholder of the name field in the sheet that makes a download rule."))
@@ -110,6 +110,29 @@ enum DownloadRuleSheet {
             actionRows.append(.note(String(localized: "One argument a line. Each becomes its own argument, so a URL with &, ; or $() is never run as a shell command. The link, cookies and the rest are also in ZIGZAG_LINK, ZIGZAG_COOKIES and the other environment variables.",
                                            comment: "Under the arguments of a Run Script download rule, explaining argv and environment.")))
         case .jsonRPC:
+            // The Torrents preset is one rule whose only real difference between services is the protocol: one
+            // dropdown fills the endpoint, method, parameters and protocol in, and leaves the catch pattern alone.
+            if preset == .torrents {
+                let service = DropdownButton()
+                service.options = TorrentService.allCases.map { DropdownButton.Option(title: $0.title) }
+                service.selectedIndex = TorrentService.allCases.firstIndex(of: .rTorrent) ?? 0
+                actionRows.append(FormSheet.Row(label: String(localized: "Service", comment: "Label of the service choice in the Torrents preset's sheet."),
+                                                view: service))
+                service.onSelect = { index in
+                    guard TorrentService.allCases.indices.contains(index) else { return }
+                    let chosen = TorrentService.allCases[index]
+                    endpointField?.stringValue = chosen.endpoint
+                    methodField?.stringValue = chosen.method
+                    parametersView?.text = chosen.parameters
+                    stylePicker?.selectedIndex = DownloadRuleAction.RPCStyle.allCases.firstIndex(of: chosen.style) ?? 0
+                    // The name follows the service until it has been made the reader's own.
+                    if chosen != .custom,
+                       name.stringValue.isEmpty || TorrentService.allCases.contains(where: { $0.ruleName == name.stringValue }) {
+                        name.stringValue = chosen.ruleName
+                    }
+                    sheetRef?.revalidate()
+                }
+            }
             let endpoint = FilledField(placeholder: "http://127.0.0.1:6800/jsonrpc")
             endpoint.stringValue = action.rpcEndpoint
             endpointField = endpoint
@@ -133,10 +156,10 @@ enum DownloadRuleSheet {
             actionRows.append(FormSheet.Row(label: String(localized: "Token", comment: "Label of the token field in a JSON-RPC download rule's sheet."), view: secret))
             actionRows.append(.note(String(localized: "A JSON array. {link}, {filename}, {cookies} and the rest are filled in, safely quoted. The token is kept in the Keychain.",
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
-        case .saveToFolder, .showInZigzag:
+        case .saveToFolder, .openFile:
             // A destination's own two things: what happens to a file of this type, and, when it is saved, where.
             // The row that picks the kind is the one the panel's "Add File Type…" opens on; the folder row is
-            // taken out of the form for Open in Zigzag, where nothing is saved to a folder at all.
+            // taken out of the form for Open, where the file goes to the ordinary place instead.
             let whereTo = DropdownButton()
             whereTo.options = destinationKinds.map { DropdownButton.Option(title: $0.title) }
             whereTo.selectedIndex = destinationKinds.firstIndex(of: action.kind) ?? 0
@@ -144,7 +167,8 @@ enum DownloadRuleSheet {
             actionRows.append(FormSheet.Row(label: String(localized: "Destination", comment: "Label of the choice in a per-extension destination's sheet: a folder of its own, or Zigzag showing the file itself."),
                                             view: whereTo))
             let folder = FilledField(placeholder: String(localized: "Choose a folder…", comment: "Placeholder of the folder field in a per-extension destination's sheet."))
-            folder.stringValue = action.folderPath
+            // A new type starts in the folder downloads already go to: "Save" means save there unless it is changed.
+            folder.stringValue = action.folderPath.isEmpty && existing == nil ? DownloadManager.folder.path : action.folderPath
             folderField = folder
             let chooseFolder = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
             chooseFolder.onClick = { _ in
@@ -152,12 +176,21 @@ enum DownloadRuleSheet {
                 panel.canChooseFiles = false
                 panel.canChooseDirectories = true
                 panel.prompt = String(localized: "Choose", comment: "Button of the open panel that picks a folder for a download rule.")
+                // It opens where the field already points — the folder downloads go to, for a new type — so the
+                // ordinary answer is one click, not a walk back from wherever the panel was last.
+                let typed = (folder.stringValue as NSString).expandingTildeInPath
+                var isFolder: ObjCBool = false
+                if !typed.isEmpty, FileManager.default.fileExists(atPath: typed, isDirectory: &isFolder), isFolder.boolValue {
+                    panel.directoryURL = URL(fileURLWithPath: typed, isDirectory: true)
+                } else {
+                    panel.directoryURL = DownloadManager.folder
+                }
                 choose(panel, into: folder)
             }
             folderActionRow = actionRows.count
             actionRows.append(FormSheet.Row(label: String(localized: "Folder", comment: "Label of the folder field in a per-extension destination's sheet: which folder files of this type are saved into."),
                                             view: stack(folder, chooseFolder)))
->>>>>>> f25be232 (feat: a file type can say where its downloa        }
+        }
 
         let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
                                              comment: "The tokens a download rule's fields may use, listed in its sheet."))
@@ -177,8 +210,10 @@ enum DownloadRuleSheet {
         ]
         // A destination adds what it does; an address rule lists its tokens, unless its path is literal (Open App).
         let rows = matchRows + actionRows + (isDestination ? [
-            FormSheet.Row.note(String(localized: "Files of this type skip the folder downloads are saved to, and go where you say instead. The first file type that matches wins.",
+            FormSheet.Row.note(String(localized: "Files of this type are saved to the folder above, or opened in your Mac’s app for them. The first file type that matches wins.",
                                                  comment: "Under the fields of a per-extension destination's sheet: what it does, and that the first one that matches decides.")),
+            FormSheet.Row.note(String(localized: "Apps, scripts, installers, archives and configuration profiles are always saved, never opened.",
+                                      comment: "Under the fields of a per-extension destination's sheet: the file types Open never opens, whatever the choice says.")),
             tokens,
         ] : (action.kind == .openApp ? [] : [tokens]))
 
@@ -195,7 +230,7 @@ enum DownloadRuleSheet {
                 action.rpcMethod = methodField?.stringValue ?? ""
                 action.rpcParameters = parametersView?.text ?? "[]"
                 action.rpcStyle = DownloadRuleAction.RPCStyle.allCases[stylePicker?.selectedIndex ?? 0]
-            case .saveToFolder, .showInZigzag:
+            case .saveToFolder, .openFile:
                 // Which of the two it is, as the choice says, and the folder one of them saves into (kept even while
                 // the other is chosen, so switching back finds it again).
                 if let index = destinationField?.selectedIndex, destinationKinds.indices.contains(index) {
@@ -218,6 +253,9 @@ enum DownloadRuleSheet {
             guard let rule = ruleFromFields(), !rule.name.isEmpty || rule.action.kind.isDestination else { return false }
             guard rule.match == .any || !rule.pattern.isEmpty else { return false }
             guard rule.isValidPattern else { return false }
+            // Open is not offered for an app, a script, an installer or an archive: such a rule could only be saved
+            // and then refused, so the sheet asks for Save instead.
+            guard !(rule.action.kind == .openFile && DownloadOpening.isRefused(pattern: rule.pattern)) else { return false }
             return rule.action.isComplete
         }
         for picker in [applies, match] + [stylePicker].compactMap({ $0 }) {
@@ -231,7 +269,7 @@ enum DownloadRuleSheet {
             sheetTitle = existing == nil
                 ? String(localized: "Add a File Type", comment: "Title of the sheet that makes a per-extension destination in Settings › Downloads.")
                 : String(localized: "Change This File Type", comment: "Title of the sheet that changes a per-extension destination in Settings › Downloads.")
-            sheetMessage = String(localized: "Saved somewhere of its own, instead of with everything else.",
+            sheetMessage = String(localized: "What happens to files of this type.",
                                   comment: "Under the title of the sheet that makes a per-extension destination.")
         } else {
             sheetTitle = existing == nil ? String(localized: "Add Download Rule", comment: "Title of the sheet that makes a download rule.")
@@ -251,7 +289,8 @@ enum DownloadRuleSheet {
                                    canConfirm: valid) { confirmed in
             // The sheet is done either way; the fields are read below, not from it.
             sheetRef = nil
-            guard confirmed, let rule = ruleFromFields() else { return }
+            guard confirmed, let rule = ruleFromFields(),
+                  !(rule.action.kind == .openFile && DownloadOpening.isRefused(pattern: rule.pattern)) else { return }
             if let secret = secretField?.stringValue, action.kind == .jsonRPC { HandoffSecrets.setSecret(secret, for: rule.id) }
             if existing == nil { DownloadRulesStore.shared.add(rule) } else { DownloadRulesStore.shared.update(rule) }
         }
@@ -262,10 +301,10 @@ enum DownloadRuleSheet {
             let row = matchRows.count + folderActionRow
             whereTo.onSelect = { [weak sheet, weak whereTo] _ in
                 guard let sheet, let whereTo else { return }
-                sheet.setHidden(destinationKinds.firstIndex(of: .showInZigzag) == whereTo.selectedIndex, forRow: row)
+                sheet.setHidden(destinationKinds.firstIndex(of: .openFile) == whereTo.selectedIndex, forRow: row)
                 sheet.revalidate()
             }
-            sheet.setHidden(destinationKinds.firstIndex(of: .showInZigzag) == whereTo.selectedIndex, forRow: row)
+            sheet.setHidden(destinationKinds.firstIndex(of: .openFile) == whereTo.selectedIndex, forRow: row)
         }
     }
 

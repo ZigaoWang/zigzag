@@ -118,7 +118,7 @@ struct DownloadRuleTests {
         let json = """
         [
           {"name":"Known","match":"contains","pattern":"a","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
-          {"name":"Future","match":"fileType","pattern":"pdf","action":{"kind":"saveToFolder","folderPath":"/tmp"}},
+          {"name":"Future","match":"futureMatch","pattern":"pdf","action":{"kind":"futureKind","folderPath":"/tmp"}},
           {"name":"Broken","applies":7,"match":{},"action":{"kind":"nonsense"}},
           {"name":"WrongMatch","match":7,"pattern":"","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
           {"name":"WrongKind","match":"contains","pattern":"x","action":{"kind":7}},
@@ -401,9 +401,9 @@ struct DownloadRuleTests {
     /// handoff rule for the same file is not a destination, so it is left to the handoff path.
     @Test func aDestinationIsTheFirstThatMatches() {
         let pdf = destination("pdf", folder: "/Users/me/Documents")
-        let books = destination("pdf, epub", .showInZigzag)
+        let books = destination("pdf, epub", .openFile)
         #expect(DownloadRulesStore.destination(in: [pdf, books], url: file, filename: "a.pdf")?.destination == .folder("/Users/me/Documents"))
-        #expect(DownloadRulesStore.destination(in: [books, pdf], url: file, filename: "a.pdf")?.destination == .show)
+        #expect(DownloadRulesStore.destination(in: [books, pdf], url: file, filename: "a.pdf")?.destination == .open)
         #expect(DownloadRulesStore.destination(in: [rule(.fileType, "pdf")], url: file, filename: "a.pdf") == nil)
         #expect(DownloadRulesStore.destination(in: [], url: file, filename: "a.pdf") == nil)
         #expect(DownloadRulesStore.destination(in: [destination("pdf")], url: file, filename: "a.epub") == nil)
@@ -421,7 +421,7 @@ struct DownloadRuleTests {
 
         let there = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
         #expect(there?.destination == folder.appendingPathComponent("report.pdf"))
-        #expect(there?.show == false, "a folder destination saves, it never opens")
+        #expect(there?.openWhenFinished == false, "a folder destination saves, it never opens")
 
         // The file's name is made safe, as every download's is.
         #expect(DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "a/b:c.pdf")?.destination
@@ -445,15 +445,18 @@ struct DownloadRuleTests {
         try Data("x".utf8).write(to: aFile)
         #expect(DownloadManager.place(for: .folder(aFile.path), folder: aFile.path, filename: "a.pdf") == nil)
 
-        // Show in Zigzag saves where it would have gone anyway, and says to show it once it's here.
-        let shown = DownloadManager.place(for: .show, folder: "ignored", filename: "report.pdf")
-        #expect(shown?.show == true)
+        // Open saves where it would have gone anyway, and says to open it once it's here.
+        let shown = DownloadManager.place(for: .open, folder: "ignored", filename: "report.pdf")
+        #expect(shown?.openWhenFinished == true)
         #expect(shown?.destination.lastPathComponent == "report.pdf")
+        // A private window keeps the file but never hands it to another app, unless the rule was let in.
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "report.pdf", canOpen: false)?.openWhenFinished == false)
     }
-    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be shown by Zigzag.
+    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be opened by the
+    /// Mac's own app.
     @Test func aDestinationSaysWhatItIsAndNeedsItsFolder() {
         #expect(DownloadRuleAction.Kind.saveToFolder.isDestination)
-        #expect(DownloadRuleAction.Kind.showInZigzag.isDestination)
+        #expect(DownloadRuleAction.Kind.openFile.isDestination)
         #expect(!DownloadRuleAction.Kind.openURL.isDestination)
         #expect(!DownloadRuleAction.Kind.runScript.isDestination)
 
@@ -461,13 +464,49 @@ struct DownloadRuleTests {
         #expect(!folder.isComplete)
         folder.folderPath = "/Users/me/Documents"
         #expect(folder.isComplete)
-        #expect(DownloadRuleAction(kind: .showInZigzag).isComplete)
+        #expect(DownloadRuleAction(kind: .openFile).isComplete)
+    }
+
+    /// A torrent preset catches what it is for — a magnet link, or an address carrying a `.torrent` — and nothing else.
+    /// aria2 and Motrix stay general unless the torrents variant is the one chosen.
+    @Test func aTorrentPresetCatchesTorrentsAndMagnets() {
+        let torrent = DownloadPreset.torrents.rule
+        #expect(torrent.name == "rTorrent")
+        #expect(torrent.matches(URL(string: "magnet:?xt=urn:btih:abc")!))
+        #expect(torrent.matches(URL(string: "https://site.example/file.torrent")!))
+        #expect(!torrent.matches(URL(string: "https://site.example/file.zip")!))
+        #expect(DownloadPreset.aria2.rule.match == .any)
+        // The service dropdown is the whole difference: same catch pattern, another protocol.
+        #expect(TorrentService.rTorrent.style == .xmlrpc)
+        #expect(TorrentService.aria2.style == .json)
+        #expect(TorrentService.motrix.endpoint == "http://127.0.0.1:16800/jsonrpc")
+        #expect(TorrentService.custom.endpoint.isEmpty)
     }
 
     @Test func aDestinationReadsAsASentence() {
-        #expect(destination("pdf, epub", folder: "/Users/me/Documents").summarySentence
+        #expect(destination("pdf, epub", folder: "/Users/me/Documents").destinationSentence
                 == "Files of type pdf, epub are saved to Documents")
-        #expect(destination("pdf", .showInZigzag).summarySentence == "Files of type pdf open in Zigzag")
+        #expect(destination("pdf", .openFile).destinationSentence == "Files of type pdf open in your Mac’s app")
+    }
+
+    /// A file-type Open never offers or performs an app, a script, an installer or an archive. The lookup skips such
+    /// a rule, and a later Save rule for the same type still decides where the file lands.
+    @Test func anOpenNeverTakesAnAppScriptOrArchive() {
+        #expect(DownloadOpening.isRefused("dmg"))
+        #expect(DownloadOpening.isRefused("APP"))
+        #expect(!DownloadOpening.isRefused("pdf"))
+        #expect(DownloadOpening.isRefused(pattern: "pdf, dmg"))
+
+        let url = URL(string: "https://example.com/tool.dmg")!
+        var open = destination("dmg", .openFile)
+        open.name = "Open"
+        #expect(DownloadRulesStore.destination(in: [open], url: url, filename: "tool.dmg") == nil)
+
+        var save = destination("dmg", .saveToFolder, folder: "/tmp")
+        save.name = "Save"
+        let found = DownloadRulesStore.destination(in: [open, save], url: url, filename: "tool.dmg")
+        #expect(found?.rule.name == "Save")
+        #expect(found?.destination == .folder("/tmp"))
     }
 
     /// A file type is named by its extensions, so it needs no name of its own — where an address rule has nothing to
@@ -481,7 +520,8 @@ struct DownloadRuleTests {
         save.action.folderPath = "/Users/me/Downloads/PDFs"
         #expect(save.action.isComplete)
 
-        var show = destination("pdf", .showInZigzag)
+        // Opening the file needs nothing more than the type.
+        var show = destination("pdf", .openFile)
         show.name = ""
         #expect(show.action.isComplete)
         #expect(show.name.isEmpty)
@@ -522,7 +562,7 @@ struct DownloadRuleTests {
     // MARK: The handoff question
 
     @Test func downloadServicesTakeDownloadsOnly() {
-        for preset in [DownloadPreset.aria2, .motrix, .rTorrent, .ytdlp] {
+        for preset in [DownloadPreset.aria2, .motrix, .torrents, .ytdlp] {
             #expect(preset.rule.applies == .downloads)
         }
         // A player is for the links you click, and for files that turn out to be media.

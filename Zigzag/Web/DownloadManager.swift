@@ -19,7 +19,10 @@ final class DownloadItem {
     /// The file this download replaces once it's done; until then it goes to a hidden file beside it, so a failed
     /// or canceled download never costs you the one you had.
     fileprivate var replaces: URL?
-    let sourceURL: URL?
+    /// A rule's "Open" chose this download: once the file is here, it goes to the Mac's own app for its type. Never
+    /// saved with the item — it is about this download, not about the file.
+    fileprivate var opensWhenFinished = false
+let sourceURL: URL?
     /// Bytes a second, smoothed over the last few seconds, for "time left".
     fileprivate(set) var speed: Double = 0
     fileprivate var lastSample: (at: Date, bytes: Int64)?
@@ -174,7 +177,12 @@ final class DownloadManager: NSObject {
     /// Where a download was already told to go (Save Page As picked the place), so it isn't asked again.
     private var chosenDestinations: [ObjectIdentifier: URL] = [:]
 
-    @discardableResult
+    /// Whether this download came from a private window, as its data store tells it.
+    private static func isPrivate(_ download: WKDownload) -> Bool {
+        !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)
+    }
+
+@discardableResult
     func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil) -> DownloadItem {
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
         download.delegate = self
@@ -469,7 +477,11 @@ final class DownloadManager: NSObject {
     /// A free name in Downloads, also avoiding names given to downloads still in progress (their files don't
     /// exist yet), so two "report.pdf"s started together don't collide.
     static func uniqueDestination(for filename: String, avoiding taken: Set<String> = []) -> URL {
-        let folder = Self.folder
+        uniqueDestination(for: filename, in: Self.folder, avoiding: taken)
+    }
+
+    /// The same, in a folder of the rule's own.
+    static func uniqueDestination(for filename: String, in folder: URL, avoiding taken: Set<String> = []) -> URL {
         let safe = safeFilename(filename)
         let base = (safe as NSString).deletingPathExtension
         let ext = (safe as NSString).pathExtension
@@ -481,6 +493,49 @@ final class DownloadManager: NSObject {
             n += 1
         }
         return candidate
+    }
+
+    /// Where a rule that *is* a destination sends the file: the folder it names, made free of collisions, or the
+    /// ordinary place for a rule that opens the file, which saves first and opens once the file is here. Nil when the
+    /// rule names no folder, or the folder it names has gone — the setting decides then, exactly as if no rule
+    /// matched. `canOpen` is false in a private window for a rule that was not let into one: the file is still saved,
+    /// but the Mac's app is never handed it.
+    static func place(for destination: DownloadDestination, folder: String, filename: String,
+                      avoiding taken: Set<String> = [], canOpen: Bool = true) -> (destination: URL, openWhenFinished: Bool)? {
+        switch destination {
+        case .folder:
+            let path = (folder as NSString).expandingTildeInPath
+            guard !path.isEmpty else { return nil }
+            var isFolder: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &isFolder), isFolder.boolValue else { return nil }
+            return (uniqueDestination(for: filename, in: URL(fileURLWithPath: path, isDirectory: true), avoiding: taken), false)
+        case .open:
+            // The last word on Open: an app, a script, an installer or an archive is saved, never handed to an app.
+            let mayOpen = canOpen && !DownloadOpening.isRefused((filename as NSString).pathExtension)
+            return (uniqueDestination(for: filename, avoiding: taken), mayOpen)
+        }
+    }
+
+    /// The first rule whose destination is this file's, read as a place to save. `place` does the deciding, so the
+    /// tokens a rule's folder may use are filled in from this very download first.
+    private static func rulePlace(url: URL, filename: String, response: URLResponse, download: WKDownload,
+                                  avoiding taken: Set<String>) -> (destination: URL, openWhenFinished: Bool)? {
+        guard let (rule, wanted) = DownloadRulesStore.shared.destination(for: url, filename: filename) else { return nil }
+        let owner = (download.webView as? BrowserWebView)?.owner
+        let values = HandoffValues(link: url,
+                                   referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
+                                   filename: filename, mime: response.mimeType ?? "",
+                                   space: owner.flatMap { Library.shared.space($0.spaceID)?.name } ?? "")
+        return place(for: wanted, folder: DownloadTokens.expand(rule.action.folderPath, with: values), filename: filename,
+                     avoiding: taken, canOpen: !isPrivate(download) || rule.runsInPrivateWindows)
+    }
+
+    /// A rule said to open the file: once it is here it goes to the Mac's own app for its type, the one a double-click
+    /// in Finder would use. A file the Mac has no app for stays in the downloads list, which is where it was going.
+    private func openWhenFinished(_ item: DownloadItem) {
+        item.opensWhenFinished = false
+        guard let url = item.destination, !DownloadOpening.isRefused(url.pathExtension) else { return }
+        NSWorkspace.shared.open(url)
     }
 }
 
@@ -511,8 +566,8 @@ extension DownloadManager: WKDownloadDelegate {
                                                   filename: DownloadTokens.filename(for: url, suggested: name),
                                                   space: Library.shared.space(owner.spaceID)?.name ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
-                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false),
-                                                  window: window, tab: owner)
+                                                  isPrivate: Self.isPrivate(download),
+window: window, tab: owner)
             switch await DownloadHandoff.decide(rule, request: handoff, tab: owner, forDownload: true) {
             case .handOff:
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
@@ -535,6 +590,7 @@ extension DownloadManager: WKDownloadDelegate {
             }
         }
         var replacing: URL?
+        var opensWhenFinished = false
         if let chosen = chosenDestinations.removeValue(forKey: ObjectIdentifier(download)) {
             destination = chosen
             // A name chosen ahead (an extension's download with "overwrite") only ever replaces a plain file there,
@@ -544,6 +600,13 @@ extension DownloadManager: WKDownloadDelegate {
                     destination = Self.uniqueDestination(for: chosen.lastPathComponent, avoiding: inProgress)
                 }
             }
+        } else if let url = download.originalRequest?.url,
+                  let place = Self.rulePlace(url: url, filename: name, response: response, download: download, avoiding: inProgress) {
+            // A rule for this file's own type decides where it lands: the folder it names, or the ordinary place for
+            // one the Mac's own app opens. A destination is a decision, never an action, so the download runs either
+            // way.
+            destination = place.destination
+            opensWhenFinished = place.openWhenFinished
         } else if Self.asksWhereToSave {
             guard let chosen = await askWhere(name: destination.lastPathComponent, in: window) else {
                 // Cancelled in the sheet: no download, and nothing left in the list.
@@ -563,7 +626,8 @@ extension DownloadManager: WKDownloadDelegate {
             item.filename = shownName
             item.replaces = replacing
             item.destination = destination
-            changed.send(item)
+            item.opensWhenFinished = opensWhenFinished
+changed.send(item)
             started.send((item, window))
         }
         return destination
@@ -650,7 +714,9 @@ extension DownloadManager: WKDownloadDelegate {
             DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
         }
         changed.send(item)
-    }
+        // A rule asked for this one to be shown, and now there is a file to show.
+        if item.opensWhenFinished { openWhenFinished(item) }
+}
 
     /// Marks a finished file as downloaded from the web by Zigzag, as Safari does. WebKit marks it as from the
     /// internet but names no app, so opening it asked about a file "created by the app (null)". A private window's

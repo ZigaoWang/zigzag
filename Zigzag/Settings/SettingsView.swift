@@ -2955,7 +2955,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             controls.distribution = .fill
             controls.alignment = .centerY
             let content = FormRow(title: types.isEmpty ? String(localized: "Untitled File Type", comment: "A per-extension destination with no extensions yet.") : types,
-                                  detail: rule.summarySentence, control: controls)
+                                  detail: rule.destinationSentence, control: controls)
             content.keywords = "\(rule.pattern) \(rule.action.textFields.joined(separator: " "))"
             downloadTypesGroup.add(content)
         }
