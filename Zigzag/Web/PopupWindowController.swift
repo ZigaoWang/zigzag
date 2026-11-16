@@ -51,8 +51,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// but nothing is fetched until the person answers. True only until the answer; a denied pop-up makes no request
     /// at all, which is what blocking is for.
     private var isHoldingFirstLoad = false
-    /// What the pop-up asked for, held back while `isHoldingFirstLoad`, and loaded once the answer is Mini.
+    /// What the pop-up asked for, held back while `isHoldingFirstLoad`, and loaded once the answer is Mini. Only the
+    /// first request is kept: a page that sends the held window somewhere else while the card is up cannot change
+    /// what the card asked about.
     private var heldRequest: URLRequest?
+    /// The page closed the held pop-up while its question was up: the question has nothing left to ask.
+    var onClose: (() -> Void)?
+    /// Whether this window has been closed, by the page or by a person, before or after the answer.
+    private(set) var isClosed = false
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?, opener: Tab?) -> WKWebView {
         let controller = makeController(configuration: configuration, features: features, parent: parent, opener: opener)
@@ -79,7 +85,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// Returns false when the window is gone, so the caller can open its own viewer instead.
     @discardableResult
     func revealHeldPage() -> Bool {
-        guard window != nil else { return false }
+        guard window != nil, !isClosed else { return false }
+        // The first address goes through the same routing as any page link, at the moment it is revealed too: a
+        // webView.load would otherwise skip WebKit's own block on a top-level data: page.
+        if let heldRequest, let url = heldRequest.url,
+           case .refuse = PopupNotice.route(url, from: opener?.url) {
+            discardHeldPage()
+            return false
+        }
         isHoldingFirstLoad = false
         showWindow(nil)
         if let heldRequest {
@@ -94,9 +107,24 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     func discardHeldPage() {
         isHoldingFirstLoad = false
         heldRequest = nil
+        onClose = nil
         close()
         // A window that was never on screen may not report its closing; the controller is let go here either way.
         Self.open.remove(self)
+    }
+
+    /// The first address the pop-up asked for, if it got that far: what a reveal is checked against.
+    var heldURL: URL? { heldRequest?.url }
+
+    /// The window closed while a question about it could still be up: end that question, once.
+    private func noteClosed() {
+        guard !isClosed else { return }
+        isClosed = true
+        isHoldingFirstLoad = false
+        heldRequest = nil
+        let close = onClose
+        onClose = nil
+        close?()
     }
 
     private static func makeController(configuration: WKWebViewConfiguration, features: WKWindowFeatures,
@@ -287,6 +315,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func windowWillClose(_ notification: Notification) {
+        noteClosed()
         observations.forEach { $0.invalidate() }
         webView.stopLoading()
         if let parentObserver { NotificationCenter.default.removeObserver(parentObserver) }
@@ -299,6 +328,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webViewDidClose(_ webView: WKWebView) {
         Diagnostics.note("Pop-up closed itself", site: webView.url?.host(), isPrivate: isPrivate)
+        noteClosed()
         window?.close()
     }
 
@@ -306,29 +336,31 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         guard Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
         // A pop-up a page inside this one opened on its own: only a remembered destination opens it, or it asks.
         if !PopupNotice.isUserInitiated(navigationAction) {
-            // Only the page itself asks, never a frame in it: a frame's pop-up is blocked quietly here too.
-            guard navigationAction.sourceFrame.isMainFrame else {
-                Diagnostics.note("Blocked a frame's pop-up", site: webView.url?.host(),
-                                 "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
-                return nil
-            }
             // The window this pop-up came from, of any kind. A page inside Zigzag Mini or an installed app's window
             // asks there too; with a browser window's controller alone, that lookup found nothing, so a pop-up a page
             // inside one of them opened on its own was dropped with nothing said.
             let parent = WindowManager.shared.promptHost(for: parentWindow) ?? (opener?.host as? PromptHost)
+            // A blank window.open() is a page link too: an allowed site keeps the open-blank-then-navigate pattern.
+            let target = navigationAction.request.url ?? URL(string: "about:blank")!
             // The same routing as any other page link, kept answer or not: an app's address asks its own question, and
             // anything the web may not open top-level opens nowhere.
-            guard let target = navigationAction.request.url else { return nil }
             switch PopupNotice.route(target, from: webView.url) {
             case .refuse:
                 Diagnostics.note("Refused a page's pop-up", site: webView.url?.host(), "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             case .app:
+                // A frame's pop-up stays blocked quietly here too: only the page itself asks for an app.
+                guard navigationAction.sourceFrame.isMainFrame else {
+                    Diagnostics.note("Blocked a frame's pop-up", site: webView.url?.host(),
+                                     "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                    return nil
+                }
                 opener?.openFromPage(target, isClick: false, asker: navigationAction.sourceFrame.securityOrigin)
                 return nil
             case .open:
                 break
             }
+            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included.
             var automatic = false
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
                 switch PopupNotice.destination(for: stored) {
@@ -347,6 +379,13 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                 }
             }
             guard automatic else {
+                // Only the page itself asks, never a frame in it: a frame's pop-up is blocked quietly here too. A
+                // blank address with no allowed site is not a question: there is nothing to ask about yet.
+                guard navigationAction.request.url != nil, navigationAction.sourceFrame.isMainFrame else {
+                    Diagnostics.note("Blocked a frame's pop-up", site: webView.url?.host(),
+                                     "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                    return nil
+                }
                 // The question belongs to the tab whose page opened this pop-up, shown in that tab's window, which
                 // comes forward so the card isn't left behind the pop-up that asked.
                 parent?.window?.makeKeyAndOrderFront(nil)
@@ -385,7 +424,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // A pop-up waiting on its answer: the address is kept, never fetched. WebKit loads the request into the view
         // it was handed before anyone has answered, and a denied pop-up must not have asked for its page.
         if isHoldingFirstLoad {
-            heldRequest = navigationAction.request
+            // Keep the first address only. A subframe load, or the opener sending the held window somewhere else
+            // after `window.open('/a.html')`, must not change what the card asked about or what is revealed.
+            if heldRequest == nil {
+                heldRequest = navigationAction.request
+            }
             return .cancel
         }
         // Downloads as a tab's are: a stream of them nobody clicked for is refused.

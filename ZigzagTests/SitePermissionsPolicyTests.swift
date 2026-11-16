@@ -35,6 +35,19 @@ import WebKit
         }
     }
 
+    /// Resetting every site clears both halves of the store: a destination kept beside the yeses and nos goes too.
+    @Test func forgetAllClearsBothStores() throws {
+        try withDefaults { defaults in
+            SitePermissions.remember("deny", subject: PermissionSubject.location, origin: "https://example.com")
+            SitePermissions.remember("mini", subject: PermissionSubject.popups, origin: "https://example.com")
+            SitePermissions.forgetAll()
+            #expect(defaults.dictionary(forKey: "SitePermissions") == nil)
+            #expect(defaults.dictionary(forKey: "SitePermissionActions") == nil)
+            #expect(SitePermissions.action(PermissionSubject.location, origin: "https://example.com") == nil)
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://example.com") == nil)
+        }
+    }
+
     @Test func migratesOldBoolsOnce() throws {
         try withDefaults { defaults in
             defaults.set(["https://example.com|camera": true, "https://example.com|popups": false,
@@ -297,6 +310,19 @@ import WebKit
         #expect(recorder.opened.isEmpty, "a refused pop-up opens nowhere")
     }
 
+    /// The answer the pop-up question writes is the answer the next ask reads: This time is keyed by the one
+    /// address, through the same path `ask` uses, not by a key a test wrote by hand.
+    @Test func thePopUpAnswerAskWritesIsTheOneReadBack() {
+        let origin = "https://example.com"
+        let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
+        let popup = URL(string: origin + "/pop-up")!
+        PopupNotice.remember(PermissionAnswer(action: "mini", remember: false), url: popup, key: origin,
+                             tab: tab, isPrivate: false)
+        #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: popup, isPrivate: false) == "mini")
+        #expect(tab.permissionAnswers.action(key: origin, kind: PermissionSubject.popups) == nil,
+                "the page answer is keyed by the request, not by the bare subject")
+    }
+
     /// A page that asks again on its own for the same address is held to the answer it already gave "this time" — no
     /// second question — and nothing is read back in a private window or with no site to key the answer to, where
     /// nothing is kept.
@@ -353,9 +379,8 @@ import WebKit
         #expect(PopupNotice.route(URL(string: "file:///tmp/index.html")!, from: URL(string: "file:///tmp/page.html")) == .open)
     }
 
-    /// A plain yes or no is written as the Bool an older build reads, so going back to one keeps every permission;
-    /// an action id only this build understands stays a string. A store of nothing but yeses and nos is a
-    /// [String: Bool] whole, which is exactly what the old build casts the entry to.
+    /// The old store stays exactly what an older build reads: a [String: Bool] of plain yeses and nos. A destination
+    /// or a handoff's choice keeps its own key beside it, so an action id never makes the Bool store unreadable.
     @Test func simpleAnswersStayReadableToAnOlderBuild() throws {
         try withDefaults { defaults in
             SitePermissions.remember("allow", subject: PermissionSubject.media(.camera), origin: "https://a.com")
@@ -368,14 +393,34 @@ import WebKit
             #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] ==
                     ["https://a.com|camera": true, "https://a.com|location": false, "https://a.com|popups": true])
 
-            // A destination or a handoff's choice is not a yes or no: it keeps its id.
+            // A destination or a handoff's choice is not a yes or no: it keeps its id, under its own key.
             SitePermissions.remember("mini", subject: PermissionSubject.popups, origin: "https://b.com")
             SitePermissions.remember("handOff", subject: "handoff:\(UUID().uuidString)", origin: "https://b.com")
-            let mixed = try #require(defaults.dictionary(forKey: "SitePermissions"))
-            #expect(mixed["https://b.com|popups"] as? String == "mini")
+            #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] ==
+                    ["https://a.com|camera": true, "https://a.com|location": false, "https://a.com|popups": true])
+            let actions = try #require(defaults.dictionary(forKey: "SitePermissionActions"))
+            #expect(actions["https://b.com|popups"] as? String == "mini")
             #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://b.com") == "mini")
             #expect(SitePermissions.action(PermissionSubject.media(.camera), origin: "https://a.com") == "allow")
             #expect(SitePermissions.action(PermissionSubject.location, origin: "https://a.com") == "deny")
+        }
+    }
+
+    /// A store from the first card build, with action strings mixed into the Bool store, is split on the launch
+    /// migration: the old key becomes pure Bool again, and every action is still read.
+    @Test func aMixedStoreIsSplitForOlderBuilds() throws {
+        try withDefaults { defaults in
+            defaults.set(["https://a.com|camera": true,
+                          "https://b.com|popups": "mini",
+                          "https://c.com|handoff:1": "browser"], forKey: "SitePermissions")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://b.com") == "mini")
+            SitePermissions.migrateAnswersToActions()
+            #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] ==
+                    ["https://a.com|camera": true])
+            let actions = try #require(defaults.dictionary(forKey: "SitePermissionActions"))
+            #expect(actions["https://b.com|popups"] as? String == "mini")
+            #expect(actions["https://c.com|handoff:1"] as? String == "browser")
+            #expect(SitePermissions.action(PermissionSubject.popups, origin: "https://b.com") == "mini")
         }
     }
 

@@ -26,6 +26,14 @@ enum PopupNotice {
         return tab?.permissionAnswers.action(key: origin, kind: requestKind(url))
     }
 
+    /// Writes what a pop-up's question was answered: This time is kept under the one request it answered, which is
+    /// the key `pageAction` reads before asking again. `ask` and the test use this one path, so the two keys cannot
+    /// drift apart again.
+    static func remember(_ answer: PermissionAnswer, url: URL, key: String, tab: Tab?, isPrivate: Bool) {
+        SitePermissions.rememberAnswer(answer, subject: PermissionSubject.popups, origin: key,
+                                       pageSubject: requestKind(url), tab: tab, isPrivate: isPrivate)
+    }
+
     /// Whether a page's own pop-up may be put to you as a question: only the page itself, never a frame in it, and
     /// only a web address or the blank page `window.open()` starts with. A frame's pop-up is blocked quietly, as it
     /// was before the card, and so is a data: page, a script, a file or one of Zigzag's own.
@@ -159,10 +167,13 @@ enum PopupNotice {
         SitePermissions.noteAsked(.popups, origin: origin, isPrivate: isPrivate)
         // The window WebKit offered, made now so a Mini answer can use it, but kept off screen with its address
         // unfetched: `revealHeldPage` shows it once the answer is known, and any other answer closes it.
+        let cancellation = QuestionCancellation()
         let held = configuration.flatMap { configuration in
             features.map { PopupWindowController.asking(configuration: configuration, features: $0,
                                                         parent: host.window, opener: tab) }
         }
+        // A pop-up the page closes while the card is up ends the question: there is nothing left to reveal.
+        held?.onClose = { cancellation.cancel() }
         let target = SiteOrigin.of(url).map(SiteOrigin.label) ?? url.absoluteString
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(
@@ -172,8 +183,9 @@ enum PopupNotice {
                 actions: [.deny],
                 menu: [.alternate("thisTab", String(localized: "This Tab", comment: "Choice in the pop-up question's menu: loads the pop-up's page in the tab you are in.")),
                        .alternate("newTab", String(localized: "New Tab", comment: "Choice in the pop-up question's menu: opens the pop-up's page in a new tab.")),
-                       .alternate("mini", String(localized: "Mini", comment: "Choice in the pop-up question's menu: opens the pop-up's page in the small pop-up viewer window."))],
+                       .alternate("mini", String(localized: "Zigzag Mini", comment: "Choice in the pop-up question's menu: opens the pop-up's page in Zigzag's small window for one page, which the app calls Zigzag Mini everywhere else."))],
                 canRemember: !isPrivate && origin != nil && secure && sameFrame,
+                cancellation: cancellation,
                 answered: {
                     // A queued question may have been answered meanwhile: a destination the page kept for the site,
                     // or the same frame's This-time choice. The site's answer wins, as it does before asking.
@@ -186,17 +198,31 @@ enum PopupNotice {
                     return nil
                 })
             guard let answer else {
+                // A closed pop-up is not a question put off: no site-wide pause comes from it.
                 held?.discardHeldPage()
+                if cancellation.isCancelled { return }
                 noteSetAside(origin: origin)
                 return
             }
+            // The page closed the window while the card was up: answering opens nothing.
+            guard held?.isClosed != true else { return }
             if let key {
-                SitePermissions.rememberAnswer(answer, subject: PermissionSubject.popups, origin: key, tab: tab, isPrivate: isPrivate)
+                remember(answer, url: url, key: key, tab: tab, isPrivate: isPrivate)
             }
             switch heldOutcome(for: answer.action, sized: features.map(PopupNotice.isSized) ?? false) {
             case .reveal:
                 // The window WebKit offered, which the page can script: a sign-in hands its result back through it.
-                if held?.revealHeldPage() == true { return }
+                if let held {
+                    // The address is checked once more at the moment it is revealed: the first request only, and
+                    // never a data: page the opener sent the held window to after the card was put up.
+                    if held.isClosed { return }
+                    if let heldURL = held.heldURL, case .refuse = route(heldURL, from: page) {
+                        held.discardHeldPage()
+                        return
+                    }
+                    if held.revealHeldPage() { return }
+                    return
+                }
             case .discardAndOpen:
                 held?.discardHeldPage()
             case .discard:

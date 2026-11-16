@@ -2025,26 +2025,29 @@ extension Tab: WKUIDelegate {
             // A page's own pop-up: a destination remembered for the site opens there with no question, otherwise the
             // banner asks and nothing opens now. Zigzag's own pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
-            // Only the page itself asks. A frame's pop-up — an ad in an iframe, say — is blocked without a word, as
-            // it was before the card, rather than putting a question up every few seconds over the page it's in.
-            guard navigationAction.sourceFrame.isMainFrame else {
-                Diagnostics.note("Blocked a frame's pop-up", site: url?.host(),
-                                 "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
-                return nil
-            }
+            // A blank `window.open()` is a page link too: an allowed site keeps the open-blank-then-navigate pattern
+            // sign-ins and payments use. A page with no allowed site still has to name an address to be asked about.
+            let target = navigationAction.request.url ?? URL(string: "about:blank")!
             // A page's pop-up is a page link like any other, kept answer or not: an app's address asks its own
             // question, and anything the web may not open top-level (data:, a script, a file) opens nowhere.
-            guard let target = navigationAction.request.url else { return nil }
             switch PopupNotice.route(target, from: url) {
             case .refuse:
                 Diagnostics.note("Refused a page's pop-up", site: url?.host(), "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             case .app:
+                // A frame's pop-up stays blocked quietly, as before the card: an ad in an iframe does not get an
+                // app question the page itself would have to answer for.
+                guard navigationAction.sourceFrame.isMainFrame else {
+                    Diagnostics.note("Blocked a frame's pop-up", site: url?.host(),
+                                     "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                    return nil
+                }
                 openFromPage(target, isClick: false, asker: navigationAction.sourceFrame.securityOrigin)
                 return nil
             case .open:
                 break
             }
+            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included.
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(url)) {
                 switch PopupNotice.destination(for: stored) {
                 case .deny:
@@ -2063,6 +2066,13 @@ extension Tab: WKUIDelegate {
                     }
                     return nil
                 }
+            }
+            // Only the page itself asks. A frame's pop-up — an ad in an iframe, say — is blocked without a word, as
+            // it was before the card, rather than putting a question up every few seconds over the page it's in.
+            guard navigationAction.request.url != nil, navigationAction.sourceFrame.isMainFrame else {
+                Diagnostics.note("Blocked a frame's pop-up", site: url?.host(),
+                                 "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                return nil
             }
             return PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost,
                                    configuration: configuration, features: windowFeatures)

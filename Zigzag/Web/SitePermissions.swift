@@ -77,33 +77,46 @@ struct PagePermissionAnswers {
 /// Block; a question's one-time answer holds for the page that asked (`PagePermissionAnswers`). Asked in a sheet,
 /// never as a surprise popup.
 enum SitePermissions {
+    /// The store builds before the card read, and still read: a Bool per "origin|subject", and nothing else. It
+    /// stays pure Bool so an older build can read every permission it understands and its next write cannot wipe
+    /// the store.
     private static let key = "SitePermissions"
+    /// The answers that are not a plain yes or no — a pop-up's destination, a handoff's choice, a screen picker.
+    /// Kept apart from `key`, so the old build never has to cast a string to read a Bool.
+    private static let actionsKey = "SitePermissionActions"
     /// Where the answers are kept; tests use their own.
     static var defaults: UserDefaults = .standard
 
     private static var stored: [String: String] {
         get {
             var actions: [String: String] = [:]
-            for (key, value) in defaults.dictionary(forKey: key) ?? [:] {
-                if let action = value as? String { actions[key] = action }
-                else if let allowed = value as? Bool { actions[key] = allowed ? legacyYes(forKey: key) : "deny" }
+            // A mixed store from a build that wrote actions beside Bools is still read, then split on the next write.
+            for (entry, value) in defaults.dictionary(forKey: key) ?? [:] {
+                if let action = value as? String { actions[entry] = action }
+                else if let allowed = value as? Bool { actions[entry] = allowed ? legacyYes(forKey: entry) : "deny" }
+            }
+            for (entry, value) in defaults.dictionary(forKey: actionsKey) ?? [:] {
+                if let action = value as? String { actions[entry] = action }
             }
             return actions
         }
         set {
-            // A plain yes or no is written the way builds before the card read it, a Bool, so going back to one
-            // loses no permission. Every other answer is an action id that only this build understands, and stays
-            // a string. A store of nothing but yeses and nos is therefore a [String: Bool] an older build reads whole.
-            var values: [String: Any] = [:]
-            for (key, action) in newValue {
+            // A plain yes or no is written the way builds before the card read it, a Bool; every other answer is an
+            // action id under its own key. Rebuilding both stores from the whole state also moves an action out of
+            // the Bool store the first time anything is written, and drops a key that changed kind.
+            var simple: [String: Bool] = [:]
+            var rich: [String: String] = [:]
+            for (entry, action) in newValue {
                 switch action {
-                case "allow": values[key] = true
-                case "deny": values[key] = false
-                case "automatic" where key.hasSuffix("|" + PermissionSubject.popups): values[key] = true
-                default: values[key] = action
+                case "allow": simple[entry] = true
+                case "deny": simple[entry] = false
+                case "automatic" where entry.hasSuffix("|" + PermissionSubject.popups): simple[entry] = true
+                default: rich[entry] = action
                 }
             }
-            defaults.set(values, forKey: key)
+            defaults.set(simple, forKey: key)
+            if rich.isEmpty { defaults.removeObject(forKey: actionsKey) }
+            else { defaults.set(rich, forKey: actionsKey) }
         }
     }
 
@@ -153,13 +166,14 @@ enum SitePermissions {
     /// all, whatever the answer says, which is why it must say so here rather than be trusted to have masked it.
     /// Returns whether the answer allows what was asked (`action` other than "deny").
     @discardableResult
-    static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, tab: Tab?, isPrivate: Bool) -> Bool {
+    static func rememberAnswer(_ answer: PermissionAnswer, subject: String, origin: String, pageSubject: String? = nil,
+                               tab: Tab?, isPrivate: Bool) -> Bool {
         // The tab knows best: a caller that forgets to pass its own privacy is still not allowed to store.
         let keepsNothing = isPrivate || (tab?.isPrivate ?? false)
         if answer.remember, !keepsNothing {
             remember(answer.action, subject: subject, origin: origin)
         } else if let tab {
-            tab.permissionAnswers.note(answer.action, key: origin, kind: subject)
+            tab.permissionAnswers.note(answer.action, key: origin, kind: pageSubject ?? subject)
         }
         return answer.action != "deny"
     }
@@ -310,7 +324,10 @@ enum SitePermissions {
         Set(stored.keys.compactMap { $0.split(separator: "|").first.map(String.init) })
     }
 
-    static func forgetAll() { defaults.removeObject(forKey: key) }
+    static func forgetAll() {
+        defaults.removeObject(forKey: key)
+        defaults.removeObject(forKey: actionsKey)
+    }
 
     /// A site's answer about your location, if it ever asked.
     static func location(origin: String) -> Bool? { allowed(action(PermissionSubject.location, origin: origin)) }
@@ -778,6 +795,20 @@ enum PermissionChoice: CaseIterable {
     }
 }
 
+/// Ends a question when what it was asked for no longer exists — the held pop-up the page closed before answering.
+/// A question still waiting its turn never appears; the card that is up goes as if Esc had been pressed.
+@MainActor
+final class QuestionCancellation {
+    private(set) var isCancelled = false
+    let changed = Signal<Void>()
+
+    func cancel() {
+        guard !isCancelled else { return }
+        isCancelled = true
+        changed.send()
+    }
+}
+
 /// "Use your location?", at the top of the page that asked, sliding down from its top edge: the question, the site
 /// under it, and two answers, Allow last and filled. The answer holds for the page that asked; Allow or Block for good
 /// is chosen in the site panel or Settings › Privacy. Not answering is easy: the close button, Esc, or a click anywhere else puts
@@ -818,6 +849,8 @@ final class PermissionPrompt: FloatingPanelView {
     private weak var controller: PromptHost?
     private var tabsToken: SignalToken?
     private var waitingToken: SignalToken?
+    /// Ends the question if the held pop-up it was asked for closes.
+    var cancelToken: SignalToken?
     /// Others waiting their turn in this window, under the answers: there only while there are any.
     private let moreWaiting = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     /// How many questions are waiting in this window, this one counted, as last read.
@@ -904,6 +937,7 @@ final class PermissionPrompt: FloatingPanelView {
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
                     canRemember: Bool = true, rememberNote: String? = nil,
+                    cancellation: QuestionCancellation? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         // A private window never offers or returns Always.
         let remembers = canRemember && !controller.promptIsPrivate
@@ -921,6 +955,7 @@ final class PermissionPrompt: FloatingPanelView {
                                          window: ObjectIdentifier(controller), request: request)
         if let before = inFlight[sharedKey] {
             let known = await before.task.value
+            guard cancellation?.isCancelled != true else { return nil }
             return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers) }
         }
         // One of the window's waiting questions from the moment it is asked, even if it cannot be shown yet: the tab
@@ -935,7 +970,7 @@ final class PermissionPrompt: FloatingPanelView {
             setWaiting(questionsWaiting(in: controller) + 1, in: controller)
             let answer = await show(host: host, request: request,
                                   symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
-                                  origin: origin, in: controller, tab: tab, answered: answered)
+                                  origin: origin, in: controller, tab: tab, cancellation: cancellation, answered: answered)
             // Answered or put off: it is no longer one of the window's waiting questions.
             PendingQuestions.answer(questionID)
             setWaiting(max(0, questionsWaiting(in: controller) - 1), in: controller)
@@ -961,11 +996,15 @@ final class PermissionPrompt: FloatingPanelView {
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
                              menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?,
+                             cancellation: QuestionCancellation? = nil,
                              answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
+        // The held pop-up it was for is gone: there is nothing to ask about any more.
+        guard cancellation?.isCancelled != true else { return nil }
         // Never under What's New, where it couldn't be seen: it waits until the notes close.
         await withCheckedContinuation { continuation in
             WhatsNewSheet.afterClosing(in: controller.window) { continuation.resume() }
         }
+        guard cancellation?.isCancelled != true else { return nil }
         // The window is gone (its tab with it): there is nowhere this question could ever be shown. A window that is
         // only hidden, minimized or on another Space still holds its question: the card is put up there, and is
         // waiting when the window comes back. Nothing is denied just because it could not be seen this second.
@@ -977,6 +1016,7 @@ final class PermissionPrompt: FloatingPanelView {
         let accent = controller.promptAccent
         return await withCheckedContinuation { continuation in
             let prompt = PermissionPrompt(frame: .zero)
+            prompt.cancelToken = cancellation?.changed.observe { [weak prompt] in prompt?.finish(nil) }
             prompt.request.stringValue = String(localized: "\(request)?", comment: "A site's permission question: the request, then a question mark, like “Use your camera?”.")
             prompt.asker.stringValue = host.withoutWWW
             prompt.askingHost = host
@@ -1073,6 +1113,8 @@ final class PermissionPrompt: FloatingPanelView {
                 if event.keyCode == 53 { prompt.finish(nil); return nil }
                 return event
             }
+            // The pop-up closed while this was being built: the answer resumes with nil before anything is shown.
+            if cancellation?.isCancelled == true { prompt.finish(nil); return }
             // Last, once it listens: a tab already gone puts it off here, and that takes down what was just set up.
             prompt.followTab()
         }
@@ -1192,6 +1234,7 @@ final class PermissionPrompt: FloatingPanelView {
         clickMonitor = nil
         tabsToken = nil
         urlToken = nil
+        cancelToken = nil
         if let controller, Self.shown[ObjectIdentifier(controller)] === self {
             // Another question may still be up in this window: the slot names the one that is, not the one that went.
             Self.shown[ObjectIdentifier(controller)] = controller.promptOverlay.subviews
