@@ -47,10 +47,11 @@ extension PromptHost {
     /// second, so a click meant for the page can't land on it. `image` stands in for a symbol where the picture is
     /// something's own (a site's icon, on a notification).
     func promptToast(_ text: String, symbol: String, image: NSImage? = nil, duration: TimeInterval,
-                     action: (title: String, run: () -> Void)? = nil, closes: Bool = false) {
+                     action: (title: String, run: () -> Void)? = nil, closes: Bool = false,
+                     placement: Toast.Placement = .topCenter) {
         let place = promptToastPlace
         Toast.show(text, symbol: symbol, image: image, action: action, duration: duration, closes: closes,
-                   over: place.over, area: place.area)
+                   over: place.over, area: place.area, placement: placement)
     }
 }
 

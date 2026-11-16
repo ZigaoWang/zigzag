@@ -749,7 +749,7 @@ enum SitePermission: String, CaseIterable {
     var choices: [PermissionChoice] {
         switch self {
         case .webRTC: [.allow, .block]
-        case .notifications: [.ask, .inZigzag, .onTheMac, .block]
+        case .notifications: [.ask, .inZigzag, .everywhere, .onTheMac, .block]
         default: PermissionChoice.ordinary
         }
     }
@@ -781,9 +781,12 @@ enum SitePermission: String, CaseIterable {
 nonisolated enum NotificationPlace: String, Sendable {
     /// Not at all.
     case blocked
-    /// As a notice in Zigzag itself, over the page it came from.
+    /// As a notice in Zigzag itself, and nowhere else: outside Zigzag there is nothing to see.
     case inZigzag
-    /// In the Mac's Notification Center, as every other app's do.
+    /// A notice in Zigzag while it is in front, and the Mac's Notification Center when it is not, so the notification
+    /// reaches you wherever you are.
+    case everywhere
+    /// In the Mac's Notification Center, as every other app's do, even while Zigzag is in front.
     case onTheMac
 
     /// What it's kept as, in the same place every other permission answer is kept. "allow" is what Zigzag saved
@@ -792,6 +795,7 @@ nonisolated enum NotificationPlace: String, Sendable {
         switch self {
         case .blocked: "deny"
         case .inZigzag: "toast"
+        case .everywhere: "everywhere"
         case .onTheMac: "system"
         }
     }
@@ -800,6 +804,7 @@ nonisolated enum NotificationPlace: String, Sendable {
     init?(action: String?) {
         switch action {
         case "toast": self = .inZigzag
+        case "everywhere": self = .everywhere
         case "allow", "system": self = .onTheMac
         case "deny": self = .blocked
         default: return nil
@@ -811,6 +816,7 @@ nonisolated enum NotificationPlace: String, Sendable {
         switch self {
         case .blocked: .block
         case .inZigzag: .inZigzag
+        case .everywhere: .everywhere
         case .onTheMac: .onTheMac
         }
     }
@@ -823,6 +829,8 @@ enum PermissionChoice: CaseIterable {
     case ask, allow, block
     /// A notification shown in Zigzag itself, over the page it came from.
     case inZigzag
+    /// A notification shown in Zigzag while it is in front, and by the Mac when it is not.
+    case everywhere
     /// A notification shown by the Mac, in Notification Center.
     case onTheMac
 
@@ -838,7 +846,7 @@ enum PermissionChoice: CaseIterable {
     var allowed: Bool? {
         switch self {
         case .ask: nil
-        case .allow, .inZigzag, .onTheMac: true
+        case .allow, .inZigzag, .everywhere, .onTheMac: true
         case .block: false
         }
     }
@@ -848,13 +856,14 @@ enum PermissionChoice: CaseIterable {
 
     /// Whether the Mac shows this site's notifications, which is what delivering them there needs. Allow counts: a
     /// site allowed before there were two places meant the Mac's.
-    var showsOnTheMac: Bool { notificationPlace == .onTheMac }
+    var showsOnTheMac: Bool { notificationPlace == .onTheMac || notificationPlace == .everywhere }
 
     /// The place this choice means for a site's notifications: nil where the choice isn't about places at all (Ask).
     /// Allow and On the Mac are the same thing: a site allowed before there were two places meant the Mac's.
     var notificationPlace: NotificationPlace? {
         switch self {
         case .inZigzag: .inZigzag
+        case .everywhere: .everywhere
         case .onTheMac, .allow: .onTheMac
         case .block: .blocked
         case .ask: nil
@@ -864,7 +873,7 @@ enum PermissionChoice: CaseIterable {
     /// The question's own dropdown for a site's notifications: the two places, worded as the row words them, each
     /// carrying the answer it is kept as.
     static var notificationPlaces: [PermissionAction] {
-        let places: [PermissionChoice] = [.inZigzag, .onTheMac]
+        let places: [PermissionChoice] = [.inZigzag, .everywhere, .onTheMac]
         return places.compactMap { choice in
             guard let place = choice.notificationPlace else { return nil }
             return PermissionAction.alternate(place.action, choice.title)
@@ -898,6 +907,7 @@ enum PermissionChoice: CaseIterable {
         case .allow: String(localized: "Allow", comment: "A choice in a permission's dropdown in Site Controls: the site may use it.")
         case .block: String(localized: "Block", comment: "A choice in a permission's dropdown in Site Controls: the site may not use it, and isn't asked about.")
         case .inZigzag: String(localized: "In Zigzag", comment: "A choice in the Notifications dropdown in Site Controls: the site's notifications show as a notice in Zigzag itself.")
+        case .everywhere: String(localized: "Everywhere", comment: "A choice in the Notifications dropdown in Site Controls: in Zigzag while it is in front, and in the Mac's Notification Center when it is not.")
         case .onTheMac: String(localized: "On the Mac", comment: "A choice in the Notifications dropdown in Site Controls: the site's notifications show in the Mac's Notification Center.")
         }
     }

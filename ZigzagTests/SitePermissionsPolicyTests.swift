@@ -117,16 +117,22 @@ import WebKit
     @Test func aNotificationsPlaceIsKeptAsItsAction() {
         #expect(NotificationPlace.blocked.action == "deny")
         #expect(NotificationPlace.inZigzag.action == "toast")
+        #expect(NotificationPlace.everywhere.action == "everywhere")
         #expect(NotificationPlace.onTheMac.action == "system")
         #expect(NotificationPlace(action: "deny") == .blocked)
         #expect(NotificationPlace(action: "toast") == .inZigzag)
+        #expect(NotificationPlace(action: "everywhere") == .everywhere)
         #expect(NotificationPlace(action: "system") == .onTheMac)
         // Allow is what Zigzag saved before there were two places, and it meant the Mac.
         #expect(NotificationPlace(action: "allow") == .onTheMac)
         #expect(NotificationPlace(action: nil) == nil)
         #expect(NotificationPlace(action: "something else") == nil)
         #expect(PermissionChoice.inZigzag.notificationPlace == .inZigzag)
+        #expect(PermissionChoice.everywhere.notificationPlace == .everywhere)
         #expect(PermissionChoice.onTheMac.notificationPlace == .onTheMac)
+        // Everywhere may show on the Mac when Zigzag is away; in-Zigzag never does.
+        #expect(PermissionChoice.everywhere.showsOnTheMac)
+        #expect(!PermissionChoice.inZigzag.showsOnTheMac)
         #expect(PermissionChoice.allow.notificationPlace == .onTheMac)
         #expect(PermissionChoice.block.notificationPlace == .blocked)
         #expect(PermissionChoice.ask.notificationPlace == nil)

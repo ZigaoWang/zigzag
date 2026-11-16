@@ -140,7 +140,16 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         if isTheOneInFront(tab) { return true }
         switch place(origin: origin, tab: tab) {
         case .inZigzag:
+            // In Zigzag only: outside it there is nothing to show, and a Mac notification would be the other answer.
+            guard NSApp.isActive else { return true }
             return showInZigzag(id: id, title: title, body: body, tab: tab, webView: webView, frame: frame)
+        case .everywhere:
+            // Everywhere: the same notice in Zigzag's own style, in the app while it is in front, and over the app or
+            // screen you are on when it is not. It never uses the Mac's Notification Center.
+            if NSApp.isActive {
+                return showInZigzag(id: id, title: title, body: body, tab: tab, webView: webView, frame: frame)
+            }
+            return showEverywhere(id: id, title: title, body: body, tab: tab, webView: webView, frame: frame)
         case .onTheMac:
             // The Mac's own switch is the Mac's business, not the site's: with it off, the notification shows in
             // Zigzag rather than nowhere, which is where a site's notification used to go.
@@ -162,26 +171,53 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         return controller.tabManager.panes(of: shown).contains { $0 === tab }
     }
 
-    /// A site's notification as a notice in Zigzag, for a site whose answer is "In Zigzag" — or one the Mac wouldn't
-    /// show. It goes in the window its tab is in, so a notification from a background window doesn't appear over the
-    /// page you're reading. Show brings that tab forward and tells the page it was clicked, as a Mac notification does;
-    /// × takes it away.
+    /// A site's notification as a notice in Zigzag, for a site whose answer is "In Zigzag" or "Everywhere" — or one
+    /// the Mac wouldn't show. It goes in the window you are looking at, not the tab's window: a notification from a
+    /// background tab has to reach you, or it is not a notification. It sits against the page's trailing edge, the way
+    /// a banner does outside Zigzag, rather than in the middle where a question goes. Show brings the tab forward and
+    /// tells the page it was clicked, as a Mac notification does; × takes it away.
     private func showInZigzag(id: String, title: String, body: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) -> Bool {
-        guard let controller = WindowManager.shared.promptHost(holding: tab) ?? WindowManager.shared.promptHost(for: tab.host?.hostWindow)
-        else { return false }
-        // A notification's body is its own second sentence; a long one is cut the way a banner's is.
-        let said = body.isEmpty ? title : String(localized: "\(title) — \(body)", comment: "A site's notification shown as a notice in Zigzag: what it says, then its body, with a dash between them. Both are the site's own words.")
-        controller.promptToast(String(said.prefix(300)), symbol: "bell.fill", image: tab.favicon, duration: 8,
-                              action: (String(localized: "Show", comment: "Button on a site's notification shown in Zigzag: brings its tab forward."),
-                                       { [weak tab, weak webView] in
-                                           if let tab { self.bringForward(tab) }
-                                           guard let webView else { return }
-                                           webView.callAsyncJavaScript("window.__zigzagNotification && window.__zigzagNotification(id, type)",
-                                                                       arguments: ["id": id, "type": "click"], in: frame, in: .page,
-                                                                       completionHandler: nil)
-                                       }),
-                              closes: true)
+        guard let controller = notificationHost(for: tab) else { return false }
+        controller.promptToast(text(title, body), symbol: "bell.fill", image: tab.favicon, duration: 8,
+                              action: showAction(id: id, tab: tab, webView: webView, frame: frame),
+                              closes: true, placement: .trailingEdge)
         return true
+    }
+
+    /// The same notice, in its own floating panel over whatever app or space you are in: the answer "Everywhere"
+    /// means Zigzag's style wherever you are, not the Mac's Notification Center.
+    private func showEverywhere(id: String, title: String, body: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) -> Bool {
+        let action = showAction(id: id, tab: tab, webView: webView, frame: frame)
+        NotificationBanner.show(text: text(title, body), image: tab.favicon, symbol: "bell.fill", onShow: action.run)
+        return true
+    }
+
+    /// What a notification says as one line: its body is its own second sentence, and a long one is cut the way a
+    /// banner's is.
+    private func text(_ title: String, _ body: String) -> String {
+        let said = body.isEmpty ? title : String(localized: "\(title) — \(body)", comment: "A site's notification shown as a notice in Zigzag: what it says, then its body, with a dash between them. Both are the site's own words.")
+        return String(said.prefix(300))
+    }
+
+    /// What Show does on a notice, wherever it is shown: brings the tab forward and tells the page it was clicked, as
+    /// a Mac notification does.
+    private func showAction(id: String, tab: Tab, webView: WKWebView, frame: WKFrameInfo) -> (title: String, run: () -> Void) {
+        (String(localized: "Show", comment: "Button on a site's notification shown in Zigzag: brings its tab forward."),
+         { [weak tab, weak webView] in
+             if let tab { self.bringForward(tab) }
+             guard let webView else { return }
+             webView.callAsyncJavaScript("window.__zigzagNotification && window.__zigzagNotification(id, type)",
+                                         arguments: ["id": id, "type": "click"], in: frame, in: .page,
+                                         completionHandler: nil)
+         })
+    }
+
+    /// The window a notification's notice goes in: the one you are looking at, so a page in another tab or another
+    /// window still reaches you. With Zigzag in the background, or a window that has no place for a notice, the tab's
+    /// own window is the fallback.
+    private func notificationHost(for tab: Tab) -> PromptHost? {
+        if let key = NSApp.keyWindow, let host = WindowManager.shared.promptHost(for: key) { return host }
+        return WindowManager.shared.promptHost(holding: tab) ?? WindowManager.shared.promptHost(for: tab.host?.hostWindow)
     }
 
     /// Brings the tab a notification belongs to into the front window, wherever it is.

@@ -66,7 +66,7 @@ struct SiteControlsPermissionTests {
     /// the Mac's, so nothing anyone has already answered changes.
     @Test func aNotificationsAnswerIsThePlaceItShowsIn() throws {
         try withDefaults {
-            #expect(SitePermission.notifications.choices == [.ask, .inZigzag, .onTheMac, .block])
+            #expect(SitePermission.notifications.choices == [.ask, .inZigzag, .everywhere, .onTheMac, .block])
             // Every other permission keeps the three it always had.
             #expect(SitePermission.location.choices == [.ask, .allow, .block])
             #expect(SitePermission.webRTC.choices == [.allow, .block])

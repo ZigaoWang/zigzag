@@ -892,6 +892,8 @@ enum Toast {
         var hideWork: DispatchWorkItem?
         /// What the toast showing is about, when it's about something that can go away (an offer for a tab's page).
         weak var owner: AnyObject?
+        /// Where it sits, so a resize puts it back in the same place.
+        var placement: Placement = .topCenter
     }
     private static var showing: [ObjectIdentifier: Showing] = [:]
 
@@ -901,6 +903,13 @@ enum Toast {
     /// How long a confirmation of something a prompt just did stays ("Password saved"): it comes up as the prompt
     /// slides away, so it stays long enough to be seen after that.
     static let confirmationDuration: TimeInterval = 3
+    /// A notice that came from outside the window (a site's notification) sits against the page's trailing edge and
+    /// keeps to a reading width, rather than taking the middle of the page as a confirmation does.
+    static let bannerWidth: CGFloat = 380
+
+    /// Where a toast sits over the page: the middle of the top edge, as confirmations do, or against the trailing
+    /// edge, for a notice that arrived from elsewhere.
+    enum Placement { case topCenter, trailingEdge }
 
     /// Whether an action shown at `shownAt` takes a click yet.
     static func acceptsAction(shownAt: Date, now: Date = Date()) -> Bool { now.timeIntervalSince(shownAt) > 0.5 }
@@ -947,8 +956,10 @@ enum Toast {
     /// `closes` adds a close button, for an offer you may want gone before it goes on its own. `owner`: what it's
     /// about, for `hide(for:in:)`.
     static func show(_ text: String, symbol: String? = nil, image: NSImage? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, in controller: BrowserWindowController) {
-        show(text, symbol: symbol, image: image, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller))
+                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil,
+                     placement: Placement = .topCenter, in controller: BrowserWindowController) {
+        show(text, symbol: symbol, image: image, action: action, duration: duration, closes: closes,
+             over: controller.root.overlay, area: area(in: controller), placement: placement)
         state(for: controller.root.overlay).owner = owner
     }
 
@@ -969,10 +980,25 @@ enum Toast {
         show(text, duration: .greatestFiniteMagnitude, over: controller.root.overlay, area: area(in: controller), busy: true)
     }
 
-    /// Top center of the page: where your eyes already are, clear of the content you're reading.
-    private static func place(_ toast: ToastView, in area: NSRect) {
-        let size = toast.size(maxWidth: max(160, area.width - Tokens.Space.x12))
-        toast.frame = NSRect(x: round(area.midX - size.width / 2), y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
+    /// Where a toast of `size` sits in `area`. Kept separate from the view so the side case can be checked without a
+    /// window: a site's notification has to land at the edge, not in the middle of the page.
+    static func frame(for size: NSSize, in area: NSRect, placement: Placement) -> NSRect {
+        switch placement {
+        case .topCenter:
+            // Where your eyes already are, clear of the content you're reading.
+            NSRect(x: round(area.midX - size.width / 2), y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
+        case .trailingEdge:
+            // Against the page's trailing edge, the top of the same clear area, out of the reading column.
+            NSRect(x: area.maxX - size.width - Tokens.Space.x3, y: area.minY + Tokens.Space.x3,
+                   width: size.width, height: size.height)
+        }
+    }
+
+    private static func place(_ toast: ToastView, in area: NSRect, placement: Placement) {
+        let maxWidth = placement == .trailingEdge ? min(bannerWidth, area.width - Tokens.Space.x12)
+                                                  : area.width - Tokens.Space.x12
+        let size = toast.size(maxWidth: max(160, maxWidth))
+        toast.frame = frame(for: size, in: area, placement: placement)
         toast.needsLayout = true
     }
 
@@ -983,7 +1009,7 @@ enum Toast {
         let host = controller.root.overlay
         guard let toast = showing[ObjectIdentifier(host)]?.toast, toast.superview === host, !toast.dismissing else { return }
         let old = toast.frame
-        place(toast, in: area(in: controller))
+        place(toast, in: area(in: controller), placement: showing[ObjectIdentifier(host)]?.placement ?? .topCenter)
         let dx = old.minX - toast.frame.minX, dy = old.minY - toast.frame.minY
         // Dragging the window's edge, it simply stays with the page; gliding there would trail behind.
         guard abs(dx) > 0.5 || abs(dy) > 0.5, !Tokens.Motion.reduceMotion, controller.window?.inLiveResize != true,
@@ -1008,7 +1034,8 @@ enum Toast {
 
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
     static func show(_ text: String, symbol: String? = nil, image: NSImage? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false) {
+                     duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect,
+                     placement: Placement = .topCenter, busy: Bool = false) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1045,12 +1072,13 @@ enum Toast {
             toast?.dismiss()
             state.toast = nil
         }
-        place(toast, in: area)
+        place(toast, in: area, placement: placement)
         if isNew {
             host.addSubview(toast)
             // A confirmation of something you just did, often from a key: it drops the few points from the top of the
-            // page it sits under, and lifts back as it goes. Quieter than a notice coming in from outside the window.
-            toast.attachedEdge = .minY
+            // page it sits under, and lifts back as it goes. Quieter than a notice coming in from outside the window,
+            // which slides in from the side it belongs to.
+            toast.attachedEdge = placement == .trailingEdge ? .maxX : .minY
             toast.present()
         } else if toast.dismissing {
             // Caught on its way out: it turns around from where it is rather than finishing the exit and vanishing.
@@ -1059,6 +1087,7 @@ enum Toast {
         // A repeat that's still up (zoom 90% → 80%) only changes the number: it comes from a key, so nothing moves.
         state.toast = toast
         state.owner = nil
+        state.placement = placement
         state.hideWork?.cancel()
         // Toasts with an action wait for the pointer to leave before going, however long it stays, so Undo never
         // slips away from under it.

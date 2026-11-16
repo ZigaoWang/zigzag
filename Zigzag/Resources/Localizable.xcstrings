@@ -6824,6 +6824,17 @@
         }
       }
     },
+    "Everywhere" : {
+      "comment" : "A choice in the Notifications dropdown in Site Controls: in Zigzag while it is in front, and in the Mac's Notification Center when it is not.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有位置"
+          }
+        }
+      }
+    },
     "Expand Group" : {
       "comment" : "Item in a group of tabs' context menu in the sidebar: shows its tabs again.",
       "localizations" : {
