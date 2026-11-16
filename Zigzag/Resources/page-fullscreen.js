@@ -273,7 +273,10 @@
   // fill the page with the same element.
   // Only WebKit's own events count: the ones told here are the page's to hear.
   let backingOut = false;
+  // Sent to the screen with Zigzag's button (`expand`): that full screen is let be until it ends.
+  let toScreen = false;
   const tookScreen = (event) => {
+    if (toScreen) { if (event.isTrusted && !nativeElement()) toScreen = false; return; }
     if (!event.isTrusted || backingOut || !fillsPage()) return;
     const el = nativeElement();
     if (!el) return;
@@ -320,7 +323,20 @@
   // A page that starts is never in full screen, whatever the one before it was.
   report();
   Object.defineProperty(window, KEY, {
-    value: Object.freeze({ exit: () => { if (current) { leave(); return true; } return false; }, get active() { return !!current; } }),
+    value: Object.freeze({
+      exit: () => { if (current) { leave(); return true; } return false; },
+      // Zigzag's button over it: what fills the page goes into the screen's own full screen.
+      expand: () => {
+        const el = current;
+        if (!el) return false;
+        leave();
+        toScreen = true;
+        const request = native.request || native.webkitRequest || native.webkitRequestS;
+        try { Promise.resolve(request.call(el)).catch(() => { toScreen = false; }); } catch (e) { toScreen = false; return false; }
+        return true;
+      },
+      get active() { return !!current; },
+    }),
     enumerable: false, configurable: false, writable: false,
   });
 })();

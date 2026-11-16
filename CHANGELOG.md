@@ -8,12 +8,15 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Download rules, in Settings › Downloads, hand a download or a link to another app, a script or a download manager like aria2, Motrix or yt-dlp, by what its address matches. Zigzag asks before it hands anything off, and whatever no rule matches is saved as before. See [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md). Thanks to [Lakeland97](https://github.com/Lakeland97). ([#191](https://github.com/ZigaoWang/zigzag/issues/191))
 - Double-clicking the empty space below your tabs opens a new tab, as in Arc. The top of the sidebar still works like a title bar, and Settings › Appearance › Double-click the sidebar for a new tab turns it off. ([#262](https://github.com/ZigaoWang/zigzag/issues/262))
+- With Full screen videos fill set to The Page, a video filling the page shows a button at its top corner, while the pointer moves, that takes it into the screen's own full screen. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#257](https://github.com/ZigaoWang/zigzag/issues/257))
+- Drag a tab onto a split's row in the sidebar to add it as a third or fourth page, as dragging one tab onto another makes a split. It takes a quarter on the side of the row you drop it on, and four make a grid. ⌘Z puts it back.
 
 ### Fixed
 - In full screen, the close, minimize and full screen buttons that come down with the menu bar have a bar behind them again, instead of floating over the page when the sidebar is hidden.
 - An address typed without http:// or https://, like localtest.me:3000 for a development server, opens over http when the site can't be reached securely, as in Chrome, Safari and Firefox. Zigzag still tries https first, and goes to http only when nothing answers securely: never past a certificate warning, and never for a site that asked to be reached only securely. The same goes for an address you paste, drop on the address bar or open from selected text. ([#252](https://github.com/ZigaoWang/zigzag/issues/252))
 - Security hardening: a page a site sends as a download is always saved, never shown as one of its pages; an extension can replace only files it downloaded itself, and a replaced file goes to the Trash; and the address keeps showing the page you're on while a reload is redirected elsewhere.
 - An extension that reconnects to itself in a loop on every page, as two Sound Booster extensions did, no longer keeps Zigzag busy. After a few seconds of it, Zigzag lets it try only now and then on that page, notes it once in the extensions log, and says which extension it is, with Turn Off… to turn it off on that site or everywhere. Other extensions, and the same one on other pages, aren't affected.
+- The mini player follows a feed of short videos, like Douyin or TikTok: when the next video starts playing, it moves to it instead of showing a black picture. Thanks to [alextend](https://github.com/alextend). ([#267](https://github.com/ZigaoWang/zigzag/issues/267))
 
 ## [0.9.1] - 2026-11-16
 

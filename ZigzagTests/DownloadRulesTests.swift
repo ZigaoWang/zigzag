@@ -96,6 +96,26 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.filename(for: URL(string: "https://example.com/")!, suggested: "") == "example.com")
     }
 
+    /// A rule names its script, and a name alone means the scripts folder in your Documents: one place for them, which
+    /// is what makes them findable, and a script kept elsewhere is still reachable by its own path.
+    @Test func aRuleNamesAScriptInItsOneFolder() {
+        let folder = Paths.scripts.standardizedFileURL
+        #expect(folder.deletingLastPathComponent().lastPathComponent == "Zigzag")
+        #expect(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "Documents")
+        #expect(folder.lastPathComponent == "Scripts")
+
+        // A bare name is in the folder; a path of its own is taken as it stands, `~` and all.
+        #expect(Paths.script(named: "yt-dlp.sh").standardizedFileURL == folder.appendingPathComponent("yt-dlp.sh"))
+        #expect(Paths.script(named: "/opt/tools/dl.sh").path == "/opt/tools/dl.sh")
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        #expect(Paths.script(named: "~/bin/dl.sh").standardizedFileURL == home.appendingPathComponent("bin/dl.sh"))
+
+        // Picked from the folder, a script is stored by its name, so the rule reads `yt-dlp.sh` and goes on working;
+        // picked anywhere else it keeps its path.
+        #expect(Paths.scriptName(for: folder.appendingPathComponent("yt-dlp.sh")) == "yt-dlp.sh")
+        #expect(Paths.scriptName(for: URL(fileURLWithPath: "/opt/tools/dl.sh")) == "/opt/tools/dl.sh")
+    }
+
     @Test func aServiceOffThisMacGetsNoCookies() {
         #expect(DownloadHandoff.serviceIsOnThisMac("http://127.0.0.1:6800/jsonrpc"))
         #expect(DownloadHandoff.serviceIsOnThisMac("http://localhost:8080/RPC2"))
@@ -461,4 +481,27 @@ struct DownloadRuleTests {
         tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
         #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .cancel)
     }
+
+    // MARK: The App field's menu
+
+    /// The App field lists what's in the Applications folders, **one level deep**: bundles only, each once, in the
+    /// order a person expects. Anything else stays one Choose an App… away.
+    @Test func theAppMenuListsApplicationsOneLevelDeep() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("apps-\(UUID().uuidString)")
+        let mac = root.appendingPathComponent("Mac"), mine = root.appendingPathComponent("Mine")
+        try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: mine.appendingPathComponent("Alpha.app"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // Not a bundle: never offered.
+        try Data().write(to: mine.appendingPathComponent("notes.txt"))
+        // A bundle inside a bundle: this reads one level, never into Contents.
+        try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app/Contents/PlugIns/Inner.app"),
+                                                withIntermediateDirectories: true)
+
+        // The same folder twice is still one entry, and the order is the names'.
+        let named = Applications.named(in: [mac.path, mine.path, mine.path])
+        #expect(named.map(\.name) == ["Alpha", "Zeta"])
+        #expect(named.first?.path == mine.appendingPathComponent("Alpha.app").path)
+    }
+
 }

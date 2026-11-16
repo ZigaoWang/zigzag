@@ -148,6 +148,23 @@ nonisolated struct TileShape: Equatable, Sendable {
     /// A half beside one page puts that page in the other half. A half beside two halves moves both into the other
     /// half, a quarter each, first one first (left or top). A quarter takes that corner of the half it's in, which
     /// keeps the other corner. Never more than four, and never a page left with a shape that isn't a half or a quarter.
+    /// A page dropped on a split's row in the sidebar, joining it (`onRight`: the right half of the row): it takes
+    /// a quarter of the half on that side (the second quarter, below or to the right), the page there keeping the
+    /// first. Two side by side become a half and two quarters, three a grid of four. Nil once there's no half left.
+    static func joining(_ regions: [TileRegion], onRight: Bool) -> TileDrop.Kind? {
+        guard regions.count < maxPanes else { return nil }
+        let halves = regions.filter(\.isHalf)
+        guard let half = halves.first(where: { $0.isColumn && ($0 == .right) == onRight }) ?? halves.last else { return nil }
+        let target: TileRegion = switch half {
+        case .left: .bottomLeft
+        case .right: .bottomRight
+        case .top: .topRight
+        default: .bottomRight
+        }
+        guard let placed = placing(target, beside: regions) else { return nil }
+        return .place(region: target, regions: placed)
+    }
+
     static func placing(_ target: TileRegion, beside regions: [TileRegion]) -> [TileRegion]? {
         if regions.isEmpty {
             guard let other = target.opposite else { return nil }

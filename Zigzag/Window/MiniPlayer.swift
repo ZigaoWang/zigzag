@@ -559,10 +559,16 @@ final class MiniPlayer {
         guard let webView, let tab else { return }
         if PageVideos.shared.isPresentingItself(webView) { apply(model.lost(tab.id)); return }
         let frame = currentFrame
+        // What else is playing on the page, when it isn't the video shown: the next one of a feed.
+        let elsewhere = PageVideos.shared.playing(in: webView).flatMap { found in
+            found.frame.id == frameID && found.video.index == videoIndex ? nil : found
+        }
         let found = frame.flatMap { frame -> PageVideo? in
-            if let same = frame.videos.first(where: { $0.index == videoIndex }), same.natural.width > 0 { return same }
-            return MiniPlayerLayout.choose(frame.videos, viewport: frame.viewport)
-        } ?? PageVideos.shared.playing(in: webView).map { found in
+            if let same = frame.videos.first(where: { $0.index == videoIndex }), same.natural.width > 0 {
+                return MiniPlayerLayout.keeps(same, whilePlaying: elsewhere?.video) ? same : nil
+            }
+            return elsewhere == nil ? MiniPlayerLayout.choose(frame.videos, viewport: frame.viewport) : nil
+        } ?? elsewhere.map { found in
             frameID = found.frame.id
             frameOrigin = .zero
             return found.video
@@ -881,7 +887,7 @@ final class MiniPlayerView: NSView {
     private static let idleHide: TimeInterval = 2.5
 
     /// A white glyph on the picture, a step bolder than the window's own, on a soft shadow so it reads on white too.
-    private static func overlayButton(_ symbol: String, side: CGFloat, glyph: CGFloat, tip: String) -> IconButton {
+    static func overlayButton(_ symbol: String, side: CGFloat, glyph: CGFloat, tip: String) -> IconButton {
         let button = IconButton(symbol: symbol, size: side, symbolSize: glyph, toolTip: tip)
         button.isOverMedia = true
         setGlyph(symbol, size: glyph, on: button)

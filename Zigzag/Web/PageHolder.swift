@@ -19,7 +19,7 @@ final class PageHolder: NSView {
     /// holder's is, so a holder made a page's size plus this leaves the page exactly that size. None with nothing
     /// docked.
     var dockedRoom: NSSize {
-        guard let page, subviews.contains(where: { $0 !== page && !$0.isHidden }) else { return .zero }
+        guard let page, subviews.contains(where: { $0 !== page && $0 !== expandButton && !$0.isHidden }) else { return .zero }
         return NSSize(width: max(0, bounds.width - page.frame.width), height: max(0, bounds.height - page.frame.height))
     }
 
@@ -89,5 +89,77 @@ final class PageHolder: NSView {
         guard size.width > 1, size.height > 1 else { return }
         page.setFrameSize(NSSize(width: size.width, height: size.height - 1))
         page.setFrameSize(size)
+    }
+
+    // MARK: Into real full screen
+
+    /// Over a page that fills itself with a video (Full screen videos fill: The Page): a button at its top corner
+    /// that takes the video into the screen's own full screen (#257). It shows while the pointer moves over the page
+    /// and goes after a moment still, as a player's controls do.
+    var showsExpand = false {
+        didSet {
+            guard showsExpand != oldValue else { return }
+            if showsExpand { revealExpand() } else { removeExpand() }
+        }
+    }
+    /// What the button does: the tab sends its video to the screen.
+    var onExpand: (() -> Void)?
+    private var expandButton: IconButton?
+    private var expandIdle: DispatchWorkItem?
+    private var expandTracking: NSTrackingArea?
+    private static let expandSide: CGFloat = 32
+    private static let expandIdleHide: TimeInterval = 2.5
+
+    private func revealExpand() {
+        let button = expandButton ?? makeExpandButton()
+        placeExpand()
+        button.animator().alphaValue = 1
+        expandIdle?.cancel()
+        let idle = DispatchWorkItem { [weak self] in
+            guard let self, let button = self.expandButton, !button.isHovered else { return }
+            NSAnimationContext.runAnimationGroup { $0.duration = Tokens.Motion.exit; button.animator().alphaValue = 0 }
+        }
+        expandIdle = idle
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.expandIdleHide, execute: idle)
+    }
+
+    private func makeExpandButton() -> IconButton {
+        let tip = String(localized: "Enter Full Screen", comment: "Tooltip of the button over a video that fills the page: puts it in the screen's own full screen.")
+        let button = MiniPlayerView.overlayButton("arrow.up.left.and.arrow.down.right", side: Self.expandSide, glyph: 15, tip: tip)
+        button.alphaValue = 0
+        button.onClick = { [weak self] _ in self?.onExpand?() }
+        addSubview(button)
+        expandButton = button
+        let tracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(tracking)
+        expandTracking = tracking
+        return button
+    }
+
+    private func removeExpand() {
+        expandIdle?.cancel()
+        expandButton?.removeFromSuperview()
+        expandButton = nil
+        if let expandTracking { removeTrackingArea(expandTracking) }
+        expandTracking = nil
+    }
+
+    private func placeExpand() {
+        guard let button = expandButton else { return }
+        let inset = Tokens.Space.x3
+        button.frame = NSRect(x: bounds.maxX - inset - Self.expandSide, y: isFlipped ? inset : bounds.maxY - inset - Self.expandSide,
+                              width: Self.expandSide, height: Self.expandSide)
+        // Over the page, never under it.
+        if subviews.last !== button { addSubview(button, positioned: .above, relativeTo: nil) }
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        if showsExpand { revealExpand() }
+    }
+
+    override func layout() {
+        super.layout()
+        placeExpand()
     }
 }

@@ -59,6 +59,8 @@ protocol SidebarListDelegate: AnyObject {
     func listDragOverFavorites(at windowPoint: NSPoint?, carrying: TabManager.SplitSide?) -> Bool
     /// A tab dropped on another tab's middle: the two open side by side.
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool)
+    /// A tab dropped on a split's row joins it, as a third or fourth page (`TabManager.joining`).
+    func listJoinSplit(_ tab: Tab, onto other: Tab, onRight: Bool)
     /// ⇧-clicked a part of the row of the pages on screen: that pane zooms over the rest, or goes back (#160).
     func listZoomPane(_ tab: Tab)
     /// A tab dropped on a pinned page's middle: a pinned split.
@@ -1906,6 +1908,11 @@ final class SidebarListView: NSView {
 
     private func canSplit(_ carried: SidebarItem, onto target: SidebarItem) -> Bool {
         guard carried != target, let a = splitSide(of: carried), let b = splitSide(of: target) else { return false }
+        // A tab onto a split's row: it joins the split, up to four pages.
+        if case .tab(let c) = carried, case .tab(let t) = target, let manager, let tab = manager.tab(with: c), let onto = manager.tab(with: t),
+           manager.split(for: onto) != nil {
+            return manager.joining(tab, onto: onto, onRight: true) != nil || manager.joining(tab, onto: onto, onRight: false) != nil
+        }
         // Pinned pages are shared by every window, so a private one makes no pinned splits and takes none apart.
         if manager?.isPrivate == true {
             if case .bookmark = carried { return false }
@@ -2239,7 +2246,9 @@ final class SidebarListView: NSView {
         if let split = drag.splitTarget {
             let ontoTab = manager.tab(with: split.id)
             if let tab {
-                if let ontoTab { delegate?.listSplit(ontoTab, with: tab, otherOnRight: split.onRight) } else { delegate?.listPinSplit(tab, onto: split.id, tabOnRight: split.onRight) }
+                if let ontoTab, manager.split(for: ontoTab) != nil {
+                    delegate?.listJoinSplit(tab, onto: ontoTab, onRight: split.onRight)
+                } else if let ontoTab { delegate?.listSplit(ontoTab, with: tab, otherOnRight: split.onRight) } else { delegate?.listPinSplit(tab, onto: split.id, tabOnRight: split.onRight) }
                 return landingView(for: tab)
             }
             if case .bookmark(let id) = drag.item, let ontoTab {

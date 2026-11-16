@@ -175,6 +175,7 @@ enum PageFullScreen {
     }
 
     static let exitCall = "window[Symbol.for('zigzag.fullscreen')]?.exit() ?? false"
+    static let expandCall = "window[Symbol.for('zigzag.fullscreen')]?.expand() ?? false"
 
     private static let webViews = NSHashTable<WKWebView>.weakObjects()
 
@@ -242,6 +243,15 @@ enum PageFullScreen {
         guard tab.isInPageFullScreen, let webView = tab.webView else { return }
         webView.runOwnScript(exitCall, world: .page)
         tab.isInPageFullScreen = false
+    }
+
+    /// The button over a page that fills itself (#257): what fills the page goes into the screen's own full screen
+    /// instead. You pressed it, so the page's call for full screen goes as yours: WebKit lets only a click or key
+    /// have it, and runs a script of the app's as one.
+    static func expand(_ tab: Tab) {
+        guard tab.isInPageFullScreen, let webView = tab.webView else { return }
+        tab.isInPageFullScreen = false
+        webView.evaluateJavaScript(expandCall, in: nil, in: .page) { _ in }
     }
 
     private final class Messages: NSObject, WKScriptMessageHandler {

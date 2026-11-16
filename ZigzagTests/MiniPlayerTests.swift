@@ -20,6 +20,16 @@ struct MiniPlayerTests {
         #expect(MiniPlayerLayout.choose([paused, playing], viewport: viewport)?.index == 1)
     }
 
+    /// A feed of short videos plays the next one in another element: the card moves to it once its own has stopped,
+    /// and stays on a video you paused when nothing else plays.
+    @Test func theCardMovesOnToAFeedsNextVideo() {
+        let r = CGRect(x: 0, y: 0, width: 640, height: 360)
+        let shown = video(0, r, playing: false), next = video(1, r, playing: true)
+        #expect(!MiniPlayerLayout.keeps(shown, whilePlaying: next))
+        #expect(MiniPlayerLayout.keeps(shown, whilePlaying: nil))
+        #expect(MiniPlayerLayout.keeps(video(0, r, playing: true), whilePlaying: next))
+    }
+
     @Test func nothingIsChosenWhenNothingPlays() {
         let ended = PageVideo(index: 0, rect: CGRect(x: 0, y: 0, width: 640, height: 360), natural: CGSize(width: 640, height: 360),
                               isPlaying: true, hasEnded: true)

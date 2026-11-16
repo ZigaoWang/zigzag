@@ -15,12 +15,15 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 新功能
 - 下载规则：在“设置 › 下载”里，可以按网址匹配，把下载或链接交给其他 App、脚本或 aria2、Motrix、yt-dlp 这样的下载工具。交出去之前 Zigzag 会先问你，没有规则匹配的照常保存。详见 [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md)。感谢 [Lakeland97](https://github.com/Lakeland97)。([#191](https://github.com/ZigaoWang/zigzag/issues/191))
 - 在标签页下方的空白处双击会新建标签页，和 Arc 一样。边栏顶部仍然像标题栏一样，可以在“设置 › 外观 › 双击边栏新建标签页”里关掉。([#262](https://github.com/ZigaoWang/zigzag/issues/262))
+- “全屏视频填满”设为“网页”时，填满网页的视频在指针移动时会在右上角显示一个按钮，点一下就进入真正的全屏。感谢 [Lakeland97](https://github.com/Lakeland97)。([#257](https://github.com/ZigaoWang/zigzag/issues/257))
+- 把标签页拖到边栏里分屏那一行上，就能加成第三、第四个页面，就像把一个标签页拖到另一个上面会分屏一样。它会占你放下那一侧的四分之一，四个就是田字格。⌘Z 可以撤销。
 
 ### 修复
 - 全屏时，跟着菜单栏一起出现的关闭、最小化和全屏按钮后面又有了一条栏，隐藏边栏时不会再直接浮在网页上。
 - 输入网址时不带 http:// 或 https://，比如开发服务器用的 localtest.me:3000，如果网站无法通过安全连接访问，就会改用 http 打开，和 Chrome、Safari、Firefox 一样。Zigzag 仍然先试 https，只有安全连接完全没有回应时才改用 http：遇到证书警告不会绕过，要求只能通过安全连接访问的网站也不会。粘贴、拖到地址栏或从选中的文字打开的网址也是这样。([#252](https://github.com/ZigaoWang/zigzag/issues/252))
 - 安全加固：网站作为下载发送的页面一定会被保存，不会当成它的网页显示；扩展只能替换它自己下载的文件，被替换的文件会移到废纸篓；页面重新载入时被重定向到别处，地址栏仍然显示你正在看的页面。
 - 在每个页面上不停重新连接自己的扩展（比如两个 Sound Booster 扩展）不再让 Zigzag 一直忙碌。这样持续几秒后，Zigzag 只让它在那个页面上隔一段时间才试一次，在扩展日志里记一次，并说出是哪个扩展，用“关闭…”可以只在那个网站上关闭它，或者在所有网站上关闭它。其他扩展，以及这个扩展在其他页面上，都不受影响。
+- 小播放器会跟着短视频连播走，比如抖音：下一个视频开始播放时会切过去，不再显示黑屏。感谢 [alextend](https://github.com/alextend)。([#267](https://github.com/ZigaoWang/zigzag/issues/267))
 
 ## [0.9.1] - 2026-11-16
 

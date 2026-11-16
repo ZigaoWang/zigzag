@@ -2931,24 +2931,41 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             : detail
     }
 
-    /// Add Rule: a plain action, or a preset that fills the fields for aria2, Motrix, rTorrent, yt-dlp, mpv or IINA.
+    /// Add Rule: the ready-made rules first — most people want aria2 or Motrix — and then Custom… for an action of
+    /// your own, so the four ways of doing something by hand don't sit in front of the ones that just work.
     private func showDownloadRuleMenu() {
-        var entries: [MenuPanel.Entry] = DownloadRuleAction.Kind.allCases.map { kind in
+        let entries: [MenuPanel.Entry] = DownloadPreset.allCases.map { preset in
+            .item(MenuPanel.Item(title: preset.title, symbol: preset.rule.action.kind.symbol) { [weak self] in
+                guard let self else { return }
+                DownloadRuleSheet.show(in: self, kind: preset.rule.action.kind, preset: preset)
+            })
+        } + [
+            .separator,
+            .item(MenuPanel.Item(title: String(localized: "Custom…", comment: "An item in the Add Rule menu of Settings › Downloads: the actions that aren't a ready-made rule — an app, a URL, a script or a JSON-RPC service."),
+                                 symbol: "slider.horizontal.3") { [weak self] in
+                guard let self else { return }
+                self.showCustomRuleMenu()
+            }),
+        ]
+        MenuPanel.show(entries, from: addDownloadRuleButton) { [weak addDownloadRuleButton] in
+            addDownloadRuleButton?.isSelected = false
+        }
+    }
+
+    /// Custom…: the four actions a rule can take, with nothing already chosen — the second panel Add Rule opens.
+    /// A destination is made from Add File Type, under Save downloads to, not from here.
+    private func showCustomRuleMenu() {
+        let entries: [MenuPanel.Entry] = DownloadRuleAction.Kind.allCases.map { kind in
             .item(MenuPanel.Item(title: kind.title, symbol: kind.symbol) { [weak self] in
                 guard let self else { return }
                 DownloadRuleSheet.show(in: self, kind: kind)
             })
         }
-        entries.append(.header(String(localized: "Presets", comment: "A heading in the Add Rule menu of Settings › Downloads, over the ready-made rules.")))
-        entries += DownloadPreset.allCases.map { preset in
-            .item(MenuPanel.Item(title: preset.title, symbol: preset.rule.action.kind.symbol) { [weak self] in
-                guard let self else { return }
-                DownloadRuleSheet.show(in: self, kind: preset.rule.action.kind, preset: preset)
-            })
+        let menu = MenuPanel.show(entries, from: addDownloadRuleButton) { [weak self] in
+            self?.addDownloadRuleButton.isSelected = false
         }
-        MenuPanel.show(entries, from: addDownloadRuleButton) { [weak addDownloadRuleButton] in
-            addDownloadRuleButton?.isSelected = false
-        }
+        // Opening this panel closed the one over it, which cleared the button: Custom… is still up.
+        if menu != nil { addDownloadRuleButton.isSelected = true }
     }
 
     /// An engine's icon: its site's, or for Custom with no address yet, a plain magnifying glass (never Google's).
