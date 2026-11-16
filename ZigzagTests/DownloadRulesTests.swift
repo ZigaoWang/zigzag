@@ -91,6 +91,8 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.filename(for: file, suggested: "-rf") == "_-rf")
         #expect(DownloadTokens.filename(for: file, suggested: ".hidden") == "hidden")
         #expect(!DownloadTokens.filename(for: file, suggested: "a\u{0}b").contains("\u{0}"))
+        // A bidi override can make "invoicefdp.exe" read as a PDF name; it is a format character, so it goes.
+        #expect(DownloadTokens.filename(for: file, suggested: "invoice\u{202E}fdp.exe") == "invoicefdp.exe")
         #expect(DownloadTokens.filename(for: URL(string: "https://example.com/")!, suggested: "") == "example.com")
     }
 
@@ -105,6 +107,7 @@ struct DownloadRuleTests {
     @Test func zigzagsOwnURLsAreNotHandoffs() {
         #expect(!DownloadHandoff.isHandoffable(URL(string: "zigzag-proceed://example.com")!))
         #expect(!DownloadHandoff.isHandoffable(URL(string: "zigzag://history")!))
+        #expect(!DownloadHandoff.isHandoffable(URL(string: "zigzag-webapp://notes")!))
         #expect(!DownloadHandoff.isHandoffable(URL(string: "file:///Users/me/x")!))
         #expect(!DownloadHandoff.isHandoffable(URL(string: "chrome-extension://abc/page")!))
         #expect(DownloadHandoff.isHandoffable(URL(string: "https://example.com/file")!))
@@ -124,8 +127,10 @@ struct DownloadRuleTests {
         #expect(rules[0].match == .contains)
         #expect(rules[1].match == .contains)
         #expect(rules[1].action.kind == .openURL)
+        #expect(!rules[1].isEnabled)
         #expect(rules[2].applies == .downloads)
         #expect(rules[2].action.kind == .openURL)
+        #expect(!rules[2].isEnabled)
     }
 
     @Test func aResponseNameKeepsItsCaseAndItsPieces() {
@@ -201,6 +206,12 @@ struct DownloadRuleTests {
         #expect(!old.applies(to: file, now: now))
         let session = HandoffCookie(name: "e", value: "5", domain: "example.com", expires: nil)
         #expect(session.applies(to: file, now: now))
+        // A host-only cookie stays on its host; one with a leading dot is for the domain.
+        let hostOnly = HandoffCookie(name: "h", value: "6", domain: "example.com")
+        #expect(hostOnly.applies(to: file, now: now))
+        #expect(!hostOnly.applies(to: URL(string: "https://sub.example.com/")!, now: now))
+        let forDomain = HandoffCookie(name: "d", value: "7", domain: ".example.com")
+        #expect(forDomain.applies(to: URL(string: "https://sub.example.com/")!, now: now))
     }
 
     @Test func headerAndNetscapeFile() {
@@ -211,7 +222,7 @@ struct DownloadRuleTests {
         let text = HandoffCookies.netscape(matching)
         #expect(text.contains("# Netscape HTTP Cookie File"))
         #expect(text.contains("#HttpOnly_.example.com\tTRUE\t/\tTRUE\t0\tsid\tabc"))
-        #expect(text.contains(".example.com\tFALSE\t/\tFALSE\t2000000\ttheme\tdark"))
+        #expect(text.contains("example.com\tFALSE\t/\tFALSE\t2000000\ttheme\tdark"))
         #expect(text.hasSuffix("\n"))
     }
 

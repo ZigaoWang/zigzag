@@ -5343,13 +5343,13 @@
         }
       }
     },
-    "Couldn’t hand off the link: %@" : {
+    "Couldn’t hand off: %@" : {
       "comment" : "Toast when a download rule's action fails. The placeholder is the reason, a few words.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未能转交链接：%@"
+            "value" : "未能转交：%@"
           }
         }
       }

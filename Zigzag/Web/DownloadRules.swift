@@ -137,11 +137,18 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         name = value(String.self, .name) ?? ""
         isEnabled = value(Bool.self, .isEnabled) ?? true
         applies = value(String.self, .applies).flatMap(Applies.init(rawValue:)) ?? .downloads
-        match = value(String.self, .match).flatMap(Match.init(rawValue:)) ?? .contains
+        if let rawMatch = value(String.self, .match) {
+            if let known = Match(rawValue: rawMatch) { match = known } else { match = .contains; isEnabled = false }
+        } else {
+            match = .contains
+        }
         pattern = value(String.self, .pattern) ?? ""
         isCaseSensitive = value(Bool.self, .isCaseSensitive) ?? false
         runsInPrivateWindows = value(Bool.self, .runsInPrivateWindows) ?? false
         action = value(DownloadRuleAction.self, .action) ?? DownloadRuleAction(kind: .openURL)
+        // A rule written by a newer build with a kind this one doesn't know is kept, but not run: it could not do
+        // what it says, and a prompt for it would be a question with no true answer.
+        if action.wasDecodedFromUnknownKind { isEnabled = false }
     }
 }
 
@@ -217,14 +224,17 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     /// A JSON array of parameters. For XML-RPC each is sent as a string.
     var rpcParameters = "[]"
     var rpcStyle: RPCStyle = .json
+    /// True when a file named an action kind this build doesn't know; the rule is kept but disabled.
+    var wasDecodedFromUnknownKind = false
 
-    /// Every string the action substitutes tokens into.
+    /// Every string the action substitutes tokens into. A path, an endpoint and a method are literal, so a token in
+    /// one of them is text, not a value.
     var textFields: [String] {
         switch kind {
-        case .openApp: [appPath]
+        case .openApp: []
         case .openURL: [urlTemplate]
-        case .runScript: [scriptPath] + arguments
-        case .jsonRPC: [rpcEndpoint, rpcMethod, rpcParameters]
+        case .runScript: arguments
+        case .jsonRPC: [rpcParameters]
         }
     }
 
@@ -273,7 +283,11 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             guard let container else { return nil }
             return try? container.decodeIfPresent(type, forKey: key)
         }
-        kind = value(String.self, .kind).flatMap(Kind.init(rawValue:)) ?? .openURL
+        if let rawKind = value(String.self, .kind) {
+            if let known = Kind(rawValue: rawKind) { kind = known } else { kind = .openURL; wasDecodedFromUnknownKind = true }
+        } else {
+            kind = .openURL
+        }
         appPath = value(String.self, .appPath) ?? ""
         urlTemplate = value(String.self, .urlTemplate) ?? ""
         scriptPath = value(String.self, .scriptPath) ?? ""
@@ -380,23 +394,36 @@ nonisolated enum DownloadTokens {
         return url.absoluteString.addingPercentEncoding(withAllowedCharacters: allowed) ?? url.absoluteString
     }
 
+    /// The characters a name may keep: no control, format (bidi included), line or paragraph separators, surrogates
+    /// or unassigned scalars, and no folder separators or colons. Shared with the download manager, so a name shown
+    /// in a rule and a name written to disk follow one policy.
+    static func safeName(_ name: String) -> String {
+        var scalars = String.UnicodeScalarView()
+        for scalar in name.unicodeScalars {
+            switch scalar.properties.generalCategory {
+            case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate, .unassigned: continue
+            default: break
+            }
+            scalars.append(scalar == "/" || scalar == "\\" || scalar == ":" ? "-" : scalar)
+        }
+        var trimmed = String(scalars).trimmingCharacters(in: .whitespacesAndNewlines)
+        while trimmed.hasPrefix(".") { trimmed.removeFirst() }
+        return trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     /// A name safe to write in Downloads, a header, or an argument: no folder separators, no control characters,
-    /// no leading dot.
+    /// no leading dot, and no leading dash that a script would read as an option.
     static func filename(for url: URL, suggested: String) -> String {
         var name = suggested
         if name.isEmpty {
             name = url.lastPathComponent
             if name.isEmpty || name == "/" { name = url.host() ?? "download" }
         }
-        name = name.removingPercentEncoding ?? name
-        name = String(name.unicodeScalars.map { scalar -> Character in
-            CharacterSet.controlCharacters.contains(scalar) || "/\\:".unicodeScalars.contains(scalar) ? "-" : Character(scalar)
-        })
-        while name.hasPrefix(".") { name.removeFirst() }
-        var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        // A leading dash would read as an option to a script that parses its argv.
-        if trimmed.hasPrefix("-") { trimmed = "_" + trimmed }
-        return trimmed.isEmpty ? "download" : trimmed
+        name = safeName(name.removingPercentEncoding ?? name)
+        if name.isEmpty { name = safeName(url.lastPathComponent) }
+        if name.isEmpty { name = "download" }
+        if name.hasPrefix("-") { name = "_" + name }
+        return name
     }
 
     /// A value as the inside of a JSON string, without the quotes.
@@ -472,6 +499,9 @@ nonisolated struct HandoffCookie: Equatable, Sendable {
                   isSecure: cookie.isSecure, isHTTPOnly: cookie.isHTTPOnly, expires: cookie.expiresDate)
     }
 
+    /// A cookie with no leading dot belongs to the exact host and no subdomain; one with a dot is for the domain.
+    var isHostOnly: Bool { !domain.hasPrefix(".") }
+
     /// Whether this cookie would be sent with a request for `url`: its domain and path cover it, it hasn't expired,
     /// and a secure cookie only goes over https.
     func applies(to url: URL, now: Date = Date()) -> Bool {
@@ -479,7 +509,8 @@ nonisolated struct HandoffCookie: Equatable, Sendable {
         guard let host = url.host()?.lowercased() else { return false }
         let cookieDomain = domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         guard !cookieDomain.isEmpty else { return false }
-        let domainMatches = host == cookieDomain || host.hasSuffix("." + cookieDomain)
+        let domainMatches = isHostOnly ? host == cookieDomain
+            : (host == cookieDomain || host.hasSuffix("." + cookieDomain))
         guard domainMatches else { return false }
         if isSecure && url.scheme?.lowercased() != "https" { return false }
         let requestPath = url.path.isEmpty ? "/" : url.path
@@ -509,8 +540,11 @@ nonisolated enum HandoffCookies {
     static func netscape(_ cookies: [HandoffCookie]) -> String {
         var lines = ["# Netscape HTTP Cookie File", "# Written by Zigzag for one handoff.", ""]
         for cookie in cookies {
-            let domain = cookie.domain.hasPrefix(".") ? cookie.domain : "." + cookie.domain
-            let includeSubdomains = cookie.domain.hasPrefix(".") ? "TRUE" : "FALSE"
+            // The leading dot and the include-subdomains flag say the same thing, and yt-dlp's loader refuses a
+            // file where they disagree: a host-only cookie is `example.com` with FALSE, a domain cookie `.example.com`
+            // with TRUE.
+            let domain = cookie.domain
+            let includeSubdomains = cookie.isHostOnly ? "FALSE" : "TRUE"
             let secure = cookie.isSecure ? "TRUE" : "FALSE"
             let expiry = cookie.expires.map { String(Int($0.timeIntervalSince1970)) } ?? "0"
             let prefix = cookie.isHTTPOnly ? "#HttpOnly_" : ""

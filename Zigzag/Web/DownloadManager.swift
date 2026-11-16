@@ -462,17 +462,7 @@ final class DownloadManager: NSObject {
     /// invisible ones that reorder or hide text (a right-to-left override makes "invoice\u{202E}fdp.exe" read as
     /// "invoiceexe.pdf"; a zero-width space hides between letters). Never hidden by a leading dot, never empty.
     nonisolated static func safeFilename(_ filename: String) -> String {
-        var scalars = String.UnicodeScalarView()
-        for scalar in filename.unicodeScalars {
-            switch scalar.properties.generalCategory {
-            case .control, .format, .lineSeparator, .paragraphSeparator, .surrogate, .unassigned: continue
-            default: break
-            }
-            scalars.append(scalar == "/" || scalar == ":" ? "-" : scalar)
-        }
-        var name = String(scalars).trimmingCharacters(in: .whitespaces)
-        while name.hasPrefix(".") { name.removeFirst() }
-        name = name.trimmingCharacters(in: .whitespaces)
+        let name = DownloadTokens.safeName(filename)
         return name.isEmpty ? "Download" : name
     }
 
@@ -684,6 +674,9 @@ extension DownloadManager: WKDownloadDelegate {
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        // The destination decision never runs for a download that fails or is cancelled first; its state goes now.
+        origins.removeValue(forKey: ObjectIdentifier(download))
+        windows.removeValue(forKey: ObjectIdentifier(download))
         guard let item = item(for: download) else { return }
         // Pausing cancels the transfer underneath; the row stays paused, with what's needed to go on.
         if item.state == .paused { return }

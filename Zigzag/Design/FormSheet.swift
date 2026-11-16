@@ -166,9 +166,11 @@ final class FormSheet: NSView, NSTextFieldDelegate {
     /// Tab goes round the form's fields, then whichever of its controls and buttons take the keyboard (with Full
     /// Keyboard Access off, only the fields do), and never leaves it.
     private func moveFocus(backward: Bool, in window: NSWindow) {
-        let stops: [NSView] = rows.compactMap { row -> NSView? in
-            if let filled = row.view as? FilledField { return filled.field }
-            return row.view.canBecomeKeyView ? row.view : nil
+        let stops: [NSView] = rows.flatMap { row -> [NSView] in
+            if let filled = row.view as? FilledField { return [filled.field] }
+            // A field beside a Choose… button is nested in the row; both take the keyboard, in the order drawn.
+            let nested = row.view.selfAndDescendants(of: NSView.self).filter(\.canBecomeKeyView)
+            return nested.isEmpty ? (row.view.canBecomeKeyView ? [row.view] : []) : nested
         } + [cancel, confirm].filter(\.canBecomeKeyView)
         guard !stops.isEmpty else { return }
         // A field being typed in has the keyboard through its editor.

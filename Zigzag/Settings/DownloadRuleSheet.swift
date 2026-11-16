@@ -130,7 +130,8 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: caseSensitive),
             FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
         ]
-        let rows = matchRows + actionRows + [tokens]
+        // Open App's path is literal: there is no field a token could fill.
+        let rows = matchRows + actionRows + (action.kind == .openApp ? [] : [tokens])
 
         func ruleFromFields() -> DownloadRule? {
             var action = action
@@ -177,10 +178,11 @@ enum DownloadRuleSheet {
                                    confirmTitle: existing == nil ? String(localized: "Add", comment: "Button of the sheet that makes a download rule.")
                                                                  : String(localized: "Save", comment: "Button of the sheet that changes a download rule."),
                                    canConfirm: valid) { confirmed in
+            // The sheet is done either way; the fields are read below, not from it.
+            sheetRef = nil
             guard confirmed, let rule = ruleFromFields() else { return }
             if let secret = secretField?.stringValue, action.kind == .jsonRPC { HandoffSecrets.setSecret(secret, for: rule.id) }
             if existing == nil { DownloadRulesStore.shared.add(rule) } else { DownloadRulesStore.shared.update(rule) }
-            sheetRef = nil
         }
         sheetRef = sheet
     }

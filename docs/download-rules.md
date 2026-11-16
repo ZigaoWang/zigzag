@@ -52,13 +52,15 @@ An Open URL template, a script's arguments and a service's parameters may use:
 | `{space}` | The name of the space the tab is in. |
 
 A script also gets `ZIGZAG_LINK`, `ZIGZAG_REFERRER`, `ZIGZAG_FILENAME`, `ZIGZAG_MIME`, `ZIGZAG_SPACE`,
-`ZIGZAG_COOKIES` and `ZIGZAG_COOKIE_HEADER` where they apply, plus `ZIGZAG_SECRET` for a service's token.
+`ZIGZAG_COOKIES` and `ZIGZAG_COOKIE_HEADER` where they apply. A JSON-RPC or XML-RPC rule may use `{secret}` in its
+parameters for the token kept in the Keychain; a script is not given the token.
 
 ## Cookies
 
 A rule that names `{cookies}` or `{cookie_header}` gets the tab's cookies from its own profile, never another
 profile's. They are read for the target only when the target is the page's own site, or when you clicked the link
-that led there. A page that names another site on its own gets none of this site's cookies, whichever rule it names.
+that led there. A download a page starts on its own, or one from the context menu, is treated as not clicked, so it
+gets no cookies. A page that names another site on its own gets none of this site's cookies, whichever rule it names.
 A JSON-RPC or XML-RPC rule also gets them only when its endpoint is on this Mac: a remote service is reached without
 the site's sign-in.
 

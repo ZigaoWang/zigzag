@@ -49,7 +49,8 @@ enum DownloadHandoff {
     /// app launch, or send a history page to a script.
     static func isHandoffable(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
-        if scheme == HistoryPage.scheme || scheme == CertificateExceptions.scheme { return false }
+        // Zigzag's own schemes, the certificate warning's proceed link and a web app's link are never a rule's.
+        if scheme == HistoryPage.scheme || scheme == CertificateExceptions.scheme || scheme == "zigzag-webapp" { return false }
         if ["about", "data", "blob", "javascript", "file"].contains(scheme) { return false }
         if scheme.hasSuffix("-extension") { return false }
         return true
@@ -77,6 +78,12 @@ enum DownloadHandoff {
         // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
         guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
         guard isHandoffable(request.url) else { return .browser }
+        // A question has to be able to show: a background tab, a window behind another, or Zigzag in the background
+        // would hold it with nothing to see. The download or link carries on as if no rule had matched.
+        if let tab, let host = WindowManager.shared.promptHost(holding: tab),
+           !host.promptShows(tab) || host.window?.isVisible != true || host.window?.isKeyWindow != true {
+            return .browser
+        }
         let origin = request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
         let kind = handoffKind(rule)
         if let origin, let tab, let kept = tab.permissionAnswers.action(key: origin, kind: kind) {
@@ -188,7 +195,7 @@ enum DownloadHandoff {
         guard case .failed(let reason) = outcome else { return }
         Diagnostics.note("Handoff failed", site: url.host(), "\(rule?.name ?? "Rule"): \(reason)", isPrivate: isPrivate)
         guard let controller = WindowManager.shared.controller(for: window) ?? WindowManager.shared.keyController else { return }
-        Toast.show(String(localized: "Couldn’t hand off the link: \(reason)", comment: "Toast when a download rule's action fails. The placeholder is the reason, a few words."),
+        Toast.show(String(localized: "Couldn’t hand off: \(reason)", comment: "Toast when a download rule's action fails for a link or a download. The placeholder is the reason, a few words."),
                    symbol: "exclamationmark.triangle", duration: 4, in: controller)
     }
 
