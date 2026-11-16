@@ -494,6 +494,7 @@ struct DownloadRuleTests {
     @Test func anOpenNeverTakesAnAppScriptOrArchive() {
         #expect(DownloadOpening.isRefused("dmg"))
         #expect(DownloadOpening.isRefused("APP"))
+        #expect(DownloadOpening.isRefused(""))
         #expect(!DownloadOpening.isRefused("pdf"))
         #expect(DownloadOpening.isRefused(pattern: "pdf, dmg"))
 
