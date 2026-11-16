@@ -44,13 +44,27 @@ struct CommandResult: Equatable {
 
 /// Turns what you typed into ranked results: URLs, searches, open tabs, bookmarks and history.
 enum CommandRanker {
+    /// Where Zigzag goes for text you gave it (typed, pasted, dropped or selected), and where it goes instead when
+    /// the secure address it chose can't be reached: as Chrome, Safari and Firefox do, an address typed without a
+    /// scheme is tried over https first, then once over http, so a server that only speaks http (a development
+    /// server on localtest.me:3000) still opens. Never for a scheme you typed, an address that goes over http
+    /// anyway (localhost, an IP address, a local network's name), a link or a search.
+    struct Destination: Equatable {
+        let url: URL
+        /// Zigzag gave it https because it had no scheme, so it's tried once more over http (`Tab.load`).
+        var httpFallback = false
+    }
+
     /// A URL if the text looks like an address, otherwise nil.
-    static func url(from text: String) -> URL? {
+    static func url(from text: String) -> URL? { destination(from: text)?.url }
+
+    /// Where the text goes if it looks like an address, otherwise nil.
+    static func destination(from text: String) -> Destination? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
         let lower = trimmed.lowercased()
         if lower.hasPrefix("http://") || lower.hasPrefix("https://") || lower.hasPrefix("file://") || lower.hasPrefix("about:") {
-            return URL(string: trimmed)
+            return URL(string: trimmed).map { Destination(url: $0) }
         }
         // The host is everything before the first of / ? #; the port comes off too.
         let hostEnd = lower.firstIndex { "/?#".contains($0) } ?? lower.endIndex
@@ -60,15 +74,16 @@ enum CommandRanker {
         if hostPart.contains("@") { return nil }
         let host = hostPart.split(separator: ":", omittingEmptySubsequences: false).first.map(String.init) ?? hostPart
         if host == "localhost" || host.range(of: #"^\d{1,3}(\.\d{1,3}){3}$"#, options: .regularExpression) != nil {
-            return URL(string: "http://" + trimmed)
+            return URL(string: "http://" + trimmed).map { Destination(url: $0) }
         }
         let labels = host.split(separator: ".", omittingEmptySubsequences: false)
         guard labels.count >= 2, labels.allSatisfy({ !$0.isEmpty }), let tld = labels.last.map(String.init) else { return nil }
         // Names only a local network knows go over plain http, the way a printer or router serves them.
-        if localTLDs.contains(tld) { return URL(string: "http://" + trimmed) }
+        if localTLDs.contains(tld) { return URL(string: "http://" + trimmed).map { Destination(url: $0) } }
         // A real top-level domain, so "node.js" and "readme.txt" are searched, not opened.
         guard knownTLDs.contains(tld) || tld.hasPrefix("xn--") else { return nil }
-        return URL(string: "https://" + trimmed)
+        // Secure first; the same address over http if that can't be reached.
+        return URL(string: "https://" + trimmed).map { Destination(url: $0, httpFallback: true) }
     }
 
     /// Selected text without the sentence around it: quotes, brackets and punctuation at either end. A parenthesis is
@@ -93,11 +108,15 @@ enum CommandRanker {
 
     /// The web address some selected text is, when it's only that (#234): "example.com", or a whole https address,
     /// the quotes, brackets or full stop around it in a sentence left off. Only the web: never a file or about: page.
-    static func url(fromSelection text: String) -> URL? {
+    static func url(fromSelection text: String) -> URL? { destination(fromSelection: text)?.url }
+
+    /// Where the selected text goes when it's a web address (`url(fromSelection:)`), with its fallback over http.
+    static func destination(fromSelection text: String) -> Destination? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 2048, !trimmed.contains(where: \.isNewline) else { return nil }
-        guard let url = url(from: withoutSurroundings(trimmed)), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https", url.host?.isEmpty == false else { return nil }
-        return url
+        guard let destination = destination(from: withoutSurroundings(trimmed)), let scheme = destination.url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https", destination.url.host?.isEmpty == false else { return nil }
+        return destination
     }
 
     private static let localTLDs: Set<String> = ["local", "lan", "internal", "test", "localhost", "home", "arpa", "corp", "intranet"]

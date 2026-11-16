@@ -39,6 +39,24 @@ struct AddressTests {
         #expect(CommandRanker.url(fromSelection: "") == nil)
     }
 
+    /// An address typed without a scheme goes over https, and over http once if https can't be reached, as other
+    /// browsers do.
+    @Test func anAddressWithoutASchemeFallsBackToHTTP() {
+        let typed = CommandRanker.destination(from: "localtest.me:3600/x?y=1#z")
+        #expect(typed?.url.absoluteString == "https://localtest.me:3600/x?y=1#z")
+        #expect(typed?.httpFallback == true)
+        #expect(CommandRanker.destination(from: " example.com ")?.httpFallback == true)
+        #expect(CommandRanker.destination(fromSelection: "(example.com).")?.httpFallback == true)
+        // A scheme you typed is the one you get, and an address that goes over http anyway has nothing to fall back to.
+        for text in ["https://example.com", "http://example.com", "localhost:3000", "192.168.1.1", "printer.local", "app.test",
+                     "file:///etc/hosts", "about:blank"] {
+            #expect(CommandRanker.destination(from: text)?.httpFallback == false, "\(text)")
+        }
+        // Words are searched for, not opened.
+        #expect(CommandRanker.destination(from: "node.js") == nil)
+        #expect(CommandRanker.destination(from: "go to example.com") == nil)
+    }
+
     /// The selection read as the right-click started counts only while WebKit's menu is still for it: a click that
     /// selected a word instead has no Open (#234).
     @Test func theMenuIsForTheSelectionReadAsTheClickStarted() {
