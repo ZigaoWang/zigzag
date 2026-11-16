@@ -104,6 +104,13 @@ nonisolated enum MiniPlayerLayout {
         plays(video) && video.isWatched
     }
 
+    /// Whether the card stays on the video it shows. A feed of short videos (Douyin, TikTok, Reels) plays the next
+    /// one in another element when this one is done: once it has stopped and another is playing, the card moves to
+    /// that one, rather than holding a stopped or black picture. Paused by you, with nothing else playing, it stays.
+    static func keeps(_ shown: PageVideo, whilePlaying other: PageVideo?) -> Bool {
+        shown.isPlaying || other == nil
+    }
+
     /// The video leaving a tab takes along, and the index of its frame among `frames` (each frame's viewport and
     /// videos): none while the page is on its way out (`leavingPage`, a link followed: what's still playing is the
     /// page you're done with), or floats or fills the screen with a video itself.
