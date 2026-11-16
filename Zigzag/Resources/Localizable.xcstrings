@@ -1756,17 +1756,6 @@
         }
       }
     },
-    "A JSON array. {link}, {filename}, {cookies} and the rest are filled in, safely quoted. The token is kept in the Keychain." : {
-      "comment" : "Explanation under Parameters in a download rule's JSON-RPC action.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "一个 JSON 数组。{link}、{filename}、{cookies} 等会被安全地引用后填入。令牌保存在钥匙串中。"
-          }
-        }
-      }
-    },
     "A blocker stopped this page" : {
       "comment" : "Title of the page Zigzag shows when a content blocker kept a page from loading.",
       "localizations" : {
@@ -11157,17 +11146,6 @@
         }
       }
     },
-    "One argument a line. Each becomes its own argument, so a URL with &, ; or $() is never run as a shell command. The link, cookies and the rest are also in ZIGZAG_LINK, ZIGZAG_COOKIES and the other environment variables." : {
-      "comment" : "Explanation under Arguments in a download rule's Run Script action.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "每行一个参数。每个参数都会成为独立参数，因此含有 &、; 或 $() 的 URL 不会被当作 shell 命令执行。链接、Cookie 等也会放在 ZIGZAG_LINK、ZIGZAG_COOKIES 等环境变量中。"
-          }
-        }
-      }
-    },
     "Only %@’s history is cleared; other profiles keep theirs." : {
       "comment" : "Added to the message of a sheet that asks before clearing History, when there's more than one profile. The placeholder is the profile's name.",
       "localizations" : {
@@ -11916,7 +11894,6 @@
         }
       }
     },
-
     "Outline Every Element" : {
       "comment" : "View › Developer menu item and command, on a development site, checked while on: draws a line around each element of the page.",
       "localizations" : {
@@ -17202,28 +17179,6 @@
         }
       }
     },
-    "The first rule that matches an address wins. A download no rule matches is saved by Zigzag." : {
-      "comment" : "Explanation under the download rules in Settings › Downloads.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一条匹配地址的规则生效。没有规则匹配的下载由 Zigzag 保存。"
-          }
-        }
-      }
-    },
-    "The first rule that matches an address wins. Rules run from the top of the list." : {
-      "comment" : "Explanation in a download rule's sheet.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一条匹配地址的规则生效。规则按列表从上到下运行。"
-          }
-        }
-      }
-    },
     "The free encyclopedia" : {
       "comment" : "Wikipedia’s tagline, on a sample page in the welcome window’s picture of Zigzag.",
       "localizations" : {
@@ -18595,17 +18550,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入“%@”以确认"
-          }
-        }
-      }
-    },
-    "Type a link or a file’s address to see which rule takes it, and what it would do." : {
-      "comment" : "Explanation under Test an address in Settings › Downloads.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入链接或文件地址，看看哪条规则会接管它，以及它会做什么。"
           }
         }
       }
@@ -22434,6 +22378,133 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网页是否可以运行自己的脚本。你在网站控制中改过的网站会保留各自的选择。"
+          }
+        }
+      }
+    },
+    "The first rule that matches wins." : {
+      "comment" : "Under the title of the sheet that makes a download rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一个匹配的规则生效。"
+          }
+        }
+      }
+    },
+    "A JSON array. Tokens are filled in." : {
+      "comment" : "Under the parameters of a JSON-RPC download rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个 JSON 数组。令牌会自动填入。"
+          }
+        }
+      }
+    },
+    "Cookies leave this Mac" : {
+      "comment" : "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint isn't on this Mac: the site's cookies would go to another machine.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 会离开这台 Mac"
+          }
+        }
+      }
+    },
+    "Cookies stay on this Mac" : {
+      "comment" : "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 留在这台 Mac 上"
+          }
+        }
+      }
+    },
+    "Drag one to change its order." : {
+      "comment" : "Under the download rules in Settings › Downloads, when there is an order to change.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖移即可更改顺序。"
+          }
+        }
+      }
+    },
+    "Kept in the Keychain" : {
+      "comment" : "Tooltip on the token field of a JSON-RPC download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存在钥匙串中"
+          }
+        }
+      }
+    },
+    "Not run through a shell" : {
+      "comment" : "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不经由 shell 运行"
+          }
+        }
+      }
+    },
+    "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES." : {
+      "comment" : "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每行一个参数。链接和 Cookie 通过 ZIGZAG_LINK 和 ZIGZAG_COOKIES 传入。"
+          }
+        }
+      }
+    },
+    "Send Anyway" : {
+      "comment" : "Button of the sheet that asks before saving a download rule that sends the site's cookies to another machine.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍然发送"
+          }
+        }
+      }
+    },
+    "Send the site’s cookies off this Mac?" : {
+      "comment" : "Title of the sheet that asks before saving a download rule which would send the site's cookies to another machine.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要把网站的 Cookie 发送到其他机器吗？"
+          }
+        }
+      }
+    },
+    "“%@” sends them to %@." : {
+      "comment" : "Message of the sheet that asks before saving a download rule that sends the site's cookies to another machine. The placeholders are the rule's name and the machine its endpoint is on.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” sends them to %2$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”会把它们发送到 %2$@。"
           }
         }
       }

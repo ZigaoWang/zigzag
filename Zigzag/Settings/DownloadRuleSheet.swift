@@ -37,8 +37,8 @@ enum DownloadRuleSheet {
         let match = DropdownButton()
         match.options = matchChoices.map { DropdownButton.Option(title: $0.title) }
         match.selectedIndex = matchChoices.firstIndex(of: source.match) ?? matchChoices.firstIndex(of: .contains) ?? 0
-        let caseSensitive = Toggle(isOn: source.isCaseSensitive)
-        caseSensitive.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
+        let matchCase = Toggle(isOn: source.isCaseSensitive)
+        matchCase.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
         let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
         runsInPrivate.setAccessibilityLabel(String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
 
@@ -49,6 +49,11 @@ enum DownloadRuleSheet {
         var scriptField: FilledField?
         var argumentView: MultilineField?
         var endpointField: FilledField?
+        /// The line under the parameters saying where the site's cookies would go, kept so one icon and a few words
+        /// can turn from a calm state into a warning as the endpoint changes.
+        var cookieStatus: StatusLabel?
+        /// Which of its two things it is saying, so it's only re-said when that changes.
+        var cookiesLeaveThisMac: Bool?
         var methodField: FilledField?
         var parametersView: MultilineField?
         var secretField: FilledField?
@@ -146,8 +151,13 @@ enum DownloadRuleSheet {
             argumentView = args
             actionRows.append(FormSheet.Row(label: String(localized: "Arguments", comment: "Label of the arguments field in a download rule's sheet: one argument a line."),
                                             view: args, height: 96))
-            actionRows.append(.note(String(localized: "One argument a line. Each becomes its own argument, so a URL with &, ; or $() is never run as a shell command. The link, cookies and the rest are also in ZIGZAG_LINK, ZIGZAG_COOKIES and the other environment variables.",
-                                           comment: "Under the arguments of a Run Script download rule, explaining argv and environment.")))
+            actionRows.append(.note(String(localized: "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES.",
+                                           comment: "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.")))
+            actionRows.append(FormSheet.Row(label: nil,
+                                            view: StatusLabel(String(localized: "Not run through a shell",
+                                                                     comment: "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line."),
+                                                              symbol: "checkmark.shield.fill"),
+                                            height: Tokens.Metric.controlHeight))
         case .jsonRPC:
             let endpoint = FilledField(placeholder: "http://127.0.0.1:6800/jsonrpc")
             endpoint.stringValue = action.rpcEndpoint
@@ -168,10 +178,15 @@ enum DownloadRuleSheet {
                                             view: parameters, height: 110))
             let secret = FilledField(placeholder: String(localized: "Token, if the service asks for one", comment: "Placeholder of the token field in a JSON-RPC download rule's sheet. It's kept in the Keychain."), secure: true)
             secret.stringValue = existing.flatMap { HandoffSecrets.secret(for: $0.id) } ?? ""
+            secret.toolTip = String(localized: "Kept in the Keychain", comment: "Tooltip on the token field of a JSON-RPC download rule's sheet.")
             secretField = secret
             actionRows.append(FormSheet.Row(label: String(localized: "Token", comment: "Label of the token field in a JSON-RPC download rule's sheet."), view: secret))
-            actionRows.append(.note(String(localized: "A JSON array. {link}, {filename}, {cookies} and the rest are filled in, safely quoted. The token is kept in the Keychain.",
+            actionRows.append(.note(String(localized: "A JSON array. Tokens are filled in.",
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
+            let status = StatusLabel(String(localized: "Cookies stay on this Mac",
+                                            comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it."))
+            cookieStatus = status
+            actionRows.append(FormSheet.Row(label: nil, view: status, height: Tokens.Metric.controlHeight))
         case .saveToFolder, .openFile:
             // A destination's own two things: what happens to a file of this type, and, when it is saved, where.
             // The row that picks the kind is the one the panel's "Add File Type…" opens on; the folder row is
@@ -224,7 +239,7 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Applies to", comment: "Label of the choice of what a download rule catches, in its sheet."), view: applies),
             FormSheet.Row(label: String(localized: "Match", comment: "Label of the choice of how a download rule matches an address, in its sheet."), view: match),
             FormSheet.Row(label: String(localized: "Address", comment: "Label of the address pattern in a download rule's sheet."), view: pattern),
-            FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: caseSensitive),
+            FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
             FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
         ]
         // A destination adds what it does; an address rule lists its tokens, unless its path is literal (Open App).
@@ -264,10 +279,27 @@ enum DownloadRuleSheet {
             rule.applies = DownloadRule.Applies.allCases[applies.selectedIndex]
             rule.match = matchChoices.indices.contains(match.selectedIndex) ? matchChoices[match.selectedIndex] : source.match
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            rule.isCaseSensitive = caseSensitive.isOn
+            rule.isCaseSensitive = matchCase.isOn
             rule.runsInPrivateWindows = runsInPrivate.isOn
             rule.action = action
             return rule
+        }
+
+        /// Where the site's cookies would go, as a state said calmly: an icon and five words that turn into a warning
+        /// the moment the endpoint leaves this Mac. No paragraph under it — the endpoint is yours to write, and what
+        /// it hands over is worth a glance as you write it, not an essay read once.
+        func refreshCookieStatus(_ rule: DownloadRule?) {
+            guard let status = cookieStatus else { return }
+            let offThisMac = rule?.sendsCookiesOffThisMac ?? false
+            guard cookiesLeaveThisMac != offThisMac else { return }
+            cookiesLeaveThisMac = offThisMac
+            status.say(offThisMac
+                       ? String(localized: "Cookies leave this Mac",
+                                comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint isn't on this Mac: the site's cookies would go to another machine.")
+                       : String(localized: "Cookies stay on this Mac",
+                                comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it."),
+                       symbol: offThisMac ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
+                       color: offThisMac ? Tokens.Color.warning : nil)
         }
 
         func isValid(_ rule: DownloadRule) -> Bool {
@@ -292,10 +324,16 @@ enum DownloadRuleSheet {
             guard !(rule.action.kind == .openFile && DownloadOpening.isRefused(pattern: rule.pattern)) else { return false }
             return rule.action.isComplete
         }
-        let valid = { ruleFromFields().map(isValid) ?? false }
+        let valid = {
+            let rule = ruleFromFields()
+            // Where the cookies would go is said as the endpoint is written, whether or not the rule is ready.
+            refreshCookieStatus(rule)
+            return rule.map(isValid) ?? false
+        }
         for picker in [applies, match] + [stylePicker].compactMap({ $0 }) {
             picker.onSelect = { _ in sheetRef?.revalidate() }
         }
+        matchCase.onChange = { _ in sheetRef?.revalidate() }
 
         // A destination is its own kind of form: a title of its own, and a line saying what it is for.
         let sheetTitle: String
@@ -324,12 +362,31 @@ enum DownloadRuleSheet {
             // The sheet is done either way; the fields are read below, not from it.
             sheetRef = nil
             guard confirmed, let rule = ruleFromFields(), isValid(rule) else { return }
-            if let secret = secretField?.stringValue, action.kind == .jsonRPC { HandoffSecrets.setSecret(secret, for: rule.id) }
-            if existing == nil {
-                let store = DownloadRulesStore.shared
-                store.add(rule, at: rule.action.kind.isDestination ? DownloadRulesStore.placeForNewFileType(in: store.rules) : nil)
-            } else {
-                DownloadRulesStore.shared.update(rule)
+            let save = {
+                if let secret = secretField?.stringValue, action.kind == .jsonRPC { HandoffSecrets.setSecret(secret, for: rule.id) }
+                if existing == nil {
+                    let store = DownloadRulesStore.shared
+                    store.add(rule, at: rule.action.kind.isDestination ? DownloadRulesStore.placeForNewFileType(in: store.rules) : nil)
+                } else {
+                    DownloadRulesStore.shared.update(rule)
+                }
+            }
+            // The site's sign-in leaving this Mac is worth one deliberate answer, the moment a rule starts doing it:
+            // Add isn't dead and the rule isn't refused — but this isn't a Return meant for a field either, since
+            // the sheet won't go ahead on Return, so sending them takes a click. A rule that already did this is
+            // asked about once, when it started, not again on every later edit.
+            let alreadyRemote = existing?.sendsCookiesOffThisMac ?? false
+            guard rule.sendsCookiesOffThisMac, !alreadyRemote else { return save() }
+            let place = URL(string: rule.action.rpcEndpoint)?.host() ?? rule.action.rpcEndpoint
+            ConfirmSheet.show(in: host,
+                              title: String(localized: "Send the site’s cookies off this Mac?",
+                                            comment: "Title of the sheet that asks before saving a download rule which would send the site's cookies to another machine."),
+                              message: String(localized: "“\(rule.name)” sends them to \(place).",
+                                              comment: "Message of the sheet that asks before saving a download rule that sends the site's cookies to another machine. The placeholders are the rule's name and the machine its endpoint is on."),
+                              confirmTitle: String(localized: "Send Anyway",
+                                                   comment: "Button of the sheet that asks before saving a download rule that sends the site's cookies to another machine."),
+                              destructive: true) { sure in
+                if sure { save() }
             }
         }
         sheetRef = sheet
