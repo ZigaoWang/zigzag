@@ -74,10 +74,10 @@ A rule asks before it hands anything off: **Hand Off**, **Open in Browser** (or 
 download it starts ask once. Open in Browser, or Save in Zigzag, leaves the link or download exactly as it would have
 been without the rule. Don't Allow refuses it: a link goes nowhere, and a download is not saved.
 
-A question is only asked where it can be seen: in the page in front, in a window that is visible and front. A link or
-download in a pop-up, in a background tab, or in a window behind another is handled by Zigzag itself, as if no rule
-had matched; the page's earlier answer still holds. The handoff question comes to pop-ups with the permission card
-that gives them a place of their own.
+A question is only asked where it can be seen: in the page in front, in a window that is visible and front. A page's
+earlier answer still holds in a background tab or a window behind another, but a new question is not asked there: the
+link or download carries on as if no rule had matched. A link or download in a pop-up is handled by Zigzag itself
+until the permission card gives pop-ups their own place to ask.
 
 ## Private windows
 

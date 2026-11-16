@@ -376,8 +376,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: parentWindow, tab: opener, wasClicked: wasClicked)
-        switch await DownloadHandoff.decide(rule, request: handoff, tab: opener, forDownload: !appliesToLinks) {
+                                              window: parentWindow, tab: nil, wasClicked: wasClicked)
+        // A pop-up has no page store of its own to keep an answer in, and its opener's is another page's. Until the
+        // permission card gives pop-ups a host, their links and downloads are Zigzag's own.
+        switch await DownloadHandoff.decide(rule, request: handoff, tab: nil, forDownload: !appliesToLinks) {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }

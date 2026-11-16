@@ -500,11 +500,7 @@ extension DownloadManager: WKDownloadDelegate {
         // own startDownload. A Save Page As chose its file already and is left alone. Handing it off cancels WebKit's
         // copy and takes its row out of the list.
         let owner = (download.webView as? BrowserWebView)?.owner
-        // A question is shown in the page's own window, and a background tab's would be held with nothing to show it
-        // until that tab is picked. Until the waiting-question marker lands, a download from a page that isn't in
-        // front is saved as usual rather than waiting on a question nobody can see.
-        let canAsk = owner.map { WindowManager.shared.promptHost(holding: $0)?.promptShows($0) ?? false } ?? false
-        if canAsk, chosenDestinations[ObjectIdentifier(download)] == nil,
+        if chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false,
                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {

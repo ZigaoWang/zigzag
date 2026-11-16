@@ -149,8 +149,12 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         isCaseSensitive = value(Bool.self, .isCaseSensitive) ?? false
         runsInPrivateWindows = value(Bool.self, .runsInPrivateWindows) ?? false
         action = value(DownloadRuleAction.self, .action) ?? DownloadRuleAction(kind: .openURL)
-        // A rule written by a newer build with a kind this one doesn't know is kept, but not run: it could not do
-        // what it says, and a prompt for it would be a question with no true answer.
+        // A rule that isn't an object, has no action, or names a kind this build doesn't know is kept, but not run:
+        // it could not do what it says, and a prompt for it would be a question with no true answer. A `.contains`
+        // rule with no action fields would otherwise catch every address.
+        if container == nil || !wasSet(.action) || (wasSet(.action) && value(DownloadRuleAction.self, .action) == nil) {
+            isEnabled = false
+        }
         if action.wasDecodedFromUnknownKind { isEnabled = false }
     }
 }
@@ -291,7 +295,8 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             if let known = Kind(rawValue: rawKind) { kind = known } else { kind = .openURL; wasDecodedFromUnknownKind = true }
         } else {
             kind = .openURL
-            if wasSet(.kind) { wasDecodedFromUnknownKind = true }
+            // No kind at all is as unreadable as one this build doesn't know.
+            wasDecodedFromUnknownKind = true
         }
         appPath = value(String.self, .appPath) ?? ""
         urlTemplate = value(String.self, .urlTemplate) ?? ""

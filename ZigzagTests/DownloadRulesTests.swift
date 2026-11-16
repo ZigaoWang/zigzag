@@ -121,11 +121,13 @@ struct DownloadRuleTests {
           {"name":"Future","match":"fileType","pattern":"pdf","action":{"kind":"saveToFolder","folderPath":"/tmp"}},
           {"name":"Broken","applies":7,"match":{},"action":{"kind":"nonsense"}},
           {"name":"WrongMatch","match":7,"pattern":"","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
-          {"name":"WrongKind","match":"contains","pattern":"x","action":{"kind":7}}
+          {"name":"WrongKind","match":"contains","pattern":"x","action":{"kind":7}},
+          {"name":"NoAction","match":"contains","pattern":"x"},
+          "not a rule"
         ]
         """
         let rules = try JSONDecoder().decode([DownloadRule].self, from: Data(json.utf8))
-        #expect(rules.count == 5)
+        #expect(rules.count == 7)
         #expect(rules[0].match == .contains)
         #expect(rules[1].match == .contains)
         #expect(rules[1].action.kind == .openURL)
@@ -136,6 +138,10 @@ struct DownloadRuleTests {
         // A field of the wrong type is not a rule either: `.contains` with no pattern would catch every address.
         #expect(!rules[3].isEnabled)
         #expect(!rules[4].isEnabled)
+        // No action would decode as an Open URL rule with nothing to open; a catch-all prompt is worse than no rule.
+        #expect(!rules[5].isEnabled)
+        #expect(!rules[6].isEnabled)
+        #expect(rules[6].name.isEmpty)
     }
 
     @Test func aResponseNameKeepsItsCaseAndItsPieces() {
@@ -354,5 +360,23 @@ struct DownloadRuleTests {
         #expect(!answers.isEmpty)
         answers.forget()
         #expect(answers.isEmpty)
+    }
+
+    /// A page that already answered keeps that answer even where no question could be shown: the answer is the
+    /// page's, and the tab it was given in may be in the background (or here, in no window at all).
+    @Test func aKeptAnswerHoldsWhereNoQuestionCouldShow() async {
+        let rule = DownloadRule(name: "aria2", applies: .downloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        let tab = Tab(url: URL(string: "https://example.com/page")!, title: "Example", spaceID: UUID())
+        let origin = "https://example.com"
+        let kind = DownloadHandoff.handoffKind(rule)
+        let request = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!, pageOrigin: origin)
+
+        tab.permissionAnswers.note("deny", key: origin, kind: kind)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .cancel)
+        tab.permissionAnswers.note("handOff", key: origin, kind: kind)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .handOff)
+        tab.permissionAnswers.note("browser", key: origin, kind: kind)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .browser)
     }
 }
