@@ -25,10 +25,8 @@ enum DownloadRuleSheet {
         let match = DropdownButton()
         match.options = DownloadRule.Match.allCases.map { DropdownButton.Option(title: $0.title) }
         match.selectedIndex = DownloadRule.Match.allCases.firstIndex(of: source.match) ?? 1
-        let caseSensitive = DropdownButton()
-        caseSensitive.options = [DropdownButton.Option(title: String(localized: "Off", comment: "A choice in a download rule: the address's case doesn't matter.")),
-                                 DropdownButton.Option(title: String(localized: "On", comment: "A choice in a download rule: the address's case matters."))]
-        caseSensitive.selectedIndex = source.isCaseSensitive ? 1 : 0
+        let caseSensitive = Toggle(isOn: source.isCaseSensitive)
+        caseSensitive.setAccessibilityLabel(String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."))
         let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
         runsInPrivate.setAccessibilityLabel(String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
 
@@ -152,7 +150,7 @@ enum DownloadRuleSheet {
             rule.applies = DownloadRule.Applies.allCases[applies.selectedIndex]
             rule.match = DownloadRule.Match.allCases[match.selectedIndex]
             rule.pattern = pattern.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-            rule.isCaseSensitive = caseSensitive.selectedIndex == 1
+            rule.isCaseSensitive = caseSensitive.isOn
             rule.runsInPrivateWindows = runsInPrivate.isOn
             rule.action = action
             return rule
@@ -164,7 +162,7 @@ enum DownloadRuleSheet {
             guard rule.isValidPattern else { return false }
             return rule.action.isComplete
         }
-        for picker in [applies, match, caseSensitive] + [stylePicker].compactMap({ $0 }) {
+        for picker in [applies, match] + [stylePicker].compactMap({ $0 }) {
             picker.onSelect = { _ in sheetRef?.revalidate() }
         }
 
@@ -203,63 +201,5 @@ enum DownloadRuleSheet {
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return stack
-    }
-}
-
-/// A plain multi-line field for a list of arguments or a JSON body, in the sheet's own type.
-final class MultilineField: NSView {
-    private let scroll = NSScrollView()
-    private let textView: NSTextView
-
-    var text: String {
-        get { textView.string }
-        set { textView.string = newValue }
-    }
-
-    init(text: String) {
-        let storage = NSTextStorage()
-        let layout = NSLayoutManager()
-        storage.addLayoutManager(layout)
-        let container = NSTextContainer(size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
-        container.widthTracksTextView = true
-        layout.addTextContainer(container)
-        textView = NSTextView(frame: .zero, textContainer: container)
-        super.init(frame: .zero)
-        textView.string = text
-        textView.font = Tokens.Font.body()
-        textView.textColor = Tokens.Color.textPrimary
-        textView.drawsBackground = false
-        textView.isRichText = false
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.isAutomaticDashSubstitutionEnabled = false
-        textView.isAutomaticTextReplacementEnabled = false
-        textView.isAutomaticSpellingCorrectionEnabled = false
-        textView.allowsUndo = true
-        textView.textContainerInset = NSSize(width: 4, height: 6)
-        textView.minSize = NSSize(width: 0, height: 0)
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.autoresizingMask = [.width]
-        scroll.documentView = textView
-        scroll.drawsBackground = false
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.borderType = .noBorder
-        addSubview(scroll)
-        wantsLayer = true
-        layer?.cornerRadius = Tokens.Radius.control
-        layer?.cornerCurve = .continuous
-        layer?.backgroundColor = cgColor(Tokens.Color.fieldFill)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override func layout() {
-        super.layout()
-        scroll.frame = bounds.insetBy(dx: 1, dy: 1)
-        let used = textView.textContainer.flatMap { textView.layoutManager?.usedRect(for: $0).height } ?? 0
-        textView.frame = NSRect(origin: .zero, size: NSSize(width: scroll.contentSize.width,
-                                                           height: max(scroll.contentSize.height, ceil(used) + textView.textContainerInset.height * 2)))
     }
 }
