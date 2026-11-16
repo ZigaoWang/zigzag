@@ -70,6 +70,8 @@ enum DownloadHandoff {
     /// Where a handoff stands: run the rule, leave it in the browser, or cancel the link.
     enum HandoffGate: Equatable { case handOff, browser, cancel }
 
+    /// A stored answer as a gate. Nil and anything that isn't one of the three answers read as the browser, which is
+    /// what a caller that only has an answer to pass has always meant.
     static func gate(stored: String?) -> HandoffGate {
         switch stored {
         case "handOff": .handOff
@@ -79,12 +81,37 @@ enum DownloadHandoff {
         }
     }
 
+    /// A kept answer as a gate, or nil when there is no answer yet. Unlike `gate`, an unknown or missing answer is not
+    /// the browser: it is the caller's sign that the question still has to be asked.
+    private static func keptGate(_ stored: String?) -> HandoffGate? {
+        switch stored {
+        case "handOff": .handOff
+        case "browser": .browser
+        case "deny": .cancel
+        default: nil
+        }
+    }
+
     /// The key a page answer is kept under: per rule, so two rules on one page keep their own answers.
     static func handoffKind(_ rule: DownloadRule) -> String { "handoff:\(rule.id.uuidString)" }
 
-    /// Asks where a handoff should go, unless this page already answered for this rule. The question asks in the
-    /// page's own window; with no window to ask in, nothing is handed off and the link or download stays as it is.
-    /// The answer holds for the page: a link that starts a download is one question, not two.
+    /// The site that produced the handoff, never the destination when a page or referrer can name it instead.
+    static func questionOrigin(for request: Request) -> String? {
+        request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
+    }
+
+    /// The third duration a handoff question offers: the rule by name, or "this rule" where it has none. Kept on the
+    /// rule itself, the answer travels with it, is exported with it, and goes when it does.
+    static func alwaysFor(_ rule: DownloadRule) -> String {
+        let name = rule.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty
+            ? String(localized: "Always for this rule", comment: "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The rule has no name.")
+            : String(localized: "Always for “\(name)”", comment: "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.")
+    }
+
+    /// Asks where a handoff should go, unless this page, this site or the rule itself already answered. The question
+    /// asks in the page's own window; with no window to ask in, nothing is handed off and the link or download stays as
+    /// it is. A link that starts a download is one question, not two.
     static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil, forDownload: Bool = false) async -> HandoffGate {
         // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
         guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
@@ -94,14 +121,26 @@ enum DownloadHandoff {
         let pageOrigin = request.pageOrigin ?? SiteOrigin.of(request.referrer)
         let origin = pageOrigin ?? SiteOrigin.of(request.url)
         let kind = handoffKind(rule)
+        let subject = PermissionSubject.handoff(rule.id)
         // What this page already answered holds wherever the page is: it was given for this question, and asking again
         // from a background tab would only lose the answer.
-        if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind) {
-            return gate(stored: kept)
+        if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind),
+           let answered = keptGate(kept) {
+            return answered
         }
+        // Then the site's standing answer. A private window is not the site the answer was given to, so the answer
+        // kept for it doesn't reach into one.
+        if !request.isPrivate, let pageOrigin, let kept = SitePermissions.action(subject, origin: pageOrigin),
+           let answered = keptGate(kept) {
+            return answered
+        }
+        // The rule's own answer belongs to the rule, as its configured fields do, so a private window that has let the
+        // rule in still reads it.
+        if let kept = rule.handoffAnswer, let answered = keptGate(kept) { return answered }
         // Nothing new is asked for a pop-up: its links and downloads stay in Zigzag.
         guard request.mayAsk else { return .browser }
         guard let controller = tab.flatMap({ WindowManager.shared.promptHost(holding: $0) })
+                ?? (request.window?.windowController as? PromptHost)
                 ?? WindowManager.shared.promptHost(for: request.window)
                 ?? WindowManager.shared.promptHost(for: NSApp?.keyWindow) else { return .browser }
         // A new question has to be able to show: a background tab, a window behind another, a pop-up's own window (not
@@ -110,6 +149,15 @@ enum DownloadHandoff {
         let inFront = tab.map { controller.promptShows($0) }
         guard questionCanShow(tabIsInFront: inFront, windowIsVisible: controller.window?.isVisible == true,
                               windowIsKey: controller.window?.isKeyWindow == true) else { return .browser }
+        // This time, then the site where there is one, then the rule's own answer for every site. A private window
+        // keeps nothing for the site, so that choice is not offered there; the rule's own is.
+        let siteMayKeep = !request.isPrivate && !controller.promptIsPrivate && pageOrigin != nil
+        var durations = [String(localized: "This time", comment: "Duration choice on a site's permission question: the answer holds for this page only.")]
+        if siteMayKeep {
+            durations.append(String(localized: "Always on this site", comment: "Duration choice on a site's permission question: the answer is remembered for this site."))
+        }
+        durations.append(alwaysFor(rule))
+        let ruleScope = durations.count - 1
         let answer = await PermissionPrompt.ask(
             host: SitePermissions.askerName(origin), origin: origin, answerKey: pageOrigin, what: rule.name, symbol: "arrow.up.forward.app",
             in: controller, tab: tab,
@@ -121,16 +169,23 @@ enum DownloadHandoff {
                     : String(localized: "Open in Browser", comment: "Button that lets a link stay in the browser instead of running a download rule.")),
                 PermissionAction(id: "handOff", title: String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."), isDeny: false, isProminent: true)
             ],
+            durations: durations,
             canRemember: false,
             answered: {
-                // Asked while another question was up: the page may have answered this one in the meantime.
-                guard let pageOrigin, let tab else { return nil }
-                switch tab.permissionAnswers.action(key: pageOrigin, kind: kind) {
-                case "handOff": return PermissionAnswer(action: "handOff", remember: false)
-                case "browser": return PermissionAnswer(action: "browser", remember: false)
-                case "deny": return PermissionAnswer(action: "deny", remember: false)
-                default: return nil
+                // Asked while another question was up: the page, the site or the rule may have answered this one in the
+                // meantime.
+                if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind),
+                   keptGate(kept) != nil {
+                    return PermissionAnswer(action: kept, remember: false)
                 }
+                if siteMayKeep, let pageOrigin, let kept = SitePermissions.action(subject, origin: pageOrigin),
+                   keptGate(kept) != nil {
+                    return PermissionAnswer(action: kept, remember: true, scopeIndex: 1)
+                }
+                if let kept = rule.handoffAnswer, keptGate(kept) != nil {
+                    return PermissionAnswer(action: kept, remember: true, scopeIndex: ruleScope)
+                }
+                return nil
             })
         guard let answer else { return .browser }
         let action: String
@@ -139,7 +194,15 @@ enum DownloadHandoff {
         case "browser": action = "browser"
         default: action = "deny"
         }
-        if let pageOrigin, let tab { tab.permissionAnswers.note(action, key: pageOrigin, kind: kind) }
+        if answer.scopeIndex == ruleScope {
+            var remembered = rule
+            remembered.handoffAnswer = action
+            DownloadRulesStore.shared.update(remembered)
+        } else if answer.scopeIndex == 1, siteMayKeep, let pageOrigin, !request.isPrivate {
+            SitePermissions.remember(action, subject: subject, origin: pageOrigin)
+        } else if let pageOrigin, let tab {
+            tab.permissionAnswers.note(action, key: pageOrigin, kind: kind)
+        }
         return gate(stored: action)
     }
 

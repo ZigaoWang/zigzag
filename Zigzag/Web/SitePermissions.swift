@@ -186,6 +186,21 @@ enum SitePermissions {
         return found
     }
 
+    /// The origins that hold an answer under a subject's own id (`"handoff:<rule UUID>"`), for listing, per rule, the
+    /// sites a handoff rule was decided on. Sorted, so a list built from it doesn't shuffle.
+    static func sites(prefix: String) -> [String] { decisions(prefix: prefix).map(\.origin) }
+
+    /// The same sites, each with what it answered (`"handOff"`, `"browser"`, `"deny"`), so a list can show a rule's
+    /// sites by their decision rather than in one undifferentiated run where a refused site reads like a handed-off
+    /// one. Sorted by origin. The one place the key is split, so a caller can't drift from it.
+    static func decisions(prefix: String) -> [(origin: String, action: String)] {
+        stored.compactMap { key, action in
+            let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[1].hasPrefix(prefix) else { return nil }
+            return (String(parts[0]), action)
+        }.sorted { $0.origin < $1.origin }
+    }
+
     private static func allowed(_ action: String?) -> Bool? { action.map { $0 != "deny" } }
     static func kind(_ type: WKMediaCaptureType) -> String {
         switch type {
@@ -997,6 +1012,7 @@ final class PermissionPrompt: FloatingPanelView {
     static func ask(host: String, origin: String? = nil, answerKey: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
+                    durations: [String]? = nil,
                     canRemember: Bool = true, rememberNote: String? = nil,
                     cancellation: QuestionCancellation? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
@@ -1004,7 +1020,7 @@ final class PermissionPrompt: FloatingPanelView {
         let remembers = canRemember && !controller.promptIsPrivate
         // Answered already: nothing to show, and nothing to mark.
         if let known = answered() {
-            return PermissionAnswer(action: known.action, remember: known.remember && remembers)
+            return PermissionAnswer(action: known.action, remember: known.remember && remembers, scopeIndex: known.scopeIndex)
         }
         let request = title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.")
         let asking = tab ?? controller.promptFrontTab
@@ -1017,7 +1033,7 @@ final class PermissionPrompt: FloatingPanelView {
         if let before = inFlight[sharedKey] {
             let known = await before.task.value
             guard cancellation?.isCancelled != true else { return nil }
-            return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers) }
+            return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers, scopeIndex: $0.scopeIndex) }
         }
         // One of the window's waiting questions from the moment it is asked, even if it cannot be shown yet: the tab
         // wears the marker, the card that is up counts it, and another tab's question is not held behind this one.
@@ -1031,6 +1047,7 @@ final class PermissionPrompt: FloatingPanelView {
             setWaiting(questionsWaiting(in: controller) + 1, in: controller)
             let answer = await show(host: host, request: request,
                                   symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
+                                  durations: durations,
                                   origin: origin, in: controller, tab: tab, cancellation: cancellation, answered: answered)
             // Answered or put off: it is no longer one of the window's waiting questions.
             PendingQuestions.answer(questionID)
@@ -1056,7 +1073,8 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?,
+                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, durations: [String]? = nil,
+                             origin: String?, in controller: PromptHost, tab: Tab?,
                              cancellation: QuestionCancellation? = nil,
                              answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         // The held pop-up it was for is gone: there is nothing to ask about any more.
@@ -1094,8 +1112,11 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.contentTintColor = Tokens.Color.textPrimary
                 prompt.badge.color = .clear
             }
-            prompt.duration.isEnabled = canRemember
-            if !canRemember {
+            prompt.duration.isEnabled = canRemember || durations != nil
+            if let durations {
+                prompt.duration.options = durations.map { DropdownButton.Option(title: $0) }
+                prompt.duration.selectedIndex = 0
+            } else if !canRemember {
                 prompt.duration.toolTip = rememberNote ?? (controller.promptIsPrivate
                     ? String(localized: "Private windows don’t remember answers.", comment: "Tooltip of the disabled duration dropdown on a permission question in a private window.")
                     : String(localized: "This site can’t remember this answer.", comment: "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept."))
@@ -1105,7 +1126,10 @@ final class PermissionPrompt: FloatingPanelView {
                 if action.isProminent { button.tint = accent }
                 button.onClick = { [weak prompt] _ in
                     guard let prompt, action.isDeny || prompt.acceptsAllow else { return }
-                    prompt.finish(PermissionAnswer(action: action.id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
+                    prompt.finish(PermissionAnswer(action: action.id,
+                                                   remember: canRemember && prompt.duration.selectedIndex == 1,
+                                                   scopeIndex: scope))
                 }
                 return button
             }
@@ -1123,7 +1147,10 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.answerMenu.tint = accent
                 prompt.answerMenu.onSelect = { [weak prompt] index in
                     guard let prompt, prompt.acceptsAllow, menu.indices.contains(index) else { return }
-                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
+                    prompt.finish(PermissionAnswer(action: menu[index].id,
+                                                   remember: canRemember && prompt.duration.selectedIndex == 1,
+                                                   scopeIndex: scope))
                 }
                 prompt.addSubview(prompt.answerMenu)
             }
@@ -1268,7 +1295,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     private func finish(_ choice: PermissionAnswer?) {
         // The disabled duration control also guards debug answers: a private or one-time question never returns Always.
-        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled) }
+        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled, scopeIndex: $0.scopeIndex) }
         stopListening()
         let answer = self.answer
         self.answer = nil

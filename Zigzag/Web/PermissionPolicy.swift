@@ -31,6 +31,15 @@ nonisolated struct PermissionAction {
 nonisolated struct PermissionAnswer {
     let action: String
     let remember: Bool
+    /// Which of the question's durations was chosen, where it offered more than the usual two. Zero is This time, so
+    /// every existing answer keeps its meaning.
+    let scopeIndex: Int
+
+    init(action: String, remember: Bool, scopeIndex: Int = 0) {
+        self.action = action
+        self.remember = remember
+        self.scopeIndex = scopeIndex
+    }
 }
 
 /// Stable identifiers under which permission actions are remembered.
@@ -51,4 +60,6 @@ nonisolated enum PermissionSubject {
     }
 
     static func app(_ scheme: String) -> String { "app:\(scheme)" }
+    /// A handoff rule's standing answers, kept per site under the rule's own id.
+    static func handoff(_ rule: UUID) -> String { "handoff:\(rule.uuidString)" }
 }

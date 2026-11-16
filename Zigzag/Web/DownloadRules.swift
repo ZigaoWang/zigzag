@@ -135,6 +135,11 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// or its cookies, to another app or script is exactly what could break that promise. A private window runs no
     /// rule that hasn't been let in, and the link or download carries on as if no rule had matched.
     var runsInPrivateWindows = false
+    /// What this rule was told about handing off, for **every site**: "handOff", "browser" or "deny". Nil is a rule
+    /// that has only been answered per site (kept under `handoff:<id>` in `SitePermissions`) or not at all. It is the
+    /// third scope a question about a rule offers, and it belongs here because it is the rule's own answer: it travels
+    /// with the rule and goes when the rule does.
+    var handoffAnswer: String?
     var action: DownloadRuleAction
 
     /// A regex that doesn't compile is kept as typed but never matches, so a half-written rule can't catch anything.
@@ -264,7 +269,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, action
+        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, handoffAnswer, action
     }
 
     /// Older files may lack a key a newer Zigzag added, and a kind this build doesn't know (a file-type rule from
@@ -290,6 +295,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         pattern = value(String.self, .pattern) ?? ""
         isCaseSensitive = value(Bool.self, .isCaseSensitive) ?? false
         runsInPrivateWindows = value(Bool.self, .runsInPrivateWindows) ?? false
+        handoffAnswer = value(String.self, .handoffAnswer)
         action = value(DownloadRuleAction.self, .action) ?? DownloadRuleAction(kind: .openURL)
         // A rule that isn't an object, has no action, or names a kind this build doesn't know is kept, but not run:
         // it could not do what it says, and a prompt for it would be a question with no true answer. A `.contains`
