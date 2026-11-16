@@ -2,21 +2,73 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// The sidebar's Now Playing card: which tab it's for, hiding it, and when it comes back.
+/// The sidebar's Now Playing cards: which tabs they're for, their order, hiding one, and when it comes back.
 @MainActor
 struct NowPlayingTests {
-    let a = UUID(), b = UUID(), c = UUID()
+    let a = UUID(), b = UUID(), c = UUID(), d = UUID(), e = UUID()
 
     private func tab(_ id: UUID, _ page: String = "https://video.example/watch?v=1", sounding: Bool = true, selected: Bool = false) -> NowPlayingChoice.Candidate {
         .init(id: id, page: page, sounding: sounding, isSelected: selected)
     }
 
-    @Test func showsTheMostRecentSoundingTabYouAreNotOn() {
+    @Test func showsTheSoundingTabsYouAreNotOn() {
         var choice = NowPlayingChoice()
-        #expect(choice.pick(from: [tab(a, selected: true), tab(b, sounding: false), tab(c)]) == c)
-        #expect(choice.pick(from: [tab(a, sounding: false, selected: true), tab(b), tab(c)]) == b)
-        #expect(choice.pick(from: [tab(a, selected: true)]) == nil)
-        #expect(choice.pick(from: []) == nil)
+        #expect(choice.pick(from: [tab(a, selected: true), tab(b, sounding: false), tab(c)]) == [c])
+        // b starts after c: its card goes on top, c's stays by the dots.
+        #expect(choice.pick(from: [tab(a, sounding: false, selected: true), tab(b), tab(c)]) == [b, c])
+        #expect(choice.pick(from: [tab(a, selected: true)]).isEmpty)
+        #expect(choice.pick(from: []).isEmpty)
+    }
+
+    @Test func everyTabThatStartsGetsACardOnTopAndNoneMove() {
+        var choice = NowPlayingChoice()
+        let on = tab(e, sounding: false, selected: true)
+        #expect(choice.pick(from: [on, tab(a)]) == [a])
+        // Recent order puts b first, but a started first: a stays at the bottom, b comes in on top.
+        #expect(choice.pick(from: [on, tab(b), tab(a)]) == [b, a])
+        #expect(choice.pick(from: [on, tab(a), tab(c), tab(b)]) == [c, b, a])
+        // One goes quiet: the others keep their order.
+        #expect(choice.pick(from: [on, tab(a), tab(c), tab(b, sounding: false)]) == [c, a])
+        // And starting again, it's the newest.
+        #expect(choice.pick(from: [on, tab(a), tab(c), tab(b)]) == [b, c, a])
+    }
+
+    @Test func severalStartingAtOnceTheOneUsedLastIsTheNewest() {
+        var choice = NowPlayingChoice()
+        #expect(choice.pick(from: [tab(e, sounding: false, selected: true), tab(a), tab(b), tab(c)]) == [a, b, c])
+    }
+
+    @Test func atMostThreeTheMostRecent() {
+        #expect(NowPlayingChoice.limit == 3)
+        var choice = NowPlayingChoice()
+        let on = tab(e, sounding: false, selected: true)
+        _ = choice.pick(from: [on, tab(a)])
+        _ = choice.pick(from: [on, tab(b), tab(a)])
+        _ = choice.pick(from: [on, tab(c), tab(b), tab(a)])
+        #expect(choice.pick(from: [on, tab(d), tab(c), tab(b), tab(a)]) == [d, c, b])
+        // The newest quiet again: the one it pushed out comes back.
+        #expect(choice.pick(from: [on, tab(d, sounding: false), tab(c), tab(b), tab(a)]) == [c, b, a])
+    }
+
+    @Test func goingToATabTakesOnlyItsCardAndItComesBackInItsPlace() {
+        var choice = NowPlayingChoice()
+        _ = choice.pick(from: [tab(e, sounding: false, selected: true), tab(a)])
+        _ = choice.pick(from: [tab(e, sounding: false, selected: true), tab(b), tab(a)])
+        #expect(choice.pick(from: [tab(e, sounding: false, selected: true), tab(c), tab(b), tab(a)]) == [c, b, a])
+        #expect(choice.pick(from: [tab(b, selected: true), tab(e, sounding: false), tab(c), tab(a)]) == [c, a])
+        #expect(choice.pick(from: [tab(e, sounding: false, selected: true), tab(b), tab(c), tab(a)]) == [c, b, a])
+    }
+
+    @Test func hidingOneCardLeavesTheOthers() {
+        var choice = NowPlayingChoice()
+        let on = tab(e, sounding: false, selected: true)
+        _ = choice.pick(from: [on, tab(a)])
+        #expect(choice.pick(from: [on, tab(b), tab(a)]) == [b, a])
+        choice.hide(b, page: "https://video.example/watch?v=1")
+        #expect(choice.pick(from: [on, tab(b), tab(a)]) == [a])
+        // Hidden past the limit, the next most recent takes its room.
+        _ = choice.pick(from: [on, tab(c), tab(b), tab(a)])
+        #expect(choice.pick(from: [on, tab(d), tab(c), tab(b), tab(a)]) == [d, c, a])
     }
 
     @Test func pausedInTheMiniPlayerKeepsTheCard() {
@@ -32,7 +84,7 @@ struct NowPlayingTests {
         #expect(!NowPlayingChoice.isSounding(playing: false, pausedFromCard: false, inMiniPlayer: false))
         var choice = NowPlayingChoice()
         let paused = NowPlayingChoice.isSounding(playing: false, pausedFromCard: false, inMiniPlayer: true)
-        #expect(choice.pick(from: [tab(a, sounding: false, selected: true), tab(b, sounding: paused)]) == b)
+        #expect(choice.pick(from: [tab(a, sounding: false, selected: true), tab(b, sounding: paused)]) == [b])
     }
 
     @Test func aMutedVideoPlayingInTheMiniPlayerShowsPause() {
@@ -50,30 +102,30 @@ struct NowPlayingTests {
         var choice = NowPlayingChoice()
         let page = "https://video.example/watch?v=1"
         choice.hide(a, page: page)
-        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page)]) == nil)
+        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page)]).isEmpty)
         // Paused in the page and played again, on the same page: still away.
-        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page, sounding: false)]) == nil)
-        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page)]) == nil)
+        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page, sounding: false)]).isEmpty)
+        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page)]).isEmpty)
         // Going to the tab and leaving it again doesn't bring it back either.
-        #expect(choice.pick(from: [tab(a, page, selected: true)]) == nil)
-        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page)]) == nil)
+        #expect(choice.pick(from: [tab(a, page, selected: true)]).isEmpty)
+        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a, page)]).isEmpty)
     }
 
     @Test func anotherTabMakingSoundGetsTheCard() {
         var choice = NowPlayingChoice()
         choice.hide(a, page: "https://video.example/watch?v=1")
-        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a), tab(b, "https://music.example/")]) == b)
+        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a), tab(b, "https://music.example/")]) == [b])
         // That one quiet again: the hidden one stays hidden.
-        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a), tab(b, "https://music.example/", sounding: false)]) == nil)
+        #expect(choice.pick(from: [tab(c, sounding: false, selected: true), tab(a), tab(b, "https://music.example/", sounding: false)]).isEmpty)
     }
 
     @Test func itComesBackWhenTheTabGoesToAnotherPage() {
         var choice = NowPlayingChoice()
         choice.hide(a, page: "https://video.example/watch?v=1")
-        #expect(choice.pick(from: [tab(c, selected: true), tab(a, "https://video.example/watch?v=2")]) == a)
+        #expect(choice.pick(from: [tab(c, selected: true), tab(a, "https://video.example/watch?v=2")]) == [a])
         #expect(choice.hidden.isEmpty)
         // Back on the first page, it's something new again: it doesn't hide by itself.
-        #expect(choice.pick(from: [tab(c, selected: true), tab(a, "https://video.example/watch?v=1")]) == a)
+        #expect(choice.pick(from: [tab(c, selected: true), tab(a, "https://video.example/watch?v=1")]) == [a])
     }
 
     @Test func aJumpWithinThePageIsNotSomethingNew() {
@@ -82,13 +134,13 @@ struct NowPlayingTests {
         var choice = NowPlayingChoice()
         choice.hide(a, page: NowPlayingChoice.page(of: URL(string: "https://video.example/watch?v=1")))
         let jumped = NowPlayingChoice.page(of: URL(string: "https://video.example/watch?v=1#chapter-2"))
-        #expect(choice.pick(from: [tab(c, selected: true), tab(a, jumped)]) == nil)
+        #expect(choice.pick(from: [tab(c, selected: true), tab(a, jumped)]).isEmpty)
     }
 
     @Test func aClosedTabIsForgotten() {
         var choice = NowPlayingChoice()
         choice.hide(a, page: "https://video.example/watch?v=1")
-        #expect(choice.pick(from: [tab(c, selected: true)]) == nil)
+        #expect(choice.pick(from: [tab(c, selected: true)]).isEmpty)
         #expect(choice.hidden.isEmpty)
     }
 
@@ -131,5 +183,37 @@ struct NowPlayingTests {
         _ = actions.last?.handler?()
         #expect(hidden == 2)
         #expect(view.hideButton.accessibilityLabel() == "Hide")
+    }
+
+    @Test func theSidebarStacksACardForEachTabAndEachHidesItsOwn() {
+        let was = Tokens.Sidebar.size
+        defer { Tokens.Sidebar.size = was }
+        let tabs = ["One", "Two", "Three"].map { Tab(url: URL(string: "https://\($0.lowercased()).example/"), title: $0, spaceID: UUID()) }
+        for size in Tokens.Sidebar.Size.allCases {
+            Tokens.Sidebar.size = size
+            let sidebar = SidebarView(frame: NSRect(x: 0, y: 0, width: 260, height: 700))
+            var hidden: [UUID] = []
+            sidebar.onNowPlayingHide = { hidden.append($0.id) }
+            sidebar.setNowPlaying(tabs.map { (tab: $0, paused: false) })
+            sidebar.layoutSubtreeIfNeeded()
+            let cards = sidebar.nowPlayingCards
+            #expect(cards.map { $0.tab?.id } == tabs.map(\.id))
+            // Top to bottom, a row's height each, a small gap between, the same width.
+            for (upper, lower) in zip(cards, cards.dropFirst()) {
+                #expect(lower.frame.minY == upper.frame.maxY + Tokens.Space.x1)
+                #expect(lower.frame.width == upper.frame.width)
+            }
+            #expect(cards.allSatisfy { $0.frame.height == Tokens.Sidebar.nowPlayingHeight })
+            // Each tells VoiceOver whose it is.
+            #expect(cards.map { $0.accessibilityLabel() ?? "" } == tabs.map { "Now playing: \($0.displayTitle)" })
+            cards[1].hideButton.accessibilityPerformPress()
+            #expect(hidden == [tabs[1].id])
+            // The same tabs again keep their cards; one gone leaves the others where they are.
+            sidebar.setNowPlaying([(tab: tabs[0], paused: true), (tab: tabs[2], paused: false)], hiding: tabs[1].id)
+            #expect(sidebar.nowPlayingCards.first === cards[0])
+            #expect(sidebar.nowPlayingCards.last === cards[2])
+            #expect(cards[0].isPaused)
+            #expect(cards[1].isLeaving)
+        }
     }
 }

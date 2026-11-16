@@ -175,19 +175,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             }
             MenuPanel.show(items, from: self.sidebar.address.captureButton)
         }
-        sidebar.nowPlaying.onClick = { [weak self] _ in
-            if let tab = self?.nowPlayingTab { self?.tabManager.select(tab) }
-        }
-        sidebar.nowPlaying.playButton.onClick = { [weak self] _ in
-            guard let tab = self?.nowPlayingTab else { return }
-            self?.toggleNowPlaying(tab)
-        }
-        sidebar.nowPlaying.muteButton.onClick = { [weak self] _ in
-            guard let tab = self?.nowPlayingTab else { return }
-            tab.setMuted(!tab.isMuted)
-        }
-        sidebar.nowPlaying.onHide = { [weak self] in self?.hideNowPlaying() }
-        sidebar.nowPlaying.onRightClick = { [weak self] _ in self?.nowPlayingMenu() }
+        sidebar.onNowPlayingShow = { [weak self] tab in self?.tabManager.select(tab) }
+        sidebar.onNowPlayingToggle = { [weak self] tab in self?.toggleNowPlaying(tab) }
+        sidebar.onNowPlayingHide = { [weak self] tab in self?.hideNowPlaying(tab) }
+        sidebar.onNowPlayingMenu = { [weak self] tab in self?.nowPlayingMenu(for: tab) }
         // An update that's ready shows in every window's sidebar, private ones too: it's for all of Zigzag, and
         // restarting closes a private window as quitting does.
         sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
@@ -929,8 +920,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private weak var nowPlayingTab: Tab?
-    /// Which tab Now Playing is for, and the ones you've hidden it for.
+    /// Which tabs Now Playing has cards for, and the ones you've hidden them for.
     private var nowPlayingChoice = NowPlayingChoice()
 
     /// The pane enlarged over the others for a moment, if any (#160).
@@ -1245,9 +1235,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return ids[index] == current ? nil : ids[index]
     }
 
-    /// The control shows the most recent tab making sound (or paused by it) that you aren't looking at, unless you've
-    /// hidden it for what that tab is playing (`NowPlayingChoice`).
-    private func updateNowPlaying(hiding: Bool = false) {
+    /// A card for each tab making sound (or paused by its card) that you aren't looking at, unless you've hidden it
+    /// for what that tab is playing (`NowPlayingChoice`). `hiding`: the tab whose card you just hid.
+    private func updateNowPlaying(hiding: UUID? = nil) {
         let selected = tabManager.selectedTab
         let tabs = tabManager.recentTabs
         let candidates = tabs.map {
@@ -1255,10 +1245,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                                        sounding: NowPlayingChoice.isSounding(playing: $0.isPlayingAudio, pausedFromCard: $0.isPlaybackPaused, inMiniPlayer: miniPlayer.holds($0)),
                                        isSelected: $0 === selected)
         }
-        let id = nowPlayingChoice.pick(from: candidates)
-        let tab = id.flatMap { id in tabs.first { $0.id == id } }
-        nowPlayingTab = tab
-        sidebar.setNowPlaying(tab, paused: tab.map(isPausedForNowPlaying) ?? false, hiding: hiding)
+        let byID = Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let shown = nowPlayingChoice.pick(from: candidates).compactMap { byID[$0] }
+        sidebar.setNowPlaying(shown.map { (tab: $0, paused: isPausedForNowPlaying($0)) }, hiding: hiding)
     }
 
     /// Paused as Now Playing shows it: by its own button, or a video stopped in the mini player.
@@ -1286,17 +1275,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         tab.setPlaybackPaused(!tab.isPlaybackPaused)
     }
 
-    /// Hides Now Playing for what its tab is playing now. The sound plays on; the card comes back when the tab goes
-    /// to another page, and shows another tab that makes sound meanwhile.
-    func hideNowPlaying() {
-        guard let tab = nowPlayingTab else { return }
+    /// Hides a tab's Now Playing card for what it's playing now. The sound plays on; the card comes back when the tab
+    /// goes to another page. The other tabs' cards stay.
+    func hideNowPlaying(_ tab: Tab) {
         nowPlayingChoice.hide(tab.id, page: NowPlayingChoice.page(of: tab.url))
-        updateNowPlaying(hiding: true)
+        updateNowPlaying(hiding: tab.id)
     }
 
-    /// Right-click on Now Playing: what its buttons do, by name, and Hide.
-    private func nowPlayingMenu() -> NSMenu? {
-        guard let tab = nowPlayingTab else { return nil }
+    /// Right-click on a Now Playing card: what its buttons do, by name, and Hide.
+    private func nowPlayingMenu(for tab: Tab) -> NSMenu? {
         let menu = NSMenu()
         menu.autoenablesItems = false
         menu.addItem(SidebarMenus.Item(String(localized: "Show Tab", comment: "VoiceOver action on the sidebar's Now Playing control: goes to the tab playing sound.")) { [weak self] in
@@ -1313,7 +1300,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         })
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item(String(localized: "Hide", comment: "Tooltip, VoiceOver action and menu item of the close button on the sidebar's Now Playing control: hides the control; the tab keeps playing.")) { [weak self] in
-            self?.hideNowPlaying()
+            self?.hideNowPlaying(tab)
         })
         return menu
     }

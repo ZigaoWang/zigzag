@@ -1496,13 +1496,14 @@ enum DebugBridge {
             CATransaction.flush()
             debugLog(String(format: "openfolders %@ => %.1f ms", arg, (CACurrentMediaTime() - start) * 1000))
         case "listhover": controller.sidebar.list.debugHover(arg != "off")
-        // nowplaying hover|off|hide|state: the sidebar's Now Playing card as if the pointer were on it, or not; its close
-        // button pressed; or which tab it shows, in the debug log.
+        // nowplaying hover|off|hide|state: the sidebar's top Now Playing card as if the pointer were on it, or not; its
+        // close button pressed; or which tabs the cards show, top to bottom, in the debug log.
         case "nowplaying":
+            let cards = controller.sidebar.nowPlayingCards.filter { !$0.isLeaving }
             switch arg {
-            case "hover", "off": controller.sidebar.nowPlaying.isHovered = arg == "hover"
-            case "hide": controller.hideNowPlaying()
-            default: debugLog("nowplaying \(controller.sidebar.nowPlaying.isHidden ? "hidden" : controller.sidebar.nowPlaying.tab?.displayTitle ?? "-")")
+            case "hover", "off": cards.first?.isHovered = arg == "hover"
+            case "hide": if let tab = cards.first?.tab { controller.hideNowPlaying(tab) }
+            default: debugLog("nowplaying \(cards.isEmpty ? "hidden" : cards.map { $0.tab?.displayTitle ?? "-" }.joined(separator: " | "))")
             }
         case "autofillhint":
             if let webView = controller.selectedWebView as? BrowserWebView { Autofill.shared.debugShow(arg, in: webView) }
