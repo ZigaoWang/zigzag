@@ -556,7 +556,7 @@ enum SitePermissions {
     /// Asked like the camera, Remember checked to start. A private window never shows them anyway.
     static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
         if let known = notifications(origin: origin, tab: tab) { return known }
-        guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { tab?.noteUnanswered(.permission, "notifications"); return nil }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, answerKey: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 actions: [.deny, .allow], canRemember: true,
@@ -586,7 +586,7 @@ enum SitePermissions {
         let key = answerKey(frame: frame, page: page)
         if let key, let known = location(key: key, tab: tab) { return known ? .grant : .deny }
         noteAsked(.location, origin: page, isPrivate: isPrivate)
-        guard let controller = WindowManager.shared.promptHost(for: window) else { return .deny }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { tab?.noteUnanswered(.permission, "location"); return .deny }
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
@@ -618,6 +618,8 @@ enum SitePermissions {
             for type in types where key.flatMap({ decision(key: $0, type: type, tab: tab) }) == nil {
                 noteAsked(type == .microphone ? .microphone : .camera, origin: page, isPrivate: isPrivate)
             }
+            // A page with no one there says so to the AI app using it.
+            tab?.noteUnanswered(.permission, type == .camera ? "camera" : type == .microphone ? "microphone" : "camera and microphone")
             return .deny
         }
         // A no for either kind already settles it; don't ask about the other.
@@ -668,6 +670,7 @@ enum SitePermissions {
         let isPrivate = tab?.isPrivate ?? false
         guard let controller = WindowManager.shared.promptHost(for: window) else {
             noteAsked(.screen, origin: page, isPrivate: isPrivate)
+            tab?.noteUnanswered(.permission, "screen sharing")
             return .deny
         }
         if let key, let kept = screenAnswer(key: key, tab: tab) {

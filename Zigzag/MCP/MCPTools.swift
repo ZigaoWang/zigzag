@@ -299,7 +299,7 @@ nonisolated struct MCPArgumentError: Error, Equatable {
 /// (Settings, History), an extension's page or a file, and never a password field.
 nonisolated enum MCPSafety {
     enum Refusal: Equatable {
-        case privateWindow, ownPage, extensionPage, notAWebPage, emptyTab, stopped, errorPage, turnedOff
+        case privateWindow, ownPage, extensionPage, notAWebPage, emptyTab, stopped, errorPage, turnedOff, notHeadless
     }
 
     /// A web address to open: http or https only, with a host. A bare name like example.com gets https.
@@ -320,11 +320,13 @@ nonisolated enum MCPSafety {
 
     /// Why a tool can't act on a tab showing `url`, or nil when it can.
     /// `errorPage`: the tab shows Zigzag's error or certificate warning page there, whose "Visit anyway" only
-    /// the person may choose. `on`: AI apps are still allowed in Settings.
+    /// the person may choose. `on`: AI apps are still allowed in Settings. `outsideHeadless`: AI apps work in the
+    /// background (Headless), and this tab isn't one of theirs.
     static func refusal(url: URL?, isPrivate: Bool, stopped: Bool = false, errorPage: Bool = false, on: Bool = true,
-                        needsPage: Bool = true) -> Refusal? {
+                        outsideHeadless: Bool = false, needsPage: Bool = true) -> Refusal? {
         if !on { return .turnedOff }
         if isPrivate { return .privateWindow }
+        if outsideHeadless { return .notHeadless }
         if stopped { return .stopped }
         if errorPage { return .errorPage }
         guard let url, url.absoluteString != "about:blank" else { return needsPage ? .emptyTab : nil }
@@ -346,6 +348,7 @@ nonisolated enum MCPSafety {
         case .stopped: "The person using Zigzag stopped control of this tab. Leave it alone, or ask them first."
         case .errorPage: "That tab shows Zigzag's error or certificate warning page. AI apps can't use it; only the person can choose to go on. Go back, or open another page."
         case .turnedOff: "Zigzag's MCP server was turned off in Settings."
+        case .notHeadless: "AI apps work in the background in Zigzag now, in a window of their own: that tab isn't one of theirs. Use list_tabs, or open_tab."
         }
     }
 

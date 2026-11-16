@@ -1157,6 +1157,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let scriptJavaScriptToggle = Toggle()
     private let aiAppsToggle = Toggle()
     private var aiAppsToken: SignalToken?
+    private let backgroundToggle = Toggle()
+    private var backgroundToken: SignalToken?
     /// The server's address and its key, there while AI apps may use Zigzag.
     private lazy var aiAddressRow: FormRow = {
         let copy = PillButton(title: String(localized: "Copy", comment: "Button that copies something to the clipboard."))
@@ -1413,6 +1415,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                             control: aiAppsToggle)
         aiRow.keywords = Self.aiAppsKeywords
         aiGroup.add(aiRow)
+        backgroundToggle.onChange = { on in Headless.isOn = on }
+        let backgroundRow = FormRow(title: String(localized: "Run AI apps in the background", comment: "A setting in Settings › Automation: AI apps get a hidden window of their own, on a profile of their own (AI Apps), instead of your windows."),
+                                    detail: String(localized: "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. Opening Zigzag with --headless does the same until it quits.",
+                                                   comment: "Explanation under “Run AI apps in the background” in Settings › Automation. --headless is how Zigzag is opened from Terminal for it: not translated."),
+                                    control: backgroundToggle)
+        backgroundRow.keywords = [Self.aiAppsKeywords, String(localized: "headless background hidden window", comment: "Words that find the Run AI apps in the background setting with Find a setting in Settings. Not shown.")].joined(separator: " ")
+        aiGroup.add(backgroundRow)
+        backgroundToken = Headless.changed.observe { [weak self] in self?.refreshAIApps() }
         aiGroup.add(aiAddressRow)
         aiGroup.add(aiKeyRow)
         connectGroup.add(aiSetupRow)
@@ -3884,6 +3894,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let shown = MCPService.isOn
         // Turned on or off elsewhere (another Settings tab): the switch follows.
         if aiAppsToggle.isOn != shown { aiAppsToggle.isOn = shown }
+        // Only for AI apps that may use Zigzag at all.
+        // On too while this run was asked to with --headless: turning it off here ends that as well.
+        if backgroundToggle.isOn != Headless.isWanted { backgroundToggle.isOn = Headless.isWanted }
+        backgroundToggle.isEnabled = shown
         let detail = MCPService.problem == nil ? MCPService.address
             : MCPService.replacedKeyForBusyPort
             ? String(localized: "Couldn’t start. Port \(Int(MCPService.port)) is in use by another app, so Zigzag made a new key. Give your AI apps the new key.",

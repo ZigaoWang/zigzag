@@ -2405,6 +2405,17 @@
         }
       }
     },
+    "AI Apps in the Background" : {
+      "comment" : "Heading of the menu bar item's menu while AI apps use Zigzag in the background.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用在后台运行"
+          }
+        }
+      }
+    },
     "AI apps are using it in the background. Stop them first with Stop AI Apps, under the sparkles in the menu bar." : {
       "comment" : "Message of the sheet shown instead of the one that deletes the profile AI apps use in the background, while they work in it. Stop AI Apps is the item's name in the menu of Zigzag's sparkles icon in the menu bar.",
       "localizations" : {
@@ -17298,6 +17309,17 @@
         }
       }
     },
+    "Run AI apps in the background" : {
+      "comment" : "A setting in Settings › Automation: AI apps get a hidden window of their own, on a profile of their own (AI Apps), instead of your windows.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 AI 应用在后台运行"
+          }
+        }
+      }
+    },
     "Run in private windows affects Open. A file type that saves still saves there." : {
       "comment" : "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.",
       "localizations" : {
@@ -19488,6 +19510,17 @@
         }
       }
     },
+    "Stop AI Apps" : {
+      "comment" : "Menu bar item's menu while AI apps use Zigzag in the background: cuts every AI app off, as Stop on a tab's bar does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止 AI 应用"
+          }
+        }
+      }
+    },
     "Stop Camera and Microphone" : {
       "comment" : "Menu item of the address bar's camera button: stops the page using the camera and microphone.",
       "localizations" : {
@@ -20563,6 +20596,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有可以运行它的标签页。"
+          }
+        }
+      }
+    },
+    "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. Opening Zigzag with --headless does the same until it quits." : {
+      "comment" : "Explanation under “Run AI apps in the background” in Settings › Automation. --headless is how Zigzag is opened from Terminal for it: not translated.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它们会在“AI 应用”个人资料中获得一个自己的隐藏窗口，看不到你的窗口和标签页。用 --headless 打开 Zigzag 也会如此，直到退出为止。"
           }
         }
       }
@@ -23723,6 +23767,17 @@
         }
       }
     },
+    "Zigzag: AI apps in the background" : {
+      "comment" : "Tooltip and VoiceOver name of the menu bar item shown while AI apps use Zigzag in the background.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag：AI 应用正在后台运行"
+          }
+        }
+      }
+    },
     "Zoom" : {
       "comment" : "Row in the site panel's This Site group.\nWindow menu item.",
       "localizations" : {
@@ -24225,6 +24280,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "透明"
+          }
+        }
+      }
+    },
+    "headless background hidden window" : {
+      "comment" : "Words that find the Run AI apps in the background setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "headless 后台 隐藏 窗口"
           }
         }
       }

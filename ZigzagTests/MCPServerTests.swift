@@ -273,6 +273,33 @@ struct MCPServerTests {
         #expect(endpoint.sessionCount == 0)
     }
 
+    /// Whichever way an app talks, a request that's taken up counts as an app at work (what Zigzag, running for AI
+    /// apps alone, stays for). One without the key, from a web page, for a session that's gone, with headers that
+    /// don't match, or a goodbye never does.
+    @Test func everyRequestTakenUpCounts() async throws {
+        let refused = endpoint()
+        _ = await refused.handle(post(Self.initialize, auth: false))
+        _ = await refused.handle(post(Self.initialize, headers: ["origin": "https://evil.example"]))
+        _ = await refused.handle(post(["jsonrpc": "2.0", "id": 2, "method": "tools/list"], headers: ["mcp-session-id": "gone"]))
+        _ = await refused.handle(modern("tools/list", headers: ["MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "tools/call"]))
+        var goodbye = post([:], headers: ["mcp-session-id": "gone"])
+        goodbye.method = "DELETE"
+        _ = await refused.handle(goodbye)
+        #expect(refused.lastRequest == nil)
+
+        let newer = endpoint()
+        let before = Date()
+        _ = await newer.handle(modern("tools/list"))
+        #expect(try #require(newer.lastRequest) >= before)
+
+        let older = endpoint()
+        let session = try #require(await older.handle(post(Self.initialize)).headers.first { $0.0 == "Mcp-Session-Id" }?.1)
+        let opened = try #require(older.lastRequest)
+        try await Task.sleep(for: .milliseconds(20))
+        _ = await older.handle(post(["jsonrpc": "2.0", "id": 2, "method": "tools/list"], headers: ["mcp-session-id": session]))
+        #expect(try #require(older.lastRequest) > opened)
+    }
+
     @Test func modernHeadersMustMatchTheBody() async {
         let endpoint = endpoint()
         let noHeaders = await endpoint.handle(modern("tools/list", headers: [:]))

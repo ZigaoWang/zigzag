@@ -16,6 +16,12 @@ protocol TabHost: AnyObject {
     func tabWantsFocus(_ tab: Tab)
     /// True when a route (#286) opened the link in another space. Only browser windows route.
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool
+    /// No one is there to answer for its pages: the window AI apps work in when they run in the background
+    /// (Headless). What a page asks of a person there (a dialog, a file, where to save) gets the quiet answer.
+    var isUnattended: Bool { get }
+    /// Its window is kept where no one sees it (their window, until it's shown): the tab that's up in it isn't on
+    /// screen, and sleeps like any other once it's idle.
+    var isOutOfSight: Bool { get }
 }
 
 extension TabHost {
@@ -25,6 +31,8 @@ extension TabHost {
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
         self.tab(tab, openURL: url, disposition: disposition, by: .page)
     }
+    var isUnattended: Bool { false }
+    var isOutOfSight: Bool { false }
 }
 
 enum OpenDisposition {
@@ -222,9 +230,10 @@ final class Tab: NSObject {
     /// Its profile's extensions. In a private tab, only those allowed in private windows run (ExtensionHost).
     @available(macOS 15.4, *)
     var extensionHost: ExtensionHost? { profile.extensions }
-    /// In a call (camera or microphone on, even muted), floating in Picture in Picture, or playing in the mini
-    /// player: not to be put to sleep.
+    /// In a call (camera or microphone on, even muted), floating in Picture in Picture, playing in the mini player, or
+    /// used by an AI app (`AgentControl`), asleep or not: not to be put to sleep, archived or cleared away.
     var isInUse: Bool {
+        if AgentControl.shared.isUsing(id) { return true }
         guard let webView else { return false }
         return isInMiniPlayer || webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none || webView.isPictureInPictureActive
     }
@@ -270,6 +279,40 @@ final class Tab: NSObject {
     weak var store: TabStore?
     /// With shared tabs (#162): the window showing its page now or last.
     weak var shownBy: TabManager?
+
+    // MARK: With no one there
+
+    /// No one is there to answer what its page asks (`TabHost.isUnattended`).
+    var isUnattended: Bool { host?.isUnattended ?? false }
+    /// The window its page's questions are asked in. None when no one is there to answer: each question then takes
+    /// the path it has always had for a page in no window, and is answered no.
+    private var promptWindow: NSWindow? { isUnattended ? nil : host?.hostWindow }
+
+    /// Something a page asked with no one there, answered no for it.
+    struct Unanswered: Equatable {
+        enum Kind: String { case alert, confirm, prompt, filePicker = "file picker", print, signIn = "sign-in", certificate, app = "open an app", permission }
+        let kind: Kind
+        /// What the page said, in its own words, or what it asked for.
+        var message = ""
+        /// The page that asked, which the tab may have left by the time the app is told.
+        var page = ""
+    }
+
+    /// What its page asked with no one there, the latest few, for the AI app that's using it to be told
+    /// (`takeUnanswered`).
+    private(set) var unanswered: [Unanswered] = []
+
+    /// Kept only where no one was there: anywhere else the person was asked, or will be.
+    func noteUnanswered(_ kind: Unanswered.Kind, _ message: String = "") {
+        guard isUnattended else { return }
+        unanswered.append(Unanswered(kind: kind, message: message, page: url?.absoluteString ?? ""))
+        if unanswered.count > 5 { unanswered.removeFirst(unanswered.count - 5) }
+    }
+
+    func takeUnanswered() -> [Unanswered] {
+        defer { unanswered = [] }
+        return unanswered
+    }
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
     private var reloadWhenShown = false
@@ -576,7 +619,7 @@ final class Tab: NSObject {
         webView.allowsMagnification = true
         webView.isInspectable = true
         Self.stopsAutomaticInsets(webView)
-        if !Self.watchesCover { Self.setWatchesCover(false, of: webView) }
+        if !watchesCover { Self.setWatchesCover(false, of: webView) }
         #if DEBUG
         if DebugBridge.mutesEverything { isMuted = webView.setPageAudioMuted(true) ?? true }
         #endif
@@ -710,7 +753,7 @@ final class Tab: NSObject {
     /// Its share of its page process's memory, as it goes to sleep: the process's footprint over the tabs awake in it.
     private func memoryInUse(by webView: BrowserWebView) -> UInt64? {
         guard let pid = EnergyWatch.processID(of: webView), pid > 0 else { return nil }
-        let sharing = WindowManager.shared.openTabs.filter { tab in
+        let sharing = WindowManager.shared.everyOpenTab.filter { tab in
             tab.webView.flatMap(EnergyWatch.processID) == pid
         }.count
         return SleepMemory.share(footprint: ProcessMemory.footprint(pid), tabsSharing: sharing)
@@ -1316,19 +1359,9 @@ final class Tab: NSObject {
             completion()
             return
         }
-        guard let webView, let holder = pageHolder, webView.superview === holder, webView.window == nil, hasLoadedOnce,
-              host.window != nil, size.width > 0, size.height > 0 else {
+        guard let webView, let letGo = holdOutOfSight(in: host, size: size) else {
             completion()
             return
-        }
-        let resizing = holder.autoresizingMask
-        holder.autoresizingMask = []
-        holder.frame = NSRect(origin: .zero, size: size)
-        host.addSubview(holder)
-        let letGo = { [weak holder, weak host] in
-            guard let holder, let host, holder.superview === host else { return }
-            holder.removeFromSuperview()
-            holder.autoresizingMask = resizing
         }
         let config = WKSnapshotConfiguration()
         config.afterScreenUpdates = true
@@ -1348,6 +1381,40 @@ final class Tab: NSObject {
                 }
                 completion()
             }
+        }
+    }
+
+    /// How many are holding its page out of sight (`holdOutOfSight`), which time it was set there (it may be taken
+    /// away and set there again while an earlier hold is still out), and how its holder resized before.
+    private var outOfSightHolds = 0
+    private var outOfSightSetting = 0
+    private var resizingBeforeHold: NSView.AutoresizingMask = []
+
+    /// Sets its page in `host` at `size`, where it's drawn though no one sees it: a page in no window isn't drawn at
+    /// all. Returns what lets it go again, or nil when there's no page to hold or it's in a window already. Held by
+    /// several at once (two pictures of it), it's let go by the last; and never if something else took it meanwhile
+    /// (you went to its tab): a hold from before that lets go of nothing set there since.
+    func holdOutOfSight(in host: NSView, size: NSSize) -> (() -> Void)? {
+        guard let webView, let holder = pageHolder, webView.superview === holder, hasLoadedOnce,
+              host.window != nil, size.width > 0, size.height > 0 else { return nil }
+        if holder.superview === host, outOfSightHolds > 0 {
+            outOfSightHolds += 1
+        } else {
+            guard webView.window == nil else { return nil }
+            resizingBeforeHold = holder.autoresizingMask
+            holder.autoresizingMask = []
+            holder.frame = NSRect(origin: .zero, size: size)
+            host.addSubview(holder)
+            outOfSightHolds = 1
+            outOfSightSetting += 1
+        }
+        let setting = outOfSightSetting
+        return { [weak self, weak holder, weak host] in
+            guard let self, setting == self.outOfSightSetting else { return }
+            self.outOfSightHolds = max(0, self.outOfSightHolds - 1)
+            guard self.outOfSightHolds == 0, let holder, let host, holder.superview === host else { return }
+            holder.removeFromSuperview()
+            holder.autoresizingMask = self.resizingBeforeHold
         }
     }
 
@@ -1512,6 +1579,10 @@ final class Tab: NSObject {
         #endif
     }()
 
+    /// `watchesCover` for this tab: never for AI apps' pages (Headless), which run as if seen in a window no one sees,
+    /// so nothing turns WebKit's hiding back on once their sound stops.
+    var watchesCover: Bool { Self.watchesCover && !profile.isHeadless }
+
     static func setWatchesCover(_ on: Bool, of webView: WKWebView) {
         let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
         guard webView.responds(to: occlusion) else { return }
@@ -1532,7 +1603,7 @@ final class Tab: NSObject {
     /// covered (an installed app's behind other apps, most often), and for a while after it stops, so a playlist's
     /// next song can load and start (#199). `_isPlayingAudio` leaves out a silent Web Audio graph.
     private func refreshCoverWatch() {
-        guard Self.watchesCover, let webView else { return }
+        guard watchesCover, let webView else { return }
         coverWait?.cancel()
         coverWait = nil
         let video = PageVideos.shared.playing(in: webView, any: true) != nil
@@ -1551,7 +1622,7 @@ final class Tab: NSObject {
     }
 
     private func watchVideos(of webView: BrowserWebView) {
-        guard Self.watchesCover else { return }
+        guard watchesCover else { return }
         videosToken = PageVideos.shared.reported.observe { [weak self, weak webView] page in
             guard let self, let webView, page === webView, self.webView === webView else { return }
             self.refreshCoverWatch()
@@ -2383,8 +2454,19 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
-        await AuthenticationPrompt.respond(to: challenge, window: host?.hostWindow, store: webView.configuration.websiteDataStore, page: webView,
-                                           tab: isPrivate ? nil : self)
+        let answer = await AuthenticationPrompt.respond(to: challenge, window: promptWindow, store: webView.configuration.websiteDataStore, page: webView,
+                                                        tab: isPrivate ? nil : self)
+        // With no one there, a site's question for a name and password is cancelled, and a site asking for a
+        // certificate goes on without one (AI apps' profile is given none of yours): the app is told.
+        let method = challenge.protectionSpace.authenticationMethod
+        if isUnattended, answer.0 == .cancelAuthenticationChallenge,
+           [NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodHTTPDigest, NSURLAuthenticationMethodNTLM].contains(method) {
+            noteUnanswered(.signIn, challenge.protectionSpace.host)
+        }
+        if isUnattended, answer.0 == .rejectProtectionSpace, method == NSURLAuthenticationMethodClientCertificate {
+            noteUnanswered(.certificate, challenge.protectionSpace.host)
+        }
+        return answer
     }
 }
 
@@ -2516,12 +2598,15 @@ extension Tab: WKUIDelegate {
     /// prints that frame; a background tab's is let be.
     @objc(_webView:printFrame:pdfFirstPageSize:completionHandler:)
     func webView(_ webView: WKWebView, printFrame frame: AnyObject?, pdfFirstPageSize size: CGSize, completionHandler: @escaping () -> Void) {
+        // No one there to print for.
+        guard !isUnattended else { noteUnanswered(.print); completionHandler(); return }
         PagePrinting.printForPage(webView, frame: frame, in: host?.hostWindow, completion: completionHandler)
     }
 
     /// The same request from older WebKit, which doesn't wait.
     @objc(_webView:printFrame:)
     func webView(_ webView: WKWebView, printFrame frame: AnyObject?) {
+        guard !isUnattended else { noteUnanswered(.print); return }
         PagePrinting.printForPage(webView, frame: frame, in: host?.hostWindow, completion: {})
     }
 
@@ -2553,33 +2638,38 @@ extension Tab: WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {
-        await PageDialogs.alert(message: message, frame: frame, window: host?.hostWindow)
+        noteUnanswered(.alert, message)
+        await PageDialogs.alert(message: message, frame: frame, window: promptWindow)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async -> Bool {
-        await PageDialogs.confirm(message: message, frame: frame, window: host?.hostWindow)
+        noteUnanswered(.confirm, message)
+        return await PageDialogs.confirm(message: message, frame: frame, window: promptWindow)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo) async -> String? {
-        await PageDialogs.prompt(message: prompt, defaultText: defaultText, frame: frame, window: host?.hostWindow)
+        noteUnanswered(.prompt, prompt)
+        return await PageDialogs.prompt(message: prompt, defaultText: defaultText, frame: frame, window: promptWindow)
     }
 
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo) async -> [URL]? {
-        await PageDialogs.openPanel(parameters: parameters, window: host?.hostWindow)
+        // With no window, the panel would come up on its own in the middle of the screen: no one there, no file.
+        guard !isUnattended else { noteUnanswered(.filePicker); return nil }
+        return await PageDialogs.openPanel(parameters: parameters, window: host?.hostWindow)
     }
 
     /// WebKit's own question for location (not public API, but how Safari asks): answered with Zigzag's prompt.
     @objc(_webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:)
     private func webView(_ webView: WKWebView, requestGeolocationPermissionFor origin: WKSecurityOrigin, initiatedBy frame: WKFrameInfo,
                  decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        Task { decisionHandler(await SitePermissions.requestLocation(origin: origin, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
+        Task { decisionHandler(await SitePermissions.requestLocation(origin: origin, window: promptWindow, isPrivate: isPrivate, tab: self)) }
     }
 
     // The completion-handler form: its Swift async name differs between SDKs, and a near miss is never called.
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
         // Camera and microphone don't need WebRTC; it's only offered when a page starts a call (`WebRTCProtection`).
-        Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
+        Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: promptWindow, isPrivate: isPrivate, tab: self)) }
     }
 
     /// Screen sharing (Meet, Zoom, Teams). WebKit asks the browser through this unpublished method; the answer
@@ -2588,7 +2678,7 @@ extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, requestDisplayCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  withSystemAudio: Bool, decisionHandler: @escaping (Int) -> Void) {
         Task { @MainActor in
-            decisionHandler(await SitePermissions.requestDisplayCapture(origin: origin, window: host?.hostWindow, tab: self).rawValue)
+            decisionHandler(await SitePermissions.requestDisplayCapture(origin: origin, window: promptWindow, tab: self).rawValue)
         }
     }
 }

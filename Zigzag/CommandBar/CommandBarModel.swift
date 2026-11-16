@@ -354,7 +354,7 @@ enum CommandRanker {
         var c = Context()
         c.isPrivate = manager.isPrivate
         c.canReopen = WindowManager.shared.canReopenLastClosed(from: manager)
-        c.spaces = Library.shared.spaces.map { Context.Space(id: $0.id, name: $0.name) }
+        c.spaces = manager.listedSpaces.map { Context.Space(id: $0.id, name: $0.name) }
         c.currentSpaceID = manager.currentSpaceID
         let tabs = manager.currentTabs
         guard let tab = manager.selectedTab else { return c }

@@ -104,7 +104,7 @@ enum SiteIcons {
 
     /// Updates open tabs and tabless pinned pages and favorites.
     private static func refreshTabs() {
-        for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshChosenIcon() }
+        for tab in WindowManager.shared.everyOpenTab { tab.refreshChosenIcon() }
         Library.shared.changed.send()
     }
 }
