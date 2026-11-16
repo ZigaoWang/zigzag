@@ -98,17 +98,42 @@ enum DownloadRuleSheet {
             let field = FilledField(placeholder: String(localized: "Choose a script…", comment: "Placeholder of the script field in a download rule's sheet."))
             field.stringValue = action.scriptPath
             scriptField = field
-            let button = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
-            button.onClick = { _ in
+            // The folder is the list: every script in it is one click away, which is what makes one place mean
+            // something. A script kept elsewhere stays reachable through Choose a Script…, and what's picked from the
+            // folder is stored as its own name, so the rule reads `yt-dlp.sh` and goes on working.
+            let pickAScript = {
                 let panel = NSOpenPanel()
                 panel.canChooseFiles = true
                 panel.canChooseDirectories = false
                 panel.treatsFilePackagesAsDirectories = false
                 panel.prompt = String(localized: "Choose", comment: "Button of the open panel that picks a script for a download rule.")
-                choose(panel, into: field)
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                field.stringValue = Paths.scriptName(for: url)
+                sheetRef?.revalidate()
+            }
+            let button = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
+            button.onClick = { [weak button] _ in
+                guard let button else { return }
+                var entries: [MenuPanel.Entry] = Paths.scriptNames().map { name in
+                    .item(MenuPanel.Item(title: name, symbol: "terminal") {
+                        field.stringValue = name
+                        sheetRef?.revalidate()
+                    })
+                }
+                if !entries.isEmpty { entries.append(.separator) }
+                entries.append(.item(MenuPanel.Item(title: String(localized: "Choose a Script…", comment: "Item in the menu beside a Run Script rule's script field: picks a script kept outside the scripts folder.")) {
+                    pickAScript()
+                }))
+                entries.append(.item(MenuPanel.Item(title: String(localized: "Show Scripts Folder", comment: "Item in the menu beside a Run Script rule's script field: opens the folder the scripts live in, in Finder."), symbol: "folder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([Paths.scripts])
+                }))
+                button.isSelected = true
+                MenuPanel.show(entries, from: button) { [weak button] in button?.isSelected = false }
             }
             actionRows.append(FormSheet.Row(label: String(localized: "Script", comment: "Label of the script field in a download rule's sheet."),
                                             view: stack(field, button)))
+            actionRows.append(.note(String(localized: "Scripts live in Documents/Zigzag/Scripts.",
+                                           comment: "Under the script field of a Run Script download rule: where a script named by its file name is looked for.")))
             let args = MultilineField(text: action.arguments.joined(separator: "\n"))
             argumentView = args
             actionRows.append(FormSheet.Row(label: String(localized: "Arguments", comment: "Label of the arguments field in a download rule's sheet: one argument a line."),

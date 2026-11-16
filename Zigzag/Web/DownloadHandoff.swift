@@ -276,8 +276,9 @@ enum DownloadHandoff {
     /// anything else must be executable. Never `/bin/sh -c`, and never a joined command line.
     private static func runScript(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
                                   request: Request, rule: DownloadRule?) -> Outcome {
-        // Literal, as an app's path is: a link may fill an argument, never choose the script.
-        let path = (action.scriptPath as NSString).expandingTildeInPath
+        // A bare file name is in the scripts folder; a path of its own is taken as it stands. Literal, as an app's
+        // path is: a link may fill an argument, never choose the script.
+        let path = Paths.script(named: action.scriptPath).path
         guard FileManager.default.fileExists(atPath: path) else {
             return .failed(String(localized: "The script is no longer there.", comment: "Why a download rule failed: the script it was told to run is gone."))
         }
