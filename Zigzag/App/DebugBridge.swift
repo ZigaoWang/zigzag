@@ -635,6 +635,15 @@ enum DebugBridge {
             let w = controller.window as? BrowserWindow
             let b = w?.standardWindowButton(.closeButton)
             debugLog("lights hidden=\(b?.isHidden ?? true) frame=\(b?.frame ?? .zero) revealed=\(controller.root.isSidebarFloatingVisible) container=\(controller.root.sidebarContainer.frame.minX)")
+            // lights tree: the title bar's views as AppKit has them, with what draws its background.
+            if arg == "tree", let top = b?.superview?.superview {
+                func dump(_ view: NSView, _ depth: Int) {
+                    debugLog(String(repeating: "  ", count: depth) + "\(type(of: view)) frame=\(view.frame) hidden=\(view.isHidden) alpha=\(view.alphaValue) window=\(view.window.map { "\(type(of: $0))" } ?? "-")")
+                    view.subviews.forEach { dump($0, depth + 1) }
+                }
+                dump(top, 0)
+                debugLog("lights transparent=\(w?.titlebarAppearsTransparent ?? false) fullScreen=\(w?.styleMask.contains(.fullScreen) ?? false)")
+            }
         case "commandbar":
             // Typing into an open bar only types, as the keyboard would.
             if !controller.commandBar.isVisible { controller.commandBar.show(mode: .newTab) }

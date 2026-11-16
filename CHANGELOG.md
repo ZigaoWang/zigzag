@@ -5,10 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Double-clicking the empty space below your tabs opens a new tab, as in Arc. The top of the sidebar still works like a title bar, and Settings › Appearance › Double-click the sidebar for a new tab turns it off. ([#262](https://github.com/ZigaoWang/zigzag/issues/262))
+
 ### Fixed
+- In full screen, the close, minimize and full screen buttons that come down with the menu bar have a bar behind them again, instead of floating over the page when the sidebar is hidden.
 - An address typed without http:// or https://, like localtest.me:3000 for a development server, opens over http when the site can't be reached securely, as in Chrome, Safari and Firefox. Zigzag still tries https first, and goes to http only when nothing answers securely: never past a certificate warning, and never for a site that asked to be reached only securely. The same goes for an address you paste, drop on the address bar or open from selected text. ([#252](https://github.com/ZigaoWang/zigzag/issues/252))
 
-## [0.9.1] - 2026-11-15
+## [0.9.1] - 2026-11-16
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.
 
@@ -1265,8 +1269,8 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 ### New
 - The first public release: signed and notarized, with updates that install themselves.
 
-[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...HEAD
-[0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/ZigaoWang/zigzag/compare/v0.8.5...v0.8.6
 [0.8.5]: https://github.com/ZigaoWang/zigzag/compare/v0.8.4...v0.8.5
