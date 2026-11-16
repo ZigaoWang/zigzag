@@ -51,13 +51,13 @@ enum PopupNotice {
         if lastAsked.count > 200 { lastAsked = lastAsked.filter { now.timeIntervalSince($0.value) < 600 } }
     }
 
-    /// The question was put off (Esc, or its window closed): not straight back up.
     /// The site's answers were forgotten: its throttle goes too, so the next pop-up asks as if it had never asked.
     static func forgetAnswers(origin: String) {
         lastAsked[origin] = nil
         setAside[origin] = nil
     }
 
+    /// The question was put off (Esc, or its window closed): not straight back up.
     static func noteSetAside(origin: String?, now: Date = Date()) {
         guard let origin else { return }
         setAside[origin] = now.addingTimeInterval(putOffGap)
@@ -103,13 +103,13 @@ enum PopupNotice {
                        .alternate("mini", String(localized: "Mini", comment: "Choice in the pop-up question's menu: opens the pop-up's page in the small pop-up viewer window."))],
                 canRemember: !isPrivate && origin != nil && secure && sameFrame,
                 answered: {
-                    // A queued question may have been answered meanwhile: the same frame's This-time choice, or a
-                    // destination the page kept for the site.
-                    if let key, let kept = pageAction(tab: tab, origin: key, isPrivate: isPrivate) {
-                        return PermissionAnswer(action: kept, remember: false)
-                    }
+                    // A queued question may have been answered meanwhile: a destination the page kept for the site,
+                    // or the same frame's This-time choice. The site's answer wins, as it does before asking.
                     if !isPrivate, let kept = storedAction(origin: origin) {
                         return PermissionAnswer(action: kept, remember: true)
+                    }
+                    if let key, let kept = pageAction(tab: tab, origin: key, isPrivate: isPrivate) {
+                        return PermissionAnswer(action: kept, remember: false)
                     }
                     return nil
                 })

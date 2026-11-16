@@ -140,7 +140,11 @@ enum ExternalLinks {
         // A background tab's page has no window attached, but its question still belongs to it: ask in the tab's own
         // host, where `PermissionPrompt` holds it and marks the tab until it can be shown. A web view with neither a
         // window nor a tab (an orphaned pop-up) must not put a question up in whatever window happens to be in front.
-        guard let controller, webView.window != nil || owner?.host != nil,
+        // Mini and an installed app's window are hosts in their own right, with no browser window to fall back on.
+        let pagePromptHost: PromptHost? = (webView.window?.windowController as? PromptHost)
+            .flatMap { $0 is BrowserWindowController ? nil : $0 }
+            ?? (owner?.host as? PromptHost).flatMap { $0 is BrowserWindowController ? nil : $0 }
+        guard let promptHost = pagePromptHost ?? controller, webView.window != nil || owner?.host != nil,
               asked.mayAsk(key, page: pageOrigin ?? pageHost, clickedHere: clickedHere, linkClick: linkClick ?? isClick) else { return }
         let name = appName(app)
         // Private windows, popups included, never remember the answer.
@@ -152,12 +156,8 @@ enum ExternalLinks {
         asked.asking.insert(key)
         // Asked where the page is: in Zigzag Mini or an installed app's window, over its own page, not in a browser
         // window behind it, where it couldn't be seen (a report: claude.ai's Open Claude did nothing in Mini).
-        let promptHost: PromptHost = (webView.window?.windowController as? PromptHost)
-            .flatMap { $0 is BrowserWindowController ? nil : $0 }
-            ?? (owner?.host as? PromptHost).flatMap { $0 is BrowserWindowController ? nil : $0 }
-            ?? controller
-        // Asked from a popup: its browser window comes forward, so the question isn't hidden behind the popup.
-        if popup != nil { controller.window?.makeKeyAndOrderFront(nil) }
+        // Asked from a popup: its window comes forward, so the question isn't hidden behind the pop-up.
+        if popup != nil { promptHost.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, what: name, symbol: "arrow.up.forward.app",
                                                     icon: NSWorkspace.shared.icon(forFile: app.path), in: promptHost,
