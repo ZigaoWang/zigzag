@@ -478,6 +478,10 @@ final class SidebarListView: NSView {
 
         var changes: [() -> Void] = []
         var moves: [(NSView, NSRect)] = []
+        // Where rows arriving one after another (a folder's pages as it opens) unfold from: just below the row above
+        // them, as it stands now. `collapse` played backwards: each glides down to its place as the rows above it in
+        // the block open, so the rows below, sliding down to make room, stay on the block's foot and never pass over it.
+        var unfoldFrom: CGFloat?
         for (item, frame) in layout {
             if let view = rows[item] {
                 // A row out of sight, staying out of sight, gives its view up: only the rows near what's on screen
@@ -485,9 +489,12 @@ final class SidebarListView: NSView {
                 if view !== drag?.view, !keepsView(item, view), !Self.overlaps(frame, near), !Self.overlaps(view.frame, near) {
                     rows[item] = nil
                     view.removeFromSuperview()
+                    unfoldFrom = nil
                     continue
                 }
                 configure(view, for: item)
+                // The space's name is left out: it's pinned to the top while the list is scrolled, away from its place.
+                unfoldFrom = view === drag?.view || item == .header ? nil : view.frame.maxY + (item == .separator ? 0 : rowGap)
                 // The space's name is placed by `pinHeader`, at the top while the list is scrolled.
                 if view === drag?.view || item == .header { continue }
                 if view.frame != frame {
@@ -502,7 +509,12 @@ final class SidebarListView: NSView {
                     view.frame = from
                     carry(view, to: frame)
                 } else {
-                    view.frame = frame
+                    if animated, !Tokens.Motion.reduceMotion, let start = unfoldFrom, start < frame.minY - 0.5 {
+                        view.frame = NSRect(x: frame.minX, y: start, width: frame.width, height: frame.height)
+                        Tokens.Motion.glide(view, to: frame)
+                    } else {
+                        view.frame = frame
+                    }
                     if animated {
                         view.alphaValue = 0
                         changes.append { view.animator().alphaValue = 1 }
