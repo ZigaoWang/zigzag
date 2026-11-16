@@ -123,10 +123,10 @@ import WebKit
             #expect(SitePermissions.downloads(origin: "https://files.example") == false)
             #expect(await !SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
 
-            // A site nobody has answered for has said nothing, and with nowhere to ask the file is left as WebKit
-            // decided it rather than silently eaten.
+            // A site nobody has answered for has said nothing; with nowhere to ask, the file is refused rather than
+            // saved unasked.
             #expect(SitePermissions.downloads(origin: "https://other.example") == nil)
-            #expect(await SitePermissions.downloadsAllowed(origin: "https://other.example", window: nil, isPrivate: false, tab: nil))
+            #expect(await !SitePermissions.downloadsAllowed(origin: "https://other.example", window: nil, isPrivate: false, tab: nil))
         }
     }
 

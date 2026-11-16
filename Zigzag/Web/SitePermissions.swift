@@ -336,11 +336,11 @@ enum SitePermissions {
 
     /// Whether this site may save a file, asking for a new site's first one and never again after "Always". False
     /// refuses the download — a question put off refuses what it asked, as every other one does. With nowhere to ask
-    /// (a window that has gone) the file is left as WebKit decided it, rather than silently eaten.
+    /// (a window that has gone) the file is refused rather than saved unasked; there is no card to answer.
     static func downloadsAllowed(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool {
         if let known = downloads(origin: origin, tab: tab) { return known }
         noteAsked(.downloads, origin: origin, isPrivate: isPrivate)
-        guard let controller = WindowManager.shared.promptHost(for: window) else { return true }
+        guard let controller = WindowManager.shared.promptHost(for: window) else { return false }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, what: "files",
                                                 symbol: "arrow.down.circle", in: controller, tab: tab,
                                                 title: String(localized: "Allow downloads from this site", comment: "A site's permission question, without its question mark. The site is sending a file."),

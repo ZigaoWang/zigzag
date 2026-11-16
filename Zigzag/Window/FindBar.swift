@@ -997,6 +997,15 @@ enum Toast {
         layer.add(move, forKey: "follow")
     }
 
+    /// Puts a notice back under a question that just came up in a window with no browser chrome (Zigzag Mini, an
+    /// installed app), using that window's own toast area.
+    static func reposition(in host: PromptHost) {
+        let spot = host.promptToastPlace
+        guard let state = showing[ObjectIdentifier(spot.over)], let toast = state.toast,
+              toast.superview === spot.over, !toast.dismissing else { return }
+        place(toast, in: spot.area)
+    }
+
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false) {

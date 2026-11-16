@@ -2093,10 +2093,10 @@ enum DebugBridge {
                   let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) else { debugLog("sitepanelstate: no panel"); break }
             try? data.write(to: URL(fileURLWithPath: arg))
         case "siteperm":
-            // siteperm <camera|microphone|location|notifications|popups|apps|webrtc> <ask|allow|block|asked>: for the page
+            // siteperm <camera|microphone|location|notifications|popups|downloads|apps|webrtc> <ask|allow|block|asked>: for the page
             // in front's site, as its Site Controls row would choose, or as if it had just asked.
             let f = arg.split(separator: " ").map(String.init)
-            let kinds: [String: SitePermission] = ["camera": .camera, "microphone": .microphone, "location": .location, "notifications": .notifications, "popups": .popups, "apps": .apps, "webrtc": .webRTC]
+            let kinds: [String: SitePermission] = ["camera": .camera, "microphone": .microphone, "location": .location, "notifications": .notifications, "popups": .popups, "downloads": .downloads, "apps": .apps, "webrtc": .webRTC]
             guard f.count == 2, let permission = kinds[f[0]], let origin = SiteOrigin.of(controller.tabManager.selectedTab?.url) else { debugLog("siteperm refused"); break }
             if f[1] == "asked" {
                 SitePermissions.noteAsked(permission, origin: origin, isPrivate: false)
