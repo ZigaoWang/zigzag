@@ -32,6 +32,17 @@ struct ErrorPageTests {
         #expect(ErrorPage.kind(of: error(NSURLErrorResourceUnavailable), url: gone) == .extensionGone)
     }
 
+    /// Only a server that doesn't speak https, or nothing on the port, sends an address typed without a scheme on to
+    /// http; a certificate keeps its warning.
+    @Test func onlyAnHTTPOnlyServerFallsBackToHTTP() {
+        #expect(ErrorPage.Kind.allCases.filter(ErrorPage.fallsBackToHTTP) == [.refused, .secureFailed])
+        #expect(ErrorPage.fallsBackToHTTP(ErrorPage.kind(of: error(NSURLErrorSecureConnectionFailed), url: site)))
+        #expect(ErrorPage.fallsBackToHTTP(ErrorPage.kind(of: error(NSURLErrorCannotConnectToHost), url: site)))
+        for code in [NSURLErrorServerCertificateUntrusted, NSURLErrorTimedOut, NSURLErrorNetworkConnectionLost, NSURLErrorCannotFindHost] {
+            #expect(!ErrorPage.fallsBackToHTTP(ErrorPage.kind(of: error(code), url: site)), "\(code)")
+        }
+    }
+
     @Test func eachKindHasItsOwnDrawing() {
         let drawings = Set([ErrorPage.Kind.offline, .notFound, .refused, .timedOut, .secureFailed, .certificate, .clientCertificate,
                             .redirects, .broken, .missingFile, .unreadableFile, .blocked, .extensionGone, .stopped, .other]

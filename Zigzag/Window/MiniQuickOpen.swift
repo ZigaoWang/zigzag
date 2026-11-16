@@ -32,13 +32,15 @@ final class MiniQuickOpen: NSWindowController, NSWindowDelegate {
     /// Open tabs, among the results and for completing an address: the front browser window's.
     static var tabs: TabManager? { browser?.tabManager }
 
-    /// The page a chosen result opens in Zigzag Mini, and whether it's a search; nil for one that isn't a page.
-    static func page(for kind: CommandResult.Kind) -> (url: URL, search: Bool)? {
+    /// The page a chosen result opens in Zigzag Mini, whether it's a search, and whether it may go over http if
+    /// https can't reach it (`CommandRanker.Destination`); nil for one that isn't a page.
+    static func page(for kind: CommandResult.Kind) -> (url: URL, search: Bool, httpFallback: Bool)? {
         switch kind {
-        case .open(let url), .history(let url): (url, false)
-        case .search(let query), .suggestion(let query): (Library.shared.searchEngine.searchURL(query), true)
-        case .searchOn(let url): (url, true)
-        case .bookmark(let id): Library.shared.bookmark(id).map { ($0.url, false) }
+        case .open(let url, let httpFallback): (url, false, httpFallback)
+        case .history(let url): (url, false, false)
+        case .search(let query), .suggestion(let query): (Library.shared.searchEngine.searchURL(query), true, false)
+        case .searchOn(let url): (url, true, false)
+        case .bookmark(let id): Library.shared.bookmark(id).map { ($0.url, false, false) }
         case .switchTo, .action, .note: nil
         }
     }
@@ -156,8 +158,9 @@ extension MiniQuickOpen: CommandBarHost {
 
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool {
         if Self.switchToTab(kind) { return true }
-        guard let (url, search) = Self.page(for: kind) else { return true }
-        MiniWindowController.open(url: url, isSearch: search, from: barFrameOnScreen, overFullScreen: overFullScreen)
+        guard let page = Self.page(for: kind) else { return true }
+        MiniWindowController.open(url: page.url, isSearch: page.search, from: barFrameOnScreen, overFullScreen: overFullScreen,
+                                  httpFallback: page.httpFallback)
         return true
     }
 

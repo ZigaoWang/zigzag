@@ -19,24 +19,42 @@ struct AddressTests {
     /// Selected text that's an address gets Open in the page's menu (#234); a sentence's punctuation around it
     /// comes off, and only web addresses count.
     @Test func selectedTextThatIsAnAddress() {
-        #expect(CommandRanker.url(fromSelection: " example.com ")?.absoluteString == "https://example.com")
-        #expect(CommandRanker.url(fromSelection: "(github.com/ZigaoWang/zigzag).")?.absoluteString == "https://github.com/ZigaoWang/zigzag")
-        #expect(CommandRanker.url(fromSelection: "“https://example.com/a?b=1”")?.absoluteString == "https://example.com/a?b=1")
+        #expect(CommandRanker.destination(fromSelection: " example.com ")?.url.absoluteString == "https://example.com")
+        #expect(CommandRanker.destination(fromSelection: "(github.com/ZigaoWang/zigzag).")?.url.absoluteString == "https://github.com/ZigaoWang/zigzag")
+        #expect(CommandRanker.destination(fromSelection: "“https://example.com/a?b=1”")?.url.absoluteString == "https://example.com/a?b=1")
         // A parenthesis is the address's own when it has its partner in it.
         let planet = "https://en.wikipedia.org/wiki/Mercury_(planet)"
-        #expect(CommandRanker.url(fromSelection: planet)?.absoluteString == planet)
-        #expect(CommandRanker.url(fromSelection: "(\(planet)).")?.absoluteString == planet)
-        #expect(CommandRanker.url(fromSelection: "\(planet),")?.absoluteString == planet)
-        #expect(CommandRanker.url(fromSelection: "example.com/a)")?.absoluteString == "https://example.com/a")
-        #expect(CommandRanker.url(fromSelection: "(example.com/a")?.absoluteString == "https://example.com/a")
-        #expect(CommandRanker.url(fromSelection: "localhost:3000")?.absoluteString == "http://localhost:3000")
-        #expect(CommandRanker.url(fromSelection: "node.js") == nil)
-        #expect(CommandRanker.url(fromSelection: "go to example.com") == nil)
-        #expect(CommandRanker.url(fromSelection: "example.com\nexample.org") == nil)
-        #expect(CommandRanker.url(fromSelection: "name@example.com") == nil)
-        #expect(CommandRanker.url(fromSelection: "file:///etc/hosts") == nil)
-        #expect(CommandRanker.url(fromSelection: "about:blank") == nil)
-        #expect(CommandRanker.url(fromSelection: "") == nil)
+        #expect(CommandRanker.destination(fromSelection: planet)?.url.absoluteString == planet)
+        #expect(CommandRanker.destination(fromSelection: "(\(planet)).")?.url.absoluteString == planet)
+        #expect(CommandRanker.destination(fromSelection: "\(planet),")?.url.absoluteString == planet)
+        #expect(CommandRanker.destination(fromSelection: "example.com/a)")?.url.absoluteString == "https://example.com/a")
+        #expect(CommandRanker.destination(fromSelection: "(example.com/a")?.url.absoluteString == "https://example.com/a")
+        #expect(CommandRanker.destination(fromSelection: "localhost:3000")?.url.absoluteString == "http://localhost:3000")
+        #expect(CommandRanker.destination(fromSelection: "node.js") == nil)
+        #expect(CommandRanker.destination(fromSelection: "go to example.com") == nil)
+        #expect(CommandRanker.destination(fromSelection: "example.com\nexample.org") == nil)
+        #expect(CommandRanker.destination(fromSelection: "name@example.com") == nil)
+        #expect(CommandRanker.destination(fromSelection: "file:///etc/hosts") == nil)
+        #expect(CommandRanker.destination(fromSelection: "about:blank") == nil)
+        #expect(CommandRanker.destination(fromSelection: "") == nil)
+    }
+
+    /// An address typed without a scheme goes over https, and over http once if https can't be reached, as other
+    /// browsers do.
+    @Test func anAddressWithoutASchemeFallsBackToHTTP() {
+        let typed = CommandRanker.destination(from: "localtest.me:3600/x?y=1#z")
+        #expect(typed?.url.absoluteString == "https://localtest.me:3600/x?y=1#z")
+        #expect(typed?.httpFallback == true)
+        #expect(CommandRanker.destination(from: " example.com ")?.httpFallback == true)
+        #expect(CommandRanker.destination(fromSelection: "(example.com).")?.httpFallback == true)
+        // A scheme you typed is the one you get, and an address that goes over http anyway has nothing to fall back to.
+        for text in ["https://example.com", "http://example.com", "localhost:3000", "192.168.1.1", "printer.local", "app.test",
+                     "file:///etc/hosts", "about:blank"] {
+            #expect(CommandRanker.destination(from: text)?.httpFallback == false, "\(text)")
+        }
+        // Words are searched for, not opened.
+        #expect(CommandRanker.destination(from: "node.js") == nil)
+        #expect(CommandRanker.destination(from: "go to example.com") == nil)
     }
 
     /// The selection read as the right-click started counts only while WebKit's menu is still for it: a click that
