@@ -269,7 +269,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             return !appPath.isEmpty
         case .openURL:
             guard !urlTemplate.isEmpty, let sample = URL(string: "https://example.com/a?b=c") else { return false }
-            let expanded = DownloadTokens.expand(urlTemplate, with: HandoffValues(link: sample, referrer: sample, filename: "file.txt", space: "Work"))
+            let expanded = DownloadTokens.expand(urlTemplate, with: HandoffValues(link: sample, referrer: sample, filename: "file.txt", space: "Work"), query: true)
             return URL(string: expanded)?.scheme != nil
         case .runScript:
             return !scriptPath.isEmpty
@@ -397,12 +397,15 @@ nonisolated enum DownloadTokens {
     /// The tokens a template may use, and what each becomes, for the editor's note.
     static let names = ["{link}", "{encoded_link}", "{referrer}", "{cookies}", "{cookie_header}", "{filename}", "{mime}", "{space}"]
 
-    /// The URL as one query value: `&`, `+`, `=` and `#` in it become part of the value, not of the query around it.
-    static func encoded(_ url: URL) -> String {
+    /// A value as one query value: `&`, `+`, `=` and `#` in it become part of the value, not of the query around it.
+    static func queryValue(_ text: String) -> String {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?#")
-        return url.absoluteString.addingPercentEncoding(withAllowedCharacters: allowed) ?? url.absoluteString
+        return text.addingPercentEncoding(withAllowedCharacters: allowed) ?? text
     }
+
+    /// The URL as one query value.
+    static func encoded(_ url: URL) -> String { queryValue(url.absoluteString) }
 
     /// The characters a name may keep: no control, format (bidi included), line or paragraph separators, surrogates
     /// or unassigned scalars, and no folder separators or colons. Shared with the download manager, so a name shown
@@ -444,23 +447,36 @@ nonisolated enum DownloadTokens {
 
     /// Fills every token in `template`, in one pass. A value is never scanned again, so a filename or a title that
     /// happens to read `{secret}` or `{link}` is passed as it is, not turned into another value.
-    static func expand(_ template: String, with values: HandoffValues, secret: String = "", json: Bool = false) -> String {
-        func value(_ text: String) -> String { json ? jsonEscaped(text) : text }
+    /// `query`: every value is one query value, so a filename or a title with `&`, `=` or `#` in it can't add a
+    /// parameter of its own to an Open URL template. `{path}`, `{query}` and `{encoded_link}` are the address's own
+    /// already-encoded parts and are not encoded twice.
+    /// `json`: every value is the inside of a JSON string.
+    static func expand(_ template: String, with values: HandoffValues, secret: String = "", json: Bool = false,
+                       query: Bool = false) -> String {
+        func value(_ text: String) -> String {
+            if json { return jsonEscaped(text) }
+            if query { return queryValue(text) }
+            return text
+        }
+        // Already encoded for where it goes: escaped for JSON if asked, but never percent-encoded again.
+        func part(_ text: String) -> String { json ? jsonEscaped(text) : text }
+        // A server's MIME type is not an option: one that starts with `-` must not be read as one by aria2 or yt-dlp.
+        let mime = values.mime.hasPrefix("-") ? "_" + values.mime : values.mime
         let replacements: [String: String] = [
-            "{encoded_link}": value(encoded(values.link)),
+            "{encoded_link}": part(encoded(values.link)),
             "{cookie_header}": value(values.cookieHeader),
             "{cookies}": value(values.cookieFile),
             "{referrer}": value(values.referrer?.absoluteString ?? ""),
             "{filename}": value(values.filename),
-            "{mime}": value(values.mime),
+            "{mime}": value(mime),
             "{space}": value(values.space),
             "{secret}": value(secret),
             // The link's own parts, so a rule can send an address somewhere else: `https://bing.com{path}` takes a
             // match on google.com to the same page on bing.com. Both are the address's own, percent-encoded, so what
             // is put back together is still one valid URL.
             "{host}": value(values.link.host() ?? ""),
-            "{path}": value(values.link.path(percentEncoded: true)),
-            "{query}": value(values.link.query(percentEncoded: true) ?? ""),
+            "{path}": part(values.link.path(percentEncoded: true)),
+            "{query}": part(values.link.query(percentEncoded: true) ?? ""),
             "{link}": value(values.link.absoluteString),
         ]
         var result = ""

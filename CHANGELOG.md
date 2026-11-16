@@ -5,9 +5,6 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
-### New
-- Settings › Downloads has rules that hand a download or a link to another app or service: aria2, Motrix, rTorrent, yt-dlp, mpv, IINA, any app, any URL scheme, or a script. A rule matches by Starts with, Contains, Ends with, Regular Expression or Any address, applies to downloads only or to links too, and the first match wins. A handoff asks before it runs and keeps the answer for the page; cookies go only to the page's own site or a link you clicked, and a service on this Mac. Rules stay out of private windows unless you allow one in. Whatever no rule matches is saved by Zigzag as before.
-
 ## [0.9.1] - 2026-11-15
 
 Protection for your IP address from WebRTC, a smarter Clear that keeps split views whole and shows what it will close, favorites that show their state, the space's name kept in view, a long list of security hardening, and text and controls aligned to the pixel across the app.

@@ -36,8 +36,8 @@ enum DownloadHandoff {
         case handedOff
         /// No rule wanted it: carry on as if there were none.
         case noMatch
-        /// A link was refused at the handoff question: cancel its navigation without running the rule. A download
-        /// has nowhere to go on to, so a refusal there leaves it to be saved as usual.
+        /// Refused at the handoff question: cancel it without running the rule. A link goes nowhere, and a download
+        /// is not saved either.
         case cancelled
         case failed(String)
     }
@@ -152,13 +152,20 @@ enum DownloadHandoff {
         return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
     }
 
-    @discardableResult
-    static func route(_ url: URL, appliesToLinks: Bool, request: Request, tab: Tab? = nil) async -> Outcome {
-        guard let rule = firstMatch(url, appliesToLinks: appliesToLinks) else { return .noMatch }
-        switch await decide(rule, request: request, tab: tab ?? request.tab) {
-        case .handOff: return await perform(rule, request: request)
-        case .browser: return .noMatch
-        case .cancel: return appliesToLinks ? .cancelled : .noMatch
+    /// Whether a rule's target is on this Mac. A script or an app runs here; an RPC service must be local; an Open URL
+    /// may carry cookies only to a custom scheme (which this Mac's own handler takes) or an http(s) address on this
+    /// Mac. A remote address never gets the site's sign-in, whatever the template says: a page that talks a rule into
+    /// firing can't also choose somewhere off the Mac for the cookies to go.
+    static func targetIsOnThisMac(_ action: DownloadRuleAction, values: HandoffValues) -> Bool {
+        switch action.kind {
+        case .openApp, .runScript:
+            return true
+        case .jsonRPC:
+            return serviceIsOnThisMac(action.rpcEndpoint)
+        case .openURL:
+            let text = DownloadTokens.expand(action.urlTemplate, with: values, query: true)
+            guard let url = URL(string: text), let scheme = url.scheme?.lowercased() else { return false }
+            return (scheme != "http" && scheme != "https") || serviceIsOnThisMac(text)
         }
     }
 
@@ -169,10 +176,9 @@ enum DownloadHandoff {
                                    mime: request.mime, space: request.space)
         let secret = rule.action.kind == .jsonRPC ? (HandoffSecrets.secret(for: rule.id) ?? "") : ""
         var cookieFile: URL?
-        // The site's sign-in may go to a target of its own, or to one you clicked through to. A page that names
-        // another site on its own gets none of this site's cookies, whichever rule it names.
-        let cookiesMayLeave = maySendCookies(request)
-            && (rule.action.kind != .jsonRPC || serviceIsOnThisMac(rule.action.rpcEndpoint))
+        // The site's sign-in may go to a target of its own, or to one you clicked through to, and only to a target on
+        // this Mac: a remote address or service never gets it, whichever rule it names.
+        let cookiesMayLeave = maySendCookies(request) && targetIsOnThisMac(rule.action, values: values)
         if rule.needsCookies {
             // A rule that names the cookie file always gets one, empty where the cookies may not leave: a service or
             // a script that insists on a jar still runs, and no site's sign-in goes where it shouldn't.
@@ -258,7 +264,7 @@ enum DownloadHandoff {
     }
 
     private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String) -> Outcome {
-        let text = DownloadTokens.expand(action.urlTemplate, with: values, secret: secret)
+        let text = DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)
         guard let url = URL(string: text), url.scheme != nil else {
             return .failed(String(localized: "The URL isn’t valid.", comment: "Why a download rule failed: the URL it was told to open can't be made."))
         }
@@ -394,9 +400,12 @@ enum DownloadHandoff {
         }
         let params = parameters.map { parameter -> String in
             let value: String
-            if let number = parameter as? NSNumber { value = "<int>\(number.intValue)</int>" }
-            else if let flag = parameter as? Bool { value = "<boolean>\(flag ? 1 : 0)</boolean>" }
-            else { value = "<string>\(escape(String(describing: parameter)))</string>" }
+            // JSONSerialization hands back true and false as NSNumbers too: a boolean is a <boolean>, never <int>1.
+            if let number = parameter as? NSNumber {
+                value = CFGetTypeID(number) == CFBooleanGetTypeID()
+                    ? "<boolean>\(number.boolValue ? 1 : 0)</boolean>"
+                    : "<int>\(number.intValue)</int>"
+            } else { value = "<string>\(escape(String(describing: parameter)))</string>" }
             return "<param><value>\(value)</value></param>"
         }.joined()
         return "<?xml version=\"1.0\"?><methodCall><methodName>\(escape(method))</methodName><params>\(params)</params></methodCall>"

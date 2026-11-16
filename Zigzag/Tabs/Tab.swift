@@ -1434,7 +1434,8 @@ extension Tab: WKNavigationDelegate {
             // A rule for downloads may take it instead: then WebKit makes no download at all.
             if policy == .download, let target = navigationAction.request.url,
                await handOffIfWanted(target, request: navigationAction.request, appliesToLinks: false, webView: webView,
-                                     wasClicked: userInitiated) {
+                                     wasClicked: userInitiated,
+                                     pageOrigin: askingOrigin(navigationAction, webView: webView)) {
                 return (.cancel, preferences)
             }
             if policy == .cancel { refusedDownload(in: webView) }
@@ -1468,7 +1469,8 @@ extension Tab: WKNavigationDelegate {
         // scripted navigation are left alone.
         if userInitiated, navigationAction.navigationType == .linkActivated, navigationAction.targetFrame?.isMainFrame ?? true,
            await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, webView: webView,
-                                 wasClicked: true) {
+                                 wasClicked: true,
+                                 pageOrigin: askingOrigin(navigationAction, webView: webView)) {
             return (.cancel, preferences)
         }
 
@@ -1666,15 +1668,22 @@ extension Tab: WKNavigationDelegate {
         return value.isEmpty ? nil : value
     }
 
+    /// The site that asked: the frame's own when the navigation came from one, or the page's. A link in an ad iframe
+    /// is asked about and answered as the ad's site, not the page's.
+    private func askingOrigin(_ action: WKNavigationAction, webView: WKWebView) -> String? {
+        SiteOrigin.of(action.sourceFrame.securityOrigin) ?? SiteOrigin.of(webView.url ?? self.url)
+    }
+
     /// Runs the first rule that catches `url`, if there is one. True means the rule took it: the navigation is
     /// cancelled. Cookies come from this tab's own store, and the space is the one it sits in.
     private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, webView: WKWebView,
-                                 filename: String? = nil, mime: String = "", wasClicked: Bool = false) async -> Bool {
+                                 filename: String? = nil, mime: String = "", wasClicked: Bool = false,
+                                 pageOrigin: String? = nil) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url ?? self.url),
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
@@ -1941,20 +1950,23 @@ extension Tab: WKUIDelegate {
            let url = navigationAction.request.url, PopupNotice.isUserInitiated(navigationAction),
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true, isPrivate: isPrivate) {
             _ = BrowserWebView.takePendingDisposition(for: webView)
-            handOffInNewWindow(rule, url: url, request: navigationAction.request, webView: webView)
+            handOffInNewWindow(rule, url: url, request: navigationAction.request, webView: webView,
+                               pageOrigin: askingOrigin(navigationAction, webView: webView),
+                               wasClicked: navigationAction.navigationType == .linkActivated)
             return nil
         }
         return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
     }
 
     /// A new-window link a rule caught: the handoff is asynchronous, so the window is simply never made.
-    private func handOffInNewWindow(_ rule: DownloadRule, url: URL, request: URLRequest, webView: WKWebView) {
+    private func handOffInNewWindow(_ rule: DownloadRule, url: URL, request: URLRequest, webView: WKWebView,
+                                    pageOrigin: String?, wasClicked: Bool) {
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url ?? self.url),
+        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
                                               filename: DownloadTokens.filename(for: url, suggested: ""),
                                               space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: host?.hostWindow, tab: self, wasClicked: true)
+                                              window: host?.hostWindow, tab: self, wasClicked: wasClicked)
         Task { @MainActor in
             switch await DownloadHandoff.decide(rule, request: handoff, tab: self) {
             case .handOff:

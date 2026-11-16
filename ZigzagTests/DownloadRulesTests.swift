@@ -280,6 +280,62 @@ struct DownloadRuleTests {
         #expect(DownloadHandoff.jsonParameters(parameters, method: "other.method", secret: "s3cret").first as? String == nil)
     }
 
+    /// An Open URL template fills each token as one query value: a filename or title with `&` or `=` in it can't add
+    /// a parameter of its own. `{path}` and `{query}` are the address's own parts and are not encoded twice.
+    @Test func openURLTokensAreOneQueryValue() throws {
+        let values = HandoffValues(link: URL(string: "https://site.example/a?b=c&d=e")!,
+                                   referrer: URL(string: "https://ref.example/x y")!,
+                                   filename: "x&url=https://evil.example/", mime: "video/mp4", space: "Work")
+        let text = DownloadTokens.expand("myapp://add?url={encoded_link}&name={filename}&ref={referrer}&mime={mime}&space={space}",
+                                         with: values, query: true)
+        let items = try #require(URLComponents(string: text)?.queryItems)
+        let byName = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
+        #expect(byName["url"] == values.link.absoluteString)
+        #expect(byName["name"] == values.filename)
+        #expect(byName["ref"] == values.referrer?.absoluteString)
+        #expect(byName["mime"] == "video/mp4")
+        // Exactly the five asked for: the filename added no sixth.
+        #expect(items.count == 5)
+
+        // The redirect case keeps the address's own path and query as they are.
+        #expect(DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values, query: true)
+                == "https://www.bing.com/a?b=c&d=e")
+    }
+
+    /// A MIME type is the server's, not an option: one that starts with `-` is passed with a `_` before it.
+    @Test func aMimeTypeCannotBeReadAsAnOption() {
+        let values = HandoffValues(link: URL(string: "https://site.example/f")!, mime: "-o/tmp/x")
+        #expect(DownloadTokens.expand("{mime}", with: values) == "_-o/tmp/x")
+    }
+
+    /// Cookies go only to a target on this Mac: a script or app runs here, an RPC service must be local, and an Open
+    /// URL may be a custom scheme or a local http(s) address. A remote address gets none.
+    @Test func cookiesOnlyGoToATargetOnThisMac() {
+        let values = HandoffValues(link: URL(string: "https://site.example/f")!)
+        func action(_ kind: DownloadRuleAction.Kind, _ field: (inout DownloadRuleAction) -> Void) -> DownloadRuleAction {
+            var action = DownloadRuleAction(kind: kind)
+            field(&action)
+            return action
+        }
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.runScript) { $0.scriptPath = "/tmp/x.sh" }, values: values))
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "myapp://add?u={encoded_link}" }, values: values))
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "http://127.0.0.1:8080/add?u={encoded_link}" }, values: values))
+        #expect(!DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "https://evil.example/?c={cookie_header}" }, values: values))
+        #expect(!DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "https://evil.example/rpc" }, values: values))
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc" }, values: values))
+    }
+
+    /// A boolean is a boolean over XML-RPC, not an integer: JSONSerialization gives both back as NSNumbers.
+    @Test func xmlRPCBodySendsBooleansAsBooleans() {
+        let body = DownloadHandoff.xmlRPC(method: "d.load", parameters: [true, 3, "x"])
+        #expect(body.contains("<boolean>1</boolean>"))
+        #expect(body.contains("<int>3</int>"))
+        #expect(!body.contains("<int>1</int>"))
+        #expect(body.contains("<boolean>0</boolean>") == false)
+        let no = DownloadHandoff.xmlRPC(method: "d.load", parameters: [false])
+        #expect(no.contains("<boolean>0</boolean>"))
+    }
+
     @Test func xmlRPCBodyEscapesItsValues() {
         let body = DownloadHandoff.xmlRPC(method: "load.start", parameters: ["", "https://example.com/a?x=1&y=2"])
         #expect(body.contains("<methodName>load.start</methodName>"))
