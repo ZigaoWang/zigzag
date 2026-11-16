@@ -1900,16 +1900,20 @@ extension Tab: WKNavigationDelegate {
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
             // A rule that was matched but didn't take it — an Open URL rule whose question was put off — leaves the
             // link or the download as it was, exactly as if no rule had matched. A download it left behind must not
-            // be offered to the same rule again by the download manager.
+            // be offered to the same rule again by the download manager. A rule set to stop the page keeps a link
+            // from loading on even then: the page's own loads and redirects would otherwise match the rule again. A
+            // download has nowhere to go on to, so it is always left as it was.
             if case .noMatch = outcome {
                 if !appliesToLinks { declinedRuleDownload = true }
-                return false
+                return appliesToLinks && rule.stopsThePage
             }
             // A tab opened just for this link has nothing left to show.
             closeIfOnlyADownload(webView)
             return true
         case .browser:
-            return false
+            // Left to the browser. A rule set to stop the page keeps a link from loading on, even where the answer
+            // was to leave it there.
+            return appliesToLinks && rule.stopsThePage
         case .cancel:
             // Don't Allow: a link asked for goes nowhere, and a download is not saved either.
             return true
@@ -2309,11 +2313,13 @@ extension Tab: WKUIDelegate {
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
                 // Put off, or nowhere to open it: the link opens the new tab it was going to open anyway, since this
-                // path has already refused the window WebKit asked for.
-                if case .noMatch = outcome { self.host?.tab(self, openURL: url, disposition: .foregroundTab) }
+                // path has already refused the window WebKit asked for — unless the rule stops the page, in which case
+                // it opens nowhere at all.
+                if case .noMatch = outcome, !rule.stopsThePage { self.host?.tab(self, openURL: url, disposition: .foregroundTab) }
             case .browser:
-                // The window WebKit asked for was refused, so the link opens the tab it was going to open anyway.
-                self.host?.tab(self, openURL: url, disposition: .foregroundTab)
+                // The window WebKit asked for was refused, so the link opens the tab it was going to open anyway,
+                // unless the rule stops the page.
+                if !rule.stopsThePage { self.host?.tab(self, openURL: url, disposition: .foregroundTab) }
             case .cancel:
                 break
             }

@@ -7773,6 +7773,7 @@
         }
       }
     },
+
     "File Types" : {
       "comment" : "A heading in Settings › Downloads, over the file types and where their downloads go.",
       "localizations" : {
@@ -8635,6 +8636,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "转交下载和链接"
+          }
+        }
+      }
+    },
+    "Hand Off %@" : {
+      "comment" : "A page's question before a download rule handles a link or download. The placeholder is the rule's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转交 %@"
           }
         }
       }
@@ -17278,6 +17290,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止朗读"
+          }
+        }
+      }
+    },
+    "Stop the page" : {
+      "comment" : "Label of the switch in a download rule's sheet that keeps the page from loading on after the rule has taken a link.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止页面"
+          }
+        }
+      }
+    },
+    "Stop the page: a link this rule takes goes no further — nothing else loads, and the page’s own redirects don’t run the rule again." : {
+      "comment" : "Explanation under the stop-the-page switch in a download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止页面：此规则接管的链接不会继续，其他内容不再加载，页面自身的重定向也不会再次触发规则。"
           }
         }
       }

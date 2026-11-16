@@ -824,6 +824,7 @@ struct DownloadRuleTests {
         #expect(decoded.first?.match == .contains)
         #expect(decoded.first?.isEnabled == true)
         #expect(decoded.first?.runsInPrivateWindows == false)
+        #expect(decoded.first?.stopsThePage == false)
         #expect(decoded.first?.action.kind == .openURL)
     }
 
@@ -943,6 +944,20 @@ struct DownloadRuleTests {
         let named = Applications.named(in: [mac.path, mine.path, mine.path])
         #expect(named.map(\.name) == ["Alpha", "Zeta"])
         #expect(named.first?.path == mine.appendingPathComponent("Alpha.app").path)
+    }
+
+    /// A rule lets the page it took a link from go on loading unless it is told not to, and being told survives the
+    /// file it's saved in.
+    @Test func aRuleLetsThePageGoOnUntilItIsToldNotTo() throws {
+        var rule = DownloadRule(name: "Whole site", match: .any, action: DownloadRuleAction(kind: .openURL))
+        rule.action.urlTemplate = "https://example.com/{link}"
+        #expect(rule.stopsThePage == false)
+
+        rule.stopsThePage = true
+        let data = try JSONEncoder().encode([rule])
+        let decoded = try JSONDecoder().decode([DownloadRule].self, from: data)
+        #expect(decoded.first?.stopsThePage == true)
+        #expect(decoded.first?.stopsThePage == rule.stopsThePage)
     }
 
     // MARK: A rule that can't be saved yet
