@@ -96,6 +96,26 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.filename(for: URL(string: "https://example.com/")!, suggested: "") == "example.com")
     }
 
+    /// A rule names its script, and a name alone means the scripts folder in your Documents: one place for them, which
+    /// is what makes them findable, and a script kept elsewhere is still reachable by its own path.
+    @Test func aRuleNamesAScriptInItsOneFolder() {
+        let folder = Paths.scripts.standardizedFileURL
+        #expect(folder.deletingLastPathComponent().lastPathComponent == "Zigzag")
+        #expect(folder.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == "Documents")
+        #expect(folder.lastPathComponent == "Scripts")
+
+        // A bare name is in the folder; a path of its own is taken as it stands, `~` and all.
+        #expect(Paths.script(named: "yt-dlp.sh").standardizedFileURL == folder.appendingPathComponent("yt-dlp.sh"))
+        #expect(Paths.script(named: "/opt/tools/dl.sh").path == "/opt/tools/dl.sh")
+        let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        #expect(Paths.script(named: "~/bin/dl.sh").standardizedFileURL == home.appendingPathComponent("bin/dl.sh"))
+
+        // Picked from the folder, a script is stored by its name, so the rule reads `yt-dlp.sh` and goes on working;
+        // picked anywhere else it keeps its path.
+        #expect(Paths.scriptName(for: folder.appendingPathComponent("yt-dlp.sh")) == "yt-dlp.sh")
+        #expect(Paths.scriptName(for: URL(fileURLWithPath: "/opt/tools/dl.sh")) == "/opt/tools/dl.sh")
+    }
+
     @Test func aServiceOffThisMacGetsNoCookies() {
         #expect(DownloadHandoff.serviceIsOnThisMac("http://127.0.0.1:6800/jsonrpc"))
         #expect(DownloadHandoff.serviceIsOnThisMac("http://localhost:8080/RPC2"))
