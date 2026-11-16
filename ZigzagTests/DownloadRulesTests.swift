@@ -379,4 +379,30 @@ struct DownloadRuleTests {
         tab.permissionAnswers.note("browser", key: origin, kind: kind)
         #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .browser)
     }
+
+    /// A page with no site of its own (a file, a data URL) is asked every time: an answer kept against the target's
+    /// site must not be borrowed for it.
+    @Test func aPageWithNoSiteBorrowsNoAnswer() async {
+        let rule = DownloadRule(name: "aria2", applies: .downloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        let tab = Tab(url: URL(string: "file:///Users/me/page.html")!, title: "File", spaceID: UUID())
+        let kind = DownloadHandoff.handoffKind(rule)
+        tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
+        let request = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .browser)
+    }
+
+    /// A pop-up may not ask (its window can sit behind the browser's), but a page's kept answer still holds there.
+    @Test func aPopupAsksNothingButReadsAKeptAnswer() async {
+        let rule = DownloadRule(name: "aria2", applies: .downloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        let tab = Tab(url: URL(string: "https://example.com/page")!, title: "Example", spaceID: UUID())
+        let kind = DownloadHandoff.handoffKind(rule)
+        var quiet = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!,
+                                            pageOrigin: "https://example.com")
+        quiet.mayAsk = false
+        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .browser)
+        tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
+        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .cancel)
+    }
 }

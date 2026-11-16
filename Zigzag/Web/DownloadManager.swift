@@ -499,15 +499,17 @@ extension DownloadManager: WKDownloadDelegate {
         // A rule for downloads that the navigation never got to see: a context-menu Download Linked File, or a page's
         // own startDownload. A Save Page As chose its file already and is left alone. Handing it off cancels WebKit's
         // copy and takes its row out of the list.
+        // Only a download WebKit made for a page can be handed off: a pop-up and an extension have no page of their
+        // own to answer the question, so their downloads stay Zigzag's, as they did before rules existed.
         let owner = (download.webView as? BrowserWebView)?.owner
-        if chosenDestinations[ObjectIdentifier(download)] == nil,
+        if let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false,
                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {
             let handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
-                                                  pageOrigin: startedAt ?? SiteOrigin.of(owner?.url ?? download.webView?.url),
+                                                  pageOrigin: startedAt ?? SiteOrigin.of(owner.url ?? download.webView?.url),
                                                   filename: DownloadTokens.filename(for: url, suggested: name),
-                                                  space: owner.flatMap { Library.shared.space($0.spaceID)?.name } ?? "",
+                                                  space: Library.shared.space(owner.spaceID)?.name ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
                                                   isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false),
                                                   window: window, tab: owner)

@@ -25,6 +25,10 @@ enum DownloadHandoff {
         /// Whether you clicked the link that led here. A click may send this page's cookies to the target; a page
         /// that starts a download or a navigation on its own may not.
         var wasClicked = false
+        /// Whether a new question may be put at all. A pop-up has no page store of its own and its window can sit
+        /// behind the browser's, so its links and downloads are always Zigzag's own rather than a question in another
+        /// window. A page's kept answer is still read, where there is a page.
+        var mayAsk = true
     }
 
     enum Outcome: Equatable {
@@ -84,16 +88,21 @@ enum DownloadHandoff {
         // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
         guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
         guard isHandoffable(request.url) else { return .browser }
-        let origin = request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
+        // The page's own site keys its answer: a page with no site (a file, a data URL) is asked every time, so the
+        // target's site is not used in its place. The target is still what a prompt names when there is no page.
+        let pageOrigin = request.pageOrigin ?? SiteOrigin.of(request.referrer)
+        let origin = pageOrigin ?? SiteOrigin.of(request.url)
         let kind = handoffKind(rule)
         // What this page already answered holds wherever the page is: it was given for this question, and asking again
         // from a background tab would only lose the answer.
-        if let origin, let tab, let kept = tab.permissionAnswers.action(key: origin, kind: kind) {
+        if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind) {
             return gate(stored: kept)
         }
+        // Nothing new is asked for a pop-up: its links and downloads stay in Zigzag.
+        guard request.mayAsk else { return .browser }
         guard let controller = tab.flatMap({ WindowManager.shared.promptHost(holding: $0) })
                 ?? WindowManager.shared.promptHost(for: request.window)
-                ?? WindowManager.shared.promptHost(for: NSApp.keyWindow) else { return .browser }
+                ?? WindowManager.shared.promptHost(for: NSApp?.keyWindow) else { return .browser }
         // A new question has to be able to show: a background tab, a window behind another, a pop-up's own window (not
         // a prompt host yet) or Zigzag in the background would hold it with nothing to see. The download or link
         // carries on as if no rule had matched.
@@ -111,8 +120,8 @@ enum DownloadHandoff {
             denyTitle: String(localized: "Don’t Allow", comment: "Button that refuses a download rule's handoff."),
             answered: {
                 // Asked while another question was up: the page may have answered this one in the meantime.
-                guard let origin, let tab else { return nil }
-                switch tab.permissionAnswers.action(key: origin, kind: kind) {
+                guard let pageOrigin, let tab else { return nil }
+                switch tab.permissionAnswers.action(key: pageOrigin, kind: kind) {
                 case "handOff": return .allow
                 case "browser": return .alternate
                 case "deny": return .deny
@@ -126,7 +135,7 @@ enum DownloadHandoff {
         case .deny: action = "deny"
         case .notNow: return .browser
         }
-        if let origin, let tab { tab.permissionAnswers.note(action, key: origin, kind: kind) }
+        if let pageOrigin, let tab { tab.permissionAnswers.note(action, key: pageOrigin, kind: kind) }
         return gate(stored: action)
     }
 

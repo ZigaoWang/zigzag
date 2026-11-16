@@ -376,7 +376,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: parentWindow, tab: nil, wasClicked: wasClicked)
+                                              window: parentWindow, tab: nil, wasClicked: wasClicked, mayAsk: false)
         // A pop-up has no page store of its own to keep an answer in, and its opener's is another page's. Until the
         // permission card gives pop-ups a host, their links and downloads are Zigzag's own.
         switch await DownloadHandoff.decide(rule, request: handoff, tab: nil, forDownload: !appliesToLinks) {

@@ -75,9 +75,10 @@ download it starts ask once. Open in Browser, or Save in Zigzag, leaves the link
 been without the rule. Don't Allow refuses it: a link goes nowhere, and a download is not saved.
 
 A question is only asked where it can be seen: in the page in front, in a window that is visible and front. A page's
-earlier answer still holds in a background tab or a window behind another, but a new question is not asked there: the
-link or download carries on as if no rule had matched. A link or download in a pop-up is handled by Zigzag itself
-until the permission card gives pop-ups their own place to ask.
+earlier answer still holds in a background tab or a window behind another; where it has no earlier answer, a new
+question is not asked there, and the link or download carries on as if no rule had matched. A link or download in a
+pop-up is always handled by Zigzag itself, whichever window is in front, until the permission card gives pop-ups their
+own place to ask.
 
 ## Private windows
 
