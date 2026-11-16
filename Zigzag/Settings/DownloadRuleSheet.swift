@@ -86,15 +86,38 @@ enum DownloadRuleSheet {
             let field = FilledField(placeholder: String(localized: "Choose an app…", comment: "Placeholder of the app field in a download rule's sheet."))
             field.stringValue = action.appPath
             appField = field
-            let button = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
-            button.onClick = { _ in
+            // The same shape as the script field's below: what lives in one place is one click away, which is what
+            // makes the list worth having. An app kept anywhere else stays reachable through Choose an App…, and
+            // what's picked from the list is stored as its full path.
+            let chooseAnApp = {
                 let panel = NSOpenPanel()
                 panel.canChooseFiles = true
                 panel.canChooseDirectories = false
                 panel.treatsFilePackagesAsDirectories = false
                 panel.allowedContentTypes = [.application]
                 panel.prompt = String(localized: "Choose", comment: "Button of the open panel that picks an app for a download rule.")
-                choose(panel, into: field)
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                field.stringValue = url.path
+                sheetRef?.revalidate()
+            }
+            let button = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
+            button.onClick = { [weak button] _ in
+                guard let button else { return }
+                var entries: [MenuPanel.Entry] = Applications.named().map { app in
+                    .item(MenuPanel.Item(title: app.name, symbol: "app") {
+                        field.stringValue = app.path
+                        sheetRef?.revalidate()
+                    })
+                }
+                if !entries.isEmpty { entries.append(.separator) }
+                entries.append(.item(MenuPanel.Item(title: String(localized: "Choose an App…", comment: "Item in the menu beside an Open App rule's app field: picks an app kept outside the Applications folders.")) {
+                    chooseAnApp()
+                }))
+                entries.append(.item(MenuPanel.Item(title: String(localized: "Show Applications Folder", comment: "Item in the menu beside an Open App rule's app field: opens this Mac's Applications folder in Finder."), symbol: "folder") {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+                }))
+                button.isSelected = true
+                MenuPanel.show(entries, from: button) { [weak button] in button?.isSelected = false }
             }
             actionRows.append(FormSheet.Row(label: String(localized: "App", comment: "Label of the app field in a download rule's sheet."),
                                             view: stack(field, button)))
@@ -502,5 +525,29 @@ enum DownloadRuleSheet {
         case .openFile:
             return nil
         }
+    }
+}
+
+/// The apps an Open App rule can hand a link to, by name: the ones in the Mac's Applications folder, its System
+/// Applications (and Utilities), and yours — one level deep, never inside a bundle. A menu rather than a scan of
+/// everything installed, with the open panel one item away for anything else.
+enum Applications {
+    static func named() -> [(name: String, path: String)] {
+        named(in: ["/Applications", "/System/Applications", "/System/Applications/Utilities",
+                   FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path])
+    }
+
+    /// The same, for a given set of folders: what a test can point at a folder of its own.
+    static func named(in folders: [String]) -> [(name: String, path: String)] {
+        var seen = Set<String>()
+        var found: [(name: String, path: String)] = []
+        for folder in folders {
+            for item in (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? [] where item.hasSuffix(".app") {
+                let path = (folder as NSString).appendingPathComponent(item)
+                guard seen.insert(path).inserted else { continue }
+                found.append((name: (item as NSString).deletingPathExtension, path: path))
+            }
+        }
+        return found.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 }

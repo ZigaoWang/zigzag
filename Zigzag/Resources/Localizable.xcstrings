@@ -4372,6 +4372,17 @@
         }
       }
     },
+    "Choose an App…" : {
+      "comment" : "Item in the menu beside an Open App rule's app field: picks an app kept outside the Applications folders.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择应用…"
+          }
+        }
+      }
+    },
     "Choose an app…" : {
       "comment" : "Placeholder of the app field in a download rule's sheet.",
       "localizations" : {
@@ -15876,6 +15887,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示所有标签页"
+          }
+        }
+      }
+    },
+    "Show Applications Folder" : {
+      "comment" : "Item in the menu beside an Open App rule's app field: opens this Mac's Applications folder in Finder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示应用文件夹"
           }
         }
       }

@@ -964,6 +964,28 @@ struct DownloadRuleTests {
         #expect(!Toast.isRepeat("a", of: nil, whileUp: true))
     }
 
+    // MARK: The App field's menu
+
+    /// The App field lists what's in the Applications folders, **one level deep**: bundles only, each once, in the
+    /// order a person expects. Anything else stays one Choose an App… away.
+    @Test func theAppMenuListsApplicationsOneLevelDeep() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("apps-\(UUID().uuidString)")
+        let mac = root.appendingPathComponent("Mac"), mine = root.appendingPathComponent("Mine")
+        try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: mine.appendingPathComponent("Alpha.app"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // Not a bundle: never offered.
+        try Data().write(to: mine.appendingPathComponent("notes.txt"))
+        // A bundle inside a bundle: this reads one level, never into Contents.
+        try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app/Contents/PlugIns/Inner.app"),
+                                                withIntermediateDirectories: true)
+
+        // The same folder twice is still one entry, and the order is the names'.
+        let named = Applications.named(in: [mac.path, mine.path, mine.path])
+        #expect(named.map(\.name) == ["Alpha", "Zeta"])
+        #expect(named.first?.path == mine.appendingPathComponent("Alpha.app").path)
+    }
+
     // MARK: The order the rules are in
     /// A drag in the rules list names the row it was dropped on, not a position, because that list shows only the
     /// handoffs: its numbering leaves the file types out, so a place in it isn't a place in the store. The rule lands
