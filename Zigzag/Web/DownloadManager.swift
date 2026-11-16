@@ -578,6 +578,7 @@ extension DownloadManager: WKDownloadDelegate {
                     return nil
                 }
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+                // A rule that was matched but didn't take it leaves the download to Zigzag, which saves it as usual.
             case .browser:
                 // Left to Zigzag: WebKit's download goes on and is saved as usual.
                 break

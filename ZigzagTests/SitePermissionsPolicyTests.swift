@@ -507,8 +507,8 @@ import WebKit
         let popup = URL(string: "https://example.com/pop-up")!
 
         PopupNotice.open(popup, action: "thisTab", from: tab, in: host)
-        #expect(recorder.opened.isEmpty, "the asking tab loads it, not the window's selected tab")
-        #expect(tab.url == popup)
+        #expect(recorder.opened.map { $0.url } == [popup.absoluteString])
+        #expect(recorder.opened.map { $0.disposition } == ["currentTab"])
 
         recorder.opened.removeAll()
         PopupNotice.open(popup, action: "newTab", from: tab, in: host)
@@ -702,10 +702,10 @@ import WebKit
 /// The tab that asked a pop-up's question, recording what its host was told to open.
 @MainActor
 private final class RecordingTabHost: TabHost {
-    var opened: [(url: String, disposition: String)] = []
+    var opened: [(url: String, disposition: String, sender: Tab.LoadSender)] = []
     var hostWindow: NSWindow? { nil }
-    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
-        opened.append((url.absoluteString, "\(disposition)"))
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender) {
+        opened.append((url.absoluteString, "\(disposition)", sender))
     }
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction,
              features: WKWindowFeatures) -> WKWebView? { nil }

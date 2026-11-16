@@ -274,8 +274,9 @@ enum PopupNotice {
         features.width != nil || features.height != nil || features.toolbarsVisibility?.boolValue == false
     }
 
-    /// Opens a pop-up where it was answered. A page link's routing holds here too: an app's address asks its own
-    /// question, and anything not on the web opens nowhere.
+    /// Opens a pop-up where it was answered. The three places are the same three an Open URL rule can name, so they
+    /// are opened by the one thing that knows what they mean (`OpenInZigzag`). The page's own configuration is passed
+    /// on, so a private pop-up's viewer is on the same data store and does not outlive it in a persistent one.
     /// Returns the real pop-up where one is made from WebKit's own request (`features` given, while it is still
     /// waiting), so the page can script it; everything else opens later or elsewhere and returns nil.
     @discardableResult
@@ -304,15 +305,10 @@ enum PopupNotice {
             openInWindow(url, disposition: .foregroundTab, from: tab, in: host)
             return nil
         case .thisTab:
-            // The tab that asked, never the selected one: in a split they are different panes.
-            if let tab, !tab.isClosed {
-                tab.load(url, by: .page)
-            } else {
-                openInWindow(url, disposition: .currentTab, from: tab, in: host)
-            }
+            OpenInZigzag.open(url, at: .thisTab, from: tab, in: host, configuration: configuration, by: .page)
             return nil
         case .newTab:
-            openInWindow(url, disposition: .foregroundTab, from: tab, in: host)
+            OpenInZigzag.open(url, at: .newTab, from: tab, in: host, configuration: configuration, by: .page)
             return nil
         case .viewer:
             guard let configuration = configuration ?? tab?.webView?.configuration else { return nil }
@@ -321,9 +317,7 @@ enum PopupNotice {
                 // the page does with the new window keep working.
                 return PopupWindowController.open(configuration: configuration, features: features, parent: host.window, opener: tab)
             }
-            // The small window that shows the pop-up's page: the pop-up viewer. The page's own configuration, so the
-            // viewer is on the same data store — a private pop-up's child must not outlive it in a persistent one.
-            PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window)
+            OpenInZigzag.open(url, at: .mini, from: tab, in: host, configuration: configuration, by: .page)
             return nil
         }
     }

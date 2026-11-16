@@ -31,6 +31,10 @@ nonisolated struct PermissionAction {
 nonisolated struct PermissionAnswer {
     let action: String
     let remember: Bool
+    /// The entry a question's own dropdown had picked, where it offers one to choose rather than to answer itself:
+    /// a rule's web address picks where to open it, then the buttons say whether to go ahead. Nil for a question with
+    /// no such dropdown, and for the answers that are the dropdown's own (a pop-up's destination).
+    var choice: String? = nil
 }
 
 /// Stable identifiers under which permission actions are remembered.
