@@ -1033,9 +1033,9 @@ final class PermissionPrompt: FloatingPanelView {
     /// `host` is how the site is named in the question; `origin`, when given, is the site it's for (`SiteOrigin`).
     /// `menu` is answers of one kind offered as a single dropdown after the buttons (where a pop-up opens); choosing
     /// one answers the question, and it stands in as the question's own filled answer.
-    /// `chooser` is the other way round: contents of one kind (where a notification shows) that the dropdown only
-    /// *picks*, while the buttons answer. The answer carries the chosen entry as `choice`, and the duration is left
-    /// out — the buttons are what say whether it happens at all.
+    /// `chooser` is the other way round: contents of one kind (where a site's notifications show, or where a web
+    /// address opens) that the dropdown only *picks*, while the buttons answer. The answer carries the chosen entry as
+    /// `choice`, and the duration is left out — the buttons are what say whether it happens at all.
     /// The duration choice is This time unless `canRemember` offers Always on this site. A disabled choice keeps
     /// `rememberNote` as its explanation. Nil means Not Now.
     static func ask(host: String, origin: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
@@ -1168,8 +1168,10 @@ final class PermissionPrompt: FloatingPanelView {
                 }
                 prompt.addSubview(prompt.answerMenu)
             }
-            // Contents of one kind (where a site's notifications show), which the dropdown only picks: the buttons
-            // answer, and the duration goes, since there is nothing to run out.
+            // Contents of one kind (where a site's notifications show, or where a web address opens), which the
+            // dropdown only picks: the buttons answer, and the duration goes, since there is nothing to run out.
+            // Nothing is answered here — the dropdown keeps the chosen index itself, and `chosenChoice` is read when a
+            // button is pressed.
             if !chooser.isEmpty {
                 prompt.hasChooser = true
                 prompt.menuChoices = chooser

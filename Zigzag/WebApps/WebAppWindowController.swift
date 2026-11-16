@@ -332,16 +332,16 @@ extension WebAppWindowController: TabHost {
     var hostWindow: NSWindow? { window }
 
     /// The site stays here; a link for a tab of its own, or one to another site, goes to the browser window.
-    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         switch disposition {
         // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
         case .currentTab, .peek:
-            tab.load(url, by: .page)
+            tab.load(url, by: sender)
         case .newWindow, .privateWindow:
-            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: .page)
+            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: sender)
         case .foregroundTab, .backgroundTab:
             let target = MiniWindowController.browserWindow()
-            target.open(url, disposition: disposition, allowSwitch: false, by: .page)
+            target.open(url, disposition: disposition, allowSwitch: false, by: sender)
             if disposition == .foregroundTab {
                 target.window?.makeKeyAndOrderFront(nil)
                 NSApp.activate()

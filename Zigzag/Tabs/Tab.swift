@@ -4,7 +4,7 @@ import WebKit
 /// What a tab asks of the window that shows it.
 protocol TabHost: AnyObject {
     var hostWindow: NSWindow? { get }
-    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition)
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender)
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView?
     func tabDidRequestClose(_ tab: Tab)
     /// Back from a tab a link opened, with no page before this one in it.
@@ -18,6 +18,10 @@ protocol TabHost: AnyObject {
 
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
+    /// Sends a tab to an address without naming who sent it: a page's own link, and every caller but a rule.
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+        self.tab(tab, openURL: url, disposition: disposition, by: .page)
+    }
 }
 
 enum OpenDisposition {
@@ -768,6 +772,9 @@ final class Tab: NSObject {
         case zigzag
         /// A page: its window.open(), a link it opened in a new tab or a card, a link in its article or PDF.
         case page
+        /// A download rule, opening the address its action asked for. A load with this one on it is never caught by a
+        /// rule again, so a rule can't take what it just opened — the address would otherwise go round for ever.
+        case rule
     }
 
     /// What a page may send a tab to on its own: only the web. An app's link goes to ExternalLinks, which asks (and
@@ -1810,6 +1817,9 @@ extension Tab: WKNavigationDelegate {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            // A rule that was matched but didn't take it — an Open URL rule whose question was put off — leaves the
+            // link or the download as it was, exactly as if no rule had matched.
+            if case .noMatch = outcome { return false }
             // A tab opened just for this link has nothing left to show.
             closeIfOnlyADownload(webView)
             return true
@@ -2141,6 +2151,9 @@ extension Tab: WKUIDelegate {
             case .handOff:
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+                // Put off, or nowhere to open it: the link opens the new tab it was going to open anyway, since this
+                // path has already refused the window WebKit asked for.
+                if case .noMatch = outcome { self.host?.tab(self, openURL: url, disposition: .foregroundTab) }
             case .browser:
                 // The window WebKit asked for was refused, so the link opens the tab it was going to open anyway.
                 self.host?.tab(self, openURL: url, disposition: .foregroundTab)
