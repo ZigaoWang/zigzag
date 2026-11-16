@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- Download rules, in Settings › Downloads, hand a download or a link to another app, a script or a download manager like aria2, Motrix or yt-dlp, by what its address matches. Zigzag asks before it hands anything off, and whatever no rule matches is saved as before. See [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md). Thanks to [Lakeland97](https://github.com/Lakeland97). ([#191](https://github.com/ZigaoWang/zigzag/issues/191))
 - Double-clicking the empty space below your tabs opens a new tab, as in Arc. The top of the sidebar still works like a title bar, and Settings › Appearance › Double-click the sidebar for a new tab turns it off. ([#262](https://github.com/ZigaoWang/zigzag/issues/262))
 
 ### Fixed
