@@ -13344,6 +13344,17 @@
         }
       }
     },
+    "Put This Away" : {
+      "comment" : "Tooltip of the × on a notice over the page, like a script's while it runs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起"
+          }
+        }
+      }
+    },
     "Put busy background tabs to sleep" : {
       "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
@@ -13406,6 +13417,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要退出 Zigzag 吗？"
+          }
+        }
+      }
+    },
+    "Ran script: %@" : {
+      "comment" : "A notice over the page saying a download rule's script has finished and exited 0. The placeholder is the script's file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本运行完成：%@"
           }
         }
       }
@@ -14675,6 +14697,17 @@
         }
       }
     },
+    "Running script: %@" : {
+      "comment" : "A notice over the page while a download rule's script runs. The placeholder is the script's file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在运行脚本：%@"
+          }
+        }
+      }
+    },
     "Runs on this site when you click it" : {
       "comment" : "Tooltip line under an extension's name in Site Controls: its site access is When You Click It, and it hasn't been clicked on this site yet.",
       "localizations" : {
@@ -15051,6 +15084,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "脚本"
+          }
+        }
+      }
+    },
+    "Script failed: %@" : {
+      "comment" : "A notice over the page saying a download rule's script has failed. The placeholder is the script's file name, and the script's own last words are under it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本运行失败：%@"
           }
         }
       }

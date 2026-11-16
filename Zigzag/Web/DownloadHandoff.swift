@@ -432,17 +432,24 @@ enum DownloadHandoff {
         let cookieFile = values.cookieFile
         let link = values.link
         let isPrivate = request.isPrivate
+        // While it runs, and how it went: a card over the page it was handed, in the window its tab is in. A run that
+        // comes and goes in a moment never flashes "running" — the card appears with how it ended instead.
+        let script = ScriptNotice(script: (path as NSString).lastPathComponent, state: .running)
+        let card = handoffHost(for: request).map { NoticeCard.show(script, tab: request.tab, in: $0) }
         process.terminationHandler = { finished in
             errorPipe.fileHandleForReading.readabilityHandler = nil
             errors.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
             if !cookieFile.isEmpty { HandoffCookies.removeFile(URL(fileURLWithPath: cookieFile)) }
-            guard finished.terminationStatus != 0 else { return }
-            // The script ran and failed. Say so: a silent failure looks like a download that never happened.
             let said = errors.text
-            let reason = said.isEmpty
-                ? String(localized: "The script exited with status \(finished.terminationStatus).", comment: "Why a download rule failed: the script finished with an error code. The placeholder is a number, like 1.")
-                : String(localized: "The script failed: \(said)", comment: "Why a download rule failed: the script exited with an error code and printed this. The placeholder is the script's own last line of error text.")
+            let status = finished.terminationStatus
             Task { @MainActor in
+                // The card says how it went, where there is one and it hasn't been put away. Anything else falls back
+                // to the notice below, so a script that fails is never silent.
+                let ended: ScriptNotice.State = status == 0 ? .ran : .failed(said)
+                if card?.say(ScriptNotice(script: script.script, state: ended)) == true || status == 0 { return }
+                let reason = said.isEmpty
+                    ? String(localized: "The script exited with status \(status).", comment: "Why a download rule failed: the script finished with an error code. The placeholder is a number, like 1.")
+                    : String(localized: "The script failed: \(said)", comment: "Why a download rule failed: the script exited with an error code and printed this. The placeholder is the script's own last line of error text.")
                 report(.failed(reason), rule: rule, url: link, isPrivate: isPrivate)
             }
         }
@@ -452,6 +459,13 @@ enum DownloadHandoff {
             return .failed(error.localizedDescription)
         }
         return .handedOff
+    }
+
+    /// The window a rule's notice belongs in: the one holding the tab it was handed (a rule in a background window
+    /// says so there), else the window the request came from.
+    private static func handoffHost(for request: Request) -> PromptHost? {
+        if let tab = request.tab, let host = WindowManager.shared.promptHost(holding: tab) { return host }
+        return WindowManager.shared.promptHost(for: request.window)
     }
 
     // MARK: JSON-RPC and XML-RPC

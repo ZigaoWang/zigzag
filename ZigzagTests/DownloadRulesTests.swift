@@ -168,6 +168,34 @@ struct DownloadRuleTests {
         #expect(!expanded.contains("{link}"))
     }
 
+    /// A script rule's notice says what it is doing while it runs, and how it went when it stops: green when it exited
+    /// 0, the script's own last words when it didn't.
+    @Test func aScriptNoticeSaysHowItWent() {
+        let running = ScriptNotice(script: "yt-dlp.sh", state: .running)
+        #expect(running.title == "Running script: yt-dlp.sh")
+        #expect(running.detail == nil)
+        #expect(running.symbol == "terminal")
+        #expect(running.tone == .plain)
+        #expect(!running.isOver)
+
+        let ran = ScriptNotice(script: "yt-dlp.sh", state: .ran)
+        #expect(ran.title == "Ran script: yt-dlp.sh")
+        #expect(ran.detail == nil)
+        #expect(ran.symbol == "checkmark.circle.fill")
+        #expect(ran.tone == .good)
+        #expect(ran.isOver)
+
+        let failed = ScriptNotice(script: "yt-dlp.sh", state: .failed("  ERROR: no such video\n"))
+        #expect(failed.title == "Script failed: yt-dlp.sh")
+        #expect(failed.detail == "ERROR: no such video")
+        #expect(failed.symbol == "exclamationmark.triangle.fill")
+        #expect(failed.tone == .bad)
+        #expect(failed.isOver)
+
+        // A script that said nothing has nothing to show under the title.
+        #expect(ScriptNotice(script: "yt-dlp.sh", state: .failed("   \n")).detail == nil)
+    }
+
     /// The link's own parts, so a rule can send an address somewhere else: the host, the path and the query on their
     /// own, exactly as the address has them.
     @Test func theLinksOwnPartsAreTokensOfTheirOwn() {

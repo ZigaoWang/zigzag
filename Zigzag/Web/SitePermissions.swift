@@ -1027,19 +1027,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// the address and the top of the page, it glides there.
     static func reposition(in controller: PromptHost, slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.drawer) {
         guard let prompt = shown[ObjectIdentifier(controller)], prompt.superview != nil, !prompt.isHidden else { return }
-        let old = prompt.frame
-        prompt.place(in: controller)
-        let dx = old.minX - prompt.frame.minX, dy = old.minY - prompt.frame.minY
-        // Dragging the window's edge, it simply stays with the page; gliding there would trail behind.
-        guard abs(dx) > 0.5 || abs(dy) > 0.5, !Tokens.Motion.reduceMotion, controller.window?.inLiveResize != true,
-              let layer = prompt.layer else { return }
-        let move = CABasicAnimation(keyPath: "transform")
-        move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))
-        move.toValue = NSValue(caTransform3D: CATransform3DIdentity)
-        move.duration = slide ?? Tokens.Motion.standard
-        move.timingFunction = slide == nil ? Tokens.Motion.drawer : timing
-        move.fillMode = .backwards
-        layer.add(move, forKey: "follow")
+        prompt.rePlace(slide: slide, timing: timing) { prompt.place(in: controller) }
     }
 
     /// Deny leads, plain alternatives keep their order, and the ordinary affirmative is last and prominent.
@@ -1302,7 +1290,7 @@ final class PermissionPrompt: FloatingPanelView {
         let area = askingTab.flatMap { controller.pageFrame(showing: $0) } ?? controller.focusedPaneFrame
         // Wide enough for the buttons, the menu and the duration on one line, within the page's own measure.
         let measured = answersWidth + Self.pad * 2
-        let width = min(max(Self.width, measured), min(Self.maxWidth, area.width - Tokens.Space.x6))
+        let width = CardOverThePage.width(measured: measured, in: area)
         frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
     }
 
@@ -1413,11 +1401,11 @@ final class PermissionPrompt: FloatingPanelView {
     }
     #endif
 
-    private static let width: CGFloat = 420
+    private static let width = CardOverThePage.width
     /// The widest a question is allowed to get: enough for the answers, the menu and the duration on one line.
-    private static let maxWidth: CGFloat = 720
-    private static let pad: CGFloat = 16
-    private static let iconSide = Tokens.Dialog.iconSide
+    private static let maxWidth = CardOverThePage.maxWidth
+    private static let pad = CardOverThePage.pad
+    private static let iconSide = CardOverThePage.iconSide
     private static let buttonHeight = DialogButtons.height
     private static let buttonGap = Tokens.Dialog.buttonGap
 
