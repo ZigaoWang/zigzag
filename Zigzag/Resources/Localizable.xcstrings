@@ -21618,6 +21618,17 @@
         }
       }
     },
+    "Custom…" : {
+      "comment" : "An item in the Add Rule menu of Settings › Downloads: the actions that aren't a ready-made rule — an app, a URL, a script or a JSON-RPC service.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定义…"
+          }
+        }
+      }
+    },
     "Show Scripts Folder" : {
       "comment" : "Item in the menu beside a Run Script rule's script field: opens the folder the scripts live in, in Finder.",
       "localizations" : {
