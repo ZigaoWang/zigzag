@@ -37,16 +37,15 @@ nonisolated enum Paths {
 
     // MARK: Scripts
 
-    /// Where a Run Script rule's scripts live: one place, in your Documents, so you can see and edit them in Finder.
-    /// It isn't the app's own data and doesn't move with the dev build or a staged copy — the scripts are yours, so a
-    /// rule written in one build finds its script in the other.
-    private static let scriptsInDocuments = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Documents/Zigzag/Scripts", isDirectory: true)
+    /// Where a Run Script rule's scripts live: one place, beside the rest of Zigzag's data, which Show Scripts Folder
+    /// opens in Finder. Not in Documents: Zigzag isn't sandboxed, so reading there would raise the system's
+    /// Documents prompt, and a Documents folder synced to iCloud can drop a script's executable bit.
+    private static let scriptsFolder = support.appendingPathComponent("Scripts", isDirectory: true)
 
     /// That folder, made when it's first read: the sheet lists what's in it and a rule's bare file name means it.
     static var scripts: URL {
-        try? FileManager.default.createDirectory(at: scriptsInDocuments, withIntermediateDirectories: true)
-        return scriptsInDocuments
+        try? FileManager.default.createDirectory(at: scriptsFolder, withIntermediateDirectories: true)
+        return scriptsFolder
     }
 
     /// The file a rule named, without touching the disk: a bare file name is in the scripts folder, and a leading `/`
@@ -54,24 +53,24 @@ nonisolated enum Paths {
     static func script(named name: String) -> URL {
         let expanded = (name as NSString).expandingTildeInPath
         guard !expanded.hasPrefix("/") else { return URL(fileURLWithPath: expanded) }
-        return scriptsInDocuments.appendingPathComponent(expanded)
+        return scriptsFolder.appendingPathComponent(expanded)
     }
 
     /// What a rule stores for a file picked in the open panel: a script in the folder is **named** rather than pathed,
     /// so the rule reads `yt-dlp.sh` and keeps working; anything else keeps its full path.
     static func scriptName(for url: URL) -> String {
         let picked = url.standardizedFileURL
-        guard picked.deletingLastPathComponent() == scriptsInDocuments.standardizedFileURL else { return picked.path }
+        guard picked.deletingLastPathComponent() == scriptsFolder.standardizedFileURL else { return picked.path }
         return picked.lastPathComponent
     }
 
     /// The scripts in that folder, by file name, as Finder lists them: what the sheet's menu offers. Folders and
     /// hidden files aren't scripts, so they aren't offered.
     static func scriptNames() -> [String] {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: scriptsInDocuments.path)) ?? []
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: scriptsFolder.path)) ?? []
         return names
             .filter { !$0.hasPrefix(".") }
-            .filter { !isFolder(scriptsInDocuments.appendingPathComponent($0)) }
+            .filter { !isFolder(scriptsFolder.appendingPathComponent($0)) }
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 

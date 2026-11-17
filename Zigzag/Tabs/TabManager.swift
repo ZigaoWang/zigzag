@@ -1232,6 +1232,12 @@ final class TabManager {
 
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
 
+    /// The tabs closed in this window that had a page, newest first, for History › Recently Closed; each comes back
+    /// with `reopenClosedTab(id)`.
+    var recentlyClosedTabs: [(id: UUID, url: URL, title: String)] {
+        closedTabs.reversed().compactMap { closed in closed.url.map { (closed.id, $0, closed.customTitle ?? closed.title) } }
+    }
+
     @discardableResult
     /// The latest closed tab (⇧⌘T), or, with an id, that one (⌘Z after closing it).
     func reopenClosedTab(_ id: UUID? = nil, select: Bool = true) -> Tab? {

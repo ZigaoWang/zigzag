@@ -23,6 +23,28 @@ struct ShipFixesTests {
         #expect(ImportCoordinator.Choice.retrying([], else: all) == all)
     }
 
+    /// #272: with the sidebar hidden, a link opened in a new tab behind the page says so; docked or slid out, the
+    /// new row in the sidebar does, and over the desk there's no page to say it on.
+    @Test func newTabNoteOnlyWithTheSidebarOutOfSight() {
+        #expect(NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: false))
+        #expect(!NewTabNote.shows(sidebarVisible: true, sidebarFloating: false, deskVisible: false))
+        #expect(!NewTabNote.shows(sidebarVisible: false, sidebarFloating: true, deskVisible: false))
+        #expect(!NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: true))
+    }
+
+    /// #272: the note names the site until the page gives its title, then the title.
+    @Test func newTabNoteNamesTheSiteUntilTheTitleComes() {
+        let site = URL(string: "https://www.example.com/a")!
+        // WebKit's empty tab for Open Link in New Tab: the site it's about to load.
+        let empty = Tab(url: nil, spaceID: UUID())
+        #expect(NewTabNote.title(of: empty, site: site) == "example.com")
+        let loading = Tab(url: site, spaceID: UUID())
+        #expect(NewTabNote.title(of: loading, site: nil) == "example.com")
+        let titled = Tab(url: site, title: "Example Domain", spaceID: UUID())
+        #expect(NewTabNote.title(of: titled, site: site) == "Example Domain")
+        #expect(NewTabNote.announcement(for: "Example Domain").contains("Example Domain"))
+    }
+
     @Test func oldHTTPLoginsFillOnTheSecureSiteOnly() throws {
         let http = try #require(Origin(URL(string: "http://example.com/login")))
         let https = try #require(Origin(URL(string: "https://example.com/")))

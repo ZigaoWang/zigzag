@@ -779,7 +779,15 @@ final class SidebarView: NSView {
     /// The dots, between Downloads and +. Too many to fit at a size you can click, they scroll sideways, keeping
     /// the space you're in in view, with their ends faded.
     private let dotStrip = DotStrip()
-    let nowPlaying = NowPlayingView()
+    /// Now Playing's cards, top to bottom, one for each tab playing in the background (`NowPlayingChoice`), those
+    /// fading away included, where they were.
+    private(set) var nowPlayingCards: [NowPlayingView] = []
+    /// A card's title clicked, its play button or Play, and its close or Hide; the tab it's for.
+    var onNowPlayingShow: ((Tab) -> Void)?
+    var onNowPlayingToggle: ((Tab) -> Void)?
+    var onNowPlayingHide: ((Tab) -> Void)?
+    /// A card's right-click menu.
+    var onNowPlayingMenu: ((Tab) -> NSMenu?)?
     /// An update that's ready, right above the dots: Restart restarts into it.
     let updateCard = UpdateCard()
 
@@ -910,8 +918,6 @@ final class SidebarView: NSView {
         list.postsFrameChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(listScrolled), name: NSView.frameDidChangeNotification, object: list)
 
-        nowPlaying.isHidden = true
-        addSubview(nowPlaying)
         updateCard.isHidden = true
         addSubview(updateCard)
 
@@ -1075,7 +1081,7 @@ final class SidebarView: NSView {
         let listTop = favoritesHeight > 0 ? favorites.frame.maxY + Tokens.Sidebar.sectionGap
             : holdsAddress ? topEdge - Tokens.Space.x2 + Tokens.Sidebar.sectionGap : topEdge
         let frames = bottomFrames()
-        nowPlaying.frame = frames.nowPlaying
+        for (card, frame) in zip(nowPlayingCards, frames.nowPlaying) { card.frame = frame }
         updateCard.frame = frames.update
         let listBottom = frames.listBottom
         scrollView.frame = NSRect(x: pad + swipeOffset, y: listTop, width: width - pad * 2, height: listBottom - listTop)
@@ -1383,16 +1389,20 @@ final class SidebarView: NSView {
     var onEditSpace: ((UUID) -> Void)?
 
     /// The bottom stack: an update that's ready sits right above the dots, where it stays put, and the now-playing
-    /// control, which comes and goes more often, above that.
-    private func bottomFrames() -> (nowPlaying: NSRect, update: NSRect, listBottom: CGFloat) {
+    /// cards, which come and go more often, above that, the last of them nearest the dots.
+    private func bottomFrames() -> (nowPlaying: [NSRect], update: NSRect, listBottom: CGFloat) {
         let pad = Tokens.Sidebar.edge
         var bottom = bottomBar.frame.minY
         let updateHeight = Tokens.Sidebar.nowPlayingHeight
         let update = NSRect(x: pad, y: bottom - (updateCard.isHidden ? 0 : updateHeight), width: bounds.width - pad * 2, height: updateHeight)
         if !updateCard.isHidden { bottom = update.minY - Tokens.Space.x1 }
         let playingHeight = Tokens.Sidebar.nowPlayingHeight
-        let playing = NSRect(x: pad, y: bottom - (nowPlaying.isHidden ? 0 : playingHeight), width: bounds.width - pad * 2, height: playingHeight)
-        if !nowPlaying.isHidden { bottom = playing.minY - Tokens.Space.x1 }
+        var playing: [NSRect] = []
+        for _ in nowPlayingCards {
+            let card = NSRect(x: pad, y: bottom - playingHeight, width: bounds.width - pad * 2, height: playingHeight)
+            playing.insert(card, at: 0)
+            bottom = card.minY - Tokens.Space.x1
+        }
         return (playing, update, bottom)
     }
 
@@ -1431,44 +1441,76 @@ final class SidebarView: NSView {
 
     private var updateCardFadingOut = false
 
-    /// Shows (or hides) the now-playing control, making room above the dots. `hiding`: you hid it, so it's put away,
-    /// a touch smaller as it fades (the present role going; with Reduce Motion only the fade, from a key at once).
-    func setNowPlaying(_ tab: Tab?, paused: Bool, hiding: Bool = false) {
-        let show = tab != nil
-        if let tab { nowPlaying.isPaused = paused; nowPlaying.show(tab) }
-        guard show == (nowPlaying.isHidden || nowPlayingFadingOut) else { return }
-        nowPlayingFadingOut = false
-        if show {
-            // Whatever a hide left on its layer goes before it fades back in.
-            Tokens.Motion.settle(nowPlaying)
-            nowPlaying.isHidden = false
-            needsLayout = true
-            nowPlaying.alphaValue = 0
-            Tokens.Motion.animate(Tokens.Motion.change) { self.nowPlaying.animator().alphaValue = 1 }
-            return
+    /// Shows a now-playing card for each tab, top to bottom, with whether it's paused, making room above the dots;
+    /// the cards of tabs no longer there go. `hiding`: you hid that tab's card, so it's put away, a touch smaller as
+    /// it fades (the present role going; with Reduce Motion only the fade, from a key at once).
+    func setNowPlaying(_ playing: [(tab: Tab, paused: Bool)], hiding: UUID? = nil) {
+        var live: [NowPlayingView] = []
+        for (tab, paused) in playing {
+            let existing = nowPlayingCards.first { $0.tab === tab }
+            let card = existing ?? makeNowPlayingCard()
+            card.isPaused = paused
+            card.show(tab)
+            live.append(card)
+            guard existing == nil || card.isLeaving else { continue }
+            // New, or playing again before its fade finished: whatever a hide left on its layer goes, and it fades in.
+            card.isLeaving = false
+            Tokens.Motion.settle(card)
+            card.alphaValue = 0
+            Tokens.Motion.animate(Tokens.Motion.change) { card.animator().alphaValue = 1 }
         }
-        // Fades out where it is first; only then does the list take back its room, so nothing vanishes at once.
-        nowPlayingFadingOut = true
-        let done: @MainActor () -> Void = {
+        // The ones going fade out where they are first; only then does the list take back their room, so nothing
+        // vanishes at once.
+        var cards = live
+        for (index, card) in nowPlayingCards.enumerated() where !live.contains(where: { $0 === card }) {
+            cards.insert(card, at: min(index, cards.count))
+            if !card.isLeaving { dismissNowPlaying(card, hiding: hiding != nil && card.tab?.id == hiding) }
+        }
+        nowPlayingCards = cards
+        needsLayout = true
+    }
+
+    private func makeNowPlayingCard() -> NowPlayingView {
+        let card = NowPlayingView()
+        card.onClick = { [weak self, weak card] _ in
+            if let tab = card?.tab { self?.onNowPlayingShow?(tab) }
+        }
+        card.playButton.onClick = { [weak self, weak card] _ in
+            if let tab = card?.tab { self?.onNowPlayingToggle?(tab) }
+        }
+        card.muteButton.onClick = { [weak card] _ in
+            if let tab = card?.tab { tab.setMuted(!tab.isMuted) }
+        }
+        card.onHide = { [weak self, weak card] in
+            if let tab = card?.tab { self?.onNowPlayingHide?(tab) }
+        }
+        card.onRightClick = { [weak self, weak card] _ in
+            guard let tab = card?.tab else { return nil }
+            return self?.onNowPlayingMenu?(tab)
+        }
+        addSubview(card, positioned: .below, relativeTo: updateCard)
+        return card
+    }
+
+    /// Fades a card out where it is, then takes it away and gives its room back to the list.
+    private func dismissNowPlaying(_ card: NowPlayingView, hiding: Bool) {
+        card.isLeaving = true
+        card.leaves += 1
+        let leave = card.leaves
+        let done: @MainActor () -> Void = { [weak self, weak card] in
             // Playing again before the fade finished: it stays.
-            guard self.nowPlayingFadingOut else { return }
-            self.nowPlayingFadingOut = false
-            self.nowPlaying.isHidden = true
-            self.nowPlaying.isHovered = false
-            Tokens.Motion.settle(self.nowPlaying)
-            self.nowPlaying.alphaValue = 1
+            guard let self, let card, card.isLeaving, card.leaves == leave else { return }
+            card.removeFromSuperview()
+            self.nowPlayingCards.removeAll { $0 === card }
             self.needsLayout = true
         }
         if hiding {
             if Tokens.Motion.isFromKey { done(); return }
-            Tokens.Motion.present(nowPlaying, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: false) { MainActor.assumeIsolated { done() } }
+            Tokens.Motion.present(card, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: false) { MainActor.assumeIsolated { done() } }
             return
         }
-        Tokens.Motion.animate(Tokens.Motion.leaving, { self.nowPlaying.animator().alphaValue = 0 }, completion: done)
+        Tokens.Motion.animate(Tokens.Motion.leaving, { card.animator().alphaValue = 0 }, completion: done)
     }
-
-    /// True while the now-playing control fades away, before it gives its room back to the list.
-    private var nowPlayingFadingOut = false
 
     func previewDotColor(_ color: NSColor, for spaceID: UUID) {
         dots.first { $0.spaceID == spaceID }?.color = color
