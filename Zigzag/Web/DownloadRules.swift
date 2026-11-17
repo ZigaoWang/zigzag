@@ -826,9 +826,12 @@ final class DownloadRulesStore {
 
     private(set) var rules: [DownloadRule]
     let changed = Signal<Void>()
+    /// The file the list is kept in. A test passes one of its own, so it never reads or writes the Mac's list.
+    private let file: URL
 
-    init() {
-        rules = JSONStore.load([DownloadRule].self, from: Paths.downloadRules) ?? []
+    init(file: URL = Paths.downloadRules) {
+        self.file = file
+        rules = JSONStore.load([DownloadRule].self, from: file) ?? []
     }
 
     /// The first rule that catches `url`, or none. `appliesToLinks` is false for a download. `filename` is the
@@ -905,7 +908,16 @@ final class DownloadRulesStore {
 
     func update(_ rule: DownloadRule) {
         guard let index = rules.firstIndex(where: { $0.id == rule.id }) else { return }
-        rules[index] = rule
+        let old = rules[index]
+        // An answer was given to the behaviour the rule had then. A different script or URL is a different thing to
+        // hand a link or download to, so the answers must not silently rule the new one; its name or another field
+        // doesn't change what runs, and leaves them alone.
+        var saved = rule
+        if old.action.scriptPath != rule.action.scriptPath || old.action.urlTemplate != rule.action.urlTemplate {
+            saved.handoffAnswer = nil
+            Self.forgetHandoffAnswers(for: rule.id)
+        }
+        rules[index] = saved
         save()
     }
 
@@ -926,9 +938,15 @@ final class DownloadRulesStore {
         rules.removeAll { $0.id == id }
         HandoffSecrets.removeSecret(for: id)
         // The answers sites gave this rule go with it: kept under its id, nothing else could ever read them again.
+        Self.forgetHandoffAnswers(for: id)
+        save()
+    }
+
+    /// Forgets the answers sites gave the rule with `id`: kept under `handoff:<id>`, only that rule could read them,
+    /// and they were given to the behavior it had when they were kept.
+    private static func forgetHandoffAnswers(for id: UUID) {
         let subject = PermissionSubject.handoff(id)
         for site in SitePermissions.sites(prefix: subject) { SitePermissions.remember(nil, subject: subject, origin: site) }
-        save()
     }
 
     /// The rules with the one whose `id` this is moved to just before `before` (`nil` puts it last). Kept apart from
@@ -967,7 +985,7 @@ final class DownloadRulesStore {
     }
 
     private func save() {
-        JSONStore.save(rules, to: Paths.downloadRules)
+        JSONStore.save(rules, to: file)
         changed.send()
     }
 }

@@ -716,6 +716,17 @@ import WebKit
             #expect(SettingsView.handoffAnswerGroups([]).isEmpty)
         }
     }
+
+    /// A kept answer's row takes the rule as its subject, as the rule's own row does, and keeps the answer and the site
+    /// it was given on in the detail beneath it.
+    @Test func aKeptAnswersRowNamesItsRuleAndSite() {
+        let row = SettingsView.handoffAnswerRow(ruleNamed: "YouTube", answer: "Hand Off", sites: "youtube.com")
+        #expect(row.title == "YouTube")
+        #expect(row.detail.contains("Hand Off"))
+        #expect(row.detail.contains("youtube.com"))
+        // A rule with no name still reads as a rule, never as an empty row.
+        #expect(SettingsView.handoffAnswerRow(ruleNamed: "  ", answer: "Hand Off", sites: "youtube.com").title == "Untitled Rule")
+    }
 }
 
 /// The tab that asked a pop-up's question, recording what its host was told to open.

@@ -3050,10 +3050,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     DownloadRulesStore.shared.update(remembered)
                     self?.reloadDownloadRules()
                 }
-                let everySite = FormRow(title: Self.handoffAnswerName(own),
-                                        detail: String(localized: "Every site", comment: "Under a download rule in Settings › Downloads: the answer beside it was given for every site, not just one."),
-                                        control: forget)
-                everySite.keywords = Self.handoffAnswerName(own)
+                let answer = Self.handoffAnswerRow(ruleNamed: rule.name, answer: Self.handoffAnswerName(own),
+                                                   sites: String(localized: "Every site", comment: "Under a download rule in Settings › Downloads: the answer beside it was given for every site, not just one."))
+                let everySite = FormRow(title: answer.title, detail: answer.detail, control: forget)
+                everySite.keywords = "\(answer.title) \(answer.detail)"
                 downloadRulesGroup.add(everySite)
             }
             // The sites this rule has a standing answer on, grouped by what was answered — handed off, left to the
@@ -3073,9 +3073,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     }
                     perSite.addArrangedSubview(forget)
                 }
-                let sitesRow = FormRow(title: group.title,
-                                       detail: group.sites.map(SiteOrigin.label).joined(separator: ", "), control: perSite)
-                sitesRow.keywords = group.sites.joined(separator: " ")
+                let answer = Self.handoffAnswerRow(ruleNamed: rule.name, answer: group.title,
+                                                   sites: group.sites.map(SiteOrigin.label).joined(separator: ", "))
+                let sitesRow = FormRow(title: answer.title,
+                                       detail: answer.detail, control: perSite)
+                sitesRow.keywords = "\(answer.title) \(group.title) \(group.sites.joined(separator: " "))"
                 downloadRulesGroup.add(sitesRow)
             }
         }
@@ -3085,6 +3087,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                              comment: "Under the download rules in Settings › Downloads, when there is an order to change.") : nil,
                            control: NSView())
         downloadRulesGroup.add(hint)
+    }
+
+    /// A row for one of a rule's kept answers: the rule that asked is the row's subject, as it is for the rule's own
+    /// row, and the answer and the sites it holds for are its detail beneath. So an answer always reads as the rule's.
+    static func handoffAnswerRow(ruleNamed name: String, answer: String, sites: String) -> (title: String, detail: String) {
+        let title = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.")
+            : name
+        return (title, "\(answer) · \(sites)")
     }
 
     /// A rule's answered sites, grouped by the answer in the order the question offers them — handed off, left to the

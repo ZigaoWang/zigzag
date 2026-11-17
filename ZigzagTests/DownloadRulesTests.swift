@@ -972,3 +972,117 @@ extension DownloadRuleTests {
         #expect(DownloadHandoff.handoffKind(rule) == "handoff:\(rule.id.uuidString)")
     }
 }
+
+/// What saving a rule does to the answers it kept: a different script or URL is a different rule's behaviour, while
+/// its name or another field leaves the answers where they are.
+extension DownloadRuleTests {
+    private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
+        let suite = "DownloadRuleKeptAnswerTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try body(defaults)
+    }
+
+    /// A rules file of its own, so a test never reads or writes the Mac's own list.
+    private func rulesFile() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-download-rules-\(UUID().uuidString).json")
+    }
+
+    @MainActor @Test func changingAScriptsPathForgetsOnlyThatRulesAnswers() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                    action: DownloadRuleAction(kind: .runScript))
+            rule.action.scriptPath = "/usr/bin/true"
+            rule.handoffAnswer = "handOff"
+            var other = DownloadRule(name: "Other", applies: .downloads, match: .contains, pattern: "other.zip",
+                                     action: DownloadRuleAction(kind: .runScript))
+            other.action.scriptPath = "/usr/bin/true"
+            other.handoffAnswer = "browser"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            store.add(other)
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule.id), origin: "https://a.example")
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(other.id), origin: "https://b.example")
+
+            var edited = rule
+            edited.action.scriptPath = "/usr/bin/false"
+            store.update(edited)
+
+            #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == nil)
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
+            // Another rule's answers, and this rule's own row, are not touched.
+            #expect(store.rules.first { $0.id == other.id }?.handoffAnswer == "browser")
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(other.id)).count == 1)
+        }
+    }
+
+    @MainActor @Test func changingAURLTemplateForgetsThatRulesAnswers() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Video", applies: .linksAndDownloads, match: .contains, pattern: "video",
+                                    action: DownloadRuleAction(kind: .openURL))
+            rule.action.urlTemplate = "mpv://{encoded_link}"
+            rule.handoffAnswer = "deny"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule.id), origin: "https://video.example")
+
+            var edited = rule
+            edited.action.urlTemplate = "iina://{encoded_link}"
+            store.update(edited)
+
+            #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == nil)
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
+        }
+    }
+
+    @MainActor @Test func renamingARuleOrChangingAnUnrelatedFieldKeepsItsAnswers() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Video", applies: .linksAndDownloads, match: .contains, pattern: "video",
+                                    action: DownloadRuleAction(kind: .openURL))
+            rule.action.urlTemplate = "mpv://{encoded_link}"
+            rule.handoffAnswer = "handOff"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule.id), origin: "https://video.example")
+
+            var edited = rule
+            edited.name = "Renamed"
+            // A field of the action that isn't the script or the URL — `openIn`'s place in a later build — is not a
+            // change of what runs.
+            edited.action.arguments = ["--unrelated"]
+            store.update(edited)
+
+            #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == "handOff")
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).count == 1)
+        }
+    }
+
+    @MainActor @Test func removingARuleForgetsTheAnswersKeptForIt() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                    action: DownloadRuleAction(kind: .openURL))
+            rule.handoffAnswer = "handOff"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule.id), origin: "https://a.example")
+
+            store.remove(id: rule.id)
+
+            #expect(store.rules.isEmpty)
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
+        }
+    }
+}
