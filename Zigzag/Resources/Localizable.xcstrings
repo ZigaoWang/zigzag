@@ -2181,7 +2181,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
+      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11476,6 +11476,17 @@
         }
       }
     },
+    "Off, so nothing fills passwords." : {
+      "comment" : "Under “iCloud Passwords extension” in Settings › Passwords, when the extension is turned off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭，所以不会填写密码。"
+          }
+        }
+      }
+    },
     "Offer %@ as your search engine" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings. The name is the search engine's, like ChatGPT.",
       "localizations" : {
@@ -12681,6 +12692,17 @@
         }
       }
     },
+    "Password manager" : {
+      "comment" : "A setting in Settings › Passwords: whether Zigzag or Apple's iCloud Passwords extension saves and fills passwords.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码管理器"
+          }
+        }
+      }
+    },
     "Password saved" : {
       "comment" : "Toast after the save-password prompt saved a password.",
       "localizations" : {
@@ -12710,6 +12732,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密码"
+          }
+        }
+      }
+    },
+    "Passwords are filled by the iCloud Passwords extension. Click its icon by the address and enter the code from macOS to connect." : {
+      "comment" : "Under “Password manager” in Settings › Passwords, with iCloud Passwords chosen. iCloud Passwords is Apple's extension, by the name Apple gives it; the code is the one the Passwords app on the Mac shows when the extension connects.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码由 iCloud 密码扩展填写。点按地址栏旁它的图标，输入 macOS 显示的验证码即可连接。"
           }
         }
       }
@@ -14313,6 +14346,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已移除 1 个固定页面"
+          }
+        }
+      }
+    },
+    "Removed, so nothing fills passwords." : {
+      "comment" : "Under “iCloud Passwords extension” in Settings › Passwords, when the extension was removed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移除，所以不会填写密码。"
           }
         }
       }
@@ -17619,6 +17663,17 @@
         }
       }
     },
+    "The iCloud Passwords extension is installed too. You can remove it in Settings › Extensions." : {
+      "comment" : "Under “Password manager” in Settings › Passwords, with Zigzag chosen while Apple's iCloud Passwords extension is still installed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 密码扩展也已安装，你可以在“设置 › 扩展”中移除它。"
+          }
+        }
+      }
+    },
     "The language you read." : {
       "comment" : "Explanation under “Translate pages into” in Settings › Translation.",
       "localizations" : {
@@ -18918,7 +18973,7 @@
       }
     },
     "Turn On" : {
-      "comment" : "Button in the toast that offers to archive unused tabs.",
+      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19472,7 +19527,7 @@
       }
     },
     "Use" : {
-      "comment" : "Button in the toast offering an extension's search engine: makes it the one Zigzag searches with.",
+      "comment" : "Button in the toast offering an extension's search engine: makes it the one Zigzag searches with.\nButton in the toast offering iCloud Passwords: it fills passwords instead of Zigzag.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19566,6 +19621,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请使用一个网址，并在搜索词所在的位置放上 %s。"
+          }
+        }
+      }
+    },
+    "Use iCloud Passwords instead of Zigzag’s?" : {
+      "comment" : "Toast after adding Apple's iCloud Passwords extension while Zigzag itself still saves and fills passwords. iCloud Passwords is the extension's name, as Apple writes it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要改用 iCloud 密码，而不用 Zigzag 自己的密码功能吗？"
           }
         }
       }
@@ -21744,6 +21810,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "https://example.com/file.zip"
+          }
+        }
+      }
+    },
+    "iCloud Passwords" : {
+      "comment" : "A choice for “Password manager” in Settings › Passwords: Apple's iCloud Passwords extension, by the name Apple gives it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 密码"
+          }
+        }
+      }
+    },
+    "iCloud Passwords extension" : {
+      "comment" : "A row in Settings › Passwords, with iCloud Passwords chosen but its extension off or removed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 密码扩展"
+          }
+        }
+      }
+    },
+    "icloud apple keychain passwords app extension autofill manager" : {
+      "comment" : "Words that find the Password manager setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "icloud apple keychain 钥匙串 密码 app 扩展 自动填充 密码管理器 苹果"
           }
         }
       }

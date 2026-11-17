@@ -217,6 +217,69 @@ struct ProfileChoiceTests {
         #expect(!PasswordManagers.zigzagHandles(chosen: false, managerOn: false, imported: true))
     }
 
+    @Test func iCloudPasswordsTurnsZigzagOffAndZigzagComesBackAsItWas() throws {
+        let suite = "ProfileChoiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let work = UUID(), home = Profile.defaultID
+        #expect(PasswordFiller.chosen(in: work, defaults: defaults) == nil)
+        // Work saved but didn't fill; home did both.
+        PasswordFiller.useICloud(in: work, saves: true, fills: false, defaults: defaults)
+        PasswordFiller.useICloud(in: home, saves: true, fills: true, defaults: defaults)
+        for profile in [work, home] {
+            #expect(PasswordFiller.chosen(in: profile, defaults: defaults) == .iCloud)
+            #expect(ProfileKey.offersToSavePasswords.choice(in: profile, defaults: defaults) == false)
+            #expect(ProfileKey.fillsPasswords.choice(in: profile, defaults: defaults) == false)
+        }
+        // Chosen again: what Zigzag did before stays what's put back, not the off it is now.
+        PasswordFiller.useICloud(in: work, saves: false, fills: false, defaults: defaults)
+        PasswordFiller.useZigzag(in: work, defaults: defaults)
+        #expect(PasswordFiller.chosen(in: work, defaults: defaults) == .zigzag)
+        #expect(ProfileKey.offersToSavePasswords.choice(in: work, defaults: defaults) == true)
+        #expect(ProfileKey.fillsPasswords.choice(in: work, defaults: defaults) == false)
+        // The other profile is still iCloud's.
+        #expect(PasswordFiller.chosen(in: home, defaults: defaults) == .iCloud)
+        PasswordFiller.useZigzag(in: home, defaults: defaults)
+        #expect(ProfileKey.offersToSavePasswords.choice(in: home, defaults: defaults) == true)
+        #expect(ProfileKey.fillsPasswords.choice(in: home, defaults: defaults) == true)
+        // Both off before: Zigzag, chosen, does both.
+        let other = UUID()
+        PasswordFiller.useICloud(in: other, saves: false, fills: false, defaults: defaults)
+        PasswordFiller.useZigzag(in: other, defaults: defaults)
+        #expect(ProfileKey.offersToSavePasswords.choice(in: other, defaults: defaults) == true)
+        #expect(ProfileKey.fillsPasswords.choice(in: other, defaults: defaults) == true)
+        // A removed profile leaves the choice behind too.
+        ProfileKey.forget(work, in: defaults)
+        #expect(PasswordFiller.chosen(in: work, defaults: defaults) == nil)
+    }
+
+    @Test func theChoiceShowsWhoFillsUntilOneIsMade() {
+        // Nothing chosen: iCloud only when its extension is on and Zigzag stepped aside for it.
+        #expect(PasswordFiller.current(chosen: nil, iCloudOn: false, zigzagSaves: true, zigzagFills: true) == .zigzag)
+        #expect(PasswordFiller.current(chosen: nil, iCloudOn: true, zigzagSaves: false, zigzagFills: false) == .iCloud)
+        // Passwords brought over from another browser are still filled by Zigzag.
+        #expect(PasswordFiller.current(chosen: nil, iCloudOn: true, zigzagSaves: false, zigzagFills: true) == .zigzag)
+        #expect(PasswordFiller.current(chosen: .zigzag, iCloudOn: true, zigzagSaves: false, zigzagFills: false) == .zigzag)
+        #expect(PasswordFiller.current(chosen: .iCloud, iCloudOn: false, zigzagSaves: false, zigzagFills: false) == .iCloud)
+    }
+
+    @Test func iCloudPasswordsIsAddedOrTurnedOnOnlyWhenItNeedsTo() {
+        #expect(PasswordFiller.need(installed: false, enabled: false) == .install)
+        #expect(PasswordFiller.need(installed: false, enabled: true) == .install)
+        #expect(PasswordFiller.need(installed: true, enabled: false) == .turnOn)
+        #expect(PasswordFiller.need(installed: true, enabled: true) == .nothing)
+        #expect(PasswordManagers.known[PasswordFiller.iCloudExtensionID] == "iCloud Passwords")
+    }
+
+    @Test func addingICloudPasswordsByHandOffersItOnce() {
+        #expect(PasswordFiller.offersSwitch(chosen: nil, zigzagHandles: true, offered: false))
+        #expect(!PasswordFiller.offersSwitch(chosen: nil, zigzagHandles: true, offered: true))
+        // Zigzag already stepped aside, or you chose: nothing to ask.
+        #expect(!PasswordFiller.offersSwitch(chosen: nil, zigzagHandles: false, offered: false))
+        #expect(!PasswordFiller.offersSwitch(chosen: .zigzag, zigzagHandles: true, offered: false))
+        #expect(!PasswordFiller.offersSwitch(chosen: .iCloud, zigzagHandles: true, offered: false))
+    }
+
     @Test func thePasswordManagerIsNamedFromWhatIsInstalled() {
         #expect(PasswordManagers.active(among: []) == nil)
         #expect(PasswordManagers.active(among: ["not-a-password-manager"]) == nil)

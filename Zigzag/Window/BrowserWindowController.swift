@@ -840,11 +840,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     /// Adding from the store: verify the package, show what it can do, install only once confirmed. `progress`
     /// hears each stage (the store bar shows them); without it, toasts do.
-    /// `also` hears each stage beside the toasts (the store's own button waits on it).
-    func installExtension(_ id: String, progress: ((InstallStage) -> Void)? = nil, also: ((InstallStage) -> Void)? = nil) {
+    /// `also` hears each stage beside the toasts (the store's own button waits on it). `into`: the profile the sheet
+    /// starts on, when it isn't the window's (Settings shows another).
+    func installExtension(_ id: String, into chosenProfile: Profile? = nil, progress: ((InstallStage) -> Void)? = nil, also: ((InstallStage) -> Void)? = nil) {
         guard #available(macOS 15.4, *) else { also?(.failed("")); return }
         // The profile you were in when you asked: it's added there, wherever you are by the time it's ready.
-        let profile = tabManager.profile
+        let profile = chosenProfile ?? tabManager.profile
         let report: (InstallStage) -> Void = { [weak self] stage in
             also?(stage)
             if let progress { progress(stage); return }
@@ -903,7 +904,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                         case .success(let name):
                             report(.added(name))
                             // After the store bar has gone, when it's up, so the two never sit on each other.
-                            DispatchQueue.main.asyncAfter(deadline: .now() + (progress == nil ? 1.5 : 3.4)) { [weak controller = self] in controller?.offerSearchEngine(of: id) }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + (progress == nil ? 1.5 : 3.4)) { [weak controller = self] in
+                                controller?.offerSearchEngine(of: id)
+                                controller?.offerICloudPasswords(of: id, in: profile)
+                            }
                         case .failure(let error): report(.failed(error.message))
                         }
                     }
@@ -923,6 +927,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         Toast.show(String(localized: "\(provider.name) can be your search engine", comment: "Toast after adding an extension that gives a search engine. The name is the engine's, like ChatGPT."),
                    symbol: "magnifyingglass",
                    action: (String(localized: "Use", comment: "Button in the toast offering an extension's search engine: makes it the one Zigzag searches with."), { ExtensionSearchProvider.use(provider) }),
+                   duration: 10, closes: true, in: self)
+    }
+
+    /// The iCloud Passwords extension added by hand while Zigzag still saves or fills passwords there: asked once
+    /// whether it should take over (#248), never switched behind your back. Settings › Passwords has the choice too.
+    private func offerICloudPasswords(of id: String, in profile: Profile) {
+        let offered = ProfileKey.iCloudPasswordsOffered.name(in: profile.id)
+        guard id == ICloudPasswords.id, ICloudPasswords.isOn(in: profile),
+              PasswordFiller.offersSwitch(chosen: PasswordFiller.chosen(in: profile.id),
+                                          zigzagHandles: PasswordCapture.offersToSave(in: profile) || Autofill.isOn(in: profile),
+                                          offered: UserDefaults.standard.bool(forKey: offered)) else { return }
+        UserDefaults.standard.set(true, forKey: offered)
+        Toast.show(String(localized: "Use iCloud Passwords instead of Zigzag’s?", comment: "Toast after adding Apple's iCloud Passwords extension while Zigzag itself still saves and fills passwords. iCloud Passwords is the extension's name, as Apple writes it."),
+                   symbol: "key",
+                   action: (String(localized: "Use", comment: "Button in the toast offering iCloud Passwords: it fills passwords instead of Zigzag."), { ICloudPasswords.use(in: profile) }),
                    duration: 10, closes: true, in: self)
     }
 

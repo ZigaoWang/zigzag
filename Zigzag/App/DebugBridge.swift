@@ -2258,6 +2258,8 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // passwordfiller zigzag|iCloud: Settings › Passwords › Password manager in the Settings tab in front (#248).
+        case "passwordfiller": controller.tabManager.selectedTab?.settingsView?.debugChoosePasswordFiller(arg)
         // sitedata seed <count> | bench <path>: made-up sites in the profile of the space in front, or Settings'
         // list of what websites keep timed (#207).
         case "sitedata":

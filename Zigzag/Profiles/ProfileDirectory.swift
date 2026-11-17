@@ -209,6 +209,12 @@ nonisolated enum ProfileKey: String, CaseIterable {
     case extensionsPinned = "ExtensionsPinned"
     case offersToSavePasswords = "PasswordsOfferToSave"
     case fillsPasswords = "PasswordsAutofill"
+    /// Who fills passwords there: Zigzag or the iCloud Passwords extension (PasswordFiller). Unset until chosen.
+    case passwordFiller = "PasswordsFiller"
+    /// Whether Zigzag saved and filled there before iCloud Passwords took over, to put back when Zigzag does again.
+    case passwordsBeforeICloud = "PasswordsBeforeICloud"
+    /// The one offer to use iCloud Passwords, once its extension went in by hand, has been made.
+    case iCloudPasswordsOffered = "PasswordsICloudOffered"
 
     func name(in profile: UUID) -> String {
         profile == Profile.defaultID ? rawValue : "\(rawValue).\(profile.uuidString)"

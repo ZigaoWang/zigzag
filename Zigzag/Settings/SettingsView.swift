@@ -1079,6 +1079,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Where downloads go: Downloads, another folder, or ask each time.
     private let downloadPlace = DropdownButton()
     private var downloadPlaceToken: SignalToken?
+    /// Who fills passwords in the profile shown: Zigzag or the iCloud Passwords extension (#248).
+    private let passwordFiller = DropdownButton()
     private let saveToggle = Toggle()
     private let fillToggle = Toggle()
     private let cardToggle = Toggle()
@@ -1126,7 +1128,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self.reloadExtensions()
                 // An ad blocker turned on or off takes YouTube over from Zigzag, or hands it back.
                 self.reloadBlocking()
-                if self.pane == .privacy || self.isSearching { self.layoutDocument() }
+                // iCloud Passwords added, turned off or removed changes who fills passwords.
+                self.reloadPasswords()
+                if self.pane == .privacy || self.pane == .passwords || self.isSearching { self.layoutDocument() }
                 // One turned on or off may give a search engine, or take yours with it.
                 self.refreshEngines()
                 self.refreshCustomSearch()
@@ -1587,6 +1591,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         reloadBlocking()
 
         // Passwords
+        passwordFiller.options = [DropdownButton.Option(title: "Zigzag"),
+                                  DropdownButton.Option(title: Self.iCloudPasswordsName)]
+        passwordFiller.onSelect = { [weak self] index in self?.choosePasswordFiller(index == 1 ? .iCloud : .zigzag) }
         saveToggle.onChange = { [weak self] on in
             guard let self else { return }
             PasswordCapture.setOffersToSave(on, in: self.profile)
@@ -2380,6 +2387,34 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let saves = PasswordCapture.offersToSave(in: profile), fills = Autofill.isOn(in: profile)
         saveToggle.isOn = saves
         fillToggle.isOn = fills
+        let filler = ICloudPasswords.filler(in: profile)
+        passwordFiller.selectedIndex = filler == .iCloud ? 1 : 0
+        let installs = profile.installs
+        let fillerNote: String? = switch filler {
+        case .iCloud: String(localized: "Passwords are filled by the iCloud Passwords extension. Click its icon by the address and enter the code from macOS to connect.",
+                             comment: "Under “Password manager” in Settings › Passwords, with iCloud Passwords chosen. iCloud Passwords is Apple's extension, by the name Apple gives it; the code is the one the Passwords app on the Mac shows when the extension connects.")
+        case .zigzag: installs.hasRecord(ICloudPasswords.id)
+            ? String(localized: "The iCloud Passwords extension is installed too. You can remove it in Settings › Extensions.",
+                     comment: "Under “Password manager” in Settings › Passwords, with Zigzag chosen while Apple's iCloud Passwords extension is still installed.")
+            : nil
+        }
+        let fillerRow = FormRow(title: String(localized: "Password manager", comment: "A setting in Settings › Passwords: whether Zigzag or Apple's iCloud Passwords extension saves and fills passwords."),
+                                detail: fillerNote, control: passwordFiller)
+        fillerRow.keywords = String(localized: "icloud apple keychain passwords app extension autofill manager", comment: "Words that find the Password manager setting with Find a setting in Settings. Not shown.")
+        passwordsGroup.add(fillerRow)
+        if filler == .iCloud {
+            // Chosen, then turned off or removed in Settings › Extensions: nothing fills until it's back.
+            if !ICloudPasswords.isOn(in: profile) {
+                let removed = !installs.isInstalled(ICloudPasswords.id)
+                let button = PillButton(title: removed ? String(localized: "Add", comment: "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.")
+                                                       : String(localized: "Turn On", comment: "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on."))
+                button.onClick = { [weak self] _ in self?.choosePasswordFiller(.iCloud) }
+                passwordsGroup.add(FormRow(title: String(localized: "iCloud Passwords extension", comment: "A row in Settings › Passwords, with iCloud Passwords chosen but its extension off or removed."),
+                                           detail: removed ? String(localized: "Removed, so nothing fills passwords.", comment: "Under “iCloud Passwords extension” in Settings › Passwords, when the extension was removed.")
+                                                           : String(localized: "Off, so nothing fills passwords.", comment: "Under “iCloud Passwords extension” in Settings › Passwords, when the extension is turned off."),
+                                           control: button))
+            }
+        }
         let manager = PasswordManagers.active(in: profile)
         let managerNote = manager.map {
             String(localized: "Off while \($0) handles passwords. Turn on to use both.",
@@ -2389,12 +2424,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             : String(localized: "After you sign in. Kept in your Keychain, synced with iCloud.", comment: "Explanation under “Offer to save passwords” in Settings › Passwords.")
         let fillNote = manager != nil && !fills ? managerNote!
             : String(localized: "Under sign-in fields, only on the site each was saved for. Passwords… there opens the Passwords app and password manager apps.", comment: "Explanation under “Fill saved passwords” in Settings › Passwords. Passwords… is the row in the fill-password menu; the Passwords app is Apple’s, password manager apps are ones like 1Password.")
-        passwordsGroup.add(FormRow(title: String(localized: "Offer to save passwords", comment: "A setting in Settings › Passwords."),
-                                   detail: saveNote,
-                                   control: saveToggle))
-        passwordsGroup.add(FormRow(title: String(localized: "Fill saved passwords", comment: "A setting in Settings › Passwords."),
-                                   detail: fillNote,
-                                   control: fillToggle))
+        // With iCloud filling, Zigzag's own two are off, and come back as they were with Zigzag chosen again.
+        if filler == .zigzag {
+            passwordsGroup.add(FormRow(title: String(localized: "Offer to save passwords", comment: "A setting in Settings › Passwords."),
+                                       detail: saveNote,
+                                       control: saveToggle))
+            passwordsGroup.add(FormRow(title: String(localized: "Fill saved passwords", comment: "A setting in Settings › Passwords."),
+                                       detail: fillNote,
+                                       control: fillToggle))
+        }
         cardToggle.isOn = ContactCard.isOn
         cardToggle.onChange = { on in ContactCard.isOn = on }
         // Not a profile's: with more than one, it stands apart from the two that are.
@@ -2407,6 +2445,45 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         passwordsWindowGroup.add(FormRow(title: String(localized: "Saved passwords", comment: "A setting in Settings › Passwords."),
                                          detail: String(localized: "See, edit, import and export them.", comment: "Explanation under “Saved passwords” in Settings › Passwords."),
                                          control: open))
+    }
+
+    private static var iCloudPasswordsName: String {
+        String(localized: "iCloud Passwords", comment: "A choice for “Password manager” in Settings › Passwords: Apple's iCloud Passwords extension, by the name Apple gives it.")
+    }
+
+    /// Hands the profile's passwords to iCloud Passwords, adding its extension first (the usual sheet) or turning it
+    /// back on, or gives them back to Zigzag. The extension stays installed then: Settings › Extensions removes it.
+    private func choosePasswordFiller(_ filler: PasswordFiller) {
+        let profile = profile
+        let id = ICloudPasswords.id
+        switch filler {
+        case .zigzag:
+            ICloudPasswords.useZigzag(in: profile)
+        case .iCloud:
+            let installs = profile.installs
+            switch PasswordFiller.need(installed: installs.isInstalled(id), enabled: installs.isEnabled(id)) {
+            case .nothing:
+                ICloudPasswords.use(in: profile)
+            case .turnOn:
+                installs.setEnabled(id, true)
+                ICloudPasswords.use(in: profile)
+            case .install:
+                // Chosen only once it's in: cancelled or failed, Zigzag goes on filling.
+                guard let browser else { break }
+                browser.installExtension(id, into: profile, also: { [weak self] stage in
+                    switch stage {
+                    case .added: if ICloudPasswords.isOn(in: profile) { ICloudPasswords.use(in: profile) }
+                    case .failed, .cancelled: break
+                    case .downloading, .reviewing, .adding: return
+                    }
+                    self?.reloadPasswords()
+                    self?.layoutDocument()
+                })
+                return
+            }
+        }
+        reloadPasswords()
+        layoutDocument()
     }
 
     private func reloadTranslation() {
@@ -2569,6 +2646,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// Chooses who fills passwords, as the Password manager menu does.
+    func debugChoosePasswordFiller(_ name: String) {
+        if let filler = PasswordFiller(rawValue: name) { choosePasswordFiller(filler) }
+    }
+
     func debugFind(_ text: String) {
         settingSearch.stringValue = text
         searchChanged()
@@ -2610,7 +2692,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 "menu": profilePicker.superview === column ? "column" : profilePicker.superview === header ? "header" : "none",
                 "headings": groups(of: pane).map { $0.title ?? "" },
                 "saves": PasswordCapture.offersToSave(in: profile), "fills": Autofill.isOn(in: profile), "found": debugFound,
-                "manager": PasswordManagers.active(in: profile) ?? ""]
+                "manager": PasswordManagers.active(in: profile) ?? "", "filler": ICloudPasswords.filler(in: profile).rawValue]
     }
     #endif
 
