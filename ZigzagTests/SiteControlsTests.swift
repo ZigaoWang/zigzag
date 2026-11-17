@@ -314,6 +314,28 @@ struct ZoomStepperTests {
         #expect(ZoomLevels.step(1.0004, by: 1) == 1.1)
     }
 
+    /// Page zoom (#273): a site with no zoom of its own opens at the default, Actual Size goes back to it, and a site
+    /// set to 100% under a larger default keeps that as its own.
+    @Test func sitesWithoutTheirOwnZoomOpenAtTheDefault() {
+        let before = ZoomLevels.defaultZoom
+        let plain = URL(string: "https://default-zoom-plain.example")!, mine = URL(string: "https://default-zoom-mine.example")!
+        defer { ZoomLevels.defaultZoom = before; ZoomLevels.forget(host: "default-zoom-plain.example"); ZoomLevels.forget(host: "default-zoom-mine.example") }
+
+        ZoomLevels.defaultZoom = 1.25
+        #expect(ZoomLevels.zoom(for: plain) == 1.25)
+        #expect(!ZoomLevels.hasOwnZoom(plain))
+
+        // 100% is the site's own now; the default needs no entry.
+        ZoomLevels.set(1, for: mine)
+        #expect(ZoomLevels.zoom(for: mine) == 1)
+        ZoomLevels.set(1.25, for: mine)
+        #expect(!ZoomLevels.hasOwnZoom(mine))
+
+        // Not one of the steps: the default falls back to 100%.
+        UserDefaults.standard.set(1.3, forKey: "DefaultZoom")
+        #expect(ZoomLevels.defaultZoom == 1)
+    }
+
     @Test func staysAtEitherEnd() {
         #expect(ZoomLevels.step(3, by: 1) == 3)
         #expect(ZoomLevels.step(0.5, by: -1) == 0.5)

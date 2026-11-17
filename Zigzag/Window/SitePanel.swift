@@ -1673,7 +1673,7 @@ final class ZoomStepper: NSView {
         [minus, percent, plus].forEach { addSubview($0) }
         minus.onClick = { [weak self] _ in self?.go(-1) }
         plus.onClick = { [weak self] _ in self?.go(1) }
-        percent.onClick = { [weak self] _ in self?.set(1) }
+        percent.onClick = { [weak self] _ in self?.set(ZoomLevels.defaultZoom) }
         refresh()
     }
 
@@ -1691,7 +1691,7 @@ final class ZoomStepper: NSView {
         switch which {
         case "in": go(1)
         case "out": go(-1)
-        default: set(1)
+        default: set(ZoomLevels.defaultZoom)
         }
     }
     #endif

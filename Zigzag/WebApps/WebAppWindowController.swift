@@ -241,7 +241,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         setZoom(ZoomLevels.step(webView.pageZoom, by: -1))
     }
 
-    @objc func actualSize(_ sender: Any?) { setZoom(1) }
+    @objc func actualSize(_ sender: Any?) { setZoom(ZoomLevels.defaultZoom) }
 
     private func setZoom(_ zoom: CGFloat) {
         guard let webView = tab.webView, let url = tab.url else { return }

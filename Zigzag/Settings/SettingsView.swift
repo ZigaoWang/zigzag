@@ -913,6 +913,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                                control: customSearch)
     private let archiveAfter = DropdownButton()
     private let favoritesPerRow = DropdownButton()
+    private let pageZoom = DropdownButton()
     private let sidebarSize = DropdownButton()
     private let darkPages = DropdownButton()
     private let pureBlackToggle = Toggle()
@@ -1327,6 +1328,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Favorites per row", comment: "A setting in Settings › Appearance: how many favorites' tiles sit side by side in the sidebar."),
                                     detail: String(localized: "Automatic fits fewer, larger ones in a narrow sidebar.", comment: "Explanation under “Favorites per row” in Settings › Appearance."),
                                     control: favoritesPerRow))
+        // As Chrome's and Safari's: the zoom of every site that has none of its own.
+        pageZoom.options = ZoomLevels.steps.map { DropdownButton.Option(title: ZoomLevels.percent($0)) }
+        pageZoom.onSelect = { index in ZoomLevels.defaultZoom = ZoomLevels.steps[index] }
+        let zoomRow = FormRow(title: String(localized: "Page zoom", comment: "A setting in Settings › Appearance: the zoom websites open at, like 110%."),
+                              detail: String(localized: "How large websites are shown. A site you zoom with ⌘+ or ⌘− keeps its own zoom.",
+                                             comment: "Explanation under “Page zoom” in Settings › Appearance."),
+                              control: pageZoom)
+        zoomRow.keywords = String(localized: "default zoom size bigger larger smaller scale text", comment: "Words that find the Page zoom setting with Find a setting in Settings. Not shown.") + " 缩放 默认缩放"
+        appearanceGroup.add(zoomRow)
         darkPages.options = DarkPages.Mode.allCases.map { mode in
             let title = switch mode {
             case .off: String(localized: "Off", comment: "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.")
@@ -3196,6 +3206,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
         sidebarSize.selectedIndex = Tokens.Sidebar.Size.allCases.firstIndex(of: Tokens.Sidebar.size) ?? 1
+        pageZoom.selectedIndex = ZoomLevels.steps.firstIndex { abs($0 - ZoomLevels.defaultZoom) < 0.001 } ?? ZoomLevels.steps.firstIndex(of: 1) ?? 0
         darkPages.selectedIndex = DarkPages.Mode.allCases.firstIndex(of: DarkPages.mode) ?? 0
         pureBlackToggle.isOn = DarkPages.pureBlack
         refreshPureBlack()
@@ -3373,7 +3384,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []

@@ -34,11 +34,26 @@ struct CommandBarHistoryTests {
         return (store, folder)
     }
 
-    /// Waits for the lookup's next answer after `ask` (which asks History something) returns.
+    /// Waits for the lookup's next answer after `ask` (which asks History something) returns. An answer that never
+    /// comes fails the test after 20 seconds instead of hanging the whole suite.
     static func answer(_ lookup: HistoryLookup, sites: Bool = false, after ask: () -> Void) async {
+        final class Once { var done = false }
+        let once = Once()
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-            if sites { lookup.onSites = { lookup.onSites = nil; done.resume() } } else { lookup.onPages = { lookup.onPages = nil; done.resume() } }
+            let finish = {
+                guard !once.done else { return }
+                once.done = true
+                if sites { lookup.onSites = nil } else { lookup.onPages = nil }
+                done.resume()
+            }
+            if sites { lookup.onSites = { finish() } } else { lookup.onPages = { finish() } }
             ask()
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(20))
+                guard !once.done else { return }
+                Issue.record("History's answer never came")
+                finish()
+            }
         }
     }
 

@@ -21,12 +21,17 @@ rule that applies to links and downloads if you want that, and choose what it se
 
 ## What a rule does
 
-- **Open App** opens the link in the app at the path chosen in the rule.
+Add Rule lists the ready-made rules first. **Custom…** holds the four actions below, for a rule of your own.
+
+- **Open App** opens the link in the app at the path chosen in the rule. **Choose…** lists the apps in your
+  Applications folders, and Choose an App… picks one kept anywhere else.
 - **Open URL** opens a URL the rule builds, such as `mpv://{encoded_link}`. This is how a scheme another app handles is
   reached.
 - **Run Script** runs an executable, with every value as its own argument or environment variable. A `.sh` file is run
   by `/bin/sh`; anything else must be executable. Zigzag never builds a shell line, so `&`, `;`, `$()` and quotes in a
-  URL arrive as part of one argument, not as commands.
+  URL arrive as part of one argument, not as commands. Scripts can live in Zigzag's Scripts folder, which **Choose… ›
+  Show Scripts Folder** opens: a script there is named in the rule by its file name, like `yt-dlp.sh`, and any other
+  script by its full path.
 - **JSON-RPC** or **XML-RPC** sends the link to a service such as aria2, Motrix or rTorrent. The endpoint and method
   are literal, as an app's or script's path is. An optional token is kept in the Keychain, never in the rules file.
 
