@@ -473,7 +473,7 @@ extension ExtensionSecurityTests {
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
         #expect(report.limits.map(\.catalogKey) == ["extension.limit.storageSync"])
-        #expect(report.limits.map(\.text) == ["Settings that stay on this Mac"])
+        #expect(report.limits.map(\.text) == ["Settings synced between Macs"])
         // sidePanel is supported by the claims, so the old table's "Side panel" is gone even though WebKit supplies it.
         #expect(!report.limits.map(\.text).contains("Side panel"))
     }
@@ -558,7 +558,22 @@ extension ExtensionSecurityTests {
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest,
                                      id: ExtensionStore.onePasswordID)
-        #expect(report.limits.map(\.text) == ["Settings that stay on this Mac"])
+        #expect(report.limits.map(\.text) == ["Settings synced between Macs"])
+    }
+
+    /// An extension asking for permissions it mostly uses gets the gap named, not its whole namespace: "Won't work
+    /// in Zigzag" may not read as "tabs do not work" when only discarding and highlighting do not.
+    @Test func aCommonPermissionNamesItsGapNotItsNamespace() async throws {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "Tab Tool", "version": "1.0",
+                                       "permissions": ["tabs", "cookies", "declarativeNetRequest", "storage"]]
+        let context = try await Self.context(manifest)
+        let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
+        #expect(report.limits.map(\.text) == ["Discarding and highlighting tabs", "Cookie partition details",
+                                              "Settings synced between Macs", "Changes to static blocking rules"])
+        #expect(!report.limits.map(\.text).contains("Some tab actions"))
+        #expect(!report.limits.map(\.text).contains("Cookie details"))
+        #expect(!report.limits.map(\.text).contains("Blocking rules"))
     }
 
     /// The later-request sheet uses the same limits as the install sheet, not an empty list.

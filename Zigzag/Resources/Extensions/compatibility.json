@@ -10,6 +10,10 @@
       "catalog": "extension.limit.tabActions",
       "order": 20
     },
+    "tabHousekeeping": {
+      "catalog": "extension.limit.tabHousekeeping",
+      "order": 21
+    },
     "windowsPopup": {
       "catalog": "extension.limit.windowsPopup",
       "order": 30
@@ -70,6 +74,10 @@
       "catalog": "extension.limit.cookies",
       "order": 140
     },
+    "cookiePartitions": {
+      "catalog": "extension.limit.cookiePartitions",
+      "order": 141
+    },
     "permissions": {
       "catalog": "extension.limit.hostAccessRequests",
       "order": 150
@@ -89,6 +97,14 @@
     "dnr": {
       "catalog": "extension.limit.blockingRules",
       "order": 190
+    },
+    "dnrStaticRules": {
+      "catalog": "extension.limit.staticRuleChanges",
+      "order": 191
+    },
+    "dnrFeedback": {
+      "catalog": "extension.limit.matchedRuleDebugging",
+      "order": 192
     },
     "webRequestBlocking": {
       "catalog": "extension.limit.webRequestBlocking",
@@ -233,12 +249,12 @@
         "discard": {
           "status": "unsupported",
           "reason": "notImplemented",
-          "group": "tabActions"
+          "group": "tabHousekeeping"
         },
         "highlight": {
           "status": "unsupported",
           "reason": "notImplemented",
-          "group": "tabActions"
+          "group": "tabHousekeeping"
         }
       }
     },
@@ -325,7 +341,7 @@
         "getPartitionKey": {
           "status": "unsupported",
           "reason": "notImplemented",
-          "group": "cookies"
+          "group": "cookiePartitions"
         }
       }
     },
@@ -369,9 +385,9 @@
       "group": "dnr",
       "members": {
         "updateStaticRules": {
-          "status": "emulated",
-          "implementation": "js:dnr",
-          "group": "dnr"
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnrStaticRules"
         },
         "getDisabledRuleIds": {
           "status": "emulated",
@@ -802,7 +818,7 @@
     "cookies": {
       "status": "partial",
       "claims": [
-        "cookies.get"
+        "cookies.getPartitionKey"
       ]
     },
     "debugger": {
@@ -813,18 +829,18 @@
     "declarativeNetRequest": {
       "status": "partial",
       "claims": [
-        "declarativeNetRequest.updateDynamicRules"
+        "declarativeNetRequest.updateStaticRules"
       ]
     },
     "declarativeNetRequestFeedback": {
       "status": "unsupported",
       "reason": "notImplemented",
-      "group": "dnr"
+      "group": "dnrFeedback"
     },
     "declarativeNetRequestWithHostAccess": {
       "status": "partial",
       "claims": [
-        "declarativeNetRequest.updateDynamicRules"
+        "declarativeNetRequest.updateStaticRules"
       ]
     },
     "desktopCapture": {
@@ -913,10 +929,7 @@
     "storage": {
       "status": "partial",
       "catalog": "extension.limit.storageSync",
-      "group": "storageSync",
-      "claims": [
-        "storage.sync"
-      ]
+      "group": "storageSync"
     },
     "system.display": {
       "status": "supported"
@@ -937,7 +950,8 @@
     "tabs": {
       "status": "partial",
       "claims": [
-        "tabs.query"
+        "tabs.discard",
+        "tabs.highlight"
       ]
     },
     "topSites": {

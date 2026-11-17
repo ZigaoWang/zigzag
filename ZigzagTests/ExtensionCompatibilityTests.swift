@@ -156,17 +156,33 @@ struct ExtensionCompatibilityTests {
         #expect(problems.first?.contains("Chrome's API does not have") == true)
     }
 
-    @Test func aPartialClaimUnderAnUnsupportedNamespaceIsRejected() throws {
-        let problems = try diagnostics(claims: """
+    @Test func aPartialRowMayNameAnUnsupportedMemberAsItsGap() throws {
+        // A partial permission's line may name the member that cannot work: that is the gap the sheet states, and it
+        // is narrower than the whole namespace. The row's line is partial, as the row is.
+        let overlay = try overlay(claims: """
         {"history": {"status": "unsupported", "reason": "webkitMissing", "group": "privacy"}}
         """, groups: """
         {"privacy": {"catalog": "extension.limit.privacySettings"}}
         """, permissions: """
         {"history": {"status": "partial", "claims": ["history.search"]}}
         """)
+        let problems = CompatibilityValidator.diagnostics(overlay: overlay, universe: try universe(),
+                                                          implementations: implementations)
+        #expect(problems.isEmpty)
+        let limits = ExtensionCompatibility(overlay: overlay).limits(forPermissions: ["history"], manifestKeys: [])
+        #expect(limits.count == 1)
+        #expect(limits.first?.status == .partial)
+        #expect(limits.first?.catalogKey == "extension.limit.privacySettings")
+    }
+
+    @Test func aPartialRowThatStatesNothingIsRejected() throws {
+        // Without a claim or its own catalog, a partial row says nothing about what is missing.
+        let problems = try diagnostics(claims: "{}", permissions: """
+        {"history": {"status": "partial"}}
+        """)
         #expect(problems.count == 1)
-        #expect(problems.first?.contains("history.search") == true)
-        #expect(problems.first?.contains("unsupported") == true)
+        #expect(problems.first?.contains("history") == true)
+        #expect(problems.first?.contains("no claims and has no catalog") == true)
     }
 
     @Test func everyClaimedImplementationExists() throws {
@@ -291,7 +307,7 @@ struct ExtensionCompatibilityTests {
             limit.catalogKey.map { ($0, limit) }
         })
         #expect(byCatalog["extension.limit.proxyScripts"]?.source == "omnibox")
-        #expect(byCatalog["extension.limit.tabGroups"]?.status == .unsupported)
+        #expect(byCatalog["extension.limit.tabGroups"]?.status == .partial)
         #expect(byCatalog["extension.limit.privacySettings"]?.status == .partial)
         #expect(byCatalog["extension.limit.gone"]?.status == .deprecated)
         #expect(!byCatalog.keys.contains("extension.limit.omnibox"))
@@ -459,7 +475,7 @@ struct ExtensionCompatibilityTests {
         #expect(limits.count == 1)
         #expect(limits.first?.catalogKey == "extension.limit.storageSync")
         #expect(limits.first?.status == .partial)
-        #expect(limits.first?.text == "Settings that stay on this Mac")
+        #expect(limits.first?.text == "Settings synced between Macs")
     }
 
     @Test func everyGroupResolvesToACatalogEntry() throws {
@@ -508,6 +524,7 @@ struct ExtensionCompatibilityTests {
         let expectedEnglish: [String: String] = [
             "extension.limit.tabGroups": "Tab groups",
             "extension.limit.tabActions": "Some tab actions",
+            "extension.limit.tabHousekeeping": "Discarding and highlighting tabs",
             "extension.limit.windowsPopup": "Popup windows",
             "extension.limit.runtime": "Restarting Zigzag",
             "extension.limit.runtimeContexts": "Open pages (background, popup, side panel and offscreen only; no tabs, subframes, developer tools or document IDs)",
@@ -523,11 +540,14 @@ struct ExtensionCompatibilityTests {
             "extension.limit.tabCapture": "Recording tabs",
             "extension.limit.tabVideoCapture": "Tab video capture",
             "extension.limit.cookies": "Cookie details",
+            "extension.limit.cookiePartitions": "Cookie partition details",
             "extension.limit.hostAccessRequests": "Site access requests",
             "extension.limit.storage": "Stored extension settings",
-            "extension.limit.storageSync": "Settings that stay on this Mac",
+            "extension.limit.storageSync": "Settings synced between Macs",
             "extension.limit.localScripts": "Scripts on local files",
             "extension.limit.blockingRules": "Blocking rules",
+            "extension.limit.staticRuleChanges": "Changes to static blocking rules",
+            "extension.limit.matchedRuleDebugging": "Matched-rule debugging",
             "extension.limit.webRequestBlocking": "Blocking requests the old way",
             "extension.limit.languageDetection": "Language detection",
             "extension.limit.legacyExtension": "Legacy extension APIs",

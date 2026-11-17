@@ -50,17 +50,6 @@ nonisolated enum CompatibilityPermissionStatus: String, Codable, CaseIterable, H
     case unsupported
     /// Chrome still answers it for old extensions; the sheet says so in one line.
     case deprecated
-
-    /// The permission answer a claim's status gives when it is shown as a line of its permission. A correction or a
-    /// bridge is a limit and therefore partial; a missing or removed member keeps its own word.
-    static func forClaim(_ status: CompatibilityStatus) -> CompatibilityPermissionStatus {
-        switch status {
-        case .native: return .supported
-        case .patched, .bridged, .emulated: return .partial
-        case .unsupported: return .unsupported
-        case .deprecated: return .deprecated
-        }
-    }
 }
 
 /// Why a path is not what an extension would have in Chrome. The install sheet groups its words by these, so the
@@ -162,8 +151,8 @@ nonisolated struct CompatibilityLimit: Hashable, Sendable {
     let catalogKey: String?
     let group: String
     let reason: CompatibilityReason
-    /// The permission answer the line shows: the permission's own status for a whole-permission line, or what the
-    /// claim's status means for its permission (`forClaim`).
+    /// The permission answer the line shows: the permission's own status for a whole-permission line, or partial for
+    /// the limit a partial row names.
     let status: CompatibilityPermissionStatus
     /// What the line falls back to until the catalog has text for its key: the permission or manifest key.
     let source: String
@@ -182,7 +171,10 @@ nonisolated enum CompatibilityText {
                           comment: "A Chrome extension feature Zigzag cannot provide: grouping tabs.")
         case "extension.limit.tabActions":
             return String(localized: "extension.limit.tabActions", defaultValue: "Some tab actions",
-                          comment: "A Chrome extension feature Zigzag cannot provide: discarding, highlighting or scripting tabs.")
+                          comment: "A Chrome extension feature Zigzag cannot provide: splitting tabs and other tab actions beyond opening and switching.")
+        case "extension.limit.tabHousekeeping":
+            return String(localized: "extension.limit.tabHousekeeping", defaultValue: "Discarding and highlighting tabs",
+                          comment: "A Chrome extension feature Zigzag cannot provide: discarding tabs to save memory and highlighting a set of tabs.")
         case "extension.limit.windowsPopup":
             return String(localized: "extension.limit.windowsPopup", defaultValue: "Popup windows",
                           comment: "A Chrome extension feature Zigzag limits: extension windows opened as popups.")
@@ -228,6 +220,9 @@ nonisolated enum CompatibilityText {
         case "extension.limit.cookies":
             return String(localized: "extension.limit.cookies", defaultValue: "Cookie details",
                           comment: "A Chrome extension feature Zigzag limits: cookie partition keys.")
+        case "extension.limit.cookiePartitions":
+            return String(localized: "extension.limit.cookiePartitions", defaultValue: "Cookie partition details",
+                          comment: "A Chrome extension feature Zigzag cannot provide: reading a cookie's partition key.")
         case "extension.limit.hostAccessRequests":
             return String(localized: "extension.limit.hostAccessRequests", defaultValue: "Site access requests",
                           comment: "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.")
@@ -235,14 +230,20 @@ nonisolated enum CompatibilityText {
             return String(localized: "extension.limit.storage", defaultValue: "Stored extension settings",
                           comment: "A Chrome extension feature Zigzag emulates: managed extension storage.")
         case "extension.limit.storageSync":
-            return String(localized: "extension.limit.storageSync", defaultValue: "Settings that stay on this Mac",
-                          comment: "A Chrome extension feature Zigzag limits: storage.sync keeps its settings on this Mac.")
+            return String(localized: "extension.limit.storageSync", defaultValue: "Settings synced between Macs",
+                          comment: "A Chrome extension feature Zigzag limits: storage.sync keeps its settings on this Mac instead of syncing them.")
         case "extension.limit.localScripts":
             return String(localized: "extension.limit.localScripts", defaultValue: "Scripts on local files",
                           comment: "A Chrome extension feature Zigzag limits: registered content scripts that name file: pages.")
         case "extension.limit.blockingRules":
             return String(localized: "extension.limit.blockingRules", defaultValue: "Blocking rules",
                           comment: "A Chrome extension feature Zigzag limits: switching individual network rules on and off.")
+        case "extension.limit.staticRuleChanges":
+            return String(localized: "extension.limit.staticRuleChanges", defaultValue: "Changes to static blocking rules",
+                          comment: "A Chrome extension feature Zigzag cannot provide: switching individual static rules on and off with declarativeNetRequest.updateStaticRules.")
+        case "extension.limit.matchedRuleDebugging":
+            return String(localized: "extension.limit.matchedRuleDebugging", defaultValue: "Matched-rule debugging",
+                          comment: "A Chrome extension feature Zigzag cannot provide: seeing which blocking rules matched a request.")
         case "extension.limit.webRequestBlocking":
             return String(localized: "extension.limit.webRequestBlocking", defaultValue: "Blocking requests the old way",
                           comment: "A Chrome extension feature Zigzag cannot provide: blocking web requests with webRequest.")
@@ -504,9 +505,11 @@ nonisolated enum CompatibilityValidator {
         }
     }
 
-    /// A permission or manifest key's four-value answer, and what each value needs: a partial one names the claims it
-    /// turns into lines, and an unsupported or deprecated one says why and where its line belongs. A named claim is
-    /// read the way the install sheet reads it, through the registry, so a member covered by its namespace is enough.
+    /// A permission or manifest key's four-value answer, and what each value needs: a partial one either names the
+    /// claims it turns into lines or carries its own resolving catalog, and an unsupported or deprecated one says why
+    /// and where its line belongs. A named claim is read the way the install sheet reads it, through the registry, so
+    /// a member covered by its namespace is enough, and a member's own limit is named directly even when the member
+    /// answers unsupported: that is the gap the row exists to state.
     private static func check(_ rows: [String: CompatibilityPermission], at section: String,
                               in overlay: CompatibilityOverlay, universe: ChromeUniverse,
                               registry: CompatibilityRegistry, diagnostics: inout [String]) {
@@ -520,17 +523,16 @@ nonisolated enum CompatibilityValidator {
                 break
             case .partial:
                 let named = row.claims ?? []
-                if named.isEmpty {
-                    diagnostics.append("\(path) is partial but names no claims")
+                if named.isEmpty && row.catalog == nil {
+                    diagnostics.append("\(path) is partial but names no claims and has no catalog")
                 }
                 for claim in named {
                     guard universe.contains(claim) else {
                         diagnostics.append("\(path) names the claim \(claim), which Chrome's API does not have")
                         continue
                     }
-                    guard let resolved = registry.claim(for: claim), resolved.status != .unsupported else {
-                        diagnostics.append("\(path) names the claim \(claim), which the overlay resolves to unsupported")
-                        continue
+                    if registry.claim(for: claim) == nil {
+                        diagnostics.append("\(path) names the claim \(claim), which the overlay does not resolve")
                     }
                 }
             case .unsupported, .deprecated:
@@ -649,9 +651,11 @@ nonisolated struct ExtensionCompatibility {
                     guard let claim = registry.claim(for: path), claim.status != .native,
                           let group = claim.group, let entry = overlay.groups[group] else { continue }
                     let order = row.order ?? entry.order ?? 0
+                    // The row is partial, so its line is a caveat about this permission however the member itself is
+                    // answered; an unsupported member names the exact gap rather than the whole namespace.
                     lines.append((order, path, CompatibilityLimit(catalogKey: entry.catalog, group: group,
                                                                   reason: claim.reason ?? row.reason ?? .notImplemented,
-                                                                  status: .forClaim(claim.status), source: path)))
+                                                                  status: .partial, source: path)))
                 }
             case .unsupported, .deprecated:
                 let group = row.group ?? name

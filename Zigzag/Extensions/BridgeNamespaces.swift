@@ -243,22 +243,27 @@ nonisolated struct ContextFilter {
 }
 
 /// Chrome's `contextId`: opaque, and the same for as long as a context lives. One that closes is forgotten, so one
-/// that opens again is a new context with a new name.
+/// that opens again is a new context with a new name. Names are kept per extension: a call from one extension must not
+/// forget another extension's live contexts, and two extensions may hold a page with the same object identity.
 nonisolated final class ContextNames {
-    private var names: [String: String] = [:]
+    private var names: [String: [String: String]] = [:]
 
-    /// The name of a context held by this object: its background, its offscreen page, its side panel, its popup.
-    func name(of object: AnyObject) -> String { name("object:\(ObjectIdentifier(object))") }
-
-    /// Forgets every context that has closed.
-    func keeping(_ live: Set<String>) {
-        names = names.filter { live.contains($0.value) }
+    /// The name of a context held by this extension: its background, its offscreen page, its side panel, its popup.
+    func name(of object: AnyObject, extensionID: String) -> String {
+        name("object:\(ObjectIdentifier(object))", extensionID: extensionID)
     }
 
-    private func name(_ key: String) -> String {
-        if let name = names[key] { return name }
+    /// Forgets every context of this extension that has closed, and no other extension's.
+    func keeping(_ live: Set<String>, extensionID: String) {
+        names[extensionID] = (names[extensionID] ?? [:]).filter { live.contains($0.value) }
+    }
+
+    private func name(_ key: String, extensionID: String) -> String {
+        var held = names[extensionID] ?? [:]
+        if let name = held[key] { return name }
         let name = UUID().uuidString
-        names[key] = name
+        held[key] = name
+        names[extensionID] = held
         return name
     }
 }
@@ -282,23 +287,23 @@ final class BridgeContexts: BridgeNamespace {
         var contexts: [Context] = []
         if context.webExtension.hasBackgroundContent,
            let background = Self.background(manifest: context.webExtension.manifest, baseURL: context.baseURL,
-                                            contextID: names.name(of: context)) {
+                                            contextID: names.name(of: context, extensionID: extensionID)) {
             contexts.append(background)
         }
         if let page = host.bridge.offscreen.page(for: extensionID) {
-            contexts.append(Context(type: .offscreenDocument, contextID: names.name(of: page), documentURL: page.url))
+            contexts.append(Context(type: .offscreenDocument, contextID: names.name(of: page, extensionID: extensionID), documentURL: page.url))
         }
         if let popup = host.shownPopup(for: extensionID) {
-            contexts.append(Self.popup(popup, contextID: names.name(of: popup)))
+            contexts.append(Self.popup(popup, contextID: names.name(of: popup, extensionID: extensionID)))
         }
         // A private window has no extension controller, and its side panel is never one to report.
         for controller in WindowManager.shared.controllers
         where !controller.tabManager.isPrivate && controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
             let panel = controller.root.sidePanel
-            contexts.append(Context(type: .sidePanel, contextID: names.name(of: panel), documentURL: panel.webView?.url,
+            contexts.append(Context(type: .sidePanel, contextID: names.name(of: panel, extensionID: extensionID), documentURL: panel.webView?.url,
                                     tabID: panel.tabID ?? -1))
         }
-        names.keeping(Set(contexts.map(\.contextID)))
+        names.keeping(Set(contexts.map(\.contextID)), extensionID: extensionID)
         return Self.matching(contexts, filter: args.object(0)).map(\.dictionary)
     }
 

@@ -662,17 +662,32 @@ struct ExtensionContextsTests {
     @Test func contextIdsAreStableAcrossCalls() {
         let names = ContextNames()
         let panel = NSObject()
-        let first = names.name(of: panel)
-        #expect(names.name(of: panel) == first)
-        #expect(names.name(of: NSObject()) != first)
+        let first = names.name(of: panel, extensionID: "one")
+        #expect(names.name(of: panel, extensionID: "one") == first)
+        #expect(names.name(of: NSObject(), extensionID: "one") != first)
         // Two popups showing the same page are two contexts, with two names.
         let url = URL(string: base + "popup.html")!
         let one = PopupPage(url), two = PopupPage(url)
-        let oneID = names.name(of: one)
-        #expect(names.name(of: two) != oneID)
+        let oneID = names.name(of: one, extensionID: "one")
+        #expect(names.name(of: two, extensionID: "one") != oneID)
         // A context that closes is forgotten, so one that opens again is a new one.
-        names.keeping([names.name(of: two)])
-        #expect(names.name(of: one) != oneID)
+        names.keeping([names.name(of: two, extensionID: "one")], extensionID: "one")
+        #expect(names.name(of: one, extensionID: "one") != oneID)
+    }
+
+    @Test func contextIdsAreKeptPerExtension() {
+        let names = ContextNames()
+        let first = NSObject(), second = NSObject()
+        let firstID = names.name(of: first, extensionID: "one")
+        let secondID = names.name(of: second, extensionID: "two")
+        // Two extensions may hold the same page object; their names are their own.
+        #expect(names.name(of: first, extensionID: "two") != firstID)
+        // One extension's sweep keeps its own live contexts and forgets none of the other's.
+        names.keeping([firstID], extensionID: "one")
+        #expect(names.name(of: second, extensionID: "two") == secondID)
+        // And it does not resurrect the other's closed context either.
+        names.keeping([], extensionID: "two")
+        #expect(names.name(of: second, extensionID: "two") != secondID)
     }
 
     @Test func documentIdsAreNotInvented() throws {
@@ -696,13 +711,13 @@ struct ExtensionContextsTests {
         let address = try #require(URL(string: base + "popup.html?tabId=770&view=side"))
         let page = PopupPage(address)
         let names = ContextNames()
-        let popup = BridgeContexts.popup(page, contextID: names.name(of: page))
+        let popup = BridgeContexts.popup(page, contextID: names.name(of: page, extensionID: "one"))
         #expect(popup.documentURL?.absoluteString == base + "popup.html?tabId=770&view=side")
         #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html?tabId=770&view=side")
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html?tabId=770&view=side"]]).count == 1)
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html"]]).isEmpty)
         // Its identity is the page itself, not its address.
-        #expect(names.name(of: page) == popup.contextID)
+        #expect(names.name(of: page, extensionID: "one") == popup.contextID)
     }
 }
 
