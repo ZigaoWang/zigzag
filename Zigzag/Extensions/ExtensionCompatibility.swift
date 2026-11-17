@@ -39,6 +39,30 @@ nonisolated enum CompatibilityStatus: String, Codable, CaseIterable, Hashable, S
     }
 }
 
+/// What the install sheet says about a manifest permission or key. This is not an API path's status: a permission can
+/// be supported while one member it turns on is not, so its answer is the sheet's own four-value axis.
+nonisolated enum CompatibilityPermissionStatus: String, Codable, CaseIterable, Hashable, Sendable {
+    /// Everything the permission turns on works; the sheet has no line for it.
+    case supported
+    /// Some of it works; the sheet has one line per distinct limit the claims name.
+    case partial
+    /// Nothing it turns on works; the sheet has one line with the reason and group.
+    case unsupported
+    /// Chrome still answers it for old extensions; the sheet says so in one line.
+    case deprecated
+
+    /// The permission answer a claim's status gives when it is shown as a line of its permission. A correction or a
+    /// bridge is a limit and therefore partial; a missing or removed member keeps its own word.
+    static func forClaim(_ status: CompatibilityStatus) -> CompatibilityPermissionStatus {
+        switch status {
+        case .native: return .supported
+        case .patched, .bridged, .emulated: return .partial
+        case .unsupported: return .unsupported
+        case .deprecated: return .deprecated
+        }
+    }
+}
+
 /// Why a path is not what an extension would have in Chrome. The install sheet groups its words by these, so the
 /// overlay never carries English prose itself.
 nonisolated enum CompatibilityReason: String, Codable, Hashable, Sendable {
@@ -79,7 +103,7 @@ nonisolated struct CompatibilityClaim: Codable, Sendable {
 
 /// What the install sheet says about a manifest permission or key, separate from the API paths it turns on.
 nonisolated struct CompatibilityPermission: Codable, Sendable {
-    var status: CompatibilityStatus
+    var status: CompatibilityPermissionStatus
     /// The claimed API paths this permission is about, so a partial permission shows one line per distinct limit.
     var claims: [String]?
     var reason: CompatibilityReason?
@@ -137,7 +161,9 @@ nonisolated struct CompatibilityLimit: Hashable, Sendable {
     let catalogKey: String?
     let group: String
     let reason: CompatibilityReason
-    let status: CompatibilityStatus
+    /// The permission answer the line shows: the permission's own status for a whole-permission line, or what the
+    /// claim's status means for its permission (`forClaim`).
+    let status: CompatibilityPermissionStatus
     /// What the line falls back to until the catalog has text for its key: the permission or manifest key.
     let source: String
 
@@ -191,14 +217,85 @@ nonisolated struct CompatibilityImplementations: Sendable {
         return false
     }
 
-    /// JavaScript identifiers are letters, digits, `_` and `$`.
+    /// Every identifier the script's code writes. Comments, strings and regular expressions are left out: a name a
+    /// comment mentions is not a correction, and a renamed one would otherwise keep passing through a stale line.
     private static func identifiers(in script: String) -> Set<String> {
         let separators = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_$")).inverted
-        let names = script.components(separatedBy: separators).filter { name in
+        let names = code(in: script).components(separatedBy: separators).filter { name in
             guard let first = name.first else { return false }
             return !first.isNumber
         }
         return Set(names)
+    }
+
+    /// The script with its comments, string literals and regular-expression bodies blanked out, so only code is read.
+    private static func code(in script: String) -> String {
+        let characters = Array(script)
+        var code: [Character] = []
+        var index = 0
+        var previous: Character?
+        while index < characters.count {
+            let character = characters[index]
+            let next = index + 1 < characters.count ? characters[index + 1] : nil
+            if character == "/", next == "/" {
+                index += 2
+                while index < characters.count, characters[index] != "\n" { index += 1 }
+                continue
+            }
+            if character == "/", next == "*" {
+                index += 2
+                while index + 1 < characters.count, !(characters[index] == "*" && characters[index + 1] == "/") {
+                    index += 1
+                }
+                index = min(index + 2, characters.count)
+                code.append(" ")
+                continue
+            }
+            if character == "'" || character == "\"" || character == "`" {
+                index += 1
+                while index < characters.count {
+                    let current = characters[index]
+                    index += 1
+                    if current == "\\" {
+                        index += 1
+                        continue
+                    }
+                    if current == character { break }
+                    // A quote that never closes on its line is a division or a regex seen wrong; stop there.
+                    if character != "`", current == "\n" { break }
+                }
+                code.append(" ")
+                continue
+            }
+            if character == "/", startsRegex(after: previous) {
+                index += 1
+                var inClass = false
+                while index < characters.count {
+                    let current = characters[index]
+                    index += 1
+                    if current == "\\" {
+                        index += 1
+                        continue
+                    }
+                    if current == "[" { inClass = true } else if current == "]" { inClass = false }
+                    else if current == "/", !inClass { break }
+                    else if current == "\n" { break }
+                }
+                code.append(" ")
+                continue
+            }
+            code.append(character)
+            if !character.isWhitespace { previous = character }
+            index += 1
+        }
+        return String(code)
+    }
+
+    /// Whether a `/` here starts a regular expression rather than a division. After a name, a number or a closing
+    /// bracket it divides; after an operator or punctuation it opens a regular expression.
+    private static func startsRegex(after previous: Character?) -> Bool {
+        guard let previous else { return true }
+        return "([{=,:;!&|?+-*%^~<>".contains(previous)
     }
 }
 
@@ -217,8 +314,8 @@ nonisolated enum CompatibilityValidator {
             guard let claim = claimed[path] else { continue }
             checkNamespace(path, claim, claims: claimed, diagnostics: &diagnostics)
         }
-        check(overlay.permissions, at: "permissions", in: overlay, diagnostics: &diagnostics)
-        check(overlay.manifest, at: "manifest", in: overlay, diagnostics: &diagnostics)
+        check(overlay.permissions, at: "permissions", in: overlay, claims: claimed, diagnostics: &diagnostics)
+        check(overlay.manifest, at: "manifest", in: overlay, claims: claimed, diagnostics: &diagnostics)
         return diagnostics
     }
 
@@ -282,11 +379,34 @@ nonisolated enum CompatibilityValidator {
         diagnostics.append("\(path) is \(claim.status.rawValue), better than its member \(worst.0) (\(worst.1.rawValue))")
     }
 
+    /// A permission or manifest key's four-value answer, and what each value needs: a partial one names the claims it
+    /// turns into lines, and an unsupported or deprecated one says why and where its line belongs.
     private static func check(_ rows: [String: CompatibilityPermission], at section: String,
-                              in overlay: CompatibilityOverlay, diagnostics: inout [String]) {
+                              in overlay: CompatibilityOverlay, claims: [String: CompatibilityClaim],
+                              diagnostics: inout [String]) {
         for (name, row) in rows.sorted(by: { $0.key < $1.key }) {
+            let path = "\(section).\(name)"
             if let group = row.group, !hasCatalog(group, in: overlay) {
-                diagnostics.append("\(section).\(name) names the group \(group), which has no catalog key")
+                diagnostics.append("\(path) names the group \(group), which has no catalog key")
+            }
+            switch row.status {
+            case .supported:
+                break
+            case .partial:
+                let named = row.claims ?? []
+                if named.isEmpty {
+                    diagnostics.append("\(path) is partial but names no claims")
+                }
+                for claim in named where claims[claim] == nil {
+                    diagnostics.append("\(path) names the claim \(claim), which the overlay does not make")
+                }
+            case .unsupported, .deprecated:
+                if row.reason == nil {
+                    diagnostics.append("\(path) is \(row.status.rawValue) but gives no reason")
+                }
+                if row.group == nil {
+                    diagnostics.append("\(path) is \(row.status.rawValue) but names no group")
+                }
             }
         }
     }
@@ -374,26 +494,39 @@ nonisolated struct ExtensionCompatibility {
     }
 
     /// The install sheet's lines for an extension asking for these permissions and manifest keys: one per distinct
-    /// catalog key, in the overlay's order. A permission or key the overlay does not limit has no line.
+    /// catalog key, in the overlay's order. A supported permission or key has no line, and one the overlay does not
+    /// mention has none either.
     func limits(forPermissions permissions: Set<String>, manifestKeys: Set<String>) -> [CompatibilityLimit] {
         guard let overlay, let registry else { return [] }
         var lines: [(order: Int, source: String, limit: CompatibilityLimit)] = []
 
         func add(_ row: CompatibilityPermission, named name: String) {
-            if let catalog = row.catalog {
+            switch row.status {
+            case .supported:
+                return
+            case .partial:
+                if let catalog = row.catalog {
+                    let group = row.group ?? name
+                    let order = row.order ?? overlay.groups[group]?.order ?? 0
+                    lines.append((order, name, CompatibilityLimit(catalogKey: catalog, group: group,
+                                                                  reason: row.reason ?? .notImplemented,
+                                                                  status: .partial, source: name)))
+                }
+                for path in row.claims ?? [] {
+                    guard let claim = registry.claim(for: path), claim.status != .native,
+                          let group = claim.group, let entry = overlay.groups[group] else { continue }
+                    let order = row.order ?? entry.order ?? 0
+                    lines.append((order, path, CompatibilityLimit(catalogKey: entry.catalog, group: group,
+                                                                  reason: claim.reason ?? row.reason ?? .notImplemented,
+                                                                  status: .forClaim(claim.status), source: path)))
+                }
+            case .unsupported, .deprecated:
                 let group = row.group ?? name
+                let catalog = row.catalog ?? overlay.groups[group]?.catalog
                 let order = row.order ?? overlay.groups[group]?.order ?? 0
                 lines.append((order, name, CompatibilityLimit(catalogKey: catalog, group: group,
                                                               reason: row.reason ?? .notImplemented,
                                                               status: row.status, source: name)))
-            }
-            for path in row.claims ?? [] {
-                guard let claim = registry.claim(for: path), claim.status != .native,
-                      let group = claim.group, let entry = overlay.groups[group] else { continue }
-                let order = row.order ?? entry.order ?? 0
-                lines.append((order, path, CompatibilityLimit(catalogKey: entry.catalog, group: group,
-                                                              reason: claim.reason ?? row.reason ?? .notImplemented,
-                                                              status: claim.status, source: path)))
             }
         }
 
@@ -405,9 +538,10 @@ nonisolated struct ExtensionCompatibility {
             guard let row = overlay.manifest[name] else { continue }
             add(row, named: name)
         }
-        var seen: Set<CompatibilityLimit> = []
+        // One line per catalog key: two permissions, or a permission and a claim, may name the same text.
+        var seen: Set<String> = []
         return lines.sorted { ($0.order, $0.source) < ($1.order, $1.source) }
             .map(\.limit)
-            .filter { seen.insert($0).inserted }
+            .filter { seen.insert($0.catalogKey ?? "group:\($0.group)").inserted }
     }
 }

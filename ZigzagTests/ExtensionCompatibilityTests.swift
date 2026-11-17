@@ -33,8 +33,10 @@ struct ExtensionCompatibilityTests {
         """)
     }
 
-    private func diagnostics(claims: String, groups: String = "{}") throws -> [String] {
-        CompatibilityValidator.diagnostics(overlay: try overlay(claims: claims, groups: groups),
+    private func diagnostics(claims: String, groups: String = "{}", permissions: String = "{}",
+                             manifest: String = "{}") throws -> [String] {
+        CompatibilityValidator.diagnostics(overlay: try overlay(claims: claims, groups: groups,
+                                                                permissions: permissions, manifest: manifest),
                                            universe: try universe(), implementations: implementations)
     }
 
@@ -89,6 +91,43 @@ struct ExtensionCompatibilityTests {
         #expect(problems.count == 5)
     }
 
+    @Test func aPermissionRowHasItsOwnFourStatuses() throws {
+        let rows = try JSONDecoder().decode([String: CompatibilityPermission].self, from: Data("""
+        {"supported": {"status": "supported"},
+         "partial": {"status": "partial", "claims": ["tabs.group"]},
+         "unsupported": {"status": "unsupported", "reason": "chromeService", "group": "privacy"},
+         "deprecated": {"status": "deprecated", "reason": "removed", "group": "privacy"}}
+        """.utf8))
+        #expect(rows["supported"]?.status == .supported)
+        #expect(rows["partial"]?.status == .partial)
+        #expect(rows["unsupported"]?.status == .unsupported)
+        #expect(rows["deprecated"]?.status == .deprecated)
+    }
+
+    @Test func anUnknownPermissionStatusIsRejected() {
+        // The API statuses are not permission statuses: `bridged` has no meaning in the install sheet.
+        #expect(throws: (any Error).self) {
+            try JSONDecoder().decode(CompatibilityPermission.self, from: Data(#"{"status": "bridged"}"#.utf8))
+        }
+    }
+
+    @Test func permissionRowsCarryTheFieldsTheirStatusNeeds() throws {
+        let problems = try diagnostics(claims: "{}", groups: """
+        {"tabGroups": {"catalog": "extension.limit.tabGroups"}}
+        """, permissions: """
+        {"partial": {"status": "partial"},
+         "unsupported": {"status": "unsupported"},
+         "deprecated": {"status": "deprecated", "reason": "removed", "group": "tabGroups"},
+         "supported": {"status": "supported"},
+         "missing": {"status": "partial", "claims": ["tabs.nope"]}}
+        """)
+        #expect(problems.contains { $0.contains("permissions.partial") && $0.contains("claims") })
+        #expect(problems.contains { $0.contains("permissions.unsupported") && $0.contains("reason") })
+        #expect(problems.contains { $0.contains("permissions.unsupported") && $0.contains("group") })
+        #expect(problems.contains { $0.contains("permissions.missing") && $0.contains("tabs.nope") })
+        #expect(problems.count == 4)
+    }
+
     @Test func everyClaimedImplementationExists() throws {
         let problems = try diagnostics(claims: """
         {"tabs": {"status": "patched", "implementation": "js:setMember"},
@@ -104,6 +143,19 @@ struct ExtensionCompatibilityTests {
         #expect(problems.contains { $0.contains("python:runtime") })
         #expect(!problems.contains { $0.contains("js:setMember") })
         #expect(!problems.contains { $0.contains("swift:history") })
+    }
+
+    @Test func aJsImplementationMustBeInTheCode() {
+        // A name a comment or a string mentions is not a correction; a renamed one must not keep passing there.
+        let implementations = CompatibilityImplementations(handlers: [], script: """
+        // contextMenusKept is only named here.
+        /* setMemberToo is only named here. */
+        const words = "contextMenusKept setMemberToo";
+        const real = (path, key, value) => {};
+        """)
+        #expect(!implementations.implements("js:contextMenusKept"))
+        #expect(!implementations.implements("js:setMemberToo"))
+        #expect(implementations.implements("js:real"))
     }
 
     @Test func aNamespaceIsNeverBetterThanItsWorstMember() throws {
@@ -158,26 +210,41 @@ struct ExtensionCompatibilityTests {
         #expect(CompatibilityText.text(for: "extension.limit.unwritten", fallback: "Tab groups") == "Tab groups")
     }
 
-    @Test func installLinesComeFromThePermissionsAndManifestKeys() throws {
+    @Test func installLinesCarryThePermissionStatusAndShareACatalogOnce() throws {
         let overlay = try overlay(claims: """
         {"tabs": {"status": "bridged", "implementation": "swift:tabs", "members": {
             "group": {"status": "unsupported", "reason": "webkitMissing", "group": "tabGroups"}
-        }}}
+        }},
+         "history": {"status": "bridged", "implementation": "swift:history", "group": "privacy"}}
         """, groups: """
         {"privacy": {"catalog": "extension.limit.privacySettings"},
-         "tabGroups": {"catalog": "extension.limit.tabGroups"}}
+         "tabGroups": {"catalog": "extension.limit.tabGroups"},
+         "gone": {"catalog": "extension.limit.gone"}}
         """, permissions: """
         {"proxy": {"status": "unsupported", "reason": "chromeService", "catalog": "extension.limit.proxyScripts",
                    "group": "privacy"},
-         "history": {"status": "bridged"}}
+         "tabs": {"status": "partial", "claims": ["tabs.group"]},
+         "history": {"status": "partial", "claims": ["history.search"]},
+         "downloads": {"status": "deprecated", "reason": "removed", "catalog": "extension.limit.gone",
+                       "group": "gone"},
+         "alarms": {"status": "supported"}}
         """, manifest: """
-        {"omnibox": {"status": "unsupported", "reason": "notImplemented", "catalog": "extension.limit.omnibox",
+        {"omnibox": {"status": "unsupported", "reason": "notImplemented", "catalog": "extension.limit.proxyScripts",
                      "group": "privacy"}}
         """)
-        let compatibility = ExtensionCompatibility(overlay: overlay)
-        let limits = compatibility.limits(forPermissions: ["proxy", "history"], manifestKeys: ["omnibox"])
-        #expect(Set(limits.map(\.catalogKey)) == ["extension.limit.proxyScripts", "extension.limit.omnibox"])
-        #expect(limits.allSatisfy { $0.group == "privacy" })
-        #expect(limits.allSatisfy { $0.status == .unsupported })
+        let limits = ExtensionCompatibility(overlay: overlay)
+            .limits(forPermissions: ["proxy", "tabs", "history", "downloads", "alarms"], manifestKeys: ["omnibox"])
+        // A shared catalog is one line, with a deterministic source, and a supported permission has no line.
+        #expect(limits.count == 4)
+        #expect(Set(limits.compactMap(\.catalogKey)) == ["extension.limit.proxyScripts", "extension.limit.tabGroups",
+                                                         "extension.limit.privacySettings", "extension.limit.gone"])
+        let byCatalog = Dictionary(uniqueKeysWithValues: limits.compactMap { limit in
+            limit.catalogKey.map { ($0, limit) }
+        })
+        #expect(byCatalog["extension.limit.proxyScripts"]?.source == "omnibox")
+        #expect(byCatalog["extension.limit.tabGroups"]?.status == .unsupported)
+        #expect(byCatalog["extension.limit.privacySettings"]?.status == .partial)
+        #expect(byCatalog["extension.limit.gone"]?.status == .deprecated)
+        #expect(!byCatalog.keys.contains("extension.limit.omnibox"))
     }
 }
