@@ -34,7 +34,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “设置 › 空间 › 新空间使用自己的个人资料”默认关闭，打开后新建的空间会自带一份个人资料，有自己的登录状态、扩展和历史记录，不用每次手动新建。个人资料以空间命名，你给空间起名时会跟着改，没有其他个人资料用这个颜色时也会用空间的颜色。空间编辑器里仍然可以选别的个人资料，已有的空间、导入的空间和无痕浏览窗口都不受影响。感谢 [pyoio](https://github.com/pyoio)。([#291](https://github.com/ZigaoWang/zigzag/issues/291))
 
 ### 修复
-- 从 Arc 导入时，收藏会留在所显示空间所属的个人资料中，不再混入从其他 Mac 同步来的收藏或旧列表。每份个人资料里的同一页面只会添加一次。
+- 从 Arc 导入时，收藏会留在所显示空间所属的个人资料中，不再混入从其他 Mac 同步来的收藏或旧列表。每份个人资料里的同一页面只会添加一次。感谢 [adagradschool](https://github.com/adagradschool)。([#290](https://github.com/ZigaoWang/zigzag/pull/290))
 - 全屏时，显示边栏并打开“无边框页面”的情况下，网页碰到屏幕边缘的角现在是直角，不再是圆角、在右上角和右下角露出一小块边栏颜色的三角，没有打开网页或网页载入时最明显。在窗口里，网页的圆角跟着窗口本身的圆角走，不管 macOS 把窗口画得多圆。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
 - HLTV（hltv.org）不再显示博彩广告：网页两侧的广告栏、点一下就会打开博彩网站的背景图，以及标志旁边和侧栏里的横幅和赔率框都去掉了。新闻、比赛、比分和视频照常。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
 - 全屏时，跟着菜单栏一起出现的关闭、最小化和全屏按钮后面又有了一条栏，隐藏边栏时不会再直接浮在网页上。
