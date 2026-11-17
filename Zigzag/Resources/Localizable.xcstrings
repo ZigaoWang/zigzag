@@ -24602,7 +24602,7 @@
       }
     },
     "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s own are listed above; Safari’s come from its own store." : {
-      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
+      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari and Firefox’s downloaded extensions are listed.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -24659,6 +24659,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未签名"
+          }
+        }
+      }
+    },
+    "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s and Safari’s come from their own stores." : {
+      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展来自 Chrome 及基于它的浏览器，经由 Chrome 网上应用店。Firefox 和 Safari 的扩展来自它们各自的商店。"
           }
         }
       }

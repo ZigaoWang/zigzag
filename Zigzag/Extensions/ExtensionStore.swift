@@ -507,17 +507,6 @@ enum ExtensionStore {
         return (try? source.write(to: folder.appendingPathComponent(FirefoxManifest.workerFile), atomically: true, encoding: .utf8)) != nil
     }
 
-    /// Installs a Firefox package the person chose, in a profile and loads it there. Returns its name. Installs
-    /// directly, without the review sheet: a caller shows that first (as the import row and the file picker do,
-    /// through `ExtensionSheet.offer`), then calls this.
-    static func installXPI(at url: URL, in profile: Profile) async -> Result<String, InstallError> {
-        guard #available(macOS 15.4, *) else { return .failure(.download) }
-        switch await prepareInstallXPI(at: url) {
-        case .success(let prepared): return await finishInstall(prepared, in: profile)
-        case .failure(let error): return .failure(error)
-        }
-    }
-
     /// Installs a prepared package in a profile and loads it there. Returns its name.
     @available(macOS 15.4, *)
     static func finishInstall(_ prepared: PreparedInstall, in profile: Profile) async -> Result<String, InstallError> {

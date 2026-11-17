@@ -154,4 +154,26 @@ struct FirefoxImportTests {
         #expect(lines.contains("one@example.com"))
         #expect(SettingsView.packageKindDetail(chrome).isEmpty)
     }
+
+    /// The note under the choices tells the truth in every reachable state: it points at the Firefox rows only when
+    /// they are showing, and simply says where Firefox's extensions come from when none are. It is there at all only
+    /// with Firefox or Safari in the choice (Safari, or Firefox before its rows arrive).
+    @Test func theChoicesNotePointsAtFirefoxRowsOnlyWhenTheyAreShowing() {
+        let noRows = ImportView.choicesNote(signIns: false, otherStores: true, firefoxListed: false)
+        #expect(noRows.contains("Chrome Web Store"))
+        #expect(!noRows.contains("listed above"))
+
+        let rows = ImportView.choicesNote(signIns: false, otherStores: true, firefoxListed: true)
+        #expect(rows.contains("Chrome Web Store"))
+        #expect(rows.contains("listed above"))
+        #expect(rows != noRows)
+
+        // With no Firefox or Safari in the choice, there is no line to show, rows or not.
+        #expect(ImportView.choicesNote(signIns: false, otherStores: false, firefoxListed: false).isEmpty)
+        #expect(ImportView.choicesNote(signIns: false, otherStores: false, firefoxListed: true).isEmpty)
+
+        // Sign-ins keeps its sentence, either way.
+        let both = ImportView.choicesNote(signIns: true, otherStores: true, firefoxListed: false)
+        #expect(both.contains("Sign-ins") && both.contains("Chrome Web Store"))
+    }
 }

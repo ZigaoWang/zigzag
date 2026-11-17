@@ -129,6 +129,16 @@ struct FirefoxInstallTests {
         }
     }
 
+    /// Installs an `.xpi` through the store's own two steps, as every caller does: prepare, then finish once the
+    /// review sheet is confirmed (`ExtensionSheet.offer` in the app). A test convenience, so the store keeps one
+    /// install path and none of its own installs past the sheet.
+    private static func install(at url: URL, in profile: Profile) async -> Result<String, ExtensionStore.InstallError> {
+        switch await ExtensionStore.prepareInstallXPI(at: url) {
+        case .success(let prepared): return await ExtensionStore.finishInstall(prepared, in: profile)
+        case .failure(let error): return .failure(error)
+        }
+    }
+
     /// The staging folders an install makes while it works: none should outlive the call.
     private static func stagingFolders() -> Set<String> {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)) ?? []
@@ -141,7 +151,7 @@ struct FirefoxInstallTests {
         let work = try Workspace()
         defer { work.cleanUp() }
         let url = try work.xpiFile(try Self.xpi(Self.manifest("one@example.com", "1.2.3")))
-        let name = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        let name = try Self.installed(await Self.install(at: url, in: work.profile))
         #expect(name == "Test")
 
         let id = ExtensionStore.xpiID(forGeckoID: "one@example.com", data: Data())
@@ -159,8 +169,8 @@ struct FirefoxInstallTests {
     @Test func twoXPIsWithTheSameGeckoIDAreOneRecordAndTheVersionIsReplaced() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
-        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(try Self.xpi(Self.manifest("same@example.com", "1.0"))), in: work.profile))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(try Self.xpi(Self.manifest("same@example.com", "2.0"))), in: work.profile))
+        _ = try Self.installed(await Self.install(at: try work.xpiFile(try Self.xpi(Self.manifest("same@example.com", "1.0"))), in: work.profile))
+        _ = try Self.installed(await Self.install(at: try work.xpiFile(try Self.xpi(Self.manifest("same@example.com", "2.0"))), in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "same@example.com", data: Data())
         #expect(ExtensionStore.packageIDs == [id])
@@ -199,7 +209,7 @@ struct FirefoxInstallTests {
             "optional_permissions": ["*://*.other.test/*"],
             "content_security_policy": "script-src 'self'; object-src 'self'",
         ])))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        _ = try Self.installed(await Self.install(at: url, in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "hosts@example.com", data: Data())
         let folder = try #require(ExtensionStore.packageDirectory(for: id))
@@ -224,7 +234,7 @@ struct FirefoxInstallTests {
         let work = try Workspace()
         defer { work.cleanUp() }
         let url = try work.xpiFile(xpi)
-        let name = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        let name = try Self.installed(await Self.install(at: url, in: work.profile))
         #expect(name == "Rescued")
         let id = ExtensionStore.xpiID(forGeckoID: "rescued@example.com", data: Data())
         #expect(work.record(id)?.kind == "firefox")
@@ -252,7 +262,7 @@ struct FirefoxInstallTests {
         let work = try Workspace()
         defer { work.cleanUp() }
         let url = try work.xpiFile(try Self.xpi(Self.manifest("letters@example.com", "1.0.0b1")))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        _ = try Self.installed(await Self.install(at: url, in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "letters@example.com", data: Data())
         #expect(work.record(id)?.version == "1.0.0b1")
@@ -278,7 +288,7 @@ struct FirefoxInstallTests {
         let url = try work.xpiFile(try Self.xpi(Self.manifest("module@example.com", "3.0", [
             "manifest_version": 3, "background": background,
         ]), files: ["a.js": Data("let a = 1;".utf8), "b.js": Data("let b = 2;".utf8)]))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        _ = try Self.installed(await Self.install(at: url, in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "module@example.com", data: Data())
         let folder = try #require(ExtensionStore.packageDirectory(for: id))
@@ -297,7 +307,7 @@ struct FirefoxInstallTests {
         let url = try work.xpiFile(try Self.xpi(Self.manifest("classic@example.com", "3.0", [
             "manifest_version": 3, "background": ["scripts": ["a.js"]],
         ]), files: ["a.js": Data("let a = 1;".utf8)]))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        _ = try Self.installed(await Self.install(at: url, in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "classic@example.com", data: Data())
         let folder = try #require(ExtensionStore.packageDirectory(for: id))
@@ -341,8 +351,8 @@ struct FirefoxInstallTests {
         let work = try Workspace()
         defer { work.cleanUp() }
         let bytes = try Self.xpi(Self.manifest(nil, "1.0"))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(bytes), in: work.profile))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(bytes), in: work.profile))
+        _ = try Self.installed(await Self.install(at: try work.xpiFile(bytes), in: work.profile))
+        _ = try Self.installed(await Self.install(at: try work.xpiFile(bytes), in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: nil, data: bytes)
         #expect(ExtensionStore.packageIDs == [id])
@@ -360,7 +370,7 @@ struct FirefoxInstallTests {
             .init(name: "manifest.json", data: try XPIArchive.json(Self.manifest("signed@example.com", "1.0"))),
             .init(name: "META-INF/mozilla.rsa", data: Data("signature".utf8)),
         ]).data
-        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(bytes), in: work.profile))
+        _ = try Self.installed(await Self.install(at: try work.xpiFile(bytes), in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "signed@example.com", data: Data())
         #expect(work.record(id)?.hasSignature == true)
@@ -373,7 +383,7 @@ struct FirefoxInstallTests {
         let work = try Workspace()
         defer { work.cleanUp() }
         let url = try work.xpiFile(try Self.xpi(Self.manifest("keys@example.com", "1.0", ["background": ["scripts": ["a.js"]]])))
-        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        _ = try Self.installed(await Self.install(at: url, in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "keys@example.com", data: Data())
         let folder = try #require(ExtensionStore.packageDirectory(for: id))

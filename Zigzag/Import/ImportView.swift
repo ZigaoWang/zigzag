@@ -67,8 +67,13 @@ final class ImportView: NSView {
     /// come from.
     private static let signInsText = String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
                                             comment: "Note under the choices in the Import window, explaining Sign-ins.")
-    private static let extensionsText = String(localized: "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s own are listed above; Safari’s come from its own store.",
+    /// Where each browser's extensions come from, with no Firefox rows to point at: the truth whether Firefox is
+    /// found or not.
+    private static let extensionsText = String(localized: "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s and Safari’s come from their own stores.",
                                                comment: "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.")
+    /// The same, once the extensions Firefox already downloaded are listed: the line may point at them.
+    private static let extensionsListedText = String(localized: "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s own are listed above; Safari’s come from its own store.",
+                                                     comment: "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari and Firefox’s downloaded extensions are listed.")
     /// The extensions coming over, under the browsers, once there are any.
     private let extensionsRow = ImportExtensionsRow()
     /// The extensions Firefox already downloaded, one row each, under a heading of their own.
@@ -215,8 +220,8 @@ final class ImportView: NSView {
                 self.rowList.addSubview(row)
                 return row
             }
-            self.needsLayout = true
-            self.fitWindow()
+            // The note now has rows to point at: recompose it, and make room for them.
+            self.choicesChanged()
         }
     }
 
@@ -243,6 +248,15 @@ final class ImportView: NSView {
     /// With no browser found, a file is the only way in, so choosing one is the main button.
     private var choosesFileFirst: Bool { stage == .choose && sources.isEmpty }
 
+    /// The note under the choices, from what the pane is showing: what Sign-ins are, and, with Firefox or Safari
+    /// chosen too, where each browser's extensions come from. `firefoxListed`: the extensions Firefox already
+    /// downloaded are showing, so that line may point at them; with none, it says where they come from instead.
+    static func choicesNote(signIns: Bool, otherStores: Bool, firefoxListed: Bool) -> String {
+        let extensions = firefoxListed ? extensionsListedText : extensionsText
+        return [signIns ? signInsText : nil, otherStores ? extensions : nil].compactMap { $0 }
+            .reduce("") { Words.sentences($0, $1) }
+    }
+
     @objc private func choicesChanged() {
         func anyChosen(offering choice: ImportCoordinator.Choice) -> Bool { rows.contains { $0.isChosen && $0.source.offers.contains(choice) } }
         // Safari's stay behind (they need Full Disk Access), so Sign-ins shows only for a browser that has them.
@@ -265,7 +279,7 @@ final class ImportView: NSView {
         choiceLabel.isHidden = !showsChoices
         let extensionsPill = choiceButtons.first { $0.0 == .extensions }?.1
         let otherStores = extensionsPill.map { !$0.isHidden && $0.isOn } == true && rows.contains { $0.isChosen && !$0.source.offers.contains(.extensions) }
-        signInsNote.stringValue = [anySignIns ? Self.signInsText : nil, otherStores ? Self.extensionsText : nil].compactMap { $0 }.reduce("") { Words.sentences($0, $1) }
+        signInsNote.stringValue = Self.choicesNote(signIns: anySignIns, otherStores: otherStores, firefoxListed: !firefoxRows.isEmpty)
         emptyState.isHidden = !choosesFileFirst
         if stage == .choose {
             chooseFile.isHidden = choosesFileFirst
