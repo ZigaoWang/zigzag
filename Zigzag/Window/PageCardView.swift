@@ -203,14 +203,34 @@ final class PageCardView: NSView {
     /// match across the gap and the corner by the sidebar matches the window's.
     var isAttached = false { didSet { if isAttached != oldValue { needsLayout = true; refreshColors() } } }
 
-    /// The corner it rounds to: none edge to edge, the generous sheet's beside the sidebar, a card's floating.
-    private var cornerRadius: CGFloat { edgeToEdge ? 0 : isAttached ? Self.attachedRadius : Tokens.Radius.card }
+    /// The corner it rounds to: none edge to edge, the window's own beside the sidebar, a card's floating.
+    private var cornerRadius: CGFloat { edgeToEdge ? 0 : isAttached ? Self.attachedRadius(in: window) : Tokens.Radius.card }
     #if DEBUG
-    /// Debug builds: another attached radius, to compare (`pagecorner <points>`).
-    static var attachedRadius = Tokens.Radius.attached
-    #else
-    static let attachedRadius = Tokens.Radius.attached
+    /// Debug builds: another attached radius, to compare (`pagecorner <points>`, `pagecorner window` for the window's).
+    static var attachedRadiusOverride: CGFloat?
     #endif
+
+    /// Meeting the window's edges, the page's corners are the window's own curve, so where they meet the window's
+    /// corners no frame shows between the two: the radius macOS gives the window (larger on newer releases), and none
+    /// in full screen, where the window has no corners and a round one left a wedge of the frame at each (#283).
+    static func attachedRadius(in window: NSWindow?) -> CGFloat {
+        #if DEBUG
+        if let attachedRadiusOverride { return attachedRadiusOverride }
+        #endif
+        guard let window else { return Tokens.Radius.attached }
+        if window.styleMask.contains(.fullScreen) { return 0 }
+        return systemCornerRadius(of: window) ?? Tokens.Radius.attached
+    }
+
+    /// The window's corner radius as AppKit draws it. Not public API, so asked first; without it, nil.
+    private static let windowCornerRadius = NSSelectorFromString("_cornerRadius")
+    static func systemCornerRadius(of window: NSWindow) -> CGFloat? {
+        guard window.responds(to: windowCornerRadius),
+              let radius = (window.value(forKey: "_cornerRadius") as? NSNumber).map({ CGFloat($0.doubleValue) }),
+              radius.isFinite, radius >= 0, radius <= 64 else { return nil }
+        return radius
+    }
+
     /// Beside the sidebar the page rests on the frame as a sheet: a soft shadow falls onto the sidebar along its edge
     /// (the window's own edges hide it everywhere else); floating, the card keeps its whisper of shadow.
     private var castsShadow: Bool { !edgeToEdge }

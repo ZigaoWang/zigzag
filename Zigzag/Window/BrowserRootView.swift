@@ -908,7 +908,7 @@ final class BrowserRootView: SpaceFrameView {
             sidePanel.frame = frame
             // Shaped like a page pane: all four corners at its radius.
             let attached = sidebarVisible && Self.isBorderless
-            sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius : Tokens.Radius.card, squareRight: (false, false))
+            sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius(in: window) : Tokens.Radius.card, squareRight: (false, false))
         }
     }
 
@@ -952,7 +952,7 @@ final class BrowserRootView: SpaceFrameView {
         // A split view's seam between its two pages shows the frame: glass under all of it then.
         guard sidebarVisible, card.isAttached, !card.isHidden,
               extraCards.allSatisfy({ $0.isHidden || $0.alphaValue == 0 }) else { return bounds }
-        return Self.mirrored(NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + Tokens.Radius.attached * 2), height: bounds.height),
+        return Self.mirrored(NSRect(x: 0, y: 0, width: min(bounds.width, sidebarWidth + max(Tokens.Radius.attached, PageCardView.attachedRadius(in: window)) * 2), height: bounds.height),
                              in: bounds, if: sidebarOnRight)
     }
 

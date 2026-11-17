@@ -2628,7 +2628,7 @@ enum DebugBridge {
             let splits = controller.tabManager.splits.map { pair in pair.ids.compactMap { controller.tabManager.tab(with: $0)?.displayTitle.prefix(12).description }.joined(separator: "|") + " \(pair.shape.regions.map(\.rawValue))" }
             debugLog("pinstate pinned=\(pinned) favorites=\(favorites) onscreen=\(splits) tabs=\(controller.tabManager.currentTabs.map { $0.displayTitle.prefix(12) })")
         case "pagecorner":
-            if let r = Double(arg) { PageCardView.attachedRadius = r; controller.root.paneCards.forEach { $0.needsLayout = true } }
+            PageCardView.attachedRadiusOverride = Double(arg).map { CGFloat($0) }; controller.root.paneCards.forEach { $0.needsLayout = true }
         case "spacedepth":
             // spacedepth <0-1>: the current space's shade, the window's mode following it.
             if let depth = Double(arg) { Library.shared.setBrightness(depth, for: controller.tabManager.currentSpaceID) }

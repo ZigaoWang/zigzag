@@ -423,8 +423,9 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   surface's one prominent pill). Moving a tab to another window then only shows it there, and closing a window closes
   none of its tabs.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
-  meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
-  (`Radius.attached`), no outline, no shadow.
+  meeting the window's edges it meets the frame cleanly: all four corners at the window's radius as macOS draws it
+  (`PageCardView.attachedRadius`, `Radius.attached` where it can't be read), square in full screen, where the window
+  has no corners, no outline, no shadow.
 - **Reader** (`Reader.swift`): the article on the page card, scripts off, crossfading in and out in `crossfade`. One
   column of 34em (the text's own size, so about 70 characters a line; Narrow 29em, Wide 40em), and everything in it
   on that column's left edge: the header (the site's icon and name at 14pt, the title in the body face at 2.1em,
