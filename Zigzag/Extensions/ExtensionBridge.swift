@@ -248,12 +248,25 @@ enum ExtensionBridgeScript {
         Bundle.main.url(forResource: "webkit-differences", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
     }()
 
+    /// Zigzag's own version, which a Firefox extension asking runtime.getBrowserInfo is told as the browser's. Read as
+    /// the rest of the app reads it; empty where there is no bundle to read it from (the local test build).
+    static let firefoxAppVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+
     /// Firefox's Promise `browser` API, built over the Chrome surface (firefox-polyfill.js). It gates itself on the
     /// package's own manifest — a Firefox package carries browser_specific_settings or applications, a Chrome one
-    /// neither — since the prelude is injected per profile, not per package.
+    /// neither — since the prelude is injected per profile, not per package. The app's version is written in where
+    /// the polyfill reads it.
     static let firefoxPolyfill: String = {
-        Bundle.main.url(forResource: "firefox-polyfill", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        guard let url = Bundle.main.url(forResource: "firefox-polyfill", withExtension: "js"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
+        return text.replacingOccurrences(of: "__ZIGZAG_VERSION__", with: jsString(firefoxAppVersion))
     }()
+
+    /// A Swift string as a JavaScript string literal, for the values written into the scripts.
+    private static func jsString(_ text: String) -> String {
+        String(data: (try? JSONSerialization.data(withJSONObject: [text])) ?? Data(), encoding: .utf8)
+            .map { String($0.dropFirst().dropLast()) } ?? "\"\""
+    }
 
     /// Everything Zigzag puts before an extension's own code, after the bridge and the compatibility layer.
     static var afterCompatibility: String { differences + "\n" + surface + "\n" + firefoxPolyfill }

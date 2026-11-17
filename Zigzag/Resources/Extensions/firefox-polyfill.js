@@ -11,6 +11,9 @@
 // older applications), a Chrome one has neither. Without them, whatever `browser` was found is left exactly as it
 // was — an extension in a Chrome package keeps Chrome's API and its callbacks.
 (() => {
+  // The app's own version, written in by ExtensionBridge.swift: what a Firefox extension asking getBrowserInfo is
+  // told as the browser's version. Not the extension manifest's.
+  const appVersion = __ZIGZAG_VERSION__;
   let done = false;
   const start = () => {
     if (done) return true;
@@ -70,14 +73,32 @@
     // WebKit's events, left as they are: a listener added through `browser` is one WebKit and the bridge look for.
     const isEvent = (value) => value && typeof value === 'object' && typeof value.addListener === 'function';
 
-    // Firefox-only members. getBrowserInfo says what Firefox says of its browser here — Zigzag. Zigzag has no
-    // runtime.getPlatformInfo of its own: the surface's, where it stood one up, answers; only when there is none
-    // does Firefox's own answer stand.
-    const getBrowserInfo = () => Promise.resolve({ name: 'Zigzag', vendor: 'Lakeland97' });
+    // Firefox-only members. getBrowserInfo says what Firefox says of its browser here — Zigzag, at the app's own
+    // version.
+    //
+    // Zigzag has no runtime.getPlatformInfo of its own, and WebKit may not either. Where WebKit answers, its answer
+    // is made Firefox's. Where it doesn't, the API surface has already stood an `unavailable` stand-in in its place,
+    // and that stand-in answers with a rejection ("chrome.runtime.getPlatformInfo isn't available in Zigzag"). A
+    // rejection or a throw means WebKit has none, so Firefox's own answer stands — the surface's refusal must not
+    // reach the extension in its place.
+    const FIREFOX_PLATFORM = { os: 'mac', arch: 'aarch64' };
+    // Firefox's spelling of the machine's architecture (WebKit reports Chrome's).
+    const firefoxArch = (arch) => arch === 'arm64' ? 'aarch64'
+      : (arch === 'x86-64' || arch === 'x86_64') ? 'x86-64'
+      : typeof arch === 'string' && arch ? arch : FIREFOX_PLATFORM.arch;
+    const getBrowserInfo = () => Promise.resolve({ name: 'Zigzag', vendor: 'Lakeland97', version: appVersion, buildID: '' });
     const getPlatformInfo = () => {
+      const none = () => ({ os: FIREFOX_PLATFORM.os, arch: FIREFOX_PLATFORM.arch });
       const native = api.runtime.getPlatformInfo;
-      if (typeof native === 'function') return asPromise(native, api.runtime)();
-      return Promise.resolve({ os: 'mac' });
+      if (typeof native !== 'function') return Promise.resolve(none());
+      let answer;
+      try { answer = Reflect.apply(native, api.runtime, []); }
+      catch (e) { return Promise.resolve(none()); }
+      if (!answer || typeof answer.then !== 'function') return Promise.resolve(none());
+      return Promise.resolve(answer).then(
+        (info) => ({ os: info && typeof info.os === 'string' && info.os ? info.os : FIREFOX_PLATFORM.os,
+                     arch: firefoxArch(info && info.arch) }),
+        none);
     };
 
     // One namespace's facade: its own object, over `target`'s members. A member is read the first time it is asked

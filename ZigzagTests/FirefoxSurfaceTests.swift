@@ -12,16 +12,19 @@ import Testing
 /// loaded over it, and the timers are driven by hand.
 @MainActor
 struct FirefoxSurfaceTests {
-    /// A Firefox package's manifest, as firefox-polyfill.js reads it.
-    private static let firefoxManifest = "{ manifest_version: 3, permissions: ['history'], "
+    /// A Firefox package's manifest, as firefox-polyfill.js reads it. Its own `version` must not be mistaken for the
+    /// browser's, which getBrowserInfo reports.
+    private static let firefoxManifest = "{ manifest_version: 3, version: '9.9.9', permissions: ['history'], "
         + "browser_specific_settings: { gecko: { id: 'firefox@zigzag.test' } } }"
     /// The same package's manifest before `browser_specific_settings` (Mozilla's older key).
     private static let legacyManifest = "{ manifest_version: 2, permissions: ['history'], "
         + "applications: { gecko: { id: 'legacy@zigzag.test' } } }"
 
     /// A fake extension background: WebKit's `chrome`, a native bridge answering one call of `history`, and the bridge
-    /// itself, then the polyfill. `extra` runs before the bridge, as an extension page's own setup would.
-    private static func firefoxWorld(manifest: String, extra: String = "") -> JSContext {
+    /// itself. `extra` runs before the bridge, as an extension page's own setup would. With `surface`, the real
+    /// api-surface.js runs in its place — after the bridge, as in the prelude — so the stand-ins it fills are present
+    /// when the polyfill runs, exactly as they are in the app.
+    private static func firefoxWorld(manifest: String, extra: String = "", surface: Bool = false) -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -47,6 +50,7 @@ struct FirefoxSurfaceTests {
         """)
         context.evaluateScript(extra)
         context.evaluateScript(ExtensionBridgeScript.source)
+        if surface { context.evaluateScript(ExtensionBridgeScript.surface) }
         context.evaluateScript(ExtensionBridgeScript.firefoxPolyfill)
         return context
     }
@@ -130,21 +134,65 @@ struct FirefoxSurfaceTests {
         context.evaluateScript("var __info = null; browser.runtime.getBrowserInfo().then((info) => { __info = info; });")
         #expect(context.evaluateScript("__info.name")?.toString() == "Zigzag")
         #expect(context.evaluateScript("__info.vendor")?.toString() == "Lakeland97")
+        #expect(context.evaluateScript("__info.buildID")?.toString() == "")
+        // The app's version, as ExtensionBridge.swift writes it in — never the extension manifest's.
+        #expect(context.evaluateScript("__info.version")?.toString() == ExtensionBridgeScript.firefoxAppVersion)
+        #expect(context.evaluateScript("__info.version")?.toString() != "9.9.9")
     }
 
     @Test func getPlatformInfoFallsBackToFirefoxsWhenAbsent() {
-        // No chrome.runtime.getPlatformInfo: Firefox's own answer.
+        // No chrome.runtime.getPlatformInfo at all: Firefox's own answer, and no rejection.
         let context = Self.firefoxWorld(manifest: Self.firefoxManifest)
-        context.evaluateScript("var __platform = null; browser.runtime.getPlatformInfo().then((info) => { __platform = info; });")
+        context.evaluateScript("""
+        var __platform = null, __failed = false;
+        browser.runtime.getPlatformInfo().then((info) => { __platform = info; }, () => { __failed = true; });
+        """)
+        #expect(context.evaluateScript("__failed")?.toBool() == false)
         #expect(context.evaluateScript("__platform.os")?.toString() == "mac")
+        #expect(context.evaluateScript("__platform.arch")?.toString() == "aarch64")
     }
 
-    @Test func theSurfacesPlatformInfoIsUsedWhenThereIsOne() {
-        let context = Self.firefoxWorld(manifest: Self.firefoxManifest,
-                                        extra: "chrome.runtime.getPlatformInfo = () => Promise.resolve({ os: 'linux', arch: 'x86-64' });")
-        context.evaluateScript("var __platform = null; browser.runtime.getPlatformInfo().then((info) => { __platform = info; });")
-        #expect(context.evaluateScript("__platform.os")?.toString() == "linux")
-        #expect(context.evaluateScript("__platform.arch")?.toString() == "x86-64")
+    @Test func aRealPlatformAnswerIsMadeFirefoxs() {
+        let arm = Self.firefoxWorld(manifest: Self.firefoxManifest,
+                                    extra: "chrome.runtime.getPlatformInfo = () => Promise.resolve({ os: 'mac', arch: 'arm64' });")
+        arm.evaluateScript("var __platform = null; browser.runtime.getPlatformInfo().then((info) => { __platform = info; });")
+        #expect(arm.evaluateScript("__platform.os")?.toString() == "mac")
+        #expect(arm.evaluateScript("__platform.arch")?.toString() == "aarch64")
+
+        let intel = Self.firefoxWorld(manifest: Self.firefoxManifest,
+                                      extra: "chrome.runtime.getPlatformInfo = () => Promise.resolve({ os: 'mac', arch: 'x86_64' });")
+        intel.evaluateScript("var __platform = null; browser.runtime.getPlatformInfo().then((info) => { __platform = info; });")
+        #expect(intel.evaluateScript("__platform.arch")?.toString() == "x86-64")
+    }
+
+    /// api-surface.js runs before the polyfill in the real prelude and fills chrome.runtime.getPlatformInfo with its
+    /// `unavailable` stand-in, which answers with a rejection. browser.runtime.getPlatformInfo must still resolve
+    /// Firefox's answer — the stand-in's refusal must not reach the extension — while chrome's own member refuses.
+    @Test func theRealSurfaceDoesNotRefuseThePlatformAnswer() {
+        let context = Self.firefoxWorld(manifest: Self.firefoxManifest, surface: true)
+        #expect(context.evaluateScript("globalThis.__zigzagSurface === true")?.toBool() == true)
+        #expect(context.evaluateScript("typeof chrome.runtime.getPlatformInfo")?.toString() == "function")
+        context.evaluateScript("""
+        var __nativeFailed = false;
+        chrome.runtime.getPlatformInfo().then(() => {}, () => { __nativeFailed = true; });
+        var __platform = null, __failed = false, __info = null;
+        browser.runtime.getPlatformInfo().then((info) => { __platform = info; }, () => { __failed = true; });
+        browser.runtime.getBrowserInfo().then((info) => { __info = info; });
+        """)
+        #expect(context.evaluateScript("__nativeFailed")?.toBool() == true)
+        #expect(context.evaluateScript("__failed")?.toBool() == false)
+        #expect(context.evaluateScript("__platform.os")?.toString() == "mac")
+        #expect(context.evaluateScript("__platform.arch")?.toString() == "aarch64")
+        #expect(context.evaluateScript("__info.name")?.toString() == "Zigzag")
+        #expect(context.evaluateScript("__info.vendor")?.toString() == "Lakeland97")
+    }
+
+    @Test func anAbsentMemberStaysUndefined() {
+        // Feature detection reads undefined through `browser`: nothing Zigzag doesn't have is invented.
+        let context = Self.firefoxWorld(manifest: Self.firefoxManifest)
+        #expect(context.evaluateScript("typeof browser.runtime.getPackageDirectoryEntry")?.toString() == "undefined")
+        #expect(context.evaluateScript("'getPackageDirectoryEntry' in browser.runtime")?.toBool() == false)
+        #expect(context.evaluateScript("browser.sidebarAction === undefined")?.toBool() == true)
     }
 
     // MARK: Events
