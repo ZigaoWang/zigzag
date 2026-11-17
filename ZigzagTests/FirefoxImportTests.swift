@@ -1,0 +1,152 @@
+import Foundation
+import Testing
+import UniformTypeIdentifiers
+@testable import Zigzag
+
+/// Importing the extensions Firefox already downloaded: the scan reads each `.xpi`'s manifest where it lies, offers
+/// the ones it finds, and installs one through the store's own path — the same package checks, the same record kind.
+/// Every test points the scan at a profile root of its own, so no run opens the person's Firefox.
+@MainActor
+@Suite(.serialized)
+struct FirefoxImportTests {
+    /// A profile root and a store of their own: nothing read or written here lands in the person's Library.
+    private final class Work {
+        let folder: URL
+        let root: URL
+        let storeRoot: URL
+        let profile: Profile
+
+        init() throws {
+            folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-firefox-import-\(UUID().uuidString)")
+            root = folder.appendingPathComponent("Profiles", isDirectory: true)
+            storeRoot = folder.appendingPathComponent("Extensions", isDirectory: true)
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: storeRoot, withIntermediateDirectories: true)
+            profile = Profile(id: UUID())
+            FirefoxImporter.rootOverride = root
+            ExtensionStore.rootOverride = storeRoot
+            ExtensionStore.forgetWhatWasRead()
+        }
+
+        /// A profile folder with its `extensions` folder, and the .xpi bytes given written into it.
+        @discardableResult
+        func profile(_ name: String, xpis: [(name: String, data: Data)]) throws -> URL {
+            let profile = root.appendingPathComponent(name, isDirectory: true)
+            let extensions = profile.appendingPathComponent("extensions", isDirectory: true)
+            try FileManager.default.createDirectory(at: extensions, withIntermediateDirectories: true)
+            for xpi in xpis { try xpi.data.write(to: extensions.appendingPathComponent(xpi.name)) }
+            return profile
+        }
+
+        func cleanUp() {
+            FirefoxImporter.rootOverride = nil
+            ExtensionStore.rootOverride = nil
+            ExtensionStore.forgetWhatWasRead()
+            try? FileManager.default.removeItem(at: folder)
+            try? FileManager.default.removeItem(at: profile.folder)
+        }
+    }
+
+    private static func installed(_ result: Result<String, ExtensionStore.InstallError>) throws -> String {
+        switch result {
+        case .success(let name): return name
+        case .failure(let error): throw error
+        }
+    }
+
+    @Test func aProfileWithAnXPIIsFoundWithItsNameVersionAndGeckoID() throws {
+        let work = try Work()
+        defer { work.cleanUp() }
+        let xpi = try XPIArchive.xpi(XPIArchive.manifest("a@b", "1.2.3", ["name": "Test Extension"]))
+        try work.profile("abc.default", xpis: [("a@b.xpi", xpi)])
+
+        let found = FirefoxImporter.found(in: work.root)
+        #expect(found.count == 1)
+        let one = try #require(found.first)
+        #expect(one.name == "Test Extension")
+        #expect(one.version == "1.2.3")
+        #expect(one.firefoxID == "a@b")
+        #expect(one.path.lastPathComponent == "a@b.xpi")
+        #expect(one.source == "abc.default")
+    }
+
+    /// Only `.xpi` files in a profile's `extensions` folder count. A file of another kind, a folder, and a package
+    /// whose zip is damaged are all left out — the damaged one is skipped, not thrown, so the scan never stops.
+    @Test func filesThatAreNotXPIsAreIgnoredAndAMalformedXPIIsSkipped() throws {
+        let work = try Work()
+        defer { work.cleanUp() }
+        let profile = try work.profile("abc.default", xpis: [
+            ("good.xpi", try XPIArchive.xpi(XPIArchive.manifest("good@example.com", "1.0"))),
+            ("broken.xpi", Data("this is not a zip at all".utf8)),
+            ("notes.txt", Data("just a note".utf8)),
+        ])
+        try FileManager.default.createDirectory(at: profile.appendingPathComponent("extensions/loose.xpi", isDirectory: true),
+                                                withIntermediateDirectories: true)
+
+        // Reading one profile alone skips the broken one without throwing.
+        let one = FirefoxImporter.found(inProfile: profile)
+        #expect(one.map(\.firefoxID) == ["good@example.com"])
+        // And the whole scan is unaffected by it.
+        let found = FirefoxImporter.found(in: work.root)
+        #expect(found.map(\.name) == ["Test"])
+        #expect(found.map(\.firefoxID) == ["good@example.com"])
+    }
+
+    /// The same gecko ID is the same extension, however many profiles hold it: one entry, and the one from the first
+    /// profile by name wins.
+    @Test func twoProfilesWithTheSameGeckoIDGiveOneEntryAndTheFirstProfileWins() throws {
+        let work = try Work()
+        defer { work.cleanUp() }
+        try work.profile("b.work", xpis: [("same.xpi", try XPIArchive.xpi(XPIArchive.manifest("same@example.com", "1.0", ["name": "From B"])))])
+        try work.profile("a.personal", xpis: [("same.xpi", try XPIArchive.xpi(XPIArchive.manifest("same@example.com", "2.0", ["name": "From A"])))])
+
+        let found = FirefoxImporter.found(in: work.root)
+        #expect(found.count == 1)
+        #expect(found.first?.source == "a.personal")
+        #expect(found.first?.name == "From A")
+        #expect(found.first?.version == "2.0")
+    }
+
+    /// What an import row does when its Add is pressed: the extension goes in through the store's own install path,
+    /// and the record it leaves says Firefox with its gecko ID.
+    @Test func theImportRowInstallsThroughInstallXPIAndRecordsFirefox() async throws {
+        let work = try Work()
+        defer { work.cleanUp() }
+        try work.profile("abc.default", xpis: [("one.xpi", try XPIArchive.xpi(XPIArchive.manifest("one@example.com", "1.0")))])
+
+        let found = try #require(FirefoxImporter.found(in: work.root).first)
+        let name = try Self.installed(await FirefoxImporter.install(found, in: work.profile))
+        #expect(name == "Test")
+
+        let id = ExtensionStore.xpiID(forGeckoID: "one@example.com", at: found.path)
+        let record = try #require(ExtensionStore.package(id))
+        #expect(record.kind == "firefox")
+        #expect(record.firefoxID == "one@example.com")
+    }
+
+    /// The extension file picker still offers a folder, and now offers a Firefox package as well as Chrome's — the
+    /// one Chrome install path and the one Firefox one.
+    @Test func theExtensionFilePickerAllowsXPIAsWellAsCRXAndFolders() {
+        let types = ExtensionFilePicker.types
+        #expect(types.contains(.folder))
+        let extensions = types.compactMap(\.preferredFilenameExtension)
+        #expect(extensions.contains("crx"))
+        #expect(extensions.contains("xpi"))
+    }
+
+    /// A Firefox package's row in Settings › Extensions says it is one and names the gecko ID it has in Firefox. A
+    /// Chrome package's row says neither.
+    @Test func aFirefoxRowNamesFirefoxAndItsGeckoIDAndAChromeRowDoesNot() throws {
+        let work = try Work()
+        defer { work.cleanUp() }
+        let firefox = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let chrome = "abcdefghijklmnopabcdefghijklmnop"
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0", kind: "firefox", firefoxID: "one@example.com"), for: firefox)
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0"), for: chrome)
+
+        let lines = SettingsView.packageKindDetail(firefox)
+        #expect(lines.contains("Firefox"))
+        #expect(lines.contains("one@example.com"))
+        #expect(SettingsView.packageKindDetail(chrome).isEmpty)
+    }
+}

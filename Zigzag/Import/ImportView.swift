@@ -18,6 +18,9 @@ final class ImportView: NSView {
             guard oldValue != stage else { return }
             // A row's Try Again waits while anything is importing.
             rows.forEach { $0.fixesEnabled = stage != .importing }
+            // The Firefox extensions are for choosing; once importing they give way like the rest.
+            firefoxRows.forEach { $0.isHidden = stage != .choose }
+            firefoxHeading.isHidden = stage != .choose
             onStageChange?(stage)
         }
     }
@@ -68,6 +71,10 @@ final class ImportView: NSView {
                                                comment: "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.")
     /// The extensions coming over, under the browsers, once there are any.
     private let extensionsRow = ImportExtensionsRow()
+    /// The extensions Firefox already downloaded, one row each, under a heading of their own.
+    private let firefoxHeading = ImportSectionHeading(String(localized: "Extensions in Firefox",
+                                                             comment: "Heading over the extensions Firefox already downloaded, in the Import window."))
+    private var firefoxRows: [FirefoxExtensionRow] = []
     /// The one question before they're added, in place of the list while it's asked.
     private var review: ImportExtensionsReview?
     private var reviewAnswer: CheckedContinuation<Bool, Never>?
@@ -176,8 +183,48 @@ final class ImportView: NSView {
             rowList.addSubview(row)
             return row
         }
+        loadFirefoxExtensions()
         choicesChanged()
         fitWindow()
+    }
+
+    /// The extensions Firefox already downloaded, offered beside the browsers. Only in its own window, and only
+    /// when Firefox is one of the browsers found, so a run without one never opens its profiles.
+    private func loadFirefoxExtensions() {
+        firefoxRows.forEach { $0.removeFromSuperview() }
+        firefoxRows = []
+        firefoxHeading.removeFromSuperview()
+        guard presentation == .window,
+              sources.contains(where: { if case .firefox = $0.kind { true } else { false } }) else { return }
+        let found = FirefoxImporter.found()
+        guard !found.isEmpty else { return }
+        rowList.addSubview(firefoxHeading)
+        firefoxRows = found.map { one in
+            let row = FirefoxExtensionRow(one)
+            row.onAdd = { [weak self, weak row] in
+                guard let self, let row else { return }
+                self.addFirefox(one, row: row)
+            }
+            rowList.addSubview(row)
+            return row
+        }
+    }
+
+    /// Adds a Firefox extension through the store's own path: verified, offered with the store's own sheet, then
+    /// installed. The row says what happened; declining leaves it as it was.
+    private func addFirefox(_ found: FirefoxImporter.Found, row: FirefoxExtensionRow) {
+        guard #available(macOS 15.4, *), let host = window?.contentView else { return }
+        let profile = target
+        row.beginWorking()
+        Task { @MainActor in
+            switch await ExtensionStore.prepareInstallXPI(at: found.path) {
+            case .failure(let error): row.finished(.failure(error))
+            case .success(let prepared):
+                ExtensionSheet.offer(prepared, in: profile, over: host,
+                                     onInstalled: { result in row.finished(result) },
+                                     onDeclined: { row.returned() })
+            }
+        }
     }
 
     /// Whether there are browsers to choose from and what to bring from them: not with none found, nor once importing.
@@ -563,6 +610,8 @@ final class ImportView: NSView {
         }
         let subtitleHeight = ceil(subtitle.sizeThatFits(NSSize(width: width, height: 200)).height)
         var items: [any ImportListItem] = rows
+        if !firefoxRows.isEmpty { items.append(firefoxHeading) }
+        items.append(contentsOf: firefoxRows)
         items.append(extensionsRow)
         if let review { items.append(review) }
         let visibleRows = items.filter { !$0.isHidden && $0.superview === rowList }

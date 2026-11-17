@@ -2,6 +2,69 @@ import Foundation
 import Testing
 @testable import Zigzag
 
+/// An XPI made byte by byte: stored entries, then the central index and its end record. Shared by every test that
+/// needs one — `FirefoxInstallTests` and `FirefoxImportTests` — so there is one zip writer, not a copy per file. The
+/// local gate compiles the requested suites together (and CI compiles the whole target), so a declaration here
+/// reaches the other suites.
+nonisolated struct XPIArchive {
+    struct Entry {
+        var name: String
+        var data = Data()
+        var mode: UInt32 = 0o100644
+    }
+
+    var entries: [Entry]
+
+    var data: Data {
+        var archive = Data(), index = Data()
+        func u16(_ value: UInt16, into bytes: inout Data) { withUnsafeBytes(of: value.littleEndian) { bytes.append(contentsOf: $0) } }
+        func u32(_ value: UInt32, into bytes: inout Data) { withUnsafeBytes(of: value.littleEndian) { bytes.append(contentsOf: $0) } }
+        for entry in entries {
+            let name = Data(entry.name.utf8), crc = PackageZip.crc32([UInt8](entry.data)), offset = UInt32(archive.count)
+            u32(0x0403_4B50, into: &archive); u16(20, into: &archive); u16(0, into: &archive); u16(0, into: &archive)
+            u16(0, into: &archive); u16(0, into: &archive); u32(crc, into: &archive)
+            u32(UInt32(entry.data.count), into: &archive); u32(UInt32(entry.data.count), into: &archive)
+            u16(UInt16(name.count), into: &archive); u16(0, into: &archive); archive.append(name); archive.append(entry.data)
+            u32(0x0201_4B50, into: &index); u16(0x0314, into: &index); u16(20, into: &index); u16(0, into: &index)
+            u16(0, into: &index); u16(0, into: &index); u16(0, into: &index); u32(crc, into: &index)
+            u32(UInt32(entry.data.count), into: &index); u32(UInt32(entry.data.count), into: &index)
+            u16(UInt16(name.count), into: &index); u16(0, into: &index); u16(0, into: &index)
+            u16(0, into: &index); u16(0, into: &index); u32(entry.mode << 16, into: &index); u32(offset, into: &index)
+            index.append(name)
+        }
+        let start = UInt32(archive.count)
+        archive.append(index)
+        u32(0x0605_4B50, into: &archive); u16(0, into: &archive); u16(0, into: &archive)
+        u16(UInt16(entries.count), into: &archive); u16(UInt16(entries.count), into: &archive)
+        u32(UInt32(index.count), into: &archive); u32(start, into: &archive); u16(0, into: &archive)
+        return archive
+    }
+
+    static func json(_ fields: [String: Any]) throws -> Data {
+        try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
+    }
+
+    /// An XPI whose root manifest is `manifest`, with any of its files beside it.
+    static func xpi(_ manifest: [String: Any], files: [String: Data] = [:]) throws -> Data {
+        var entries = [Entry(name: "manifest.json", data: try json(manifest))]
+        for (name, data) in files.sorted(by: { $0.key < $1.key }) { entries.append(.init(name: name, data: data)) }
+        return XPIArchive(entries: entries).data
+    }
+
+    /// An XPI whose manifest is the bytes given: for a manifest WebKit can't read, whatever JSON sees in it.
+    static func xpi(manifestData: Data) -> Data {
+        XPIArchive(entries: [.init(name: "manifest.json", data: manifestData)]).data
+    }
+
+    /// A Firefox manifest, with whatever else the test needs.
+    static func manifest(_ geckoID: String?, _ version: String, _ extra: [String: Any] = [:]) -> [String: Any] {
+        var fields: [String: Any] = ["manifest_version": 2, "name": "Test", "version": version]
+        if let geckoID { fields["browser_specific_settings"] = ["gecko": ["id": geckoID]] }
+        for (key, value) in extra { fields[key] = value }
+        return fields
+    }
+}
+
 /// Installing a Firefox package (.xpi): it gets a record of its own — its kind, its gecko ID and the opaque ID it
 /// installs as — the package is unpacked as a Chrome one is, and its manifest is made into the shape WebKit loads
 /// before anything is handed over.
@@ -46,64 +109,14 @@ struct FirefoxInstallTests {
 
     // MARK: Fixtures
 
-    /// An XPI made byte by byte: stored entries, then the central index and its end record.
-    private struct TestXPI {
-        struct Entry {
-            var name: String
-            var data = Data()
-            var mode: UInt32 = 0o100644
-        }
-
-        var entries: [Entry]
-
-        var data: Data {
-            var archive = Data(), index = Data()
-            func u16(_ value: UInt16, into bytes: inout Data) { withUnsafeBytes(of: value.littleEndian) { bytes.append(contentsOf: $0) } }
-            func u32(_ value: UInt32, into bytes: inout Data) { withUnsafeBytes(of: value.littleEndian) { bytes.append(contentsOf: $0) } }
-            for entry in entries {
-                let name = Data(entry.name.utf8), crc = PackageZip.crc32([UInt8](entry.data)), offset = UInt32(archive.count)
-                u32(0x0403_4B50, into: &archive); u16(20, into: &archive); u16(0, into: &archive); u16(0, into: &archive)
-                u16(0, into: &archive); u16(0, into: &archive); u32(crc, into: &archive)
-                u32(UInt32(entry.data.count), into: &archive); u32(UInt32(entry.data.count), into: &archive)
-                u16(UInt16(name.count), into: &archive); u16(0, into: &archive); archive.append(name); archive.append(entry.data)
-                u32(0x0201_4B50, into: &index); u16(0x0314, into: &index); u16(20, into: &index); u16(0, into: &index)
-                u16(0, into: &index); u16(0, into: &index); u16(0, into: &index); u32(crc, into: &index)
-                u32(UInt32(entry.data.count), into: &index); u32(UInt32(entry.data.count), into: &index)
-                u16(UInt16(name.count), into: &index); u16(0, into: &index); u16(0, into: &index)
-                u16(0, into: &index); u16(0, into: &index); u32(entry.mode << 16, into: &index); u32(offset, into: &index)
-                index.append(name)
-            }
-            let start = UInt32(archive.count)
-            archive.append(index)
-            u32(0x0605_4B50, into: &archive); u16(0, into: &archive); u16(0, into: &archive)
-            u16(UInt16(entries.count), into: &archive); u16(UInt16(entries.count), into: &archive)
-            u32(UInt32(index.count), into: &archive); u32(start, into: &archive); u16(0, into: &archive)
-            return archive
-        }
-    }
-
-    private static func json(_ fields: [String: Any]) throws -> Data {
-        try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
-    }
-
-    /// An XPI whose root manifest is `manifest`, with any of its files beside it.
     private static func xpi(_ manifest: [String: Any], files: [String: Data] = [:]) throws -> Data {
-        var entries = [TestXPI.Entry(name: "manifest.json", data: try json(manifest))]
-        for (name, data) in files.sorted(by: { $0.key < $1.key }) { entries.append(.init(name: name, data: data)) }
-        return TestXPI(entries: entries).data
+        try XPIArchive.xpi(manifest, files: files)
     }
 
-    /// An XPI whose manifest is the bytes given: for a manifest WebKit can't read, whatever JSON sees in it.
-    private static func xpi(manifestData: Data) -> Data {
-        TestXPI(entries: [.init(name: "manifest.json", data: manifestData)]).data
-    }
+    private static func xpi(manifestData: Data) -> Data { XPIArchive.xpi(manifestData: manifestData) }
 
-    /// A Firefox manifest, with whatever else the test needs.
     private static func manifest(_ geckoID: String?, _ version: String, _ extra: [String: Any] = [:]) -> [String: Any] {
-        var fields: [String: Any] = ["manifest_version": 2, "name": "Test", "version": version]
-        if let geckoID { fields["browser_specific_settings"] = ["gecko": ["id": geckoID]] }
-        for (key, value) in extra { fields[key] = value }
-        return fields
+        XPIArchive.manifest(geckoID, version, extra)
     }
 
     private static func installed(_ result: Result<String, ExtensionStore.InstallError>) throws -> String {

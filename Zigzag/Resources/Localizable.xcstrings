@@ -24534,6 +24534,83 @@
           }
         }
       }
+    },
+    "Extensions in Firefox" : {
+      "comment" : "Heading over the extensions Firefox already downloaded, in the Import window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 里的扩展"
+          }
+        }
+      }
+    },
+    "Firefox" : {
+      "comment" : "Under an extension's name in Settings › Extensions: it is a Firefox extension (.xpi).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox"
+          }
+        }
+      }
+    },
+    "Firefox profile %@" : {
+      "comment" : "On a Firefox extension in the Import window: the Firefox profile folder it was found in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 个人资料 %@"
+          }
+        }
+      }
+    },
+    "Firefox extension, version %@" : {
+      "comment" : "Under the title of the sheet that asks before adding a Firefox extension (.xpi).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 扩展，版本 %@"
+          }
+        }
+      }
+    },
+    "Choose a folder that holds the extension’s manifest.json, or a Firefox extension (.xpi) file." : {
+      "comment" : "Message of the panel that installs an extension from a folder or a .xpi file. manifest.json and .xpi are file names.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一个包含扩展 manifest.json 的文件夹，或一个 Firefox 扩展（.xpi）文件。"
+          }
+        }
+      }
+    },
+    "Couldn’t add this extension" : {
+      "comment" : "Title of the notice when a picked extension file can't be added.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法添加这个扩展"
+          }
+        }
+      }
+    },
+    "Install from File…" : {
+      "comment" : "Button in Settings › Extensions: installs an extension from a folder or a package file (.crx, .xpi) on this Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从文件安装…"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
