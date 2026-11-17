@@ -172,15 +172,54 @@ struct FirefoxInstallTests {
         #expect(saved.kind == "firefox" && saved.firefoxID == "a@b")
     }
 
-    @Test func anXPIWebKitCannotReadFailsUnsupportedAndLeavesNoStaging() async throws {
+    /// An MV3 Firefox manifest keeps host patterns in `permissions` and its policy as one string: exactly what
+    /// normalization exists to rescue. It installs, and the copy on disk is the normalized one.
+    @Test func anMV3XPIWithHostsInPermissionsAndAStringPolicyInstallsNormalized() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
-        // A manifest JSONSerialization reads (so the package itself is sound) but WebKit's parser can't: it isn't
-        // UTF-8, and has no byte order mark to say so.
-        let manifestData = try #require(#"{"manifest_version":3,"name":"Broken","version":"1.0"}"#.data(using: .utf16LittleEndian))
+        let url = try work.xpiFile(try Self.xpi(Self.manifest("hosts@example.com", "2.0", [
+            "manifest_version": 3,
+            "permissions": ["storage", "https://example.com/*"],
+            "optional_permissions": ["*://*.other.test/*"],
+            "content_security_policy": "script-src 'self'; object-src 'self'",
+        ])))
+        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+
+        let id = ExtensionStore.xpiID(forGeckoID: "hosts@example.com", at: url)
+        let folder = try #require(ExtensionStore.packageDirectory(for: id))
+        let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
+        // The host patterns moved where WebKit reads site access; the API permission stayed where it was.
+        #expect(onDisk["permissions"] as? [String] == ["storage"])
+        #expect(onDisk["host_permissions"] as? [String] == ["https://example.com/*"])
+        #expect(onDisk["optional_permissions"] as? [String] == [])
+        #expect(onDisk["optional_host_permissions"] as? [String] == ["*://*.other.test/*"])
+        // Firefox's one-string policy became the shape WebKit expects.
+        let policy = try #require(onDisk["content_security_policy"] as? [String: Any])
+        #expect(policy["extension_pages"] as? String == "script-src 'self'; object-src 'self'")
+    }
+
+    /// A package's own manifest can be one WebKit can't read as it came (not UTF-8); the normalized copy we write is
+    /// what WebKit loads, so it installs. Verifying before normalization would have refused it.
+    @Test func aManifestWebKitCannotReadAsItCameIsRescuedByNormalization() async throws {
+        let manifestData = try #require(#"{"manifest_version":2,"name":"Rescued","version":"1.0","browser_specific_settings":{"gecko":{"id":"rescued@example.com"}}}"#.data(using: .utf16LittleEndian))
         let xpi = Self.xpi(manifestData: manifestData)
-        #expect(try XPIPackage(xpi).manifest["name"] as? String == "Broken")
+        // The package itself is sound: its manifest is JSON, just not in an encoding WebKit reads.
+        #expect(try XPIPackage(xpi).manifest["name"] as? String == "Rescued")
+        let work = try Workspace()
+        defer { work.cleanUp() }
         let url = try work.xpiFile(xpi)
+        let name = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+        #expect(name == "Rescued")
+        let id = ExtensionStore.xpiID(forGeckoID: "rescued@example.com", at: url)
+        #expect(work.record(id)?.kind == "firefox")
+    }
+
+    /// A manifest version WebKit doesn't run: its parser takes the manifest, but nothing here implements it, so the
+    /// package is refused and nothing is left staged.
+    @Test func anXPIWhoseManifestWebKitCannotRunFailsUnsupportedAndLeavesNoStaging() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let url = try work.xpiFile(try Self.xpi(Self.manifest("future@example.com", "1.0", ["manifest_version": 5])))
 
         let before = Self.stagingFolders()
         let result = await ExtensionStore.prepareInstallXPI(at: url)
@@ -189,6 +228,31 @@ struct FirefoxInstallTests {
             return
         }
         #expect(Self.stagingFolders() == before)
+    }
+
+    /// Firefox versions may carry letters (`1.0.0b1`), which Chrome's grammar refuses. A package isn't damaged over
+    /// one: it installs, and the version it declares is the one recorded.
+    @Test func aFirefoxVersionWithLettersInstallsAndIsRecorded() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let url = try work.xpiFile(try Self.xpi(Self.manifest("letters@example.com", "1.0.0b1")))
+        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+
+        let id = ExtensionStore.xpiID(forGeckoID: "letters@example.com", at: url)
+        #expect(work.record(id)?.version == "1.0.0b1")
+        let versions = try FileManager.default.contentsOfDirectory(atPath: work.root.appendingPathComponent(id).appendingPathComponent("versions").path)
+        #expect(versions == ["1.0.0b1"])
+    }
+
+    /// A Firefox version names the folder it's kept in, so it still has to be a safe name: no separators, no
+    /// climbing out, not empty, not enormous.
+    @Test func aFirefoxVersionMustStillBeASafeFolderName() {
+        for good in ["1.0", "1.0.0b1", "2024.1-beta", "3.0.0.0", "1.2.3+build"] {
+            #expect(ExtensionStore.isValidFirefoxVersion(good), "\(good)")
+        }
+        for bad in ["", ".", "..", "a/b", "a\\b", "a..b", ".hidden", "a b", String(repeating: "1", count: 65)] {
+            #expect(!ExtensionStore.isValidFirefoxVersion(bad), "\(bad)")
+        }
     }
 
     @Test func anMV3ModuleBackgroundGetsAnImportingWorkerOnDisk() async throws {

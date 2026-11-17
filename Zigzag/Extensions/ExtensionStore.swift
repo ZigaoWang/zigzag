@@ -417,8 +417,8 @@ enum ExtensionStore {
     }
 
     /// Prepares a Firefox package (.xpi) the person chose: read with the package rules, unpacked to a staging
-    /// folder, its manifest written for WebKit, and handed to WebKit to verify, without installing it. The kind and
-    /// gecko ID come with it, for the record an install keeps.
+    /// folder, its manifest written into the shape WebKit loads, and only then handed to WebKit to verify, without
+    /// installing it. The kind and gecko ID come with it, for the record an install keeps.
     @available(macOS 15.4, *)
     static func prepareInstallXPI(at url: URL) async -> Result<PreparedInstall, InstallError> {
         guard let data = try? Data(contentsOf: url), let package = try? XPIPackage(data) else { return .failure(.unpack) }
@@ -430,19 +430,27 @@ enum ExtensionStore {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unpack)
         }
-        // WebKit has to be able to read the package's own manifest: one it can't read (some tools write one that
-        // isn't UTF-8) won't run here whatever we'd write over it.
-        guard (try? await WKWebExtension(resourceBaseURL: staging)) != nil else {
-            try? FileManager.default.removeItem(at: staging)
-            return .failure(.unsupported)
-        }
-        // The copy WebKit loads is this one, rewritten into the shape it knows; the package's own is never touched.
+        // The copy WebKit loads is one written for it. The package's own manifest is never touched, and one WebKit
+        // couldn't read as it came (not UTF-8, say) is rescued by the rewrite rather than refused.
         let normalized = FirefoxManifest.normalized(package.manifest)
-        guard let version = normalized["version"] as? String, isValidVersion(version),
-              writeManifest(normalized, in: staging), writeFirefoxWorker(in: staging, background: normalized["background"] as? [String: Any]) else {
+        // Firefox's own version grammar, not Chrome's: a package with letters in its version isn't damaged. The
+        // version names the folder it's kept in, so it still has to be a safe name.
+        guard let version = normalized["version"] as? String, isValidFirefoxVersion(version) else {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unpack)
         }
+        // WebKit runs Manifest V2 and V3. A package declaring another version is not one it can run, whatever its
+        // parser makes of the manifest.
+        guard [2, 3].contains((normalized["manifest_version"] as? NSNumber)?.intValue ?? 2) else {
+            try? FileManager.default.removeItem(at: staging)
+            return .failure(.unsupported)
+        }
+        guard writeManifest(normalized, in: staging),
+              writeFirefoxWorker(in: staging, background: normalized["background"] as? [String: Any]) else {
+            try? FileManager.default.removeItem(at: staging)
+            return .failure(.unpack)
+        }
+        // The rewritten copy is what WebKit will load: if it can't read it, the package won't run here.
         guard let ext = try? await WKWebExtension(resourceBaseURL: staging) else {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unsupported)
@@ -747,6 +755,16 @@ enum ExtensionStore {
         return (1...4).contains(parts.count) && parts.allSatisfy { part in
             (1...5).contains(part.count) && part.allSatisfy { $0.isASCII && $0.isNumber } && (Int(part) ?? .max) <= 65535
         }
+    }
+
+    /// A version as a Firefox package declares it. Firefox's grammar allows letters and punctuation (`1.0.0b1`,
+    /// `2024.1-beta`), which Chrome's own grammar refuses, so a package isn't called damaged over one. The version
+    /// names the folder it's kept in, so it still has to be a safe name: non-empty, at most 64 characters, starting
+    /// with a letter or a digit, then only letters, digits and `.`, `_`, `+`, `-`, and never `..`.
+    nonisolated static func isValidFirefoxVersion(_ version: String) -> Bool {
+        guard (1...64).contains(version.count), !version.contains(".."),
+              let first = version.first, first.isASCII, first.isLetter || first.isNumber else { return false }
+        return version.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "._+-".contains($0)) }
     }
 
     private static func removeVersions(of id: String, keeping keep: [String]) {
