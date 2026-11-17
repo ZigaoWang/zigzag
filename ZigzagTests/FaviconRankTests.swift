@@ -88,6 +88,8 @@ struct FaviconSessionTests {
         #expect(configuration.httpCookieStorage == nil)
         #expect(!configuration.httpShouldSetCookies)
         #expect(configuration.httpCookieAcceptPolicy == .never)
+        // Nor kept in the shared disk cache, out of reach of Clear History.
+        #expect(configuration.urlCache == nil)
     }
 
     /// Suggestions and notification icons go through `.cookieless`: `.ephemeral` alone keeps a site's cookies in

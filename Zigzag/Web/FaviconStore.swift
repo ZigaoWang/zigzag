@@ -25,6 +25,10 @@ final class FaviconStore {
     static func makeConfiguration() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.default
         config.dropsCookies()
+        // Icons are kept by host in Zigzag's own store; the shared disk cache would also keep a list of the sites
+        // they came from, which Clear History never reaches.
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 10
         config.httpAdditionalHeaders = ["User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) \(WebKitSetup.applicationNameForUserAgent)"]
         return config
