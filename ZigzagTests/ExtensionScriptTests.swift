@@ -1116,23 +1116,42 @@ struct ExtensionScriptTests {
     }
 
     /// Chrome's MV3 service worker has no `getBackgroundPage` at all, on either global, even where WebKit's property
-    /// won't be deleted: the runtime is stood in for by one that doesn't have it.
+    /// won't be deleted: the runtime is stood in for by one without it. Its descriptor-compatible target still
+    /// enumerates and describes the members that stay, a non-configurable one included.
     @Test func anMV3WorkerHasNoBackgroundPageMember() {
         let worker = Self.workerWorld(worker: true, setup: """
-        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
-        Object.defineProperty(chrome.runtime, 'getBackgroundPage', { value: () => null, configurable: false });
-        var browser = { runtime: { getManifest: () => ({ manifest_version: 3 }) } };
-        Object.defineProperty(browser.runtime, 'getBackgroundPage', { value: () => null, configurable: false });
+        var __manifest = () => ({ manifest_version: 3 });
+        Object.defineProperty(chrome.runtime, 'getManifest', { value: __manifest, configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(chrome.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
+        var browser = { runtime: { id: 'x' } };
+        Object.defineProperty(browser.runtime, 'getManifest', { value: __manifest, configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(browser.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
         """)
         worker.evaluateScript("__zigzagAfterSurface()")
         for root in ["chrome", "browser"] {
             #expect(worker.evaluateScript("'getBackgroundPage' in \(root).runtime").toBool() == false, "\(root)")
             #expect(worker.evaluateScript("typeof \(root).runtime.getBackgroundPage").toString() == "undefined", "\(root)")
             #expect(worker.evaluateScript("\(root).runtime.getBackgroundPage === undefined").toBool(), "\(root)")
+            // Enumeration and descriptors of what stays are safe, though getManifest can't be redefined.
+            #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getManifest')").toBool(), "\(root)")
+            #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getBackgroundPage')").toBool() == false, "\(root)")
+            #expect(worker.evaluateScript("typeof Object.getOwnPropertyDescriptor(\(root).runtime, 'getManifest').value").toString() == "function", "\(root)")
+            #expect(worker.evaluateScript("Object.getOwnPropertyDescriptor(\(root).runtime, 'getManifest').enumerable").toBool(), "\(root)")
+            #expect(worker.evaluateScript("\(root).runtime.getManifest().manifest_version").toInt32() == 3, "\(root)")
+            #expect(worker.evaluateScript("typeof JSON.stringify(\(root).runtime)").toString() == "string", "\(root)")
         }
-        // The stand-in takes nothing else away.
-        #expect(worker.evaluateScript("typeof chrome.runtime.getManifest").toString() == "function")
-        #expect(worker.evaluateScript("browser.runtime.getManifest().manifest_version").toInt32() == 3)
+    }
+
+    /// Two globals that share one runtime still share it when a member has to be hidden from both.
+    @Test func aSharedRuntimeStaysOneAcrossGlobals() {
+        let worker = Self.workerWorld(worker: true, setup: """
+        Object.defineProperty(chrome.runtime, 'getManifest', { value: () => ({ manifest_version: 3 }), configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(chrome.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
+        var browser = { runtime: chrome.runtime };
+        """)
+        worker.evaluateScript("__zigzagAfterSurface()")
+        #expect(worker.evaluateScript("chrome.runtime === browser.runtime").toBool())
+        #expect(worker.evaluateScript("'getBackgroundPage' in browser.runtime").toBool() == false)
     }
 
     /// An MV2 page has no `getContexts` even where WebKit's property can't be deleted, and the rest of runtime stays.

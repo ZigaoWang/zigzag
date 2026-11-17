@@ -252,6 +252,8 @@
     // surface put one. A property the object won't give up is hidden behind a stand-in for the object that holds it:
     // it is not there to `in`, to `typeof`, or to a read, and everything else passes through as before.
     const removeMember = (path, key) => {
+      // The object a member was taken from -> the stand-in hiding it, so two globals sharing one runtime keep sharing.
+      const removed = new Map();
       for (const root of roots) {
         const parent = path.reduce((object, part) => { kept.add(object); return object && object[part]; }, root);
         kept.add(parent);
@@ -260,25 +262,61 @@
         if (added && Object.prototype.hasOwnProperty.call(added, key)) delete added[key];
         try { delete parent[key]; } catch (e) {}
         if (!(key in parent)) continue;
-        // A fresh target, not the object itself: a proxy may not report a non-configurable property of its target as
-        // missing. Everything else is read from, and written to, the real object.
-        const hidden = new Proxy({}, {
-          get(target, name) {
-            if (name === key) return undefined;
-            const member = Reflect.get(parent, name);
-            if (typeof member !== 'function') return member;
-            if (!bound.has(member)) bound.set(member, member.bind(parent));
-            return bound.get(member);
-          },
-          has(target, name) { return name !== key && name in parent; },
-          set(target, name, value) { return Reflect.set(parent, name, value); },
-          defineProperty(target, name, descriptor) { return Reflect.defineProperty(parent, name, descriptor); },
-          deleteProperty(target, name) { return Reflect.deleteProperty(parent, name); },
-          ownKeys() { return Reflect.ownKeys(parent).filter((name) => name !== key); },
-          getOwnPropertyDescriptor(target, name) {
-            return name === key ? undefined : Reflect.getOwnPropertyDescriptor(parent, name);
-          },
-        });
+        let hidden = removed.get(parent);
+        if (!hidden) {
+          // The stand-in's target carries the object's own descriptors, bar the hidden member: a proxy may not report
+          // a non-configurable property its extensible target doesn't have, or enumeration and descriptor reads
+          // throw. Reads still go to the real object, so methods see its data.
+          const descriptors = Object.getOwnPropertyDescriptors(parent);
+          delete descriptors[key];
+          for (const name of Reflect.ownKeys(descriptors)) {
+            const descriptor = descriptors[name];
+            if (!('value' in descriptor) || typeof descriptor.value !== 'function') continue;
+            if (!bound.has(descriptor.value)) bound.set(descriptor.value, descriptor.value.bind(parent));
+            // A member nothing can redefine must read as the very value its descriptor reports.
+            if (descriptor.writable === false && descriptor.configurable === false) descriptor.value = bound.get(descriptor.value);
+          }
+          const target = Object.create(Object.getPrototypeOf(parent));
+          Object.defineProperties(target, descriptors);
+          hidden = new Proxy(target, {
+            get(target, name) {
+              if (name === key) return undefined;
+              const own = Reflect.getOwnPropertyDescriptor(target, name);
+              if (own && own.configurable === false && own.writable === false && 'value' in own) return own.value;
+              const member = Reflect.get(parent, name);
+              if (typeof member !== 'function') return member;
+              if (!bound.has(member)) bound.set(member, member.bind(parent));
+              return bound.get(member);
+            },
+            has(target, name) { return name !== key && name in parent; },
+            set(target, name, value) {
+              const done = Reflect.set(parent, name, value);
+              if (done) {
+                const own = Reflect.getOwnPropertyDescriptor(target, name);
+                try {
+                  if (own && 'value' in own) Reflect.defineProperty(target, name, { value });
+                  else if (!own) Reflect.defineProperty(target, name, { value, writable: true, enumerable: true, configurable: true });
+                } catch (e) {}
+              }
+              return done;
+            },
+            defineProperty(target, name, descriptor) {
+              const done = Reflect.defineProperty(parent, name, descriptor);
+              if (done && name !== key) { try { Reflect.defineProperty(target, name, descriptor); } catch (e) {} }
+              return done;
+            },
+            deleteProperty(target, name) {
+              const done = Reflect.deleteProperty(parent, name);
+              if (done) { try { Reflect.deleteProperty(target, name); } catch (e) {} }
+              return done;
+            },
+            ownKeys(target) { return Reflect.ownKeys(target); },
+            getOwnPropertyDescriptor(target, name) {
+              return name === key ? undefined : Reflect.getOwnPropertyDescriptor(target, name);
+            },
+          });
+          removed.set(parent, hidden);
+        }
         setMemberIn(root, path.slice(0, -1), path[path.length - 1], hidden);
       }
     };
