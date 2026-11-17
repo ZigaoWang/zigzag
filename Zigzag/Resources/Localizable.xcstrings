@@ -1816,6 +1816,17 @@
         }
       }
     },
+    "%lld zapped" : {
+      "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏 %lld 个"
+          }
+        }
+      }
+    },
     "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step." : {
       "comment" : "Steps in the note from the 1Password extension's button. Keep each step on its own line starting with its number and a period (1. 2. 3.); the line after the blank line is a note. Settings › Browser and Add Browser are names in 1Password.",
       "localizations" : {
@@ -2631,13 +2642,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements show again." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，隐藏的元素也会重新显示。"
           }
         }
       }
@@ -5011,6 +5022,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "点按以更改"
+          }
+        }
+      }
+    },
+    "Click what to zap. Press Esc when you’re done." : {
+      "comment" : "Toast while picking elements to hide on a page with Zap Element from Site Controls.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按要隐藏的部分，完成后按 Esc。"
           }
         }
       }
@@ -15762,6 +15784,17 @@
         }
       }
     },
+    "Restore All" : {
+      "comment" : "At the end of the row in the site panel that counts the elements zapped on the site: shows them all again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全部恢复"
+          }
+        }
+      }
+    },
     "Restore and Restart" : {
       "comment" : "Button of the sheet that restores the backup.",
       "localizations" : {
@@ -18504,6 +18537,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "感谢你试用 Zigzag。我做它，是想给你在网上做的一切一个安静的家。希望它给你的感觉也是这样。"
+          }
+        }
+      }
+    },
+    "That can’t be zapped. Try something around it." : {
+      "comment" : "Toast when the element clicked with Zap Element can't be named well enough to hide on later visits.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个部分无法隐藏，试试它外面的一层。"
           }
         }
       }
@@ -21955,6 +21999,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你在这里也已登录你的网站，其他所有内容都在你的边栏中。你可以随时从“设置”导入更多内容。"
+          }
+        }
+      }
+    },
+    "Zap Element" : {
+      "comment" : "Item in the … menu of the site panel: pick elements on the page to hide on this site, like Arc's Zap.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏元素"
           }
         }
       }

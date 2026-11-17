@@ -3711,12 +3711,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
-            && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty
+            && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements show again.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -3730,6 +3730,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 SiteJavaScript.forgetAll()
                 ClientCertificates.forgetAll()
                 ClientCertificates.forgetAllSessions()
+                SiteBoosts.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -3747,7 +3748,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
-            .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites)
+            .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -3795,6 +3796,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else if CookieBanners.sitesLeft.contains(site) {
                 said.append(String(localized: "cookie banners left alone", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer."))
             }
+            if let zaps = SiteBoosts.all[site]?.zaps.count, zaps > 0 {
+                said.append(SiteBoosts.zapped(zaps))
+            }
             if let certificate = ClientCertificates.kept(host: site) {
                 said.append(String(localized: "certificate: \(certificate.name)", comment: "A choice made for a site in Settings › Privacy, in a list of them: the certificate from your Keychain it's always sent, by name."))
             }
@@ -3825,6 +3829,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 SiteJavaScript.forget(site: site)
                 ClientCertificates.forget(site: site)
                 ClientCertificates.forgetSessions(site: site)
+                SiteBoosts.forget(site: site)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }

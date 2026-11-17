@@ -85,6 +85,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | English | 简体中文 | Not used | Why |
 |---|---|---|---|
 | Clear (history, cache, cookies) | 清除 | 清空 | Safari: 清除历史记录. |
+| Zap Element (hide part of a site, as Arc's Zap) | 隐藏元素 | 抹除元素, 消除元素 | Says what happens to it; counted 已隐藏 3 个, and Restore All is 全部恢复. |
 | Ask / Allow / Block (a site's permission) | 询问 / 允许 / 阻止 | | The same three words wherever a permission is set: Site Controls and Settings › Privacy › Sites. |
 | Close Tab | 关闭标签页 | | Safari. |
 | Reopen Closed Tab | 重新打开已关闭的标签页 | | Safari's 重新打开最近关闭的标签页, shortened. |

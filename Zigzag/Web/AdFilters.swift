@@ -711,20 +711,30 @@ enum PageFilters {
     }
 
     static func scripts(for injection: AdInjection, host: String) -> [WKUserScript] {
-        let name = (try? JSONSerialization.data(withJSONObject: [host])).flatMap { String(data: $0, encoding: .utf8) }.map { String($0.dropFirst().dropLast()) } ?? "\"\""
+        let name = jsString(host)
         func script(_ body: String, in world: WKContentWorld) -> WKUserScript {
             WKUserScript(source: "\(mark)\nif (location.hostname === \(name)) {\n\(body)\n}",
                          injectionTime: .atDocumentStart, forMainFrameOnly: false, in: world)
         }
         var scripts = injection.page.map { script($0, in: .page) } + injection.isolated.map { script($0, in: world) }
-        if !injection.styles.isEmpty, let css = (try? JSONSerialization.data(withJSONObject: [injection.styles])).flatMap({ String(data: $0, encoding: .utf8) }) {
-            scripts.append(script("""
-            const style = document.createElement('style');
-            style.textContent = \(css)[0];
-            const add = () => (document.head || document.documentElement).appendChild(style);
-            if (document.documentElement) add(); else document.addEventListener('readystatechange', add, { once: true });
-            """, in: world))
-        }
+        if !injection.styles.isEmpty { scripts.append(script(styleSource(injection.styles), in: world)) }
         return scripts
+    }
+
+    /// A string as a JavaScript literal.
+    nonisolated static func jsString(_ text: String) -> String {
+        (try? JSONSerialization.data(withJSONObject: [text])).flatMap { String(data: $0, encoding: .utf8) }.map { String($0.dropFirst().dropLast()) } ?? "\"\""
+    }
+
+    /// A script that adds a style sheet to the document as it starts. `keptAs`: a name in the script's world the
+    /// style element is kept under, so running it again replaces the sheet instead of adding another (Boosts).
+    nonisolated static func styleSource(_ css: String, keptAs name: String? = nil) -> String {
+        let made = name.map { "window[\(jsString($0))] || (window[\(jsString($0))] = document.createElement('style'))" } ?? "document.createElement('style')"
+        return """
+        const style = \(made);
+        style.textContent = \(jsString(css));
+        const add = () => { if (!style.isConnected) (document.head || document.documentElement).appendChild(style); };
+        if (document.documentElement) add(); else document.addEventListener('readystatechange', add, { once: true });
+        """
     }
 }

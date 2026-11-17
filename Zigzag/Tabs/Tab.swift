@@ -1690,6 +1690,9 @@ extension Tab: WKNavigationDelegate {
             // The page's ad blocking follows where it's going: allowed sites load without it. Only now, once it's
             // going there: a link opened elsewhere leaves this page's blocking as it was.
             if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
+            // The site's zapped elements, hidden from the document's start (`PageBoosts`).
+            PageBoosts.prepare(webView, for: showsExtensionPage ? nil : url, privateStore: privateStore,
+                               errorPage: ErrorPage.pending.contains(webView))
             // WebRTC on or off for where it's going, before its page is made (`WebRTCProtection`).
             WebRTCProtection.apply(to: webView, for: url, in: self)
             // Back and Forward go to pages you've had; anything else the page started waits to show. A reload waits

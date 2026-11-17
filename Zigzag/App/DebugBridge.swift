@@ -2161,6 +2161,17 @@ enum DebugBridge {
         // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON). sitext open|fold: its
         // Extensions header. sitextcount <n>: panels opened from now on show n extensions (0: as they are).
         case "sitepage": SitePanel.shown?.debugPage(arg)
+        // zap <css selector>: Zap Element's click on the first element that matches, in the page in front. zapmode
+        // on|off: the picker on that page, or off. zaphover <css selector>: its outline on that element. zapstate:
+        // the site's boosts, in the debug log.
+        case "zap": if let tab = controller.tabManager.selectedTab { ZapPicker.debugZap(arg, in: tab) }
+        case "zapmode":
+            if arg == "off" { ZapPicker.current?.stop() } else if let tab = controller.tabManager.selectedTab { ZapPicker.start(in: tab, controller: controller) }
+        case "zaphover": ZapPicker.debugHover(arg)
+        case "zapstate":
+            let tab = controller.tabManager.selectedTab
+            let boost = SiteBoosts.boost(for: tab?.webView?.url, privateStore: tab?.privateStore)
+            debugLog("zapstate \(SiteBoosts.site(of: tab?.webView?.url) ?? "-") picking=\(ZapPicker.current != nil) zaps=\(boost.zaps)")
         case "sitecert": SitePanel.shown?.debugCertificate(Int(arg) ?? 0)
         case "sitext": SitePanel.shown?.extensionsSection?.debugCommand(arg)
         case "sitextcount": SitePanel.debugExtensionCount = Int(arg) ?? 0
