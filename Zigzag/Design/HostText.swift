@@ -90,7 +90,7 @@ nonisolated enum AddressText {
     }
 }
 
-/// A page's whole address where there's room for it (the bar above the page, a pop-up window, Zigzag Mini's strip),
+/// A page's whole address where there's room for it (a pop-up window, Zigzag Mini's strip),
 /// as Chrome shows it: no "https://", no "www.", the host in the text's own ink and what follows it (path, query,
 /// fragment) quiet. The sidebar's narrow field keeps the host alone. Only for a website's page (http and https);
 /// every other page keeps its name (`AddressView.name(of:)`). The host is the one WebKit loads ("xn--" for an

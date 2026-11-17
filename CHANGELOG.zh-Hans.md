@@ -24,6 +24,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - ⌘T 的命令栏可以拖到窗口里任何地方，边栏上面也行：按住它的边缘或文字周围的空白拖动就好，和 Raycast 一样，放下后会一直待在那里。拖动时会出现参考线，标出它默认的位置，也就是窗口正中和平常的高度，靠近时会吸附上去，想放回去很容易。双击它的边缘就能回到默认位置。感谢 [miateo](https://github.com/miateo)。([#280](https://github.com/ZigaoWang/zigzag/issues/280))
 - 打开“防止 WebRTC 泄露 IP 地址”后，像 Google Meet 这样一打开就要用 WebRTC 的网站，不会再一声不吭地打不开：网页上方会提示此网站尝试使用 WebRTC，但你已将其阻止，点“为此网站允许”就会允许它并重新载入网页。每个页面只提示一次，网页里嵌的框架不会提示，关掉之后这次打开 Zigzag 期间也不会再提示。感谢 [bkonia](https://github.com/bkonia) 和 [Lakeland97](https://github.com/Lakeland97)。([#276](https://github.com/ZigaoWang/zigzag/issues/276))
 - “设置 › 下载”可以把某种类型的文件存到它自己的文件夹，或者存好后用 Mac 上的 App 打开，比如用“预览”打开 PDF。“打开”只对安全的类型有效：App、脚本、安装器、压缩包、磁盘映像、网页和指向别处的链接都只会存储。感谢 [Lakeland97](https://github.com/Lakeland97)。([#263](https://github.com/ZigaoWang/zigzag/issues/263))
+- 打开“设置 › 外观 › 地址栏放在页面上方”后，地址变成和分屏页面一样的安静小框：网站名居中在网页上方，点一下或按 ⌘L 就在原地展开。后退、前进和刷新还在左边，阅读器、固定的扩展和“网站设置”在右边。感谢 [Lakeland97](https://github.com/Lakeland97)。([#275](https://github.com/ZigaoWang/zigzag/issues/275))
 
 ### 修复
 - 全屏时，跟着菜单栏一起出现的关闭、最小化和全屏按钮后面又有了一条栏，隐藏边栏时不会再直接浮在网页上。

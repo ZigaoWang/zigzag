@@ -135,6 +135,22 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        // The site's pill above the page (#275) is the address there: a click opens the command bar right over it, as
+        // a split pane's pill does; a right-click, a middle-click and a drop do what they do on the sidebar's address.
+        let pill = root.topBar.pill
+        pill.onClick = { [weak self, weak pill] _ in
+            guard let self, let pill else { return }
+            if let tab = self.tabManager.selectedTab { self.editAddress(of: tab, from: pill) } else { self.commandBar.show(mode: .editCurrent, anchor: pill) }
+        }
+        pill.onRightClick = { [weak self] _ in
+            if let self { SitePanel.toggle(in: self, from: self.sidebar.address) }
+            return nil
+        }
+        pill.onMiddleClick = { [weak self] in self?.closeTab(nil) }
+        pill.drop.onDrop = { [weak self] destination in
+            self?.open(destination.url, disposition: .currentTab, httpFallback: destination.httpFallback)
+            return self != nil
+        }
         // A link or words dropped on the address: the page you're on goes there (#182).
         sidebar.address.drop.onDrop = { [weak self] destination in
             self?.open(destination.url, disposition: .currentTab, httpFallback: destination.httpFallback)
@@ -547,7 +563,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         guard sidebar.holdsAddress == above else { return }
         if window?.isVisible == true { closeFloatingPanels() }
         sidebar.holdsAddress = !above
-        if above { root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address) }
+        if above {
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            let tab = tabManager.selectedTab
+            root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
+        }
         root.barHoldsAddress = above
         showTopBar()
     }
@@ -626,6 +646,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // Back on the tab whose video the mini player took as you left Zigzag: it goes back in its page.
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
+        root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         paintTopBar()
         // A collapsed pinned section shows the pinned page you're on, so it changes with the selection; so does a shut
         // group of tabs (#209), which shows only the tab you're on.
@@ -1424,6 +1445,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 withdrawStaleTranslationOffer()
             }
             sidebar.update(tab: tab)
+            root.topBar.showPage(url: tab.url, notSecure: tab.isNotSecure)
             paintTopBar()
             updateWindowTitle()
             offerWebStoreExtension()
@@ -3065,6 +3087,8 @@ extension BrowserWindowController: CommandBarHost {
         // In split view under the bar, the bar's address steps aside: the address of the pane you're in, as ⌘L edits
         // that pane's page.
         if root.stripsInBar { return focusedPaneAddress.isHidden ? nil : focusedPaneAddress }
+        // Above the page, the site's pill opens in place, as a pane's does.
+        if root.showsTopBar, root.topBar.holdsAddress { return root.topBar.pill.isHidden ? nil : root.topBar.pill }
         if root.showsTopBar { return sidebar.address }
         return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }

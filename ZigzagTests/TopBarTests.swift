@@ -183,6 +183,53 @@ struct TopBarTests {
         #expect(buttons.map(\.frame) == frames.buttons)
     }
 
+    @Test func theSiteIsInAPillOverThePagesMiddleWithTheButtonsAtTheEnd() throws {
+        // #275: the address's buttons at the trailing end, the pill as wide as its site, centered over the page, as
+        // a split pane's strip places its own.
+        let frames = TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: inset,
+                                       addressWidth: 54, pill: 120, pillCenter: 480)
+        let pill = try #require(frames.pill)
+        #expect(frames.address.maxX == 1000 - inset && frames.address.width == 54)
+        #expect(pill.width == 120 && pill.midX == 480)
+        #expect(pill.height == Tokens.Pane.addressHeight && pill.midY == Tokens.Sidebar.lightsCenter)
+        #expect(pill.minX > frames.buttons[2].maxX && pill.maxX < frames.address.minX)
+        #expect(pill == PaneHeaderView.pillFrame(center: 480, room: frames.buttons[2].maxX + Tokens.Space.x2...frames.address.minX - Tokens.Space.x2,
+                                                 fitting: 120, overCard: false, midY: Tokens.Sidebar.lightsCenter))
+        // On the page's card, a field's width, as a pane's over its card.
+        let onCard = TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: inset,
+                                       addressWidth: 54, pill: 120, pillCenter: 480, onCard: true)
+        #expect(onCard.pill?.width == PaneHeaderView.addressMaxWidth && onCard.pill?.midX == 480)
+        // Centered over a page whose middle is near the buttons, it's nudged clear of them rather than cut.
+        let nudged = try #require(TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: inset,
+                                                    addressWidth: 54, pill: 300, pillCenter: 900).pill)
+        #expect(nudged.width == 300 && nudged.maxX == frames.address.minX - Tokens.Space.x2)
+    }
+
+    @Test func theBarKeepsTheAddressesButtonsAndTheSidebarGetsItsFieldBack() {
+        let sidebar = SidebarView()
+        let root = BrowserRootView(sidebar: sidebar)
+        root.frame = window
+        sidebar.holdsAddress = false
+        root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+        root.showsTopBar = true
+        root.topBar.showPage(url: URL(string: "https://fontsinuse.com"), notSecure: false)
+        root.layoutSubtreeIfNeeded()
+        let bar = root.topBar, address = sidebar.address
+        #expect(address.buttonsOnly && address.frame.width == address.buttonsWidth)
+        #expect(!bar.pill.isHidden && bar.pill.frame.width == bar.pill.fittingWidth)
+        // Over the page's middle.
+        #expect(abs(bar.frame.minX + bar.pill.frame.midX - root.cardFrame.midX) <= 0.5)
+        // Its Site Controls is the address's own, last, where the page's right edge is.
+        #expect(address.siteControlsButton.superview === address && !address.siteControlsButton.isHidden)
+        #expect(address.frame.maxX == bar.bounds.width - bar.trailingInset)
+        #expect(address.siteControlsButton.frame.maxX == address.bounds.width)
+        // Back in the sidebar, the field again.
+        sidebar.holdsAddress = true
+        #expect(!address.buttonsOnly)
+        root.layoutSubtreeIfNeeded()
+        #expect(bar.pill.isHidden)
+    }
+
     @Test func narrowBarNeverGivesTheAddressANegativeWidth() {
         let frames = TopBarView.frames(width: 40, buttons: 3, trafficLightsWidth: 52, trailingInset: 6)
         #expect(frames.address.width == 0)
