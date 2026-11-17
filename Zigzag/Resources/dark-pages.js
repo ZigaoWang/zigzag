@@ -377,7 +377,9 @@
     settled = settled === true;
     wanted = choice();
     // Not wanted, it's still looked at, for the bar above it: a page dark on its own gives it its dark (#134).
-    if (!wanted) { dropPrepaint(); releaseMark(); apply(false); if (styled()) native = isDarkOnItsOwn(settled) || !!quietDark(); send(); return; }
+    // A dark app laid over a root and body that paint nothing is dark at its top and in its middle alike; a light
+    // page with a dark bar across its top (star-history.com) is light.
+    if (!wanted) { dropPrepaint(); releaseMark(); apply(false); if (styled()) native = isDarkOnItsOwn(settled) || !!quietDark(true); send(); return; }
     if (forced()) { native = null; apply(true); return; }
     if (styled()) { native = isDarkOnItsOwn(settled); dropPrepaint(); }
     // Until the page can be looked at it stays on its dark ground (`prepaint`), never white: Dark Reader goes to work
@@ -401,6 +403,8 @@
   const colorOf = () => {
     const body = document.body;
     let c = body ? backgroundOf(body) : null;
+    // Nothing painted under a page dark on its own: the dark it shows, not Dark Reader's.
+    if (!c && native === true && !darkened) c = quietDark();
     if (!c) c = darkened || native === true ? rgba(theme().darkSchemeBackgroundColor) : { r: 255, g: 255, b: 255, a: 1 };
     // A page dark on its own whose root and body paint white or nothing (a dark app laid over them): the dark at its
     // top, else its middle, which is what's seen under the bar (#134). Only a quiet dark, not a button's green.
@@ -408,14 +412,19 @@
     return hex(c);
   };
   // The quiet dark at the page's top, else its middle: what's seen under the bar. Not a button's green.
-  const quietDark = () => {
+  // `both`: only when the top and the middle are both a quiet dark (the top's then).
+  const quietDark = (both) => {
     if (!document.body) return null;
+    let found = null;
     for (const [x, y] of [[0.5, 0.02], [0.5, 0.5]]) {
       const el = document.elementFromPoint(innerWidth * x, innerHeight * y);
       const under = el ? backgroundOf(el) : null;
-      if (under && lightness(under) < 0.3 && Math.max(under.r, under.g, under.b) - Math.min(under.r, under.g, under.b) <= 48) return under;
+      const quiet = under && lightness(under) < 0.3 && Math.max(under.r, under.g, under.b) - Math.min(under.r, under.g, under.b) <= 48;
+      if (quiet && !both) return under;
+      if (!quiet && both) return null;
+      if (quiet && !found) found = under;
     }
-    return null;
+    return found;
   };
   // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {

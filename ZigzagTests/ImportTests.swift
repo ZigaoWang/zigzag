@@ -289,12 +289,18 @@ struct ImportLayoutTests {
         (0..<count).map { ImportCoordinator.fileSource(FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-layout-\($0).csv")) }
     }
 
-    static func laidOut(_ view: ImportView) -> [NSView] {
-        view.frame = NSRect(x: 0, y: 0, width: 560, height: 2000)
+    /// What it shows: its own views, and those in the body that scrolls between the heading and the buttons.
+    static func laidOut(_ view: ImportView, height: CGFloat = 2000) -> [NSView] {
+        view.frame = NSRect(x: 0, y: 0, width: 560, height: height)
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
-        return view.subviews.filter { !$0.isHidden }
+        let own = view.subviews.filter { !$0.isHidden }
+        let body = own.compactMap { ($0 as? NSScrollView)?.documentView }.flatMap { $0.subviews.filter { !$0.isHidden } }
+        return own.filter { !($0 is NSScrollView) } + body
     }
+
+    /// Where a view is in the window, wherever it sits.
+    static func place(_ view: NSView) -> NSRect { view.convert(view.bounds, to: nil) }
 
     static func expectNothingPiled(_ shown: [NSView], sourceLocation: SourceLocation = #_sourceLocation) {
         for view in shown {
@@ -302,9 +308,45 @@ struct ImportLayoutTests {
         }
         for (i, a) in shown.enumerated() {
             for b in shown[(i + 1)...] {
-                #expect(!a.frame.intersects(b.frame), "\(type(of: a)) \(a.frame) overlaps \(type(of: b)) \(b.frame)", sourceLocation: sourceLocation)
+                #expect(!place(a).intersects(place(b)), "\(type(of: a)) \(place(a)) overlaps \(type(of: b)) \(place(b))", sourceLocation: sourceLocation)
             }
         }
+    }
+
+    /// Too much to fit (many browsers, Chrome's profiles, every choice): the body scrolls, and Import stays inside the
+    /// window under it, not pushed off the bottom (#293).
+    @Test func importStaysInViewWhenTheContentIsTall() throws {
+        let view = ImportView(presentation: .window, detect: { Self.files(12) })
+        for height: CGFloat in [2000, 520, 360] {
+            // Scrolled, the body's rows run on under the buttons, clipped, so they're checked laid out whole.
+            let shown = Self.laidOut(view, height: height)
+            if height == 2000 { Self.expectNothingPiled(shown) }
+            let primary = try #require(view.subviews.first { $0 is PrimaryButton })
+            let scroll = try #require(view.subviews.first { $0 is NSScrollView } as? NSScrollView)
+            let content = try #require(scroll.documentView)
+            #expect(!primary.isHidden)
+            #expect(primary.frame.maxY <= view.bounds.height, "Import ends at \(primary.frame.maxY) in a view \(view.bounds.height) tall")
+            #expect(primary.frame.minY >= scroll.frame.maxY, "Import overlaps the body")
+            let list = try #require(content.subviews.first { $0 is NSScrollView } as? NSScrollView)
+            let rows = try #require(list.documentView)
+            if view.naturalHeight <= height {
+                // It all fits: nothing scrolls.
+                #expect(content.frame.height == scroll.frame.height)
+                #expect(rows.frame.height == list.frame.height)
+            } else {
+                // The browsers scroll first, so the choices stay in view.
+                #expect(rows.frame.height > list.frame.height)
+            }
+            if height == 520 {
+                let pill = try #require(content.subviews.first { $0 is ChoicePill && !$0.isHidden })
+                #expect(pill.frame.maxY <= scroll.frame.height, "The choices are scrolled out of view")
+            }
+            if height == 360 {
+                // Too short even for that: all of it scrolls.
+                #expect(content.frame.height > scroll.frame.height)
+            }
+        }
+        #expect(view.naturalHeight > 520)
     }
 
     @Test func noBrowsersShowsTheEmptyStateAndNoChoices() {

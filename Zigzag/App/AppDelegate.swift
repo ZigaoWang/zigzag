@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: Self.pageTextDefaults)
+        // And a spelling or substitution choice holds for every page, the Mac's until you make one (#296).
+        PageTextChecking.shared.start()
         // A second copy (one opened from the disk image while the installed one runs) would load the same data
         // and save over it: it hands over to the one already running and goes, before reading anything.
         if !Self.isHostingTests, !SingleCopy.claim() {
@@ -75,6 +77,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         _ = Library.shared
         _ = Profiles.shared.default.history
+        // Empty pages' pictures no space has any more: a deleted space's, kept until now so ⌘Z could bring it back.
+        let backgrounds = Set(Library.shared.spaces.compactMap(\.backgroundImage))
+        DispatchQueue.global(qos: .utility).async { SpaceBackground.prune(keeping: backgrounds) }
         // Icons clearing history set aside, if Zigzag didn't get to remove them when it quit.
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Copies an import read through, if Zigzag stopped before removing them: they can hold passwords.

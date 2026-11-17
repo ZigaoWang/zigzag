@@ -321,13 +321,18 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   the accent ring from the keyboard). A link, an address or words dragged over any address field (the sidebar's, the
   bar above the page's, a pane strip's, Zigzag Mini's) get the accent drop ring around the field, and let go they
   load in that field's page, or search for the words (`AddressDrop`, #182). Favorites: small soft tiles four to a row in the same look. The space's name
-  over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row shows both pages, each half with its icon, its title and, while that page
-  plays or is muted, its own speaker; a pinned page split beside a tab carries the pair in its own row, so each page
-  shows once and one row is lit. A tile group of three or four tabs is one row too, a part for each page in reading
-  order with a hairline between, each part's title only while every part has room for a few words
-  (`TabRowView.segments`), else each icon in the middle of its part; pointing at a part names its page, and a
-  double-click renames that page (over its title, or the row for the moment when the part shows no title). A row of
-  several pages keeps the close button's room while it's hidden, so nothing in it moves under the pointer.
+  over its pinned tabs. The tab you're on: the light card of the color, which slides when you pick another. A split row (two pages, or a tile group's three or four) is one row: a part
+  of one width for each page in reading order (`TabRowView.splitParts`), a `Color.separator` hairline between them 8pt
+  short of the row's top and bottom, and in each part a tab's row in small: the icon 6pt in from the part's start, the
+  title after it faded where it's cut, ending 6pt before the next hairline, and while that page plays or is muted, its
+  speaker at the part's end. Where a part is narrower than its icon, the gaps and a few letters
+  (`TabRowView.segmentMinWidth`, 56 at Medium), every part shows its icon alone in its middle, hairlines still between.
+  In the split you're on, the page you're in has its title in the row's ink and the others in `quietInk`; with icons
+  alone, the page you're in has the hover wash under its part. The close button comes as a tab's does, over the last
+  title's faded end, so nothing moves under the pointer; its room is kept, at rest too, where it would cover too much (icons
+  alone, a speaker in the last part, or the last part's whole title), decided by the row's width, never its state. A pinned page split beside a tab carries the pair in its own row, so each page
+  shows once and one row is lit. Pointing at a part names its page, and a double-click renames that page (over its
+  title, or the row for the moment when the part shows no title).
   A pinned page that has wandered reads "<its name> / <the page it's on>". Then
   the bottom bar: downloads, space dots, +. A space with an icon shows it in place of its dot, at the sidebar's size
   (`Sidebar.spaceIcon`: a favorite's icon, 16, 18, 20), each in a 26pt key (28 at Large, `Sidebar.spaceTarget`).
@@ -495,6 +500,11 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   shape of its own on white with room around it, or the name's first letter on the site's color.
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
+- **A space with no page open** (`EmptyPage`): the page card stays, in the space's wash (`Theme.wash`, the sidebar's
+  color a few steps lighter by day, deep and calm at night), with the wordmark engraved in its middle. White, grays,
+  black and private windows keep the plain card. A picture chosen in the space's editor (Background) fills the card
+  instead, aspect fill and centered, read only while the page is empty; on it the wordmark is laid on in white with
+  one soft shadow (`Color.markOnPicture`), since an engraving can't read over every picture.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
   Passwords in a light tint of their window's space, `Brand.Theme.for(view).wash`), `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,

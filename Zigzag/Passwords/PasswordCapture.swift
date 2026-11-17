@@ -646,3 +646,87 @@ enum PasswordManagers {
         chosen ?? (!managerOn || imported)
     }
 }
+
+/// Who saves and fills passwords in a profile (#248): Zigzag itself, or Apple's iCloud Passwords extension, which
+/// talks to the Passwords app on this Mac. Choosing iCloud turns Zigzag's own saving and filling off there, so the
+/// two never both offer, and remembers them as they were; choosing Zigzag again puts them back. The Passwords
+/// window is there either way.
+nonisolated enum PasswordFiller: String {
+    case zigzag
+    case iCloud
+
+    /// Apple's iCloud Passwords extension, by its Chrome Web Store ID.
+    static let iCloudExtensionID = "pejdijmoenmkgeppbflobdenhhabjlaj"
+
+    /// What was chosen in a profile; nil until something is.
+    static func chosen(in profile: UUID, defaults: UserDefaults = .standard) -> PasswordFiller? {
+        defaults.string(forKey: ProfileKey.passwordFiller.name(in: profile)).flatMap(PasswordFiller.init)
+    }
+
+    /// Who fills now. Until you choose, iCloud when its extension is on and Zigzag already stepped aside for it
+    /// (PasswordManagers), so the choice shows what's so.
+    static func current(chosen: PasswordFiller?, iCloudOn: Bool, zigzagSaves: Bool, zigzagFills: Bool) -> PasswordFiller {
+        chosen ?? (iCloudOn && !zigzagSaves && !zigzagFills ? .iCloud : .zigzag)
+    }
+
+    /// iCloud fills: Zigzag's own saving and filling go off, kept as they were for when Zigzag fills again.
+    static func useICloud(in profile: UUID, saves: Bool, fills: Bool, defaults: UserDefaults = .standard) {
+        if chosen(in: profile, defaults: defaults) != .iCloud {
+            defaults.set([saves, fills], forKey: ProfileKey.passwordsBeforeICloud.name(in: profile))
+        }
+        defaults.set(false, forKey: ProfileKey.offersToSavePasswords.name(in: profile))
+        defaults.set(false, forKey: ProfileKey.fillsPasswords.name(in: profile))
+        defaults.set(PasswordFiller.iCloud.rawValue, forKey: ProfileKey.passwordFiller.name(in: profile))
+    }
+
+    /// Zigzag fills again: saving and filling as they were before iCloud, chosen outright, so the extension, still
+    /// installed, doesn't turn them off. If both were off, both go on: Zigzag is what you chose.
+    static func useZigzag(in profile: UUID, defaults: UserDefaults = .standard) {
+        let before = defaults.array(forKey: ProfileKey.passwordsBeforeICloud.name(in: profile)) as? [Bool] ?? []
+        var saves = before.first ?? true, fills = before.dropFirst().first ?? true
+        if !saves && !fills { (saves, fills) = (true, true) }
+        defaults.set(saves, forKey: ProfileKey.offersToSavePasswords.name(in: profile))
+        defaults.set(fills, forKey: ProfileKey.fillsPasswords.name(in: profile))
+        defaults.removeObject(forKey: ProfileKey.passwordsBeforeICloud.name(in: profile))
+        defaults.set(PasswordFiller.zigzag.rawValue, forKey: ProfileKey.passwordFiller.name(in: profile))
+    }
+
+    /// What choosing iCloud needs first in a profile: its extension added, or turned back on there.
+    enum Need: Equatable { case nothing, turnOn, install }
+
+    static func need(installed: Bool, enabled: Bool) -> Need { !installed ? .install : enabled ? .nothing : .turnOn }
+
+    /// Whether to offer iCloud once, when its extension went in by hand: only while Zigzag still saves or fills,
+    /// before anything was chosen, and never twice.
+    static func offersSwitch(chosen: PasswordFiller?, zigzagHandles: Bool, offered: Bool) -> Bool {
+        chosen == nil && zigzagHandles && !offered
+    }
+}
+
+/// Handing a profile's passwords to the iCloud Passwords extension and back.
+@MainActor
+enum ICloudPasswords {
+    static var id: String { PasswordFiller.iCloudExtensionID }
+
+    static func filler(in profile: Profile) -> PasswordFiller {
+        PasswordFiller.current(chosen: PasswordFiller.chosen(in: profile.id), iCloudOn: isOn(in: profile),
+                               zigzagSaves: PasswordCapture.offersToSave(in: profile), zigzagFills: Autofill.isOn(in: profile))
+    }
+
+    /// The extension is installed and on in the profile.
+    static func isOn(in profile: Profile) -> Bool {
+        guard #available(macOS 15.4, *) else { return false }
+        return profile.installs.isInstalled(id) && profile.installs.isEnabled(id)
+    }
+
+    /// iCloud fills in the profile; its extension is there already. Its button is pinned by the address when
+    /// there's room, so it's easy to find to connect.
+    static func use(in profile: Profile) {
+        PasswordFiller.useICloud(in: profile.id, saves: PasswordCapture.offersToSave(in: profile), fills: Autofill.isOn(in: profile))
+        Autofill.shared.hide()
+        let installs = profile.installs
+        if installs.isEnabled(id) && !installs.pins.contains(id) { installs.togglePin(id) }
+    }
+
+    static func useZigzag(in profile: Profile) { PasswordFiller.useZigzag(in: profile.id) }
+}

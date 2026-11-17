@@ -533,6 +533,7 @@ enum DebugBridge {
         if name == "pinhover" { SitePanel.shown?.debugHover(arg); return }
         if name.hasPrefix("mp") { runMiniPlayer(name, arg, in: controller); return }
         if name == "pageprobe" { pageProbe(arg); return }
+        if name == "scrollbench" { ScrollBench.run(arg, in: controller); return }
         // updateready <version>|off: the sidebar's update card, Restart to Update and Settings' row for a pretend
         // update (Restart only says what it would do); updatedismiss: the card's close button; updatestate <path>:
         // the menu item's title and what's staged (JSON).
@@ -756,6 +757,9 @@ enum DebugBridge {
         // editornewprofile: the space editor's New Profile, as its menu item does. editorname <name>: types that name.
         case "editornewprofile": SpaceEditorPanel.current?.debugNewProfile()
         case "editorname": SpaceEditorPanel.current?.debugType(arg)
+        // editorbackground <path>: Background › Choose Image… with that file picked; editorbackground (none): Remove.
+        case "editorbackground":
+            if arg.isEmpty { SpaceEditorPanel.current?.debugRemoveBackground() } else { SpaceEditorPanel.current?.debugSetBackground(URL(fileURLWithPath: arg)) }
         case "tourskip": Tutorial.skip()
         case "tourend": Tutorial.isHidden = true; controller.root.overlay.subviews.compactMap { $0 as? GuidedTour }.forEach { $0.removeFromSuperview() }
         case "fullscreen": controller.window?.toggleFullScreen(nil)
@@ -1695,6 +1699,12 @@ enum DebugBridge {
             controller.peek.tab?.webView?.evaluateJavaScript(arg) { result, error in
                 debugLog("peekjs => \(String(describing: result).prefix(500)) \(error.map { String(describing: $0) } ?? "")")
             }
+        case "textcheck":
+            // textcheck [<selector>]: sends a spelling or substitution toggle (toggleAutomaticSpellingCorrection:) to
+            // the selected page as Edit › Spelling and Grammar would, then writes WebKit's choices as the app keeps them.
+            if !arg.isEmpty { controller.selectedWebView?.perform(NSSelectorFromString(arg), with: nil) }
+            let values = PageTextChecking.shared.current().sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
+            debugLog("textcheck \(values.joined(separator: " ")) system=\(NSSpellChecker.isAutomaticSpellingCorrectionEnabled) sent=\(PageTextChecking.shared.sent)")
         case "js":
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
@@ -2215,6 +2225,13 @@ enum DebugBridge {
             if let data = try? JSONSerialization.data(withJSONObject: PageDialogSheet.debugState(), options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "dialogsaved": PageDialogSheet.debugShowSaved()
         case "dialogcancel": PageDialogSheet.debugCancel()
+        case "dialogchoose":
+            // dialogchoose <index> [on|off]: picks a choice in the sheet showing, sets its "always" choice, and continues.
+            let f = arg.split(separator: " ")
+            PageDialogSheet.debugChoose(Int(f.first ?? "") ?? 0, remember: f.count > 1 ? f[1] == "on" : nil)
+        case "clientcerts":
+            // clientcerts: the certificates kept for sites, in the debug log.
+            debugLog("clientcerts \(ClientCertificates.sites.sorted().map { "\($0)=\(ClientCertificates.kept(host: $0)?.name ?? "")" })")
         case "windowshot":
             // windowshot <path>: the window's own drawing, as a PNG; web content may be blank.
             guard let view = controller.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
@@ -2248,6 +2265,8 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // passwordfiller zigzag|iCloud: Settings › Passwords › Password manager in the Settings tab in front (#248).
+        case "passwordfiller": controller.tabManager.selectedTab?.settingsView?.debugChoosePasswordFiller(arg)
         // sitedata seed <count> | bench <path>: made-up sites in the profile of the space in front, or Settings'
         // list of what websites keep timed (#207).
         case "sitedata":
@@ -3043,6 +3062,149 @@ enum TrafficLightWatch {
         let container = buttons.first?.superview?.superview?.frame ?? .zero
         let titlebar = buttons.first?.superview?.frame ?? .zero
         return "lights=\(frames.joined(separator: " ")) container=\(NSStringFromRect(container)) titlebar=\(NSStringFromRect(titlebar))"
+    }
+}
+#endif
+
+#if DEBUG
+/// scrollbench <path> [seconds] [js|wheel] [points per frame]: scrolls the front tab's page up and down for a while
+/// and writes how evenly frames came (JSON): in the page, the gaps between its animation frames; in Zigzag, the gaps
+/// between display link callbacks on the main thread, which a stall there shows as a long one. `js` scrolls with
+/// `scrollBy` each frame; `wheel` hands the web view trackpad-like scroll events (to it alone, never the system's
+/// event stream), so WebKit's own scrolling does the moving.
+@MainActor
+enum ScrollBench {
+    private final class Ticker: NSObject {
+        var last: CFTimeInterval = 0
+        var gaps: [Double] = []
+        var tick: ((CADisplayLink) -> Void)?
+        /// The layers WebKit shows the page with, in Zigzag: how many display frames saw any of them moved
+        /// (the page's scrolling as it reaches the screen).
+        weak var root: CALayer?
+        var previous: [ObjectIdentifier: CGFloat] = [:]
+        var movedTicks = 0
+        var ticks = 0
+        @objc func fire(_ link: CADisplayLink) {
+            if last > 0 { gaps.append((link.timestamp - last) * 1000) }
+            last = link.timestamp
+            if let root {
+                var now: [ObjectIdentifier: CGFloat] = [:]
+                var stack = [root]
+                while let layer = stack.popLast(), now.count < 4000 {
+                    let shown = layer.presentation() ?? layer
+                    now[ObjectIdentifier(layer)] = shown.bounds.origin.y + shown.position.y * 3
+                    stack.append(contentsOf: layer.sublayers ?? [])
+                }
+                if !previous.isEmpty {
+                    ticks += 1
+                    if now.contains(where: { key, value in previous[key].map { abs($0 - value) > 0.01 } ?? false }) { movedTicks += 1 }
+                }
+                previous = now
+            }
+            tick?(link)
+        }
+    }
+
+    static func stats(_ gaps: [Double], frame: Double) -> [String: Any] {
+        guard !gaps.isEmpty else { return ["count": 0] }
+        let sorted = gaps.sorted()
+        func pct(_ p: Double) -> Double { sorted[min(sorted.count - 1, Int(Double(sorted.count) * p))] }
+        let dropped = gaps.reduce(0) { $0 + max(0, Int(($1 / frame).rounded()) - 1) }
+        return ["count": gaps.count, "p50": pct(0.5), "p95": pct(0.95), "p99": pct(0.99), "max": sorted.last!,
+                "mean": gaps.reduce(0, +) / Double(gaps.count), "dropped": dropped, "over1.5frames": gaps.filter { $0 > frame * 1.5 }.count]
+    }
+
+    static func run(_ arg: String, in controller: BrowserWindowController) {
+        let f = arg.split(separator: " ").map(String.init)
+        guard let path = f.first else { return }
+        let seconds = f.count > 1 ? Double(f[1]) ?? 5 : 5
+        let mode = f.count > 2 ? f[2] : "js"
+        let step = f.count > 3 ? Double(f[3]) ?? 12 : 12
+        guard let webView = controller.selectedWebView, let window = webView.window else {
+            try? "no page".write(toFile: path, atomically: true, encoding: .utf8); return
+        }
+        let screenFPS = window.screen?.maximumFramesPerSecond ?? 0
+        let ticker = Ticker()
+        var direction = 1.0
+        var sent = 0
+        if mode == "wheel" {
+            let center = NSPoint(x: webView.bounds.midX, y: webView.bounds.midY)
+            let inWindow = webView.convert(center, to: nil)
+            let onScreen = window.convertPoint(toScreen: inWindow)
+            let flippedY = (NSScreen.screens.first?.frame.height ?? 0) - onScreen.y
+            var phaseStart = CACurrentMediaTime()
+            var began = false
+            ticker.tick = { link in
+                let now = link.timestamp
+                // A gesture each second and a half, alternating direction, as fingers on a trackpad would.
+                if now - phaseStart > 1.5 { phaseStart = now; direction = -direction; began = false
+                    if let end = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: 0, wheel3: 0) {
+                        end.setIntegerValueField(.scrollWheelEventScrollPhase, value: 4)
+                        end.location = CGPoint(x: onScreen.x, y: flippedY)
+                        if let e = NSEvent(cgEvent: end) { webView.scrollWheel(with: e) }
+                    }
+                }
+                let dy = Int32(-direction * step)
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: 0, wheel3: 0) else { return }
+                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: began ? 2 : 1)
+                cg.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(dy))
+                cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
+                cg.location = CGPoint(x: onScreen.x, y: flippedY)
+                cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+                cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+                began = true
+                if let event = NSEvent(cgEvent: cg) { webView.scrollWheel(with: event); sent += 1 }
+            }
+        }
+        ticker.root = webView.layer
+        let link = webView.displayLink(target: ticker, selector: #selector(Ticker.fire(_:)))
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+        link.add(to: .main, forMode: .common)
+        let pageScript = """
+        const scrolls = mode === 'js';
+        const gaps = []; let last = 0, dir = 1, y0 = scrollY, moved = 0;
+        const end = performance.now() + seconds * 1000;
+        await new Promise((done) => {
+          const frame = (t) => {
+            if (last) gaps.push(t - last);
+            last = t;
+            if (scrolls) {
+              const max = document.scrollingElement.scrollHeight - innerHeight;
+              if (scrollY >= max - 1) dir = -1; else if (scrollY <= 0) dir = 1;
+              window.scrollBy(0, dir * step);
+            }
+            moved += Math.abs(scrollY - y0); y0 = scrollY;
+            if (t < end) requestAnimationFrame(frame); else done();
+          };
+          requestAnimationFrame(frame);
+        });
+        return JSON.stringify({ gaps, moved, height: document.scrollingElement.scrollHeight, visibility: document.visibilityState });
+        """
+        Task {
+            var result: [String: Any] = ["mode": mode, "seconds": seconds, "screenFPS": screenFPS, "step": step,
+                                         "occluded": !window.occlusionState.contains(.visible), "key": window.isKeyWindow]
+            do {
+                let value = try await webView.callAsyncJavaScript(pageScript, arguments: ["mode": mode, "seconds": seconds, "step": step],
+                                                                  in: nil, contentWorld: .defaultClient)
+                if let text = value as? String, let data = text.data(using: .utf8),
+                   let page = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let gaps = page["gaps"] as? [Double] ?? []
+                    result["page"] = stats(gaps, frame: 1000 / Double(max(screenFPS, 60)))
+                    result["pageMoved"] = page["moved"]
+                    result["pageHeight"] = page["height"]
+                    result["visibility"] = page["visibility"]
+                }
+            } catch { result["error"] = "\(error)" }
+            link.invalidate()
+            result["mainThread"] = stats(ticker.gaps, frame: 1000 / Double(max(screenFPS, 60)))
+            result["wheelEvents"] = sent
+            result["layerMovedTicks"] = ticker.movedTicks
+            result["layerTicks"] = ticker.ticks
+            if let data = try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: URL(fileURLWithPath: path))
+            }
+        }
     }
 }
 #endif

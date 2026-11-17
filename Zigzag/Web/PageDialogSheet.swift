@@ -17,6 +17,14 @@ final class PageDialogSheet: NSView {
         case cancelled
         /// Don't show this page's dialogs any more (until it loads something new).
         case blocked
+        /// A sheet with choices: the one picked, and whether its "always" choice was on.
+        case chose(index: Int, remember: Bool)
+    }
+
+    /// One thing to pick in a sheet that lists choices (a certificate a site asks for).
+    struct Choice {
+        let title: String
+        let detail: String
     }
 
     /// Saved passwords a sign-in sheet offers, behind a quiet button: picking one fills the fields with what `fill`
@@ -37,6 +45,11 @@ final class PageDialogSheet: NSView {
     private let block = PillButton(title: String(localized: "Block Dialogs", comment: "Button in a page's JavaScript dialog sheet, once it has shown a second dialog."), style: .quiet)
     private let saved = PillButton(title: String(localized: "Saved Passwords", comment: "Button in a site's HTTP sign-in sheet: lists the passwords saved for the site, to fill one in."), style: .quiet)
     private var savedLogins: SavedLogins?
+    private var choiceRows: [ChoiceRow] = []
+    private let choiceScroll = NSScrollView()
+    private let choiceList = FlippedView()
+    private var chosen = 0 { didSet { for (index, row) in choiceRows.enumerated() { row.isSelected = index == chosen } } }
+    private var rememberPill: ChoicePill?
     private var savedMenu: AutofillMenu?
     /// Says which question it answers, so another way of answering it (an extension) can close it.
     private var answers: String?
@@ -54,7 +67,7 @@ final class PageDialogSheet: NSView {
     private let pad = Tokens.Dialog.padding
 
     private init(title: String, message: String, fields: [Field], confirmTitle: String, showsCancel: Bool, offersBlock: Bool,
-                 savedLogins: SavedLogins?, completion: @escaping (Result) -> Void) {
+                 savedLogins: SavedLogins?, choices: [Choice], remember: String?, completion: @escaping (Result) -> Void) {
         header = DialogHeader(title: title)
         body = NSTextField(wrappingLabelWithString: message)
         confirm = PillButton(title: confirmTitle, style: .prominent)
@@ -73,6 +86,31 @@ final class PageDialogSheet: NSView {
             panel.addSubview(input)
             inputs.append(input)
         }
+        if !choices.isEmpty {
+            choiceScroll.drawsBackground = false
+            choiceScroll.borderType = .noBorder
+            choiceScroll.useSlimScroller()
+            choiceScroll.documentView = choiceList
+            panel.addSubview(choiceScroll)
+            for (index, choice) in choices.enumerated() {
+                let row = ChoiceRow(choice)
+                row.onClick = { [weak self] _ in self?.chosen = index }
+                row.onDoubleClick = { [weak self] in
+                    self?.chosen = index
+                    self?.finishChoosing()
+                }
+                choiceList.addSubview(row)
+                choiceRows.append(row)
+            }
+            // Set directly: an observer doesn't run for a property set in its own class's init.
+            choiceRows.first?.isSelected = true
+            if let remember {
+                let pill = ChoicePill(title: remember)
+                pill.isOn = true
+                panel.addSubview(pill)
+                rememberPill = pill
+            }
+        }
         buttons.trailing = showsCancel ? [cancel, confirm] : [confirm]
         if offersBlock {
             block.toolTip = String(localized: "Don’t let this page show more dialogs", comment: "Tooltip of Block Dialogs in a page's JavaScript dialog sheet.")
@@ -82,7 +120,7 @@ final class PageDialogSheet: NSView {
             buttons.leading = [saved]
             saved.onClick = { [weak self] _ in self?.toggleSavedMenu() }
         }
-        confirm.onClick = { [weak self] _ in self?.finish(.confirmed(self?.inputs.map(\.stringValue) ?? [])) }
+        confirm.onClick = { [weak self] _ in self?.finishChoosing() }
         cancel.onClick = { [weak self] _ in self?.finish(.cancelled) }
         block.onClick = { [weak self] _ in self?.finish(.blocked) }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
@@ -93,9 +131,23 @@ final class PageDialogSheet: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
+    /// The main button: the choice picked when it lists choices, else what's in its fields.
+    private func finishChoosing() {
+        if choiceRows.isEmpty { finish(.confirmed(inputs.map(\.stringValue))) }
+        else { finish(.chose(index: chosen, remember: rememberPill?.isOn ?? false)) }
+    }
+
+    /// Up and down move the choice, keeping it in sight.
+    private func moveChoice(_ step: Int) {
+        guard !choiceRows.isEmpty else { return }
+        chosen = min(max(0, chosen + step), choiceRows.count - 1)
+        choiceList.scrollToVisible(choiceRows[chosen].frame)
+    }
+
     @MainActor
     static func ask(in window: NSWindow, title: String, message: String, fields: [Field] = [], confirmTitle: String = String(localized: "OK", comment: "Button that answers a page's JavaScript dialog sheet."),
-                    showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil, savedLogins: SavedLogins? = nil, tag: String? = nil) async -> Result {
+                    showsCancel: Bool, offersBlock: Bool, page: WKWebView? = nil, savedLogins: SavedLogins? = nil, tag: String? = nil,
+                    choices: [Choice] = [], remember: String? = nil) async -> Result {
         // Over the page that asked, so it stays with its tab; a dialog without a page covers the window.
         guard let host = page ?? window.contentView else { return .cancelled }
         // One at a time on a page: a second question (two sign-ins at once) waits for the first, never stacks on it.
@@ -104,7 +156,8 @@ final class PageDialogSheet: NSView {
         let task = Task { @MainActor in
             _ = await before?.value
             return await present(in: window, host: host, title: title, message: message, fields: fields, confirmTitle: confirmTitle,
-                                 showsCancel: showsCancel, offersBlock: offersBlock, page: page, savedLogins: savedLogins, tag: tag)
+                                 showsCancel: showsCancel, offersBlock: offersBlock, page: page, savedLogins: savedLogins, tag: tag,
+                                 choices: choices, remember: remember)
         }
         queue[key] = task
         let result = await task.value
@@ -116,10 +169,11 @@ final class PageDialogSheet: NSView {
 
     @MainActor
     private static func present(in window: NSWindow, host: NSView, title: String, message: String, fields: [Field], confirmTitle: String,
-                                showsCancel: Bool, offersBlock: Bool, page: WKWebView?, savedLogins: SavedLogins?, tag: String?) async -> Result {
+                                showsCancel: Bool, offersBlock: Bool, page: WKWebView?, savedLogins: SavedLogins?, tag: String?,
+                                choices: [Choice], remember: String?) async -> Result {
         return await withCheckedContinuation { continuation in
             let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle, showsCancel: showsCancel,
-                                        offersBlock: offersBlock, savedLogins: savedLogins) { continuation.resume(returning: $0) }
+                                        offersBlock: offersBlock, savedLogins: savedLogins, choices: choices, remember: remember) { continuation.resume(returning: $0) }
             sheet.page = page
             sheet.answers = tag
             sheet.homeWindow = window
@@ -153,7 +207,9 @@ final class PageDialogSheet: NSView {
                     }
                 }
                 switch event.keyCode {
-                case 36, 76: sheet.finish(.confirmed(sheet.inputs.map(\.stringValue))); return nil
+                case 36, 76: sheet.finishChoosing(); return nil
+                case 125 where !sheet.choiceRows.isEmpty: sheet.moveChoice(1); return nil
+                case 126 where !sheet.choiceRows.isEmpty: sheet.moveChoice(-1); return nil
                 case 53: sheet.finish(sheet.cancel.superview == nil ? .confirmed([]) : .cancelled); return nil
                 default: return event
                 }
@@ -219,13 +275,22 @@ final class PageDialogSheet: NSView {
     static func debugState() -> [[String: Any]] {
         open.compactMap(\.sheet).filter(\.isUp).map { sheet in
             ["title": sheet.header.title.stringValue, "fields": sheet.inputs.map { $0.field is NSSecureTextField ? "\($0.stringValue.count) characters" : $0.stringValue },
-             "savedButton": sheet.saved.superview != nil, "savedMenu": sheet.savedMenu != nil]
+             "savedButton": sheet.saved.superview != nil, "savedMenu": sheet.savedMenu != nil,
+             "choices": sheet.choiceRows.map(\.choice.title), "chosen": sheet.chosen, "remember": sheet.rememberPill.map { $0.isOn } as Any]
         }
     }
 
     /// Opens the saved passwords' menu on the sign-in sheet showing.
     static func debugShowSaved() {
         open.compactMap(\.sheet).first { $0.savedMenu == nil && $0.saved.superview != nil }?.toggleSavedMenu()
+    }
+
+    /// Picks a choice in the first sheet listing them, sets its "always" choice when given, and continues.
+    static func debugChoose(_ index: Int, remember: Bool?) {
+        guard let sheet = open.compactMap(\.sheet).first(where: { $0.isUp && !$0.choiceRows.isEmpty }) else { return }
+        sheet.chosen = min(max(0, index), sheet.choiceRows.count - 1)
+        if let remember { sheet.rememberPill?.isOn = remember }
+        sheet.finishChoosing()
     }
 
     /// Answers every dialog showing with Cancel (OK for an alert), as Escape does.
@@ -317,12 +382,17 @@ final class PageDialogSheet: NSView {
 
     private var bodyHeight: CGFloat { ceil(body.sizeThatFits(NSSize(width: width - pad * 2, height: 600)).height) }
     private let fieldHeight: CGFloat = 36
+    /// Up to four choices show at once; more scroll.
+    private var choicesHeight: CGFloat {
+        choiceRows.isEmpty ? 0 : CGFloat(min(choiceRows.count, 4)) * ChoiceRow.height + Tokens.Space.x2
+    }
+    private var rememberHeight: CGFloat { rememberPill == nil ? 0 : Tokens.Metric.controlHeight + Tokens.Space.x2 }
 
     override func layout() {
         super.layout()
         let fields = CGFloat(inputs.count) * (fieldHeight + Tokens.Space.x2)
         let height = pad + header.height(for: width - pad * 2) + Tokens.Space.x2 + bodyHeight + Tokens.Dialog.gap + fields
-            + Tokens.Space.x2 + DialogButtons.height + pad
+            + choicesHeight + rememberHeight + Tokens.Space.x2 + DialogButtons.height + pad
         panel.frame = NSRect(x: round((bounds.width - width) / 2), y: max(0, round((bounds.height - height) / 2.4)), width: width, height: height)
     }
 
@@ -336,6 +406,68 @@ final class PageDialogSheet: NSView {
             y += fieldHeight + Tokens.Space.x2
         }
         y += inputs.isEmpty ? 0 : Tokens.Space.x2
+        if !choiceRows.isEmpty {
+            // The rows' icons line up with the message's first letter; their fills reach out into the padding.
+            let listHeight = choicesHeight - Tokens.Space.x2
+            choiceScroll.frame = NSRect(x: pad - CardRow.inset, y: y, width: inner + CardRow.inset * 2, height: listHeight)
+            choiceList.frame = NSRect(x: 0, y: 0, width: choiceScroll.frame.width, height: CGFloat(choiceRows.count) * ChoiceRow.height)
+            for (index, row) in choiceRows.enumerated() {
+                row.frame = NSRect(x: 0, y: CGFloat(index) * ChoiceRow.height, width: choiceList.frame.width, height: ChoiceRow.height)
+            }
+            y += choicesHeight
+        }
+        if let rememberPill {
+            // The pill's check, not its edge, lines up with the text above.
+            rememberPill.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: min(inner + Tokens.Space.x2 * 2, rememberPill.fittingWidth),
+                                        height: Tokens.Metric.controlHeight)
+            y += rememberHeight
+        }
         buttons.frame = NSRect(x: pad, y: y, width: inner, height: DialogButtons.height)
+    }
+}
+
+/// A choice in a dialog's list: a symbol, its name, and a quiet line under it. The picked one is the soft card.
+private final class ChoiceRow: InteractiveView {
+    static let height: CGFloat = 48
+    let choice: PageDialogSheet.Choice
+    private let icon = NSImageView()
+    private let title: Label
+    private let detail: Label
+
+    init(_ choice: PageDialogSheet.Choice) {
+        self.choice = choice
+        title = Label(choice.title, font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
+        detail = Label(choice.detail, font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+        super.init(frame: .zero)
+        layer?.cornerRadius = Tokens.Radius.row
+        layer?.cornerCurve = .continuous
+        icon.image = Tokens.Symbol.image("person.text.rectangle", size: Tokens.Symbol.row)
+        icon.imageScaling = .scaleNone
+        [icon, title, detail].forEach { addSubview($0) }
+        setAccessibilityRole(.radioButton)
+        setAccessibilityLabel(choice.detail.isEmpty ? choice.title : "\(choice.title), \(choice.detail)")
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+    override var isFlipped: Bool { true }
+    override func accessibilityValue() -> Any? { isSelected ? 1 : 0 }
+
+    override func layout() {
+        super.layout()
+        let side = Tokens.Metric.favicon
+        icon.frame = NSRect(x: CardRow.inset, y: (bounds.height - side) / 2, width: side, height: side)
+        let x = icon.frame.maxX + CardRow.inset - Label.inset
+        let width = max(0, bounds.width - x - CardRow.inset + Label.inset)
+        let gap: CGFloat = 2
+        let text = title.lineHeight + (detail.stringValue.isEmpty ? 0 : gap + detail.lineHeight)
+        let top = round((bounds.height - text) / 2)
+        title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
+        detail.frame = NSRect(x: x, y: title.frame.maxY + gap, width: width, height: detail.lineHeight)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        applyRowStyle(animated: animated)
+        icon.contentTintColor = isSelected ? Brand.Theme.for(self).accent : Tokens.Color.icon
     }
 }

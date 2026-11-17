@@ -283,18 +283,35 @@ final class BrowserRootView: SpaceFrameView {
     /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
     /// it (#210): the window still reads as a sidebar and a page, as it does with a page open.
     let emptyHint = EmptySpaceMark()
+    /// Under the wordmark, on the card: the space's soft wash, or its picture (`EmptyPage`). Read only while empty.
+    let emptyBackdrop = EmptyPageBackdrop()
     var isEmpty = false {
         didSet {
             guard oldValue != isEmpty else { return }
             // The bar above the page takes the page's color, and there's none now.
             refreshGlassFrame()
+            emptyBackdrop.isActive = isEmpty
             // A change of state in place, eased; opening a window or restoring one, it's simply there.
-            guard window?.isVisible == true else { emptyHint.alphaValue = isEmpty ? 1 : 0; return }
+            guard window?.isVisible == true else {
+                emptyHint.alphaValue = isEmpty ? 1 : 0
+                emptyBackdrop.alphaValue = isEmpty ? 1 : 0
+                return
+            }
             Tokens.Motion.animate(Tokens.Motion.change) {
                 self.emptyHint.animator().alphaValue = self.isEmpty ? 1 : 0
+                self.emptyBackdrop.animator().alphaValue = self.isEmpty ? 1 : 0
             }
         }
     }
+
+    /// The empty page as `space` has it: its wash and its picture, none of either in a private window.
+    func showEmptyPage(of space: SpaceInfo, isPrivate: Bool, animated: Bool) {
+        // The picture as the library has it: a look being dragged in the editor is a copy from when it opened.
+        let kept = Library.shared.space(space.id) ?? space
+        emptyBackdrop.show(ground: EmptyPage.ground(for: space, isPrivate: isPrivate),
+                           picture: EmptyPage.picture(for: kept, isPrivate: isPrivate), animated: animated && window?.isVisible == true)
+    }
+
     /// Desk view hides the pages while their picture flies into or out of a card, so the two never show at once.
     /// They stay in the window and keep drawing, so they're ready the moment they show again.
     var pagesHidden = false {
@@ -536,6 +553,9 @@ final class BrowserRootView: SpaceFrameView {
         addSubview(sidePanel)
         emptyHint.alphaValue = 0
         addSubview(emptyHint)
+        emptyBackdrop.alphaValue = 0
+        card.setBackdrop(emptyBackdrop)
+        emptyBackdrop.onPictureChange = { [weak self] shown in self?.emptyHint.onPicture = shown }
         for extra in extraCards {
             extra.isHidden = true
             addSubview(extra)
@@ -1836,7 +1856,12 @@ final class SplitDropHint: NSView {
 /// so it reads as pressed in on any color, black and white included. Nothing to click or dismiss; ⌘T and the
 /// sidebar's New Tab are where a tab comes from.
 final class EmptySpaceMark: NSView {
-    static let size = NSSize(width: 28 * WordmarkView.aspect, height: 28)
+    /// Room around the letters for the shadow they cast on a picture, so it isn't cut at the view's edge.
+    static let margin: CGFloat = 6
+    static let size = NSSize(width: 28 * WordmarkView.aspect + margin * 2, height: 28 + margin * 2)
+    /// On the space's picture (`EmptyPageBackdrop`) an engraving can't read over every picture: the letters are
+    /// laid on it instead, in white with one soft shadow (`Color.markOnPicture`).
+    var onPicture = false { didSet { if onPicture != oldValue { needsDisplay = true } } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -1853,7 +1878,21 @@ final class EmptySpaceMark: NSView {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         // A dark space has little to shade, so light carries the cut; a light one has little to light, so shade does.
         let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let ink = WordmarkView.outline(in: bounds.insetBy(dx: 2, dy: 2))
+        let ink = WordmarkView.outline(in: bounds.insetBy(dx: 2 + Self.margin, dy: 2 + Self.margin))
+        if onPicture {
+            var fill = NSColor.white.cgColor, shade = NSColor.black.cgColor
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                fill = Tokens.Color.markOnPicture.cgColor
+                shade = Tokens.Color.markOnPictureShadow.cgColor
+            }
+            context.saveGState()
+            context.setShadow(offset: CGSize(width: 0, height: -Tokens.Shadow.liftDrop), blur: Tokens.Shadow.liftRadius, color: shade)
+            context.addPath(ink)
+            context.setFillColor(fill)
+            context.fillPath()
+            context.restoreGState()
+            return
+        }
         let below = CGMutablePath(); below.addPath(ink, transform: CGAffineTransform(translationX: 0, y: -1))
 
         // The rim of light under each letter: the outline nudged down, less the letters themselves.

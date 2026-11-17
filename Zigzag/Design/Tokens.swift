@@ -196,9 +196,9 @@ enum Tokens {
         private static var current: Size = UserDefaults.standard.string(forKey: "SidebarSize").flatMap(Size.init(rawValue:)) ?? .medium
 
         /// A Medium size at the size chosen, in whole points.
-        static func scaled(_ value: CGFloat) -> CGFloat { (value * current.scale).rounded() }
+        static func scaled(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size ?? current).scale).rounded() }
         /// The same for a height or an icon, in even points, so what's centered in it lands on whole points.
-        static func scaledEven(_ value: CGFloat) -> CGFloat { (value * current.scale / 2).rounded() * 2 }
+        static func scaledEven(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size ?? current).scale / 2).rounded() * 2 }
 
         /// From the sidebar's edges to its rows, favorites and address.
         static let edge: CGFloat = 6
@@ -213,6 +213,9 @@ enum Tokens {
         static let rowGap: CGFloat = 2
         /// A row's favicon, or the symbol in its place.
         static var favicon: CGFloat { scaledEven(16) }
+        static func favicon(for size: Size) -> CGFloat { scaledEven(16, for: size) }
+        /// The least title a part of a split's row shows beside its icon: a few letters. Narrower, its icon alone.
+        static func splitTitleMin(for size: Size? = nil) -> CGFloat { scaled(20, for: size) }
         /// From a row's edge to its icon, and from the icon to its title's first letter.
         static let rowInset: CGFloat = 6
         static let iconGap: CGFloat = Space.x2
@@ -1339,6 +1342,13 @@ enum Tokens {
         static let surfaceGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
         static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06),
             highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.30))
+        /// The wordmark on a space's picture (its empty page's Background): white letters, light or dark, with one
+        /// soft shadow (`Shadow.liftRadius`, `liftDrop`) under them, so they read on a busy picture, as a Mac's own
+        /// lock screen does. Stronger with Increase Contrast.
+        static let markOnPicture = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0xFFFFFF, alpha: 0.86),
+            highLight: hex(0xFFFFFF, alpha: 1), highDark: hex(0xFFFFFF, alpha: 1))
+        static let markOnPictureShadow = dynamic(light: hex(0x000000, alpha: 0.32), dark: hex(0x000000, alpha: 0.45),
+            highLight: hex(0x000000, alpha: 0.55), highDark: hex(0x000000, alpha: 0.65))
         /// Behind a PDF's pages and in its sidebar: a shade off the card, so each page stands out as paper.
         static let pdfBackdrop = dynamic(light: hex(0xEDEDF0), dark: hex(0x161618))
         /// Between a PDF's pages while they're drawn dark: a shade lighter than the dark paper, so each still reads as one.

@@ -1410,6 +1410,8 @@ final class DropdownButton: InteractiveView {
     /// How it's painted: the plain control, or, where it stands in for a filled answer (a question's own affirmative,
     /// offered as choices), the primary look. `tint` replaces the primary's fill with the window's accent.
     var look: ButtonLook = .secondary { didSet { stateDidChange(animated: false) } }
+    /// Its menu opens light or dark as the button is drawn, not as the window is (a card in its page's look).
+    var menuTakesOwnLook = false
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
     private var openedAt: TimeInterval = 0
     private var menuOpen = false { didSet { stateDidChange(animated: false) } }
@@ -1503,7 +1505,8 @@ final class DropdownButton: InteractiveView {
         }
         openedAt = ProcessInfo.processInfo.systemUptime
         menuOpen = true
-        MenuPanel.show(items, from: self, placement: .over(selectedIndex, textInset: Self.textInset), minWidth: bounds.width) { [weak self] in
+        MenuPanel.show(items, from: self, placement: .over(selectedIndex, textInset: Self.textInset), minWidth: bounds.width,
+                       appearance: menuTakesOwnLook ? effectiveAppearance : nil) { [weak self] in
             self?.menuOpen = false
         }
     }
@@ -1700,11 +1703,13 @@ final class MenuPanel: FloatingPanelView {
 
     /// Opens a menu from `anchor`. `closed` runs once it's gone, chosen or not.
     @discardableResult
+    /// `appearance`: light or dark for the menu, when it isn't the window's (a menu from a card in the page's look).
     static func show(_ entries: [Entry], from anchor: NSView, placement: Placement = .below, minWidth: CGFloat = 0,
-                     closed: (() -> Void)? = nil) -> MenuPanel? {
+                     appearance: NSAppearance? = nil, closed: (() -> Void)? = nil) -> MenuPanel? {
         current?.close(animated: false)
         guard let window = anchor.window, let host = window.contentView else { closed?(); return nil }
         let menu = MenuPanel(entries: entries)
+        menu.appearance = appearance
         menu.anchor = anchor
         menu.onClose = closed
 
