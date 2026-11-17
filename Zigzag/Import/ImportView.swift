@@ -33,9 +33,16 @@ final class ImportView: NSView {
     private let subtitle = NSTextField(wrappingLabelWithString: "")
     private var sources: [ImportCoordinator.Source] = []
     private var rows: [SourceRow] = []
-    /// The browsers scroll when there are more than fit, so the choices and Import stay in view.
+    /// Everything between the heading and the buttons. When it's taller than the window can be (many browsers,
+    /// Chrome's profiles, the choices wrapping), the browsers scroll first, so what to bring stays in view; on a
+    /// screen too short even for that, all of it scrolls. Import and Not Now stay at the bottom either way (#293).
+    private let bodyScroll = NSScrollView()
+    private let body = FlippedView()
     private let rowScroll = NSScrollView()
     private let rowList = FlippedView()
+    /// How tall it would be with nothing scrolled away: what its own window fits to.
+    private(set) var naturalHeight: CGFloat = 0
+    private var rowsScrolled = false
     private let choiceLabel = Label(String(localized: "Bring", comment: "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…"), font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
     private var choiceButtons: [(ImportCoordinator.Choice, ChoicePill)] = []
     /// With more than one profile: which one what's imported goes into. The profile of the space you're in, to begin with.
@@ -96,15 +103,19 @@ final class ImportView: NSView {
         signInsNote.font = Tokens.Font.small()
         signInsNote.textColor = Tokens.Color.textSecondary
         signInsNote.isSelectable = false
-        rowScroll.drawsBackground = false
-        rowScroll.useSlimScroller()
-        rowScroll.verticalScrollElasticity = .allowed
-        rowScroll.horizontalScrollElasticity = .none
-        rowScroll.contentView = FlippedClipView()
-        rowScroll.contentView.drawsBackground = false
-        rowScroll.documentView = rowList
+        for (scroll, content) in [(bodyScroll, body), (rowScroll, rowList)] {
+            scroll.drawsBackground = false
+            scroll.borderType = .noBorder
+            scroll.useSlimScroller()
+            scroll.verticalScrollElasticity = .automatic
+            scroll.horizontalScrollElasticity = .none
+            scroll.contentView = FlippedClipView()
+            scroll.contentView.drawsBackground = false
+            scroll.documentView = content
+        }
         emptyState.isHidden = true
-        [title, subtitle, emptyState, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker, chooseFile, primary, secondary].forEach { addSubview($0) }
+        [title, subtitle, emptyState, rowScroll, choiceLabel, signInsNote, intoLabel, intoPicker].forEach { body.addSubview($0) }
+        [bodyScroll, chooseFile, primary, secondary].forEach { addSubview($0) }
         intoIDs = ProfileChoice.fill(intoPicker, selected: intoProfile)
         intoPicker.setAccessibilityLabel(intoLabel.stringValue)
         intoPicker.onSelect = { [weak self] index in
@@ -134,7 +145,7 @@ final class ImportView: NSView {
             let box = ChoicePill(title: name)
             box.tint = Brand.Theme.brand.accent
             box.onChange = { [weak self] _ in self?.choicesChanged() }
-            addSubview(box)
+            body.addSubview(box)
             choiceButtons.append((choice, box))
         }
         chooseFile.onClick = { [weak self] _ in self?.pickFile() }
@@ -205,6 +216,9 @@ final class ImportView: NSView {
         }
         primary.isEnabled = stage != .choose || choosesFileFirst || (rows.contains(where: \.isChosen) && !chosenData.isEmpty)
         needsLayout = true
+        // A choice that brings more lines (Chrome's Extensions, the note on Sign-ins) makes room for them while the
+        // screen has it; it never shrinks back, so ticking a browser on and off doesn't bounce the window.
+        fitWindow(growOnly: true)
     }
 
     private var chosenData: ImportCoordinator.Choice {
@@ -414,7 +428,7 @@ final class ImportView: NSView {
         }
         showPasswords.isHidden = passwords == 0
         // The finished moment: the lit surface, the count, and the ribbon writing itself across it.
-        if hero.superview == nil { addSubview(hero) }
+        if hero.superview == nil { body.addSubview(hero) }
         banner.isHidden = true
         hero.showSuccess(summaries, somethingFailed: problems)
         primary.title = presentation == .welcome ? String(localized: "Start Browsing", comment: "Last button of the welcome window, after importing.")
@@ -424,19 +438,31 @@ final class ImportView: NSView {
         needsLayout = true
     }
 
-    /// In its own window, the window follows the content: shorter once only the summary is left.
-    func fitWindow() {
+    /// The tallest its own window gets: 780 points, or less on a short screen, where what's left scrolls.
+    static func tallestWindow(on screen: NSScreen?) -> CGFloat {
+        min(780, (screen ?? NSScreen.main)?.visibleFrame.height ?? 900)
+    }
+
+    /// In its own window, the window follows the content: shorter once only the summary is left. `growOnly`: only
+    /// taller, never shorter.
+    func fitWindow(growOnly: Bool = false) {
         guard presentation == .window, let window else { return }
+        // Measured as it is now, not as it was last laid out.
+        needsLayout = true
         layoutSubtreeIfNeeded()
-        let bottom = subviews.filter { !$0.isHidden && $0.superview === self }.map(\.frame.maxY).max() ?? bounds.height
-        let height = min(bottom + Tokens.Space.x6, 780)
         var frame = window.frame
         // Against the view's own height, as the window was first sized: it runs under the title bar, so the
         // layout rect (below it) fitted every later change a title bar too tall.
+        let chrome = frame.height - bounds.height
+        let height = min(naturalHeight, Self.tallestWindow(on: window.screen) - chrome)
         let delta = height - bounds.height
-        guard abs(delta) > 1 else { return }
+        guard abs(delta) > 1, !growOnly || delta > 0 else { return }
         frame.size.height += delta
         frame.origin.y -= delta
+        // Grown down past the bottom of the screen, it moves up to stay on it.
+        if let visible = (window.screen ?? NSScreen.main)?.visibleFrame, frame.minY < visible.minY {
+            frame.origin.y = min(visible.minY, visible.maxY - frame.height)
+        }
         window.setFrame(frame, display: true, animate: window.isVisible && !Tokens.Motion.reduceMotion)
     }
 
@@ -529,6 +555,7 @@ final class ImportView: NSView {
         super.layout()
         let width: CGFloat = min(440, bounds.width - Tokens.Space.x8 * 2)
         let x = round((bounds.width - width) / 2)
+        // Everything but the banner and the buttons goes in the body, top-down from its own top.
         var y: CGFloat = 0
         func place(_ view: NSView, height: CGFloat, gap: CGFloat = 0) {
             view.frame = NSRect(x: x, y: y, width: width, height: height)
@@ -543,108 +570,121 @@ final class ImportView: NSView {
         let rowsHeight: CGFloat = rowHeights.reduce(0, +) + CGFloat(max(0, visibleRows.count - 1)) * Tokens.Space.x2
         let signInsShown = showsChoices && !signInsNote.stringValue.isEmpty
         let noteHeight: CGFloat = signInsShown ? Tokens.Space.x2 + ceil(signInsNote.sizeThatFits(NSSize(width: width, height: 200)).height) : 0
-        // The choices wrap onto a second line when they don't fit one (Arc's Spaces and Tabs with Sign-ins).
-        var pillLines = 1, used: CGFloat = 0
-        for (_, box) in choiceButtons where !box.isHidden {
-            if used > 0, used + box.fittingWidth > width { pillLines += 1; used = 0 }
-            used += box.fittingWidth + Tokens.Space.x2
-        }
-        let pillsHeight = CGFloat(pillLines) * Tokens.Space.x8 + CGFloat(pillLines - 1) * Tokens.Space.x2
-        let choicesHeight: CGFloat = showsChoices ? Tokens.Space.x4 + Tokens.Space.x2 + pillsHeight + noteHeight : 0
         // Where it goes is asked only once there's a choice, and only before importing.
         let showsInto = stage == .choose && Library.shared.hasManyProfiles
-        let intoHeight: CGFloat = showsInto ? Tokens.Space.x4 + intoLabel.lineHeight + Tokens.Space.x2 + Tokens.Space.x8 : 0
         let emptyHeight: CGFloat = choosesFileFirst ? emptyState.preferredHeight(for: width) + Tokens.Space.x4 : 0
-        let showsHero = hero.superview != nil
-        let heroHeight: CGFloat = showsHero ? ImportHero.height + Tokens.Space.x8 : 0
         let titleHeight = ceil(title.intrinsicContentSize.height)
-        let total = heroHeight + titleHeight + Tokens.Space.x2 + subtitleHeight + Tokens.Space.x6 + rowsHeight + emptyHeight
-            + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + intoHeight + Tokens.Space.x8 + Tokens.Space.x8
-        if presentation == .window {
-            banner.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 128)
-            banner.contentInset = x
-            y = (banner.isHidden ? Tokens.Space.x12 : banner.frame.maxY + Tokens.Space.x6)
-        } else {
-            y = max(Tokens.Space.x16, round((bounds.height - total) / 2))
-        }
-        if showsHero {
-            hero.frame = NSRect(x: x, y: y, width: width, height: ImportHero.height)
-            y = hero.frame.maxY + Tokens.Space.x6
-        }
-        title.alignment = .left
-        title.attributedStringValue = Brand.display(title.stringValue, size: Tokens.TypeSize.display, color: Tokens.Color.textPrimary)
-        // What isn't placed is hidden, so nothing is left drawing where it last was, or in the corner.
-        title.isHidden = title.stringValue.isEmpty
-        subtitle.isHidden = subtitle.stringValue.isEmpty
-        if !title.isHidden { place(title, height: titleHeight, gap: Tokens.Space.x2) }
-        if !subtitle.isHidden { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
-        emptyState.isHidden = emptyHeight == 0
-        if emptyHeight > 0 { place(emptyState, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
-        // The rows get what's left once everything else fits: in their own window, as tall as the screen allows.
-        let limit: CGFloat
-        if presentation == .window {
-            let screen = window?.screen?.visibleFrame.height ?? 900
-            limit = min(780, screen - 60) - (window.map { $0.frame.height - $0.contentLayoutRect.height } ?? 28)
-        } else {
-            limit = bounds.height
-        }
-        let fixed = (presentation == .window ? 128 + Tokens.Space.x6 : Tokens.Space.x16 * 2) + heroHeight + (title.stringValue.isEmpty ? 0 : titleHeight + Tokens.Space.x2)
-            + (subtitle.stringValue.isEmpty ? 0 : subtitleHeight + Tokens.Space.x6) + emptyHeight
-            + (showsChoices ? Tokens.Space.x6 + choicesHeight : 0) + intoHeight + Tokens.Space.x8 * 2 + Tokens.Space.x6
-        let listHeight = max(120, min(rowsHeight, limit - fixed))
         var ry: CGFloat = 0
         for (row, height) in zip(visibleRows, rowHeights) {
             row.frame = NSRect(x: 0, y: ry, width: width, height: height)
             ry += height + Tokens.Space.x2
         }
         rowList.frame = NSRect(x: 0, y: 0, width: width, height: rowsHeight)
-        rowScroll.isHidden = visibleRows.isEmpty
-        if !visibleRows.isEmpty { place(rowScroll, height: rowsHeight > listHeight ? listHeight : rowsHeight, gap: Tokens.Space.x2) }
-        if showsChoices {
-            y += Tokens.Space.x4
-            place(choiceLabel, height: choiceLabel.lineHeight, gap: Tokens.Space.x2)
-            // The pills reach out by their padding, so each line's first check starts where the words above do, as
-            // Choose File… below does.
-            let start = x + Label.inset - Tokens.Space.x2
-            var cx = start
-            for (_, box) in choiceButtons where !box.isHidden {
-                let w = box.fittingWidth
-                if cx + w > x + width { cx = start; y += Tokens.Space.x8 + Tokens.Space.x2 }
-                box.frame = NSRect(x: cx, y: y, width: w, height: Tokens.Space.x8)
-                cx += w + Tokens.Space.x2
+        // Lays the body out with the browsers this tall, and says how tall the body came to.
+        func layBody(listHeight: CGFloat) -> CGFloat {
+            y = 0
+            if hero.superview != nil {
+                hero.frame = NSRect(x: x, y: y, width: width, height: ImportHero.height)
+                y = hero.frame.maxY + Tokens.Space.x6
             }
-            y += Tokens.Space.x8
-            signInsNote.isHidden = !signInsShown
-            if signInsShown {
-                y += Tokens.Space.x2
-                place(signInsNote, height: noteHeight - Tokens.Space.x2)
+            title.alignment = .left
+            title.attributedStringValue = Brand.display(title.stringValue, size: Tokens.TypeSize.display, color: Tokens.Color.textPrimary)
+            // What isn't placed is hidden, so nothing is left drawing where it last was, or in the corner.
+            title.isHidden = title.stringValue.isEmpty
+            subtitle.isHidden = subtitle.stringValue.isEmpty
+            if !title.isHidden { place(title, height: titleHeight, gap: Tokens.Space.x2) }
+            if !subtitle.isHidden { place(subtitle, height: subtitleHeight, gap: Tokens.Space.x6) }
+            emptyState.isHidden = emptyHeight == 0
+            if emptyHeight > 0 { place(emptyState, height: emptyHeight - Tokens.Space.x4, gap: Tokens.Space.x4) }
+            rowScroll.isHidden = visibleRows.isEmpty
+            if !visibleRows.isEmpty { place(rowScroll, height: listHeight, gap: Tokens.Space.x2) }
+            if showsChoices {
+                y += Tokens.Space.x4
+                place(choiceLabel, height: choiceLabel.lineHeight, gap: Tokens.Space.x2)
+                // The pills reach out by their padding, so each line's first check starts where the words above do, as
+                // Choose File… below does. They wrap onto a second line when they don't fit one (Arc's Spaces and Tabs
+                // with Sign-ins).
+                let start = x + Label.inset - Tokens.Space.x2
+                var cx = start
+                for (_, box) in choiceButtons where !box.isHidden {
+                    let w = box.fittingWidth
+                    if cx + w > x + width { cx = start; y += Tokens.Space.x8 + Tokens.Space.x2 }
+                    box.frame = NSRect(x: cx, y: y, width: w, height: Tokens.Space.x8)
+                    cx += w + Tokens.Space.x2
+                }
+                y += Tokens.Space.x8
+                signInsNote.isHidden = !signInsShown
+                if signInsShown {
+                    y += Tokens.Space.x2
+                    place(signInsNote, height: noteHeight - Tokens.Space.x2)
+                }
+            } else {
+                signInsNote.isHidden = true
             }
-        } else {
-            signInsNote.isHidden = true
+            intoLabel.isHidden = !showsInto
+            intoPicker.isHidden = !showsInto
+            if showsInto {
+                y += Tokens.Space.x4
+                place(intoLabel, height: intoLabel.lineHeight, gap: Tokens.Space.x2)
+                intoPicker.frame = NSRect(x: x, y: y, width: min(intoPicker.intrinsicContentSize.width, width), height: Tokens.Space.x8)
+                y += Tokens.Space.x8
+            }
+            return y
         }
-        intoLabel.isHidden = !showsInto
-        intoPicker.isHidden = !showsInto
-        if showsInto {
-            y += Tokens.Space.x4
-            place(intoLabel, height: intoLabel.lineHeight, gap: Tokens.Space.x2)
-            intoPicker.frame = NSRect(x: x, y: y, width: min(intoPicker.intrinsicContentSize.width, width), height: Tokens.Space.x8)
-            y += Tokens.Space.x8
-        }
-        y += Tokens.Space.x8
+        let fullHeight = layBody(listHeight: rowsHeight)
+        var contentHeight = fullHeight
         let buttonHeight = Tokens.Space.x8
+        // Below the body: a gap, the buttons, and the margin under them.
+        let tail = Tokens.Space.x8 + buttonHeight + (presentation == .window ? Tokens.Space.x6 : Tokens.Space.x16)
+        let top: CGFloat
+        if presentation == .window {
+            banner.frame = NSRect(x: 0, y: 0, width: bounds.width, height: 128)
+            banner.contentInset = x
+            top = banner.isHidden ? Tokens.Space.x12 : banner.frame.maxY + Tokens.Space.x6
+        } else {
+            top = max(Tokens.Space.x16, round((bounds.height - contentHeight - tail) / 2))
+        }
+        naturalHeight = top + fullHeight + tail
+        // Too tall for the window: the browsers give up room first, down to two and a half of them (the half one says
+        // there are more), so the choices of what to bring stay in view.
+        let room = bounds.height - top - tail
+        if fullHeight > room, !visibleRows.isEmpty {
+            let shortest = min(rowsHeight, (rowHeights.first ?? 0) * 2.5 + Tokens.Space.x2 * 2)
+            contentHeight = layBody(listHeight: max(shortest, rowsHeight - (fullHeight - room)))
+        }
+        // The browsers just started to scroll: their scroller shows for a moment, so the ones below are found.
+        let rowsScroll = rowScroll.frame.height < rowsHeight
+        if rowsScroll, !rowsScrolled { rowScroll.flashScrollers() }
+        rowsScrolled = rowsScroll
+        Self.keepInRange(rowScroll)
+        // The body gets what's left once the heading and the buttons fit; what doesn't fit scrolls between them.
+        let viewport = max(0, min(contentHeight, bounds.height - top - tail))
+        bodyScroll.frame = NSRect(x: 0, y: top, width: bounds.width, height: viewport)
+        body.frame = NSRect(x: 0, y: 0, width: bounds.width, height: contentHeight)
+        Self.keepInRange(bodyScroll)
+        let by = bodyScroll.frame.maxY + Tokens.Space.x8
         let pw = max(primary.fittingWidth, 96)
-        primary.frame = NSRect(x: x + width - pw, y: y, width: pw, height: buttonHeight)
+        primary.frame = NSRect(x: x + width - pw, y: by, width: pw, height: buttonHeight)
         if !secondary.isHidden {
             let sw = secondary.fittingWidth
-            secondary.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - sw, y: y, width: sw, height: buttonHeight)
+            secondary.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - sw, y: by, width: sw, height: buttonHeight)
         }
         if !showPasswords.isHidden {
             let w = showPasswords.fittingWidth + Tokens.Space.x2
-            showPasswords.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - w, y: y, width: w, height: buttonHeight)
+            showPasswords.frame = NSRect(x: primary.frame.minX - Tokens.Space.x2 - w, y: by, width: w, height: buttonHeight)
         }
         if !chooseFile.isHidden {
-            chooseFile.frame = NSRect(x: x - Tokens.Space.x2, y: y, width: chooseFile.fittingWidth, height: buttonHeight)
+            chooseFile.frame = NSRect(x: x - Tokens.Space.x2, y: by, width: chooseFile.fittingWidth, height: buttonHeight)
         }
+    }
+
+    /// Shorter content (a choice turned off, the import begun) doesn't leave a list scrolled past its end.
+    private static func keepInRange(_ scroll: NSScrollView) {
+        let clip = scroll.contentView
+        let furthest = max(0, (scroll.documentView?.frame.height ?? 0) - clip.bounds.height)
+        guard clip.bounds.origin.y > furthest else { return }
+        clip.scroll(to: NSPoint(x: 0, y: furthest))
+        scroll.reflectScrolledClipView(clip)
     }
 }
 
@@ -904,8 +944,9 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         // Laid out once tall, so the content's real height can be measured, then fitted.
         view.frame.size.height = 2000
         view.layoutSubtreeIfNeeded()
-        let height = view.subviews.filter { !$0.isHidden }.map(\.frame.maxY).max().map { $0 + Tokens.Space.x6 } ?? 560
-        window.setContentSize(NSSize(width: 560, height: min(height, 780)))
+        // A screen too short for it all gets a window that fits, and the browsers and choices scroll (#293).
+        let chrome = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 560, height: 100)).height - 100
+        window.setContentSize(NSSize(width: 560, height: min(view.naturalHeight, ImportView.tallestWindow(on: NSScreen.main) - chrome)))
         window.center()
         shared = controller
         controller.showWindow(nil)

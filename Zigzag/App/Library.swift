@@ -222,6 +222,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// Sites that always open in this space, whatever space the link came from (#286, `SiteRoutes`): hosts without
     /// "www.", each covering its subdomains. Nil: none (older libraries too).
     var routedSites: [String]? = nil
+    /// The picture the space's empty page shows (Background in its editor): a file's name in Zigzag's own
+    /// `Backgrounds` folder (`SpaceBackground`). Nil: the soft wash of the space's color.
+    var backgroundImage: String? = nil
 
     /// No hue of its own: white, a gray, or black.
     var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
@@ -658,6 +661,15 @@ final class Library {
         guard let i = index(of: id), spaces[i].icon != icon else { return }
         spaces[i].icon = icon
         commit()
+    }
+
+    /// The picture for the space's empty page, or nil for none. The one it had is deleted: Remove takes the copy away.
+    func setBackgroundImage(_ name: String?, forSpace id: UUID) {
+        guard let i = index(of: id), spaces[i].backgroundImage != name else { return }
+        let old = spaces[i].backgroundImage
+        spaces[i].backgroundImage = name
+        commit()
+        SpaceBackground.remove(old)
     }
 
     /// The color each space was given when it was made, in order. A space from before that was kept still has it as

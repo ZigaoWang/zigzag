@@ -32,8 +32,10 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 在 Zigzag Mini、已安装的网页 App，或隐藏了边栏的窗口里，网站有请求在等你时，窗口边缘会出现一条柔和的线，点一下就能把窗口带到前面来回答。感谢 [Lakeland97](https://github.com/Lakeland97)。([#284](https://github.com/ZigaoWang/zigzag/pull/284))
 - 网站可以始终在你选的空间中打开，就像 Arc 的 Air Traffic Control。在网站设置里设好“打开于”，或在“设置 › 空间 › 在空间中打开的网站”里添加网站，之后指向这个网站及其子域名的链接，无论来自其他 App、命令栏、地址栏还是其他空间里的链接，都会在那里新开一个标签页，并有一条小提示告诉你去了哪里。空间用的是自己的个人资料时，网站的 Cookie 也是分开的，就像 Firefox 的容器标签页。重定向、登录和网页自己的弹窗都会留在原处，无痕浏览窗口不受影响，Zigzag Mini 也一样，直到你把它的网页移到 Zigzag 里。空间被移除后，它的网站会重新在任意空间中打开。感谢 [retorquere](https://github.com/retorquere)。([#286](https://github.com/ZigaoWang/zigzag/issues/286))
 - “设置 › 空间 › 新空间使用自己的个人资料”默认关闭，打开后新建的空间会自带一份个人资料，有自己的登录状态、扩展和历史记录，不用每次手动新建。个人资料以空间命名，你给空间起名时会跟着改，没有其他个人资料用这个颜色时也会用空间的颜色。空间编辑器里仍然可以选别的个人资料，已有的空间、导入的空间和无痕浏览窗口都不受影响。感谢 [pyoio](https://github.com/pyoio)。([#291](https://github.com/ZigaoWang/zigzag/issues/291))
+- 没有打开网页的空间不再是纯白或纯黑，而是铺上一层很淡的空间颜色，像是边栏的浅色版。空间编辑器里新增了“背景”一行：点按“选取图像…”可以在字标后面放一张你自己的图像，点按“移除”就去掉。Zigzag 会保存一份按你的屏幕大小缩好的副本，所以就算原图被移走或删掉，图像也还在。无痕浏览窗口保持原样。
 
 ### 修复
+- 高刷新率屏幕上滚动和动画更流畅了。网页现在按屏幕的完整刷新率绘制，在 ProMotion 屏幕上每秒最多 120 次，和 Chrome 一样，不再最多 60 次；以前网站自己的平滑滚动、动画和随滚动移动的内容看起来会一顿一顿的。想换回原来的刷新率，可以在“设置 › 开发者 › 功能标志”里打开 Prefer Page Rendering Updates near 60fps。
 - 从 Arc 导入时，收藏会留在所显示空间所属的个人资料中，不再混入从其他 Mac 同步来的收藏或旧列表。每份个人资料里的同一页面只会添加一次。感谢 [adagradschool](https://github.com/adagradschool)。([#290](https://github.com/ZigaoWang/zigzag/pull/290))
 - 全屏时，显示边栏并打开“无边框页面”的情况下，网页碰到屏幕边缘的角现在是直角，不再是圆角、在右上角和右下角露出一小块边栏颜色的三角，没有打开网页或网页载入时最明显。在窗口里，网页的圆角跟着窗口本身的圆角走，不管 macOS 把窗口画得多圆。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
 - HLTV（hltv.org）不再显示博彩广告：网页两侧的广告栏、点一下就会打开博彩网站的背景图，以及标志旁边和侧栏里的横幅和赔率框都去掉了。新闻、比赛、比分和视频照常。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
@@ -44,6 +46,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 小播放器会跟着短视频连播走，比如抖音：下一个视频开始播放时会切过去，不再显示黑屏。感谢 [alextend](https://github.com/alextend)。([#267](https://github.com/ZigaoWang/zigzag/issues/267))
 - 从 Arc 导入会保留 Arc 的个人资料。你的 Arc 空间分布在多份个人资料里时，Arc 里自己建的每份个人资料都会变成同名的 Zigzag 个人资料（已有同名的就放进那份），连同它的空间、收藏、历史记录和登录状态；Arc 默认个人资料里的空间会放进你导入到的那份个人资料。再次导入不会重复添加，只用一份 Arc 个人资料时和以前一样。感谢 [miateo](https://github.com/miateo)。([#279](https://github.com/ZigaoWang/zigzag/issues/279))
 - Proton Pass 能用了：它的窗口不再说浏览器在激活它时遇到困难、让你更新浏览器，而是直接打开登录页。它启动后会把自己的扩展接口藏起来不让别的脚本用，在 Zigzag 里这样做会让它收不到自己的消息。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
+- 导入窗口里选了 Chrome 后，“导入”按钮不再跑到窗口底下点不到。屏幕放得下时，窗口会跟着你选的内容变高；放不下时，浏览器列表和选项可以滚动，“导入”和“以后”一直留在底部。感谢 [tachebleue](https://github.com/tachebleue)。([#293](https://github.com/ZigaoWang/zigzag/issues/293))
 
 ## [0.9.1] - 2026-11-16
 

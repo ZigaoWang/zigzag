@@ -75,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         _ = Library.shared
         _ = Profiles.shared.default.history
+        // Empty pages' pictures no space has any more: a deleted space's, kept until now so ⌘Z could bring it back.
+        let backgrounds = Set(Library.shared.spaces.compactMap(\.backgroundImage))
+        DispatchQueue.global(qos: .utility).async { SpaceBackground.prune(keeping: backgrounds) }
         // Icons clearing history set aside, if Zigzag didn't get to remove them when it quit.
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Copies an import read through, if Zigzag stopped before removing them: they can hold passwords.

@@ -617,6 +617,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.sidebarContainer.gradient = end.map { ($0, space.gradientAngle) }
         root.sidebarContainer.grain = tabManager.isPrivate ? 0 : space.grain ?? 0
         root.sidebarContainer.windowGlass = root.windowGlass
+        root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
     }
 
     private func showSelectedTab() {

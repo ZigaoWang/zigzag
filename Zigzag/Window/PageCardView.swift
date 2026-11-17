@@ -438,6 +438,14 @@ final class PageCardView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// The empty page's ground (`EmptyPageBackdrop`): on the surface under the page, so it has the card's shape,
+    /// corners and edge in every layout, and moves with it.
+    func setBackdrop(_ backdrop: NSView) {
+        backdrop.frame = surface.bounds
+        backdrop.autoresizingMask = [.width, .height]
+        surface.addSubview(backdrop, positioned: .below, relativeTo: clip)
+    }
+
     override var isFlipped: Bool { true }
 
     /// Around the surface, for the length of a move: the corners turning square or round again (`turnCorners`).

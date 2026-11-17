@@ -3484,6 +3484,17 @@
         }
       }
     },
+    "Background" : {
+      "comment" : "Label in a space's editor, before the buttons that choose or remove the picture its empty page shows.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "背景"
+          }
+        }
+      }
+    },
     "Background audio and clipboard" : {
       "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
       "localizations" : {
@@ -4301,12 +4312,23 @@
       }
     },
     "Choose" : {
-      "comment" : "Button of the panel that picks the downloads folder.",
+      "comment" : "Button of the panel that picks a picture for a space's empty page.\nButton of the panel that picks the downloads folder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取"
+          }
+        }
+      }
+    },
+    "Choose a picture for this space’s empty page." : {
+      "comment" : "Message of the panel that picks a picture for a space's empty page, from Background in the space's editor.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为此空间的空白页面选取一张图像。"
           }
         }
       }
@@ -4340,6 +4362,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取图标"
+          }
+        }
+      }
+    },
+    "Choose Image…" : {
+      "comment" : "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取图像…"
           }
         }
       }
@@ -5917,6 +5950,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未能翻译此页面。请稍后再试。"
+          }
+        }
+      }
+    },
+    "Couldn’t use this picture" : {
+      "comment" : "Title of the notice when a picture chosen for a space's empty page can't be read.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法使用这张图像"
           }
         }
       }
@@ -13922,7 +13966,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nButton on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
+      "comment" : "Button in a space's editor, on the Background row: takes the picture off the space's empty page and deletes Zigzag's copy of it.\nButton of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nButton on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20719,6 +20763,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag %@ 已就绪，重新启动即可更新。"
+          }
+        }
+      }
+    },
+    "Zigzag can’t read that file as a picture. Choose a photo or an image file, like a JPEG, PNG or HEIC." : {
+      "comment" : "Message of the notice when a picture chosen for a space's empty page can't be read.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 无法将该文件读取为图像。请选取照片或图像文件，例如 JPEG、PNG 或 HEIC。"
           }
         }
       }
