@@ -748,6 +748,8 @@ enum DebugBridge {
             for case .item(let item) in entries where item.title == arg { item.action() }
         case "markedfolder":controller.newFolder(with: controller.pinnedIDs(for: controller.sidebar.list.marked)); controller.sidebar.list.clearMarks()
         case "newspaceui": controller.newSpace(nil)
+        // ownprofile on|off: Settings › Spaces › Give new spaces their own profile (#291).
+        case "ownprofile": Library.newSpacesGetOwnProfile = arg == "on"
         case "editspace": SpaceEditorPanel.toggle(spaceID: controller.tabManager.currentSpaceID, in: controller)
         case "closeeditor": SpaceEditorPanel.current?.close()
         case "canceleditor": SpaceEditorPanel.current?.cancel()

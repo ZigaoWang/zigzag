@@ -2031,6 +2031,17 @@
         }
       }
     },
+    "A space you make gets a profile named after it, with its own sign-ins, extensions and history. Spaces you have now stay on theirs." : {
+      "comment" : "Explanation under “Give new spaces their own profile” in Settings › Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建的空间会有一份以它命名的个人资料，有自己的登录状态、扩展和历史记录。现有的空间保持不变。"
+          }
+        }
+      }
+    },
     "A tab needs your answer" : {
       "comment" : "Tooltip of the glow along the sidebar's edge when one page is waiting for an answer.",
       "localizations" : {
@@ -6181,6 +6192,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文件和链接"
+          }
+        }
+      }
+    },
+    "Give new spaces their own profile" : {
+      "comment" : "A setting in Settings › Spaces: a space you make gets a new profile of its own, named after the space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新空间使用自己的个人资料"
           }
         }
       }
@@ -22410,6 +22432,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已选中"
+          }
+        }
+      }
+    },
+    "separate profile per space each own container isolate new space" : {
+      "comment" : "Words that find the Give new spaces their own profile setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单独 个人资料 每个空间 各自 容器 隔离 新空间"
           }
         }
       }

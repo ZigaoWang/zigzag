@@ -1798,6 +1798,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
+    /// A profile made with the space (Settings › Spaces › Give new spaces their own profile, #291): it takes the
+    /// space's name as you type it, as one New Profile made here does.
+    func follow(madeProfile id: UUID) {
+        namedProfile = id
+        refreshProfiles()
+    }
+
     /// The space as it was when the editor opened; closing registers one ⌘Z for everything changed.
     private let before = Library.shared.snapshot
     private var edited = false

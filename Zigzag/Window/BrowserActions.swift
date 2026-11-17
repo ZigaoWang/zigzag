@@ -583,13 +583,19 @@ extension BrowserWindowController: NSMenuItemValidation {
         // Spaces are kept for good; a private window keeps nothing.
         guard !tabManager.isPrivate else { return }
         var created: SpaceInfo?
-        libraryChange(String(localized: "New Space", comment: "Undo action name, shown in the Edit menu as Undo New Space.")) { created = Library.shared.addSpace(profile: tabManager.profile.id) }
+        let own = Library.newSpacesGetOwnProfile
+        libraryChange(String(localized: "New Space", comment: "Undo action name, shown in the Edit menu as Undo New Space.")) {
+            created = Library.shared.addSpace(profile: tabManager.profile.id, ownProfile: own)
+        }
         guard let space = created else { return }
+        // Its own profile, when Settings › Spaces gives new spaces one (#291).
+        let madeProfile = own ? Library.shared.profileID(ofSpace: space.id) : nil
         let previous = tabManager.currentSpaceID
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
         tabManager.switchToSpace(space.id)
         Tutorial.complete("space")
         renameSpace(nil)
+        if let madeProfile { SpaceEditorPanel.current?.follow(madeProfile: madeProfile) }
         // Esc while naming it: never mind. Back where you were, without the space, and the guide still asks for one.
         SpaceEditorPanel.current?.onCancel = { [weak self] in
             guard let self, Library.shared.space(space.id) != nil else { return }
@@ -597,6 +603,10 @@ extension BrowserWindowController: NSMenuItemValidation {
             if Library.shared.space(previous) != nil { tabManager.switchToSpace(previous) }
             // Nothing was in it yet, so there's nothing for ⌘Z to bring back.
             Library.shared.removeSpace(space.id)
+            // Nor in the profile made for it, unless a space was put on it since.
+            if let madeProfile, madeProfile != Profile.defaultID, Library.shared.spaces(in: madeProfile).isEmpty {
+                Task { await Profiles.shared.remove(madeProfile) }
+            }
         }
     }
     @objc func renameSpace(_ sender: Any?) {
