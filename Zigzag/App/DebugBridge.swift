@@ -1699,6 +1699,12 @@ enum DebugBridge {
             controller.peek.tab?.webView?.evaluateJavaScript(arg) { result, error in
                 debugLog("peekjs => \(String(describing: result).prefix(500)) \(error.map { String(describing: $0) } ?? "")")
             }
+        case "textcheck":
+            // textcheck [<selector>]: sends a spelling or substitution toggle (toggleAutomaticSpellingCorrection:) to
+            // the selected page as Edit › Spelling and Grammar would, then writes WebKit's choices as the app keeps them.
+            if !arg.isEmpty { controller.selectedWebView?.perform(NSSelectorFromString(arg), with: nil) }
+            let values = PageTextChecking.shared.current().sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
+            debugLog("textcheck \(values.joined(separator: " ")) system=\(NSSpellChecker.isAutomaticSpellingCorrectionEnabled) sent=\(PageTextChecking.shared.sent)")
         case "js":
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
