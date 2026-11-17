@@ -858,6 +858,9 @@ final class Tab: NSObject {
     /// own load replaced, which would clear `openedByRule` while the rule's load is still on its way; this outlives
     /// that, so the address the rule opened is never offered to a rule again until a page arrives here.
     private var ruleOpenedURL: URL?
+    /// The address whose handoff question was last put off in this tab. A link put off loads, and when it turns out
+    /// to be a file its response and its download would otherwise ask the same question again.
+    private var ruleDeclinedURL: URL?
     /// True when the handoff question for this navigation or download was put off. WebKit still makes the download,
     /// and the download manager must not put the same question up a second time for it.
     private var declinedRuleDownload = false
@@ -1523,6 +1526,8 @@ extension Tab: WKNavigationDelegate {
             } else if [.linkActivated, .formSubmitted, .backForward, .reload].contains(navigationAction.navigationType) {
                 openedByRule = false
             }
+            // A link clicked again is a new question, even for the address that was put off a moment ago.
+            if userInitiated, navigationAction.navigationType == .linkActivated { ruleDeclinedURL = nil }
             ownLoadPending = nil
             ownHistoryTarget = nil
             // A fallback over http is for the address it was given for: any other the main frame goes to ends it.
@@ -1864,7 +1869,7 @@ extension Tab: WKNavigationDelegate {
                                  pageOrigin: String? = nil) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take. A page a rule opened is the rule's own
         // doing: the rule that took the address must not take it again, whether the page becomes a load or a download.
-        guard !openedByRule, !wasOpenedByRule(url) else { return false }
+        guard !openedByRule, !wasOpenedByRule(url), !wasDeclined(url) else { return false }
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
         // A link has no file name; a download's own name is what an earlier file-type destination matches, so the
         // handoff scan must see it and stand aside for that destination.
@@ -1880,7 +1885,10 @@ extension Tab: WKNavigationDelegate {
         let decision = await DownloadHandoff.decide(rule, request: handoff, tab: self, forDownload: !appliesToLinks)
         handoff.place = decision.place
         // A question put off for a download leaves the file to Zigzag, and the download manager must not ask again.
-        if decision.declined, !appliesToLinks { declinedRuleDownload = true }
+        if decision.declined {
+            ruleDeclinedURL = url
+            if !appliesToLinks { declinedRuleDownload = true }
+        }
         switch decision.gate {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
@@ -1903,6 +1911,12 @@ extension Tab: WKNavigationDelegate {
         }
     }
 
+    /// Whether `url` is the address whose handoff question was last put off in this tab.
+    private func wasDeclined(_ url: URL?) -> Bool {
+        guard let url, let declined = ruleDeclinedURL else { return false }
+        return Self.sameAddress(declined, url)
+    }
+
     /// Whether `url` is the address a download rule last sent this tab to.
     private func wasOpenedByRule(_ url: URL?) -> Bool {
         guard let url, let opened = ruleOpenedURL else { return false }
@@ -1911,7 +1925,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
         let byRule = openedByRule || wasOpenedByRule(download.originalRequest?.url)
-        let declined = declinedRuleDownload
+        let declined = declinedRuleDownload || wasDeclined(download.originalRequest?.url)
         openedByRule = false
         declinedRuleDownload = false
         DownloadManager.shared.track(download, window: host?.hostWindow, openedByRule: byRule, rulesAlreadyDeclined: declined)
@@ -1920,7 +1934,7 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         let byRule = openedByRule || wasOpenedByRule(download.originalRequest?.url)
-        let declined = declinedRuleDownload
+        let declined = declinedRuleDownload || wasDeclined(download.originalRequest?.url)
         openedByRule = false
         declinedRuleDownload = false
         DownloadManager.shared.track(download, window: host?.hostWindow, openedByRule: byRule, rulesAlreadyDeclined: declined)
@@ -1948,6 +1962,7 @@ extension Tab: WKNavigationDelegate {
         // this navigation has been answered by the page arriving.
         openedByRule = false
         ruleOpenedURL = nil
+        ruleDeclinedURL = nil
         declinedRuleDownload = false
         forgetPageErrors()
         // The new page is here: its address shows.
