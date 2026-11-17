@@ -365,8 +365,8 @@ struct ExtensionCompatibilityTests {
 
     @Test func everyKnownPermissionHasAClaim() throws {
         let (overlay, _) = try shipped()
-        // The old limitNames table's keys, verbatim. ExtensionReport keeps it private, so the union the plan names
-        // is written here; a permission added to either table without a claim fails this test.
+        // The keys the old limitNames table named, verbatim, kept so the union the plan covers is still checked after
+        // that table's removal. A permission added to the report without a claim fails this test.
         let oldLimitKeys: Set<String> = [
             "sidePanel", "identity", "identity.email", "notifications", "downloads", "downloads.open",
             "idle", "offscreen", "webRequestBlocking", "history", "bookmarks", "topSites", "tabGroups",
@@ -439,6 +439,18 @@ struct ExtensionCompatibilityTests {
             }
         }
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    /// One feature is one line however many members ask: tabCapture's permission row and its capture claim both name
+    /// tab video capture, so the claims path hands the sheet a single line.
+    @Test func oneFeatureIsOneLineHoweverManyMembersAsk() throws {
+        let (overlay, _) = try shipped()
+        let limits = ExtensionCompatibility(overlay: overlay)
+            .limits(forPermissions: ["tabCapture"], manifestKeys: [])
+        #expect(limits.count == 1)
+        #expect(limits.first?.catalogKey == "extension.limit.tabVideoCapture")
+        #expect(limits.first?.text == "Tab video capture")
+        #expect(limits.first?.source == "tabCapture")
     }
 
     @Test func theStorageLimitReachesTheSheet() throws {

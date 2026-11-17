@@ -4,8 +4,9 @@ import WebKit
 /// What an extension will be able to do, and what it asks for that Zigzag can't give it, in plain words.
 /// Shown before installing and in Settings.
 ///
-/// The limits come from WebKit itself: it quietly drops permissions it doesn't support, so anything the
-/// manifest asks for that WebKit didn't recognize is something that won't work here.
+/// The limits come from the compatibility claims over `chrome-api.json`: each permission and manifest key is
+/// answered by the overlay, and the sheet shows the lines those answers name. A permission no claim covers and
+/// WebKit drops is still named, by the permission itself.
 @available(macOS 15.4, *)
 struct ExtensionReport {
     struct Line: Hashable {
@@ -15,8 +16,8 @@ struct ExtensionReport {
 
     /// What it can do once added, most important first. Empty for an extension that asks for nothing notable.
     let abilities: [Line]
-    /// Features it asks for that won't work in Zigzag, as short names ("Side panel", "Signing in").
-    let limits: [String]
+    /// Features it asks for that won't work in Zigzag, as the claims word them.
+    let limits: [CompatibilityLimit]
     /// What the lines were worded from, so several extensions' can be put together.
     private var asked = Asked()
 
@@ -38,15 +39,71 @@ struct ExtensionReport {
         let patterns = ext.allRequestedMatchPatterns.map(\.string)
         abilities = Self.abilities(permissions: requested, patterns: patterns, id: id, replacesNewTab: replacesNewTab, searchEngine: searchEngine)
         asked = Asked(permissions: requested, patterns: Set(patterns), replacesNewTab: replacesNewTab, searchEngines: searchEngine.map { [$0] } ?? [], ids: [id])
+        limits = Self.lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
+    }
 
-        var limits: [String] = ExtensionShims.shim(for: id)?.knownIssue.map { [$0] } ?? []
-        let covered = (ExtensionShims.shim(for: id)?.coveredPermissions ?? []).union(ExtensionBridgeScript.permissions)
-        for permission in requested.subtracting(recognized).subtracting(covered).sorted() {
-            if let name = Self.limitNames[permission], !limits.contains(name) { limits.append(name) }
+    /// The lines Settings shows for an extension, without building its whole report. The overlay behind them is
+    /// decoded once, by `ExtensionCompatibility.shared`.
+    static func limits(for ext: WKWebExtension, manifest: [String: Any], id: String) -> [CompatibilityLimit] {
+        let requested = strings(manifest, ["permissions", "optional_permissions"])
+        let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
+        return lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
+    }
+
+    /// The claims' lines for the permissions and manifest keys a manifest asks for, less what a shim's prelude
+    /// stands in for, plus a line named by the permission itself where neither WebKit nor the claims know it. Only
+    /// wording and suppression happen here: nothing grants, widens or drops a permission.
+    private static func lines(for manifest: [String: Any], requested: Set<String>, recognized: Set<String>,
+                              id: String, log: Bool) -> [CompatibilityLimit] {
+        var limits = claimedLines(for: requested, manifestKeys: manifestKeys(in: manifest), id: id, log: log)
+        let covered = ExtensionShims.shim(for: id)?.coveredPermissions ?? []
+        let claimed = ExtensionCompatibility.shared.overlay.map { Set($0.permissions.keys) } ?? []
+        // WebKit dropping it is what makes it a limit; a permission it supplies but no claim mentions still works.
+        // MV2 allows host patterns beside permissions; a pattern is not a permission missing a claim.
+        let names = Set(requested.filter(Self.isPermissionName))
+        for name in names.subtracting(recognized).subtracting(claimed).subtracting(covered).sorted() {
+            limits.append(CompatibilityLimit(catalogKey: nil, group: name, reason: .webkitMissing,
+                                             status: .unsupported, source: name))
+            if log { ExtensionLog.write("\(id): \(name) is not in the compatibility claims; reported by name") }
         }
-        for (permission, name) in Self.partLimits where requested.contains(permission) && !limits.contains(name) { limits.append(name) }
-        for (key, name) in Self.manifestLimits where manifest[key] != nil && !limits.contains(name) { limits.append(name) }
-        self.limits = limits
+        return limits
+    }
+
+    /// The lines the overlay has for these permissions and manifest keys, with a shim's covered permissions left
+    /// out: the prelude answers those well enough that the person won't miss them.
+    private static func claimedLines(for requested: Set<String>, manifestKeys: Set<String>, id: String,
+                                     log: Bool) -> [CompatibilityLimit] {
+        let shim = ExtensionShims.shim(for: id)
+        let covered = shim?.coveredPermissions ?? []
+        var limits = ExtensionCompatibility.shared.limits(forPermissions: requested, manifestKeys: manifestKeys)
+        let hidden = limits.filter { covered.contains(permission(of: $0)) }
+        limits.removeAll { covered.contains(permission(of: $0)) }
+        if log {
+            for limit in hidden {
+                ExtensionLog.write("\(id): \(limit.text) is covered by the extension's prelude; not a limit")
+            }
+            if let knownIssue = shim?.knownIssue {
+                ExtensionLog.write("\(id): a prelude-known issue has no compatibility claim: \(knownIssue)")
+            }
+        }
+        return limits
+    }
+
+    /// The manifest keys the claims have lines for, as this manifest asks for them.
+    private static func manifestKeys(in manifest: [String: Any]) -> Set<String> {
+        guard let overlay = ExtensionCompatibility.shared.overlay else { return [] }
+        return Set(overlay.manifest.keys.filter { manifest[$0] != nil })
+    }
+
+    /// The manifest permission a line belongs to: its source's first component. A whole-permission line's source is
+    /// the permission itself; a member line's is the claim's path (`management.getSelf`).
+    private static func permission(of limit: CompatibilityLimit) -> String {
+        String(limit.source.prefix { $0 != "." })
+    }
+
+    /// Whether a manifest string is a permission's name rather than a host match pattern MV2 allows beside it.
+    private static func isPermissionName(_ name: String) -> Bool {
+        !name.contains("://") && name != "<all_urls>" && !name.hasPrefix("*")
     }
 
     /// What several extensions added together will be able to do, worded once: "every website" once, not once
@@ -80,11 +137,17 @@ struct ExtensionReport {
         let full = ExtensionReport(extension: ext, manifest: manifest, id: id)
         let oldPatterns = Self.strings(old, ["host_permissions", "optional_host_permissions"])
             .union(Self.strings(old, ["permissions"]).filter { $0.contains("://") || $0 == "<all_urls>" })
-        let oldLines = Set(Self.abilities(permissions: Self.strings(old, ["permissions", "optional_permissions"]), patterns: Array(oldPatterns), id: id,
+        let oldPermissions = Self.strings(old, ["permissions", "optional_permissions"])
+        let oldLines = Set(Self.abilities(permissions: oldPermissions, patterns: Array(oldPatterns), id: id,
                                           replacesNewTab: (old["chrome_url_overrides"] as? [String: Any])?["newtab"] != nil,
                                           searchEngine: ExtensionSearchProvider(manifest: old, extensionID: id)?.name))
         abilities = full.abilities.filter { !oldLines.contains($0) }
-        limits = full.limits
+        // The delta is by catalog key: a line the old version already had is not news. An unclaimed permission has
+        // no key, so its own name stands in; every permission the old manifest doesn't claim counts, so one it
+        // already asked for is not shown again.
+        let oldLimits = Set(Self.lines(for: old, requested: oldPermissions, recognized: [], id: id, log: false)
+            .map(\.identity))
+        limits = full.limits.filter { !oldLimits.contains($0.identity) }
     }
 
     /// What an extension asking for more (`permissions.request`) would gain, for asking you first. Every permission
@@ -103,7 +166,7 @@ struct ExtensionReport {
             lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "Use more of Zigzag’s features", comment: "One thing an extension can do, in the sheet that asks before it gets more access: stands in for permissions with no line of their own.")))
         }
         abilities = lines
-        limits = []
+        limits = Self.claimedLines(for: permissions, manifestKeys: [], id: id, log: true)
     }
 
     /// Permissions an extension gets only when you say so, when it asks for one later: what Chrome warns about, and
@@ -212,44 +275,10 @@ struct ExtensionReport {
         }
     }
 
-    /// Permissions WebKit doesn't support, by the feature a person would notice is missing.
-    private static let limitNames: [String: String] = [
-        "sidePanel": String(localized: "Side panel", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "identity": String(localized: "Signing in with your account", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "identity.email": String(localized: "Signing in with your account", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "notifications": String(localized: "Notifications", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "downloads": String(localized: "Downloads", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "downloads.open": String(localized: "Downloads", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "idle": String(localized: "Knowing when you’re away", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "offscreen": String(localized: "Background audio and clipboard", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "webRequestBlocking": String(localized: "Blocking requests the old way", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "history": String(localized: "Your browsing history", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "bookmarks": String(localized: "Your bookmarks", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "topSites": String(localized: "Your top sites", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "tabGroups": String(localized: "Tab groups", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "fontSettings": String(localized: "Font settings", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "tts": String(localized: "Reading aloud", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "ttsEngine": String(localized: "Reading aloud", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "geolocation": String(localized: "Your location", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "clipboardRead": String(localized: "Reading what you copy", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "management": String(localized: "Managing other extensions", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "privacy": String(localized: "Privacy settings", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "debugger": String(localized: "Debugging pages", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "pageCapture": String(localized: "Saving pages", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "desktopCapture": String(localized: "Recording your screen", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "tabCapture": String(localized: "Recording tabs", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "system.display": String(localized: "Display information", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-        "power": String(localized: "Keeping your Mac awake", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag."),
-    ]
+}
 
-    /// The part of an API the bridge answers that still won't work, by the permission that brings it.
-    private static let partLimits: [(String, String)] = [
-        // Fixed proxy servers work; WebKit has nothing to run a proxy auto-config script on.
-        ("proxy", String(localized: "Proxy scripts (PAC)", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag: proxy auto-config scripts, which choose a proxy for each site.")),
-    ]
-
-    /// Manifest features with no WebKit equivalent.
-    private static let manifestLimits: [(String, String)] = [
-        ("omnibox", String(localized: "Address bar keyword", comment: "Feature name in the list of things an extension uses that won’t work in Zigzag.")),
-    ]
+private extension CompatibilityLimit {
+    /// What makes two lines the same feature across versions: the catalog key that words it, or the raw permission
+    /// when no claim covers it.
+    var identity: String { catalogKey ?? "permission:\(source)" }
 }

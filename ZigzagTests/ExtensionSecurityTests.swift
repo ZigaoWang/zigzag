@@ -464,6 +464,111 @@ struct ExtensionSecurityTests {
 // MARK: Install sheets
 
 extension ExtensionSecurityTests {
+    /// The install sheet's limits come from the compatibility claims, not from what WebKit happens to recognize: a
+    /// permission WebKit supplies still gets the line its claim names, and one the claims support gets none.
+    @Test func limitsComeFromClaimsNotFromWebKit() async throws {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
+                                       "permissions": ["storage", "sidePanel"]]
+        let context = try await Self.context(manifest)
+        let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
+        #expect(report.limits.map(\.catalogKey) == ["extension.limit.storageSync"])
+        #expect(report.limits.map(\.text) == ["Settings that stay on this Mac"])
+        // sidePanel is supported by the claims, so the old table's "Side panel" is gone even though WebKit supplies it.
+        #expect(!report.limits.map(\.text).contains("Side panel"))
+    }
+
+    /// A permission neither WebKit nor the claims know is still something the extension asked for and won't get:
+    /// it is reported by its own name, with no invented English around it, once.
+    @Test func aPermissionNoClaimCoversIsReportedNotDropped() async throws {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
+                                       "permissions": ["alarms", "totallyMadeUpPermission"],
+                                       "optional_permissions": ["anotherUnknownPermission"]]
+        let context = try await Self.context(manifest)
+        let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
+        // WebKit knows alarms, so an unclaimed but working permission is not a limit.
+        #expect(!report.limits.map(\.source).contains("alarms"))
+        let madeUp = try #require(report.limits.first { $0.source == "totallyMadeUpPermission" })
+        #expect(madeUp.catalogKey == nil)
+        #expect(madeUp.text == "totallyMadeUpPermission")
+        #expect(madeUp.status == .unsupported)
+        #expect(report.limits.filter { $0.source == "totallyMadeUpPermission" }.count == 1)
+        let optional = try #require(report.limits.first { $0.source == "anotherUnknownPermission" })
+        #expect(optional.catalogKey == nil)
+        #expect(optional.text == "anotherUnknownPermission")
+        // MV2 puts host patterns beside permissions; a pattern is not a permission missing a claim.
+        let legacy: [String: Any] = ["manifest_version": 2, "name": "Test", "version": "1.0",
+                                     "permissions": ["storage", "https://*.example.com/*", "<all_urls>"]]
+        let legacyContext = try await Self.context(legacy)
+        let legacyReport = ExtensionReport(extension: legacyContext.webExtension, manifest: legacy, id: id)
+        #expect(!legacyReport.limits.map(\.source).contains("https://*.example.com/*"))
+        #expect(!legacyReport.limits.map(\.source).contains("<all_urls>"))
+    }
+
+    /// Every line a person saw before the claims either still reads the same or is one the claims now say works.
+    @Test func theInstallSheetLimitsReadAsTheyDidBefore() async throws {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let permissions = ["sidePanel", "identity", "identity.email", "notifications", "downloads", "downloads.open",
+                           "idle", "offscreen", "webRequestBlocking", "history", "bookmarks", "topSites", "tabGroups",
+                           "fontSettings", "tts", "ttsEngine", "geolocation", "clipboardRead", "management", "privacy",
+                           "debugger", "pageCapture", "desktopCapture", "tabCapture", "system.display", "power", "proxy"]
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
+                                       "permissions": permissions, "omnibox": ["keyword": "test"]]
+        let context = try await Self.context(manifest)
+        let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
+        #expect(Set(report.limits.map(\.text)) == [
+            "Tab groups", "Signing in with your account", "Tab video capture", "Blocking requests the old way",
+            "Debugging pages", "Font settings", "Privacy settings", "Managing other extensions", "Saving pages",
+            "Recording your screen", "Address bar keyword", "Reading aloud", "Your location", "Reading what you copy",
+            "Proxy scripts (PAC)",
+        ])
+        // The seven permission rows the claims now call supported keep the old table's lines out, and tabCapture's
+        // line is the video-specific one rather than the old "Recording tabs".
+        for gone in ["Side panel", "Your browsing history", "Your bookmarks", "Your top sites", "Notifications",
+                     "Downloads", "Knowing when you’re away", "Background audio and clipboard", "Recording tabs",
+                     "Display information", "Keeping your Mac awake"] {
+            #expect(!report.limits.map(\.text).contains(gone), "\(gone)")
+        }
+    }
+
+    /// An update's sheet names only the limits the new version adds, by their catalog key, not every limit it has.
+    @Test func anUpdateShowsOnlyLimitsItAdds() async throws {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let old: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
+                                  "permissions": ["privacy", "tabGroups"]]
+        var new = old
+        new["version"] = "1.1"
+        new["permissions"] = ["privacy", "tabGroups", "fontSettings"]
+        let context = try await Self.context(new)
+        let report = ExtensionReport(newIn: context.webExtension, manifest: new, comparedTo: old, id: id)
+        #expect(report.limits.map(\.text) == ["Font settings"])
+        // Taking one away is not an addition.
+        var fewer = new
+        fewer["permissions"] = ["privacy"]
+        let removed = ExtensionReport(newIn: context.webExtension, manifest: fewer, comparedTo: old, id: id)
+        #expect(removed.limits.isEmpty)
+    }
+
+    /// A shim's prelude stands in for the permissions it covers, so the lines those permissions would add are
+    /// suppressed; the claims still word every other line.
+    @Test func aShimCoveredPermissionIsNotReported() async throws {
+        let manifest: [String: Any] = ["manifest_version": 3, "name": "1Password", "version": "1.0",
+                                       "permissions": ["management", "privacy", "storage"]]
+        let context = try await Self.context(manifest)
+        let report = ExtensionReport(extension: context.webExtension, manifest: manifest,
+                                     id: ExtensionStore.onePasswordID)
+        #expect(report.limits.map(\.text) == ["Settings that stay on this Mac"])
+    }
+
+    /// The later-request sheet uses the same limits as the install sheet, not an empty list.
+    @Test func theQuestionShowsTheSameLimitsAsTheSheet() {
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        #expect(ExtensionReport(requesting: ["privacy", "tabGroups"], id: id).limits.map(\.text)
+                == ["Tab groups", "Privacy settings"])
+        #expect(ExtensionReport(requesting: ["sidePanel"], id: id).limits.isEmpty)
+    }
+
     /// The install sheet words what these permissions bring, as the later-request sheet does.
     @Test func theInstallSheetNamesEveryRiskyPermission() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
