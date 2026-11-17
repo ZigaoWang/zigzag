@@ -949,6 +949,11 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// The resize handle, on the sidebar's edge that faces the page.
+    /// Where the waiting glow goes while the sidebar is hidden: the window's own edge on the sidebar's side.
+    static func attentionEdgeFrame(in bounds: NSRect, onRight: Bool) -> NSRect {
+        AttentionEdge.frame(forPage: bounds, sidebarOnRight: onRight)
+    }
+
     static func resizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
         let width = Tokens.Metric.resizeHandleWidth
         return mirrored(NSRect(x: bounds.minX + sidebarWidth - width / 2, y: bounds.minY, width: width, height: bounds.height), in: bounds, if: onRight)
@@ -996,8 +1001,10 @@ final class BrowserRootView: SpaceFrameView {
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         resizeHandle.frame = Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
-        // The glow takes the resize handle's place while the sidebar is out of sight and a question is waiting.
-        attentionEdge.frame = resizeHandle.frame
+        // The glow sits on the window's edge where the sidebar comes back from, while the sidebar is out of sight and a
+        // question is waiting. Not at the resize handle: with the sidebar hidden that is the sidebar's width into the
+        // page, a line through what you are reading.
+        attentionEdge.frame = Self.attentionEdgeFrame(in: bounds, onRight: sidebarOnRight)
         let waiting = waitingTabs
         attentionEdge.waiting = waiting.count
         attentionEdge.isHidden = sidebarVisible || waiting.isEmpty

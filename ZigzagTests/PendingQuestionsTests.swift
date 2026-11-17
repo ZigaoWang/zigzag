@@ -65,4 +65,15 @@ import Testing
         #expect(left.minX < page.midX && right.minX > page.midX, "the two sides are opposite ones")
         #expect(left.minY == page.minY && left.height == page.height, "the page's whole height, either way")
     }
+
+    /// A browser window with its sidebar hidden glows on its own edge too, never at the hidden sidebar's width, which
+    /// would draw the line through the middle of the page.
+    @Test func aBrowserWindowGlowsOnItsEdgeNotInsideThePage() {
+        let bounds = NSRect(x: 0, y: 0, width: 1280, height: 800)
+        let left = BrowserRootView.attentionEdgeFrame(in: bounds, onRight: false)
+        let right = BrowserRootView.attentionEdgeFrame(in: bounds, onRight: true)
+        #expect(left.minX == bounds.minX)
+        #expect(right.minX >= bounds.maxX - Tokens.Metric.hairline)
+        #expect(left.maxX < Tokens.Metric.sidebarWidth / 2, "nowhere near where the sidebar's edge would be")
+    }
 }
