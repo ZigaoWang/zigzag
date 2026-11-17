@@ -25,8 +25,10 @@ Please don't include real passwords or personal data in your report. Use test ac
 
 ## What to expect
 
-- An acknowledgment within 3 working days.
-- An initial assessment, and a plan if it's confirmed, within 10 working days.
+Zigzag has one maintainer, so these are aims rather than promises:
+
+- An acknowledgment, usually within a few days.
+- An initial assessment, and a plan if it's confirmed, usually within two weeks.
 - Updates as the fix progresses. Fixes ship through Zigzag's automatic updates.
 - Once the fixed version is out, a GitHub security advisory for the issue, and a line in the release notes. You're
   credited in both if you'd like to be.
@@ -52,9 +54,9 @@ In scope: the Zigzag app and its code in this repository. That includes:
 - The sandboxed helpers that read pictures and PDFs from websites (ZigzagImageDecoder and ZigzagPDFRenderer).
 - Secure connections: certificate warnings, Visit anyway, sites on the HSTS preload list, and trusting servers
   on this Mac in Developer Mode.
-- Site permissions (camera, microphone, location, notifications, pop-ups, opening apps, WebRTC) and Protect IP
-  address from WebRTC.
-- Downloads, and links that open other apps.
+- Site permissions (camera, microphone, screen sharing, location, notifications, pop-ups, opening apps, WebRTC,
+  JavaScript), the permission card that asks for them, and Protect IP address from WebRTC.
+- Downloads, file types (Save and Open) and download rules, and links that open other apps.
 - Private windows, profiles, Zigzag Mini and sites installed as apps.
 - Content blocking, dark pages and cookie banner handling, including the filter lists and scriptlets Zigzag
   downloads.

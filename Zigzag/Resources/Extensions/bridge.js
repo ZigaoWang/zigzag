@@ -821,20 +821,29 @@
       const remove = event.removeListener && event.removeListener.bind(event);
       const has = event.hasListener && event.hasListener.bind(event);
       const wrapped = new WeakMap();
-      try {
-        event.addListener = (listener, ...rest) => {
-          if (typeof listener !== 'function') return add(listener, ...rest);
-          const guarded = (first, ...more) => (test(first) ? undefined : listener(first, ...more));
-          wrapped.set(listener, guarded);
-          return add(guarded, ...rest);
-        };
-        if (remove) event.removeListener = (listener) => remove(wrapped.get(listener) || listener);
-        if (has) event.hasListener = (listener) => has(wrapped.get(listener) || listener);
-      } catch (e) {}
+      // Set plainly, or defined when it can't be: either way it has to have taken, or nothing is hidden.
+      const put = (name, value) => {
+        try { event[name] = value; } catch (e) {}
+        if (event[name] !== value) { try { Object.defineProperty(event, name, { value, configurable: true, writable: true }); } catch (e) {} }
+        return event[name] === value;
+      };
+      const addListener = (listener, ...rest) => {
+        if (typeof listener !== 'function') return add(listener, ...rest);
+        const guarded = (first, ...more) => (test(first) ? undefined : listener(first, ...more));
+        wrapped.set(listener, guarded);
+        return add(guarded, ...rest);
+      };
+      if (!put('addListener', addListener)) console.warn('Zigzag: user scripts’ messages could not be kept from runtime listeners');
+      if (remove) put('removeListener', (listener) => remove(wrapped.get(listener) || listener));
+      if (has) put('hasListener', (listener) => has(wrapped.get(listener) || listener));
       return add;
     };
-    const addMessage = hide(api.runtime.onMessage, marked);
-    const addConnect = hide(api.runtime.onConnect, (port) => !!portInfo(port));
+    // On chrome and on browser both, should WebKit give each its own events.
+    const runtimes = [...new Set([globalThis.chrome, globalThis.browser].map((target) => target && target.runtime).filter(Boolean))];
+    held.push(...runtimes);
+    const hideAll = (name, test) => [...new Set(runtimes.map((runtime) => runtime[name]))].map((event) => hide(event, test)).find(Boolean);
+    const addMessage = hideAll('onMessage', marked);
+    const addConnect = hideAll('onConnect', (port) => !!portInfo(port));
     if (addConnect) { try { Object.defineProperty(globalThis, '__zigzagConnectAll', { value: addConnect, configurable: true }); } catch (e) {} }
 
     if (addMessage) addMessage((message, sender, sendResponse) => {
