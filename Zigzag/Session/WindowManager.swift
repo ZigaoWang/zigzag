@@ -250,7 +250,7 @@ final class WindowManager {
         if !controller.tabManager.isPrivate, controller.tabManager.allTabs.contains(where: { $0.url != nil }) {
             var history: [UUID: Data] = [:]
             for tab in controller.tabManager.allTabs { if let data = tab.interactionStateForSaving { history[tab.id] = data } }
-            closedWindows.append((windowState(controller), history))
+            closedWindows.append((UUID(), windowState(controller), history))
             if closedWindows.count > 10 { closedWindows.removeFirst() }
         }
         controllers.removeAll { $0 === controller }
@@ -485,7 +485,7 @@ final class WindowManager {
     }
 
     /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.
-    private var closedWindows: [(state: SessionState.WindowState, history: [UUID: Data])] = []
+    private var closedWindows: [(id: UUID, state: SessionState.WindowState, history: [UUID: Data])] = []
     var canReopenClosedWindow: Bool {
         let open = openTabIDs
         return closedWindows.contains { !isBack($0.state, open: open) }
@@ -501,6 +501,27 @@ final class WindowManager {
             restoreWindow(closed.state, history: closed.history)
             return
         }
+    }
+
+    /// The windows Reopen Closed Window can bring back, newest first, for History › Recently Closed: each with its
+    /// tabs' count and the tab it was showing.
+    var recentlyClosedWindows: [(id: UUID, tabCount: Int, shown: SessionState.TabState?)] {
+        let open = openTabIDs
+        return closedWindows.reversed().filter { !isBack($0.state, open: open) }.map { closed in
+            let state = closed.state
+            let tabs = state.spaces.flatMap(\.tabs) + state.bookmarkTabs.map(\.tab)
+            let space = state.spaces.first { $0.spaceID == state.currentSpaceID }
+            let shown = space.flatMap { space in space.tabs.first { $0.id == space.selectedTabID } } ?? tabs.first
+            return (closed.id, tabs.count, shown)
+        }
+    }
+
+    /// Brings back one closed window, picked in History › Recently Closed.
+    func reopenClosedWindow(_ id: UUID) {
+        guard let index = closedWindows.firstIndex(where: { $0.id == id }) else { return }
+        let closed = closedWindows.remove(at: index)
+        guard !isBack(closed.state, open: openTabIDs) else { return }
+        restoreWindow(closed.state, history: closed.history)
     }
 
     private var openTabIDs: Set<UUID> { Set(controllers.flatMap { $0.tabManager.allTabs.map(\.id) }) }

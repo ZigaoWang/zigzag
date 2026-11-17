@@ -204,16 +204,20 @@ enum MainMenu {
         }
         main.addItem(submenu(String(localized: "View", comment: "A menu in the menu bar."), viewItems))
 
-        main.addItem(submenu(String(localized: "History", comment: "A menu in the menu bar."), [
+        let history = submenu(String(localized: "History", comment: "A menu in the menu bar."), [
             // One History, as in Chrome: the window, with its own search.
             item(String(localized: "Show History", comment: "History menu item."), #selector(AppDelegate.showHistory(_:)), "y"),
             item(String(localized: "Reopen Closed Tab", comment: "History menu item."), #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
             item(String(localized: "Reopen Closed Window", comment: "History menu item."), #selector(AppDelegate.reopenClosedWindow(_:)), ""),
+            // Then, filled each time it opens, the tabs and windows closed lately and the pages visited by day (#271).
+            HistoryMenu.makeRecentlyClosedItem(),
             .separator(),
             item(String(localized: "Clear History…", comment: "History menu item."), #selector(C.clearHistory(_:)), ""),
             item(String(localized: "Clear Cache…", comment: "History menu item."), #selector(C.clearCache(_:)), ""),
             item(String(localized: "Clear Cookies…", comment: "History menu item."), #selector(C.clearCookies(_:)), ""),
-        ]))
+        ])
+        history.submenu?.delegate = HistoryMenu.shared
+        main.addItem(history)
 
         let window = submenu(String(localized: "Window", comment: "A menu in the menu bar."), [
             item(String(localized: "Minimize", comment: "Window menu item."), #selector(NSWindow.performMiniaturize(_:)), "m"),

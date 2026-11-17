@@ -6328,6 +6328,17 @@
         }
       }
     },
+    "Earlier Today" : {
+      "comment" : "History menu item: a submenu of the pages visited today before the ones listed above it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天早些时候"
+          }
+        }
+      }
+    },
     "Edit" : {
       "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.",
       "localizations" : {
@@ -13019,6 +13030,17 @@
         }
       }
     },
+    "Recently Closed" : {
+      "comment" : "History menu item: a submenu of the tabs and windows you closed lately.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近关闭"
+          }
+        }
+      }
+    },
     "Recipes" : {
       "comment" : "A sample tab’s title in the welcome window’s picture of Zigzag.",
       "localizations" : {
@@ -19353,6 +19375,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "窗口"
+          }
+        }
+      }
+    },
+    "Window with %lld Tabs" : {
+      "comment" : "History › Recently Closed: a closed window, with how many tabs it had.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Window with %lld Tab"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Window with %lld Tabs"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个标签页的窗口"
+                }
+              }
+            }
           }
         }
       }

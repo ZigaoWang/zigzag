@@ -13,6 +13,7 @@
 		01AF8CAE8DC01BC74B382DCA /* HistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */; };
 		0331720F36DE295A3260ED04 /* ScreenSharingPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 847F7D89E14067DB959C036C /* ScreenSharingPromptTests.swift */; };
 		038B1D66977B38EB772C0ECD /* HistoryClustersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */; };
+		AF0AB0A49CF5A8B44233693E /* HistoryMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2568EC51DD9F3FAAE5DBFDF5 /* HistoryMenuTests.swift */; };
 		042871C2F2FBB3DE6063F8EC /* UpdateReadyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9639DF654DDE86C4358E43CB /* UpdateReadyTests.swift */; };
 		045ED3408AB26EF379758FB3 /* MiniPlayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31C428612569D93D17E6153 /* MiniPlayerTests.swift */; };
 		0617A9798A9371758CAD4DE8 /* chrome-bookmarks-work.json in Resources */ = {isa = PBXBuildFile; fileRef = BD3E507FE9CD5CD3025750FE /* chrome-bookmarks-work.json */; };
@@ -228,6 +229,7 @@
 		74E21381E1E1236C1E3449C0 /* BridgeUserScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E3E2C413D61E7DBFC4242F2 /* BridgeUserScripts.swift */; };
 		751BFDE224833B08BD7A597B /* SafePDFTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 687E897D4F5886E6376DAA6D /* SafePDFTests.swift */; };
 		75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9C34787271E39E26E0156FC /* MainMenu.swift */; };
+		CE5046E6187D607731AAB70F /* HistoryMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D70DDEBAE2B1AEFF28A65CC /* HistoryMenu.swift */; };
 		769E7489108DDC7DB699DC36 /* page-fullscreen.js in Resources */ = {isa = PBXBuildFile; fileRef = B6B4DC12DA4D88C56E886156 /* page-fullscreen.js */; };
 		789E734404BE475A5AA09EE2 /* find-count.html in Resources */ = {isa = PBXBuildFile; fileRef = 8BC5CFBDE21CD4D0E29009EB /* find-count.html */; };
 		793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */; };
@@ -861,6 +863,7 @@
 		A8679BD8FFD9BC3825E36199 /* MiniLinkWakeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniLinkWakeTests.swift; sourceTree = "<group>"; };
 		A9205F70718ADF73D6C096BD /* Freezes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Freezes.swift; sourceTree = "<group>"; };
 		A9C34787271E39E26E0156FC /* MainMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenu.swift; sourceTree = "<group>"; };
+		0D70DDEBAE2B1AEFF28A65CC /* HistoryMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryMenu.swift; sourceTree = "<group>"; };
 		AAAD2D187E4B75F090D74271 /* PictureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureService.swift; sourceTree = "<group>"; };
 		AB2B3B3C45A3F10C98E861B1 /* PageShortcutsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageShortcutsTests.swift; sourceTree = "<group>"; };
 		AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionHost.swift; sourceTree = "<group>"; };
@@ -930,6 +933,7 @@
 		CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissions.swift; sourceTree = "<group>"; };
 		CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarHistoryTests.swift; sourceTree = "<group>"; };
 		CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryClustersTests.swift; sourceTree = "<group>"; };
+		2568EC51DD9F3FAAE5DBFDF5 /* HistoryMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryMenuTests.swift; sourceTree = "<group>"; };
 		CFFAB9323B9B8363B22FEE73 /* FolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderTests.swift; sourceTree = "<group>"; };
 		D0B754CF4F921CAA567C219B /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
 		D0FDA440FDF6324DAFBA1C61 /* PasswordsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordsWindow.swift; sourceTree = "<group>"; };
@@ -1504,6 +1508,7 @@
 				88F9F8B1C1119171EFC0072B /* DebugBridge.swift */,
 				27F3073C0E2D268EC8C3B767 /* DockProgress.swift */,
 				A61765B735BE30C84A0D55AA /* Feedback.swift */,
+				0D70DDEBAE2B1AEFF28A65CC /* HistoryMenu.swift */,
 				77478845778FB285ADD29C14 /* Library.swift */,
 				4363A8C97194CFB82618511C /* main.swift */,
 				A9C34787271E39E26E0156FC /* MainMenu.swift */,
@@ -1609,6 +1614,7 @@
 				C928420068829E660FA04DC9 /* FormSheetTests.swift */,
 				3C753D7948805748B235F981 /* FreezeReportTests.swift */,
 				CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */,
+				2568EC51DD9F3FAAE5DBFDF5 /* HistoryMenuTests.swift */,
 				A43306E6C8C1E74DFDB70B17 /* HistoryStoreTests.swift */,
 				C365A80CA95A963BF8C2E024 /* HostTextTests.swift */,
 				3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */,
@@ -2189,6 +2195,7 @@
 				E1A05EC81079773031DC8766 /* MCPTools.swift in Sources */,
 				3A8D1C284C79CAA6AC3EE480 /* MCPWait.swift in Sources */,
 				75CC6D443207EDB11002FAD3 /* MainMenu.swift in Sources */,
+				CE5046E6187D607731AAB70F /* HistoryMenu.swift in Sources */,
 				4DAED34F3D46EDCBC3322752 /* MainThreadStack.swift in Sources */,
 				C98C23949C56DEB824D49CA7 /* Materials.swift in Sources */,
 				A132043CAFE24A7179715C2B /* MaterialsShowcase.swift in Sources */,
@@ -2403,6 +2410,7 @@
 				9EBDB7B646861E6CE816243B /* FormSheetTests.swift in Sources */,
 				0C5C2F5738FFF3C9FE3D145D /* FreezeReportTests.swift in Sources */,
 				038B1D66977B38EB772C0ECD /* HistoryClustersTests.swift in Sources */,
+				AF0AB0A49CF5A8B44233693E /* HistoryMenuTests.swift in Sources */,
 				B09D1913AC2A768692EAF240 /* HistoryStoreTests.swift in Sources */,
 				A698488EDA6EA723DE9A51C8 /* HostTextTests.swift in Sources */,
 				3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */,
