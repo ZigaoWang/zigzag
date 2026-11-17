@@ -1,5 +1,5 @@
 ! Title: Zigzag fixes
-! Description: Fixes for sites that Zigzag's ad and tracker blocking gets in the way of, in uBlock Origin's syntax.
+! Description: Fixes for sites that Zigzag's ad and tracker blocking gets in the way of or misses, in uBlock Origin's syntax.
 ! Zigzag downloads this list with uBlock Origin's own and runs it through the same engine and scriptlets.
 ! Homepage: https://zigzagbrowser.com
 ! Expires: 12 hours
@@ -13,3 +13,15 @@
 ! https://github.com/ZigaoWang/zigzag/issues/208
 chat.deepseek.com##+js(prevent-fetch, /api/v0/telemetry)
 chat.deepseek.com##+js(prevent-xhr, /api/v0/telemetry)
+
+! HLTV (hltv.org) places its betting ads itself: pictures from its own /img/ path, links through /out2/, the two
+! columns beside the page, an odds box by the logo, and a clickable picture behind the page set on <body> by its
+! scripts. uBlock Origin stops their pictures (||hltv.org/img/*?ixlib=$image), a request rule Zigzag's content blocker
+! doesn't have, so they're hidden here, by the places they stand in, not the names its scripts make up each build.
+! https://github.com/ZigaoWang/zigzag/issues/283
+hltv.org##.bg-sidebar
+hltv.org##.fbw-flex-wrapper
+hltv.org##div:has(> a[href^="/out2/"] > img)
+hltv.org##aside:has(> a[href^="/out2/"])
+hltv.org##aside:has(> div > a[href^="/out2/"])
+hltv.org##+js(ra, style|data-href, body, stay)
