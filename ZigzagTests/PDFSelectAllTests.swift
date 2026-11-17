@@ -109,3 +109,14 @@ struct PDFSelectAllTests {
         #expect(try await webView.evaluateJavaScript("String(getSelection())") as? String == "Every word")
     }
 }
+
+extension PDFDarkPagesTests {
+    /// A PDF whose response says it's past the viewer's limit is left to WebKit's viewer before any of it is copied;
+    /// one that gives no length (-1) is read and measured as before.
+    @Test func aPDFSaidToBeTooLargeIsNeverCopied() {
+        #expect(PDFViewerView.isTooLarge(said: Int64(PDFLimits.maxInputBytes) + 1))
+        #expect(!PDFViewerView.isTooLarge(said: Int64(PDFLimits.maxInputBytes)))
+        #expect(!PDFViewerView.isTooLarge(said: -1))
+        #expect(!PDFViewerView.isTooLarge(said: 0))
+    }
+}

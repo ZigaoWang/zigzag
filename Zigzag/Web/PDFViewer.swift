@@ -505,7 +505,12 @@ final class PDFViewerView: NSView {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
         // WebKit's own copy first, once it has all of it: no second download, and nothing a fetch of our own could
         // get differently (a link that works once).
-        if let data = await mainResourceData(of: webView, at: url) { return data }
+        switch await mainResourceData(of: webView, at: url) {
+        case .data(let data): return data
+        // Too big for the viewer: fetching it again would only find that out a second time.
+        case .tooLarge: return nil
+        case .unavailable: break
+        }
         // Only the cookies a link from another site would carry too: a "Strict" one, held back from the page's own
         // load when another site sent you there, isn't sent behind its back now.
         let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
@@ -529,13 +534,18 @@ final class PDFViewerView: NSView {
 
     /// The bytes WebKit loaded for the page, once it's done loading them (WebKit's own unpublished call, as Safari
     /// has it). Nil if it can't say, or they aren't a PDF's: the viewer fetches the file itself then.
-    private static func mainResourceData(of webView: WKWebView, at url: URL) async -> Data? {
+    private enum MainResource { case data(Data), tooLarge, unavailable }
+
+    /// Whether a response's own length (-1 when it gave none) is past what the viewer takes.
+    nonisolated static func isTooLarge(said length: Int64, limit: Int = PDFLimits.maxInputBytes) -> Bool { length > Int64(limit) }
+
+    private static func mainResourceData(of webView: WKWebView, at url: URL) async -> MainResource {
         let selector = NSSelectorFromString("_getMainResourceDataWithCompletionHandler:")
-        guard webView.responds(to: selector) else { return nil }
+        guard webView.responds(to: selector) else { return .unavailable }
         while webView.isLoading, webView.url == url, !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(50))
         }
-        guard webView.url == url, !Task.isCancelled else { return nil }
+        guard webView.url == url, !Task.isCancelled else { return .unavailable }
         typealias Call = @convention(c) (AnyObject, Selector, @escaping @convention(block) (NSData?, NSError?) -> Void) -> Void
         let call = unsafeBitCast(webView.method(for: selector), to: Call.self)
         let data: Data? = await withCheckedContinuation { continuation in
@@ -545,8 +555,8 @@ final class PDFViewerView: NSView {
                 continuation.resume(returning: data as Data?)
             }
         }
-        guard let data, data.count <= SafePDF.maxInputBytes, data.prefix(1024).range(of: Data("%PDF-".utf8)) != nil else { return nil }
-        return data
+        guard let data, data.prefix(1024).range(of: Data("%PDF-".utf8)) != nil else { return .unavailable }
+        return data.count <= SafePDF.maxInputBytes ? .data(data) : .tooLarge
     }
 
     /// The PDF opened in the helper. Nil when the helper can't read it (not a PDF, behind a password, or it failed):

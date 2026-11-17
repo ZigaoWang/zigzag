@@ -122,6 +122,9 @@ final class Tab: NSObject {
     private var pdfResponseURL: URL?
     /// The name that response gave the PDF (`Content-Disposition`), if it gave one.
     private var pdfResponseName: String?
+    /// That response said the PDF is bigger than Zigzag's viewer takes: WebKit's own viewer shows it, and its bytes
+    /// are never copied into the app or fetched again.
+    private var pdfResponseTooLarge = false
     /// Settings, over the page while the tab is at zigzag://settings; nil for any other page.
     private(set) var settingsView: SettingsView?
     /// Reader's article, while it covers this tab's page: the tab's picture is of it, as you see it.
@@ -1689,6 +1692,7 @@ extension Tab: WKNavigationDelegate {
         if navigationResponse.isForMainFrame {
             pdfResponseURL = mime == "application/pdf" ? response.url : nil
             pdfResponseName = mime == "application/pdf" ? HistoryStore.suggestedName(of: response) : nil
+            pdfResponseTooLarge = mime == "application/pdf" && PDFViewerView.isTooLarge(said: response.expectedContentLength)
         }
         let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
         let policy = downloads.decide(mimeType: mime, contentDisposition: disposition.lowercased(), canShowMIMEType: navigationResponse.canShowMIMEType,
@@ -2300,7 +2304,8 @@ extension Tab {
         }
         // In peek, a form's reply, or one ours couldn't open (on this page, or one that brought the helper down this
         // session, which a reload would only bring down again): WebKit's own viewer shows it.
-        guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url), !SafePDF.broughtDownTheHelper(url) else {
+        guard !self.isPeek, self.pageIsGet, !self.pdfFailed.contains(url), !SafePDF.broughtDownTheHelper(url),
+              !(self.pdfResponseURL == url && self.pdfResponseTooLarge) else {
             if self.pdfViewer != nil { self.setPDFViewer(nil) }
             return
         }
