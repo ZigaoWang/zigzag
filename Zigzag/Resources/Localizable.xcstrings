@@ -24426,6 +24426,114 @@
           }
         }
       }
+    },
+    "extension.limit.browserSettings" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: changing the browser's own settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Browser settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浏览器设置"
+          }
+        }
+      }
+    },
+    "extension.limit.contextualIdentities" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: containers, Firefox's separate identities for tabs.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Containers"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容器"
+          }
+        }
+      }
+    },
+    "extension.limit.dns" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: resolving host names itself.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "DNS resolution"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS 解析"
+          }
+        }
+      }
+    },
+    "extension.limit.pkcs11" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: PKCS#11 security modules.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Security modules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全模块"
+          }
+        }
+      }
+    },
+    "extension.limit.theme" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: installing browser themes.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Themes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题"
+          }
+        }
+      }
+    },
+    "extension.limit.tabGroups" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: grouping tabs.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tab groups"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页组"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

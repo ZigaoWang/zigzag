@@ -120,23 +120,30 @@ nonisolated struct CompatibilityOverlay: Codable, Sendable {
     var manifest: [String: CompatibilityPermission]
 
     enum LoadError: LocalizedError {
-        case missingResource
+        case missingResource(String)
         case malformed(String)
 
         var errorDescription: String? {
             switch self {
-            case .missingResource:
-                return "compatibility.json is missing from the app"
+            case .missingResource(let name):
+                return "\(name).json is missing from the app"
             case .malformed(let reason):
                 return "compatibility.json is malformed: \(reason)"
             }
         }
     }
 
-    /// The overlay as the app ships it. `bundle` is the app's, or a test's, own bundle.
+    /// The overlay as the app ships it: Chrome's. `bundle` is the app's, or a test's, own bundle.
     static func load(bundle: Bundle = .main) throws -> CompatibilityOverlay {
-        guard let url = bundle.url(forResource: "compatibility", withExtension: "json") else {
-            throw LoadError.missingResource
+        try load(kind: .chromium, bundle: bundle)
+    }
+
+    /// The overlay for one package kind: Chrome's `compatibility.json`, or Firefox's own `firefox-compatibility.json`.
+    /// The two are separate files; a Firefox-only member never reaches Chrome's matrix or the other way round.
+    static func load(kind: ExtensionKind, bundle: Bundle = .main) throws -> CompatibilityOverlay {
+        let name = kind == .firefox ? "firefox-compatibility" : "compatibility"
+        guard let url = bundle.url(forResource: name, withExtension: "json") else {
+            throw LoadError.missingResource(name)
         }
         do {
             return try JSONDecoder().decode(CompatibilityOverlay.self, from: Data(contentsOf: url))
@@ -307,6 +314,21 @@ nonisolated enum CompatibilityText {
         case "extension.limit.deprecatedChannel":
             return String(localized: "extension.limit.deprecatedChannel", defaultValue: "Deprecated Google APIs",
                           comment: "A Chrome extension feature Chrome removed: its old Google messaging channels.")
+        case "extension.limit.contextualIdentities":
+            return String(localized: "extension.limit.contextualIdentities", defaultValue: "Containers",
+                          comment: "A Firefox extension feature Zigzag cannot provide: containers, Firefox's separate identities for tabs.")
+        case "extension.limit.browserSettings":
+            return String(localized: "extension.limit.browserSettings", defaultValue: "Browser settings",
+                          comment: "A Firefox extension feature Zigzag cannot provide: changing the browser's own settings.")
+        case "extension.limit.pkcs11":
+            return String(localized: "extension.limit.pkcs11", defaultValue: "Security modules",
+                          comment: "A Firefox extension feature Zigzag cannot provide: PKCS#11 security modules.")
+        case "extension.limit.dns":
+            return String(localized: "extension.limit.dns", defaultValue: "DNS resolution",
+                          comment: "A Firefox extension feature Zigzag cannot provide: resolving host names itself.")
+        case "extension.limit.theme":
+            return String(localized: "extension.limit.theme", defaultValue: "Themes",
+                          comment: "A Firefox extension feature Zigzag cannot provide: installing browser themes.")
         default:
             return fallback
         }
@@ -338,9 +360,13 @@ nonisolated struct CompatibilityImplementations: Sendable {
     static func shipped(bundle: Bundle = .main) -> CompatibilityImplementations {
         let differences = bundle.url(forResource: "webkit-differences", withExtension: "js")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        // Firefox's own answers (`getBrowserInfo`, `getPlatformInfo`, the Promise facade) live only in the polyfill,
+        // so a Firefox claim may name them: the scan reads the code that would do the work, as it does for Chrome.
+        let polyfill = bundle.url(forResource: "firefox-polyfill", withExtension: "js")
+            .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
         return CompatibilityImplementations(handlers: ExtensionBridge.handlerNames
                                                 .union(ExtensionBridge.handlerTypeNames),
-                                            script: differences + "\n" + ExtensionShims.compatibility)
+                                            script: differences + "\n" + ExtensionShims.compatibility + "\n" + polyfill)
     }
 
     /// Whether an implementation names something that exists. A dotted `js:` name is checked part by part, as in
@@ -616,6 +642,19 @@ nonisolated struct ExtensionCompatibility {
     /// The overlay the app ships. Nil where there is none yet, as in a test or a build before the claims land.
     static let shared = ExtensionCompatibility(overlay: try? CompatibilityOverlay.load(),
                                                universe: try? ChromeUniverse.load())
+
+    /// Firefox's own pair, loaded once: `firefox-compatibility.json` over `firefox-api.json`. A claim never crosses
+    /// from one kind's overlay to the other's universe.
+    private static let firefox = ExtensionCompatibility(overlay: try? CompatibilityOverlay.load(kind: .firefox),
+                                                        universe: try? ChromeUniverse.load(resource: "firefox-api"))
+
+    /// The pair a package kind words its sheet with: Chrome's overlay over `chrome-api.json`, or Firefox's own.
+    static func shared(for kind: ExtensionKind) -> ExtensionCompatibility {
+        switch kind {
+        case .chromium: return shared
+        case .firefox: return firefox
+        }
+    }
 
     let overlay: CompatibilityOverlay?
     let universe: ChromeUniverse?

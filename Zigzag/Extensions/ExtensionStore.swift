@@ -561,7 +561,9 @@ enum ExtensionStore {
         guard let pending = package(id)?.pendingVersion, let new = packageDirectory(for: id, version: pending),
               let old = packageDirectory(for: id), let newManifest = manifest(in: new), let oldManifest = manifest(in: old),
               let ext = try? await WKWebExtension(resourceBaseURL: new) else { return nil }
-        return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id))
+        // The record's kind words the sheet: a Firefox package's update reads Firefox's overlay, not Chrome's.
+        let kind = package(id).flatMap { ExtensionKind(rawValue: $0.kind) } ?? .chromium
+        return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id, kind: kind))
     }
 
     /// The ID of an extension read from a folder: from the folder's path, the way Chrome makes it, so loading the

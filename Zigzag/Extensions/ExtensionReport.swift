@@ -52,25 +52,27 @@ struct ExtensionReport {
         let patterns = ext.allRequestedMatchPatterns.map(\.string)
         abilities = Self.abilities(permissions: requested, patterns: patterns, id: id, replacesNewTab: replacesNewTab, searchEngine: searchEngine)
         asked = Asked(permissions: requested, patterns: Set(patterns), replacesNewTab: replacesNewTab, searchEngines: searchEngine.map { [$0] } ?? [], ids: [id])
-        limits = Self.lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
+        limits = Self.lines(for: manifest, requested: requested, recognized: recognized, id: id, kind: kind, log: true)
     }
 
     /// The lines Settings shows for an extension, without building its whole report. The overlay behind them is
-    /// decoded once, by `ExtensionCompatibility.shared`.
-    static func limits(for ext: WKWebExtension, manifest: [String: Any], id: String) -> [CompatibilityLimit] {
+    /// decoded once, by `ExtensionCompatibility.shared(for:)`, and read for the package's own kind.
+    static func limits(for ext: WKWebExtension, manifest: [String: Any], id: String,
+                       kind: ExtensionKind = .chromium) -> [CompatibilityLimit] {
         let requested = strings(manifest, ["permissions", "optional_permissions"])
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
-        return lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
+        return lines(for: manifest, requested: requested, recognized: recognized, id: id, kind: kind, log: true)
     }
 
     /// The claims' lines for the permissions and manifest keys a manifest asks for, less what a shim's prelude
     /// stands in for, plus a line named by the permission itself where neither WebKit nor the claims know it. Only
-    /// wording and suppression happen here: nothing grants, widens or drops a permission.
+    /// wording and suppression happen here: nothing grants, widens or drops a permission. The `kind` picks which
+    /// overlay's claims answer: Chrome's, or Firefox's own.
     private static func lines(for manifest: [String: Any], requested: Set<String>, recognized: Set<String>,
-                              id: String, log: Bool) -> [CompatibilityLimit] {
-        var limits = claimedLines(for: requested, manifestKeys: manifestKeys(in: manifest), id: id, log: log)
+                              id: String, kind: ExtensionKind, log: Bool) -> [CompatibilityLimit] {
+        var limits = claimedLines(for: requested, manifestKeys: manifestKeys(in: manifest, kind: kind), id: id, kind: kind, log: log)
         let covered = ExtensionShims.shim(for: id)?.coveredPermissions ?? []
-        let claimed = ExtensionCompatibility.shared.overlay.map { Set($0.permissions.keys) } ?? []
+        let claimed = ExtensionCompatibility.shared(for: kind).overlay.map { Set($0.permissions.keys) } ?? []
         // WebKit dropping it is what makes it a limit; a permission it supplies but no claim mentions still works.
         // MV2 allows host patterns beside permissions; a pattern is not a permission missing a claim.
         let names = Set(requested.filter(Self.isPermissionName))
@@ -85,10 +87,10 @@ struct ExtensionReport {
     /// The lines the overlay has for these permissions and manifest keys, with a shim's covered permissions left
     /// out: the prelude answers those well enough that the person won't miss them.
     private static func claimedLines(for requested: Set<String>, manifestKeys: Set<String>, id: String,
-                                     log: Bool) -> [CompatibilityLimit] {
+                                     kind: ExtensionKind, log: Bool) -> [CompatibilityLimit] {
         let shim = ExtensionShims.shim(for: id)
         let covered = shim?.coveredPermissions ?? []
-        var limits = ExtensionCompatibility.shared.limits(forPermissions: requested, manifestKeys: manifestKeys)
+        var limits = ExtensionCompatibility.shared(for: kind).limits(forPermissions: requested, manifestKeys: manifestKeys)
         let hidden = limits.filter { covered.contains(permission(of: $0)) }
         limits.removeAll { covered.contains(permission(of: $0)) }
         if log {
@@ -103,8 +105,8 @@ struct ExtensionReport {
     }
 
     /// The manifest keys the claims have lines for, as this manifest asks for them.
-    private static func manifestKeys(in manifest: [String: Any]) -> Set<String> {
-        guard let overlay = ExtensionCompatibility.shared.overlay else { return [] }
+    private static func manifestKeys(in manifest: [String: Any], kind: ExtensionKind) -> Set<String> {
+        guard let overlay = ExtensionCompatibility.shared(for: kind).overlay else { return [] }
         return Set(overlay.manifest.keys.filter { manifest[$0] != nil })
     }
 
@@ -146,8 +148,9 @@ struct ExtensionReport {
     }
 
     /// Only what a new version asks for beyond the old one, for approving an update.
-    init(newIn ext: WKWebExtension, manifest: [String: Any], comparedTo old: [String: Any], id: String) {
-        let full = ExtensionReport(extension: ext, manifest: manifest, id: id)
+    init(newIn ext: WKWebExtension, manifest: [String: Any], comparedTo old: [String: Any], id: String,
+         kind: ExtensionKind = .chromium) {
+        let full = ExtensionReport(extension: ext, manifest: manifest, id: id, kind: kind)
         let oldPatterns = Self.strings(old, ["host_permissions", "optional_host_permissions"])
             .union(Self.strings(old, ["permissions"]).filter { $0.contains("://") || $0 == "<all_urls>" })
         let oldPermissions = Self.strings(old, ["permissions", "optional_permissions"])
@@ -158,14 +161,14 @@ struct ExtensionReport {
         // The delta is by catalog key: a line the old version already had is not news. An unclaimed permission has
         // no key, so its own name stands in; every permission the old manifest doesn't claim counts, so one it
         // already asked for is not shown again.
-        let oldLimits = Set(Self.lines(for: old, requested: oldPermissions, recognized: [], id: id, log: false)
+        let oldLimits = Set(Self.lines(for: old, requested: oldPermissions, recognized: [], id: id, kind: kind, log: false)
             .map(\.identity))
         limits = full.limits.filter { !oldLimits.contains($0.identity) }
     }
 
     /// What an extension asking for more (`permissions.request`) would gain, for asking you first. Every permission
     /// asked for shows in a line, if only in the last one.
-    init(requesting permissions: Set<String>, id: String) {
+    init(requesting permissions: Set<String>, id: String, kind: ExtensionKind = .chromium) {
         var lines = Self.abilities(permissions: permissions, patterns: [], id: id)
         var worded: Set<String> = ["nativeMessaging", "history", "tabs", "webNavigation", "bookmarks", "downloads", "notifications",
                                    "declarativeNetRequest", "declarativeNetRequestWithHostAccess", "userScripts", "cookies", "proxy", "management"]
@@ -179,7 +182,7 @@ struct ExtensionReport {
             lines.append(Line(symbol: "puzzlepiece.extension", text: String(localized: "Use more of Zigzag’s features", comment: "One thing an extension can do, in the sheet that asks before it gets more access: stands in for permissions with no line of their own.")))
         }
         abilities = lines
-        limits = Self.claimedLines(for: permissions, manifestKeys: [], id: id, log: true)
+        limits = Self.claimedLines(for: permissions, manifestKeys: [], id: id, kind: kind, log: true)
     }
 
     /// Permissions an extension gets only when you say so, when it asks for one later: what Chrome warns about, and
