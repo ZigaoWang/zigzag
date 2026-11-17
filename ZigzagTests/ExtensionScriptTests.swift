@@ -155,6 +155,152 @@ struct ExtensionScriptTests {
         #expect(((api["runtime"]?["enums"] as? [String: [String: String]])?["ContextType"])?["OFFSCREEN_DOCUMENT"] == "OFFSCREEN_DOCUMENT")
     }
 
+    /// A fake extension world for api-surface.js: WebKit's runtime with the manifest and the diagnostics channel an
+    /// extension's background has, and none of the API namespaces the surface must fill.
+    private static func surfaceWorld(_ surface: String? = nil) throws -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+        var __notes = [], __console = [];
+        var console = {
+          log: (m) => __console.push(String(m)), warn: (m) => __console.push(String(m)),
+          error: (m) => __console.push(String((m && m.message) || m)),
+        };
+        var chrome = {
+          runtime: {
+            id: 'x',
+            getManifest: () => ({ permissions: ['history'] }),
+            sendNativeMessage: (host, message) => { __notes.push({ host, ...message }); return Promise.resolve(); },
+          },
+        };
+        // WebKit's lastError is a property of the runtime object, as it is here: the surface must put this one back.
+        var __nativeLastError = () => undefined;
+        Object.defineProperty(chrome.runtime, 'lastError', { get: __nativeLastError, configurable: true, enumerable: true });
+        var browser = chrome;
+        """)
+        let script = try #require(surface ?? (ExtensionBridgeScript.surface.isEmpty ? nil : ExtensionBridgeScript.surface),
+                                  "the generated surface script")
+        context.evaluateScript(script)
+        #expect(context.evaluateScript("globalThis.__zigzagSurface === true")?.toBool() == true, "the surface started")
+        return context
+    }
+
+    @Test func anUnsupportedCallbackGetsLastErrorAndNoResult() throws {
+        let context = try Self.surfaceWorld()
+        #expect(context.evaluateScript("typeof chrome.history.search")?.toString() == "function")
+        context.evaluateScript("""
+        var __result = 'not called', __seen = null, __seenKeys = '';
+        var __before = chrome.runtime.lastError;
+        chrome.history.search({ text: '' }, (...args) => {
+          __seen = chrome.runtime.lastError;
+          __seenKeys = __seen ? Object.keys(__seen).sort().join() : '';
+          __result = args.length;
+        });
+        var __returned = chrome.runtime.lastError;
+        """)
+        // Nothing before the call returns: the callback is asynchronous, as Chrome's is.
+        #expect(context.evaluateScript("__result").toString() == "not called")
+        #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__result").toInt32() == 0)
+        #expect(context.evaluateScript("__seen.message").toString() == "chrome.history.search isn't available in Zigzag")
+        #expect(context.evaluateScript("__seenKeys").toString() == "message")
+    }
+
+    @Test func lastErrorIsGoneOnceTheCallbackReturns() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        var __during = null, __ran = 0, __thrown = 0, __gone = null, __goneAfterThrow = null;
+        var __native = Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get;
+        chrome.history.search({ text: '' }, () => {
+          __ran++;
+          __during = chrome.runtime.lastError && chrome.runtime.lastError.message;
+          setTimeout(() => { __gone = chrome.runtime.lastError === undefined; }, 0);
+        });
+        chrome.history.getVisits({ url: 'https://a.example/' }, () => {
+          __thrown++;
+          setTimeout(() => { __goneAfterThrow = chrome.runtime.lastError === undefined; }, 0);
+          throw new Error("the extension's own failure");
+        });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__ran").toInt32() == 1)
+        #expect(context.evaluateScript("__during").toString() == "chrome.history.search isn't available in Zigzag")
+        #expect(context.evaluateScript("__gone").toBool())
+        // A callback that throws leaves no lastError behind either, and its own failure is reported.
+        #expect(context.evaluateScript("__thrown").toInt32() == 1)
+        #expect(context.evaluateScript("__goneAfterThrow").toBool())
+        #expect(context.evaluateScript("Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get === __native").toBool())
+        #expect(context.evaluateScript("__console.join()").toString().contains("the extension's own failure"))
+    }
+
+    @Test func anUnsupportedPromiseRejectsWithTheFeatureNameOnly() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        var __error = null, __during = 'not checked';
+        var __promise = chrome.history.getVisits({ url: 'https://a.example/' });
+        __during = chrome.runtime.lastError;
+        __promise.then(
+          () => { __error = 'resolved'; },
+          (e) => { __error = { name: e.name, message: e.message, isError: e instanceof Error }; },
+        );
+        """)
+        #expect(context.evaluateScript("__error.name").toString() == "Error")
+        #expect(context.evaluateScript("__error.message").toString() == "chrome.history.getVisits isn't available in Zigzag")
+        #expect(context.evaluateScript("__error.isError").toBool())
+        // The promise form never sets lastError, before or after it settles.
+        #expect(context.evaluateScript("__during === undefined && chrome.runtime.lastError === undefined").toBool())
+    }
+
+    @Test func anUnsupportedCallIsNotedOnce() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        chrome.history.search({ text: 'a' }, () => {});
+        chrome.history.search({ text: 'b' }, () => {});
+        chrome.history.getVisits({ url: 'https://a.example/' });
+        """)
+        #expect(context.evaluateScript("__notes.length").toInt32() == 2)
+        #expect(context.evaluateScript("__notes.map((n) => n.text).join()").toString() == "chrome.history.search,chrome.history.getVisits")
+        #expect(context.evaluateScript("__notes[0].host + ' ' + __notes[0].where + ' ' + __notes[0].kind").toString()
+                == "zigzag.diagnostics surface unavailable")
+        // A third call to the same member is not noted again.
+        context.evaluateScript("chrome.history.search({ text: 'c' }).catch(() => {});")
+        #expect(context.evaluateScript("__notes.length").toInt32() == 2)
+    }
+
+    @Test func unsupportedEventsKeepTheirListenersAndNeverFire() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        var __fired = 0, __otherFired = 0;
+        var __event = chrome.history.onVisited, __fresh = chrome.history.onVisitRemoved;
+        var __listener = () => { __fired++; }, __other = () => { __otherFired++; };
+        __event.addListener(__listener);
+        __event.addListener(__listener);
+        __event.addListener(__other);
+        __event.addListener('not a listener');
+        """)
+        #expect(context.evaluateScript("__event !== __fresh").toBool())
+        #expect(context.evaluateScript("__fresh.hasListeners()").toBool() == false)
+        #expect(context.evaluateScript("__event.hasListeners()").toBool())
+        #expect(context.evaluateScript("__event.hasListener(__listener)").toBool())
+        #expect(context.evaluateScript("__event.hasListener(__other)").toBool())
+        #expect(context.evaluateScript("__event.hasListener('not a listener')").toBool() == false)
+        // Inert: nothing to fire, and no timer of its own calls a listener.
+        #expect(context.evaluateScript("typeof __event.fire === 'undefined'").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__fired + __otherFired").toInt32() == 0)
+        // A listener added twice is one listener, and taking it away leaves only the other.
+        context.evaluateScript("__event.removeListener(__listener);")
+        #expect(context.evaluateScript("__event.hasListener(__listener)").toBool() == false)
+        #expect(context.evaluateScript("__event.hasListeners()").toBool())
+        context.evaluateScript("__event.removeListener(__other);")
+        #expect(context.evaluateScript("__event.hasListeners()").toBool() == false)
+    }
+
     /// A fake extension world for webkit-differences.js: the background or one of its pages in a tab, with ports
     /// that the test carries between the two.
     private static let fakeWorld = """
