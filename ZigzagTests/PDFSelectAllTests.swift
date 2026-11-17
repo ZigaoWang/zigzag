@@ -141,3 +141,15 @@ extension PDFDarkPagesTests {
         #expect(RemoteOutlineEntry(title: clipped, level: 0, page: 0, y: .nan).isWellFormed(pages: 1))
     }
 }
+
+extension PDFDarkPagesTests {
+    /// A selection made on a page's text stays a forward run, or none, when the text comes back shorter.
+    @Test func aSelectionNeverRunsBackwards() {
+        #expect(ZigzagPDFView.run(from: 2, to: 6, length: 10) == 2..<6)
+        #expect(ZigzagPDFView.run(from: 2, to: 60, length: 10) == 2..<10)
+        #expect(ZigzagPDFView.run(from: 40, to: 60, length: 10) == nil)
+        #expect(ZigzagPDFView.run(from: 12, to: 11, length: 10) == nil)
+        #expect(ZigzagPDFView.run(from: 0, to: 5, length: 0) == nil)
+        #expect(ZigzagPDFView.run(from: -3, to: 2, length: 10) == 0..<2)
+    }
+}

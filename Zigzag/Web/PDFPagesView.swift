@@ -896,9 +896,15 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
         guard let selection, let text = texts[page] else { return nil }
         let start = min(selection.anchor, selection.head), end = max(selection.anchor, selection.head)
         guard page >= start.page, page <= end.page else { return nil }
-        let from = page == start.page ? start.index : 0
-        let to = page == end.page ? end.index + 1 : text.string.length
-        return from < to ? from..<min(to, text.string.length) : nil
+        return Self.run(from: page == start.page ? start.index : 0, to: page == end.page ? end.index + 1 : text.string.length,
+                        length: text.string.length)
+    }
+
+    /// The part of a page's text from `from` up to `to`, within its `length`: nil when none of it is there, as when
+    /// the text came back shorter than when it was selected.
+    nonisolated static func run(from: Int, to: Int, length: Int) -> Range<Int>? {
+        let from = max(0, min(from, length)), to = max(0, min(to, length))
+        return from < to ? from..<to : nil
     }
 
     var hasSelection: Bool { selection != nil }
@@ -1013,9 +1019,10 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
             } else if let text = await document?.text(page: page) {
                 string = text.string
             } else { continue }
-            let from = page == start.page ? start.index : 0
-            let to = min(page == end.page ? end.index + 1 : string.length, string.length)
-            if from < to { parts.append(string.substring(with: NSRange(location: from, length: to - from))) }
+            if let run = Self.run(from: page == start.page ? start.index : 0, to: page == end.page ? end.index + 1 : string.length,
+                                  length: string.length) {
+                parts.append(string.substring(with: NSRange(run)))
+            }
         }
         return parts.joined(separator: "\n")
     }
