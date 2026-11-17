@@ -67,6 +67,19 @@ nonisolated enum PasswordGenerator {
 
         func allows(_ kind: String) -> Bool { allowedClasses?.contains(kind) ?? true }
 
+        /// About how many bits of randomness a password made under these rules has: its length times the bits of
+        /// each character drawn. A tight `maxlength` or digits only can bring it down to a short PIN.
+        var strengthBits: Double {
+            let length = Double(min(max(20, minLength), maxLength))
+            return length * log2(Double(letters.count))
+        }
+
+        /// Below this, what Zigzag could make isn't a strong password, so it doesn't fill or save one as strong.
+        static let minimumStrongBits: Double = 40
+
+        /// The rules leave room for a password worth calling strong.
+        var allowsStrongPassword: Bool { strengthBits >= Self.minimumStrongBits }
+
         /// The letters and digits to draw from: the site's classes, or all of them.
         var letters: [Character] {
             let pool = PasswordGenerator.alphabet.filter {

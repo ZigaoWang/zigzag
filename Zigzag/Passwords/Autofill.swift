@@ -379,6 +379,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         String(localized: "This page changed before Zigzag could fill it. Click the field again.", comment: "Toast when a login or strong password was picked but the page went to another site, or its tab was no longer in front.")
     }
 
+    private static var rulesTooTight: String {
+        String(localized: "This site’s password rules didn’t fit a strong password. Type one yourself.", comment: "Toast when Zigzag couldn't make a strong password the site accepts.")
+    }
+
     /// Fills a new strong password into the form's new-password fields, and saves it right away as a login of its
     /// own, so it's never lost if the sign-up's submit goes unnoticed or the page reloads. It replaces the account's
     /// saved password, or gets the username, only once the site has taken the form.
@@ -389,6 +393,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         let origin = target.origin
         let webView = target.webView
         hide()
+        // Rules so tight that the password would be a short PIN: not strong, so not filled or saved as one.
+        guard rules.allowsStrongPassword else { Self.tell(Self.rulesTooTight, about: webView); return }
         let candidates = PasswordGenerator.candidates(rules, count: 6)
         Task {
             let arguments: [String: Any] = ["candidates": candidates.map { $0.withUnsafeString { String($0) } }, "expectedOrigin": origin.description]
@@ -402,7 +408,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
                 } else if result?["noField"] as? Bool == true {
                     Self.tell(Self.noPasswordField, about: webView)
                 } else {
-                    Self.tell(String(localized: "This site’s password rules didn’t fit a strong password. Type one yourself.", comment: "Toast when Zigzag couldn't make a strong password the site accepts."), about: webView)
+                    Self.tell(Self.rulesTooTight, about: webView)
                 }
                 return
             }

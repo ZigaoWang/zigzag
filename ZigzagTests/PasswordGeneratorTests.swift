@@ -72,4 +72,13 @@ struct PasswordRulesTests {
         let password = PasswordGenerator.generate(PasswordGenerator.Rules(minLength: 32)).withUnsafeString { String($0) }
         #expect(password.count == 32)
     }
+
+    @Test func rulesThatOnlyAllowAPINAreNotCalledStrong() {
+        #expect(PasswordGenerator.Rules().allowsStrongPassword)
+        #expect(PasswordGenerator.Rules(maxLength: 8).allowsStrongPassword)
+        #expect(PasswordGenerator.Rules(passwordRules: "allowed: lower, upper, digit;", maxLength: 12).allowsStrongPassword)
+        #expect(!PasswordGenerator.Rules(maxLength: 4).allowsStrongPassword)
+        #expect(!PasswordGenerator.Rules(passwordRules: "allowed: digit; maxlength: 6;").allowsStrongPassword)
+        #expect(!PasswordGenerator.Rules(passwordRules: "required: digit; maxlength: 4;").allowsStrongPassword)
+    }
 }
