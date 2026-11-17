@@ -88,22 +88,23 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     // MARK: Telling when a page tries
 
-    /// On a page without WebRTC, a call that starts after a click (Join, Call) is told, so Zigzag can offer to allow
-    /// the site. `RTCPeerConnection` stays undefined, as WebKit leaves it: only looking it up right after a click or
-    /// a key says so, once a frame, so a script that looks on its own (a fingerprinting one, as the page loads) changes
-    /// nothing and asks nothing. Where WebRTC is on, it does nothing at all.
+    /// On a page without WebRTC, looking up `RTCPeerConnection` is told, so Zigzag can say so and offer to allow the
+    /// site. It stays undefined, as WebKit leaves it. A call that starts after a click (Join, Call) is told as such,
+    /// and asks; a page that looks on its own, as it loads (Meet does, and breaks), is told once a frame, for a quiet
+    /// notice on the page itself (`notice(in:isMainFrame:)`). Where WebRTC is on, it does nothing at all.
     private static let script = """
     (() => {
       if ('RTCPeerConnection' in window) return;
-      let told = false;
+      let told = false, noted = false;
       for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection']) {
         try {
           Object.defineProperty(window, name, {
             configurable: true, enumerable: false,
             get() {
-              if (!told && navigator.userActivation?.isActive !== false) {
-                told = true;
-                try { window.webkit.messageHandlers.\(messageName).postMessage({}); } catch (e) {}
+              const clicked = navigator.userActivation?.isActive !== false;
+              if (clicked ? !told : !noted) {
+                if (clicked) told = true; else noted = true;
+                try { window.webkit.messageHandlers.\(messageName).postMessage({ clicked }); } catch (e) {}
               }
               return undefined;
             },
@@ -126,9 +127,15 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == Self.messageName, let webView = message.webView else { return }
-        // Only right after a click or a key in a page: what the page says of itself isn't enough.
-        guard Date().timeIntervalSince(UndoClock.lastPageInput) < 5 else { return }
-        if let tab = (webView as? BrowserWebView)?.owner, tab.webView === webView {
+        let tab = (webView as? BrowserWebView)?.owner.flatMap { $0.webView === webView ? $0 : nil }
+        // Asked only right after a click or a key in a page: what the page says of itself isn't enough. Otherwise
+        // the page tried on its own, and its tab says so quietly.
+        let clicked = (message.body as? [String: Any])?["clicked"] as? Bool ?? true
+        guard clicked, Date().timeIntervalSince(UndoClock.lastPageInput) < 5 else {
+            if let tab { Self.notice(in: tab, isMainFrame: message.frameInfo.isMainFrame) }
+            return
+        }
+        if let tab {
             Task { _ = await Self.offer(in: tab) }
         } else if let popup = PopupWindowController.all.first(where: { $0.webView === webView }) {
             // A pop-up's page (a call that opens in a window of its own): asked in the window of the tab that
@@ -170,6 +177,7 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         // Asked once a page, whatever the answer: a site trying again and again never asks again.
         tab.permissionAnswers.note(false, key: origin, kind: kind)
         SitePermissions.noteAsked(.webRTC, origin: origin, isPrivate: tab.isPrivate)
+        hideNotice(in: tab)
         guard let controller = WindowManager.shared.promptHost(for: tab.host?.hostWindow) else { return nil }
         // From a pop-up: the window that asks comes forward, so the question isn't hidden behind it.
         if bringingForward { controller.window?.makeKeyAndOrderFront(nil) }
@@ -187,10 +195,60 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         return nil
     }
 
-    /// Sites whose question was put away without an answer, this session.
+    /// Sites whose question or notice was put away without an answer, this session.
     private static var putAway: Set<String> = []
+    /// Sites the notice has shown for this session: once each, since many sites look for WebRTC on every page load
+    /// (analytics, fingerprinting) and a notice on each would get in the way. Site Controls still has the switch.
+    private static var noticed: Set<String> = []
 
     private static let kind = "webRTC"
+    private static let noticeKind = "webRTCNotice"
+
+    // MARK: Saying so when a page tries on its own
+
+    /// Whether a page that looked for WebRTC on its own, while it's blocked, says so: only the page itself (not a frame
+    /// in it, an ad's), once a page load, never once the page asked (its question says it), and never for a site
+    /// you've chosen Block for, or that has shown or put the notice away this session.
+    nonisolated static func notices(allowed: Bool, chosen: Bool?, isMainFrame: Bool, noticedHere: Bool, askedHere: Bool,
+                                    putAway: Bool) -> Bool {
+        !allowed && chosen != false && isMainFrame && !noticedHere && !askedHere && !putAway
+    }
+
+    /// "This site tried to use WebRTC, which you've blocked.", over the page in `tab`, with Allow for This Site:
+    /// kept for the site (in a private window, the tab alone) and the page reloaded into it, as in Site Controls.
+    /// Noted in Diagnostics once a page, whether or not the tab is in front to show it. Says whether it noted it.
+    @discardableResult
+    static func notice(in tab: Tab, isMainFrame: Bool) -> Bool {
+        let here = page(of: tab)
+        guard isAvailable, let origin = SiteOrigin.of(here),
+              notices(allowed: allows(here, in: tab), chosen: tab.webRTCHere[origin] ?? SitePermissions.webRTC(origin: origin),
+                      isMainFrame: isMainFrame, noticedHere: tab.permissionAnswers.answer(key: origin, kind: noticeKind) != nil,
+                      askedHere: tab.permissionAnswers.answer(key: origin, kind: kind) != nil,
+                      putAway: putAway.contains(origin) || noticed.contains(origin))
+        else { return false }
+        tab.permissionAnswers.note(false, key: origin, kind: noticeKind)
+        Diagnostics.note("WebRTC", site: SiteOrigin.label(origin), "blocked, the page tried to use it", isPrivate: tab.isPrivate)
+        guard let controller = WindowManager.shared.window(of: tab),
+              controller.promptShows(tab) else { return true }
+        noticed.insert(origin)
+        Toast.show(String(localized: "This site tried to use WebRTC, which you’ve blocked.", comment: "Notice over a page when WebRTC is off for it (Settings › Privacy › Protect IP address from WebRTC) and the page tried to use it, as a call site like Google Meet does. WebRTC is a name: keep it as it is."),
+                   symbol: "phone.fill",
+                   action: (String(localized: "Allow for This Site", comment: "Button on the notice that a site tried to use blocked WebRTC: allows WebRTC for the site and reloads the page."), { [weak tab] in
+                       guard let tab, SiteOrigin.of(page(of: tab)) == origin else { return }
+                       choose(true, origin: origin, in: tab)
+                   }),
+                   duration: 8, owner: noticeOwner, onClose: { putAway.insert(origin) }, in: controller)
+        return true
+    }
+
+    /// What the notice is shown for, to take it down: not the tab, which would read as the offer to translate its page.
+    private static let noticeOwner = NSObject()
+
+    /// Takes the notice down for the question, which says the same and more.
+    private static func hideNotice(in tab: Tab) {
+        guard let controller = WindowManager.shared.window(of: tab) else { return }
+        Toast.hide(for: noticeOwner, in: controller)
+    }
 
     /// The page the tab shows, or the one it's going to before any.
     private static func page(of tab: Tab) -> URL? { tab.webView?.url ?? tab.url }

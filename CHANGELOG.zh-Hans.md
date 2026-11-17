@@ -21,6 +21,11 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “设置 › 外观 › 网页缩放”可以设置所有网站默认的缩放比例，和 Chrome、Safari 一样。用 ⌘+ 或 ⌘− 缩放过的网站会保留自己的缩放，“实际大小”会回到默认值。感谢 [Lakeland97](https://github.com/Lakeland97)。([#273](https://github.com/ZigaoWang/zigzag/issues/273))
 - 隐藏边栏时，用 ⌘ 点按、中键点按或“在新标签页中打开链接”在后台打开的链接，会在边栏那一侧短暂显示一条提示，带着新标签页的图标和标题。点一下就切到那个标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#272](https://github.com/ZigaoWang/zigzag/issues/272))
 - “历史记录”菜单更像 Safari 了：“最近关闭”里列出最近关掉的标签页和窗口，可以挑一个重新打开；下面是今天访问过的网页，再往下是过去七天每天一个子菜单。点网页会在当前标签页打开，按住 ⌘ 点会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#271](https://github.com/ZigaoWang/zigzag/issues/271))
+- ⌘T 的命令栏可以拖到窗口里任何地方，边栏上面也行：按住它的边缘或文字周围的空白拖动就好，和 Raycast 一样，放下后会一直待在那里。拖动时会出现参考线，标出它默认的位置，也就是窗口正中和平常的高度，靠近时会吸附上去，想放回去很容易。双击它的边缘就能回到默认位置。感谢 [miateo](https://github.com/miateo)。([#280](https://github.com/ZigaoWang/zigzag/issues/280))
+- 打开“防止 WebRTC 泄露 IP 地址”后，像 Google Meet 这样一打开就要用 WebRTC 的网站，不会再一声不吭地打不开：网页上方会提示此网站尝试使用 WebRTC，但你已将其阻止，点“为此网站允许”就会允许它并重新载入网页。每个页面只提示一次，网页里嵌的框架不会提示，关掉之后这次打开 Zigzag 期间也不会再提示。感谢 [bkonia](https://github.com/bkonia) 和 [Lakeland97](https://github.com/Lakeland97)。([#276](https://github.com/ZigaoWang/zigzag/issues/276))
+- “设置 › 下载”可以把某种类型的文件存到它自己的文件夹，或者存好后用 Mac 上的 App 打开，比如用“预览”打开 PDF。“打开”只对安全的类型有效：App、脚本、安装器、压缩包、磁盘映像、网页和指向别处的链接都只会存储。感谢 [Lakeland97](https://github.com/Lakeland97)。([#263](https://github.com/ZigaoWang/zigzag/issues/263))
+- 打开“设置 › 外观 › 地址栏放在页面上方”后，地址变成和分屏页面一样的安静小框：网站名居中在网页上方，点一下或按 ⌘L 就在原地展开。后退、前进和刷新还在左边，阅读器、固定的扩展和“网站设置”在右边。感谢 [Lakeland97](https://github.com/Lakeland97)。([#275](https://github.com/ZigaoWang/zigzag/issues/275))
+- “设置 › 标签页 › 窗口共享空间的标签页”打开后，同一空间的每个窗口会列出相同的标签页，和 Arc 一样，不再各有各的标签页。每个窗口仍然显示自己的那一个；一个网页同一时间只能显示在一个窗口中，选中在另一个窗口里打开着的标签页时会出现“在此显示”，点一下就把它原样带过来，不用重新载入。打开、关闭、移动、嵌套、分组和分屏标签页，每个窗口都会同步；关闭一个窗口不会关掉任何标签页。隐私窗口仍然只有自己的标签页。打开这个设置会把各窗口的标签页合在一起，关掉则让每个窗口留下它手上的标签页，两种情况都不会丢标签页。默认关闭。感谢 [miateo](https://github.com/miateo)。([#162](https://github.com/ZigaoWang/zigzag/issues/162))
 
 ### 修复
 - 全屏时，跟着菜单栏一起出现的关闭、最小化和全屏按钮后面又有了一条栏，隐藏边栏时不会再直接浮在网页上。
@@ -28,6 +33,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 安全加固：网站作为下载发送的页面一定会被保存，不会当成它的网页显示；扩展只能替换它自己下载的文件，被替换的文件会移到废纸篓；页面重新载入时被重定向到别处，地址栏仍然显示你正在看的页面。
 - 在每个页面上不停重新连接自己的扩展（比如两个 Sound Booster 扩展）不再让 Zigzag 一直忙碌。这样持续几秒后，Zigzag 只让它在那个页面上隔一段时间才试一次，在扩展日志里记一次，并说出是哪个扩展，用“关闭…”可以只在那个网站上关闭它，或者在所有网站上关闭它。其他扩展，以及这个扩展在其他页面上，都不受影响。
 - 小播放器会跟着短视频连播走，比如抖音：下一个视频开始播放时会切过去，不再显示黑屏。感谢 [alextend](https://github.com/alextend)。([#267](https://github.com/ZigaoWang/zigzag/issues/267))
+- 从 Arc 导入会保留 Arc 的个人资料。你的 Arc 空间分布在多份个人资料里时，Arc 里自己建的每份个人资料都会变成同名的 Zigzag 个人资料（已有同名的就放进那份），连同它的空间、收藏、历史记录和登录状态；Arc 默认个人资料里的空间会放进你导入到的那份个人资料。再次导入不会重复添加，只用一份 Arc 个人资料时和以前一样。感谢 [miateo](https://github.com/miateo)。([#279](https://github.com/ZigaoWang/zigzag/issues/279))
 
 ## [0.9.1] - 2026-11-16
 

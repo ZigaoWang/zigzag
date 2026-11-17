@@ -213,6 +213,20 @@ final class PaneHeaderView: NSView {
         return .noReload
     }
 
+    /// The address pill in a row of buttons: centered on `center` (its page's middle), as wide as its address
+    /// (`fitting`), within the `room` the buttons leave and nudged clear of them where centering would cut it. Over
+    /// its card, the field takes the room up to a comfortable width (`addressMaxWidth`), as an address field does,
+    /// rather than a small pill adrift in it. A split pane's strip and the bar above the page (#275) place theirs alike.
+    static func pillFrame(center: CGFloat, room: ClosedRange<CGFloat>, fitting: CGFloat, overCard: Bool, midY: CGFloat) -> NSRect {
+        let h = Tokens.Pane.addressHeight
+        let width = max(0, min(room.upperBound - room.lowerBound, overCard ? addressMaxWidth : fitting))
+        let x = min(max(center - width / 2, room.lowerBound), room.upperBound - width)
+        return NSRect(x: round(x), y: midY - h / 2, width: width, height: h)
+    }
+
+    /// Too narrow a pill shows nothing readable: it steps aside.
+    static func pillFits(_ frame: NSRect) -> Bool { frame.width >= PaneAddressView.padding * 3 }
+
     private var currentFit = Fit.all
     /// The widest the address grows over its card.
     static let addressMaxWidth: CGFloat = 560
@@ -278,15 +292,9 @@ final class PaneHeaderView: NSView {
         [back, forward, reload, zoom, swap, orientation, close, more, closeTab].forEach { $0.radius = Tokens.Radius.control }
         // The address pill is centered over its pane, as wide as its text, within the room the buttons leave, and
         // nudged clear of them where centering would cut it.
-        let h = Tokens.Pane.addressHeight
-        let center = addressCenter ?? bounds.midX
-        let lo = x + Tokens.Space.x2, hi = trailing - Tokens.Space.x2
-        // Over its card, the field takes the room between the two groups, up to a comfortable width, as an address
-        // field does, rather than a small pill adrift in it.
-        let pillWidth = max(0, min(hi - lo, overCard ? Self.addressMaxWidth : address.fittingWidth))
-        let pillX = min(max(center - pillWidth / 2, lo), hi - pillWidth)
-        address.frame = NSRect(x: round(pillX), y: y + (b - h) / 2, width: pillWidth, height: h)
-        address.isHidden = address.text.isEmpty || pillWidth < PaneAddressView.padding * 3
+        address.frame = Self.pillFrame(center: addressCenter ?? bounds.midX, room: x + Tokens.Space.x2...max(x + Tokens.Space.x2, trailing - Tokens.Space.x2),
+                                       fitting: address.fittingWidth, overCard: overCard, midY: y + b / 2)
+        address.isHidden = address.text.isEmpty || !Self.pillFits(address.frame)
         line.frame = NSRect(x: 0, y: bounds.height - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)
         windowGuard.frame = bounds
     }
@@ -311,7 +319,8 @@ final class TitleBandGuard: NSControl {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// A pane's address: the page's address in a small field, a faint fill and a 1px edge. A click edits it.
+/// A pane's address: the page's address in a small field, a faint fill and a 1px edge. A click edits it. The bar
+/// above the page holds one too (`TopBarView.pill`), for the page alone in the window (#275).
 final class PaneAddressView: InteractiveView {
 
     // MARK: Dropping a link or words (#182)
@@ -339,19 +348,42 @@ final class PaneAddressView: InteractiveView {
         hasText && (width >= fitting - 0.5 || width >= padding * 2 + buttonRoom + minTextWithButton)
     }
     var showsSiteControls: Bool { !isHidden && !siteControls.isHidden }
+    /// Whether the field has its own Site Controls at its end. The bar above the page keeps the address's own buttons
+    /// beside the field instead (`TopBarView.pill`), so its field has none.
+    var hasSiteControls = true { didSet { if hasSiteControls != oldValue { needsLayout = true } } }
+
+    /// The page isn't secure (plain http, or a certificate let through on the warning page): the not-secure mark
+    /// before the address, as the sidebar's address has it.
+    var notSecure = false {
+        didSet {
+            guard notSecure != oldValue else { return }
+            mark.isHidden = !notSecure
+            mark.toolTip = notSecure ? SitePanel.notSecure : nil
+            refreshAccessibilityLabel()
+            needsLayout = true
+        }
+    }
+    private let mark = NSImageView()
+    /// What the mark takes before the address: its width and the gap after it.
+    private static var markRoom: CGFloat { Tokens.Space.x3 + Tokens.Space.x1 }
 
     var text: String = "" {
         didSet {
             label.stringValue = text
-            setAccessibilityLabel(text.isEmpty ? String(localized: "Address", comment: "VoiceOver name of the address in a split view page's strip, while it has none.") : text)
+            refreshAccessibilityLabel()
             needsLayout = true
         }
+    }
+
+    private func refreshAccessibilityLabel() {
+        let name = text.isEmpty ? String(localized: "Address", comment: "VoiceOver name of the address in a split view page's strip, while it has none.") : text
+        setAccessibilityLabel(notSecure && !text.isEmpty ? String(localized: "\(name), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.") : name)
     }
 
     /// As wide as the whole address and the padding, with the few points a middle-truncating field keeps in hand
     /// before it cuts (centered, so they never show).
     var fittingWidth: CGFloat {
-        return fullTextWidth + Self.padding * 2 + Self.slack + Self.buttonRoom
+        return fullTextWidth + Self.padding * 2 + Self.slack + (hasSiteControls ? Self.buttonRoom : 0) + (notSecure ? Self.markRoom : 0)
     }
     private static let slack: CGFloat = Tokens.Space.x2
     /// The whole address's width, measured as the field draws it, whatever it shows now.
@@ -369,6 +401,11 @@ final class PaneAddressView: InteractiveView {
         layer?.cornerRadius = Tokens.Radius.control
         layer?.cornerCurve = .continuous
         addSubview(label)
+        mark.image = Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline)
+        mark.imageScaling = .scaleNone
+        mark.contentTintColor = Tokens.Color.textTertiary
+        mark.isHidden = true
+        addSubview(mark)
         siteControls.radius = Tokens.Radius.control - Self.buttonInset
         siteControls.pressOutset = NSEdgeInsets(top: Self.buttonInset, left: 1, bottom: Self.buttonInset, right: Self.buttonInset)
         addSubview(siteControls)
@@ -387,12 +424,13 @@ final class PaneAddressView: InteractiveView {
     override func layout() {
         super.layout()
         let h = label.lineHeight
-        let button = Self.showsButton(width: bounds.width, fitting: fittingWidth, hasText: !text.isEmpty)
+        let button = hasSiteControls && Self.showsButton(width: bounds.width, fitting: fittingWidth, hasText: !text.isEmpty)
         siteControls.isHidden = !button
         let side = Self.buttonSide
         siteControls.frame = NSRect(x: bounds.width - Self.buttonInset - side, y: (bounds.height - side) / 2, width: side, height: side)
-        label.frame = NSRect(x: Self.padding - Label.inset, y: label.centeredY(in: bounds.height),
-                             width: max(0, bounds.width - Self.padding * 2 - (button ? Self.buttonRoom : 0) + Label.inset * 2), height: h)
+        let markRoom = notSecure ? Self.markRoom : 0
+        label.frame = NSRect(x: Self.padding + markRoom - Label.inset, y: label.centeredY(in: bounds.height),
+                             width: max(0, bounds.width - Self.padding * 2 - markRoom - (button ? Self.buttonRoom : 0) + Label.inset * 2), height: h)
         // An address too long for the strip shows its host alone, cut so its domain stays whole (#189): cut in the
         // middle, "gemini.goo…/app" would hide whose site it is.
         let fits = label.frame.width - Label.inset * 2 >= fullTextWidth - 0.5
@@ -401,6 +439,12 @@ final class PaneAddressView: InteractiveView {
         if label.stringValue != shown { label.stringValue = shown }
         label.lineBreakMode = shown == text && fits ? .byTruncatingMiddle : AddressView.lineBreak(forName: shown)
         toolTip = shown == text && fits ? nil : text
+        guard notSecure else { return }
+        // The mark goes just before the address's first letter. In a field wider than the address (centered in it),
+        // the address moves over by half the mark, so the two together sit in the field's middle.
+        let ink = min(ceil((shown as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.body()]).width), label.frame.width - Label.inset * 2)
+        if label.frame.width - Label.inset * 2 - ink >= markRoom { label.frame.origin.x -= markRoom / 2 }
+        mark.frame = NSRect(x: round(label.frame.midX - ink / 2 - markRoom), y: 0, width: Tokens.Space.x3, height: bounds.height)
     }
 
     override func stateDidChange(animated: Bool) {

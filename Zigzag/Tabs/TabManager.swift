@@ -1,7 +1,10 @@
 import AppKit
 import WebKit
 
-/// Owns every tab of one window, grouped by space. Views read from it; they never own web views.
+/// One window's tabs, grouped by space. The tabs themselves are its store's (`TabStore`): the window's own, or, while
+/// Settings › Tabs has windows share a space's tabs (#162), every everyday window's; the space you're in, the tab chosen
+/// in each space and the order you went through them are always this window's own. Views read from it; they never own
+/// web views.
 final class TabManager {
     enum Change {
         /// Tabs added, removed or moved, or bookmarks changed.
@@ -12,55 +15,65 @@ final class TabManager {
         case content
     }
 
-    // What extensions are told of the tabs is worked out from these three (`extensionList`): any change starts it over.
-    private(set) var tabsBySpace: [UUID: [Tab]] = [:] { didSet { extensionLists.removeAll() } }
-    private(set) var bookmarkTabs: [UUID: Tab] = [:] { didSet { extensionLists.removeAll() } }
+    /// The tabs this window shows: its own, or every everyday window's while they share them (#162).
+    private(set) var store: TabStore
+    // What extensions are told of the tabs is worked out from these three (`extensionList`): any change starts it over,
+    // in every window showing them.
+    private(set) var tabsBySpace: [UUID: [Tab]] {
+        get { store.tabsBySpace }
+        _modify { yield &store.tabsBySpace; store.listsChanged() }
+    }
+    private(set) var bookmarkTabs: [UUID: Tab] {
+        get { store.bookmarkTabs }
+        _modify { yield &store.bookmarkTabs; store.listsChanged() }
+    }
     private var selectedBySpace: [UUID: UUID] = [:]
     private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll() } }
-    /// Most recently used first. Drives Control+Tab.
+    /// Most recently used first, in this window. Drives Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
-    private var closedTabs: [ClosedTab] = []
+    private var closedTabs: [ClosedTab] {
+        get { store.closedTabs }
+        _modify { yield &store.closedTabs }
+    }
     /// Closed tabs brought back, by the id each had: the new tab's id.
-    private var reopenedAs: [UUID: UUID] = [:]
-    /// How many closed tabs ⇧⌘T and ⌘Z can bring back: fifty more than the biggest lot closed at once. It never
-    /// shrinks back, or closing two more after Clear took sixty would leave ⌘Z on the sixty short.
-    private var closedLimit = 50
-    /// The groups of tabs (#209) this window has, by id; which tabs are in each, the tabs say (`Tab.groupID`).
-    private(set) var groups: [UUID: TabGroup] = [:]
+    private var reopenedAs: [UUID: UUID] {
+        get { store.reopenedAs }
+        _modify { yield &store.reopenedAs }
+    }
+    /// How many closed tabs ⇧⌘T and ⌘Z can bring back (`TabStore.closedLimit`).
+    private var closedLimit: Int {
+        get { store.closedLimit }
+        set { store.closedLimit = newValue }
+    }
+    /// The groups of tabs (#209), by id; which tabs are in each, the tabs say (`Tab.groupID`).
+    private(set) var groups: [UUID: TabGroup] {
+        get { store.groups }
+        _modify { yield &store.groups }
+    }
     /// Groups that went when their last tab closed or left, so ⌘Z or ⇧⌘T bringing a tab back brings its group too.
-    private var emptiedGroups: [UUID: TabGroup] = [:]
+    private var emptiedGroups: [UUID: TabGroup] {
+        get { store.emptiedGroups }
+        _modify { yield &store.emptiedGroups }
+    }
 
     weak var host: TabHost? {
-        didSet { allTabs.forEach { $0.host = host } }
+        didSet {
+            // Its own tabs: all of them, or, while other windows show them too (#162), those no window has yet.
+            let alone = store.managers.count <= 1
+            allTabs.forEach { if alone || $0.host == nil { $0.host = host } }
+        }
     }
     let changed = Signal<Change>()
 
     private var libraryToken: SignalToken?
-    private var tabTokens: [UUID: SignalToken] = [:]
 
-    /// Watches a tab so navigation inside it gets saved for crash recovery. A page's own title saves at most every
-    /// half minute: pages that count down or flash "(1) New message" would otherwise save the whole session every
-    /// second or two. A name you give a tab saves at once.
-    private func watch(_ tab: Tab) {
-        tab.privateStore = privateStore
-        var lastTitleSave = Date.distantPast
-        tabTokens[tab.id] = tab.changed.observe { [weak self] change in
-            switch change {
-            case .url, .audio, .renamed:
-                self?.changed.send(.content)
-            case .title where Date().timeIntervalSince(lastTitleSave) > 30:
-                lastTitleSave = Date()
-                self?.changed.send(.content)
-            default:
-                break
-            }
-        }
-    }
+    /// Watches a tab so navigation inside it gets saved for crash recovery (`TabStore.watch`).
+    private func watch(_ tab: Tab) { store.watch(tab) }
     private var suspendTimer: Timer?
 
     /// A tab closed by a change elsewhere (a space or pinned page deleted): no longer watched or among the recent.
     private func forget(_ tab: Tab) {
-        tabTokens[tab.id] = nil
+        store.unwatch(tab.id)
         recentTabIDs.removeAll { $0 == tab.id }
     }
 
@@ -89,13 +102,16 @@ final class TabManager {
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
-    let privateStore: WKWebsiteDataStore?
+    var privateStore: WKWebsiteDataStore? { store.privateStore }
     var isPrivate: Bool { privateStore != nil }
 
-    init(spaceID: UUID? = nil, isPrivate: Bool = false) {
-        privateStore = isPrivate ? .nonPersistent() : nil
+    /// `store`: the tabs other windows show, for a window that shows them too (#162); nil makes a store of its own.
+    /// A private window always has its own.
+    init(spaceID: UUID? = nil, isPrivate: Bool = false, store: TabStore? = nil) {
+        self.store = (isPrivate ? nil : store) ?? TabStore(isPrivate: isPrivate)
         let requested = spaceID.flatMap { Library.shared.space($0)?.id }
         currentSpaceID = requested ?? Library.shared.spaces[0].id
+        self.store.attach(self)
         libraryToken = Library.shared.changed.observe { [weak self] in
             // Favorites and pinned pages count among the navigable tabs.
             self?.extensionLists.removeAll()
@@ -109,12 +125,200 @@ final class TabManager {
         suspendTimer?.tolerance = 10
     }
 
+    /// Set once the window is gone: it shows nothing any more.
+    private(set) var isInvalidated = false
+
+    /// Whether this is the last window showing its tabs: closing it closes them.
+    var isLastView: Bool { store.managers.allSatisfy { $0 === self } }
+
+    /// The window closes. The last window of a store closes its tabs; one of several sharing them (#162) leaves them
+    /// to the windows still open, its pages free for them to show and its tabs' links opening there.
     func invalidate() {
+        guard !isInvalidated else { return }
         suspendTimer?.invalidate()
-        allTabs.forEach { $0.close(keepingSnapshot: !isPrivate) }
-        tabsBySpace = [:]
-        bookmarkTabs = [:]
+        isInvalidated = true
+        store.detach(self)
+        let others = store.managers
+        guard let heir = others.first else {
+            allTabs.forEach { $0.close(keepingSnapshot: !isPrivate) }
+            tabsBySpace = [:]
+            bookmarkTabs = [:]
+            return
+        }
+        var released: [Tab] = []
+        for tab in allTabs {
+            if tab.shownBy === self { tab.shownBy = nil; released.append(tab) }
+            if tab.host == nil || tab.host === host { Self.rehost(tab, to: heir.host) }
+        }
+        // A page shown here and waiting in another window comes on screen there.
+        for other in others {
+            other.listChanged()
+            if released.contains(where: other.isShowing) { other.pageTaken() }
+        }
     }
+
+    // MARK: Windows sharing their tabs
+
+    /// Set while this window hears of a change another made, so it isn't sent back.
+    private var isRelaying = false
+
+    /// The pages on screen here, as last drawn: a change elsewhere draws the page again only if it changes them.
+    private var shownLastTime: [UUID] = []
+    private var shownSignature: [UUID] {
+        guard let tab = selectedTab else { return [] }
+        return [tab.id] + (split(for: tab)?.ids ?? [])
+    }
+
+    /// The tab you're on (with the pages beside it) changed. A page this window no longer shows, waiting in another
+    /// window that shares the tabs: it comes on screen there now.
+    private func selectionChanged() {
+        let before = shownLastTime
+        shownLastTime = shownSignature
+        changed.send(.selection)
+        let released = Set(before).subtracting(shownLastTime)
+        guard !released.isEmpty, !isInvalidated, store.isShared else { return }
+        for other in store.managers where other !== self {
+            guard let tab = other.selectedTab else { continue }
+            if other.panes(of: tab).contains(where: { released.contains($0.id) && $0.shownBy !== other }) { other.pageTaken() }
+        }
+    }
+
+    /// Another window changed the tabs: the tab chosen here in a space that lost it is another, and the list (and the
+    /// page, if what's on screen here changed) is drawn again.
+    func listChanged() {
+        guard !isInvalidated else { return }
+        isRelaying = true
+        defer { isRelaying = false }
+        extensionLists.removeAll()
+        settleSelection()
+        changed.send(.structure)
+        if shownSignature != shownLastTime { selectionChanged() }
+    }
+
+    /// Every space's chosen tab still in it: one closed elsewhere, or moved to another space, is replaced by the tab
+    /// you were on before it there (one no other window shows, if there is one), else the first, else none.
+    private func settleSelection() {
+        for (space, id) in selectedBySpace {
+            if let tab = tab(with: id), tab.isFavorite || tab.spaceID == space { continue }
+            let list = tabs(in: space)
+            let recent = recentTabs.filter { $0.spaceID == space && !$0.isFavorite && !$0.isClosed }
+            let free = recent.first { !isShownElsewhere($0) } ?? list.first { !isShownElsewhere($0) }
+            selectedBySpace[space] = (free ?? recent.first ?? list.first)?.id
+        }
+    }
+
+    /// Whether this window has the tab's page on screen now: the tab it's on, or a page beside it.
+    func isShowing(_ tab: Tab) -> Bool {
+        guard !isInvalidated, let selected = selectedTab else { return false }
+        return selected === tab || panes(of: selected).contains { $0 === tab }
+    }
+
+    /// The pages this window has on screen now.
+    var allTabsShownNow: [Tab] { selectedTab.map(panes(of:)) ?? [] }
+
+    /// Whether this window has the tab chosen in any space, on screen or not.
+    func hasChosen(_ tab: Tab) -> Bool { selectedBySpace.values.contains(tab.id) }
+
+    /// Another window sharing the tabs has this page on screen: here it shows that, and offers to show it here instead.
+    func isShownElsewhere(_ tab: Tab) -> Bool { store.isShared && store.isShownElsewhere(tab, than: self) }
+
+    /// This window puts these pages on screen, taking them from a window that had them. Returns the windows to tell
+    /// once the pages are here: they show the pages are in this window now.
+    private func claim(_ pages: [Tab]) -> [TabManager] {
+        var losers: [TabManager] = []
+        for page in pages {
+            if let owner = page.shownBy, owner !== self, owner.isShowing(page), !losers.contains(where: { $0 === owner }) { losers.append(owner) }
+            own(page)
+        }
+        // A video playing in another window's mini player: that window lets it go.
+        if store.isShared, pages.contains(where: \.isInMiniPlayer) {
+            for other in store.managers where other !== self && !losers.contains(where: { $0 === other }) { losers.append(other) }
+        }
+        return losers
+    }
+
+    /// Before the window draws a page: whether it may. It takes the page if no other window has it on screen.
+    func mayShow(_ page: Tab) -> Bool {
+        guard !isShownElsewhere(page) else { return false }
+        own(page)
+        return true
+    }
+
+    private func own(_ page: Tab) {
+        page.shownBy = self
+        Self.rehost(page, to: host)
+    }
+
+    /// A tab goes to another window's keeping (it's shown there, or its window closed): its links open there now, and
+    /// extensions hear that it moved.
+    private static func rehost(_ tab: Tab, to host: TabHost?) {
+        guard let host, tab.host !== host else { return }
+        let old = tab.host as? BrowserWindowController
+        tab.host = host
+        tab.store?.listsChanged()
+        if #available(macOS 15.4, *), let old, !old.tabManager.isPrivate,
+           let place = old.tabManager.navigableTabs.firstIndex(where: { $0 === tab }) {
+            ExtensionCenter.tabMoved(tab, from: place, in: old)
+        }
+    }
+
+    /// Another window took a page this one had on screen.
+    private func pageTaken() {
+        isRelaying = true
+        defer { isRelaying = false }
+        selectionChanged()
+    }
+
+    /// A window opened beside this one, sharing its tabs: it starts on the tabs this one chose in the other spaces,
+    /// and in the space it opens on, on none (for a new tab or the command bar).
+    func startSelection(from other: TabManager) {
+        guard other.store === store, other !== self else { return }
+        selectedBySpace = other.selectedBySpace
+        selectedBySpace[currentSpaceID] = nil
+        recentTabIDs = other.recentTabIDs
+    }
+
+    /// This window's page went to another window sharing the tabs (Move to New Window, a tab dragged out): it goes on
+    /// to the tab you were on before here, one no other window shows if there is one, as if the tab had closed. The
+    /// tab stays open.
+    func moveOn(from tab: Tab) {
+        guard let selected = selectedTab, isShowing(tab) else { return }
+        let space = selected.spaceID
+        let gone = Set(panes(of: selected).map(\.id) + [selected.id])
+        let rest = recentTabs.filter { !gone.contains($0.id) && $0.spaceID == space && !$0.isClosed }
+            + tabs(in: space).filter { !gone.contains($0.id) }
+        if let next = rest.first(where: { !isShownElsewhere($0) }) {
+            select(next, claiming: false)
+        } else {
+            selectedBySpace[space] = nil
+            selectionChanged()
+        }
+    }
+
+    /// Settings › Tabs turned sharing on or off (`TabStore.share`, `unshare`): this window shows `store`'s tabs now.
+    func adopt(store new: TabStore) {
+        guard new !== store else { return }
+        store.detach(self)
+        store = new
+        new.attach(self)
+    }
+
+    /// The store changed under this window: what it chose that it no longer has is another, and it's drawn again.
+    func storeChanged() {
+        isRelaying = true
+        defer { isRelaying = false }
+        extensionLists.removeAll()
+        recentTabIDs = recentTabIDs.filter { tab(with: $0) != nil }
+        // A nested tab whose parent went to another window comes to the top level.
+        for space in Array(tabsBySpace.keys) { repairTree(in: space) }
+        settleSelection()
+        settleGroups()
+        changed.send(.structure)
+        shownLastTime = []
+        selectionChanged()
+    }
+
+    func forgetExtensionLists() { extensionLists.removeAll() }
 
     // MARK: Reading
 
@@ -154,11 +358,16 @@ final class TabManager {
 
     func bookmarkTab(for bookmarkID: UUID) -> Tab? { bookmarkTabs[bookmarkID] }
 
-    /// Tabs in most-recently-used order across all spaces.
+    /// Tabs in most-recently-used order across all spaces: as this window went through them, then, while windows
+    /// share their tabs (#162), those it hasn't been on (opened in another window), most recently looked at first.
     var recentTabs: [Tab] {
         // One pass to index the tabs, not a search for each id.
-        let byID = Dictionary(allTabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return recentTabIDs.compactMap { byID[$0] }
+        let tabs = allTabs
+        let byID = Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let recent = recentTabIDs.compactMap { byID[$0] }
+        guard store.isShared, recent.count < tabs.count else { return recent }
+        let seen = Set(recentTabIDs)
+        return recent + tabs.filter { !seen.contains($0.id) }.sorted { $0.lastActivated > $1.lastActivated }
     }
 
     // MARK: Creating
@@ -334,13 +543,13 @@ final class TabManager {
         liftChildren(of: tab)
         tabsBySpace[tab.spaceID]?.remove(at: index)
         recentTabIDs.removeAll { $0 == tab.id }
-        tabTokens[tab.id] = nil
+        store.unwatch(tab.id)
         if #available(macOS 15.4, *), !toWindow { ExtensionCenter.tabClosed(tab) }
         structureChanged()
         if wasSelected {
             if let partner { select(partner) } else { selectAfterClosing(tab, index: index) }
         } else if place.split != nil {
-            changed.send(.selection)
+            selectionChanged()
         }
         return place
     }
@@ -372,7 +581,7 @@ final class TabManager {
         let wasSelected = selectedTab === tab
         bookmarkTabs[bookmarkID] = nil
         recentTabIDs.removeAll { $0 == tab.id }
-        tabTokens[tab.id] = nil
+        store.unwatch(tab.id)
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         structureChanged()
         if wasSelected { selectAfterClosing(tab, index: 0) }
@@ -408,7 +617,7 @@ final class TabManager {
     /// it. Returns the pages that came, each with its place among the other window's tabs as extensions count them.
     @discardableResult
     func take(_ tab: Tab, from other: TabManager, at index: Int) -> [(tab: Tab, from: Int)] {
-        guard other !== self, !tab.isClosed, tab.bookmarkID == nil, other.tab(with: tab.id) === tab else { return [] }
+        guard other !== self, other.store !== store, !tab.isClosed, tab.bookmarkID == nil, other.tab(with: tab.id) === tab else { return [] }
         let pair = other.split(for: tab)
         let panes = other.panes(of: tab)
         let together = pair != nil && panes.count == pair?.count && panes.allSatisfy { $0.bookmarkID == nil }
@@ -445,17 +654,21 @@ final class TabManager {
     }
 
     func restoreSelection(_ selection: [UUID: UUID], currentSpaceID: UUID) {
-        selectedBySpace = selection
+        // Only tabs it has (a window sharing tabs with others chose among theirs, #162).
+        selectedBySpace = selection.filter { tab(with: $0.value) != nil }
         if Library.shared.space(currentSpaceID) != nil { self.currentSpaceID = currentSpaceID }
         if let tab = selectedTab { promote(tab) }
         structureChanged()
         changed.send(.space)
-        changed.send(.selection)
+        selectionChanged()
     }
 
     // MARK: Selecting
 
-    func select(_ tab: Tab) {
+    /// `claiming`: its page comes on screen here even if another window sharing the tabs shows it (#162), which then
+    /// shows it's here now. Without, for a tab chosen for you (the one you were on before the tab you closed), a page
+    /// another window shows stays there, and this window says so.
+    func select(_ tab: Tab, claiming: Bool = true) {
         // A tab closed since (one an old undo step or a stale button still points at) never comes back from here.
         guard !tab.isClosed else { return }
         Autofill.shared.hide()
@@ -481,13 +694,16 @@ final class TabManager {
         // and just left isn't unloaded the moment you look away.
         if previous !== tab { previous?.markActivated() }
         selectedBySpace[tab.spaceID] = tab.id
+        let losers = claiming ? claim(panes(of: tab)) : []
         tab.markActivated()
         promote(tab)
         tab.ensureWebView()
         tab.reloadIfItStopped()
         tab.shown()
         if #available(macOS 15.4, *), previous !== tab { ExtensionCenter.tabActivated(tab, previous: previous) }
-        changed.send(.selection)
+        selectionChanged()
+        // After the pages are here, so a window that loses one finds it gone from its own cards.
+        for loser in losers { loser.pageTaken() }
     }
 
     private func promote(_ tab: Tab) {
@@ -497,7 +713,7 @@ final class TabManager {
 
     func clearSelection() {
         selectedBySpace[currentSpaceID] = nil
-        changed.send(.selection)
+        selectionChanged()
     }
 
     func selectNext(offset: Int) {
@@ -679,7 +895,7 @@ final class TabManager {
             tab.ensureWebView()
             if tab !== left { tab.shown() }
         }
-        changed.send(.selection)
+        selectionChanged()
     }
 
     /// What Clear closes in a space and why. `unused`: the tabs you've drifted away from, keeping the ones you're
@@ -703,7 +919,8 @@ final class TabManager {
         let nested = Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a })
         // A group of tabs (#209) is kept or closed as one, as a nest is.
         let parents = TabGroups.clearParents(nested, nodes: treeNodes(in: spaceID), groups: groupIDs(in: spaceID))
-        let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse }.map(\.id))
+        // What another window sharing the tabs has on screen stays too: it's in use there (#162).
+        let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse || isShownElsewhere($0) }.map(\.id))
         let ages = Dictionary(tabs.map { ($0.id, now.timeIntervalSince($0.lastActivated)) }, uniquingKeysWith: { a, _ in a })
         let (closing, kind) = Self.clearing(tabs.map(\.id), current: current?.id, groups: groups, parents: parents, busy: busy, ages: ages)
         return (tabs.filter { closing.contains($0.id) }, kind)
@@ -809,7 +1026,7 @@ final class TabManager {
             promote(tab)
             tab.ensureWebView()
         }
-        changed.send(.selection)
+        selectionChanged()
     }
 
     /// Shows another space's list without leaving the page you're on (used while dragging a tab).
@@ -828,6 +1045,10 @@ final class TabManager {
     }
 
     private func libraryDidChange() {
+        guard !isInvalidated else { return }
+        // Every window hears the library change for itself: nothing here is sent on to the others sharing the tabs.
+        isRelaying = true
+        defer { isRelaying = false }
         let spaceIDs = Set(Library.shared.spaces.map(\.id))
         // A removed space takes its tabs with it.
         for (id, tabs) in tabsBySpace where !spaceIDs.contains(id) {
@@ -866,22 +1087,27 @@ final class TabManager {
         if !spaceIDs.contains(currentSpaceID) {
             currentSpaceID = Library.shared.spaces[0].id
             changed.send(.space)
-            changed.send(.selection)
+            selectionChanged()
         }
         // A space put on another profile takes its open pages there. Not a favorite that was open in it: that
         // stays its own profile's, in another of that profile's spaces, and the space shows a page of its own.
+        // (While windows share their tabs, each hears the change: whichever comes first moves them, and each looks
+        // again at what it has chosen.)
         var reselected = false
-        for tab in bookmarkTabs.values where tab.isFavorite && Profiles.shared.profile(forSpace: tab.spaceID) !== tab.homeProfile {
-            for (space, id) in selectedBySpace where id == tab.id && Profiles.shared.profile(forSpace: space) !== tab.homeProfile {
-                selectedBySpace[space] = tabs(in: space).first?.id
-                reselected = reselected || space == currentSpaceID
-            }
+        let favorites = Dictionary(bookmarkTabs.values.filter(\.isFavorite).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for (space, id) in selectedBySpace {
+            guard let tab = favorites[id], Profiles.shared.profile(forSpace: space) !== tab.homeProfile else { continue }
+            selectedBySpace[space] = tabs(in: space).first?.id
+            reselected = reselected || space == currentSpaceID
+        }
+        for tab in favorites.values where Profiles.shared.profile(forSpace: tab.spaceID) !== tab.homeProfile {
             if let space = space(for: tab.homeProfile) { tab.setSpace(space) }
         }
         for tab in allTabs { tab.settleProfile() }
-        if reselected { changed.send(.selection) }
+        if store.isShared { settleSelection() }
+        if reselected { selectionChanged() }
         structureChanged()
-        if splits.count != splitCount { changed.send(.selection) }
+        if splits.count != splitCount || shownSignature != shownLastTime { selectionChanged() }
     }
 
     // MARK: Bookmarks
@@ -1059,7 +1285,7 @@ final class TabManager {
         }
         Library.shared.removeBookmarks(pinned.ids)
         // A pinned split that was on screen stays there, now as tabs.
-        if halves.contains(where: { $0.tab === selectedTab }) { changed.send(.selection) }
+        if halves.contains(where: { $0.tab === selectedTab }) { selectionChanged() }
         return halves.first { $0.id == bookmarkID }?.tab
     }
 
@@ -1130,14 +1356,14 @@ final class TabManager {
         }
         let wasSelected = selectedTab === tab
         // The half of a split that wasn't focused: the pane it was in goes too, though the selection stays.
-        defer { if pair != nil, !wasSelected { changed.send(.selection) } }
+        defer { if pair != nil, !wasSelected { selectionChanged() } }
         if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
         if let bookmarkID = tab.bookmarkID {
             // Closing a pinned page closes it, wherever it had got to: one ⌘W, never two. The pin stays, and
             // opens fresh at its own address next time.
             bookmarkTabs[bookmarkID] = nil
             recentTabIDs.removeAll { $0 == tab.id }
-            tabTokens[tab.id] = nil
+            store.unwatch(tab.id)
             tab.close()
             structureChanged()
             if wasSelected { selectAfterClosing(tab, index: 0) }
@@ -1151,7 +1377,7 @@ final class TabManager {
         list.remove(at: index)
         tabsBySpace[tab.spaceID] = list
         recentTabIDs.removeAll { $0 == tab.id }
-        tabTokens[tab.id] = nil
+        store.unwatch(tab.id)
         tab.close()
         structureChanged()
         if wasSelected { selectAfterClosing(tab, index: index) }
@@ -1168,7 +1394,7 @@ final class TabManager {
             tabsBySpace[tab.spaceID] = list
         }
         recentTabIDs.removeAll { $0 == tab.id }
-        tabTokens[tab.id] = nil
+        store.unwatch(tab.id)
         tab.close()
         structureChanged()
     }
@@ -1213,20 +1439,25 @@ final class TabManager {
     }
 
     /// Where you land after closing the tab you were on: the page it was opened from, else the tab you were on before
-    /// it in this space (as a browser's Back would), else its neighbor in the list.
+    /// it in this space (as a browser's Back would), else its neighbor in the list. While windows share their tabs
+    /// (#162), one another window has on screen stays there: a tab it isn't showing comes first, and if there's none,
+    /// this window says where that one is.
     private func selectAfterClosing(_ closed: Tab, index: Int) {
         let list = tabs(in: closed.spaceID)
-        if let opener = closed.opener, list.contains(where: { $0 === opener }) {
-            select(opener)
-        } else if !leavesSpaceEmpty, let previous = recentTabs.first(where: { $0 !== closed && $0.spaceID == closed.spaceID && !$0.isClosed }) {
-            select(previous)
+        let recent = recentTabs
+        let before = { (tab: Tab) in tab !== closed && tab.spaceID == closed.spaceID && !tab.isClosed }
+        if let opener = closed.opener, list.contains(where: { $0 === opener }), !isShownElsewhere(opener) {
+            select(opener, claiming: false)
+        } else if !leavesSpaceEmpty, let previous = recent.first(where: { before($0) && !isShownElsewhere($0) }) ?? recent.first(where: before) {
+            select(previous, claiming: false)
         } else if !list.isEmpty {
-            select(list[min(index, list.count - 1)])
-        } else if !leavesSpaceEmpty, let recent = recentTabs.first(where: { $0.spaceID == closed.spaceID }) {
-            select(recent)
+            let near = list[min(index, list.count - 1)]
+            select(isShownElsewhere(near) ? list.first { !isShownElsewhere($0) } ?? near : near, claiming: false)
+        } else if !leavesSpaceEmpty, let recent = recent.first(where: { $0.spaceID == closed.spaceID }) {
+            select(recent, claiming: false)
         } else {
             selectedBySpace[closed.spaceID] = nil
-            changed.send(.selection)
+            selectionChanged()
         }
     }
 
@@ -1466,7 +1697,11 @@ final class TabManager {
         }
     }
 
-    private(set) var splits: [SplitPair] = []
+    /// The splits and tile groups: rows of the list, so every window sharing it has them too.
+    private(set) var splits: [SplitPair] {
+        get { store.splits }
+        _modify { yield &store.splits }
+    }
 
     func split(for tab: Tab) -> SplitPair? {
         splits.first { $0.contains(tab.id) }
@@ -1548,7 +1783,7 @@ final class TabManager {
         splits[index] = rest
         if notify {
             structureChanged()
-            changed.send(.selection)
+            selectionChanged()
         }
         // The page that grew over its room: the one whose place now covers part of where it was.
         let gone = pair.shape.regions[pair.ids.firstIndex(of: tab.id) ?? 0].cells
@@ -1662,7 +1897,7 @@ final class TabManager {
         splits.removeAll { $0.contains(tab.id) }
         if notify, splits.count != before {
             structureChanged()
-            changed.send(.selection)
+            selectionChanged()
         }
     }
 
@@ -1678,7 +1913,7 @@ final class TabManager {
         guard let index = splits.firstIndex(where: { $0.contains(tab.id) }), !splits[index].isGroup else { return }
         splits[index].vertical.toggle()
         rememberPinnedLayout(splits[index])
-        changed.send(.selection)
+        selectionChanged()
     }
 
     /// The two pages trade places; each keeps the size it had.
@@ -1708,7 +1943,7 @@ final class TabManager {
         splits[index] = new
         rememberPinnedLayout(new)
         structureChanged()
-        changed.send(.selection)
+        selectionChanged()
         return true
     }
 
@@ -1726,13 +1961,14 @@ final class TabManager {
         pages.forEach { unsplit($0, notify: false) }
         splits.append(pair)
         structureChanged()
-        changed.send(.selection)
+        selectionChanged()
     }
 
     /// The splits and groups a session saved, those whose pages all came back and may still be side by side.
     func restoreSplits(_ pairs: [SplitPair]) {
-        var placed: Set<UUID> = []
-        splits = pairs.filter { pair in
+        // Those of another window sharing the tabs (#162) stay as they are.
+        var placed = Set(splits.flatMap(\.ids))
+        splits += pairs.filter { pair in
             let pages = pair.ids.compactMap { tab(with: $0) }
             guard pages.count == pair.count, placed.isDisjoint(with: pair.ids) else { return false }
             let fits = pair.isGroup ? groupFits(pages) : canSplit(pages[0], with: pages[1])
@@ -1797,7 +2033,7 @@ final class TabManager {
         let now = arrangement
         for (id, tab) in now.tabs where target.tabs[id] == nil && done.tabs[id] != nil {
             tab.close()
-            tabTokens[id] = nil
+            store.unwatch(id)
             recentTabIDs.removeAll { $0 == id }
         }
         let since = now.tabs.filter { target.tabs[$0.key] == nil && done.tabs[$0.key] == nil }
@@ -1826,7 +2062,7 @@ final class TabManager {
         for (space, id) in target.selected where alive[id] != nil { selectedBySpace[space] = id }
         selectedBySpace = selectedBySpace.filter { tab(with: $0.value) != nil }
         structureChanged()
-        changed.send(.selection)
+        selectionChanged()
     }
 
     // MARK: Nesting
@@ -1915,6 +2151,9 @@ final class TabManager {
     func structureChanged() {
         settleGroups()
         changed.send(.structure)
+        // Windows sharing these tabs (#162) draw them again too.
+        guard !isBatching, !isRelaying, store.isShared else { return }
+        for other in store.managers where other !== self { other.listChanged() }
     }
 
     private func settleGroups() {
@@ -2092,8 +2331,13 @@ final class TabManager {
         // Kept awake: what's on screen (both halves of a split), anything in a call or floating, and sites that notify.
         // Favorites and sites kept awake too, unless memory is critically short (TabSleep). Other spaces' pages sleep
         // like any tab once idle; their snapshots still show while you swipe to them.
-        var selectedIDs = Set([selectedTab?.id].compactMap { $0 })
-        for id in Array(selectedIDs) { if let tab = tab(with: id) { selectedIDs.formUnion(partners(of: tab).map(\.id)) } }
+        // Windows sharing their tabs (#162): the oldest looks for all of them, keeping what each has on screen.
+        let windows = store.managers.isEmpty ? [self] : store.managers
+        guard windows.first === self else { return }
+        var selectedIDs = Set<UUID>()
+        for window in windows {
+            if let tab = window.selectedTab { selectedIDs.formUnion(window.panes(of: tab).map(\.id) + [tab.id]) }
+        }
         let live = allTabs.filter { !$0.isSuspended }
         let now = Date()
         let memory = MemoryPressure.shared.level
@@ -2118,7 +2362,7 @@ final class TabManager {
             }
         }
         // Each space keeps the page it shows out of the archive, as before.
-        archiveStaleTabs(keeping: selectedIDs.union(selectedBySpace.values))
+        archiveStaleTabs(keeping: selectedIDs.union(windows.flatMap(\.selectedBySpace.values)))
     }
 
     /// Whether a tab on its way to sleep (TabSleep.queue) still may: it's open and awake, and no window has come to
@@ -2152,7 +2396,7 @@ final class TabManager {
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
             recentTabIDs.removeAll { $0 == tab.id }
-            tabTokens[tab.id] = nil
+            store.unwatch(tab.id)
             if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
             tab.close()
         }

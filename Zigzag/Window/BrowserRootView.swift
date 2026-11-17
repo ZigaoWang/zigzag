@@ -1014,6 +1014,8 @@ final class BrowserRootView: SpaceFrameView {
         topBar.frame = bar
         topBar.rowTop = topBarFrame.minY - bar.minY
         (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
+        // The site's pill over the page's middle, as a split pane's is over its pane's.
+        topBar.addressCenter = pageAreaFrame.midX - bar.minX
         let frames = tileFrames
         let over = liftedCards.map { lifted in paneCards.firstIndex { $0 === lifted }.flatMap { frames.indices.contains($0) ? frames[$0] : nil } ?? frames[0] }
         topBar.setStrips(liftedCards.map(\.header), panes: over.map { ($0.minX - bar.minX)...max($0.minX, $0.maxX) - bar.minX })

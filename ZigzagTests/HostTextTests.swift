@@ -258,14 +258,17 @@ struct FullAddressTests {
         #expect(paragraph?.lineBreakMode == AddressView.lineBreak(forName: page.host))
     }
 
-    @Test func onlyTheBarAboveThePageShowsTheWholeAddress() {
-        let address = AddressView()
-        #expect(!address.showsFullAddress)
-        let sidebar = NSView()
-        sidebar.addSubview(address)
-        #expect(!address.showsFullAddress)
+    @Test func theBarAboveThePageShowsTheSiteInItsPill() {
+        // #275: the site in the pill, as a split pane's, named as the sidebar's address names it; a new tab's prompt.
         let bar = TopBarView()
-        bar.addSubview(address)
-        #expect(address.showsFullAddress)
+        bar.showPage(url: URL(string: "https://www.example.com/some/long/path?q=1"), notSecure: false)
+        #expect(bar.pill.text == "example.com")
+        #expect(!bar.pill.hasSiteControls)
+        bar.showPage(url: nil, notSecure: false)
+        #expect(bar.pill.text == String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab."))
+        // A page that isn't secure keeps its mark, and says so.
+        bar.showPage(url: URL(string: "http://example.com"), notSecure: true)
+        #expect(bar.pill.notSecure)
+        #expect(bar.pill.accessibilityLabel()?.contains(SitePanel.notSecure) == true)
     }
 }

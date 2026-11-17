@@ -206,6 +206,9 @@ nonisolated enum ChromiumImporter {
         if !cookieFiles.isEmpty, key != .failure(.denied) {
             for file in cookieFiles {
                 let read = SignInImporter.chromium(at: file, key: try? key?.get())
+                if let folder = profiles.first(where: { file.path.hasPrefix($0.path + "/") })?.lastPathComponent {
+                    batch.cookieProfiles[folder, default: []].append(batch.cookies.count..<batch.cookies.count + read.cookies.count)
+                }
                 batch.cookies += read.cookies
                 batch.unreadableCookies += read.unreadable
             }

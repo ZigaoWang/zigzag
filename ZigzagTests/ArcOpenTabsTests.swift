@@ -175,3 +175,114 @@ import Testing
         #expect(manager.tabs(in: space).count == 5)
     }
 }
+
+/// Arc's profiles stay apart: each space and each profile's Favorites go to the profile here its Arc profile
+/// becomes, and with one Arc profile in use everything goes to one profile, as before (#279).
+@MainActor struct ArcProfilesTests {
+    private static let custom: [String: Any] = ["custom": ["_0": ["directoryBasename": "Profile 1"]]]
+    private static let standard: [String: Any] = ["default": [String: Any]()]
+
+    private func tab(_ id: String, _ url: String) -> [String: Any] {
+        ["id": id, "data": ["tab": ["savedURL": url]], "childrenIds": [String]()]
+    }
+
+    /// Home on Arc's default profile and Work on "Profile 1", each with its Favorites container after its marker.
+    private func sidebar(homeProfile: [String: Any] = standard, workProfile: [String: Any] = custom) throws -> ArcImporter.Sidebar {
+        let items: [[String: Any]] = [
+            ["id": "pinA", "childrenIds": ["p1"], "data": ["itemContainer": [:]]],
+            tab("p1", "https://example.com/home"),
+            ["id": "pinB", "childrenIds": ["p2"], "data": ["itemContainer": [:]]],
+            tab("p2", "https://example.com/work"),
+            ["id": "topA", "childrenIds": ["fa1", "fa2"], "data": ["itemContainer": [:]]],
+            tab("fa1", "https://mail.example.com/"),
+            tab("fa2", "https://news.example.com/"),
+            ["id": "topB", "childrenIds": ["fb1"], "data": ["itemContainer": [:]]],
+            tab("fb1", "https://tracker.example.com/"),
+        ]
+        let spaces: [Any] = [
+            "a", ["id": "a", "title": "Home", "containerIDs": ["pinned", "pinA"], "profile": homeProfile],
+            "b", ["id": "b", "title": "Work", "containerIDs": ["pinned", "pinB"], "profile": workProfile],
+        ]
+        let top: [Any] = [homeProfile, "topA", workProfile, "topB"]
+        let root: [String: Any] = ["sidebar": ["containers": [["global": [:]], ["spaces": spaces, "items": items, "topAppsContainerIDs": top]]]]
+        return try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: root))
+    }
+
+    @Test func profileMarkers() {
+        #expect(ArcImporter.arcProfile(Self.custom) == "Profile 1")
+        #expect(ArcImporter.arcProfile(["value": Self.custom]) == "Profile 1")
+        #expect(ArcImporter.arcProfile(Self.standard) == nil)
+        #expect(ArcImporter.arcProfile("default") == nil)
+        #expect(ArcImporter.arcProfile(nil) == nil)
+        #expect(ArcImporter.arcProfile(["custom": ["_0": ["directoryBasename": "Default"]]]) == nil)
+    }
+
+    @Test func twoProfilesStayApart() throws {
+        let parsed = try sidebar()
+        #expect(parsed.spaces.map(\.name) == ["Home", "Work"])
+        #expect(parsed.profilesInUse == ["Profile 1"])
+        #expect(parsed.profile(of: parsed.spaces[0].id) == nil)
+        #expect(parsed.profile(of: parsed.spaces[1].id) == "Profile 1")
+        // Every favorite still comes, each profile's on its own.
+        #expect(parsed.favorites.count == 3)
+        let groups = parsed.favoriteGroups
+        #expect(groups.map(\.profile) == [nil, "Profile 1"])
+        #expect(groups.first?.favorites.compactMap { $0.url.host() } == ["mail.example.com", "news.example.com"])
+        #expect(groups.last?.favorites.compactMap { $0.url.host() } == ["tracker.example.com"])
+        let plan = ArcImporter.plan(parsed, parts: .all, existing: [])
+        #expect(plan.favoriteGroups.map(\.favorites.count) == [2, 1])
+        #expect(ArcImporter.plan(parsed, parts: .spaces, existing: []).favoriteGroups.isEmpty)
+    }
+
+    /// One Arc profile in use, the default or one of its own: nothing kept apart, all favorites together.
+    @Test func oneProfileAsBefore() throws {
+        for (home, work) in [(Self.standard, Self.standard), (Self.custom, Self.custom)] {
+            let parsed = try sidebar(homeProfile: home, workProfile: work)
+            #expect(parsed.profilesInUse.isEmpty)
+            #expect(parsed.spaces.allSatisfy { parsed.profile(of: $0.id) == nil })
+            #expect(parsed.favoriteGroups.count == 1)
+            #expect(parsed.favoriteGroups.first?.profile == nil)
+            #expect(parsed.favoriteGroups.first?.favorites.map(\.id) == parsed.favorites.map(\.id))
+            #expect(parsed.favorites.count == 3)
+        }
+    }
+
+    /// Importing again merges into the space with its name on its own profile, else the one with its name anywhere.
+    @Test func importingAgainMergesOnItsProfile() {
+        let work = UUID()
+        let onDefault = SpaceInfo(name: "Work", color: .sky), onWork = SpaceInfo(name: "Work", color: .sky)
+        let profileOf: (UUID) -> UUID = { $0 == onWork.id ? work : Profile.defaultID }
+        let incoming = SpaceInfo(name: "Work", color: .sky)
+        #expect(ArcImporter.match(incoming, in: [onDefault, onWork], wants: work, profileOf: profileOf)?.id == onWork.id)
+        #expect(ArcImporter.match(incoming, in: [onDefault, onWork], wants: Profile.defaultID, profileOf: profileOf)?.id == onDefault.id)
+        #expect(ArcImporter.match(incoming, in: [onDefault], wants: work, profileOf: profileOf)?.id == onDefault.id)
+        #expect(ArcImporter.match(SpaceInfo(name: "Other", color: .sky), in: [onDefault, onWork], wants: work, profileOf: profileOf) == nil)
+    }
+
+    /// A profile here is named as Arc shows it, else after its folder, and one already with that name is reused.
+    @Test func profileNames() {
+        #expect(ArcImporter.profileName("Profile 1", names: ["Profile 1": "School"]) == "School")
+        #expect(ArcImporter.profileName("Profile 2", names: ["Profile 1": "School"]) == "Profile 2")
+        #expect(ArcImporter.profileName("Profile 1", names: ["Profile 1": " "]) == "Profile 1")
+        let school = ProfileInfo(id: UUID(), name: "School")
+        let profiles = [ProfileInfo(id: Profile.defaultID), school]
+        #expect(ArcImporter.profile(named: "school", in: profiles)?.id == school.id)
+        #expect(ArcImporter.profile(named: "Work", in: profiles) == nil)
+    }
+
+    /// Sign-ins go to the profile their Arc profile went to; the rest to the one importing.
+    @Test func signInsFollowTheirProfile() {
+        func cookie(_ name: String) -> SignInImporter.Cookie {
+            SignInImporter.Cookie(domain: ".example.com", name: name, value: "v", path: "/", expires: nil, secure: true, httpOnly: false, sameSite: .lax)
+        }
+        var batch = ImportBatch()
+        batch.cookies = [cookie("a"), cookie("b"), cookie("c")]
+        batch.cookieProfiles = ["Default": [0..<1], "Profile 1": [1..<3]]
+        let into = UUID(), work = UUID()
+        let groups = ImportCoordinator.cookieGroups(batch, apart: ["Profile 1": work], into: into)
+        #expect(groups.map(\.profile) == [into, work])
+        #expect(groups.map { $0.cookies.map(\.name) } == [["a"], ["b", "c"]])
+        let one = ImportCoordinator.cookieGroups(batch, apart: [:], into: into)
+        #expect(one.map(\.profile) == [into] && one.first?.cookies.count == 3)
+    }
+}

@@ -580,6 +580,10 @@ enum DebugBridge {
         case "child": if let url = URL(string: arg), let tab = controller.tabManager.selectedTab { controller.tab(tab, openURL: url, disposition: .backgroundTab) }
         // nest on|off: Settings › Tabs › Open ⌘-clicked links under their tab.
         case "nest": TabManager.nestsOpenedLinks = arg == "on"
+        // sharetabs on|off: Settings › Tabs › Windows share a space's tabs (#162).
+        case "sharetabs": TabStore.windowsShareTabs = arg == "on"
+        // showhere: Show Here, over a page another window has on screen (#162).
+        case "showhere": if let tab = controller.tabManager.selectedTab { controller.showHere(tab) }
         // foldtab <index>: folds or shows the tabs nested under the tab at that place in the space's list.
         case "foldtab":
             let tabs = controller.tabManager.currentTabs
@@ -659,6 +663,14 @@ enum DebugBridge {
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
+        // bardrag <dx> <dy> [hold]: as dragging the open bar by its edge that far (hold: not let go yet, the guides
+        // stay); barreset: as double-clicking its edge; barframe: where it is, in the debug log.
+        case "bardrag":
+            let f = arg.split(separator: " ")
+            let n = f.prefix(2).compactMap { Double($0) }
+            if n.count == 2 { controller.commandBar.debugDrag(n[0], n[1], ending: f.dropFirst(2).first != "hold") }
+        case "barreset": controller.commandBar.debugResetPosition()
+        case "barframe": debugLog("barframe \(NSStringFromRect(controller.commandBar.debugPanelFrame)) overlay=\(NSStringFromRect(controller.root.overlay.bounds)) page=\(NSStringFromRect(controller.root.cardFrame))")
         case "permprompt":
             if arg == "app" {
                 Task { _ = await PermissionPrompt.ask(host: "meeting.tencent.com", what: "Calendar", symbol: "arrow.up.forward.app",
@@ -1771,6 +1783,7 @@ enum DebugBridge {
                 let m = c.tabManager
                 return ["window": i + 1, "private": m.isPrivate, "space": m.currentSpace.name,
                         "selected": m.selectedTab?.displayTitle ?? "", "tabs": m.currentTabs.map(\.displayTitle),
+                        "elsewhere": m.selectedTab.map(m.isShownElsewhere) ?? false, "shared": m.store.isShared,
                         "host": m.currentTabs.map { tab in (WindowManager.shared.controllers.firstIndex { $0 === tab.host } ?? -1) + 1 },
                         "frame": c.window.map { NSStringFromRect($0.frame) } ?? "", "number": c.window?.windowNumber ?? 0]
             }

@@ -41,6 +41,9 @@ nonisolated struct ImportBatch: Sendable {
     var history: [(URL, String, Int, Date)] = []
     /// The sites you're signed in to there; held only until they're set into Zigzag's website data.
     var cookies: [SignInImporter.Cookie] = []
+    /// Which of `cookies` came from which of the browser's profiles, by its folder ("Profile 1"): their places in
+    /// `cookies`. Arc's go to the profile here its own went to.
+    var cookieProfiles: [String: [Range<Int>]] = [:]
     /// There, but wouldn't open: said gently once they're in, with any WebKit wouldn't take.
     var unreadableCookies = 0
     /// Something that couldn't come over, and how to fix it.

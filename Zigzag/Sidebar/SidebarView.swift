@@ -146,9 +146,11 @@ final class AddressView: InteractiveView {
 
     /// How many of `count` pins can show when `otherButtons` share the end of a field with `room` for text and
     /// buttons: the site's name keeps its minimum, and every button takes its width and a gap.
-    /// `text`: the width of the site's name, or the prompt, in full: pins give way before it's cut short.
-    static func pinsThatFit(count: Int, otherButtons: Int, room: CGFloat, text: CGFloat = 0) -> Int {
-        let spare = room - max(Tokens.Sidebar.addressMinText, ceil(text)) - CGFloat(otherButtons) * pinStep
+    /// `text`: the width of the site's name, or the prompt, in full: pins give way before it's cut short. Nil for
+    /// buttons with no site beside them (`buttonsOnly`).
+    static func pinsThatFit(count: Int, otherButtons: Int, room: CGFloat, text: CGFloat? = 0) -> Int {
+        let site = text.map { max(Tokens.Sidebar.addressMinText, ceil($0)) } ?? 0
+        let spare = room - site - CGFloat(otherButtons) * pinStep
         return max(0, min(count, Int(floor(spare / pinStep))))
     }
 
@@ -444,24 +446,28 @@ final class AddressView: InteractiveView {
         return .byTruncatingMiddle
     }
 
-    /// The page's whole address, where the field has the room for it (`showsFullAddress`); nil for the site alone.
-    private var fullAddress: FullAddress.Parts?
-    /// What the field shows now, to show again when it moves.
-    private var shownPage: (url: URL?, notSecure: Bool) = (nil, false)
+    /// In the bar above the page (#275) the site is in the pill in the bar's middle (`TopBarView.pill`), as a split
+    /// pane's is, and the field keeps only its buttons, side by side at the bar's end with no field around them:
+    /// Reader, the camera, the pinned extensions and Site Controls, each as it is in the sidebar.
+    var buttonsOnly = false {
+        didSet {
+            guard buttonsOnly != oldValue else { return }
+            label.isHidden = buttonsOnly
+            lock.isHidden = buttonsOnly || lock.image == nil
+            setAccessibilityElement(!buttonsOnly)
+            stateDidChange(animated: false)
+            needsLayout = true
+        }
+    }
 
-    /// In the bar above the page the field is wide: it shows the whole address, the site dark and the rest quiet.
-    /// In the sidebar it's narrow, and shows the site alone.
-    var showsFullAddress: Bool { superview is TopBarView }
-
-    override func viewDidMoveToSuperview() {
-        super.viewDidMoveToSuperview()
-        show(url: shownPage.url, notSecure: shownPage.notSecure)
+    /// The width the buttons take side by side with nothing around them (`buttonsOnly`), every pin showing.
+    var buttonsWidth: CGFloat {
+        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + 1
+        return CGFloat(count) * Self.pinStep - 2
     }
 
     func show(url: URL?, notSecure: Bool) {
-        shownPage = (url, notSecure)
         label.stringValue = Self.name(of: url)
-        fullAddress = showsFullAddress && !label.stringValue.isEmpty ? FullAddress.parts(of: url) : nil
         label.lineBreakMode = Self.lineBreak(forName: label.stringValue)
         // The host crisp, in the text's own color; the prompt quiet.
         label.textColor = label.stringValue.isEmpty ? Tokens.Color.textTertiary : Tokens.Color.textPrimary
@@ -470,9 +476,9 @@ final class AddressView: InteractiveView {
         // certificate let through on the warning page, for as long as it's in use.
         let insecure = notSecure && url != nil
         lock.image = insecure ? Tokens.Symbol.image(SitePanel.notSecureSymbol, size: Tokens.Symbol.inline) : nil
-        lock.isHidden = !insecure
+        lock.isHidden = !insecure || buttonsOnly
         lock.toolTip = insecure ? SitePanel.notSecure : nil
-        let spoken = fullAddress?.whole ?? label.stringValue
+        let spoken = label.stringValue
         setAccessibilityLabel(insecure ? String(localized: "\(spoken), \(SitePanel.notSecure)", comment: "Accessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.") : spoken)
         reflow(animated: true)
     }
@@ -491,10 +497,14 @@ final class AddressView: InteractiveView {
     /// Works out what fits and puts everything in its place. The one place the field is laid out, so a button and the
     /// text beside it never disagree; when nothing changed it does nothing, as it runs throughout a page load.
     private func reflow(animated requested: Bool) {
+        // Buttons alone at the bar's end: a button coming or going changes how wide they are, which the bar sets.
+        if buttonsOnly, abs(buttonsWidth - bounds.width) > 0.5 { superview?.needsLayout = true }
         // While a pin is carried the places are held still; the drop catches up.
         guard bounds.width > 0, pinDrag == nil else { return }
         let animated = requested && window != nil && !Tokens.Motion.isFromKey
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
+        // With no field around them, the buttons reach its ends, as the bar's other buttons reach theirs.
+        let end = buttonsOnly ? 0 : inset
         // The host sits clear of the field's rounded edge, as far in as the buttons are from its right end, so the
         // text has room to breathe. After the not-secure mark when there is one.
         var x = Tokens.Space.x3
@@ -505,10 +515,11 @@ final class AddressView: InteractiveView {
         for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
-        let room = bounds.width - x - inset - Tokens.Space.x1
-        // The pins make room for the site, never for the rest of a whole address, which is cut first.
-        let text = ((fullAddress?.host ?? label.stringValue) as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
-        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room, text: text)
+        // Without the site beside them, the buttons have the whole width, a gap's worth past the last one included.
+        let room = buttonsOnly ? bounds.width + 2 : bounds.width - x - inset - Tokens.Space.x1
+        // The pins make room for the site.
+        let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
+        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room, text: buttonsOnly ? nil : text)
         // The one furthest from Site Controls gives way first.
         let showing = pinEntries.suffix(fit)
         for entry in pinEntries.dropLast(fit) { takeAway(entry.button, animated: animated, removing: false) }
@@ -518,22 +529,21 @@ final class AddressView: InteractiveView {
         if showingChanged { updatePinControls(Array(showing)) }
 
         let trailing = others + showing.map(\.button) + [siteControlsButton]
-        var right = bounds.width - inset
+        var right = bounds.width - end
         for (index, button) in trailing.enumerated().reversed() {
             let frame = NSRect(x: right - side, y: inset, width: side, height: side)
-            // Concentric with the field's corners.
-            button.radius = Tokens.Sidebar.addressRadius - inset
+            // Concentric with the field's corners; with no field, a button's own, as the bar's others.
+            button.radius = buttonsOnly ? Tokens.Radius.control : Tokens.Sidebar.addressRadius - inset
             // The field's rim around it presses it too: top to bottom, out to the field's end, half the gap to a
             // neighbor.
-            button.pressOutset = NSEdgeInsets(top: inset, left: 1, bottom: inset, right: index == trailing.count - 1 ? inset : 1)
+            button.pressOutset = NSEdgeInsets(top: end, left: 1, bottom: end, right: index == trailing.count - 1 ? end : 1)
             place(button, at: frame, animated: animated)
             right = frame.minX - 2
         }
         if showingChanged || pinFramesBefore != showing.map(\.button.frame) { onPinsMoved?() }
 
         let h = label.lineHeight
-        let labelFrame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: right - Tokens.Space.x1 - x + Label.inset * 2, height: h)
-        if let fullAddress { FullAddress.show(fullAddress, in: label, room: labelFrame.width - Label.inset * 2) }
+        let labelFrame = NSRect(x: x - Label.inset, y: label.centeredY(in: bounds.height), width: max(0, right - Tokens.Space.x1 - x + Label.inset * 2), height: h)
         // A mark appearing starts in its place rather than flying in from the corner.
         if lock.frame.width == 0 { lock.frame = lockFrame }
         guard label.frame != labelFrame || lock.frame != lockFrame else { return }
@@ -591,13 +601,14 @@ final class AddressView: InteractiveView {
         for button in [readerButton, captureButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
-        return super.hitTest(point)
+        // Buttons alone in the bar: between them is the bar's, which moves the window.
+        return buttonsOnly ? nil : super.hitTest(point)
     }
 
     override func stateDidChange(animated: Bool) {
         // A soft field of the space's own color, a step lighter under the pointer and pressed. On a page's own color
-        // (the bar above the page), a page's neutral field instead, which shows on white too.
-        let fill = isOnPage ? (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill)
+        // (the bar above the page), a page's neutral field instead, which shows on white too. Buttons alone, none.
+        let fill = buttonsOnly ? NSColor.clear : isOnPage ? (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill)
             : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
         Tokens.Motion.withoutAnimation {
@@ -862,7 +873,8 @@ final class SidebarView: NSView {
     var holdsAddress = true {
         didSet {
             guard holdsAddress != oldValue else { return }
-            if holdsAddress { addressViews.forEach(addSubview) }
+            // Back from the bar above the page: the field again, the site in it.
+            if holdsAddress { address.buttonsOnly = false; addressViews.forEach(addSubview) }
             needsLayout = true
         }
     }

@@ -1,10 +1,12 @@
 import AppKit
 
 /// The bar above the page (Settings › Appearance › Address bar above the page), as in Arc's and Chrome's top-bar
-/// layout: back, forward and reload, then the address. They're the sidebar's own views, moved here rather than made
-/// again, so their actions, the panels and popups that come out of them, the command bar and their tooltips work as
-/// they do in the sidebar. It lies on the window's frame as the sidebar does, its middle on the traffic lights' line,
-/// and like the sidebar it moves the window and zooms it on a double-click.
+/// layout: back, forward and reload at the leading end, the site in a quiet pill over the page's middle (the one a
+/// split pane's strip has, `pill`), and the address's own buttons at the trailing end (#275). The buttons are the
+/// sidebar's own views, moved here rather than made again, so their actions, the panels and popups that come out of
+/// them, the command bar and their tooltips work as they do in the sidebar. It lies on the window's frame as the
+/// sidebar does, its middle on the traffic lights' line, and like the sidebar it moves the window and zooms it on a
+/// double-click.
 ///
 /// A page can bring tools of its own to the bar's trailing end (`accessory`), after the address. With the address
 /// kept in the sidebar, the bar is there for them alone, and they sit at its trailing end all the same.
@@ -82,11 +84,33 @@ final class TopBarView: NSView {
     /// The address is here (Settings › Appearance › Address bar above the page), not in the sidebar.
     var holdsAddress: Bool { address?.superview === self }
 
+    /// The page's site, in the pill a split pane's strip has (#275): centered over the page, as wide as the site,
+    /// quiet. A click opens the command bar right over it, as a pane's does, and ⌘L does the same. The address's
+    /// own buttons (`AddressView.buttonsOnly`) stay at the bar's trailing end, so the pill has no Site Controls.
+    let pill: PaneAddressView = {
+        let pill = PaneAddressView()
+        pill.hasSiteControls = false
+        pill.isHidden = true
+        return pill
+    }()
+    /// Where the pill centers, from the bar's leading edge: the page's middle. Nil centers it in its room.
+    var addressCenter: CGFloat? { didSet { if addressCenter != oldValue { needsLayout = true } } }
+
+    /// Shows the page's site in the pill: its name as the sidebar's address has it (History, a file's name), or the
+    /// prompt on a new tab, and the not-secure mark when it isn't secure.
+    func showPage(url: URL?, notSecure: Bool) {
+        let name = AddressView.name(of: url)
+        pill.text = name.isEmpty ? String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab.") : name
+        pill.notSecure = notSecure && url != nil
+        needsLayout = true
+    }
+
     override init(frame: NSRect) {
         super.init(frame: frame)
         setAccessibilityRole(.toolbar)
         sidebarButton.isHidden = true
         addSubview(sidebarButton)
+        addSubview(pill)
         // Settings › Appearance › Sidebar size: the address held here takes its new height.
         sizeObserver = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.needsLayout = true }
@@ -100,10 +124,12 @@ final class TopBarView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
-    /// Takes the sidebar's buttons and address, in order.
+    /// Takes the sidebar's buttons and address, in order: the address keeps only its buttons here, the pill showing
+    /// the site (the sidebar gives it back its field when it takes it back).
     func hold(buttons: [NSView], address: NSView) {
         self.buttons = buttons
         self.address = address
+        (address as? AddressView)?.buttonsOnly = true
         (buttons + [address]).forEach(addSubview)
         refreshOnPage()
         needsLayout = true
@@ -112,7 +138,10 @@ final class TopBarView: NSView {
     struct Frames: Equatable {
         var sidebarButton: NSRect?
         var buttons: [NSRect]
+        /// The address: its buttons alone at the room's trailing end when `addressWidth` is given, else the room.
         var address: NSRect
+        /// The pill with the site, centered over the page in the room left before the address's buttons.
+        var pill: NSRect?
         /// The page's tools, when they take any room: the bar's whole height, ending where the address would.
         var accessory: NSRect?
     }
@@ -123,8 +152,12 @@ final class TopBarView: NSView {
     /// `onRight`: the sidebar is on the right, so its toggle is at the bar's trailing end, where the sidebar's own
     /// lands (`trailingToggle`), with the address ending as far before it as it starts after the buttons.
     /// `accessory`: the width the page's tools take at the trailing end; the address ends a gap before them.
+    /// `addressWidth`: the address's buttons' width, at the room's end; `pill`: the pill's own width (its site's),
+    /// centered on `pillCenter` (the page's middle) in the room before them, as a pane's strip places its own
+    /// (`PaneHeaderView.pillFrame`); `onCard`, the bar on the page's card: the pill takes up to a field's width.
     static func frames(width: CGFloat, buttons: Int, sidebarButton: Bool = false, onRight: Bool = false, trafficLightsWidth: CGFloat,
-                       leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat, accessory: CGFloat = 0) -> Frames {
+                       leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat, accessory: CGFloat = 0,
+                       addressWidth: CGFloat? = nil, pill: CGFloat? = nil, pillCenter: CGFloat? = nil, onCard: Bool = false) -> Frames {
         let mid = height / 2, b = Tokens.Sidebar.button
         let leads = sidebarButton && !onRight
         var x = leadX(sidebarButton: leads, trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset)
@@ -139,8 +172,14 @@ final class TopBarView: NSView {
         let end = min(width - trailingInset, last.map { $0.minX - Tokens.Space.x2 } ?? .infinity)
         let tools = accessory > 0 ? NSRect(x: max(start, end - accessory), y: 0, width: min(accessory, max(0, end - start)), height: height) : nil
         let addressEnd = tools.map { $0.minX - Tokens.Space.x2 } ?? end
-        return Frames(sidebarButton: first ?? last, buttons: rects,
-                      address: NSRect(x: start, y: round(mid - h / 2), width: max(0, addressEnd - start), height: h), accessory: tools)
+        let room = max(0, addressEnd - start)
+        let addressWide = min(addressWidth ?? room, room)
+        let address = NSRect(x: start + room - addressWide, y: round(mid - h / 2), width: addressWide, height: h)
+        let pillFrame = pill.map { fitting in
+            let hi = max(start, addressWidth == nil || addressWide <= 0 ? start + room : address.minX - Tokens.Space.x2)
+            return PaneHeaderView.pillFrame(center: pillCenter ?? (start + hi) / 2, room: start...hi, fitting: fitting, overCard: onCard, midY: mid)
+        }
+        return Frames(sidebarButton: first ?? last, buttons: rects, address: address, pill: pillFrame, accessory: tools)
     }
 
     /// The toggle at the bar's trailing end, for a sidebar on the right: `Sidebar.edge` in from the window's edge
@@ -201,7 +240,7 @@ final class TopBarView: NSView {
     }
 
     /// The bar's own back, forward, reload and address, which step aside for the panes' strips.
-    var ownControls: [NSView] { buttons + [address].compactMap { $0 } }
+    var ownControls: [NSView] { buttons + [address].compactMap { $0 } + (holdsAddress ? [pill] : []) }
 
     struct Strip: Equatable {
         var frame: NSRect
@@ -233,16 +272,18 @@ final class TopBarView: NSView {
 
     /// Each control showing here and where it goes.
     private var places: [(view: NSView, frame: NSRect)] {
-        func frames(accessory: CGFloat) -> Frames {
+        let holdsAddress = self.holdsAddress
+        func frames(accessory: CGFloat, alone: Bool = false) -> Frames {
             Self.frames(width: bounds.width, buttons: buttons.count, sidebarButton: showsSidebarButton, onRight: sidebarOnRight,
-                        trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset, accessory: accessory)
+                        trafficLightsWidth: trafficLightsWidth, leadingInset: leadingInset, trailingInset: trailingInset, accessory: accessory,
+                        addressWidth: alone ? nil : (address as? AddressView)?.buttonsWidth,
+                        pill: holdsAddress && !alone ? pill.fittingWidth : nil, pillCenter: addressCenter, onCard: pageColor != nil)
         }
         // The page's tools take what they ask for of the room the address has, less what the address keeps while
         // it's here; with the panes' strips in the row (a split), there are none.
         var tools: CGFloat = 0
         if let accessory, strips.isEmpty {
-            let holdsAddress = address?.superview === self
-            tools = accessory.width(fitting: max(0, frames(accessory: 0).address.width - (holdsAddress ? Self.addressMinWidth + Tokens.Space.x2 : 0)))
+            tools = accessory.width(fitting: max(0, frames(accessory: 0, alone: true).address.width - (holdsAddress ? Self.addressMinWidth + Tokens.Space.x2 : 0)))
         }
         accessory?.isHidden = tools <= 0
         let frames = frames(accessory: tools)
@@ -251,6 +292,7 @@ final class TopBarView: NSView {
         if let toggle = frames.sidebarButton { places.append((sidebarButton, toggle)) }
         for (button, rect) in zip(buttons, frames.buttons) where button.superview === self { places.append((button, rect)) }
         if let address, address.superview === self { places.append((address, frames.address)) }
+        if let rect = frames.pill { places.append((pill, rect)) }
         for (strip, place) in zip(strips, stripPlaces) where strip.superview === self { places.append((strip, place.frame)) }
         places = places.map { ($0.view, $0.frame.offsetBy(dx: 0, dy: rowTop)) }
         // Held for the sidebar's own: where that one lands in the window, whatever the bar's row is doing.
@@ -273,12 +315,25 @@ final class TopBarView: NSView {
     override func layout() {
         super.layout()
         for place in places { place.view.frame = place.frame }
+        refreshPill()
         centerStripAddresses()
+    }
+
+    /// The pill shows while the address is here and it has the room to read; while the panes' strips are in the row,
+    /// the window fades it with the bar's other controls (`ownControls`).
+    override func willRemoveSubview(_ subview: NSView) {
+        super.willRemoveSubview(subview)
+        // The sidebar takes the address back: the site goes back with it.
+        if subview === address { pill.isHidden = true }
+    }
+
+    private func refreshPill() {
+        if !holdsAddress { pill.isHidden = true } else if strips.isEmpty { pill.isHidden = !PaneHeaderView.pillFits(pill.frame) }
     }
 
     /// Where each control showing is now, in the superview's terms: taken before the sidebar comes or goes.
     var controlPositions: [ObjectIdentifier: NSRect] {
-        Dictionary(uniqueKeysWithValues: ([sidebarButton] + buttons + [address, accessory].compactMap { $0 } + (strips as [NSView]))
+        Dictionary(uniqueKeysWithValues: ([sidebarButton, pill] + buttons + [address, accessory].compactMap { $0 } + (strips as [NSView]))
             .filter { $0.superview === self && !$0.isHidden }
             .map { (ObjectIdentifier($0), $0.frame.offsetBy(dx: frame.minX, dy: frame.minY)) })
     }

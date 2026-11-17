@@ -417,6 +417,11 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   on screen; let go outside Zigzag and it becomes a window of its own (with ⌥, Zigzag Mini). The page moves as it is,
   never reloaded, a split or tile group whole. A window a move leaves with no tabs closes, unless it's the only one,
   and one ⌘Z in the window they went to sends them back. A private window keeps its tabs to itself.
+  With Settings › Tabs › Windows share a space’s tabs on (#162), every everyday window lists the same tabs instead, as
+  in Arc, each with its own space and tab on screen. A page is on screen in one window at a time: another window on it
+  shows the card's own ground, "Shown in another window" and Show Here (the
+  surface's one prominent pill). Moving a tab to another window then only shows it there, and closing a window closes
+  none of its tabs.
 - **Page**: the opaque card the web page sits in, `Radius.card`, concentric with the window. Beside the sidebar and
   meeting the window's edges it meets the frame cleanly: all four corners at the window's radius
   (`Radius.attached`), no outline, no shadow.

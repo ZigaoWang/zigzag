@@ -185,7 +185,9 @@ final class BrowserWindow: NSWindow {
     private func swallowsPanelPress(_ event: NSEvent) -> Bool {
         guard [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type), let content = contentView,
               let frame = content.superview else { return false }
-        return FloatingPanelView.isBareSurface(frame.hitTest(frame.convert(event.locationInWindow, from: nil)))
+        guard let panel = FloatingPanelView.bareSurfacePanel(frame.hitTest(frame.convert(event.locationInWindow, from: nil))) else { return false }
+        if event.type == .leftMouseDown { panel.onBarePress?(event) }
+        return true
     }
 
     // MARK: Moving the window from the page

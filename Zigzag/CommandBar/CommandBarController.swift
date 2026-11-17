@@ -120,6 +120,8 @@ protocol CommandBarHost: AnyObject {
     var commandBarFitsAnchor: Bool { get }
     /// The browser window's tabs, for open tabs among the results and for completing what you type; nil if there's none.
     var commandBarTabs: TabManager? { get }
+    /// The bar over the page can be dragged anywhere in the window, and stays where you put it (a browser window).
+    var commandBarIsMovable: Bool { get }
     /// The profile whose history, favorites and open pages the bar suggests: the one of the space it's used in.
     var commandBarProfile: Profile { get }
     /// The page ⌘L edits.
@@ -140,6 +142,7 @@ protocol CommandBarHost: AnyObject {
 extension CommandBarHost {
     var commandBarCentersOnAnchor: Bool { false }
     var commandBarFitsAnchor: Bool { false }
+    var commandBarIsMovable: Bool { false }
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool { false }
     func commandBarDidHide() {}
 }
@@ -162,7 +165,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         set { panel.showsDesktop = newValue }
     }
     private let field = PlainTextField(font: Tokens.Font.title(.regular), placeholder: String(localized: "Search or enter address", comment: "Placeholder of the command bar's field."))
-    private let fieldIcon = NSImageView()
+    /// Not a control: a press on it is the bar's own, and drags the bar.
+    private let fieldIcon = PassiveImageView()
     private let divider = ColorView(color: Tokens.Color.separator)
     private var rows: [CommandRowView] = []
     private var results: [CommandResult] = []
@@ -243,6 +247,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         hintKey.isHidden = true
         [chip, chipRule, hint, hintKey].forEach { panel.addSubview($0) }
         panel.onLayout = { [weak self] in self?.layoutPanel() }
+        panel.onBarePress = { [weak self] event in self?.barePress(event) }
         scrim.onClick = { [weak self] in self?.dismiss() }
         history.onPages = { [weak self] in self?.mergeArrived() }
         history.onSites = { [weak self] in self?.completionArrived() }
@@ -292,6 +297,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             history.use(host.commandBarProfile.history)
             history.reset()
             completionAsked = nil
+            // Another window may have moved it since.
+            position = CommandBarPlacement.load()
             scrim.frame = isAnchored ? host.commandBarOverlay.bounds : card
             host.commandBarOverlay.addSubview(scrim)
             host.commandBarOverlay.addSubview(panel)
@@ -348,6 +355,8 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         typingMonitor = nil
         fetcher.cancel()
         scrim.hide()
+        dragStart = nil
+        guides.show(x: nil, y: nil)
         // Esc or Return: gone at once, as it came.
         panel.dismiss(instantly: isAnchored || Tokens.Motion.isFromKey) { [weak self, weak host] in
             // Shown again while it was leaving: it's still here.
@@ -416,6 +425,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             let x = max(Tokens.Space.x2, min(start, bounds.maxX - margin - wide))
             return NSRect(x: x, y: address.minY, width: wide, height: fieldHeight + listHeight)
         }
+        if host.commandBarIsMovable {
+            let placement = self.placement(in: host)
+            return NSRect(origin: placement.origin(for: position), size: NSSize(width: placement.width, height: Tokens.Metric.commandBarFieldHeight + listHeight))
+        }
         let card = host.commandBarPageFrame
         // Room to breathe on both sides of the page, however narrow the window.
         let margin = Tokens.Space.x8
@@ -436,6 +449,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if isAnchored {
             top = anchorFrame(in: host).minY
             bottom = host.commandBarOverlay.bounds.maxY
+        } else if host.commandBarIsMovable {
+            let placement = self.placement(in: host)
+            top = placement.origin(for: position).y
+            bottom = placement.bottom(for: position)
         } else {
             let card = host.commandBarPageFrame
             top = panelTop(in: card)
@@ -443,6 +460,96 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         }
         let room = bottom - Tokens.Space.x4 - top - fieldHeight - Self.listInset * 2
         return max(1, min(Tokens.Metric.commandBarMaxRows, Int(room / rowHeight)))
+    }
+
+    // MARK: Moving it
+
+    /// Where you've put the bar over the page; the default unless you dragged it.
+    private var position = CommandBarPlacement.load()
+    private lazy var guides = CommandBarGuides()
+    /// While the bar is dragged: its top-left when the drag began, and which guides it's on.
+    private var dragStart: NSPoint?
+    private var snapped = (x: false, y: false)
+
+    /// A dragged bar keeps room for its field and this many rows.
+    private static let minimumRows = 4
+
+    private func placement(in host: CommandBarHost) -> CommandBarPlacement {
+        CommandBarPlacement(bounds: host.commandBarOverlay.bounds, page: host.commandBarPageFrame,
+                            minimumHeight: Tokens.Metric.commandBarFieldHeight + Self.listInset * 2 + Tokens.Metric.commandBarRowHeight * CGFloat(Self.minimumRows))
+    }
+
+    private var isMovable: Bool { isVisible && !isAnchored && host?.commandBarIsMovable == true }
+
+    /// A press on the bar's own surface, not its text or a row: dragged past a few points it moves the bar, as
+    /// Raycast's does; twice puts it back where it opens by default.
+    private func barePress(_ event: NSEvent) {
+        guard isMovable, let host, let window = host.window else { return }
+        if event.clickCount == 2 { resetPosition(); return }
+        let overlay = host.commandBarOverlay
+        let start = overlay.convert(event.locationInWindow, from: nil)
+        var moving = false
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if next.type == .leftMouseUp { break }
+            let now = overlay.convert(next.locationInWindow, from: nil)
+            let delta = NSPoint(x: now.x - start.x, y: now.y - start.y)
+            if !moving {
+                guard hypot(delta.x, delta.y) >= CommandBarPlacement.dragThreshold else { continue }
+                moving = true
+                beginDrag()
+            }
+            drag(by: delta)
+        }
+        if moving { endDrag() }
+    }
+
+    private func beginDrag() {
+        guard let host else { return }
+        dragStart = panel.frame.origin
+        snapped = (false, false)
+        let overlay = host.commandBarOverlay
+        guides.frame = overlay.bounds
+        guides.color = Brand.Theme.of(host.commandBarIsPrivate ? nil : host.commandBarSpace).accent
+        if guides.superview !== overlay { overlay.addSubview(guides, positioned: .below, relativeTo: panel) }
+    }
+
+    /// `delta`: how far the pointer has come since the drag began, top-down.
+    private func drag(by delta: NSPoint) {
+        guard let host, let start = dragStart else { return }
+        let placement = self.placement(in: host)
+        let drag = placement.drag(to: NSPoint(x: start.x + delta.x, y: start.y + delta.y))
+        // Onto a guide: a light tap, as Keynote's alignment guides give.
+        if (drag.snappedX && !snapped.x) || (drag.snappedY && !snapped.y) { Haptics.snap() }
+        snapped = (drag.snappedX, drag.snappedY)
+        position = drag.position
+        guides.show(x: drag.snappedX ? placement.guideX : nil, y: drag.snappedY ? placement.guideY : nil)
+        refitRows()
+        panel.frame = panelFrame()
+    }
+
+    private func endDrag() {
+        guard dragStart != nil else { return }
+        dragStart = nil
+        guides.show(x: nil, y: nil)
+        CommandBarPlacement.save(position)
+    }
+
+    /// Back to where the bar opens by default, gliding there unless Reduce Motion is on.
+    private func resetPosition() {
+        position = .standard
+        CommandBarPlacement.save(position)
+        let from = panel.frame
+        refitRows()
+        let to = panelFrame()
+        guard from != to else { return }
+        panel.frame = from
+        Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { self.panel.animator().frame = to }
+    }
+
+    /// The bar moved higher or lower: as many rows as fit there now.
+    private func refitRows() {
+        guard let fresh = currentResults(), fresh.count != results.count else { return }
+        display(fresh, animated: false)
     }
 
     /// Opened from the address it's the address field's own height, so clicking in changes nothing but the width.
@@ -1048,6 +1155,19 @@ extension CommandBarController {
         controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     }
 
+    /// As dragging the bar by its edge this far from where it is (`bardrag`); `ending` lets go.
+    func debugDrag(_ dx: CGFloat, _ dy: CGFloat, ending: Bool) {
+        guard isMovable else { return }
+        if dragStart == nil { beginDrag() }
+        drag(by: NSPoint(x: dx, y: dy))
+        if ending { endDrag() }
+    }
+
+    /// As a double-click on the bar's edge (`barreset`).
+    func debugResetPosition() { if isMovable { resetPosition() } }
+
+    var debugPanelFrame: NSRect { panel.frame }
+
     /// Esc in the field, as the key would press it.
     func debugEscape() {
         guard let editor = field.currentEditor() as? NSTextView else { dismiss(); return }
@@ -1092,6 +1212,75 @@ final class ScrimView: ColorView {
         isLeaving = true
         Tokens.Motion.fadeBackdrop(self, entering: false, evenFromKeyboard: evenFromKeyboard) {
             if self.isLeaving { self.removeFromSuperview() }
+        }
+    }
+}
+
+/// An image that's only a picture: a press on it is what's under it.
+final class PassiveImageView: NSImageView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+/// The guides a dragged command bar snaps to: a hairline down the middle of where it opens and one across its top,
+/// each showing only while the bar sits on it.
+final class CommandBarGuides: NSView {
+    private let vertical = CALayer()
+    private let horizontal = CALayer()
+    var color: NSColor = Tokens.Color.textTertiary { didSet { refreshColor() } }
+    private var x: CGFloat?
+    private var y: CGFloat?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        for line in [vertical, horizontal] {
+            line.opacity = 0
+            line.cornerRadius = Tokens.Metric.hairline / 2
+            layer?.addSublayer(line)
+        }
+        refreshColor()
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshColor()
+    }
+
+    private func refreshColor() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let line = cgColor(color.withAlphaComponent(0.7))
+            Tokens.Motion.withoutAnimation { [vertical, horizontal].forEach { $0.backgroundColor = line } }
+        }
+    }
+
+    /// Shows the line down at `x` and the one across at `y`, in the overlay's coordinates; nil fades a line out.
+    func show(x: CGFloat?, y: CGFloat?) {
+        if let x { self.x = x }
+        if let y { self.y = y }
+        place()
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(Tokens.Motion.snap.duration)
+        CATransaction.setAnimationTimingFunction(Tokens.Motion.snap.timing)
+        vertical.opacity = x == nil ? 0 : 1
+        horizontal.opacity = y == nil ? 0 : 1
+        CATransaction.commit()
+    }
+
+    override func layout() {
+        super.layout()
+        place()
+    }
+
+    private func place() {
+        let inset = Tokens.Space.x2, line = Tokens.Metric.hairline
+        Tokens.Motion.withoutAnimation {
+            if let x { vertical.frame = NSRect(x: floor(x), y: inset, width: line, height: max(0, bounds.height - inset * 2)) }
+            if let y { horizontal.frame = NSRect(x: inset, y: floor(y), width: max(0, bounds.width - inset * 2), height: line) }
         }
     }
 }

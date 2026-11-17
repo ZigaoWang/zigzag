@@ -240,12 +240,20 @@ final class Tab: NSObject {
     /// it, as Safari and Chrome do.
     var returnsToOpener: Bool {
         guard !canGoBack, !isPeek, bookmarkID == nil, let opener, !opener.isClosed else { return false }
-        // Dragged into another window, the page it came from is no longer beside it.
-        return opener.spaceID == spaceID && opener.host === host
+        // Dragged into another window, the page it came from is no longer beside it. (Windows sharing their tabs
+        // list it beside it all the same, #162.)
+        return opener.spaceID == spaceID && (opener.host === host || (store != nil && opener.store === store))
     }
     var canGoBackOrReturn: Bool { canGoBack || returnsToOpener }
 
+    /// The window it belongs to: the one that made it, or, while windows share their tabs (#162), the one that last
+    /// showed it. Its links open there, and extensions see it there.
     weak var host: TabHost?
+    /// The tabs it's among (`TabStore`): its window's, or every window's while windows share their tabs.
+    weak var store: TabStore?
+    /// While windows share their tabs (#162): the window that has its page on screen, or last had. Another window on
+    /// this tab shows that it's there.
+    weak var shownBy: TabManager?
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
     private var reloadWhenShown = false
@@ -629,7 +637,7 @@ final class Tab: NSObject {
     /// Its share of its page process's memory, as it goes to sleep: the process's footprint over the tabs awake in it.
     private func memoryInUse(by webView: BrowserWebView) -> UInt64? {
         guard let pid = EnergyWatch.processID(of: webView), pid > 0 else { return nil }
-        let sharing = WindowManager.shared.controllers.flatMap(\.tabManager.allTabs).filter { tab in
+        let sharing = WindowManager.shared.openTabs.filter { tab in
             tab.webView.flatMap(EnergyWatch.processID) == pid
         }.count
         return SleepMemory.share(footprint: ProcessMemory.footprint(pid), tabsSharing: sharing)
@@ -1740,7 +1748,11 @@ extension Tab: WKNavigationDelegate {
                                  pageOrigin: String? = nil) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
-        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: isPrivate) else { return false }
+        // A link has no file name; a download's own name is what an earlier file-type destination matches, so the
+        // handoff scan must see it and stand aside for that destination.
+        let handoffName = appliesToLinks ? "" : (filename ?? DownloadTokens.filename(for: url, suggested: ""))
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
+                                                    isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
         let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
