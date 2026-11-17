@@ -587,8 +587,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     private func mayDownload(_ url: URL, request: URLRequest? = nil, asking: Bool = true) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
             // A file on this Mac has no site to ask about. A page a site made (about:blank, data:) has an origin it
-            // cannot name, so it is not allowed to save what it was given.
-            if (webView.url ?? url).isFileURL { return true }
+            // cannot name, so with asking on it is not allowed to save what it was given; with asking off it saves as
+            // it always did.
+            if SitePermissions.pageWithoutSiteMayDownload(isFile: (webView.url ?? url).isFileURL) { return true }
             refusedDownload(text: DownloadPolicy.blockedText, note: "A page with no site of its own tried to save a file")
             return false
         }
@@ -596,13 +597,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         // where the question belongs; it comes forward so the card is not hidden behind this page.
         let window = WindowManager.shared.promptHost(for: parentWindow)?.window
             ?? opener.flatMap { WindowManager.shared.promptHost(holding: $0)?.window }
-        guard let window else {
-            refusedDownload(text: DownloadPolicy.blockedText, note: "This site is not allowed to save files")
-            return false
-        }
         // Only a site that has not answered needs the question brought forward; a later download is decided without
-        // pulling the window in front of the page the person is using.
-        if SitePermissions.asksBeforeDownloads, SitePermissions.downloads(origin: origin, tab: opener) == nil {
+        // pulling the window in front of the page the person is using. With no window left to ask in, a site that
+        // needs asking is refused below, while one that doesn't (asking off, or an answer kept) decides as before.
+        if let window, SitePermissions.asksBeforeDownloads, SitePermissions.downloads(origin: origin, tab: opener) == nil {
             window.makeKeyAndOrderFront(nil)
         }
         let allowed = await SitePermissions.downloadsAllowed(origin: origin, window: window, isPrivate: isPrivate, tab: opener,

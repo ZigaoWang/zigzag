@@ -1758,8 +1758,9 @@ extension Tab: WKNavigationDelegate {
     private func mayDownload(_ url: URL, in webView: WKWebView, retry: URLRequest? = nil, asking: Bool = true) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
             // A file on this Mac has no site to ask about and nowhere to keep an answer. A page a site made
-            // (about:blank, data:) has an origin it cannot name, so it is not allowed to save what it was given.
-            if (webView.url ?? url).isFileURL { return true }
+            // (about:blank, data:) has an origin it cannot name, so with asking on it is not allowed to save what it
+            // was given; with asking off it saves as it always did.
+            if SitePermissions.pageWithoutSiteMayDownload(isFile: (webView.url ?? url).isFileURL) { return true }
             refusedDownload(in: webView, text: DownloadPolicy.blockedText,
                             note: "A page with no site of its own tried to save a file")
             return false

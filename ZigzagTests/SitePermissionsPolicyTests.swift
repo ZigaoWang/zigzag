@@ -148,6 +148,19 @@ import WebKit
         }
     }
 
+    /// A page with no site of its own (an about:blank pop-up a site wrote a file into) saves as it always did while
+    /// asking is off; only with asking on is it refused, having no site to ask about. A local file always saves.
+    @Test func aPageWithoutASiteSavesAsBeforeWithAskingOff() throws {
+        try withDefaults { _ in
+            SitePermissions.asksBeforeDownloads = false
+            #expect(SitePermissions.pageWithoutSiteMayDownload(isFile: false))
+            #expect(SitePermissions.pageWithoutSiteMayDownload(isFile: true))
+            SitePermissions.asksBeforeDownloads = true
+            #expect(!SitePermissions.pageWithoutSiteMayDownload(isFile: false))
+            #expect(SitePermissions.pageWithoutSiteMayDownload(isFile: true))
+        }
+    }
+
     /// Asking on: the first download asks, and the site's Allow is kept, so the next file is decided without a card.
     @Test func askingOnceKeepsTheAnswerForTheSite() async throws {
         try await withDefaultsAsync {

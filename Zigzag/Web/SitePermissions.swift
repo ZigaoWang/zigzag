@@ -363,6 +363,13 @@ enum SitePermissions {
         set { defaults.set(newValue, forKey: "SiteAsksBeforeDownloads") }
     }
 
+    /// Whether a page with no site of its own (about:blank, data:) may save a file. A file on this Mac always may. With
+    /// asking off, nothing changes from before sites were asked: such a page saves as it always did. With asking on it
+    /// has no site to ask about or keep an answer for, so it may not.
+    static func pageWithoutSiteMayDownload(isFile: Bool) -> Bool {
+        isFile || !asksBeforeDownloads
+    }
+
     /// Whether a site may save files: Allow or Block kept for it, else the answer given on `tab`'s page ("This time"),
     /// else nil — nobody has said yet.
     static func downloads(origin: String, tab: Tab? = nil) -> Bool? {
