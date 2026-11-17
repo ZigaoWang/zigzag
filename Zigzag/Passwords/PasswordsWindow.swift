@@ -107,7 +107,7 @@ final class PasswordsView: NSView {
     private var selectedNever: Origin?
     private var rows: [SiteRow] = []
     private var changeObserver: Any?
-    private var sleepObservers: [Any] = []
+    private var sleepObservers: [PasswordAuthentication.LockObserver] = []
     private var isLocked = true
 
     override init(frame: NSRect) {
@@ -157,12 +157,7 @@ final class PasswordsView: NSView {
         changeObserver = NotificationCenter.default.addObserver(forName: PasswordStore.didChange, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { if PasswordAuthentication.isUnlocked { self?.reload() } }
         }
-        let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.willSleepNotification] {
-            sleepObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.lock() }
-            })
-        }
+        sleepObservers = PasswordAuthentication.observeLocking { [weak self] in self?.lock() }
         // Still unlocked from a moment ago: straight to the passwords, no locked screen in between.
         setLocked(!PasswordAuthentication.isUnlocked)
         refreshCounts()
@@ -188,7 +183,7 @@ final class PasswordsView: NSView {
 
     isolated deinit {
         if let changeObserver { NotificationCenter.default.removeObserver(changeObserver) }
-        sleepObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
+        sleepObservers.forEach { $0.remove() }
         NotificationCenter.default.removeObserver(self)
     }
 

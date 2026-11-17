@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import OSLog
 import Testing
@@ -109,5 +110,20 @@ struct OriginTests {
         #expect(Origin(URL(string: "file:///Users/me/a.html")) == nil)
         #expect(Origin(URL(string: "webkit-extension://abc/popup.html")) == nil)
         #expect(Origin(nil) == nil)
+    }
+}
+
+@MainActor struct VaultLockTests {
+    /// A manual screen lock (not only sleep) locks the vault. Private centers, so nothing is broadcast to other apps.
+    @Test func lockingTheScreenLocksTheVault() async throws {
+        let workspace = NotificationCenter(), distributed = NotificationCenter()
+        var locks = 0
+        let observers = PasswordAuthentication.observeLocking(workspace: workspace, distributed: distributed) { locks += 1 }
+        defer { observers.forEach { $0.remove() } }
+        distributed.post(name: PasswordAuthentication.screenLockedNotification, object: nil)
+        workspace.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
+        for _ in 0..<100 where locks < 2 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(locks == 2)
+        #expect(PasswordAuthentication.screenLockedNotification.rawValue == "com.apple.screenIsLocked")
     }
 }

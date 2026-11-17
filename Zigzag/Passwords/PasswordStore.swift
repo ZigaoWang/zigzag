@@ -419,15 +419,38 @@ enum PasswordAuthentication {
     /// The last successful check, so one unlock covers the Passwords window for a while, even after it's closed.
     /// It ends when the Mac sleeps or locks, whether or not the window is open.
     @MainActor private static var unlockedUntil: Date? { didSet { if unlockedUntil != nil { watchForSleep() } } }
-    @MainActor private static var sleepObservers: [Any] = []
+    @MainActor private static var sleepObservers: [LockObserver] = []
 
-    /// Once, on the first unlock: sleep, the screen sleeping or another user switching in locks again.
+    /// Once, on the first unlock: sleep, the screen sleeping, the screen being locked or another user switching in locks again.
     @MainActor private static func watchForSleep() {
         guard sleepObservers.isEmpty else { return }
-        let center = NSWorkspace.shared.notificationCenter
-        for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.willSleepNotification] {
-            sleepObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { _ in
-                MainActor.assumeIsolated { lock() }
+        sleepObservers = observeLocking { lock() }
+    }
+
+    /// Sent when the screen is locked by hand (Control-Command-Q, the menu, a hot corner), even while the display stays on.
+    static let screenLockedNotification = Notification.Name("com.apple.screenIsLocked")
+
+    /// One registration, so it can be removed from the center it was added to.
+    struct LockObserver {
+        let center: NotificationCenter
+        let token: Any
+        func remove() { center.removeObserver(token) }
+    }
+
+    /// Calls `action` whenever the Mac sleeps, its screen sleeps or locks, or another user switches in.
+    /// The centers can be swapped in tests, so a test never broadcasts a screen lock to other apps.
+    @MainActor static func observeLocking(workspace: NotificationCenter = NSWorkspace.shared.notificationCenter,
+                                          distributed: NotificationCenter = DistributedNotificationCenter.default(),
+                                          _ action: @escaping @MainActor () -> Void) -> [LockObserver] {
+        let events: [(NotificationCenter, Notification.Name)] = [
+            (workspace, NSWorkspace.screensDidSleepNotification),
+            (workspace, NSWorkspace.sessionDidResignActiveNotification),
+            (workspace, NSWorkspace.willSleepNotification),
+            (distributed, screenLockedNotification),
+        ]
+        return events.map { center, name in
+            LockObserver(center: center, token: center.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { action() }
             })
         }
     }
