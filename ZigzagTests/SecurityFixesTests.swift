@@ -4,6 +4,20 @@ import WebKit
 import os
 @testable import Zigzag
 
+struct MoveToApplicationsTests {
+    /// Only a copy signed as this app is gets its quarantine taken off.
+    @Test func onlyACopySignedLikeTheAppPasses() throws {
+        let app = Bundle.main.bundleURL
+        #expect(MoveToApplications.isSigned(like: app, app))
+        let fake = FileManager.default.temporaryDirectory.appendingPathComponent("Fake-\(UUID().uuidString).app")
+        let macOS = fake.appendingPathComponent("Contents/MacOS")
+        try FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fake) }
+        try Data("#!/bin/sh\n".utf8).write(to: macOS.appendingPathComponent("Fake"))
+        #expect(!MoveToApplications.isSigned(like: app, fake))
+    }
+}
+
 /// Rules that keep pages and extensions inside their lines: which native helpers an extension may start, which
 /// sites it may ask for, and where a link in Reader or a PDF may go.
 @MainActor
