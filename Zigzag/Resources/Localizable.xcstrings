@@ -2483,17 +2483,6 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
-      "comment" : "Message of the sheet that forgets the choices made for single sites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
-          }
-        }
-      }
-    },
     "Advanced" : {
       "comment" : "A heading in the column of Settings, over Extensions, Shortcuts, Automation and Developer.",
       "localizations" : {
@@ -20772,6 +20761,17 @@
         }
       }
     },
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
+      "comment" : "Message of the sheet that forgets the choices made for single sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
+          }
+        }
+      }
+    },
     "an extension" : {
       "comment" : "Stands in for an extension's name when it has none, inside a sentence like “an extension is listening to this tab”.",
       "localizations" : {
@@ -22222,6 +22222,130 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取脚本…"
+          }
+        }
+      }
+    },
+    "Every site" : {
+      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有网站"
+          }
+        }
+      }
+    },
+    "JavaScript" : {
+      "comment" : "A setting in Settings › Privacy: whether pages may run their scripts. A name: keep it as it is.\nRow in the site panel's This Site group: whether the site's pages may run their scripts. A name: keep it as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JavaScript"
+          }
+        }
+      }
+    },
+    "javascript js scripts disable block noscript privacy" : {
+      "comment" : "Words that find the JavaScript setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "javascript js 脚本 禁用 阻止 关闭 noscript 隐私"
+          }
+        }
+      }
+    },
+    "JavaScript off" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages don't run their scripts.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭 JavaScript"
+          }
+        }
+      }
+    },
+    "JavaScript on" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages run their scripts, whatever Settings › Privacy › JavaScript says.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 JavaScript"
+          }
+        }
+      }
+    },
+    "javascript.allowed" : {
+      "comment" : "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages run their scripts.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Allowed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许"
+          }
+        }
+      }
+    },
+    "javascript.not-allowed" : {
+      "comment" : "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages don't run their scripts.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Not Allowed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不允许"
+          }
+        }
+      }
+    },
+    "Off here" : {
+      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site's own choice turns its scripts off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站已关闭"
+          }
+        }
+      }
+    },
+    "On here" : {
+      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site runs its scripts, though Settings › Privacy › JavaScript is Not Allowed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站已打开"
+          }
+        }
+      }
+    },
+    "Whether pages may run their scripts. Sites you change in Site Controls keep their own choice." : {
+      "comment" : "Explanation under “JavaScript” in Settings › Privacy. Site Controls is the panel from the address.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页是否可以运行自己的脚本。你在网站控制中改过的网站会保留各自的选择。"
           }
         }
       }

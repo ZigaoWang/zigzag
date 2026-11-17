@@ -664,6 +664,12 @@ final class SitePanel: FloatingPanelView {
         darkRow?.debugChoose(index)
     }
 
+    /// sitejs allowed|blocked: chooses in the JavaScript row's dropdown.
+    func debugJavaScript(_ arg: String) {
+        guard ["allowed", "blocked"].contains(arg) else { return }
+        javaScriptRow?.debugChoose(arg == "allowed" ? 0 : 1)
+    }
+
     /// sitezoom in|out|reset: the Zoom row's buttons.
     func debugZoom(_ arg: String) { zoomStepper?.debugPress(arg) }
 
@@ -802,6 +808,21 @@ final class SitePanel: FloatingPanelView {
         }
     }
 
+    /// The JavaScript row's choices (#282).
+    static let javaScriptAllowed = String(localized: "javascript.allowed", defaultValue: "Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages run their scripts.")
+    static let javaScriptNotAllowed = String(localized: "javascript.not-allowed", defaultValue: "Not Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages don't run their scripts.")
+
+    /// What the JavaScript row says under its name, so a page that looks broken is explained: off here because of the
+    /// setting, or the site's own choice where it differs from the setting. Nothing where it's as everywhere else.
+    static func javaScriptStatus(url: URL, tab: Tab) -> String? {
+        let allowed = SiteJavaScript.allows(url, in: tab)
+        if SiteJavaScript.isOwn(url, in: tab) {
+            if !allowed { return String(localized: "Off here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site's own choice turns its scripts off.") }
+            return SiteJavaScript.isAllowed ? nil : String(localized: "On here", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group: this site runs its scripts, though Settings › Privacy › JavaScript is Not Allowed.")
+        }
+        return allowed ? nil : String(localized: "Every site", comment: "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.")
+    }
+
     static func darkStatus(tab: Tab, url: URL) -> String? {
         DarkStatus.of(DarkPages.siteChoice(for: url), wanted: DarkPages.wants(url), native: tab.darkPage?.native == true,
                       developerLook: tab.developerInEffect.appearance != .followsMac).text
@@ -831,6 +852,8 @@ final class SitePanel: FloatingPanelView {
 
     /// The Dark page row, while there is one.
     private weak var darkRow: PanelRow?
+    /// The JavaScript row, while there is one.
+    private weak var javaScriptRow: PanelRow?
 
     private func buildRows() {
         rows = []
@@ -874,6 +897,18 @@ final class SitePanel: FloatingPanelView {
                     if let webView = self.tab.webView { CookieBanners.forget(in: webView) }
                     self.tab.reload()
                 })
+            case .javaScript:
+                // The page's own scripts here (#282): Allowed or Not Allowed, over Settings › Privacy › JavaScript.
+                // It's for the page as it loads, so choosing reloads it; in a private window it's this tab's alone.
+                let tab = tab, url = url
+                let allowed = SiteJavaScript.allows(url, in: tab)
+                let row = PanelRow.choice(String(localized: "JavaScript", comment: "Row in the site panel's This Site group: whether the site's pages may run their scripts. A name: keep it as it is."),
+                                          options: [Self.javaScriptAllowed, Self.javaScriptNotAllowed], selected: allowed ? 0 : 1,
+                                          status: { _ in Self.javaScriptStatus(url: url, tab: tab) }) { index in
+                    SiteJavaScript.choose(index == 0, for: url, in: tab)
+                }
+                javaScriptRow = row
+                rows.append(row)
             case .darkPage:
                 // Dark pages for this site alone (#134): Automatic follows Settings, On and Off hold whatever it says,
                 // Force darkens it even where it looks dark on its own. Under the name, what that means here now.
@@ -1859,7 +1894,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, javaScript, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions }
     /// The rows into the panel's other pages. Extensions are on the first page itself (#215), and the connection is a
     /// small line under the site's name (#221).
     enum Link: Equatable { case permissions }
@@ -1893,6 +1928,8 @@ enum SitePanelRows {
         if c.isWeb, !c.coveredPage { rows.append(.zoom) }
         if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
+        // JavaScript on every web site, a private window's too (chosen for its tab alone).
+        if c.isWeb { rows.append(.javaScript) }
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
