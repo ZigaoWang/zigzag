@@ -900,7 +900,15 @@ enum ExtensionShims {
       const noop = () => {};
       const event = () => ({ addListener: noop, removeListener: noop, hasListener: () => false, hasListeners: () => false });
       const done = (value) => (...args) => { const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null; if (cb) { setTimeout(() => cb(value), 0); return; } return Promise.resolve(value); };
-      const no = (what) => (...args) => { const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null; const e = new Error(what + " isn't available in Zigzag"); if (cb) { setTimeout(() => cb(undefined), 0); return; } return Promise.reject(e); };
+      // As the bridge does: a failing callback runs with `runtime.lastError` set for exactly its duration, and a
+      // promise rejects with an Error naming the feature. WebKit's own lastError is put back afterwards.
+      const callWithError = (callback, error) => {
+        const runtime = api.runtime;
+        const before = Object.getOwnPropertyDescriptor(runtime, 'lastError');
+        try { Object.defineProperty(runtime, 'lastError', { get: () => ({ message: String((error && error.message) || error) }), configurable: true, enumerable: true }); } catch (e) {}
+        try { callback(); } finally { try { if (before) Object.defineProperty(runtime, 'lastError', before); else delete runtime.lastError; } catch (e) {} }
+      };
+      const no = (what) => (...args) => { const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null; const error = new Error(what + " isn't available in Zigzag"); if (cb) { setTimeout(() => callWithError(cb, error), 0); return; } return Promise.reject(error); };
       let manifest = {};
       try { manifest = api.runtime.getManifest() || {}; } catch (e) {}
       const asked = new Set([...(manifest.permissions || []), ...(manifest.optional_permissions || [])]);
@@ -908,8 +916,8 @@ enum ExtensionShims {
       const add = (name, value) => { if (asked.has(name) && api[name] == null) { try { Object.defineProperty(api, name, { value, configurable: true, enumerable: true, writable: true }); held.push(value); } catch (e) {} } };
       const fill = (name, values) => { const target = api[name]; if (!target) return; held.push(target); for (const [k, v] of Object.entries(values)) { if (!(k in target)) { try { target[k] = v; } catch (e) {} } } };
       // Missing calls on namespaces WebKit does have: often called unconditionally.
-      fill('action', { setBadgeTextColor: done(), getBadgeTextColor: done([0, 0, 0, 255]), getUserSettings: done({ isOnToolbar: true }) });
-      fill('tabs', { group: no('Tab groups'), ungroup: done(), discard: done(), highlight: done(), TAB_ID_NONE: -1 });
+      fill('action', { setBadgeTextColor: no('The action badge text colour'), getBadgeTextColor: no('The action badge text colour'), getUserSettings: no('The action toolbar setting') });
+      fill('tabs', { group: no('Tab groups'), ungroup: no('Tab groups'), discard: no('Discarding tabs'), highlight: no('Highlighting tabs'), TAB_ID_NONE: -1 });
       fill('windows', { WINDOW_ID_NONE: -1, WINDOW_ID_CURRENT: -2 });
       // getContexts is the bridge's, with the real answer: an always-empty one ("no popup
       // open") sends some (Bitwarden) into a loop asking again.
@@ -924,7 +932,7 @@ enum ExtensionShims {
         RuleActionType: names(['BLOCK', 'REDIRECT', 'ALLOW', 'UPGRADE_SCHEME', 'MODIFY_HEADERS', 'ALLOW_ALL_REQUESTS'], camel),
         ResourceType: names(['MAIN_FRAME', 'SUB_FRAME', 'STYLESHEET', 'SCRIPT', 'IMAGE', 'FONT', 'OBJECT', 'XMLHTTPREQUEST', 'PING', 'CSP_REPORT', 'MEDIA', 'WEBSOCKET', 'WEBTRANSPORT', 'WEBBUNDLE', 'OTHER']),
       });
-      fill('i18n', { detectLanguage: done({ isReliable: false, languages: [] }) });
+      fill('i18n', { detectLanguage: no('Language detection') });
       fill('storage', { managed: { get: done({}), getBytesInUse: done(0), onChanged: event() } });
       // WebKit refuses a whole set of rules when one names a header it doesn't know (Claude sets its own on its API
       // calls). As close to Chrome as it gets: the unknown header is left out and the rest of the rules still apply.
@@ -959,7 +967,7 @@ enum ExtensionShims {
       // Whole namespaces, only where asked for.
       // Its constants are read as the extension starts (Claude does), so they must be there, or it stops loading.
       const colors = Object.freeze(Object.fromEntries(['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple', 'cyan', 'orange'].map((c) => [c.toUpperCase(), c])));
-      add('tabGroups', { TAB_GROUP_ID_NONE: -1, Color: colors, query: done([]), get: no('Tab groups'), update: no('Tab groups'), move: no('Tab groups'), onCreated: event(), onUpdated: event(), onRemoved: event(), onMoved: event() });
+      add('tabGroups', { TAB_GROUP_ID_NONE: -1, Color: colors, query: no('Tab groups'), get: no('Tab groups'), update: no('Tab groups'), move: no('Tab groups'), onCreated: event(), onUpdated: event(), onRemoved: event(), onMoved: event() });
       add('sidePanel', { setPanelBehavior: done(), setOptions: done(), getOptions: done({ enabled: false }), getPanelBehavior: done({ openPanelOnActionClick: false }), open: no('The side panel') });
       add('offscreen', { createDocument: no('Offscreen documents'), closeDocument: done(), hasDocument: done(false), Reason: {} });
       add('idle', { queryState: done('active'), setDetectionInterval: noop, getAutoLockDelay: done(0), onStateChanged: event() });
@@ -967,13 +975,13 @@ enum ExtensionShims {
       add('downloads', { download: no('Downloads from extensions'), search: done([]), cancel: done(), erase: done([]), show: noop, showDefaultFolder: noop, open: no('Opening downloads'), setUiOptions: done(), onCreated: event(), onChanged: event(), onErased: event(), onDeterminingFilename: event() });
       add('history', { search: done([]), getVisits: done([]), addUrl: done(), deleteUrl: done(), deleteRange: done(), deleteAll: done(), onVisited: event(), onVisitRemoved: event() });
       add('bookmarks', { getTree: done([{ id: '0', title: '', children: [] }]), get: done([]), getChildren: done([]), getRecent: done([]), search: done([]), create: no('Bookmarks from extensions'), update: no('Bookmarks from extensions'), remove: no('Bookmarks from extensions'), onCreated: event(), onRemoved: event(), onChanged: event(), onMoved: event() });
-      add('sessions', { getRecentlyClosed: done([]), getDevices: done([]), restore: no('Restoring sessions'), MAX_SESSION_RESULTS: 25, onChanged: event() });
+      add('sessions', { getRecentlyClosed: no('Recently closed sessions'), getDevices: no('Sessions from other devices'), restore: no('Restoring sessions'), MAX_SESSION_RESULTS: 25, onChanged: event() });
       add('topSites', { get: done([]) });
-      add('debugger', { attach: no('Debugging pages'), detach: done(), sendCommand: no('Debugging pages'), getTargets: done([]), onEvent: event(), onDetach: event() });
-      add('management', { getSelf: done({ id: api.runtime.id, name: manifest.name, version: manifest.version, enabled: true, installType: 'normal', type: 'extension' }), getAll: done([]), get: no('Other extensions'), setEnabled: no('Turning other extensions off'), onEnabled: event(), onDisabled: event(), onInstalled: event(), onUninstalled: event() });
+      add('debugger', { attach: no('Debugging pages'), detach: no('Debugging pages'), sendCommand: no('Debugging pages'), getTargets: no('Debugging pages'), onEvent: event(), onDetach: event() });
+      add('management', { getSelf: done({ id: api.runtime.id, name: manifest.name, version: manifest.version, enabled: true, installType: 'normal', type: 'extension' }), getAll: no('Other extensions'), get: no('Other extensions'), setEnabled: no('Turning other extensions off'), onEnabled: event(), onDisabled: event(), onInstalled: event(), onUninstalled: event() });
       add('identity', { getRedirectURL: (path) => 'https://' + api.runtime.id + '.chromiumapp.org/' + (path || ''), launchWebAuthFlow: no('Signing in through the browser'), getAuthToken: no('Signing in through the browser'), getProfileUserInfo: done({ email: '', id: '' }), onSignInChanged: event() });
       add('tts', { speak: done(), stop: noop, getVoices: done([]), isSpeaking: done(false), onEvent: event() });
-      add('fontSettings', { getFontList: done([]), getFont: done({ fontId: '' }), setFont: done(), clearFont: done(), onFontChanged: event() });
+      add('fontSettings', { getFontList: no('Font settings'), getFont: no('Font settings'), setFont: no('Font settings'), clearFont: no('Font settings'), onFontChanged: event() });
       add('privacy', { services: {}, network: {}, websites: {} });
       add('power', { requestKeepAwake: noop, releaseKeepAwake: noop });
       add('search', { query: no('Searching from extensions') });

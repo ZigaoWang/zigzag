@@ -189,6 +189,171 @@ struct ExtensionScriptTests {
         return context
     }
 
+    /// A fake extension background for bridge.js: WebKit's runtime, a native bridge that refuses every call, and none
+    /// of the namespaces the bridge must install.
+    private static func bridgeWorld(permissions: [String]) -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        let list = "[" + permissions.map { "'\($0)'" }.joined(separator: ", ") + "]"
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+        var __warned = [];
+        var console = { log: () => {}, warn: (m) => __warned.push(String(m)), error: () => {} };
+        const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false, hasListeners: () => false });
+        var chrome = {
+          runtime: { id: 'x', getManifest: () => ({ permissions: \(list) }),
+                     sendNativeMessage: (host, message) => Promise.resolve({ error: message.ns + '.' + message.fn + ' could not be answered' }),
+                     connectNative: () => ({ onMessage: event(), onDisconnect: event(), postMessage: () => {} }) },
+        };
+        var browser = chrome;
+        """)
+        context.evaluateScript(ExtensionBridgeScript.source)
+        return context
+    }
+
+    /// A fake extension background for the compatibility prelude: WebKit's runtime, and the namespaces WebKit supplies
+    /// that the layer fills in. The ones it stands up whole are left absent, as WebKit leaves them.
+    private static func compatibilityWorld(permissions: [String]) -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        let list = "[" + permissions.map { "'\($0)'" }.joined(separator: ", ") + "]"
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+        var console = { log: () => {}, warn: () => {}, error: () => {} };
+        var chrome = {
+          runtime: { id: 'x', getManifest: () => ({ name: 'Test extension', version: '1.0', permissions: \(list) }),
+                     sendNativeMessage: () => Promise.resolve() },
+          action: {}, tabs: {}, i18n: {}, storage: {},
+        };
+        var browser = chrome;
+        """)
+        context.evaluateScript(ExtensionShims.compatibility)
+        return context
+    }
+
+    @Test func aBridgedCallbackFailureSetsLastError() {
+        let context = Self.bridgeWorld(permissions: ["history", "identity"])
+        #expect(context.evaluateScript("typeof chrome.history.search")?.toString() == "function")
+        context.evaluateScript("""
+        var __called = 0, __during = null, __args = -1, __before = chrome.runtime.lastError;
+        chrome.history.search({ text: '' }, (...args) => {
+          __called++;
+          __during = chrome.runtime.lastError && chrome.runtime.lastError.message;
+          __args = args.length;
+        });
+        var __immediate = __called;
+        var __returned = chrome.runtime.lastError;
+        """)
+        // As in Chrome, the failure arrives after the call returns, and `lastError` is there only while it runs.
+        #expect(context.evaluateScript("__immediate").toInt32() == 0)
+        #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__called").toInt32() == 1)
+        #expect(context.evaluateScript("__during").toString() == "history.search could not be answered")
+        #expect(context.evaluateScript("__args").toInt32() == 0)
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+        // The promise form rejects with the same Error, and never sets `lastError`.
+        context.evaluateScript("""
+        var __error = null, __seen = 'not checked';
+        chrome.history.getVisits({ url: 'https://a.example/' }).then(
+          () => { __error = 'resolved'; },
+          (e) => { __error = e.message; __seen = chrome.runtime.lastError; });
+        """)
+        #expect(context.evaluateScript("__error").toString() == "history.getVisits could not be answered")
+        #expect(context.evaluateScript("__seen === undefined && chrome.runtime.lastError === undefined").toBool())
+        // A member whose failure is its own, not the bridge's: the same error is there for its callback.
+        context.evaluateScript("""
+        var __signIn = null, __signInArgs = -1;
+        chrome.identity.getAuthToken({ interactive: false }, (...args) => {
+          __signIn = chrome.runtime.lastError && chrome.runtime.lastError.message;
+          __signInArgs = args.length;
+        });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__signIn").toString() == "Chrome's own account sign-in isn't available in Zigzag; use launchWebAuthFlow")
+        #expect(context.evaluateScript("__signInArgs").toInt32() == 0)
+        // The extension's log says what failed.
+        #expect(context.evaluateScript("__warned.length").toInt32() == 1)
+    }
+
+    @Test func aCompatibilityLayerFailureNoLongerLooksLikeSuccess() {
+        let context = Self.compatibilityWorld(permissions: ["debugger"])
+        context.evaluateScript("""
+        var __called = 0, __during = null, __args = -1, __before = chrome.runtime.lastError;
+        chrome.debugger.detach({ tabId: 1 }, (...args) => {
+          __called++;
+          __during = chrome.runtime.lastError && chrome.runtime.lastError.message;
+          __args = args.length;
+        });
+        var __returned = chrome.runtime.lastError;
+        """)
+        #expect(context.evaluateScript("__called").toInt32() == 0)
+        #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__called").toInt32() == 1)
+        #expect(context.evaluateScript("__during").toString() == "Debugging pages isn't available in Zigzag")
+        #expect(context.evaluateScript("__args").toInt32() == 0)
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+        // The promise form rejects with an Error, and has no `lastError` before or after.
+        context.evaluateScript("""
+        var __promise = chrome.debugger.getTargets(), __seen = 'not checked';
+        __seen = chrome.runtime.lastError;
+        __promise.then(() => { __error = 'resolved'; }, (e) => { __error = { isError: e instanceof Error, message: e.message }; });
+        """)
+        #expect(context.evaluateScript("__seen === undefined").toBool())
+        #expect(context.evaluateScript("__error.isError").toBool())
+        #expect(context.evaluateScript("__error.message").toString() == "Debugging pages isn't available in Zigzag")
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    @Test func anUnsupportedCompatibilityMemberIsNotAnsweredWithAnEmptySuccess() {
+        let context = Self.compatibilityWorld(permissions: ["action", "tabs", "tabGroups", "sessions", "debugger", "fontSettings", "management", "i18n", "storage"])
+        context.evaluateScript("""
+        var __results = [];
+        var __check = (name, call) => { call((...args) => __results.push(name + ' ' + (chrome.runtime.lastError ? 'failed' : 'succeeded') + ' ' + args.length)); };
+        __check('action.setBadgeTextColor', (cb) => chrome.action.setBadgeTextColor('red', cb));
+        __check('action.getBadgeTextColor', (cb) => chrome.action.getBadgeTextColor(cb));
+        __check('action.getUserSettings', (cb) => chrome.action.getUserSettings(cb));
+        __check('tabs.ungroup', (cb) => chrome.tabs.ungroup(1, cb));
+        __check('tabs.discard', (cb) => chrome.tabs.discard(1, cb));
+        __check('tabs.highlight', (cb) => chrome.tabs.highlight({ windowId: 1, tabs: [1] }, cb));
+        __check('tabGroups.query', (cb) => chrome.tabGroups.query({}, cb));
+        __check('sessions.getRecentlyClosed', (cb) => chrome.sessions.getRecentlyClosed(cb));
+        __check('sessions.getDevices', (cb) => chrome.sessions.getDevices(cb));
+        __check('debugger.detach', (cb) => chrome.debugger.detach({ tabId: 1 }, cb));
+        __check('debugger.getTargets', (cb) => chrome.debugger.getTargets(cb));
+        __check('fontSettings.getFontList', (cb) => chrome.fontSettings.getFontList(cb));
+        __check('fontSettings.getFont', (cb) => chrome.fontSettings.getFont({ genericFamily: 'standard' }, cb));
+        __check('fontSettings.setFont', (cb) => chrome.fontSettings.setFont({ genericFamily: 'standard', fontId: 'x' }, cb));
+        __check('fontSettings.clearFont', (cb) => chrome.fontSettings.clearFont({ genericFamily: 'standard' }, cb));
+        __check('management.getAll', (cb) => chrome.management.getAll(cb));
+        __check('i18n.detectLanguage', (cb) => chrome.i18n.detectLanguage('hello', cb));
+        """)
+        context.evaluateScript("__flush()")
+        let failed = ["action.setBadgeTextColor", "action.getBadgeTextColor", "action.getUserSettings",
+                      "tabs.ungroup", "tabs.discard", "tabs.highlight", "tabGroups.query",
+                      "sessions.getRecentlyClosed", "sessions.getDevices", "debugger.detach", "debugger.getTargets",
+                      "fontSettings.getFontList", "fontSettings.getFont", "fontSettings.setFont", "fontSettings.clearFont",
+                      "management.getAll", "i18n.detectLanguage"]
+        #expect(context.evaluateScript("__results.join()").toString() == failed.map { "\($0) failed 0" }.joined(separator: ","))
+        // What is answered truthfully is still answered: the extension's own manifest, and managed storage's empty
+        // answer without enterprise policy.
+        context.evaluateScript("""
+        chrome.management.getSelf((info) => { globalThis.__self = info.name + ' ' + info.version + ' ' + info.enabled; });
+        chrome.storage.managed.get((values) => { globalThis.__managed = JSON.stringify(values); });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__self").toString() == "Test extension 1.0 true")
+        #expect(context.evaluateScript("__managed").toString() == "{}")
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
     @Test func anUnsupportedCallbackGetsLastErrorAndNoResult() throws {
         let context = try Self.surfaceWorld()
         #expect(context.evaluateScript("typeof chrome.history.search")?.toString() == "function")
