@@ -15,23 +15,24 @@ nonisolated struct XPIPackage {
 
     let manifest: [String: Any]
     let firefoxID: String?
+    /// Whether the archive carries Mozilla's signature file, `META-INF/mozilla.rsa`: a record of its presence, never
+    /// a check that the signature is valid or covers these files.
     let hasSignature: Bool
     private let data: Data
 
+    /// Reads the root `manifest.json`, decompressing only that entry: nothing else in the package is unpacked here.
     init(_ data: Data) throws {
         let entries = try Self.entries(data)
         // The manifest is the package's own, at its root: one under a folder is a zip of a folder, not an XPI.
-        guard entries.contains(where: { !$0.isDirectory && $0.path == ["manifest.json"] }) else {
+        guard let manifestEntry = entries.first(where: { !$0.isDirectory && $0.path == ["manifest.json"] }) else {
             let manifestAnywhere = entries.contains { !$0.isDirectory && $0.path.last == "manifest.json" }
             throw manifestAnywhere ? Failure.manifestNotAtRoot : Failure.missingManifest
         }
-        // PackageZip keeps its entry reader to itself, so the manifest is read as anything else in the package is:
-        // unpacked into a folder of its own, which is then removed. Nothing is written beside the package.
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-xpi-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: folder) }
-        try Self.unpack(data, into: folder)
-        guard let contents = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")),
-              let manifest = (try? JSONSerialization.jsonObject(with: contents)) as? [String: Any] else {
+        let contents: [UInt8]
+        do { contents = try PackageZip.content(of: manifestEntry, in: [UInt8](data)) }
+        catch let failure as PackageZip.Failure { throw Self.failure(failure) }
+        guard PackageZip.crc32(contents) == manifestEntry.crc,
+              let manifest = (try? JSONSerialization.jsonObject(with: Data(contents))) as? [String: Any] else {
             throw Failure.damaged
         }
         self.manifest = manifest
