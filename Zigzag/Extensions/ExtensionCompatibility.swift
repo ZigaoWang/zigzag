@@ -13,7 +13,7 @@ nonisolated enum CompatibilityStatus: String, Codable, CaseIterable, Hashable, S
     case patched
     /// Zigzag's native code answers it; the claim names the handler.
     case bridged
-    /// Zigzag reproduces the observable behaviour without the Chrome service; the claim names it.
+    /// Zigzag reproduces the observable behavior without the Chrome service; the claim names it.
     case emulated
     /// Zigzag cannot answer it: a loud, Chrome-shaped failure and a line in the install sheet.
     case unsupported
