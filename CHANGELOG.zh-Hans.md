@@ -37,6 +37,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 网站要求提供证书来确认你的身份时（有些单位的 Outlook、Microsoft 登录和内网就是这样），Zigzag 会像 Safari 一样从你的钥匙串里提供证书。页面上会出现一个面板，列出网站能接受的证书，写明每个是谁颁发的、什么时候过期，还有“始终为此网站使用这个证书”，默认打开，下次就不用再选了。“设置 › 隐私 › 网站”会列出每个网站用的证书，可以忘掉。证书删掉或过期后会重新询问，点“取消”就不带证书继续；无痕浏览窗口每次都会问，选择只保留到窗口关闭。要添加证书，在“钥匙串访问”里打开它的 .p12 文件就行；macOS 可能会问一次是否允许 Zigzag 使用它的密钥。感谢 [ldhieu](https://github.com/ldhieu)。([#297](https://github.com/ZigaoWang/zigzag/issues/297))
 - 在边栏里点一下之后，按 ⌘A 会选中“标签页”部分的所有标签页，和 Arc、Finder 一样，可以一起关闭、移动、固定或分屏。收起的分组里和折叠起来的标签页下面的标签页不会被选中，按 Esc 取消选择。在网页、地址栏或重命名框里按 ⌘A，还是选中那里的文字。感谢 [Kevoin](https://github.com/Kevoin)。([#302](https://github.com/ZigaoWang/zigzag/issues/302))
 - 归档的标签页有了自己的列表，就像 Arc 的归档。在“历史记录 › 显示归档”或命令栏里的“显示归档”打开它：自动收起的标签页按归档的日期排好，每个都写着网站和它原来所在的空间。点按一个就会在那个空间里重新打开。列表可以搜索，也可以“清除归档”，之后用提示里的“撤销”可以恢复。“设置 › 标签页 › 归档闲置的标签页”关着时，列表会说明这一点，并给出打开它的按钮。无痕浏览窗口的标签页永远不会归档。
+- 标签页、固定标签页和收藏可以用你自己的图像当图标。在它的菜单里，“更改图标…”旁边的“选取图像…”可以选 1 MB 以内的 SVG、PNG、JPEG、HEIC、PDF 或 ICNS 文件，“使用网站图标”会换回网站自己的图标。Zigzag 会存一份自己的副本，原文件移走或删掉图标也还在；SVG 会安全地绘制，不运行脚本，也不从别处载入任何东西。感谢 [bkonia](https://github.com/bkonia)。([#303](https://github.com/ZigaoWang/zigzag/issues/303))
 
 ### 修复
 - 在 macOS 15 上，Bitwarden 能用了，不会再一打开就说不支持 WebAssembly。macOS 15 自带的 WebKit 会忽略扩展运行 WebAssembly 的许可，Bitwarden 的密码库代码离不开它，于是被拒绝了。现在 Zigzag 会用这个 WebKit 认得的写法给这类扩展这个许可，脚本能从哪里载入的限制不变。macOS 26 及以后的版本不受影响。感谢 [ldhieu](https://github.com/ldhieu)。([#298](https://github.com/ZigaoWang/zigzag/issues/298))

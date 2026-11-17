@@ -200,6 +200,8 @@ extension BrowserWindowController {
         let before = tab.customIcon
         guard before != icon else { return }
         tab.customIcon = icon
+        // Saved with the session now, not only with the next change to it.
+        onStateChange?()
         let id = tab.id
         sidebarUndo.registerUndo(withTarget: self) { controller in
             guard let tab = controller.tabManager.tab(with: id) else { return }

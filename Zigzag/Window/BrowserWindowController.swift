@@ -2995,6 +2995,58 @@ extension BrowserWindowController: SidebarDelegate {
         panel.show(beside: anchor, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
     }
 
+    /// Choose Image…: an image file as the tab's icon (#303), copied into Zigzag's folder.
+    func chooseImageIcon(for tab: Tab) {
+        let id = tab.id
+        pickPageImage { [weak self] icon in
+            guard let self, let tab = self.tabManager.tab(with: id) else { return }
+            self.setIconWithUndo(icon, for: tab)
+        }
+    }
+
+    /// Choose Image… for a pinned page or a favorite.
+    func chooseImageIcon(forBookmark id: UUID) {
+        guard !tabManager.isPrivate, Library.shared.bookmark(id) != nil else { return }
+        pickPageImage { [weak self] icon in self?.setIconWithUndo(icon, forBookmark: id) }
+    }
+
+    private func pickPageImage(_ done: @escaping (String) -> Void) {
+        guard let window else { return }
+        closeFloatingPanels()
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = PageImageIcon.types
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.")
+        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.")
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            self?.usePageImage(url, done)
+        }
+    }
+
+    /// Reads the file into an icon, or says why it can't be one.
+    func usePageImage(_ url: URL, _ done: @escaping (String) -> Void) {
+        Task { [weak self] in
+            do throws(PageImageIcon.Failure) {
+                done(try await PageImageIcon.store(url))
+            } catch {
+                guard let host = self?.window?.contentView else { return }
+                ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t use this picture", comment: "Title of the notice when an image file chosen as a page's icon can't be used."),
+                                    message: Self.pageImageFailure(error))
+            }
+        }
+    }
+
+    static func pageImageFailure(_ failure: PageImageIcon.Failure) -> String {
+        switch failure {
+        case .tooLarge:
+            String(localized: "That file is larger than 1 MB. Choose a smaller image.", comment: "Message of the notice when an image file chosen as a page's icon is too big.")
+        case .unreadable:
+            String(localized: "Zigzag can’t read that file as an image. Choose an SVG, PNG, JPEG, HEIC, PDF or ICNS file.", comment: "Message of the notice when an image file chosen as a page's icon can't be read.")
+        }
+    }
+
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }
     func listJoinSplit(_ tab: Tab, onto other: Tab, onRight: Bool) {
         guard let kind = tabManager.joining(tab, onto: other, onRight: onRight) else { return }

@@ -854,6 +854,16 @@ enum DebugBridge {
                 let icon = f.count > 1 && f[1] != "none" ? f[1] : nil
                 if let id = list[n].bookmarkID { Library.shared.setIcon(icon, forBookmark: id) } else { list[n].customIcon = icon }
             }
+        // pageiconfile <index> <path>: Choose Image… for the tab at that sidebar position, with the file already picked.
+        case "pageiconfile":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            let list = controller.tabManager.navigableTabs
+            if f.count == 2, let n = Int(f[0]), list.indices.contains(n) {
+                let tab = list[n]
+                controller.usePageImage(URL(fileURLWithPath: f[1])) { icon in
+                    if let id = tab.bookmarkID { controller.setIconWithUndo(icon, forBookmark: id) } else { controller.setIconWithUndo(icon, for: tab) }
+                }
+            }
         case "killpage":
             // killpage <url prefix>: ends that tab's page process, as macOS does when it takes memory back.
             if let webView = controller.tabManager.allTabs.first(where: { $0.url?.absoluteString.hasPrefix(arg) == true })?.webView,

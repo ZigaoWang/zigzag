@@ -4394,7 +4394,7 @@
       }
     },
     "Choose" : {
-      "comment" : "Button of the panel that picks a picture for a space's empty page.\nButton of the panel that picks the downloads folder.",
+      "comment" : "Button of the panel that picks a picture for a space's empty page.\nButton of the panel that picks the downloads folder.\nButton of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4449,7 +4449,7 @@
       }
     },
     "Choose Image…" : {
-      "comment" : "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.",
+      "comment" : "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.\nItem in the context menu of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6059,7 +6059,7 @@
       }
     },
     "Couldn’t use this picture" : {
-      "comment" : "Title of the notice when a picture chosen for a space's empty page can't be read.",
+      "comment" : "Title of the notice when a picture chosen for a space's empty page can't be read.\nTitle of the notice when an image file chosen as a page's icon can't be used.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -23241,6 +23241,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每行一个参数。链接和 Cookie 通过 ZIGZAG_LINK 和 ZIGZAG_COOKIES 传入。"
+          }
+        }
+      }
+    },
+    "Choose an image to use as this page’s icon." : {
+      "comment" : "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取一张图像用作此页面的图标。"
+          }
+        }
+      }
+    },
+    "That file is larger than 1 MB. Choose a smaller image." : {
+      "comment" : "Message of the notice when an image file chosen as a page's icon is too big.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件大于 1 MB。请选取一张较小的图像。"
+          }
+        }
+      }
+    },
+    "Zigzag can’t read that file as an image. Choose an SVG, PNG, JPEG, HEIC, PDF or ICNS file." : {
+      "comment" : "Message of the notice when an image file chosen as a page's icon can't be read.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 无法将此文件读取为图像。请选取 SVG、PNG、JPEG、HEIC、PDF 或 ICNS 文件。"
           }
         }
       }

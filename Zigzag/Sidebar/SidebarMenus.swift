@@ -126,10 +126,16 @@ enum SidebarMenus {
         String(localized: "Use Site Icon", comment: "Item in the context menu of a tab, a pinned tab or a favorite that has an icon you chose: puts the site's own icon back. Also the tooltip of that choice among the icons.")
     }
 
-    /// Change Icon…, and Use Site Icon once one is chosen: right after Rename in a tab's, pinned tab's and favorite's
-    /// menus alike.
-    private static func addIconItems(to menu: NSMenu, hasIcon: Bool, change: @escaping () -> Void, useSite: @escaping () -> Void) {
+    static var chooseImageTitle: String {
+        String(localized: "Choose Image…", comment: "Item in the context menu of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.")
+    }
+
+    /// Change Icon…, Choose Image… and Use Site Icon once one is chosen: right after Rename in a tab's, pinned tab's
+    /// and favorite's menus alike.
+    private static func addIconItems(to menu: NSMenu, hasIcon: Bool, change: @escaping () -> Void, chooseImage: @escaping () -> Void,
+                                     useSite: @escaping () -> Void) {
         menu.addItem(Item(changeIconTitle, change))
+        menu.addItem(Item(chooseImageTitle, chooseImage))
         if hasIcon { menu.addItem(Item(useSiteIconTitle, useSite)) }
     }
 
@@ -144,7 +150,8 @@ enum SidebarMenus {
         menu.autoenablesItems = false
         let manager = controller.tabManager
         menu.addItem(Item(String(localized: "Rename", comment: "Item in a tab's context menu in the sidebar.")) { controller.sidebar.list.beginRenaming(tab: tab.id) })
-        addIconItems(to: menu, hasIcon: tab.customIcon != nil, change: { controller.chooseIcon(for: tab) }, useSite: { controller.setIconWithUndo(nil, for: tab) })
+        addIconItems(to: menu, hasIcon: tab.customIcon != nil, change: { controller.chooseIcon(for: tab) },
+                     chooseImage: { controller.chooseImageIcon(for: tab) }, useSite: { controller.setIconWithUndo(nil, for: tab) })
         menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) {
             if let url = tab.url { controller.copyLink(url) }
         })
@@ -206,7 +213,7 @@ enum SidebarMenus {
         // So is its icon, which a private window never writes into your pins.
         if pinned == nil, !manager.isPrivate {
             addIconItems(to: menu, hasIcon: bookmark.icon != nil, change: { controller.chooseIcon(forBookmark: bookmark.id) },
-                         useSite: { controller.setIconWithUndo(nil, forBookmark: bookmark.id) })
+                         chooseImage: { controller.chooseImageIcon(forBookmark: bookmark.id) }, useSite: { controller.setIconWithUndo(nil, forBookmark: bookmark.id) })
         }
         // Copy Link right after Rename and the icon, as in a tab's and a favorite's menus.
         menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.copyLink(bookmark.url) })
@@ -380,7 +387,7 @@ enum SidebarMenus {
             // A private window never writes into your favorites.
             if !manager.isPrivate {
                 addIconItems(to: menu, hasIcon: favorite.icon != nil, change: { controller.chooseIcon(forBookmark: favorite.id) },
-                             useSite: { controller.setIconWithUndo(nil, forBookmark: favorite.id) })
+                             chooseImage: { controller.chooseImageIcon(forBookmark: favorite.id) }, useSite: { controller.setIconWithUndo(nil, forBookmark: favorite.id) })
             }
         }
         menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu.")) { controller.copyLink(favorite.url) })
