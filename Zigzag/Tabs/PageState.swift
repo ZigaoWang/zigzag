@@ -118,7 +118,8 @@ nonisolated struct PageState: Equatable, Sendable {
     const waitFor = waits ? 6 : 0;
     let moved = false;
     const stop = () => { moved = true; };
-    for (const kind of ['wheel', 'keydown', 'mousedown', 'touchstart']) addEventListener(kind, stop, { capture: true, once: true });
+    // Passive: a wheel listener that could cancel makes WebKit wait for the page before it scrolls.
+    for (const kind of ['wheel', 'keydown', 'mousedown', 'touchstart']) addEventListener(kind, stop, { capture: true, once: true, passive: true });
     const setter = (el) => Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value')?.set;
     let left = fields.slice(), scrolled = y < 1 && x < 1, lastY = scrollY;
     for (let i = 0; i < 20 + waitFor && !(scrolled && left.length === 0); i++) {
