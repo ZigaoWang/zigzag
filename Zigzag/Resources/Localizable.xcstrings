@@ -1998,6 +1998,17 @@
         }
       }
     },
+    "A site opens in its space wherever its link comes from: another app, the command bar or another space. It covers the site’s subdomains. When a space is removed, its sites open in any space again." : {
+      "comment" : "Under Sites in Spaces in Settings › Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站会在它的空间中打开，无论链接来自其他 App、命令栏还是其他空间，也包括它的子域名。空间被移除后，它的网站会重新在任意空间中打开。"
+          }
+        }
+      }
+    },
     "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it." : {
       "comment" : "Explanation under “New Zigzag Mini” in Settings › Zigzag Mini: what Zigzag Mini is.",
       "localizations" : {
@@ -2159,7 +2170,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
+      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2302,7 +2313,7 @@
       }
     },
     "Add Site…" : {
-      "comment" : "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.",
+      "comment" : "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2670,6 +2681,17 @@
         }
       }
     },
+    "All of %@" : {
+      "comment" : "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "整个 %@"
+          }
+        }
+      }
+    },
     "All Passwords" : {
       "comment" : "A kind of password in the Passwords window's column, and the list's title: every saved password.",
       "localizations" : {
@@ -2868,6 +2890,17 @@
         }
       }
     },
+    "Always Open a Site in a Space" : {
+      "comment" : "Title of the sheet that sends a site to a space, from Settings › Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终在一个空间中打开网站"
+          }
+        }
+      }
+    },
     "Always Translate" : {
       "comment" : "A heading in Settings › Translation.",
       "localizations" : {
@@ -2963,6 +2996,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "任意地址"
+          }
+        }
+      }
+    },
+    "Any Space" : {
+      "comment" : "The first choice of Open in, in the site panel and in Settings › Spaces: the site opens in whatever space the link is in, as usual.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任意空间"
           }
         }
       }
@@ -6108,6 +6152,17 @@
         }
       }
     },
+    "Links to the site and its subdomains open in this space, wherever they come from." : {
+      "comment" : "Under the title of the sheet that sends a site to a space, from Settings › Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指向此网站及其子域名的链接，无论来自哪里，都会在这个空间中打开。"
+          }
+        }
+      }
+    },
     "List the file extensions this rule catches, like pdf, epub." : {
       "comment" : "Tooltip on the extensions field of a download rule with none yet, so its Add button can't be pressed.",
       "localizations" : {
@@ -6115,6 +6170,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "列出这条规则要匹配的文件扩展名，例如 pdf、epub。"
+          }
+        }
+      }
+    },
+    "Open in" : {
+      "comment" : "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开于"
+          }
+        }
+      }
+    },
+    "Opened in %@" : {
+      "comment" : "Toast after a link to a site that always opens in a space (Settings › Spaces) opened there instead of where it was clicked or typed. The name is the space's.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在“%@”中打开"
           }
         }
       }
@@ -6137,6 +6214,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在另一个窗口中显示"
+          }
+        }
+      }
+    },
+    "Sites in Spaces" : {
+      "comment" : "A heading in Settings › Spaces, over the sites that always open in a space you chose, whatever space or app the link came from.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在空间中打开的网站"
+          }
+        }
+      }
+    },
+    "Space for %@" : {
+      "comment" : "VoiceOver name of the space menu on a row in Settings › Spaces › Sites in Spaces: a site, like youtube.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的空间"
           }
         }
       }
@@ -6170,6 +6269,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第一条匹配地址的规则生效。规则按列表从上到下运行。"
+          }
+        }
+      }
+    },
+    "To always open a site in a space, choose it under Open in, in the site’s controls." : {
+      "comment" : "Explanation under “None yet” in Settings › Spaces › Sites in Spaces. Open in is the row in the site panel.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要让网站始终在某个空间中打开，请在它的网站设置中的“打开于”里选择空间。"
           }
         }
       }
@@ -10883,7 +10993,7 @@
       }
     },
     "None yet" : {
-      "comment" : "A row in Settings › Developer, shown when no page size is listed.\nA row in Settings › Developer, shown when no site is in Developer Mode.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
+      "comment" : "A row in Settings › Developer, shown when no page size is listed.\nA row in Settings › Developer, shown when no site is in Developer Mode.\nA row under Sites in Spaces in Settings › Spaces, shown when no site always opens in a space.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13790,7 +13900,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nButton on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16535,7 +16645,7 @@
       }
     },
     "Space" : {
-      "comment" : "VoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "Label of the space menu in the sheet that sends a site to a space, from Settings › Spaces.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

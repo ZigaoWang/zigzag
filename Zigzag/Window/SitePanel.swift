@@ -687,6 +687,13 @@ final class SitePanel: FloatingPanelView {
               let choice = permissionKinds[row].choices.firstIndex(of: wanted) else { return }
         permissionsGroup.rows[row].debugChoose(choice)
     }
+
+    /// <index> <row title>: picks that choice in the This Site row of that name, as its menu would ("1 Open in").
+    func debugChooseRow(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        guard f.count == 2, let index = Int(f[0]), let row = rows.first(where: { $0.debugTitle.hasPrefix(f[1] + ":") }) else { return }
+        row.debugChoose(index)
+    }
     #endif
 
     #if DEBUG
@@ -847,6 +854,7 @@ final class SitePanel: FloatingPanelView {
         // Translating is a browser window's (`translatePage`).
         context.foreignLanguage = controller != nil && tab.foreignLanguage != nil
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
+        context.manySpaces = Library.shared.spaces.count > 1 && SiteRoutes.site(of: url) != nil
         return context
     }
 
@@ -946,6 +954,8 @@ final class SitePanel: FloatingPanelView {
                     ExtensionStore.extensionsOffSites = sites
                     self.tab.reload()
                 })
+            case .openIn:
+                rows.append(openInRow())
             case .alwaysTranslate:
                 guard let language = tab.foreignLanguage else { break }
                 let name = PageTranslator.name(of: language)
@@ -1031,6 +1041,29 @@ final class SitePanel: FloatingPanelView {
         row.value = own.isEmpty ? "" : PermissionChoice.summary(choices)
         row.shortValue = own.isEmpty ? "" : PermissionChoice.shortSummary(choices)
         needsLayout = true
+    }
+
+    /// Open in (#286): the space this site always opens in, or Any space. A page on a subdomain of a listed site shows
+    /// that site's choice, and changes it; otherwise the page's own site is listed.
+    private func openInRow() -> PanelRow {
+        let spaces = Library.shared.spaces
+        let route = Library.shared.siteRoute(for: url)
+        let site = route?.site ?? SiteRoutes.site(of: url) ?? self.site
+        let selected = route.flatMap { route in spaces.firstIndex { $0.id == route.spaceID }.map { $0 + 1 } } ?? 0
+        let pageSite = SiteRoutes.site(of: url)
+        return .choice(String(localized: "Open in", comment: "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from."),
+                       options: [Self.anySpace] + spaces.map(\.name), selected: selected,
+                       status: { index in
+                           // Said only when the choice is a parent site's: what else it covers.
+                           guard index > 0, site != pageSite else { return nil }
+                           return String(localized: "All of \(site)", comment: "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).")
+                       }) { index in
+            Library.shared.setSiteRoute(site, to: index > 0 && spaces.indices.contains(index - 1) ? spaces[index - 1].id : nil)
+        }
+    }
+
+    static var anySpace: String {
+        String(localized: "Any Space", comment: "The first choice of Open in, in the site panel and in Settings › Spaces: the site opens in whatever space the link is in, as usual.")
     }
 
     private func rebuildRows() {
@@ -1894,7 +1927,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, javaScript, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, javaScript, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions, openIn }
     /// The rows into the panel's other pages. Extensions are on the first page itself (#215), and the connection is a
     /// small line under the site's name (#221).
     enum Link: Equatable { case permissions }
@@ -1921,6 +1954,8 @@ enum SitePanelRows {
         var extensionHost = true
         /// There are extensions to run, or not, on this site.
         var hasExtensions = false
+        /// There's more than one space for the site to always open in (#286).
+        var manySpaces = false
     }
 
     static func rows(_ c: Context) -> [Row] {
@@ -1938,6 +1973,8 @@ enum SitePanelRows {
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
         // Whether extensions run here: on a web site, once there are extensions to run.
         if c.isWeb, !c.isPrivate, c.extensionHost, c.hasExtensions { rows.append(.extensions) }
+        // The space the site always opens in: never chosen from a private window, which keeps nothing of its sites.
+        if c.isWeb, !c.isPrivate, c.manySpaces { rows.append(.openIn) }
         return rows
     }
 

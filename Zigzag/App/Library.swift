@@ -219,6 +219,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// The color Zigzag gave the space when it was made, which Use Default Colors puts back. Nil: not kept yet (made
     /// before it was, and not changed since), so `Library.defaultColors` works it out.
     var defaultColor: SpaceColor? = nil
+    /// Sites that always open in this space, whatever space the link came from (#286, `SiteRoutes`): hosts without
+    /// "www.", each covering its subdomains. Nil: none (older libraries too).
+    var routedSites: [String]? = nil
 
     /// No hue of its own: white, a gray, or black.
     var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
@@ -763,6 +766,23 @@ final class Library {
     func insertSpace(_ space: SpaceInfo, at index: Int) {
         guard self.index(of: space.id) == nil else { return }
         spaces.insert(space, at: max(0, min(index, spaces.count)))
+        commit()
+    }
+
+    // MARK: Sites that open in a space (#286)
+
+    /// Every site sent to a space, in the spaces' order.
+    var siteRoutes: [SiteRoutes.Route] { SiteRoutes.routes(in: spaces) }
+
+    /// The route that covers a page, if any.
+    func siteRoute(for url: URL?) -> SiteRoutes.Route? { SiteRoutes.route(for: url, in: siteRoutes) }
+
+    /// Sends `site` to a space from now on, or (nil) lets it open in any space again.
+    func setSiteRoute(_ site: String, to space: UUID?) {
+        guard space.map({ self.space($0) != nil }) ?? true else { return }
+        let next = SiteRoutes.setting(site, to: space, in: spaces)
+        guard next != spaces else { return }
+        spaces = next
         commit()
     }
 

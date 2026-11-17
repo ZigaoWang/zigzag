@@ -941,6 +941,37 @@ enum DebugBridge {
         case "newspace":
             let space = Library.shared.addSpace(name: arg.isEmpty ? nil : arg)
             controller.tabManager.switchToSpace(space.id)
+        // route <site> <space name|any>: the site always opens in that space (#286), or anywhere. routes: the list,
+        // and every window's spaces and tabs, in the log.
+        case "route":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            guard let site = f.first.flatMap(SiteRoutes.entry(from:)) else { break }
+            let name = f.count > 1 ? f[1] : "any"
+            Library.shared.setSiteRoute(site, to: Library.shared.spaces.first { $0.name == name }?.id)
+        // sendclick x y [cmd]: a click handed straight to the window (window points, top-left origin), for a copy that
+        // stays behind the app you're using, where posted events don't reach the page.
+        case "sendclick":
+            let f = arg.split(separator: " ").map(String.init)
+            guard f.count >= 2, let x = Double(f[0]), let y = Double(f[1]), let window = controller.window else { break }
+            let point = NSPoint(x: x, y: window.frame.height - y)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: point, modifierFlags: f.contains("cmd") ? [.command] : [],
+                                                  timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                  context: nil, eventNumber: 0, clickCount: 1, pressure: 1) { window.sendEvent(event) }
+            }
+        // linkroute <url> [new|bg] [signin]: a link clicked in the tab's page, as Tab hands it to its window once WebKit
+        // says you clicked it: a plain click, ⌘⇧-click (new) or ⌘-click (bg); falls back to loading it as a click would.
+        case "linkroute":
+            let f = arg.split(separator: " ").map(String.init)
+            guard let url = f.first.flatMap(URL.init(string:)), let tab = controller.tabManager.selectedTab else { break }
+            let newTab = f.contains("new") || f.contains("bg")
+            if !controller.tab(tab, routesLink: url, arrival: newTab ? .linkNewTab : .linkClick, inBackground: f.contains("bg")) {
+                if newTab { controller.tab(tab, openURL: url, disposition: f.contains("bg") ? .backgroundTab : .foregroundTab) } else { tab.load(url, by: .page) }
+            }
+        case "routes":
+            let list = Library.shared.siteRoutes.map { "\($0.site)→\(Library.shared.space($0.spaceID)?.name ?? "?")" }
+            let tabs = controller.tabManager.allTabs.map { "\(Library.shared.space($0.spaceID)?.name ?? "?"):\($0.url?.absoluteString ?? "-")" }
+            debugLog("routes [\(list.joined(separator: ", "))] shown=\(controller.tabManager.currentSpace.name) tabs=\(tabs)")
         case "spacehue": if let degrees = Double(arg) { Library.shared.setHue(degrees / 360, for: controller.tabManager.currentSpaceID) }
         case "spacedefaults":
             if let panel = SpaceEditorPanel.current { panel.useDefaultColors() } else { Library.shared.useDefaultColors(forSpace: controller.tabManager.currentSpaceID) }
@@ -2080,6 +2111,8 @@ enum DebugBridge {
         case "sidebarsize": if let size = Tokens.Sidebar.Size(rawValue: arg) { Tokens.Sidebar.size = size }
         case "newtabplace": if let place = TabManager.NewTabPlace(rawValue: arg) { TabManager.newTabPlace = place }
         case "sitepanel": SitePanel.toggle(in: controller, from: controller.sidebar.address)
+        // sitepanelrow <index> <row title>: a choice in the open panel's This Site row of that name.
+        case "sitepanelrow": SitePanel.shown?.debugChooseRow(arg)
         case "panesite", "panemore":
             // panesite <pane>: that split pane's Site Controls button, as a click on it (#160). panemore <pane>: its ⋯.
             let cards = controller.root.paneCards
