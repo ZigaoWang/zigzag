@@ -503,18 +503,36 @@ enum ArcImporter {
         var favorites: [Bookmark] = []
         var topIDs: [String] = []
         var topProfile: [String: String] = [:]
+        // Arc Sync keeps Favorites for profiles on other Macs, even when none of the displayed spaces uses them.
+        // A folder name alone isn't an identity: each Mac can have an unrelated "Profile 1".
+        let activeProfiles = Set(spaceList.map { sidebarProfile($0["profile"]) ?? SidebarProfile() })
+        var readProfiles = Set<SidebarProfile>()
+        // A marker matches a displayed space's profile exactly, or by folder where either side names no Mac.
+        func shown(_ profile: SidebarProfile) -> SidebarProfile? {
+            if activeProfiles.contains(profile) { return profile }
+            return activeProfiles.first { $0.folder == profile.folder && ($0.machineID == nil || profile.machineID == nil) }
+        }
         for copy in copies.reversed() {
             // Each profile's marker, then the ID of its Favorites container; only IDs name an item.
-            var current: String?
+            var current: SidebarProfile?, marked = false
+            var copiedProfiles = Set<SidebarProfile>()
             for value in copy.top {
                 if let id = value as? String, items[id] != nil {
                     guard !topIDs.contains(id) else { continue }
+                    if marked {
+                        guard let current = current.flatMap(shown), !readProfiles.contains(current) else { continue }
+                        copiedProfiles.insert(current)
+                    }
                     topIDs.append(id)
-                    if let current { topProfile[id] = current }
+                    if let folder = current?.folder { topProfile[id] = folder }
                 } else if !(value is String) {
-                    current = arcProfile(value)
+                    current = sidebarProfile(value)
+                    marked = true
                 }
             }
+            // The fullest copy's container wins, including an empty list after favorites were removed in Arc.
+            // Older formats without profile markers keep their existing import behavior.
+            readProfiles.formUnion(copiedProfiles)
         }
         for id in topIDs {
             let inside = bookmarks(under: id)
@@ -524,18 +542,29 @@ enum ArcImporter {
         return Sidebar(spaces: spaces, favorites: favorites, openTabs: open, profiles: profiles)
     }
 
-    /// The Arc profile a space's `profile` or a Favorites marker names: its folder ("Profile 1") for one made in
-    /// Arc, nil for Arc's default. Arc writes it as {"custom": {"_0": {"directoryBasename": "Profile 1"}}} or
-    /// {"default": {}}, sometimes wrapped once more.
-    static func arcProfile(_ marker: Any?, depth: Int = 0) -> String? {
+    /// The identity Arc uses in the sidebar. Its default profile has neither a folder nor a machine ID.
+    private struct SidebarProfile: Hashable {
+        var folder: String? = nil
+        var machineID: String? = nil
+    }
+
+    private static func sidebarProfile(_ marker: Any?, depth: Int = 0) -> SidebarProfile? {
         guard depth < 6, let dict = marker as? [String: Any] else { return nil }
         if let folder = dict["directoryBasename"] as? String {
-            return folder.isEmpty || folder == "Default" ? nil : folder
+            return folder.isEmpty || folder == "Default" ? SidebarProfile()
+                : SidebarProfile(folder: folder, machineID: dict["machineID"] as? String)
         }
-        for (key, value) in dict where key != "default" {
-            if let folder = arcProfile(value, depth: depth + 1) { return folder }
+        if dict["default"] != nil { return SidebarProfile() }
+        for value in dict.values {
+            if let profile = sidebarProfile(value, depth: depth + 1) { return profile }
         }
         return nil
+    }
+
+    /// The folder of the profile a space uses on this Mac, for its history and sign-ins. Arc wraps it as
+    /// {"custom": {"_0": {"directoryBasename": "Profile 1", "machineID": "…"}}}, sometimes wrapped once more.
+    static func arcProfile(_ marker: Any?, depth: Int = 0) -> String? {
+        sidebarProfile(marker, depth: depth)?.folder
     }
 
     // MARK: Open tabs
