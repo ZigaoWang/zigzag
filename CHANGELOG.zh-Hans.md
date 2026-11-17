@@ -32,6 +32,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 在 Zigzag Mini、已安装的网页 App，或隐藏了边栏的窗口里，网站有请求在等你时，窗口边缘会出现一条柔和的线，点一下就能把窗口带到前面来回答。感谢 [Lakeland97](https://github.com/Lakeland97)。([#284](https://github.com/ZigaoWang/zigzag/pull/284))
 
 ### 修复
+- 从 Arc 导入时，收藏会留在所显示空间所属的个人资料中，不再混入从其他 Mac 同步来的收藏或旧列表。每份个人资料里的同一页面只会添加一次。
 - 全屏时，显示边栏并打开“无边框页面”的情况下，网页碰到屏幕边缘的角现在是直角，不再是圆角、在右上角和右下角露出一小块边栏颜色的三角，没有打开网页或网页载入时最明显。在窗口里，网页的圆角跟着窗口本身的圆角走，不管 macOS 把窗口画得多圆。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
 - HLTV（hltv.org）不再显示博彩广告：网页两侧的广告栏、点一下就会打开博彩网站的背景图，以及标志旁边和侧栏里的横幅和赔率框都去掉了。新闻、比赛、比分和视频照常。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
 - 全屏时，跟着菜单栏一起出现的关闭、最小化和全屏按钮后面又有了一条栏，隐藏边栏时不会再直接浮在网页上。

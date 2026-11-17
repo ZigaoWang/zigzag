@@ -7,6 +7,25 @@ import Testing
 struct FavoriteTests {
     private let ids = (0..<5).map { _ in UUID() }
 
+    /// A repeated page is added once per profile, keeping the first name and its place in Arc's order.
+    @MainActor @Test func importingFavoritesDeduplicatesTheBatchWithinEachProfile() {
+        let library = Library.shared
+        let work = library.addProfile(name: "Favorite import Work"), home = library.addProfile(name: "Favorite import Home")
+        defer {
+            library.removeProfile(work.id); library.finishedRemovingProfile(work.id)
+            library.removeProfile(home.id); library.finishedRemovingProfile(home.id)
+        }
+        let mail = Bookmark(url: URL(string: "https://example.com/mail")!, title: "Mail")
+        let docs = Bookmark(url: URL(string: "https://example.com/docs")!, title: "Docs")
+        let repeated = Bookmark(url: mail.url, title: "Other name")
+        #expect(library.appendFavorites([mail, docs, repeated], in: work.id) == 2)
+        #expect(library.favorites(in: work.id).map(\.title) == ["Mail", "Docs"])
+        #expect(library.appendFavorites([mail, repeated, docs], in: work.id) == 0)
+        #expect(library.appendFavorites([repeated], in: home.id) == 1)
+        #expect(library.favorites(in: home.id).map(\.title) == ["Other name"])
+        #expect(library.favorites(in: work.id).map(\.title) == ["Mail", "Docs"])
+    }
+
     @Test func placesBeforeATile() {
         let order = Library.placing([ids[4]], atSlot: 1, in: Array(ids[0..<4]), splits: [])
         #expect(order == [ids[0], ids[4], ids[1], ids[2], ids[3]])

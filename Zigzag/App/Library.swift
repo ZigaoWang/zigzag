@@ -972,8 +972,8 @@ final class Library {
     /// Adds to a profile's favorites the ones it doesn't already have; returns how many that was.
     @discardableResult
     func appendFavorites(_ new: [Bookmark], in profile: UUID) -> Int {
-        let known = Set(favorites(in: profile).map { $0.url.absoluteString })
-        let added = new.filter { !known.contains($0.url.absoluteString) }
+        var known = Set(favorites(in: profile).map { $0.url.absoluteString })
+        let added = new.filter { known.insert($0.url.absoluteString).inserted }
         favorites += added
         for favorite in added { directory.assign(favorite: favorite.id, to: profile) }
         commit()
