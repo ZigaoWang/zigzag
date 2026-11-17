@@ -55,6 +55,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - Proton Pass 能用了：它的窗口不再说浏览器在激活它时遇到困难、让你更新浏览器，而是直接打开登录页。它启动后会把自己的扩展接口藏起来不让别的脚本用，在 Zigzag 里这样做会让它收不到自己的消息。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
 - 导入窗口里选了 Chrome 后，“导入”按钮不再跑到窗口底下点不到。屏幕放得下时，窗口会跟着你选的内容变高；放不下时，浏览器列表和选项可以滚动，“导入”和“以后”一直留在底部。感谢 [tachebleue](https://github.com/tachebleue)。([#293](https://github.com/ZigaoWang/zigzag/issues/293))
 - 网站的请求卡片（摄像头、位置、通知、弹出窗口等）现在会跟着下面的网页变成浅色或深色，和网页上方的栏一样，“仅此一次”的菜单也一样。以前在浅色的空间里，网站是深色的或者 Mac 开着深色模式，它还是浅色的。卡片显示时网页变了，它也会跟着变。感谢 [Lakeland97](https://github.com/Lakeland97)。([#300](https://github.com/ZigaoWang/zigzag/issues/300))
+- 后台的标签页正要进入睡眠或被关掉时，如果它的网站刚好把它转到另一个网站，Zigzag 不会再意外退出了，之前就有一次是在 Mac 唤醒后一两分钟发生的。网页还在载入的标签页现在会等它载入完再睡眠，Zigzag 不再需要的网页也会稍等一下再关掉，不再和 WebKit 撞在一起。感谢 [rcoopr](https://github.com/rcoopr)。([#305](https://github.com/ZigaoWang/zigzag/issues/305))
 
 ## [0.9.1] - 2026-11-16
 

@@ -461,3 +461,32 @@ enum PictureInPicture {
         if window.hidesOnDeactivate { window.hidesOnDeactivate = false }
     }
 }
+
+/// A page's web view Zigzag is done with (its tab closed, slept or rebuilt): kept until the next turn of the main
+/// loop, closed, then let go. Never freed inside a WebKit callback: WebKit in macOS 26.5 can be in the middle of
+/// putting the page's next site in a new process when its view goes, and then crashes without it (#305,
+/// https://bugs.webkit.org/show_bug.cgi?id=316686). Closed first, so a page something else still holds stops there.
+@MainActor
+enum PageRetirement {
+    private static var retiring: [WKWebView] = []
+
+    static func retire(_ webView: WKWebView) {
+        retiring.append(webView)
+        guard retiring.count == 1 else { return }
+        DispatchQueue.main.async { MainActor.assumeIsolated { closeRetired() } }
+    }
+
+    private static func closeRetired() {
+        let going = retiring
+        retiring = []
+        going.forEach(close)
+    }
+
+    private static let closeSelector = NSSelectorFromString("_close")
+
+    private static func close(_ webView: WKWebView) {
+        guard webView.responds(to: closeSelector) else { return }
+        typealias Close = @convention(c) (AnyObject, Selector) -> Void
+        unsafeBitCast(webView.method(for: closeSelector), to: Close.self)(webView, closeSelector)
+    }
+}

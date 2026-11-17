@@ -631,6 +631,9 @@ final class Tab: NSObject {
         guard sleepTicket == ticket, self.webView === webView else { return }
         sleepTicket += 1
         guard state?.hasTypedText != true else { return }
+        // A page on its way (a site sending it on after the Mac wakes) is let finish: the next look tries again (#305).
+        // Not one stuck in a loop.
+        guard !webView.isLoading || reason == EnergyWatch.sleepReason else { return }
         captureSnapshot { [weak self] in
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
@@ -728,6 +731,7 @@ final class Tab: NSObject {
         webView.owner = nil
         webView.removeFromSuperview()
         self.webView = nil
+        PageRetirement.retire(webView)
         isLoading = false
         isLeavingPage = false
         isPlayingAudio = false

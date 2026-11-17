@@ -27,6 +27,8 @@ nonisolated enum TabSleep {
         var isFavorite = false
         /// From a site kept awake in its site controls.
         var keptAwake = false
+        /// Its page is on its way: let it arrive first (#305).
+        var isLoading = false
     }
 
     /// What macOS last said of memory, within `MemoryPressure.lasts`.
@@ -49,7 +51,7 @@ nonisolated enum TabSleep {
         var out: [UUID] = []
         var keptAwake: UUID?
         let lowOnMemory = memory != .normal
-        for tab in tabs.sorted(by: { $0.unseen > $1.unseen }) where !tab.mustStay && !tab.hasTypedText {
+        for tab in tabs.sorted(by: { $0.unseen > $1.unseen }) where !tab.mustStay && !tab.hasTypedText && !tab.isLoading {
             if tab.keptAwake {
                 if memory == .critical, tab.unseen > lowOnMemoryIdle, keptAwake == nil { keptAwake = tab.id }
                 continue
