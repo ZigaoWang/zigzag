@@ -46,6 +46,23 @@ enum PopupNotice {
         }
     }
 
+    /// What a page's own pop-up asked for, as a page link. `window.open('')` arrives as an address with no scheme,
+    /// not nil, so an empty one is the blank page rather than something to refuse. `isBlank` covers about:blank too,
+    /// which is just as nameless: a stored answer must not use it to take a whole tab.
+    static func popupTarget(_ url: URL?) -> (url: URL, isBlank: Bool) {
+        guard let url, !url.absoluteString.isEmpty, let scheme = url.scheme, !scheme.isEmpty else {
+            return (URL(string: "about:blank")!, true)
+        }
+        return (url, url.absoluteString.lowercased() == "about:blank")
+    }
+
+    /// Whether a stored answer may open a pop-up that is a frame's or that names no address. Allow and Zigzag Mini
+    /// may; This Tab and New Tab may not, since either would move the page wholesale, and a frame or a blank window
+    /// can ask without a click.
+    static func storedDestinationMayOpen(_ destination: Destination, forBlankOrFrame: Bool) -> Bool {
+        !forBlankOrFrame || destination == .automatic || destination == .viewer
+    }
+
     /// Where a page's pop-up address may be opened: the same routing a page link takes, so a kept destination can
     /// never be used to open a data: page, a script or one of Zigzag's own at the top level.
     enum Route: Equatable { case open, app, refuse }

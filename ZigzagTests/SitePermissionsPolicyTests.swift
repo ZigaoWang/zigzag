@@ -379,6 +379,36 @@ import WebKit
         #expect(PopupNotice.route(URL(string: "file:///tmp/index.html")!, from: URL(string: "file:///tmp/page.html")) == .open)
     }
 
+    /// `window.open('')` reaches the delegate as an address with no scheme, not as nil, so an empty or scheme-less
+    /// address is the blank page. An allowed site's blank pop-up is then a web address like any other and opens.
+    @Test func aBlankPopupIsTheBlankPageNotARefusal() {
+        let blank = URL(string: "about:blank")!
+        let empty = PopupNotice.popupTarget(nil)
+        #expect(empty.url == blank)
+        #expect(empty.isBlank)
+        let schemeLess = PopupNotice.popupTarget(URL(string: "no-scheme"))
+        #expect(schemeLess.url == blank)
+        #expect(schemeLess.isBlank)
+        let aboutBlank = PopupNotice.popupTarget(blank)
+        #expect(aboutBlank.url == blank)
+        #expect(aboutBlank.isBlank)
+
+        let named = PopupNotice.popupTarget(URL(string: "https://example.com/x"))
+        #expect(named.url == URL(string: "https://example.com/x")!)
+        #expect(named.isBlank == false)
+        #expect(PopupNotice.route(empty.url, from: nil) == .open)
+
+        // An allowed site's blank pop-up may open; a frame's or a blank one may not use This Tab or New Tab, since
+        // either would move the page without a click.
+        #expect(PopupNotice.storedDestinationMayOpen(.automatic, forBlankOrFrame: true))
+        #expect(PopupNotice.storedDestinationMayOpen(.viewer, forBlankOrFrame: true))
+        #expect(PopupNotice.storedDestinationMayOpen(.thisTab, forBlankOrFrame: true) == false)
+        #expect(PopupNotice.storedDestinationMayOpen(.newTab, forBlankOrFrame: true) == false)
+        #expect(PopupNotice.storedDestinationMayOpen(.deny, forBlankOrFrame: true) == false)
+        #expect(PopupNotice.storedDestinationMayOpen(.thisTab, forBlankOrFrame: false))
+        #expect(PopupNotice.storedDestinationMayOpen(.newTab, forBlankOrFrame: false))
+    }
+
     /// The old store stays exactly what an older build reads: a [String: Bool] of plain yeses and nos. A destination
     /// or a handoff's choice keeps its own key beside it, so an action id never makes the Bool store unreadable.
     @Test func simpleAnswersStayReadableToAnOlderBuild() throws {

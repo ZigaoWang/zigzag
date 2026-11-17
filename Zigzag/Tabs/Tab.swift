@@ -2032,8 +2032,8 @@ extension Tab: WKUIDelegate {
             // banner asks and nothing opens now. Zigzag's own pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
             // A blank `window.open()` is a page link too: an allowed site keeps the open-blank-then-navigate pattern
-            // sign-ins and payments use. A page with no allowed site still has to name an address to be asked about.
-            let target = navigationAction.request.url ?? URL(string: "about:blank")!
+            // sign-ins and payments use. WebKit hands it over as a scheme-less address, not nil.
+            let (target, isBlank) = PopupNotice.popupTarget(navigationAction.request.url)
             // A page's pop-up is a page link like any other, kept answer or not: an app's address asks its own
             // question, and anything the web may not open top-level (data:, a script, a file) opens nowhere.
             switch PopupNotice.route(target, from: url) {
@@ -2053,9 +2053,15 @@ extension Tab: WKUIDelegate {
             case .open:
                 break
             }
-            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included.
+            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included,
+            // but only Allow and Zigzag Mini may open those: This Tab or New Tab from a frame or a blank window would
+            // move the page without a click.
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(url)) {
-                switch PopupNotice.destination(for: stored) {
+                let destination = PopupNotice.destination(for: stored)
+                guard PopupNotice.storedDestinationMayOpen(destination, forBlankOrFrame: isBlank || !navigationAction.sourceFrame.isMainFrame) else {
+                    return nil
+                }
+                switch destination {
                 case .deny:
                     return nil
                 case .automatic:
@@ -2073,11 +2079,11 @@ extension Tab: WKUIDelegate {
                     return nil
                 }
             }
-            // Only the page itself asks. A frame's pop-up — an ad in an iframe, say — is blocked without a word, as
-            // it was before the card, rather than putting a question up every few seconds over the page it's in.
-            guard navigationAction.request.url != nil, navigationAction.sourceFrame.isMainFrame else {
-                Diagnostics.note("Blocked a frame's pop-up", site: url?.host(),
-                                 "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
+            // Only the page itself asks, and only for an address: a frame's pop-up — an ad in an iframe, say — is
+            // blocked without a word, and there is nothing to ask about a blank window yet.
+            guard !isBlank, navigationAction.sourceFrame.isMainFrame else {
+                Diagnostics.note("Blocked a frame's or a blank pop-up", site: url?.host(),
+                                 "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             }
             return PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost,

@@ -341,7 +341,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             // inside one of them opened on its own was dropped with nothing said.
             let parent = WindowManager.shared.promptHost(for: parentWindow) ?? (opener?.host as? PromptHost)
             // A blank window.open() is a page link too: an allowed site keeps the open-blank-then-navigate pattern.
-            let target = navigationAction.request.url ?? URL(string: "about:blank")!
+            // WebKit hands it over as a scheme-less address, not nil.
+            let (target, isBlank) = PopupNotice.popupTarget(navigationAction.request.url)
             // The same routing as any other page link, kept answer or not: an app's address asks its own question, and
             // anything the web may not open top-level opens nowhere.
             switch PopupNotice.route(target, from: webView.url) {
@@ -360,10 +361,16 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             case .open:
                 break
             }
-            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included.
+            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included,
+            // but only Allow and Zigzag Mini may open those: This Tab or New Tab from a frame or a blank window would
+            // move the page without a click.
             var automatic = false
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
-                switch PopupNotice.destination(for: stored) {
+                let destination = PopupNotice.destination(for: stored)
+                guard PopupNotice.storedDestinationMayOpen(destination, forBlankOrFrame: isBlank || !navigationAction.sourceFrame.isMainFrame) else {
+                    return nil
+                }
+                switch destination {
                 case .deny:
                     return nil
                 case .viewer:
@@ -381,9 +388,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             guard automatic else {
                 // Only the page itself asks, never a frame in it: a frame's pop-up is blocked quietly here too. A
                 // blank address with no allowed site is not a question: there is nothing to ask about yet.
-                guard navigationAction.request.url != nil, navigationAction.sourceFrame.isMainFrame else {
-                    Diagnostics.note("Blocked a frame's pop-up", site: webView.url?.host(),
-                                     "\(navigationAction.request.url?.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                guard !isBlank, navigationAction.sourceFrame.isMainFrame else {
+                    Diagnostics.note("Blocked a frame's or a blank pop-up", site: webView.url?.host(),
+                                     "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                     return nil
                 }
                 // The question belongs to the tab whose page opened this pop-up, shown in that tab's window, which
@@ -426,7 +433,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if isHoldingFirstLoad {
             // Keep the first address only. A subframe load, or the opener sending the held window somewhere else
             // after `window.open('/a.html')`, must not change what the card asked about or what is revealed.
-            if heldRequest == nil {
+            // The first top-level address only: a subframe load must not become what the card asked about.
+            if heldRequest == nil, navigationAction.targetFrame?.isMainFrame ?? true {
                 heldRequest = navigationAction.request
             }
             return .cancel
