@@ -7867,7 +7867,7 @@
         }
       }
     },
-    "Forget the answer for every site" : {
+    "Forget the Answer for Every Site" : {
       "comment" : "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site.",
       "localizations" : {
         "zh-Hans" : {

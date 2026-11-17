@@ -3043,7 +3043,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             // it travels with the rule and is forgotten here rather than in a site's row.
             if let own = rule.handoffAnswer {
                 let forget = IconButton(symbol: "xmark", size: .compact,
-                                        toolTip: String(localized: "Forget the answer for every site", comment: "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site."))
+                                        toolTip: String(localized: "Forget the Answer for Every Site", comment: "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site."))
                 forget.onClick = { [weak self] _ in
                     var remembered = rule
                     remembered.handoffAnswer = nil
