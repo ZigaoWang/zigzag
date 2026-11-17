@@ -7039,7 +7039,7 @@
       }
     },
     "Every link and download goes to %@" : {
-      "comment" : "A download rule in a sentence: it catches every address. The placeholder is the rule's name — where the link goes.",
+      "comment" : "A download rule in a sentence: it catches every address. The placeholder is where the rule's action puts things: an app, a folder or a service.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7116,7 +7116,7 @@
       }
     },
     "Everything you download goes to %@" : {
-      "comment" : "A download rule in a sentence: it catches every address. The placeholder is the rule's name — where the link goes.",
+      "comment" : "A download rule in a sentence: it catches every address. The placeholder is where the rule's action puts things: an app, a folder or a service.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

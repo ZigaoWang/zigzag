@@ -218,9 +218,9 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         if match == .any {
             return applies == .downloads
                 ? String(localized: "Everything you download goes to \(goes)",
-                         comment: "A download rule in a sentence: it catches every address. The placeholder is the rule's name — where the link goes.")
+                         comment: "A download rule in a sentence: it catches every address. The placeholder is where the rule's action puts things: an app, a folder or a service.")
                 : String(localized: "Every link and download goes to \(goes)",
-                         comment: "A download rule in a sentence: it catches every address. The placeholder is the rule's name — where the link goes.")
+                         comment: "A download rule in a sentence: it catches every address. The placeholder is where the rule's action puts things: an app, a folder or a service.")
         }
         let files = applies == .downloads
             ? String(localized: "Files", comment: "The subject of a download rule's sentence, for a rule that catches downloads but not links.")
