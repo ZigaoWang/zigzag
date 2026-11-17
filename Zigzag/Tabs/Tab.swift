@@ -854,6 +854,10 @@ final class Tab: NSObject {
     /// navigation it just made, and that includes a download the navigation turns into. Cleared when the page
     /// commits, fails, or becomes a download.
     private var openedByRule = false
+    /// The address a download rule last sent this tab to. A navigation that fails is often only the one the rule's
+    /// own load replaced, which would clear `openedByRule` while the rule's load is still on its way; this outlives
+    /// that, so the address the rule opened is never offered to a rule again until a page arrives here.
+    private var ruleOpenedURL: URL?
     /// True when the handoff question for this navigation or download was put off. WebKit still makes the download,
     /// and the download manager must not put the same question up a second time for it.
     private var declinedRuleDownload = false
@@ -1515,6 +1519,7 @@ extension Tab: WKNavigationDelegate {
             declinedRuleDownload = false
             if ownSender == .rule {
                 openedByRule = true
+                ruleOpenedURL = navigationAction.request.url
             } else if [.linkActivated, .formSubmitted, .backForward, .reload].contains(navigationAction.navigationType) {
                 openedByRule = false
             }
@@ -1859,7 +1864,7 @@ extension Tab: WKNavigationDelegate {
                                  pageOrigin: String? = nil) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take. A page a rule opened is the rule's own
         // doing: the rule that took the address must not take it again, whether the page becomes a load or a download.
-        guard !openedByRule else { return false }
+        guard !openedByRule, !wasOpenedByRule(url) else { return false }
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
         // A link has no file name; a download's own name is what an earlier file-type destination matches, so the
         // handoff scan must see it and stand aside for that destination.
@@ -1898,8 +1903,14 @@ extension Tab: WKNavigationDelegate {
         }
     }
 
+    /// Whether `url` is the address a download rule last sent this tab to.
+    private func wasOpenedByRule(_ url: URL?) -> Bool {
+        guard let url, let opened = ruleOpenedURL else { return false }
+        return Self.sameAddress(opened, url)
+    }
+
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
-        let byRule = openedByRule
+        let byRule = openedByRule || wasOpenedByRule(download.originalRequest?.url)
         let declined = declinedRuleDownload
         openedByRule = false
         declinedRuleDownload = false
@@ -1908,7 +1919,7 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
-        let byRule = openedByRule
+        let byRule = openedByRule || wasOpenedByRule(download.originalRequest?.url)
         let declined = declinedRuleDownload
         openedByRule = false
         declinedRuleDownload = false
@@ -1936,6 +1947,7 @@ extension Tab: WKNavigationDelegate {
         // The rule-opened page is here, so its own links and downloads are its own again; a question declined for
         // this navigation has been answered by the page arriving.
         openedByRule = false
+        ruleOpenedURL = nil
         declinedRuleDownload = false
         forgetPageErrors()
         // The new page is here: its address shows.
