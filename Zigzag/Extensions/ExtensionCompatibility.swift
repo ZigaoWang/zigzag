@@ -174,18 +174,142 @@ nonisolated struct CompatibilityLimit: Hashable, Sendable {
 /// overlay; until a key has a localized string its fallback is shown.
 nonisolated enum CompatibilityText {
     static func text(for key: String?, fallback: String) -> String {
-        guard key != nil else { return fallback }
-        return fallback
+        guard let key else { return fallback }
+        switch key {
+        case "extension.limit.tabGroups":
+            return String(localized: "extension.limit.tabGroups", defaultValue: "Tab groups",
+                          comment: "A Chrome extension feature Zigzag cannot provide: grouping tabs.")
+        case "extension.limit.tabActions":
+            return String(localized: "extension.limit.tabActions", defaultValue: "Some tab actions",
+                          comment: "A Chrome extension feature Zigzag cannot provide: discarding, highlighting or scripting tabs.")
+        case "extension.limit.windowsPopup":
+            return String(localized: "extension.limit.windowsPopup", defaultValue: "Popup windows",
+                          comment: "A Chrome extension feature Zigzag limits: extension windows opened as popups.")
+        case "extension.limit.runtime":
+            return String(localized: "extension.limit.runtime", defaultValue: "Restarting Zigzag",
+                          comment: "A Chrome extension feature Zigzag cannot provide: restarting the browser or reading its package folder.")
+        case "extension.limit.action":
+            return String(localized: "extension.limit.action", defaultValue: "Toolbar button settings",
+                          comment: "A Chrome extension feature Zigzag limits: badge text colour and toolbar button settings.")
+        case "extension.limit.notifications":
+            return String(localized: "extension.limit.notifications", defaultValue: "Notifications",
+                          comment: "A Chrome extension feature Zigzag limits: notification buttons and settings.")
+        case "extension.limit.sidePanel":
+            return String(localized: "extension.limit.sidePanel", defaultValue: "Side panel",
+                          comment: "A Chrome extension feature Zigzag limits: the side panel's layout and open/close events.")
+        case "extension.limit.systemDisplay":
+            return String(localized: "extension.limit.systemDisplay", defaultValue: "Display information",
+                          comment: "A Chrome extension feature Zigzag limits: changing display settings.")
+        case "extension.limit.power":
+            return String(localized: "extension.limit.power", defaultValue: "Keeping your Mac awake",
+                          comment: "A Chrome extension feature Zigzag limits: reporting activity to keep the Mac awake.")
+        case "extension.limit.signIn":
+            return String(localized: "extension.limit.signIn", defaultValue: "Signing in with your account",
+                          comment: "A Chrome extension feature Zigzag limits: Chrome's own Google account sign-in.")
+        case "extension.limit.bookmarks":
+            return String(localized: "extension.limit.bookmarks", defaultValue: "Your bookmarks",
+                          comment: "A Chrome extension feature Zigzag limits: bookmark import and reorder events.")
+        case "extension.limit.downloads":
+            return String(localized: "extension.limit.downloads", defaultValue: "Downloads",
+                          comment: "A Chrome extension feature Zigzag limits: the download shelf, danger prompts and filename events.")
+        case "extension.limit.tabCapture":
+            return String(localized: "extension.limit.tabCapture", defaultValue: "Recording tabs",
+                          comment: "A Chrome extension feature Zigzag limits: tab video capture; audio is captured.")
+        case "extension.limit.cookies":
+            return String(localized: "extension.limit.cookies", defaultValue: "Cookie details",
+                          comment: "A Chrome extension feature Zigzag limits: cookie partition keys.")
+        case "extension.limit.hostAccessRequests":
+            return String(localized: "extension.limit.hostAccessRequests", defaultValue: "Site access requests",
+                          comment: "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.")
+        case "extension.limit.storage":
+            return String(localized: "extension.limit.storage", defaultValue: "Stored extension settings",
+                          comment: "A Chrome extension feature Zigzag emulates: managed extension storage.")
+        case "extension.limit.storageSync":
+            return String(localized: "extension.limit.storageSync", defaultValue: "Settings that stay on this Mac",
+                          comment: "A Chrome extension feature Zigzag limits: storage.sync keeps its settings on this Mac.")
+        case "extension.limit.localScripts":
+            return String(localized: "extension.limit.localScripts", defaultValue: "Scripts on local files",
+                          comment: "A Chrome extension feature Zigzag limits: registered content scripts that name file: pages.")
+        case "extension.limit.blockingRules":
+            return String(localized: "extension.limit.blockingRules", defaultValue: "Blocking rules",
+                          comment: "A Chrome extension feature Zigzag limits: switching individual network rules on and off.")
+        case "extension.limit.webRequestBlocking":
+            return String(localized: "extension.limit.webRequestBlocking", defaultValue: "Blocking requests the old way",
+                          comment: "A Chrome extension feature Zigzag cannot provide: blocking web requests with webRequest.")
+        case "extension.limit.languageDetection":
+            return String(localized: "extension.limit.languageDetection", defaultValue: "Language detection",
+                          comment: "A Chrome extension feature Zigzag cannot provide: i18n.detectLanguage.")
+        case "extension.limit.legacyExtension":
+            return String(localized: "extension.limit.legacyExtension", defaultValue: "Legacy extension APIs",
+                          comment: "A Chrome extension feature Chrome removed: the old chrome.extension namespace.")
+        case "extension.limit.sessions":
+            return String(localized: "extension.limit.sessions", defaultValue: "Closed tabs and sessions",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the sessions API.")
+        case "extension.limit.search":
+            return String(localized: "extension.limit.search", defaultValue: "Search settings",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the search API.")
+        case "extension.limit.debugger":
+            return String(localized: "extension.limit.debugger", defaultValue: "Debugging pages",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the debugger API.")
+        case "extension.limit.fontSettings":
+            return String(localized: "extension.limit.fontSettings", defaultValue: "Font settings",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the fontSettings API.")
+        case "extension.limit.privacySettings":
+            return String(localized: "extension.limit.privacySettings", defaultValue: "Privacy settings",
+                          comment: "A Chrome extension feature Zigzag cannot provide: changing the browser's privacy settings.")
+        case "extension.limit.management":
+            return String(localized: "extension.limit.management", defaultValue: "Managing other extensions",
+                          comment: "A Chrome extension feature Zigzag limits: listing and changing other extensions.")
+        case "extension.limit.pageCapture":
+            return String(localized: "extension.limit.pageCapture", defaultValue: "Saving pages",
+                          comment: "A Chrome extension feature Zigzag cannot provide: saving a page as MHTML.")
+        case "extension.limit.desktopCapture":
+            return String(localized: "extension.limit.desktopCapture", defaultValue: "Recording your screen",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the desktopCapture API.")
+        case "extension.limit.addressBarKeyword":
+            return String(localized: "extension.limit.addressBarKeyword", defaultValue: "Address bar keyword",
+                          comment: "A Chrome extension feature Zigzag cannot provide: an omnibox keyword.")
+        case "extension.limit.publicSuffix":
+            return String(localized: "extension.limit.publicSuffix", defaultValue: "Domain names",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the publicSuffix API.")
+        case "extension.limit.devtools":
+            return String(localized: "extension.limit.devtools", defaultValue: "Developer tools",
+                          comment: "A Chrome extension feature Zigzag cannot provide: extension DevTools panels.")
+        case "extension.limit.contentSettings":
+            return String(localized: "extension.limit.contentSettings", defaultValue: "Content settings",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the contentSettings API.")
+        case "extension.limit.readingList":
+            return String(localized: "extension.limit.readingList", defaultValue: "Reading list",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the readingList API.")
+        case "extension.limit.tts":
+            return String(localized: "extension.limit.tts", defaultValue: "Reading aloud",
+                          comment: "A Chrome extension feature Zigzag limits: extensions that are themselves a text-to-speech engine.")
+        case "extension.limit.geolocation":
+            return String(localized: "extension.limit.geolocation", defaultValue: "Your location",
+                          comment: "A Chrome extension feature Zigzag cannot provide: the geolocation permission.")
+        case "extension.limit.clipboardRead":
+            return String(localized: "extension.limit.clipboardRead", defaultValue: "Reading what you copy",
+                          comment: "A Chrome extension feature Zigzag cannot provide: reading the clipboard.")
+        case "extension.limit.proxyScripts":
+            return String(localized: "extension.limit.proxyScripts", defaultValue: "Proxy scripts (PAC)",
+                          comment: "A Chrome extension feature Zigzag cannot provide: proxy auto-config scripts, which choose a proxy for each site.")
+        case "extension.limit.deprecatedChannel":
+            return String(localized: "extension.limit.deprecatedChannel", defaultValue: "Deprecated Google APIs",
+                          comment: "A Chrome extension feature Chrome removed: its old Google messaging channels.")
+        default:
+            return fallback
+        }
     }
 }
 
 /// What an implementation may name: a handler the bridge answers (`swift:history`), or a name the corrections
-/// script writes (`js:setMember`, `js:cookies.onChanged`). Both are read from the code that would do the work, never
-/// listed a second time here.
+/// scripts write (`js:setMember`, `js:cookies.onChanged`). Both are read from the code that would do the work, never
+/// listed a second time here. `emulated` claims name the compatibility shim's members (`js:getSelf`,
+/// `js:managed`), which is where an emulation with no Chrome service lives.
 nonisolated struct CompatibilityImplementations: Sendable {
     /// The bridge's handler names, by the namespace an extension calls.
     let handlers: Set<String>
-    /// The corrections script's own source.
+    /// The corrections scripts' own source: `webkit-differences.js` and the compatibility shim.
     let script: String
     /// Every identifier the script writes, so a `js:` name is checked against what is there.
     private let symbols: Set<String>
@@ -196,12 +320,15 @@ nonisolated struct CompatibilityImplementations: Sendable {
         symbols = Self.identifiers(in: script)
     }
 
-    /// The app's own: the bridge's handlers and `webkit-differences.js` as it ships.
+    /// The app's own: the bridge's handlers, `webkit-differences.js` and the compatibility shim as they ship. The
+    /// shim answers the few members WebKit has no counterpart for but Chrome still describes (`management.getSelf`,
+    /// `storage.managed`), so an `emulated` claim names it rather than a correction it never wrote.
     @MainActor
     static func shipped(bundle: Bundle = .main) -> CompatibilityImplementations {
-        let script = bundle.url(forResource: "webkit-differences", withExtension: "js")
+        let differences = bundle.url(forResource: "webkit-differences", withExtension: "js")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-        return CompatibilityImplementations(handlers: ExtensionBridge.handlerNames, script: script)
+        return CompatibilityImplementations(handlers: ExtensionBridge.handlerNames,
+                                            script: differences + "\n" + ExtensionShims.compatibility)
     }
 
     /// Whether an implementation names something that exists. A dotted `js:` name is checked part by part, as in

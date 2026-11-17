@@ -288,4 +288,241 @@ struct ExtensionCompatibilityTests {
         #expect(byCatalog["extension.limit.gone"]?.status == .deprecated)
         #expect(!byCatalog.keys.contains("extension.limit.omnibox"))
     }
+
+    // MARK: The seeded overlay
+
+    private func shipped() throws -> (overlay: CompatibilityOverlay, universe: ChromeUniverse) {
+        let overlay = try #require(ExtensionCompatibility.shared.overlay,
+                                   "compatibility.json must ship with the app")
+        let universe = try #require(ExtensionCompatibility.shared.universe,
+                                    "chrome-api.json must ship with the app")
+        return (overlay, universe)
+    }
+
+    /// Every claim, nested members flattened to their canonical path.
+    private func flatten(_ claims: [String: CompatibilityClaim], prefix: String = "")
+        -> [(path: String, claim: CompatibilityClaim)] {
+        claims.flatMap { name, claim in
+            let path = prefix.isEmpty ? name : "\(prefix).\(name)"
+            return [(path, claim)] + flatten(claim.members ?? [:], prefix: path)
+        }
+        .sorted { $0.path < $1.path }
+    }
+
+    /// The app's string catalog. The local gate copies the test file out of the repository, so `ZZ_REPO` names it;
+    /// an Xcode build compiles it in place, where `#filePath` does.
+    private static var repo: URL {
+        if let path = ProcessInfo.processInfo.environment["ZZ_REPO"], !path.isEmpty {
+            return URL(fileURLWithPath: path)
+        }
+        return URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    }
+
+    private static func stringCatalog() throws -> [String: Any] {
+        let data = try Data(contentsOf: repo.appendingPathComponent("Zigzag/Resources/Localizable.xcstrings"))
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return json?["strings"] as? [String: Any] ?? [:]
+    }
+
+    @MainActor @Test func everyNamespaceZigzagImplementsIsClaimed() throws {
+        let (overlay, universe) = try shipped()
+        let implemented = [
+            "alarms", "commands", "i18n", "storage", "webNavigation",
+            "tabs", "windows", "runtime", "action", "contextMenus", "cookies", "permissions",
+            "scripting", "declarativeNetRequest", "webRequest",
+            "history", "topSites", "bookmarks", "downloads", "notifications", "idle", "tts",
+            "offscreen", "identity", "sidePanel", "proxy", "tabCapture", "userScripts",
+            "system.display", "power", "extension",
+        ]
+        for namespace in implemented {
+            #expect(universe.contains(namespace), "\(namespace) is not in chrome-api.json")
+            #expect(overlay.claims[namespace] != nil, "\(namespace) is reachable but unclaimed")
+        }
+        // Every bridge handler that answers an extension's namespace has a claim. `contexts` answers
+        // runtime.getContexts and `contextMenusKept` answers contextMenus; the favicon and fetch handlers are
+        // Zigzag's own plumbing, not a Chrome namespace.
+        for handler in ExtensionBridge.handlerNames {
+            switch handler {
+            case "contexts":
+                #expect(overlay.claims["runtime"]?.members?["getContexts"]?.status == .bridged)
+            case "contextMenusKept":
+                #expect(overlay.claims["contextMenus"] != nil)
+            case "favicons", "extensionFetch":
+                continue
+            default:
+                #expect(overlay.claims[handler] != nil, "bridge handler \(handler) has no namespace claim")
+            }
+        }
+    }
+
+    @Test func everyKnownPermissionHasAClaim() throws {
+        let (overlay, _) = try shipped()
+        // The old limitNames table's keys, verbatim. ExtensionReport keeps it private, so the union the plan names
+        // is written here; a permission added to either table without a claim fails this test.
+        let oldLimitKeys: Set<String> = [
+            "sidePanel", "identity", "identity.email", "notifications", "downloads", "downloads.open",
+            "idle", "offscreen", "webRequestBlocking", "history", "bookmarks", "topSites", "tabGroups",
+            "fontSettings", "tts", "ttsEngine", "geolocation", "clipboardRead", "management", "privacy",
+            "debugger", "pageCapture", "desktopCapture", "tabCapture", "system.display", "power",
+        ]
+        let known = oldLimitKeys.union(ExtensionReport.askedPermissions)
+        #expect(known.count == 40)
+        for permission in known.sorted() {
+            #expect(overlay.permissions[permission] != nil, "\(permission) has no install-sheet row")
+        }
+    }
+
+    @MainActor @Test func everyClaimedImplementationInTheShippedOverlayExists() throws {
+        let (overlay, universe) = try shipped()
+        let implementations = CompatibilityImplementations.shipped()
+        var problems: [String] = []
+        for (path, claim) in flatten(overlay.claims) {
+            if !universe.contains(path) { problems.append("\(path) is not in Chrome's API") }
+            switch claim.status {
+            case .patched, .bridged, .emulated:
+                guard let implementation = claim.implementation, !implementation.isEmpty else {
+                    problems.append("\(path) is \(claim.status.rawValue) but names no implementation")
+                    continue
+                }
+                if !implementations.implements(implementation) {
+                    problems.append("\(path) names \(implementation), which does not exist")
+                }
+            case .unsupported, .deprecated:
+                if claim.reason == nil {
+                    problems.append("\(path) is \(claim.status.rawValue) but gives no reason")
+                }
+                if claim.group == nil {
+                    problems.append("\(path) is \(claim.status.rawValue) but names no group")
+                }
+            case .native:
+                break
+            }
+        }
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    @Test func everyGroupResolvesToACatalogEntry() throws {
+        let (overlay, _) = try shipped()
+        var groups: Set<String> = []
+        for (_, claim) in flatten(overlay.claims) {
+            if let group = claim.group { groups.insert(group) }
+        }
+        for row in overlay.permissions.values {
+            if let group = row.group { groups.insert(group) }
+        }
+        for row in overlay.manifest.values {
+            if let group = row.group { groups.insert(group) }
+        }
+        let registry = CompatibilityRegistry(overlay: overlay)
+        for row in overlay.permissions.values where row.status == .partial {
+            for path in row.claims ?? [] {
+                if let group = registry.claim(for: path)?.group { groups.insert(group) }
+            }
+        }
+        #expect(!groups.isEmpty)
+        for group in groups.sorted() {
+            #expect(overlay.groups[group]?.catalog.isEmpty == false,
+                    "\(group) has no catalog key")
+        }
+        for (name, group) in overlay.groups {
+            #expect(!group.catalog.isEmpty, "\(name) has an empty catalog key")
+        }
+    }
+
+    @Test func everyLimitCatalogKeyIsTranslated() throws {
+        let (overlay, _) = try shipped()
+        var keys = Set(overlay.groups.values.map(\.catalog))
+        for row in overlay.permissions.values {
+            if let catalog = row.catalog { keys.insert(catalog) }
+        }
+        for row in overlay.manifest.values {
+            if let catalog = row.catalog { keys.insert(catalog) }
+        }
+        let catalog = try Self.stringCatalog()
+        var unwritten: [String] = []
+        var untranslated: [String] = []
+        for key in keys.sorted() {
+            let sentinel = "⟨no catalog text⟩"
+            if CompatibilityText.text(for: key, fallback: sentinel) == sentinel { unwritten.append(key) }
+            let value = ((((catalog[key] as? [String: Any])?["localizations"] as? [String: Any])?["zh-Hans"]
+                as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String
+            if value?.isEmpty != false { untranslated.append(key) }
+        }
+        #expect(!keys.isEmpty)
+        #expect(unwritten.isEmpty, "No CompatibilityText case for: \(unwritten)")
+        #expect(untranslated.isEmpty, "No zh-Hans value for: \(untranslated)")
+
+        // The lines a person already saw keep the old wording as their English.
+        let oldWording: [String: String] = [
+            "extension.limit.sidePanel": "Side panel",
+            "extension.limit.signIn": "Signing in with your account",
+            "extension.limit.notifications": "Notifications",
+            "extension.limit.downloads": "Downloads",
+            "extension.limit.webRequestBlocking": "Blocking requests the old way",
+            "extension.limit.bookmarks": "Your bookmarks",
+            "extension.limit.tabGroups": "Tab groups",
+            "extension.limit.fontSettings": "Font settings",
+            "extension.limit.tts": "Reading aloud",
+            "extension.limit.geolocation": "Your location",
+            "extension.limit.clipboardRead": "Reading what you copy",
+            "extension.limit.management": "Managing other extensions",
+            "extension.limit.privacySettings": "Privacy settings",
+            "extension.limit.debugger": "Debugging pages",
+            "extension.limit.pageCapture": "Saving pages",
+            "extension.limit.desktopCapture": "Recording your screen",
+            "extension.limit.tabCapture": "Recording tabs",
+            "extension.limit.systemDisplay": "Display information",
+            "extension.limit.power": "Keeping your Mac awake",
+            "extension.limit.proxyScripts": "Proxy scripts (PAC)",
+            "extension.limit.addressBarKeyword": "Address bar keyword",
+        ]
+        for (key, wording) in oldWording {
+            #expect(CompatibilityText.text(for: key, fallback: "⟨fallback⟩") == wording, "\(key)")
+            #expect(keys.contains(key), "\(key) is not in the catalog")
+        }
+    }
+
+    @Test func everyPermissionRowWordsItsLines() throws {
+        let (overlay, _) = try shipped()
+        let compatibility = ExtensionCompatibility(overlay: overlay)
+        for (name, row) in overlay.permissions {
+            let limits = compatibility.limits(forPermissions: [name], manifestKeys: [])
+            switch row.status {
+            case .supported:
+                #expect(limits.isEmpty, "\(name) is supported but has a limit line")
+            case .partial:
+                #expect(!limits.isEmpty, "\(name) is partial but has no limit line")
+                #expect(limits.allSatisfy { $0.status == .partial }, "\(name) has a line that is not partial")
+            case .unsupported, .deprecated:
+                #expect(limits.count == 1, "\(name) should have one line, not \(limits.count)")
+                #expect(limits.first?.status == row.status)
+            }
+            for limit in limits {
+                #expect(limit.catalogKey != nil, "\(name) has a line with no catalog key")
+                #expect(limit.text != "", "\(name) has an empty line")
+            }
+        }
+        let omnibox = compatibility.limits(forPermissions: [], manifestKeys: ["omnibox"])
+        #expect(omnibox.count == 1)
+        #expect(omnibox.first?.catalogKey == "extension.limit.addressBarKeyword")
+        #expect(omnibox.first?.text == "Address bar keyword")
+    }
+
+    @MainActor @Test func aClaimCannotGrantAnything() throws {
+        let (overlay, _) = try shipped()
+        let handlers = ExtensionBridge.handlerNames
+        let permissions = ExtensionBridgeScript.permissions
+        let granted = ExtensionBridgeScript.granted
+        let registry = CompatibilityRegistry(overlay: overlay)
+        let compatibility = ExtensionCompatibility(overlay: overlay)
+        _ = compatibility.limits(forPermissions: Set(overlay.permissions.keys),
+                                  manifestKeys: Set(overlay.manifest.keys))
+        // The registry's only surface is claimedPaths, claim(for:) and status(of:): there is no setter for a
+        // permission's state, so reading the overlay cannot grant, widen or drop one.
+        #expect(registry.claim(for: "history")?.status == .bridged)
+        #expect(CompatibilityRegistry(overlay: overlay).claimedPaths == registry.claimedPaths)
+        #expect(ExtensionBridge.handlerNames == handlers)
+        #expect(ExtensionBridgeScript.permissions == permissions)
+        #expect(ExtensionBridgeScript.granted == granted)
+    }
 }
