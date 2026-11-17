@@ -44,6 +44,10 @@ struct SettingsLayoutTests {
     /// middle, so a label is set that much higher than its line box would be, in a container counting from the top
     /// or from the bottom, on the screen's pixels.
     @Test func labelsCenterTheirCapitals() {
+        // Where the letters land is a sub-pixel offset: on a display with no sub-pixels to speak of it rounds away
+        // and the two positions measured below come out equal, so there is nothing here to measure. Upstream runs
+        // this on Retina; a CI runner has no screen at all, and reports none.
+        guard (NSScreen.main?.backingScaleFactor ?? 1) >= 2 else { return }
         let font = Tokens.Font.control()
         final class Flipped: NSView { override var isFlipped: Bool { true } }
         let height = Tokens.Page.controlHeight
@@ -150,5 +154,47 @@ struct SettingsLayoutTests {
         label.stringValue = "Fits"
         label.fadeTail()
         #expect(label.layer?.mask == nil)
+    }
+
+    /// A row puts its control where the control's own width says. A field is filled by the space it's given, so
+    /// nothing else would ever give it one, and it drew at no width: a row holding one (the test address under the
+    /// download rules) showed the words and no field to type in.
+    @Test func aFieldInARowIsGivenRoomToDraw() async throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView?.wantsLayer = true
+        let settings = SettingsView(pane: .downloads)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        window.contentView?.addSubview(settings)
+        settings.layoutSubtreeIfNeeded()
+
+        let pane = try #require(settings.subviews.compactMap { $0 as? NSScrollView }.last?.documentView)
+        var fields: [FilledField] = []
+        func collect(_ view: NSView) {
+            if let field = view as? FilledField { fields.append(field) }
+            view.subviews.forEach(collect)
+        }
+        collect(pane)
+        #expect(!fields.isEmpty)
+        for field in fields {
+            #expect(field.frame.width > 0)
+            #expect(field.frame.height > 0)
+        }
+    }
+
+    /// A form sheet lays its rows out by frame. A row holding a field with a Choose… button beside it must give the
+    /// button its width inside the row: `NSStackView(views:)` turns autoresizing off, so a stack left to itself sizes
+    /// to its content (the field's own width plus the button) and the button is drawn past the row's end, unseen.
+    @Test func aFieldBesideAButtonKeepsTheButtonInsideTheRow() {
+        let field = FilledField(placeholder: "example.com")
+        let button = PillButton(title: "Choose…")
+        let stack = DownloadRuleSheet.stack(field, button)
+        let rowWidth: CGFloat = 216
+        stack.frame = NSRect(x: 0, y: 0, width: rowWidth, height: Tokens.Metric.controlHeight)
+        stack.layoutSubtreeIfNeeded()
+        #expect(stack.frame.width == rowWidth, "the stack took the row's width")
+        #expect(field.frame.width > 0)
+        #expect(button.frame.width > 0, "the button was given room")
+        #expect(field.frame.minX >= -0.5)
+        #expect(button.frame.maxX <= rowWidth + 0.5, "the button sits inside the row, not past its end")
     }
 }

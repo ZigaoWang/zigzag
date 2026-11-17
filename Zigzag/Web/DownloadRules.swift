@@ -112,18 +112,6 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             }
         }
 
-        /// The short form a rule's row shows beside its name.
-        var shortTitle: String {
-            switch self {
-            case .startsWith: String(localized: "starts with", comment: "A rule's kind, in its row in Settings › Downloads.")
-            case .contains: String(localized: "contains", comment: "A rule's kind, in its row in Settings › Downloads.")
-            case .endsWith: String(localized: "ends with", comment: "A rule's kind, in its row in Settings › Downloads.")
-            case .regex: String(localized: "matches", comment: "A rule's kind, in its row in Settings › Downloads, before a regular expression.")
-            case .fileType: String(localized: "file type", comment: "A rule's kind, in its row in Settings › Downloads: it catches a file by its extension.")
-            case .any: String(localized: "any address", comment: "A rule's kind, in its row in Settings › Downloads: the catch-all.")
-            }
-        }
-
         /// The extensions a `fileType` pattern names: comma-separated, whitespace and a leading dot tolerated. The
         /// extension is the part after the dot (`tar.gz` is one), so a name matches when it ends in `.<extension>`.
         static func extensions(in pattern: String) -> [String] {
@@ -220,13 +208,47 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    /// What the row says it catches.
-    var matchSummary: String {
+    /// The rule in a sentence, as its row in Settings › Downloads says it: "Files ending in .torrent go to
+    /// rTorrent". It ends where the rule's action puts things — an app, a folder or a service — not with the rule's
+    /// own name, which the row already shows above.
+    var summarySentence: String {
+        // A file-type rule is a per-extension destination, whose row says the types and where they go.
+        if match == .fileType { return destinationSentence }
+        let goes = action.summary
+        if match == .any {
+            return applies == .downloads
+                ? String(localized: "Everything you download goes to \(goes)",
+                         comment: "A download rule in a sentence: it catches every address. The placeholder is where the rule's action puts things: an app, a folder or a service.")
+                : String(localized: "Every link and download goes to \(goes)",
+                         comment: "A download rule in a sentence: it catches every address. The placeholder is where the rule's action puts things: an app, a folder or a service.")
+        }
+        let files = applies == .downloads
+            ? String(localized: "Files", comment: "The subject of a download rule's sentence, for a rule that catches downloads but not links.")
+            : String(localized: "Files and links", comment: "The subject of a download rule's sentence, for a rule that catches links as well as downloads.")
+        let catches: String
         switch match {
-        case .fileType: return DownloadRule.Match.extensions(in: pattern).joined(separator: ", ")
-        case .any: return Match.any.shortTitle
-        case .regex: return "\(Match.regex.shortTitle) \(pattern)"
-        default: return "\(match.shortTitle) \(pattern)"
+        case .startsWith:
+            catches = String(localized: "\(files) starting with \(pattern)", comment: "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the beginning of the address.")
+        case .contains:
+            catches = String(localized: "\(files) whose address contains \(pattern)", comment: "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the text looked for in the address.")
+        case .endsWith:
+            catches = String(localized: "\(files) ending in \(pattern)", comment: "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the end of the address, such as .torrent.")
+        case .regex:
+            catches = String(localized: "\(files) matching \(pattern)", comment: "Part of a download rule's sentence: what it catches by regular expression. The first placeholder is “Files” or “Files and links”, the second the expression.")
+        case .fileType, .any:
+            catches = files
+        }
+        switch action.kind {
+        case .jsonRPC:
+            return String(localized: "\(catches) go to \(goes)", comment: "A download rule in a sentence: what it catches, then the service it sends it to. The placeholders are the two parts, as in “Files ending in .torrent” and “rTorrent”.")
+        case .openApp, .openURL:
+            return String(localized: "\(catches) open in \(goes)", comment: "A download rule in a sentence: what it catches, then the app it opens in. The placeholders are the two parts.")
+        case .runScript:
+            return String(localized: "\(catches) are handed to \(goes)", comment: "A download rule in a sentence: what it catches, then the script it is given to. The placeholders are the two parts.")
+        case .saveToFolder:
+            return String(localized: "\(catches) are saved to \(goes)", comment: "A download rule in a sentence: what it catches, then the folder its files are saved into. The placeholders are the two parts.")
+        case .openFile:
+            return String(localized: "\(catches) open in your Mac’s app", comment: "A download rule in a sentence: what it catches, then that the Mac's own app opens it.")
         }
     }
 
@@ -429,6 +451,14 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
     }
 
+    /// Whether the service's endpoint is an address it could be reached at: it needs a scheme. `URL(string:)` is
+    /// forgiving — it parses `bing.com`, and a bare word — so scheme-less text is not an address a request could go
+    /// to, and a rule that couldn't work is never saved quietly.
+    var endpointIsUsable: Bool {
+        guard let url = URL(string: rpcEndpoint), let scheme = url.scheme, !scheme.isEmpty else { return false }
+        return true
+    }
+
     /// Whether the action has what it needs to run.
     var isComplete: Bool {
         switch kind {
@@ -441,7 +471,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .runScript:
             return !scriptPath.isEmpty
         case .jsonRPC:
-            return !rpcEndpoint.isEmpty && URL(string: rpcEndpoint) != nil && !rpcMethod.isEmpty
+            return endpointIsUsable && !rpcMethod.isEmpty
         case .saveToFolder:
             return !folderPath.isEmpty
         case .openFile:

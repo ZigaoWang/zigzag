@@ -339,7 +339,7 @@ struct DownloadRuleTests {
         #expect(DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "myapp://add?u={encoded_link}" }, values: values))
         #expect(DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "http://127.0.0.1:8080/add?u={encoded_link}" }, values: values))
         #expect(!DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "https://evil.example/?c={cookie_header}" }, values: values))
-        #expect(!DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "https://evil.example/rpc" }, values: values))
+        #expect(!DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "https://seedbox.example/rpc" }, values: values))
         #expect(DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc" }, values: values))
     }
 
@@ -638,6 +638,33 @@ struct DownloadRuleTests {
         #expect(decoded.first?.action.destination == .folder("/Users/me/Downloads/PDFs"))
     }
 
+    /// Everything holding a rule's Add button back, in the order the form is filled in: the button's own words and the
+    /// fields it marks come from this one list, so the two can never disagree.
+    @Test func aRuleSaysEverythingHoldingAddBack() {
+        var mine = rule(.contains, "")
+        mine.name = ""
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).map(\.field) == [.name, .pattern, .action(.url)])
+
+        // While you type, only what you have already filled in wrong is said: a pattern you haven't reached isn't.
+        mine.name = "Torrents"
+        #expect(DownloadRuleSheet.heldUp(mine, all: false).map(\.field) == [.action(.url)])
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).map(\.field) == [.pattern, .action(.url)])
+
+        mine.pattern = "torrent"
+        mine.action.urlTemplate = "mpd://{link}"
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
+
+        // A broken expression is worth saying whether or not you are hovering.
+        mine.match = .regex
+        mine.pattern = "(["
+        #expect(DownloadRuleSheet.heldUp(mine, all: false).map(\.field) == [.pattern])
+
+        // An `any` rule needs no pattern at all.
+        mine.match = .any
+        mine.pattern = ""
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
+    }
+
     // MARK: The file a rule is saved in
 
     @Test func aRuleSurvivesItsJSON() throws {
@@ -778,4 +805,36 @@ struct DownloadRuleTests {
         #expect(named.first?.path == mine.appendingPathComponent("Alpha.app").path)
     }
 
+    // MARK: A rule that can't be saved yet
+
+    /// The field a rule's action still needs something in, which its sheet marks so a greyed Add button says which
+    /// one is holding it up. The plainest case is an address with no scheme: `bing.com` parses, but nothing could
+    /// open it, so the rule isn't complete and the address field is the one to fill.
+    @Test func anActionThatCannotRunNamesTheFieldHoldingItUp() {
+        var open = DownloadRuleAction(kind: .openURL)
+        #expect(DownloadRuleSheet.actionHoldUp(open)?.field == .url)
+        open.urlTemplate = "bing.com"
+        #expect(DownloadRuleSheet.actionHoldUp(open)?.field == .url)
+        open.urlTemplate = "mpv://{encoded_link}"
+        #expect(DownloadRuleSheet.actionHoldUp(open) == nil)
+
+        var app = DownloadRuleAction(kind: .openApp)
+        #expect(DownloadRuleSheet.actionHoldUp(app)?.field == .app)
+        app.appPath = "/Applications/VLC.app"
+        #expect(DownloadRuleSheet.actionHoldUp(app) == nil)
+
+        var script = DownloadRuleAction(kind: .runScript)
+        #expect(DownloadRuleSheet.actionHoldUp(script)?.field == .script)
+        script.scriptPath = "/usr/bin/true"
+        #expect(DownloadRuleSheet.actionHoldUp(script) == nil)
+
+        var rpc = DownloadRuleAction(kind: .jsonRPC)
+        #expect(DownloadRuleSheet.actionHoldUp(rpc)?.field == .endpoint)
+        rpc.rpcEndpoint = "not an address"
+        #expect(DownloadRuleSheet.actionHoldUp(rpc)?.field == .endpoint)
+        rpc.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc"
+        #expect(DownloadRuleSheet.actionHoldUp(rpc)?.field == .method)
+        rpc.rpcMethod = "aria2.addUri"
+        #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
+    }
 }

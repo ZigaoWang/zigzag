@@ -1159,12 +1159,17 @@ final class FilledField: NSView {
     /// panel's field is a soft fill. A page's header sets it for its search.
     var isOutlined = false { didSet { updateColors(); needsLayout = true } }
 
+    /// What's in it is wrong for what it's for: its edge takes the warning color until it's right again, so a form
+    /// that can't be confirmed says which field is holding it up instead of leaving its button dead unexplained.
+    var isInvalid = false { didSet { guard isInvalid != oldValue else { return }; updateColors() } }
+
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.backgroundColor = (isOutlined ? Tokens.Color.controlFill : Tokens.Color.fieldFill).cgColor
             let ring = (tint ?? Brand.Theme.for(self).accent).withAlphaComponent(Tokens.Color.focusAlpha)
-            layer?.borderColor = (isEditing ? ring : isOutlined ? Tokens.Color.controlEdge : .clear).cgColor
-            layer?.borderWidth = isEditing ? 1.5 : isOutlined ? Tokens.Metric.hairline : 1.5
+            layer?.borderColor = (isInvalid ? Tokens.Color.destructive
+                                             : isEditing ? ring : isOutlined ? Tokens.Color.controlEdge : .clear).cgColor
+            layer?.borderWidth = isInvalid || isEditing ? 1.5 : isOutlined ? Tokens.Metric.hairline : 1.5
             layer?.shadowOpacity = isOutlined ? 1 : 0
             layer?.shadowColor = Tokens.Color.controlShadow.cgColor
             layer?.shadowRadius = Tokens.Shadow.controlRadius
@@ -2058,7 +2063,6 @@ final class MenuPanel: FloatingPanelView {
 final class StatusLabel: NSView {
     private let check = NSImageView()
     private let label: Label
-
     init(_ text: String, symbol: String = "checkmark.circle.fill") {
         label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
