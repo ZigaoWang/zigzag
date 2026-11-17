@@ -67,18 +67,32 @@ def is_primitive(kind):
 
 
 def split_bases(text):
-    return [base.strip() for base in text.split(",") if base.strip()]
+    """The plain interface names in an `extends` list. A generic contract (`Omit<T, "k">`, `Array<T>`) is not a base
+    this document can resolve, so it is dropped rather than guessing the members it adds or removes."""
+    bases = []
+    depth = 0
+    current = ""
+    for char in text:
+        if char in "<([":
+            depth += 1
+        elif char in ">)]":
+            depth -= 1
+        if char == "," and depth == 0:
+            bases.append(current)
+            current = ""
+            continue
+        current += char
+    bases.append(current)
+    return [base for base in (b.strip() for b in bases) if re.fullmatch(r"[\w.]+", base)]
 
 
 def add_const(spec, name, kind):
-    """A namespace const: an event, a constant, or a runtime object. Firefox types give a constant no value."""
+    """A namespace const: an event or a runtime object. Never a constant: Firefox's types declare `const TAB_ID_NONE:
+    number` and give no value, and a wrong value (`"number"`) installed by api-surface.js is worse than an absent one."""
     kind = re.sub(r"\s*\|\s*undefined\s*$", "", kind.strip()).strip().strip("|").strip()
     if is_event(kind):
         spec["events"].append(name)
-    elif is_primitive(kind):
-        # The declared type is all this document can hold for `const TAB_ID_NONE: number`. A claim needs the path.
-        spec["constants"][name] = kind
-    else:
+    elif not is_primitive(kind):
         spec["objects"].append([name, kind])
 
 
@@ -159,13 +173,16 @@ def parse(text):
             match = re.match(r"function (\w+)\s*[(<]", line)
             if match and match.group(1) not in e["functions"]:
                 e["functions"].append(match.group(1))
-            match = re.match(r"const (\w+):\s*$", line)
+            match = re.match(r"const (\w+):\s*(.*)$", line)
             if match:
-                pending = ["const", e, match.group(1), [line], braces(line)]
-                continue
-            match = re.match(r"const (\w+):\s*(.+?);", line)
-            if match:
-                add_const(e, match.group(1), match.group(2))
+                # A declaration that ends on this line is complete; one that runs on — a multi-line event type, a
+                # union ending in `| undefined`, or an object spelled out below — is gathered until its `;`.
+                rest = match.group(2)
+                if ";" in rest and braces(line) == 0:
+                    add_const(e, match.group(1), rest.split(";", 1)[0])
+                else:
+                    pending = ["const", e, match.group(1), [line], braces(line)]
+                    continue
             match = re.match(r"type (\w+) =", line)
             if match:
                 pending = ["type", e, match.group(1), [line], braces(line)]
@@ -176,11 +193,11 @@ def parse(text):
                     while len(stack) > 1 and depth < stack[-1][2]:
                         stack.pop()
                 continue
-            match = re.match(r"interface (\w+)(?:<[^>]*>)?(?:\s+extends\s+([\w.,\s]+))? \{", line)
+            match = re.match(r"interface (\w+)(?:<[^>]*>)?(?:\s+extends\s+(.+?))?\s*\{", line)
             if match:
                 key = (ns + "." if ns else "") + match.group(1)
                 stack.append(("interface", key, depth + 1))
-                interfaces.setdefault(key, {"functions": [], "events": [], "constants": {},
+                interfaces.setdefault(key, {"functions": [], "events": [],
                                             "properties": {}, "bases": split_bases(match.group(2) or "")})
         elif depth == declaration_depth and top[0] == "interface":
             members = interfaces[top[1]]
@@ -194,8 +211,6 @@ def parse(text):
                     name, kind = match.group(1), match.group(2).strip()
                     if is_event(kind):
                         members["events"].append(name)
-                    elif name.isupper():
-                        members["constants"][name] = kind
                     else:
                         members["properties"][name] = kind
         # A declaration's own braces are counted on its line, exactly as chrome-api.py does.
@@ -226,7 +241,7 @@ def merged(interfaces, ns, kind, seen=()):
     if key in seen:
         return None
     seen = seen + (key,)
-    spec = {"functions": [], "events": [], "constants": {}}
+    spec = {"functions": [], "events": []}
     for base in found["bases"]:
         inherited = merged(interfaces, ns, base, seen)
         if not inherited:
@@ -235,14 +250,12 @@ def merged(interfaces, ns, kind, seen=()):
             if member not in spec["functions"]:
                 spec["functions"].append(member)
         spec["events"].extend(inherited["events"])
-        spec["constants"].update(inherited.get("constants", {}))
         if inherited.get("properties"):
             spec.setdefault("properties", {}).update(inherited["properties"])
     for member in found["functions"]:
         if member not in spec["functions"]:
             spec["functions"].append(member)
     spec["events"].extend(found["events"])
-    spec["constants"].update(found["constants"])
     properties = {}
     for name, member_kind in found["properties"].items():
         inner = merged(interfaces, ns, member_kind, seen)

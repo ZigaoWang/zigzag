@@ -454,9 +454,6 @@
   ]
  },
  "contextMenus": {
-  "constants": {
-   "ACTION_MENU_TOP_LEVEL_LIMIT": "number"
-  },
   "enums": {
    "ItemType": {
     "CHECKBOX": "checkbox",
@@ -559,18 +556,6 @@
   ]
  },
  "declarativeNetRequest": {
-  "constants": {
-   "DYNAMIC_RULESET_ID": "string",
-   "GUARANTEED_MINIMUM_STATIC_RULES": "number",
-   "MAX_NUMBER_OF_DISABLED_STATIC_RULES": "number",
-   "MAX_NUMBER_OF_DYNAMIC_AND_SESSION_RULES": "number",
-   "MAX_NUMBER_OF_DYNAMIC_RULES": "number",
-   "MAX_NUMBER_OF_ENABLED_STATIC_RULESETS": "number",
-   "MAX_NUMBER_OF_REGEX_RULES": "number",
-   "MAX_NUMBER_OF_SESSION_RULES": "number",
-   "MAX_NUMBER_OF_STATIC_RULESETS": "number",
-   "SESSION_RULESET_ID": "string"
-  },
   "enums": {
    "ResourceType": {
     "BEACON": "beacon",
@@ -642,9 +627,6 @@
   ]
  },
  "devtools.inspectedWindow": {
-  "constants": {
-   "tabId": "number"
-  },
   "events": [
    "onResourceAdded",
    "onResourceContentCommitted"
@@ -665,9 +647,6 @@
   ]
  },
  "devtools.panels": {
-  "constants": {
-   "themeName": "string"
-  },
   "events": [
    "onThemeChanged"
   ],
@@ -807,9 +786,6 @@
   }
  },
  "extension": {
-  "constants": {
-   "inIncognitoContext": "boolean"
-  },
   "enums": {
    "ViewType": {
     "POPUP": "popup",
@@ -1011,9 +987,6 @@
   ]
  },
  "menus": {
-  "constants": {
-   "ACTION_MENU_TOP_LEVEL_LIMIT": "number"
-  },
   "enums": {
    "ItemType": {
     "CHECKBOX": "checkbox",
@@ -1437,9 +1410,6 @@
   }
  },
  "runtime": {
-  "constants": {
-   "id": "string"
-  },
   "enums": {
    "ContextType": {
     "BACKGROUND": "BACKGROUND",
@@ -1504,6 +1474,9 @@
    "onConnect",
    "onUserScriptConnect",
    "onConnectExternal",
+   "onMessage",
+   "onMessageExternal",
+   "onUserScriptMessage",
    "onRestartRequired",
    "onPerformanceWarning"
   ],
@@ -1563,9 +1536,6 @@
   ]
  },
  "sessions": {
-  "constants": {
-   "MAX_SESSION_RESULTS": "number"
-  },
   "events": [
    "onChanged"
   ],
@@ -1602,9 +1572,6 @@
   ],
   "objects": {
    "local": {
-    "constants": {
-     "QUOTA_BYTES": "number"
-    },
     "events": [
      "onChanged"
     ],
@@ -1618,9 +1585,6 @@
     ]
    },
    "managed": {
-    "constants": {
-     "QUOTA_BYTES": "number"
-    },
     "events": [
      "onChanged"
     ],
@@ -1634,9 +1598,6 @@
     ]
    },
    "session": {
-    "constants": {
-     "QUOTA_BYTES": "number"
-    },
     "events": [
      "onChanged"
     ],
@@ -1650,14 +1611,6 @@
     ]
    },
    "sync": {
-    "constants": {
-     "MAX_ITEMS": "number",
-     "MAX_SUSTAINED_WRITE_OPERATIONS_PER_MINUTE": "number",
-     "MAX_WRITE_OPERATIONS_PER_HOUR": "number",
-     "MAX_WRITE_OPERATIONS_PER_MINUTE": "number",
-     "QUOTA_BYTES": "number",
-     "QUOTA_BYTES_PER_ITEM": "number"
-    },
     "events": [
      "onChanged"
     ],
@@ -1673,9 +1626,6 @@
   }
  },
  "tabGroups": {
-  "constants": {
-   "TAB_GROUP_ID_NONE": "number"
-  },
   "enums": {
    "Color": {
     "BLUE": "blue",
@@ -1703,9 +1653,6 @@
   ]
  },
  "tabs": {
-  "constants": {
-   "TAB_ID_NONE": "number"
-  },
   "enums": {
    "MutedInfoReason": {
     "CAPTURE": "capture",
@@ -1973,9 +1920,6 @@
   ]
  },
  "webRequest": {
-  "constants": {
-   "MAX_HANDLER_BEHAVIOR_CHANGED_CALLS_PER_10_MINUTES": "number"
-  },
   "enums": {
    "CertificateTransparencyStatus": {
     "NOT_APPLICABLE": "not_applicable",
@@ -2101,10 +2045,6 @@
   ]
  },
  "windows": {
-  "constants": {
-   "WINDOW_ID_CURRENT": "number",
-   "WINDOW_ID_NONE": "number"
-  },
   "enums": {
    "CreateType": {
     "DETACHED_PANEL": "detached_panel",
