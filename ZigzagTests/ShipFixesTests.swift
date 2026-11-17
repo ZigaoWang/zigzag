@@ -591,6 +591,28 @@ struct UpdateBackupTests {
 
     /// A backup from before there were profiles has no Profiles.json: putting it back leaves the one there is, so
     /// spaces stay on their profiles.
+    /// The restore marker names a backup folder, never a path: one that leads out of Backups is ignored.
+    @Test func restoreRefusesAPathOutOfTheBackups() throws {
+        let root = try makeRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try "now".write(to: root.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        let elsewhere = root.appendingPathComponent("Elsewhere", isDirectory: true)
+        try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+        try "planted".write(to: elsewhere.appendingPathComponent("Library.json"), atomically: true, encoding: .utf8)
+        let folder = root.appendingPathComponent("Backups", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "../Elsewhere".write(to: folder.appendingPathComponent("Restore"), atomically: true, encoding: .utf8)
+
+        UpdateBackup.restoreIfAsked(root: root)
+
+        #expect(read(root.appendingPathComponent("Library.json")) == "now")
+        #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("Restore").path))
+        #expect(UpdateBackup.isBackupName("2026-10-02T09-00-00Z 0.4.0"))
+        for name in ["", ".", "..", "../Elsewhere", "2026-10-02T09-00-00Z 0.4.0/../../x", "/tmp/x", ".hidden"] {
+            #expect(!UpdateBackup.isBackupName(name))
+        }
+    }
+
     @Test func restoreLeavesProfilesWhenTheBackupHasNone() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }

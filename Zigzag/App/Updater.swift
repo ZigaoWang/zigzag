@@ -543,6 +543,12 @@ nonisolated enum UpdateBackup {
         NSApp.terminate(nil)
     }
 
+    /// A backup folder's own name, as `make` writes it ("2026-10-02T09-00-00Z 0.4.0"): one path component, dated.
+    static func isBackupName(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0") && !name.hasPrefix(".")
+            && date(of: name) != nil
+    }
+
     /// At launch: if a restore was asked for, the backup's files replace the ones in use. What's there now is
     /// backed up first, and nothing live goes until its replacement is in place.
     static func restoreIfAsked(root: URL = Paths.support) {
@@ -550,6 +556,8 @@ nonisolated enum UpdateBackup {
         let marker = folder(in: root).appendingPathComponent(restoreMarker)
         guard let name = try? String(contentsOf: marker, encoding: .utf8) else { return }
         try? manager.removeItem(at: marker)
+        // Only the name of a backup made at an update, right in the Backups folder: never a path out of it.
+        guard isBackupName(name) else { return }
         let source = folder(in: root).appendingPathComponent(name, isDirectory: true)
         guard manager.fileExists(atPath: source.path) else { return }
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
