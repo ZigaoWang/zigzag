@@ -38,6 +38,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 在边栏里点一下之后，按 ⌘A 会选中“标签页”部分的所有标签页，和 Arc、Finder 一样，可以一起关闭、移动、固定或分屏。收起的分组里和折叠起来的标签页下面的标签页不会被选中，按 Esc 取消选择。在网页、地址栏或重命名框里按 ⌘A，还是选中那里的文字。感谢 [Kevoin](https://github.com/Kevoin)。([#302](https://github.com/ZigaoWang/zigzag/issues/302))
 - 归档的标签页有了自己的列表，就像 Arc 的归档。在“历史记录 › 显示归档”或命令栏里的“显示归档”打开它：自动收起的标签页按归档的日期排好，每个都写着网站和它原来所在的空间。点按一个就会在那个空间里重新打开。列表可以搜索，也可以“清除归档”，之后用提示里的“撤销”可以恢复。“设置 › 标签页 › 归档闲置的标签页”关着时，列表会说明这一点，并给出打开它的按钮。无痕浏览窗口的标签页永远不会归档。
 - 标签页、固定标签页和收藏可以用你自己的图像当图标。在它的菜单里，“更改图标…”旁边的“选取图像…”可以选 1 MB 以内的 SVG、PNG、JPEG、HEIC、PDF 或 ICNS 文件，“使用网站图标”会换回网站自己的图标。Zigzag 会存一份自己的副本，原文件移走或删掉图标也还在；SVG 会安全地绘制，不运行脚本，也不从别处载入任何东西。感谢 [bkonia](https://github.com/bkonia)。([#303](https://github.com/ZigaoWang/zigzag/issues/303))
+- “拷贝链接”会去掉 utm_source 这类跟踪参数，粘贴到支持富文本的地方时会是带网页标题的链接。
 
 ### 修复
 - 在 macOS 15 上，Bitwarden 能用了，不会再一打开就说不支持 WebAssembly。macOS 15 自带的 WebKit 会忽略扩展运行 WebAssembly 的许可，Bitwarden 的密码库代码离不开它，于是被拒绝了。现在 Zigzag 会用这个 WebKit 认得的写法给这类扩展这个许可，脚本能从哪里载入的限制不变。macOS 26 及以后的版本不受影响。感谢 [ldhieu](https://github.com/ldhieu)。([#298](https://github.com/ZigaoWang/zigzag/issues/298))

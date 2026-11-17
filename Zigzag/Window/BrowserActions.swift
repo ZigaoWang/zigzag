@@ -45,10 +45,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         closeWithUndo(tab)
     }
 
-    /// Copies a link and says so, wherever the copy came from.
-    func copyLink(_ url: URL) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+    /// Copies a link, without its tracking parameters and titled where rich text is taken, and says so, wherever the
+    /// copy came from.
+    func copyLink(_ url: URL, title: String?) {
+        CleanLink.write(url, title: title)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
     }
 
@@ -145,7 +145,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         guard let tab = selectedTab, let url = tab.url else { return }
         // From the address bar, or the top of the page with the sidebar hidden, which stays hidden.
         let anchor = addressAnchor
-        let picker = NSSharingServicePicker(items: [url as NSURL])
+        let picker = NSSharingServicePicker(items: [CleanLink.clean(url) as NSURL])
         picker.show(relativeTo: anchor.rect, of: anchor.view, preferredEdge: .maxY)
     }
 
@@ -191,16 +191,14 @@ extension BrowserWindowController: NSMenuItemValidation {
     // MARK: Edit
 
     @objc func copyPageURL(_ sender: Any?) {
-        guard let url = selectedTab?.url else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
+        guard let tab = selectedTab, let url = tab.url else { return }
+        copyLink(url, title: tab.displayTitle)
     }
 
     @objc func copyPageURLAsMarkdown(_ sender: Any?) {
         guard let tab = selectedTab, let url = tab.url else { return }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString("[\(tab.displayTitle)](\(url.absoluteString))", forType: .string)
+        NSPasteboard.general.setString(CleanLink.markdown(url, title: tab.displayTitle), forType: .string)
         Toast.show(String(localized: "Markdown link copied", comment: "Toast after the page's title and address are copied as a Markdown link."), symbol: "link", in: self)
     }
 

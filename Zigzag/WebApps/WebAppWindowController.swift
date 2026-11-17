@@ -223,8 +223,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
 
     @objc func copyPageURL(_ sender: Any?) {
         guard let url = tab.url else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        CleanLink.write(url, title: tab.displayTitle)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
     }
 

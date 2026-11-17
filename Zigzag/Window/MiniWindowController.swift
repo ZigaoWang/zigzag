@@ -662,8 +662,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The strip's Copy Link, and ⇧⌘C: the page's address, with the toast a browser window shows.
     @objc func copyPageURL(_ sender: Any?) {
         guard let url = tab.url, !isLeaving else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        CleanLink.write(url, title: tab.displayTitle)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
     }
 

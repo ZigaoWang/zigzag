@@ -65,6 +65,8 @@
 		1CDB552BE051BEBF9C1496B7 /* CertificateDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C054793F49E04AC36C79015 /* CertificateDetails.swift */; };
 		C297C0DE0000000000000001 /* ClientCertificates.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000002 /* ClientCertificates.swift */; };
 		C297C0DE0000000000000003 /* ClientCertificatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000004 /* ClientCertificatesTests.swift */; };
+		C1EA411C0000000000000001 /* CleanLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EA411C0000000000000002 /* CleanLink.swift */; };
+		C1EA411C0000000000000003 /* CleanLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EA411C0000000000000004 /* CleanLinkTests.swift */; };
 		1D559D9E556FBB7102DFE892 /* OwnScriptsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B103184C04CE5BBD5558790 /* OwnScriptsTests.swift */; };
 		1DA962212F01E44D0B6D9E0E /* SiteExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A3767514BB748BE54E5B7A /* SiteExtensions.swift */; };
 		1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */; };
@@ -597,6 +599,8 @@
 		0C054793F49E04AC36C79015 /* CertificateDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateDetails.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000002 /* ClientCertificates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificates.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000004 /* ClientCertificatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificatesTests.swift; sourceTree = "<group>"; };
+		C1EA411C0000000000000002 /* CleanLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanLink.swift; sourceTree = "<group>"; };
+		C1EA411C0000000000000004 /* CleanLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanLinkTests.swift; sourceTree = "<group>"; };
 		0C4237F81EED9D709728975F /* SiteDataBench.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteDataBench.swift; sourceTree = "<group>"; };
 		0C625E33D1E438FE873F8B42 /* PageScreenshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageScreenshot.swift; sourceTree = "<group>"; };
 		0C67092285DC153FB7BBDFCE /* Materials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Materials.swift; sourceTree = "<group>"; };
@@ -1428,6 +1432,7 @@
 				7A6A928496FC897893B22DF7 /* BrowserWebView.swift */,
 				0C054793F49E04AC36C79015 /* CertificateDetails.swift */,
 				C297C0DE0000000000000002 /* ClientCertificates.swift */,
+				C1EA411C0000000000000002 /* CleanLink.swift */,
 				91506D36CD561CBD7E11897D /* ContentBlocker.swift */,
 				77ECA64FC76B1FB111087527 /* CookieBanners.swift */,
 				96D4CC131CEDF843998D604C /* DarkPages.swift */,
@@ -1633,6 +1638,7 @@
 				BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */,
 				501B90ADF75ED2EF79493586 /* CertificateTrustTests.swift */,
 				C297C0DE0000000000000004 /* ClientCertificatesTests.swift */,
+				C1EA411C0000000000000004 /* CleanLinkTests.swift */,
 				6B6C77CFE33BFCD7CC963266 /* ChromeProfilesImportTests.swift */,
 				7069B71082962459B24D179F /* ChromiumExtensionsTests.swift */,
 				8055982B8B54C35C4214DBB3 /* ClearWordingTests.swift */,
@@ -2183,6 +2189,7 @@
 				6C9AC35EBAD0FD18FB48FE1F /* CarriedCopy.swift in Sources */,
 				1CDB552BE051BEBF9C1496B7 /* CertificateDetails.swift in Sources */,
 				C297C0DE0000000000000001 /* ClientCertificates.swift in Sources */,
+				C1EA411C0000000000000001 /* CleanLink.swift in Sources */,
 				7C806AF0D441AEAF227DC06C /* CertificatePage.swift in Sources */,
 				58E9C13EC966E01059CFEF0A /* ChromiumExtensions.swift in Sources */,
 				D14729ACC5D7A52A9E69E2A9 /* ChromiumImporter.swift in Sources */,
@@ -2456,6 +2463,7 @@
 				1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */,
 				CE33211DE5E98DCFE4811C4A /* CertificateTrustTests.swift in Sources */,
 				C297C0DE0000000000000003 /* ClientCertificatesTests.swift in Sources */,
+				C1EA411C0000000000000003 /* CleanLinkTests.swift in Sources */,
 				D7DA27736AE177FF489E42C3 /* ChromeProfilesImportTests.swift in Sources */,
 				95116D4DAA8CC50801C588B5 /* ChromiumExtensionsTests.swift in Sources */,
 				8377230ECD7E9BB931B97A7B /* ClearWordingTests.swift in Sources */,
