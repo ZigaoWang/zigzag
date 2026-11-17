@@ -508,6 +508,24 @@ struct DownloadRuleTests {
         #expect(DownloadOpening.isRefused(pattern: "pdf, dmg"))
         #expect(!DownloadOpening.isRefused("pdf"))
 
+        // What else runs, loads, or sends the Mac somewhere when opened: location files, web pages, plug-ins,
+        // workflows and macro documents.
+        for type in ["fileloc", "inetloc", "webloc", "url", "html", "svg", "webarchive", "js", "wflow", "shortcut",
+                     "scptd", "plugin", "dylib", "qtz", "jnlp", "class", "ipa", "docm", "xlsm", "term", "tool"] {
+            #expect(DownloadOpening.isRefused(type), "\(type) must not open")
+        }
+        #expect(DownloadOpening.isRefused(pattern: "epub, fileloc"))
+        // A type the list doesn't name is still refused when the Mac calls it a script or an archive.
+        for type in ["sparseimage", "cpgz", "xar", "phtml", "pyc"] {
+            #expect(!DownloadOpening.refused.contains(type))
+            #expect(DownloadOpening.isRefused(type), "\(type) must not open")
+        }
+        // The ordinary documents and media Open is for.
+        for type in ["pdf", "epub", "txt", "rtf", "md", "csv", "json", "png", "jpg", "heic", "mp3", "mp4", "mov",
+                     "docx", "xlsx", "pptx", "pages", "key", "numbers", "ics", "vcf"] {
+            #expect(!DownloadOpening.isRefused(type), "\(type) should be able to open")
+        }
+
         let url = URL(string: "https://example.com/tool.dmg")!
         var open = destination("dmg", .openFile)
         open.name = "Open"

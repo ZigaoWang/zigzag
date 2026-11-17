@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import UniformTypeIdentifiers
 import WebKit
 
 // MARK: - A rule
@@ -29,11 +30,26 @@ nonisolated enum DownloadOpening {
         // Archives.
         "zip", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "7z", "rar", "zst", "lz", "lzma", "jar",
         // Scripts and automation.
-        "command", "terminal", "sh", "bash", "zsh", "fish", "csh", "ksh", "py", "rb", "pl", "php",
-        "scpt", "applescript", "workflow", "action",
+        "command", "terminal", "term", "tool", "sh", "bash", "zsh", "fish", "csh", "ksh", "py", "rb", "pl", "php",
+        "js", "mjs", "jxa", "scpt", "scptd", "applescript", "workflow", "wflow", "action", "shortcut",
+        // Plug-ins, helpers and code that loads into another app.
+        "plugin", "bundle", "framework", "dylib", "so", "osax", "appex", "xpc", "saver", "qlgenerator", "mdimporter",
+        "service", "systemextension", "driver", "inputplugin", "ibplugin", "menu", "help", "x11app", "nib", "xib",
+        "qtz", "class", "jnlp", "ipa", "cin", "icp", "gcx", "ipg",
+        // Locations and web pages: opening one sends the Mac to another address or file, or runs a page from disk.
+        "fileloc", "inetloc", "webloc", "url", "afploc", "ftploc", "mailloc", "newsloc",
+        "html", "htm", "shtml", "xhtml", "xht", "mht", "mhtml", "svg", "svgz", "webarchive",
+        // Office documents that carry macros.
+        "docm", "dotm", "xlsm", "xltm", "xlam", "pptm", "potm", "ppsm", "ppam",
         // Configuration profiles.
         "mobileconfig"
     ]
+
+    /// The kinds of file the Mac itself calls risky, for an extension the list above doesn't name: anything that runs,
+    /// a script, an archive or disk image, a web location. macOS's own risk list (CoreTypes' LSRiskCategory) names the
+    /// same families; reading the type keeps an extension the list missed from slipping past.
+    private static let refusedTypes: [UTType] = [.executable, .application, .unixExecutable, .script, .shellScript,
+                                                .archive, .diskImage, .internetLocation, .html]
 
     static func isRefused(_ type: String) -> Bool {
         let trimmed = type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -44,7 +60,13 @@ nonisolated enum DownloadOpening {
         // and `gz` are, and a page-supplied `pdf,dmg` cannot smuggle the second one past this check.
         return trimmed.split(whereSeparator: { $0 == "." || $0 == "," })
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .contains { refused.contains($0) }
+            .contains(where: isRefusedPart)
+    }
+
+    private static func isRefusedPart(_ part: String) -> Bool {
+        if refused.contains(part) { return true }
+        guard let type = UTType(filenameExtension: part) else { return false }
+        return refusedTypes.contains { type.conforms(to: $0) }
     }
 
     /// Whether any extension a file-type pattern names is one an Open must refuse. An Open rule for one of them could
@@ -53,9 +75,7 @@ nonisolated enum DownloadOpening {
         let extensions = DownloadRule.Match.extensions(in: pattern)
         // No extension at all is no type to vouch for, just as an extensionless file is not.
         guard !extensions.isEmpty else { return true }
-        return extensions.contains { extensionName in
-            extensionName.split(separator: ".").contains { refused.contains(String($0).lowercased()) }
-        }
+        return extensions.contains { isRefused($0) }
     }
 }
 
