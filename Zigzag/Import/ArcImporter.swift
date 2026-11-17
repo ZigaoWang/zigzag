@@ -507,6 +507,11 @@ enum ArcImporter {
         // A folder name alone isn't an identity: each Mac can have an unrelated "Profile 1".
         let activeProfiles = Set(spaceList.map { sidebarProfile($0["profile"]) ?? SidebarProfile() })
         var readProfiles = Set<SidebarProfile>()
+        // A marker matches a displayed space's profile exactly, or by folder where either side names no Mac.
+        func shown(_ profile: SidebarProfile) -> SidebarProfile? {
+            if activeProfiles.contains(profile) { return profile }
+            return activeProfiles.first { $0.folder == profile.folder && ($0.machineID == nil || profile.machineID == nil) }
+        }
         for copy in copies.reversed() {
             // Each profile's marker, then the ID of its Favorites container; only IDs name an item.
             var current: SidebarProfile?, marked = false
@@ -515,7 +520,7 @@ enum ArcImporter {
                 if let id = value as? String, items[id] != nil {
                     guard !topIDs.contains(id) else { continue }
                     if marked {
-                        guard let current, activeProfiles.contains(current), !readProfiles.contains(current) else { continue }
+                        guard let current = current.flatMap(shown), !readProfiles.contains(current) else { continue }
                         copiedProfiles.insert(current)
                     }
                     topIDs.append(id)

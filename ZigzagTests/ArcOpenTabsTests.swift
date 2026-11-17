@@ -320,6 +320,26 @@ import Testing
         #expect(parsed.favorites.map(\.url.lastPathComponent) == (empty ? [] : ["new"]))
     }
 
+    /// A marker that names no Mac (an older Arc, or one side written without it) still matches its folder, so a
+    /// profile's Favorites aren't dropped just because only one of the two markers carries a machine ID.
+    @Test(arguments: [false, true])
+    func favoritesMatchAFolderWithoutAMachine(spaceHasMachine: Bool) throws {
+        let withMachine = profile("Profile 4", machine: "mac-a")
+        let bare: [String: Any] = ["custom": ["_0": ["directoryBasename": "Profile 4"]]]
+        let spaces: [[String: Any]] = [
+            ["id": "home", "title": "Home", "profile": Self.standard],
+            ["id": "work", "title": "Work", "profile": spaceHasMachine ? withMachine : bare],
+        ]
+        let copy = favoritesCopy(spaces: spaces, groups: [
+            (spaceHasMachine ? bare : withMachine, ["https://example.com/mail"]),
+            (Self.standard, ["https://example.com/home"]),
+        ])
+        let parsed = try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: ["sidebar": ["containers": [copy]]]))
+        let plan = ArcImporter.plan(parsed, parts: .all, existing: [])
+        #expect(plan.favoriteGroups.map(\.profile) == [nil, "Profile 4"])
+        #expect(plan.favoriteGroups.map { $0.favorites.map(\.url.lastPathComponent) } == [["home"], ["mail"]])
+    }
+
     /// Importing again merges into the space with its name on its own profile, else the one with its name anywhere.
     @Test func importingAgainMergesOnItsProfile() {
         let work = UUID()
