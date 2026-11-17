@@ -219,6 +219,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// The color Zigzag gave the space when it was made, which Use Default Colors puts back. Nil: not kept yet (made
     /// before it was, and not changed since), so `Library.defaultColors` works it out.
     var defaultColor: SpaceColor? = nil
+    /// Sites that always open in this space, whatever space the link came from (#286, `SiteRoutes`): hosts without
+    /// "www.", each covering its subdomains. Nil: none (older libraries too).
+    var routedSites: [String]? = nil
 
     /// No hue of its own: white, a gray, or black.
     var isNeutral: Bool { (hue == nil && color.isNeutral) || (tint ?? 1) < 0.005 }
@@ -615,15 +618,23 @@ final class Library {
 
     func index(of id: UUID) -> Int? { spaces.firstIndex { $0.id == id } }
 
-    /// A new space, on `profile`: where you made it from, so a space made among separate ones stays with them.
+    /// Settings › Spaces: a space you make with + or New Space gets a profile of its own, named after it (#291). Off
+    /// unless you turn it on. Spaces made before, and ones an import makes, stay as they are.
+    static var newSpacesGetOwnProfile: Bool {
+        get { UserDefaults.standard.bool(forKey: "NewSpacesGetOwnProfile") }
+        set { UserDefaults.standard.set(newValue, forKey: "NewSpacesGetOwnProfile") }
+    }
+
+    /// A new space, on `profile`: where you made it from, so a space made among separate ones stays with them. With
+    /// `ownProfile`, on a new profile of its own instead, named after it (`newSpacesGetOwnProfile`).
     @discardableResult
-    func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID) -> SpaceInfo {
+    func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID, ownProfile: Bool = false) -> SpaceInfo {
         let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
         var space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
                               color: pick)
         space.defaultColor = pick
         spaces.append(space)
-        directory.assign(space: space.id, to: profile)
+        directory.place(newSpace: space, on: profile, ownProfile: ownProfile, usedColors: profiles.map { self.color(of: $0) })
         commit()
         return space
     }
@@ -763,6 +774,23 @@ final class Library {
     func insertSpace(_ space: SpaceInfo, at index: Int) {
         guard self.index(of: space.id) == nil else { return }
         spaces.insert(space, at: max(0, min(index, spaces.count)))
+        commit()
+    }
+
+    // MARK: Sites that open in a space (#286)
+
+    /// Every site sent to a space, in the spaces' order.
+    var siteRoutes: [SiteRoutes.Route] { SiteRoutes.routes(in: spaces) }
+
+    /// The route that covers a page, if any.
+    func siteRoute(for url: URL?) -> SiteRoutes.Route? { SiteRoutes.route(for: url, in: siteRoutes) }
+
+    /// Sends `site` to a space from now on, or (nil) lets it open in any space again.
+    func setSiteRoute(_ site: String, to space: UUID?) {
+        guard space.map({ self.space($0) != nil }) ?? true else { return }
+        let next = SiteRoutes.setting(site, to: space, in: spaces)
+        guard next != spaces else { return }
+        spaces = next
         commit()
     }
 
@@ -972,8 +1000,8 @@ final class Library {
     /// Adds to a profile's favorites the ones it doesn't already have; returns how many that was.
     @discardableResult
     func appendFavorites(_ new: [Bookmark], in profile: UUID) -> Int {
-        let known = Set(favorites(in: profile).map { $0.url.absoluteString })
-        let added = new.filter { !known.contains($0.url.absoluteString) }
+        var known = Set(favorites(in: profile).map { $0.url.absoluteString })
+        let added = new.filter { known.insert($0.url.absoluteString).inserted }
         favorites += added
         for favorite in added { directory.assign(favorite: favorite.id, to: profile) }
         commit()
@@ -1583,8 +1611,7 @@ final class Library {
     @discardableResult
     func addProfile(forSpace id: UUID) -> ProfileInfo? {
         guard let space = space(id) else { return nil }
-        let used = profiles.map { color(of: $0) }
-        let pick = space.color.isNeutral || used.contains(space.color) ? SpaceColor.next(unused: used) : space.color
+        let pick = ProfileDirectory.ownColor(for: space.color, used: profiles.map { color(of: $0) })
         let info = directory.addOwn(for: id, named: space.name, taken: profiles.map(\.displayName), color: pick)
         commit()
         return info

@@ -247,6 +247,99 @@ import Testing
         }
     }
 
+    private func profile(_ folder: String, machine: String) -> [String: Any] {
+        ["custom": ["_0": ["directoryBasename": folder, "machineID": machine]]]
+    }
+
+    /// A made-up sidebar with one container per profile, in either of Arc's encodings.
+    private func favoritesCopy(spaces: [[String: Any]], groups: [(profile: [String: Any], urls: [String])]) -> [String: Any] {
+        var items: [[String: Any]] = [], top: [Any] = []
+        for (i, group) in groups.enumerated() {
+            let children = group.urls.indices.map { "favorite-\(i)-\($0)" }
+            items.append(["id": "top-\(i)", "childrenIds": children, "data": ["itemContainer": [:]]])
+            items += zip(children, group.urls).map { tab($0.0, $0.1) }
+            top += [group.profile, "top-\(i)"]
+        }
+        return ["spaces": spaces, "items": items, "topAppsContainerIDs": top]
+    }
+
+    private func synced(_ copy: [String: Any]) -> [String: Any] {
+        let spaces = copy["spaces"] as? [[String: Any]] ?? []
+        let items = copy["items"] as? [[String: Any]] ?? []
+        return ["spaceModels": spaces.map { ["value": $0] }, "items": items.map { ["value": $0] },
+                "container": ["value": ["orderedSpaceIDs": spaces.compactMap { $0["id"] as? String },
+                                         "topAppsContainerIDs": copy["topAppsContainerIDs"] ?? []]]]
+    }
+
+    /// Arc Sync keeps other Macs' Favorites, including unrelated profiles with the same folder name.
+    /// Only the profiles of spaces Arc still shows belong in the import, even with just one profile in use.
+    @Test(arguments: [false, true], [false, true])
+    func favoritesFollowTheirSpacesMachine(useSync: Bool, oneProfile: Bool) throws {
+        let local = profile("Profile 4", machine: "mac-a"), remote = profile("Profile 4", machine: "mac-b")
+        let unused = profile("Profile 9", machine: "mac-a")
+        var spaces: [[String: Any]] = [
+            ["id": "work", "title": "Work", "profile": local],
+            ["id": "focus", "title": "Focus", "profile": ["value": local]],
+        ]
+        if !oneProfile { spaces.insert(["id": "home", "title": "Home", "profile": Self.standard], at: 0) }
+        let copy = favoritesCopy(spaces: spaces, groups: [
+            (remote, ["https://example.com/remote"]),
+            (local, ["https://example.com/mail", "https://example.com/docs"]),
+            (unused, ["https://example.com/unused"]),
+            (Self.standard, ["https://example.com/home"]),
+        ])
+        let root: [String: Any] = useSync ? ["sidebarSyncState": synced(copy)] : ["sidebar": ["containers": [copy]]]
+        let parsed = try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: root))
+        let plan = ArcImporter.plan(parsed, parts: .all, existing: [])
+        #expect(parsed.favorites.map(\.url.lastPathComponent) == (oneProfile ? ["mail", "docs"] : ["mail", "docs", "home"]))
+        #expect(plan.favoriteGroups.map(\.profile) == (oneProfile ? [nil] : [nil, "Profile 4"]))
+        #expect(plan.favoriteGroups.map { $0.favorites.map(\.url.lastPathComponent) } == (oneProfile ? [["mail", "docs"]] : [["home"], ["mail", "docs"]]))
+        #expect(parsed.spaces.filter { $0.name == "Work" || $0.name == "Focus" }.allSatisfy {
+            parsed.profile(of: $0.id) == (oneProfile ? nil : "Profile 4")
+        })
+    }
+
+    /// A replacement Favorites container in the current copy wins over an older container for the same profile.
+    /// An empty current list stays empty, rather than resurrecting favorites removed in Arc.
+    @Test(arguments: [false, true])
+    func olderFavoritesContainersStayBehind(empty: Bool) throws {
+        let local = profile("Profile 4", machine: "mac-a")
+        let spaces: [[String: Any]] = [["id": "work", "title": "Work", "profile": local]]
+        let older = favoritesCopy(spaces: spaces, groups: [(local, ["https://example.com/old"])])
+        var current = favoritesCopy(spaces: spaces, groups: [(local, empty ? [] : ["https://example.com/new"])])
+        var items = try #require(current["items"] as? [[String: Any]])
+        items[0]["id"] = "replacement-top"
+        items[0]["childrenIds"] = empty ? [String]() : ["new-favorite"]
+        if !empty { items[1]["id"] = "new-favorite" }
+        current["topAppsContainerIDs"] = [local, "replacement-top"]
+        // The current copy is fuller even when its Favorites list is empty.
+        items += (0..<3).map { tab("extra-\($0)", "https://example.com/extra-\($0)") }
+        current["items"] = items
+        let root: [String: Any] = ["sidebar": ["containers": [older]], "sidebarSyncState": synced(current)]
+        let parsed = try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: root))
+        #expect(parsed.favorites.map(\.url.lastPathComponent) == (empty ? [] : ["new"]))
+    }
+
+    /// A marker that names no Mac (an older Arc, or one side written without it) still matches its folder, so a
+    /// profile's Favorites aren't dropped just because only one of the two markers carries a machine ID.
+    @Test(arguments: [false, true])
+    func favoritesMatchAFolderWithoutAMachine(spaceHasMachine: Bool) throws {
+        let withMachine = profile("Profile 4", machine: "mac-a")
+        let bare: [String: Any] = ["custom": ["_0": ["directoryBasename": "Profile 4"]]]
+        let spaces: [[String: Any]] = [
+            ["id": "home", "title": "Home", "profile": Self.standard],
+            ["id": "work", "title": "Work", "profile": spaceHasMachine ? withMachine : bare],
+        ]
+        let copy = favoritesCopy(spaces: spaces, groups: [
+            (spaceHasMachine ? bare : withMachine, ["https://example.com/mail"]),
+            (Self.standard, ["https://example.com/home"]),
+        ])
+        let parsed = try ArcImporter.readSidebar(JSONSerialization.data(withJSONObject: ["sidebar": ["containers": [copy]]]))
+        let plan = ArcImporter.plan(parsed, parts: .all, existing: [])
+        #expect(plan.favoriteGroups.map(\.profile) == [nil, "Profile 4"])
+        #expect(plan.favoriteGroups.map { $0.favorites.map(\.url.lastPathComponent) } == [["home"], ["mail"]])
+    }
+
     /// Importing again merges into the space with its name on its own profile, else the one with its name anywhere.
     @Test func importingAgainMergesOnItsProfile() {
         let work = UUID()

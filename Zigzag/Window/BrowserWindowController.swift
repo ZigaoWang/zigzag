@@ -2345,7 +2345,26 @@ extension BrowserWindowController: TabHost {
         open(url, disposition: disposition, opener: tab, allowSwitch: false, by: .page)
     }
 
+    func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool {
+        openRouted(url, arrival: arrival, from: tab, inBackground: inBackground, by: .page)
+    }
+
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
+        // A link to a site you chose a space for opens there (#286), as a page of its own: Open Link in New Tab, or a
+        // link you clicked that opens a new tab. A sized window (a sign-in's pop-up) and a peek stay as they are.
+        if let url = action.request.url, Tab.route(forPageLink: url, from: tab.url) == .load,
+           features.width == nil, features.height == nil {
+            let pending = BrowserWebView.pendingDisposition(for: tab.webView)
+            let clicked = pending == nil && action.navigationType == .linkActivated && PopupNotice.isUserInitiated(action)
+            if pending == .foregroundTab || pending == .backgroundTab || clicked {
+                let flags = action.modifierFlags
+                let background = pending == .backgroundTab || (clicked && flags.contains(.command) && !flags.contains(.shift))
+                if openRouted(url, arrival: .linkNewTab, from: tab, inBackground: background, by: .page) {
+                    _ = BrowserWebView.takePendingDisposition(for: tab.webView)
+                    return nil
+                }
+            }
+        }
         if let pending = BrowserWebView.takePendingDisposition(for: tab.webView) {
             if pending == .peek { return showPeek(url: nil, configuration: configuration) }
             // A new window gets its own fresh page, not one tied to this tab (and a private one never shares anything).

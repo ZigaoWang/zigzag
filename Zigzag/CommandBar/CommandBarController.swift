@@ -1063,6 +1063,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let inCurrent = editing
         func open(_ url: URL, search: Bool = false, httpFallback: Bool = false) {
             if !inCurrent { Tutorial.complete("newTab") }
+            // A site you chose a space for opens there (#286), never over the page you're on in this one. A search
+            // stays where you asked it.
+            if !search, controller.openRouted(url, arrival: .typed, inBackground: inBackground && !inCurrent, by: .you,
+                                              httpFallback: httpFallback) { return }
             // Typed or chosen here: yours, so an app's link you typed opens without asking (the site's Block still holds).
             if inCurrent {
                 manager.selectedTab?.load(url, by: .you, httpFallback: httpFallback)

@@ -345,6 +345,11 @@ final class WindowManager {
         if Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
         let key = keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
         if let controller = key ?? controllers.last(where: { !$0.tabManager.isPrivate }) ?? restoreIfNoWindows() {
+            // A site you chose a space for opens there (#286).
+            if fromAnotherApp, controller.openRouted(url, arrival: .otherApp, by: .zigzag) {
+                controller.window?.makeKeyAndOrderFront(nil)
+                return
+            }
             // Only a new tab is offered Zigzag Mini: a tab already open on the page is simply gone to.
             let isNew = controller.tabManager.existingTab(for: url) == nil
             controller.open(url, disposition: .foregroundTab)

@@ -51,6 +51,43 @@ struct SpaceProfileTests {
         #expect(directory.shownName(ofSpace: play, spaceName: "Play") == directory.all[0].displayName)
     }
 
+    /// Settings › Spaces › Give new spaces their own profile (#291): a space you make comes with a profile named
+    /// after it, in its color; off, it stays on the profile it was made from.
+    @Test func aNewSpaceCanComeWithItsOwnProfile() {
+        var directory = ProfileDirectory()
+        let other = directory.add(name: "Other", color: .rose)
+        let space = SpaceInfo(name: "Work", color: .sage)
+        let made = directory.place(newSpace: space, on: other.id, ownProfile: true, usedColors: [.sky, .rose])
+        #expect(made?.name == "Work" && made?.color == .sage)
+        #expect(directory.profileID(ofSpace: space.id) == made?.id)
+        #expect(directory.all.count == 3)
+
+        let plain = SpaceInfo(name: "Play", color: .sky)
+        #expect(directory.place(newSpace: plain, on: other.id, ownProfile: false, usedColors: []) == nil)
+        #expect(directory.profileID(ofSpace: plain.id) == other.id)
+        #expect(directory.all.count == 3)
+    }
+
+    @Test func aNewSpacesProfileTakesAFreeName() {
+        var directory = ProfileDirectory()
+        directory.add(name: "Work")
+        let first = directory.place(newSpace: SpaceInfo(name: "work", color: .sky), on: Profile.defaultID, ownProfile: true, usedColors: [])
+        let second = directory.place(newSpace: SpaceInfo(name: "Work", color: .sky), on: Profile.defaultID, ownProfile: true, usedColors: [])
+        #expect(first?.name == "work 2" && second?.name == "Work 3")
+        // The first profile's own name, Default until it's renamed, is taken too.
+        let named = directory.place(newSpace: SpaceInfo(name: directory.all[0].displayName, color: .sky), on: Profile.defaultID,
+                                    ownProfile: true, usedColors: [])
+        #expect(named?.name == directory.all[0].displayName + " 2")
+    }
+
+    @Test func aNewSpacesProfileTakesAColorNoProfileHas() {
+        // The space's own, unless a profile has it or it's gray, white or black: then the next one no profile has.
+        #expect(ProfileDirectory.ownColor(for: .sage, used: [.sky]) == .sage)
+        let taken = ProfileDirectory.ownColor(for: .sky, used: [.sky])
+        #expect(taken != .sky && !taken.isNeutral)
+        #expect(!ProfileDirectory.ownColor(for: .graphite, used: [.sky]).isNeutral)
+    }
+
     @Test func theEditorSaysWhatAProfileKeepsApart() {
         // One line under the Profile row, whatever the profiles: with one, it's the only place that says so.
         #expect(!ProfileChoice.spaceNote.isEmpty)
