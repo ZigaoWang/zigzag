@@ -44,6 +44,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 小播放器会跟着短视频连播走，比如抖音：下一个视频开始播放时会切过去，不再显示黑屏。感谢 [alextend](https://github.com/alextend)。([#267](https://github.com/ZigaoWang/zigzag/issues/267))
 - 从 Arc 导入会保留 Arc 的个人资料。你的 Arc 空间分布在多份个人资料里时，Arc 里自己建的每份个人资料都会变成同名的 Zigzag 个人资料（已有同名的就放进那份），连同它的空间、收藏、历史记录和登录状态；Arc 默认个人资料里的空间会放进你导入到的那份个人资料。再次导入不会重复添加，只用一份 Arc 个人资料时和以前一样。感谢 [miateo](https://github.com/miateo)。([#279](https://github.com/ZigaoWang/zigzag/issues/279))
 - Proton Pass 能用了：它的窗口不再说浏览器在激活它时遇到困难、让你更新浏览器，而是直接打开登录页。它启动后会把自己的扩展接口藏起来不让别的脚本用，在 Zigzag 里这样做会让它收不到自己的消息。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
+- 导入窗口里选了 Chrome 后，“导入”按钮不再跑到窗口底下点不到。屏幕放得下时，窗口会跟着你选的内容变高；放不下时，浏览器列表和选项可以滚动，“导入”和“以后”一直留在底部。感谢 [tachebleue](https://github.com/tachebleue)。([#293](https://github.com/ZigaoWang/zigzag/issues/293))
 
 ## [0.9.1] - 2026-11-16
 
