@@ -1122,6 +1122,7 @@ extension CommandBarController {
         case "feedback": Feedback.show(in: controller)
         case "report": ProblemReport.show(in: controller)
         case "history": HistoryPage.open(in: controller)
+        case "archive": ArchivePage.open(in: controller)
         case "settings": SettingsPage.open(in: controller)
         // The page and window commands do what the menu bar's items of the same name do.
         case "pin", "unpin": controller.toggleBookmark(nil)

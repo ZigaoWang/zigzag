@@ -3137,6 +3137,28 @@
         }
       }
     },
+    "Archive" : {
+      "comment" : "Title of the Archive page, the list of tabs that were archived; also its tab's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档"
+          }
+        }
+      }
+    },
+    "Archive cleared" : {
+      "comment" : "Toast after the Archive page is cleared.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已清除归档"
+          }
+        }
+      }
+    },
     "Archive tabs you haven’t used" : {
       "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
@@ -3166,6 +3188,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已从“%@”归档"
+          }
+        }
+      }
+    },
+    "Archived tabs are forgotten. History keeps the pages you visited." : {
+      "comment" : "Message of the sheet that asks before clearing the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已归档的标签页会被忘掉。历史记录仍会保留你访问过的页面。"
+          }
+        }
+      }
+    },
+    "Archived tabs show up here when Settings › Tabs › Archive tabs you haven’t used is on." : {
+      "comment" : "On the Archive page while archiving is off. Name the setting as it reads in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开“设置 › 标签页 › 归档闲置的标签页”后，归档的标签页会出现在这里。"
           }
         }
       }
@@ -4569,6 +4613,17 @@
         }
       }
     },
+    "Clear Archive" : {
+      "comment" : "Button on the Archive page, and the button of the sheet that asks before clearing it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除归档"
+          }
+        }
+      }
+    },
     "Clear Browsing Data" : {
       "comment" : "A heading in Settings › Privacy: buttons that clear history, cache and cookies.",
       "localizations" : {
@@ -4763,6 +4818,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要清除今天的历史记录吗？"
+          }
+        }
+      }
+    },
+    "Clear the archive?" : {
+      "comment" : "Title of the sheet that asks before clearing the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除归档吗？"
           }
         }
       }
@@ -6256,6 +6322,17 @@
         }
       }
     },
+    "No archived tab matches “%@”." : {
+      "comment" : "On the Archive page when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有与“%@”匹配的已归档标签页。"
+          }
+        }
+      }
+    },
     "Open in" : {
       "comment" : "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from.",
       "localizations" : {
@@ -6267,6 +6344,17 @@
         }
       }
     },
+    "Open Settings" : {
+      "comment" : "Button on the Archive page while archiving is off: opens Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
+          }
+        }
+      }
+    },
     "Opened in %@" : {
       "comment" : "Toast after a link to a site that always opens in a space (Settings › Spaces) opened there instead of where it was clicked or typed. The name is the space's.",
       "localizations" : {
@@ -6274,6 +6362,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已在“%@”中打开"
+          }
+        }
+      }
+    },
+    "Search archive" : {
+      "comment" : "Placeholder of the search field on the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索归档"
+          }
+        }
+      }
+    },
+    "Show Archive" : {
+      "comment" : "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示归档"
           }
         }
       }
@@ -6333,6 +6443,17 @@
         }
       }
     },
+    "Tabs you haven’t used in a while show up here." : {
+      "comment" : "On the Archive page while it's empty and archiving is on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "闲置一段时间的标签页会归档到这里。"
+          }
+        }
+      }
+    },
     "That folder isn’t there. Choose one that is." : {
       "comment" : "Tooltip on the folder field of a per-extension destination whose folder has gone or is a file, so its Add button is greyed.",
       "localizations" : {
@@ -6373,6 +6494,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要让网站始终在某个空间中打开，请在它的网站设置中的“打开于”里选择空间。"
+          }
+        }
+      }
+    },
+    "Today" : {
+      "comment" : "Heading of the tabs archived today, on the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天"
           }
         }
       }
@@ -12065,7 +12197,7 @@
       }
     },
     "Open in %@" : {
-      "comment" : "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.",
+      "comment" : "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.\nTooltip of a row on the Archive page: the tab opens again in the space it came from. The placeholder is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19220,7 +19352,7 @@
       }
     },
     "Undo" : {
-      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nEdit menu item.\nToast button",
+      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nButton in the toast after the Archive page is cleared.\nEdit menu item.\nToast button",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20515,6 +20647,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "黄色"
+          }
+        }
+      }
+    },
+    "Yesterday" : {
+      "comment" : "Heading of the tabs archived yesterday, on the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天"
           }
         }
       }

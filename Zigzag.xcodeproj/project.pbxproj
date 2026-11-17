@@ -92,6 +92,8 @@
 		2BAC5D63A9B904BE86762FE6 /* blocklist.json.lzfse in Resources */ = {isa = PBXBuildFile; fileRef = BCDDE0751DF4A678A1B2C2DC /* blocklist.json.lzfse */; };
 		2BCEBD93F26C4F204FC20014 /* darkreader.js in Resources */ = {isa = PBXBuildFile; fileRef = C5ACB615AF39EAE8D2A86DE7 /* darkreader.js */; };
 		2D55489310DC30BCEAE9D9C3 /* HistoryPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9318C9D9C45049E8105EA1CE /* HistoryPage.swift */; };
+		A1C0FFEE00000000000A0001 /* ArchivePage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE00000000000A0002 /* ArchivePage.swift */; };
+		A1C0FFEE00000000000A0003 /* ArchiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C0FFEE00000000000A0004 /* ArchiveTests.swift */; };
 		2DAB6350F3AD369496F738CF /* DebugBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F9F8B1C1119171EFC0072B /* DebugBridge.swift */; };
 		2E6B0BE7362F9BFA6D652A71 /* BrandContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4C5CC6B99DC222FF742570A /* BrandContrastTests.swift */; };
 		2E8C9DF367FE32D045315D1C /* Brand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A64A4FFBD5B64DD888870043 /* Brand.swift */; };
@@ -846,6 +848,8 @@
 		D1A1F83A57343E7D5039E922 /* CommandBarPlacement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarPlacement.swift; sourceTree = "<group>"; };
 		928D7647F31AE3EE93056E2F /* MCPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
 		9318C9D9C45049E8105EA1CE /* HistoryPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryPage.swift; sourceTree = "<group>"; };
+		A1C0FFEE00000000000A0002 /* ArchivePage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchivePage.swift; sourceTree = "<group>"; };
+		A1C0FFEE00000000000A0004 /* ArchiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveTests.swift; sourceTree = "<group>"; };
 		93578FE502EC8C0F2D11346A /* FindMarks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindMarks.swift; sourceTree = "<group>"; };
 		9386D76C86995FCCE7A77BC2 /* PageSizeInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageSizeInputTests.swift; sourceTree = "<group>"; };
 		946C16FE0634A5AE372B5725 /* WebAppInstallSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppInstallSheet.swift; sourceTree = "<group>"; };
@@ -1433,6 +1437,7 @@
 				93578FE502EC8C0F2D11346A /* FindMarks.swift */,
 				05040A784BBF98D3612C0A6A /* HistoryClusters.swift */,
 				9318C9D9C45049E8105EA1CE /* HistoryPage.swift */,
+				A1C0FFEE00000000000A0002 /* ArchivePage.swift */,
 				C88AED5826C66F3EF3876CA0 /* HistoryStore.swift */,
 				0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */,
 				ADF6A2A22DF8C77C3C203284 /* OwnScripts.swift */,
@@ -1667,6 +1672,7 @@
 				3C753D7948805748B235F981 /* FreezeReportTests.swift */,
 				CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */,
 				2568EC51DD9F3FAAE5DBFDF5 /* HistoryMenuTests.swift */,
+				A1C0FFEE00000000000A0004 /* ArchiveTests.swift */,
 				A43306E6C8C1E74DFDB70B17 /* HistoryStoreTests.swift */,
 				C365A80CA95A963BF8C2E024 /* HostTextTests.swift */,
 				3BD5AAEBB8EB9458DBC73239 /* ImportTests.swift */,
@@ -2233,6 +2239,7 @@
 				E31FC3B636082D37DDFB6A0D /* HistoryClusters.swift in Sources */,
 				63392082D00360175C202F9A /* HistoryLookup.swift in Sources */,
 				2D55489310DC30BCEAE9D9C3 /* HistoryPage.swift in Sources */,
+				A1C0FFEE00000000000A0001 /* ArchivePage.swift in Sources */,
 				01AF8CAE8DC01BC74B382DCA /* HistoryStore.swift in Sources */,
 				8A3C09720A513455A8558735 /* HostText.swift in Sources */,
 				A59C6B456EB71D4263B94AB1 /* IconChoice.swift in Sources */,
@@ -2484,6 +2491,7 @@
 				0C5C2F5738FFF3C9FE3D145D /* FreezeReportTests.swift in Sources */,
 				038B1D66977B38EB772C0ECD /* HistoryClustersTests.swift in Sources */,
 				AF0AB0A49CF5A8B44233693E /* HistoryMenuTests.swift in Sources */,
+				A1C0FFEE00000000000A0003 /* ArchiveTests.swift in Sources */,
 				B09D1913AC2A768692EAF240 /* HistoryStoreTests.swift in Sources */,
 				A698488EDA6EA723DE9A51C8 /* HostTextTests.swift in Sources */,
 				3F301EE8453229EED42DFAED /* ImportTests.swift in Sources */,

@@ -491,6 +491,7 @@ final class Tab: NSObject {
         // Zigzag's own pages go by their names wherever the chrome names them.
         if SettingsPage.isSettings(url) { return String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") }
         if HistoryPage.isHistory(url) { return String(localized: "History", comment: "The name of the tab showing Zigzag's History.") }
+        if ArchivePage.isArchive(url) { return ArchivePage.title }
         if !title.isEmpty { return title }
         // A file on your Mac, or a PDF from the web, is called by its name: it has no title of its own.
         if let url, let name = HistoryStore.fileName(of: url) { return name }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Tabs that tidy themselves: an ordinary tab you haven't looked at in a while leaves the sidebar for the archive,
-/// where the command bar still finds it. Pinned pages, favorites, what's on screen, anything playing or in a call,
+/// where the command bar and the Archive page (zigzag://archive) still find it. Pinned pages, favorites, what's on screen, anything playing or in a call,
 /// and private windows are never archived. The archive keeps a month, newest first, and survives quitting.
 nonisolated struct ArchivedTab: Codable, Equatable, Identifiable {
     var id = UUID()
@@ -58,10 +58,16 @@ final class TabArchive {
     private static let keep: TimeInterval = 30 * 24 * 3600
     private static let limit = 500
 
-    private init() {
-        entries = JSONStore.load([ArchivedTab].self, from: Paths.file("Archive.json")) ?? []
+    /// Where it's kept; nil keeps it in memory only (tests).
+    private let file: URL?
+
+    init(file: URL? = Paths.file("Archive.json"), entries: [ArchivedTab]? = nil) {
+        self.file = file
+        self.entries = entries ?? file.flatMap { JSONStore.load([ArchivedTab].self, from: $0) } ?? []
         prune()
     }
+
+    func entry(_ id: UUID) -> ArchivedTab? { entries.first { $0.id == id } }
 
     func add(_ entry: ArchivedTab) { add(contentsOf: [entry]) }
 
@@ -135,11 +141,71 @@ final class TabArchive {
     private static let writer = DispatchQueue(label: "app.zigzag.archive", qos: .utility)
 
     private func save() {
+        if self === Self.shared { ArchivePage.refreshOpenPages() }
+        guard let file else { return }
         let entries = entries
-        let file = Paths.file("Archive.json")
         Self.writer.async { JSONStore.save(entries, to: file) }
     }
 
     /// Waits for what's being written, so quitting never cuts it short.
     static func flush() { writer.sync {} }
+}
+
+/// The Archive page's days, newest first: Today, Yesterday, then each earlier day by its date.
+nonisolated enum ArchiveDays {
+    struct Day: Equatable {
+        /// The day's first moment.
+        let start: Date
+        let entries: [ArchivedTab]
+    }
+
+    /// `entries` in any order; each day's newest first.
+    static func group(_ entries: [ArchivedTab], calendar: Calendar = .current) -> [Day] {
+        var byDay: [Date: [ArchivedTab]] = [:]
+        for entry in entries { byDay[calendar.startOfDay(for: entry.archivedAt), default: []].append(entry) }
+        return byDay.keys.sorted(by: >).map { start in
+            Day(start: start, entries: (byDay[start] ?? []).sorted { $0.archivedAt > $1.archivedAt })
+        }
+    }
+
+    /// “Today”, “Yesterday”, then the weekday and date (“Saturday, November 14”), with the year when it isn't this one.
+    static func title(of day: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale = Words.dates) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: day), to: calendar.startOfDay(for: now)).day ?? 0
+        if days <= 0 { return String(localized: "Today", comment: "Heading of the tabs archived today, on the Archive page.") }
+        if days == 1 { return String(localized: "Yesterday", comment: "Heading of the tabs archived yesterday, on the Archive page.") }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        let sameYear = calendar.component(.year, from: day) == calendar.component(.year, from: now)
+        formatter.setLocalizedDateFormatFromTemplate(sameYear ? "EEEEMMMMd" : "yEEEEMMMMd")
+        return formatter.string(from: day)
+    }
+
+    /// Every word is in the title, the address or the name of the space it came from.
+    static func matches(_ entry: ArchivedTab, words: [String], space: String?) -> Bool {
+        let haystack = [entry.title, entry.url.absoluteString, space ?? ""].joined(separator: " ").lowercased()
+        return words.allSatisfy { haystack.contains($0) }
+    }
+
+    static func words(_ query: String) -> [String] {
+        query.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+}
+
+extension TabManager {
+    /// An archived tab back as a tab, in front, in the space it was archived from (the one you're in when that space
+    /// is gone, or in a private window), and out of the archive. Already open there: that tab.
+    @discardableResult
+    func restore(_ entry: ArchivedTab, from archive: TabArchive = .shared) -> Tab {
+        archive.remove(url: entry.url)
+        let space = !isPrivate && Library.shared.space(entry.spaceID) != nil ? entry.spaceID : currentSpaceID
+        switchToSpace(space)
+        let key = Self.normalize(entry.url)
+        if let open = tabs(in: space).first(where: { $0.url.map(Self.normalize) == key }) {
+            select(open)
+            return open
+        }
+        return newTab(url: entry.url, spaceID: space, select: true, title: entry.title.isEmpty ? nil : entry.title, by: .you)
+    }
 }
