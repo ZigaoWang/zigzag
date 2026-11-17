@@ -535,50 +535,174 @@ extension ExtensionBridgeTests {
     }
 }
 
-/// `runtime.getContexts`, as Chrome answers it: Claude's side panel opens only when it finds itself there as its
-/// tab's side panel, by its whole address (#112).
+/// `runtime.getContexts`, as Chrome answers it: its background, its offscreen page, its popup and its side panel,
+/// with Chrome's filters over them. Claude's side panel opens only when it finds itself there as its tab's side panel,
+/// by its whole address (#112). Only what Zigzag can name truthfully is reported: no tab, document or incognito
+/// identity it doesn't have.
 struct ExtensionContextsTests {
     private let id = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
     private let base = "webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn/"
+    private var baseURL: URL { URL(string: base)! }
+    /// The extension's origin, as Chrome reports it: its actual scheme, query and all.
+    private var origin: String { String(base.dropLast()) }
 
-    @available(macOS 15.4, *)
-    private var pages: [BridgeContexts.Page] {
-        [BridgeContexts.Page(type: "BACKGROUND", url: URL(string: base + "zigzag-entry.js")),
-         BridgeContexts.Page(type: "OFFSCREEN_DOCUMENT", url: URL(string: base + "offscreen.html")),
-         BridgeContexts.Page(type: "SIDE_PANEL", url: URL(string: base + "sidepanel.html?tabId=770"), tabID: 770)]
+    /// A popup's page as WebKit holds it. Its address is the page's own, not a path rebuilt by anyone else.
+    private final class PopupPage: WKWebView {
+        private let address: URL?
+        override var url: URL? { address }
+        init(_ address: URL?) {
+            self.address = address
+            super.init(frame: .zero, configuration: WKWebViewConfiguration())
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+    }
+
+    /// The pages an extension has open: its background, its offscreen page, and a side panel opened for one tab.
+    private var contexts: [Context] {
+        [Context(type: .background, contextID: "background", documentURL: URL(string: base + "zigzag-entry.js")),
+         Context(type: .offscreenDocument, contextID: "offscreen", documentURL: URL(string: base + "offscreen.html")),
+         Context(type: .sidePanel, contextID: "sidepanel", documentURL: URL(string: base + "sidepanel.html?tabId=770"), tabID: 770)]
     }
 
     @Test func aSidePanelForOneTabNamesItsTab() {
-        guard #available(macOS 15.4, *) else { return }
-        let found = BridgeContexts.contexts(pages, extensionID: id, filter: ["documentUrls": [base + "sidepanel.html?tabId=770"]])
+        let found = BridgeContexts.matching(contexts, filter: ["documentUrls": [base + "sidepanel.html?tabId=770"]])
         #expect(found.count == 1)
-        #expect(found.first?["contextType"] as? String == "SIDE_PANEL")
-        #expect(found.first?["tabId"] as? Int == 770)
-        #expect(found.first?["documentUrl"] as? String == base + "sidepanel.html?tabId=770")
-        #expect(found.first?["documentOrigin"] as? String == "webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn")
+        #expect(found.first?.type == .sidePanel)
+        #expect(found.first?.tabID == 770)
+        #expect(found.first?.dictionary["documentUrl"] as? String == base + "sidepanel.html?tabId=770")
+        #expect(found.first?.dictionary["documentOrigin"] as? String == origin)
         // Every other page is no tab's.
-        let all = BridgeContexts.contexts(pages, extensionID: id, filter: [:])
-        #expect(all.map { $0["tabId"] as? Int } == [-1, -1, 770])
+        #expect(BridgeContexts.matching(contexts, filter: [:]).map(\.tabID) == [-1, -1, 770])
     }
 
     @Test func addressesMatchWholeQueryIncluded() {
-        guard #available(macOS 15.4, *) else { return }
-        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["documentUrls": [base + "sidepanel.html"]]).isEmpty)
-        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["documentUrls": [base + "sidepanel.html?tabId=771"]]).isEmpty)
+        #expect(BridgeContexts.matching(contexts, filter: ["documentUrls": [base + "sidepanel.html"]]).isEmpty)
+        #expect(BridgeContexts.matching(contexts, filter: ["documentUrls": [base + "sidepanel.html?tabId=771"]]).isEmpty)
     }
 
     @Test func aPanelForEveryTabIsNoTabs() {
-        guard #available(macOS 15.4, *) else { return }
-        let panel = [BridgeContexts.Page(type: "SIDE_PANEL", url: URL(string: base + "sidepanel.html"))]
-        #expect(BridgeContexts.contexts(panel, extensionID: id, filter: [:]).first?["tabId"] as? Int == -1)
+        let panel = [Context(type: .sidePanel, contextID: "sidepanel", documentURL: URL(string: base + "sidepanel.html"))]
+        #expect(BridgeContexts.matching(panel, filter: [:]).first?.tabID == -1)
     }
 
     @Test func filtersNarrowTheAnswer() {
-        guard #available(macOS 15.4, *) else { return }
-        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["contextTypes": ["SIDE_PANEL"]]).count == 1)
-        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["tabIds": [770]]).count == 1)
-        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["documentOrigins": ["webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn"]]).count == 3)
-        #expect(BridgeContexts.contexts(pages, extensionID: id, filter: ["incognito": true]).isEmpty)
+        #expect(BridgeContexts.matching(contexts, filter: ["contextTypes": ["SIDE_PANEL"]]).count == 1)
+        #expect(BridgeContexts.matching(contexts, filter: ["tabIds": [770]]).count == 1)
+        #expect(BridgeContexts.matching(contexts, filter: ["documentOrigins": [origin]]).count == 3)
+        #expect(BridgeContexts.matching(contexts, filter: ["incognito": true]).isEmpty)
+    }
+
+    @Test func backgroundWorkerHasNoDocumentFields() throws {
+        let worker = try #require(BridgeContexts.background(manifest: ["manifest_version": 3, "background": ["service_worker": "zigzag-entry.js"]],
+                                                            baseURL: baseURL, contextID: "background"))
+        #expect(worker.type == .background)
+        #expect(worker.tabID == -1)
+        #expect(worker.windowID == -1)
+        #expect(worker.frameID == -1)
+        #expect(worker.documentID == nil)
+        #expect(worker.documentURL == nil)
+        #expect(worker.dictionary["documentId"] == nil)
+        #expect(worker.dictionary["documentUrl"] == nil)
+        #expect(worker.dictionary["documentOrigin"] == nil)
+    }
+
+    @Test func mv2BackgroundPageUsesItsGeneratedPage() throws {
+        let declared = try #require(BridgeContexts.background(manifest: ["manifest_version": 2, "background": ["page": "background.html"]],
+                                                              baseURL: baseURL, contextID: "background"))
+        #expect(declared.documentURL?.absoluteString == base + "background.html")
+        #expect(declared.frameID == 0)
+        #expect(declared.tabID == -1)
+        // Scripts alone: the page Chrome generates for them.
+        let generated = try #require(BridgeContexts.background(manifest: ["manifest_version": 2, "background": ["scripts": ["background.js"]]],
+                                                               baseURL: baseURL, contextID: "background"))
+        #expect(generated.documentURL?.absoluteString == base + "_generated_background_page.html")
+        #expect(generated.frameID == 0)
+    }
+
+    @Test func anExtensionWithoutBackgroundHasNoBackgroundContext() {
+        #expect(BridgeContexts.background(manifest: ["manifest_version": 3], baseURL: baseURL, contextID: "background") == nil)
+        #expect(BridgeContexts.background(manifest: ["manifest_version": 2, "background": [String: Any]()], baseURL: baseURL, contextID: "background") == nil)
+    }
+
+    @Test func filtersMatchEveryChromeField() {
+        let worker = Context(type: .background, contextID: "worker", frameID: -1)
+        let panel = Context(type: .sidePanel, contextID: "panel", documentID: "doc-1",
+                            documentURL: URL(string: base + "panel.html?tab=7"), tabID: 7, windowID: 3)
+        let popup = Context(type: .popup, contextID: "popup", documentURL: URL(string: base + "popup.html"), windowID: 3)
+        let all = [worker, panel, popup]
+        #expect(BridgeContexts.matching(all, filter: ["contextIds": ["panel"]]).map(\.contextID) == ["panel"])
+        #expect(BridgeContexts.matching(all, filter: ["documentIds": ["doc-1"]]).map(\.contextID) == ["panel"])
+        #expect(BridgeContexts.matching(all, filter: ["documentOrigins": [origin]]).map(\.contextID) == ["panel", "popup"])
+        #expect(BridgeContexts.matching(all, filter: ["documentUrls": [base + "popup.html", base + "panel.html?tab=7"]]).map(\.contextID) == ["panel", "popup"])
+        #expect(BridgeContexts.matching(all, filter: ["frameIds": [-1]]).map(\.contextID) == ["worker"])
+        #expect(BridgeContexts.matching(all, filter: ["incognito": false]).count == 3)
+        #expect(BridgeContexts.matching(all, filter: ["tabIds": [7]]).map(\.contextID) == ["panel"])
+        #expect(BridgeContexts.matching(all, filter: ["windowIds": [3]]).map(\.contextID) == ["panel", "popup"])
+        #expect(BridgeContexts.matching(all, filter: ["contextTypes": ["POPUP", "BACKGROUND"]]).map(\.contextID) == ["worker", "popup"])
+        // Every field given narrows the answer, and every value within one widens it.
+        #expect(BridgeContexts.matching(all, filter: ["windowIds": [3], "contextTypes": ["POPUP"]]).map(\.contextID) == ["popup"])
+        #expect(BridgeContexts.matching(all, filter: ["windowIds": [4]]).isEmpty)
+        #expect(BridgeContexts.matching(all, filter: [:]).count == 3)
+    }
+
+    @Test func filtersMatchAbsentDocumentFieldsAsEmpty() {
+        let worker = Context(type: .background, contextID: "worker", frameID: -1)
+        let popup = Context(type: .popup, contextID: "popup", documentURL: URL(string: base + "popup.html"))
+        let all = [worker, popup]
+        // An explicit empty list matches nothing, where leaving the field out matches everything.
+        #expect(BridgeContexts.matching(all, filter: ["contextIds": []]).isEmpty)
+        #expect(BridgeContexts.matching(all, filter: ["documentUrls": []]).isEmpty)
+        #expect(BridgeContexts.matching(all, filter: ["contextTypes": []]).isEmpty)
+        // A document field leaves out a context that has no document.
+        #expect(BridgeContexts.matching(all, filter: ["documentUrls": [base + "popup.html"]]).map(\.contextID) == ["popup"])
+        #expect(BridgeContexts.matching(all, filter: ["documentIds": ["anything"]]).isEmpty)
+        #expect(BridgeContexts.matching(all, filter: ["documentOrigins": [origin]]).map(\.contextID) == ["popup"])
+    }
+
+    @Test func contextIdsAreStableAcrossCalls() {
+        let names = ContextNames()
+        let panel = NSObject()
+        let first = names.name(of: panel)
+        #expect(names.name(of: panel) == first)
+        #expect(names.name(of: NSObject()) != first)
+        // Two popups showing the same page are two contexts, with two names.
+        let url = URL(string: base + "popup.html")!
+        let one = PopupPage(url), two = PopupPage(url)
+        let oneID = names.name(of: one)
+        #expect(names.name(of: two) != oneID)
+        // A context that closes is forgotten, so one that opens again is a new one.
+        names.keeping([names.name(of: two)])
+        #expect(names.name(of: one) != oneID)
+    }
+
+    @Test func documentIdsAreNotInvented() throws {
+        let worker = try #require(BridgeContexts.background(manifest: ["manifest_version": 3, "background": ["service_worker": "zigzag-entry.js"]],
+                                                            baseURL: baseURL, contextID: "background"))
+        let page = try #require(BridgeContexts.background(manifest: ["manifest_version": 2, "background": ["page": "background.html"]],
+                                                          baseURL: baseURL, contextID: "background"))
+        let popup = Context(type: .popup, contextID: "popup", documentURL: URL(string: base + "popup.html"))
+        let panel = Context(type: .sidePanel, contextID: "panel", documentURL: URL(string: base + "panel.html"), tabID: 770)
+        for context in [worker, page, popup, panel] {
+            #expect(context.documentID == nil)
+            #expect(context.dictionary["documentId"] == nil)
+        }
+        // What can be named is there.
+        #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html")
+        #expect(panel.dictionary["tabId"] as? Int == 770)
+    }
+
+    @Test func aPopupKeepsItsQueryString() throws {
+        // The address is the page's own (`WKWebView.url`), not the path `shownPopupPage` gives tab capture.
+        let address = try #require(URL(string: base + "popup.html?tabId=770&view=side"))
+        let page = PopupPage(address)
+        let names = ContextNames()
+        let popup = BridgeContexts.popup(page, contextID: names.name(of: page))
+        #expect(popup.documentURL?.absoluteString == base + "popup.html?tabId=770&view=side")
+        #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html?tabId=770&view=side")
+        #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html?tabId=770&view=side"]]).count == 1)
+        #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html"]]).isEmpty)
+        // Its identity is the page itself, not its address.
+        #expect(names.name(of: page) == popup.contextID)
     }
 }
 

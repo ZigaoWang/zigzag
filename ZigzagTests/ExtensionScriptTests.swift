@@ -157,7 +157,8 @@ struct ExtensionScriptTests {
 
     /// A fake extension world for api-surface.js: WebKit's runtime with the manifest and the diagnostics channel an
     /// extension's background has, and none of the API namespaces the surface must fill.
-    private static func surfaceWorld(_ surface: String? = nil) throws -> JSContext {
+    private static func surfaceWorld(_ surface: String? = nil, version: Int? = nil) throws -> JSContext {
+        let manifest = version.map { "{ permissions: ['history'], manifest_version: \($0) }" } ?? "{ permissions: ['history'] }"
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -173,7 +174,7 @@ struct ExtensionScriptTests {
         var chrome = {
           runtime: {
             id: 'x',
-            getManifest: () => ({ permissions: ['history'] }),
+            getManifest: () => (\(manifest)),
             sendNativeMessage: (host, message) => { __notes.push({ host, ...message }); return Promise.resolve(); },
           },
         };
@@ -1167,6 +1168,167 @@ struct ExtensionScriptTests {
 
     private static func quoted(_ text: String) -> String {
         String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
+    }
+
+    // MARK: - runtime contexts (Task 8a: getContexts and getBackgroundPage)
+
+    /// `runtime.getContexts` is Chrome's MV3 member; an MV2 extension never had it, so the bridge doesn't give it one.
+    @Test func contextsAreAnMV3MemberOnly() {
+        for (version, present) in [(3, true), (2, false)] {
+            let context = JSContext()!
+            context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+            context.evaluateScript("""
+            var window = globalThis;
+            var __timers = [];
+            var setTimeout = (f) => { __timers.push(f); return __timers.length; }, clearTimeout = () => {};
+            var setInterval = () => 0, clearInterval = () => {};
+            var console = { warn: () => {}, error: () => {}, log: () => {} };
+            var navigator = { userAgent: 'Chrome/140.0.0.0 Safari/537.36' };
+            const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false });
+            var chrome = {
+              runtime: { id: 'x', getManifest: () => ({ manifest_version: \(version) }), onMessage: event(), onConnect: event(),
+                         sendNativeMessage: () => Promise.resolve({ value: [] }) },
+            };
+            """)
+            context.evaluateScript(ExtensionBridgeScript.source)
+            #expect(context.evaluateScript("typeof chrome.runtime.getContexts").toString() == (present ? "function" : "undefined"),
+                    "manifest \(version)")
+        }
+    }
+
+    /// The API surface fills every missing runtime function, but not Chrome's MV3-only `getContexts` in an MV2
+    /// extension: there it must stay absent, so feature detection takes Chrome's path.
+    @Test func theAPISurfaceLeavesGetContextsOutOfMV2() throws {
+        let v2 = try Self.surfaceWorld(version: 2)
+        #expect(v2.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
+        #expect(v2.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
+        let v3 = try Self.surfaceWorld(version: 3)
+        #expect(v3.evaluateScript("typeof chrome.runtime.getContexts").toString() == "function")
+        // In the app the bridge answers; where only the surface ran, the member still fails loudly rather than doing
+        // nothing.
+        v3.evaluateScript("var __error = null; chrome.runtime.getContexts({}).catch((e) => { __error = e.message; });")
+        #expect(v3.evaluateScript("__error").toString() == "chrome.runtime.getContexts isn't available in Zigzag")
+    }
+
+    /// An MV3 extension has no background page, and Chrome says so rather than handing back WebKit's null. Its page
+    /// still has the member, by promise or callback, with `runtime.lastError` only for as long as the callback runs.
+    @Test func anMV3PageIsToldThereIsNoBackgroundPage() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
+        chrome.runtime.getBackgroundPage = () => null;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        #expect(page.evaluateScript("typeof chrome.runtime.getBackgroundPage").toString() == "function")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then(() => { globalThis.__promise = 'page'; }, (e) => { globalThis.__promise = e.message; });
+        chrome.runtime.getBackgroundPage(() => { globalThis.__heard = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none'; });
+        """)
+        #expect(page.evaluateScript("__promise").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
+        // The error lives only while the callback runs.
+        #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// WebKit's own `runtime.lastError` is there before the failing callback and again after it, as the surface's
+    /// unavailable calls already keep it.
+    @Test func theBackgroundPageErrorPutsWebKitsLastErrorBack() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
+        chrome.runtime.getBackgroundPage = () => null;
+        var __nativeLastError = () => ({ message: 'native' });
+        Object.defineProperty(chrome.runtime, 'lastError', { get: __nativeLastError, configurable: true, enumerable: true });
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        var __during = null;
+        chrome.runtime.getBackgroundPage(() => { __during = chrome.runtime.lastError && chrome.runtime.lastError.message; });
+        """)
+        #expect(page.evaluateScript("__during").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get === __nativeLastError").toBool())
+        #expect(page.evaluateScript("chrome.runtime.lastError.message").toString() == "native")
+    }
+
+    /// An MV2 page still has its background page, and gets it by promise and by callback alike.
+    @Test func anMV2PageKeepsItsBackgroundPage() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        globalThis.__background = { isBackgroundPage: true };
+        chrome.runtime.getBackgroundPage = () => __background;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then((p) => { globalThis.__promise = !!p.isBackgroundPage; });
+        chrome.runtime.getBackgroundPage((p) => { globalThis.__heard = !!p.isBackgroundPage; });
+        """)
+        #expect(page.evaluateScript("__promise").toBool())
+        #expect(page.evaluateScript("__heard").toBool())
+        #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// An MV2 page whose background isn't running hears the same words Chrome uses, not WebKit's null.
+    @Test func anMV2PageWithoutABackgroundHearsChrome() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        chrome.runtime.getBackgroundPage = () => null;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then(() => { globalThis.__promise = 'page'; }, (e) => { globalThis.__promise = e.message; });
+        chrome.runtime.getBackgroundPage(() => { globalThis.__heard = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none'; });
+        """)
+        #expect(page.evaluateScript("__promise").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
+    }
+
+    /// Chrome's MV3 service worker has no `getBackgroundPage` at all, on either global, even where WebKit's property
+    /// won't be deleted: the runtime is stood in for by one without it. Its descriptor-compatible target still
+    /// enumerates and describes the members that stay, a non-configurable one included.
+    @Test func anMV3WorkerHasNoBackgroundPageMember() {
+        let worker = Self.workerWorld(worker: true, setup: """
+        var __manifest = () => ({ manifest_version: 3 });
+        Object.defineProperty(chrome.runtime, 'getManifest', { value: __manifest, configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(chrome.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
+        var browser = { runtime: { id: 'x' } };
+        Object.defineProperty(browser.runtime, 'getManifest', { value: __manifest, configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(browser.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
+        """)
+        worker.evaluateScript("__zigzagAfterSurface()")
+        for root in ["chrome", "browser"] {
+            #expect(worker.evaluateScript("'getBackgroundPage' in \(root).runtime").toBool() == false, "\(root)")
+            #expect(worker.evaluateScript("typeof \(root).runtime.getBackgroundPage").toString() == "undefined", "\(root)")
+            #expect(worker.evaluateScript("\(root).runtime.getBackgroundPage === undefined").toBool(), "\(root)")
+            // Enumeration and descriptors of what stays are safe, though getManifest can't be redefined.
+            #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getManifest')").toBool(), "\(root)")
+            #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getBackgroundPage')").toBool() == false, "\(root)")
+            #expect(worker.evaluateScript("typeof Object.getOwnPropertyDescriptor(\(root).runtime, 'getManifest').value").toString() == "function", "\(root)")
+            #expect(worker.evaluateScript("Object.getOwnPropertyDescriptor(\(root).runtime, 'getManifest').enumerable").toBool(), "\(root)")
+            #expect(worker.evaluateScript("\(root).runtime.getManifest().manifest_version").toInt32() == 3, "\(root)")
+            #expect(worker.evaluateScript("typeof JSON.stringify(\(root).runtime)").toString() == "string", "\(root)")
+        }
+    }
+
+    /// Two globals that share one runtime still share it when a member has to be hidden from both.
+    @Test func aSharedRuntimeStaysOneAcrossGlobals() {
+        let worker = Self.workerWorld(worker: true, setup: """
+        Object.defineProperty(chrome.runtime, 'getManifest', { value: () => ({ manifest_version: 3 }), configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(chrome.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
+        var browser = { runtime: chrome.runtime };
+        """)
+        worker.evaluateScript("__zigzagAfterSurface()")
+        #expect(worker.evaluateScript("chrome.runtime === browser.runtime").toBool())
+        #expect(worker.evaluateScript("'getBackgroundPage' in browser.runtime").toBool() == false)
+    }
+
+    /// An MV2 page has no `getContexts` even where WebKit's property can't be deleted, and the rest of runtime stays.
+    @Test func anMV2PageHasNoGetContextsEvenWhenWebKitWontGiveItUp() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        Object.defineProperty(chrome.runtime, 'getContexts', { value: () => [], configurable: false });
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        #expect(page.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
+        #expect(page.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
+        #expect(page.evaluateScript("typeof chrome.runtime.getManifest").toString() == "function")
     }
 }
 

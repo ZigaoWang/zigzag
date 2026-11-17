@@ -19,6 +19,9 @@
     let manifest = {};
     try { manifest = api.runtime.getManifest() || {}; } catch (e) {}
     const asked = new Set([...(manifest.permissions || []), ...(manifest.optional_permissions || [])]);
+    // Chrome's runtime.getContexts is MV3's alone. An MV2 extension has no member at all, not even a stand-in that
+    // would make feature detection take the wrong path.
+    const mv3 = manifest.manifest_version === 3;
     const inWorker = typeof window === 'undefined';
     const noted = new Set();
     const note = (name) => {
@@ -101,7 +104,10 @@
     };
     // `path` is where `target` sits under chrome, for the stand-in that's needed where WebKit refuses a member.
     const fill = (target, spec, name, path) => {
-      for (const fn of spec.functions || []) if (typeof target[fn] !== 'function') put(target, fn, unavailable(`${name}.${fn}`), path);
+      for (const fn of spec.functions || []) {
+        if (!mv3 && name === 'chrome.runtime' && fn === 'getContexts') continue;
+        if (typeof target[fn] !== 'function') put(target, fn, unavailable(`${name}.${fn}`), path);
+      }
       for (const ev of spec.events || []) put(target, ev, event(), path);
       for (const [key, value] of Object.entries(spec.constants || {})) if (target[key] === undefined) put(target, key, value, path);
       for (const [key, values] of Object.entries(spec.enums || {})) if (target[key] === undefined) put(target, key, Object.freeze({ ...values }), path);
