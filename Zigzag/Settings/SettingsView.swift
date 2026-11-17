@@ -928,6 +928,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var newTabRow: FormRow!
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
+    private let shareTabsToggle = Toggle()
     private let swipeToggle = Toggle()
     private let miniToggle = Toggle()
     private let energyToggle = Toggle()
@@ -1392,6 +1393,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               control: nestToggle)
         nestRow.keywords = String(localized: "nested tree child command click", comment: "Words that find the Open ⌘-clicked links under their tab setting with Find a setting in Settings. Not shown.")
         tabsGroup.add(nestRow)
+        shareTabsToggle.onChange = { on in TabStore.windowsShareTabs = on }
+        let shareRow = FormRow(title: String(localized: "Windows share a space’s tabs", comment: "A setting in Settings › Tabs: every window showing the same space lists the same open tabs, as in Arc, instead of each window having tabs of its own."),
+                               detail: String(localized: "Every window on a space lists the same tabs, each showing its own. A page can be on screen in one window at a time.", comment: "Explanation under “Windows share a space’s tabs” in Settings › Tabs."),
+                               control: shareTabsToggle)
+        shareRow.keywords = String(localized: "windows share same tabs sync arc sidebar another window", comment: "Words that find the Windows share a space’s tabs setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(shareRow)
         archiveAfter.options = TabArchive.After.allCases.map { DropdownButton.Option(title: $0.title) }
         archiveAfter.onSelect = { index in TabArchive.after = TabArchive.After.allCases[index] }
         tabsGroup.add(FormRow(title: String(localized: "Archive tabs you haven’t used", comment: "A setting in Settings › Tabs."),
@@ -3197,6 +3204,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshNewTabPlace()
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
+        shareTabsToggle.isOn = TabStore.windowsShareTabs
         swipeToggle.isOn = SwipeNavigator.isOn
         miniToggle.isOn = MiniWindowController.opensExternalLinks
         miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []

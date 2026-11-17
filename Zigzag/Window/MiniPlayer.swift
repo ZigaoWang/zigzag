@@ -115,7 +115,9 @@ final class MiniPlayer {
     /// or by a page in the background) goes back in, out of sight, as one you leave playing does.
     func soundChanged() {
         guard let controller else { return }
-        for tab in controller.tabManager.allTabs where tab.isPlayingAudio && !tab.isPeek && !tab.isClosed && tab.id != model.tab && !isOnScreen(tab) {
+        // Not one another window sharing the tabs has (#162).
+        for tab in controller.tabManager.allTabs where tab.isPlayingAudio && !tab.isPeek && !tab.isClosed && tab.id != model.tab && !isOnScreen(tab)
+            && controller.holds(tab) && !controller.tabManager.isShownElsewhere(tab) {
             guard let webView = tab.webView, webView.window == nil, tab.pageHolder?.superview == nil,
                   !parked.contains(where: { $0.webView === webView }) else { continue }
             keepInWindow(webView, of: tab)
@@ -159,7 +161,10 @@ final class MiniPlayer {
     func tabsChanged() {
         unpark { entry in
             guard let tab = entry.tab, let webView = entry.webView else { return true }
-            return tab.isClosed || controller?.tabManager.tab(with: tab.id) !== tab || tab.webView !== webView
+            // Or one another window sharing the tabs has put on screen since (#162).
+            let elsewhere = controller?.tabManager.store.isShared == true && webView.window != nil && webView.window !== controller?.window
+                && webView.fullscreenState == .notInFullscreen
+            return tab.isClosed || controller?.tabManager.tab(with: tab.id) !== tab || tab.webView !== webView || elsewhere
         }
         guard let id = model.tab else { return }
         if let tab, !tab.isClosed, controller?.tabManager.tab(with: id) === tab, let webView, tab.webView === webView,

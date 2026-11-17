@@ -48,8 +48,10 @@ final class MiniQuickOpen: NSWindowController, NSWindowDelegate {
     /// Switch to Tab: that tab's browser window comes forward with it, rather than a copy of it opening here.
     static func switchToTab(_ kind: CommandResult.Kind) -> Bool {
         guard case .switchTo(let id) = kind else { return false }
-        for controller in WindowManager.shared.controllers {
-            guard let tab = controller.tabManager.tab(with: id) else { continue }
+        for found in WindowManager.shared.controllers {
+            guard let tab = found.tabManager.tab(with: id) else { continue }
+            // The window it's in, of those sharing it (#162).
+            let controller = WindowManager.shared.window(of: tab) ?? found
             controller.tabManager.select(tab)
             controller.window?.makeKeyAndOrderFront(nil)
             return true

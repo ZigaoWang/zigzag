@@ -5877,6 +5877,50 @@
         }
       }
     },
+    "Every window on a space lists the same tabs, each showing its own. A page can be on screen in one window at a time." : {
+      "comment" : "Explanation under “Windows share a space’s tabs” in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一空间的每个窗口列出相同的标签页，各自显示自己的那一个。一个网页同一时间只能显示在一个窗口中。"
+          }
+        }
+      }
+    },
+    "Show Here" : {
+      "comment" : "Button over a tab's picture that brings its page from the other window it's shown in to this one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此显示"
+          }
+        }
+      }
+    },
+    "Shown in another window" : {
+      "comment" : "Over a tab's picture, in place of its page, when another window has that page on screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在另一个窗口中显示"
+          }
+        }
+      }
+    },
+    "Windows share a space’s tabs" : {
+      "comment" : "A setting in Settings › Tabs: every window showing the same space lists the same open tabs, as in Arc, instead of each window having tabs of its own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口共享空间的标签页"
+          }
+        }
+      }
+    },
     "default zoom size bigger larger smaller scale text" : {
       "comment" : "Words that find the Page zoom setting with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -21984,6 +22028,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "website data cookies cache storage sites remove 网站数据 Cookie 缓存 存储 网站 移除"
+          }
+        }
+      }
+    },
+    "windows share same tabs sync arc sidebar another window" : {
+      "comment" : "Words that find the Windows share a space’s tabs setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窗口 共享 相同 标签页 同步 arc 边栏 另一个窗口"
           }
         }
       }

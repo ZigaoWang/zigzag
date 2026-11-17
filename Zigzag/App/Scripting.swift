@@ -40,11 +40,14 @@ enum Scripting {
     static var frontWindow: BrowserWindowController? { windows.first }
 
     /// A window's tabs as a script lists them, in the sidebar's order: the favorites' open pages, then space by space
-    /// its pinned tabs' open pages and its tabs.
+    /// its pinned tabs' open pages and its tabs. While windows share their tabs (#162), a window lists those that are
+    /// in it, the ones it has on screen or last had, so each tab is listed once.
     static func tabs(of manager: TabManager) -> [Tab] {
-        ordered(favorites: Library.shared.favorites.map(\.id),
-                spaces: Library.shared.spaces.map { ($0.id, $0.bookmarks.map(\.id)) },
-                bookmarkTabs: manager.bookmarkTabs, tabs: manager.tabs(in:))
+        let all = ordered(favorites: Library.shared.favorites.map(\.id),
+                          spaces: Library.shared.spaces.map { ($0.id, $0.bookmarks.map(\.id)) },
+                          bookmarkTabs: manager.bookmarkTabs, tabs: manager.tabs(in:))
+        guard manager.store.isShared, let window = manager.host as? BrowserWindowController else { return all }
+        return all.filter(window.holds)
     }
 
     static func ordered<T>(favorites: [UUID], spaces: [(id: UUID, pinned: [UUID])], bookmarkTabs: [UUID: T], tabs: (UUID) -> [T]) -> [T] {

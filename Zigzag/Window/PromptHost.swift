@@ -43,7 +43,7 @@ extension WindowManager {
 
     /// The window `tab` lives in, wherever it's showing.
     func promptHost(holding tab: Tab) -> PromptHost? {
-        if let controller = controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) { return controller }
+        if let controller = window(of: tab) { return controller }
         return MiniWindowController.all.first { $0.tab === tab }
     }
 }
@@ -51,7 +51,7 @@ extension WindowManager {
 extension BrowserWindowController: PromptHost {
     var promptOverlay: NSView { root.overlay }
     var promptFrontTab: Tab? { tabManager.selectedTab }
-    func promptHolds(_ tab: Tab) -> Bool { tabManager.allTabs.contains { $0 === tab } }
+    func promptHolds(_ tab: Tab) -> Bool { tabManager.allTabs.contains { $0 === tab } && holds(tab) }
     func promptShows(_ tab: Tab) -> Bool {
         let front = tabManager.selectedTab
         return front.map { tabManager.panes(of: $0).contains { $0 === tab } } == true
