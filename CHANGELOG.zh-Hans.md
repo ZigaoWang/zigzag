@@ -30,6 +30,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 可以给所有网站或者单个网站关掉 JavaScript，和 Chrome 一样。“设置 › 隐私 › JavaScript”管所有网站，选“允许”或“不允许”；网站控制里的“JavaScript”一行能给当前网站单独设置，改了会重新载入网页。关掉的网站在那一行会写明，网页看起来坏了也好找原因。Zigzag 自己的页面和功能照常能用，无痕浏览窗口里的选择只对那个标签页有效，“设置 › 隐私 › 网站”里会列出每个网站的选择，可以忘掉。感谢 [Lakeland97](https://github.com/Lakeland97)。([#282](https://github.com/ZigaoWang/zigzag/issues/282))
 - “设置 › 隐私 › 下载文件前先询问网站”（默认关闭）打开后，网站第一次下载会先问你，和 Safari 一样。可以对这个网站一直允许，“网站设置”里也有“下载”一行，可以选询问、允许或阻止。感谢 [Lakeland97](https://github.com/Lakeland97)。([#256](https://github.com/ZigaoWang/zigzag/pull/256))
 - 在 Zigzag Mini、已安装的网页 App，或隐藏了边栏的窗口里，网站有请求在等你时，窗口边缘会出现一条柔和的线，点一下就能把窗口带到前面来回答。感谢 [Lakeland97](https://github.com/Lakeland97)。([#284](https://github.com/ZigaoWang/zigzag/pull/284))
+- 网站可以始终在你选的空间中打开，就像 Arc 的 Air Traffic Control。在网站设置里设好“打开于”，或在“设置 › 空间 › 在空间中打开的网站”里添加网站，之后指向这个网站及其子域名的链接，无论来自其他 App、命令栏、地址栏还是其他空间里的链接，都会在那里新开一个标签页，并有一条小提示告诉你去了哪里。空间用的是自己的个人资料时，网站的 Cookie 也是分开的，就像 Firefox 的容器标签页。重定向、登录和网页自己的弹窗都会留在原处，无痕浏览窗口不受影响，Zigzag Mini 也一样，直到你把它的网页移到 Zigzag 里。空间被移除后，它的网站会重新在任意空间中打开。感谢 [retorquere](https://github.com/retorquere)。([#286](https://github.com/ZigaoWang/zigzag/issues/286))
 
 ### 修复
 - 全屏时，显示边栏并打开“无边框页面”的情况下，网页碰到屏幕边缘的角现在是直角，不再是圆角、在右上角和右下角露出一小块边栏颜色的三角，没有打开网页或网页载入时最明显。在窗口里，网页的圆角跟着窗口本身的圆角走，不管 macOS 把窗口画得多圆。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
