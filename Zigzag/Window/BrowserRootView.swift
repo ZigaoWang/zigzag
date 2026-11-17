@@ -488,6 +488,9 @@ final class BrowserRootView: SpaceFrameView {
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
     private let resizeHandle = ResizeHandle()
+    /// The glow along the sidebar's edge while a question is waiting that this window can't show.
+    private let attentionEdge = AttentionEdge()
+    private var attentionToken: SignalToken?
     /// Floating surfaces (command bar, previews, peek) live here, above everything.
     let overlay = PassthroughView()
     /// An extension's side panel, docked right of the page while open.
@@ -583,6 +586,17 @@ final class BrowserRootView: SpaceFrameView {
             self.onTilesChange?(shape, true)
         }
         addSubview(resizeHandle)
+        attentionEdge.isHidden = true
+        attentionEdge.onClick = { [weak self] in
+            guard let self else { return }
+            self.setSidebarVisible(true, animated: true)
+            // Bring the tab the question is for to the front, so the banner it is waiting for comes up.
+            if let waiting = self.waitingTabs.first,
+               let tabs = (self.window?.windowController as? BrowserWindowController)?.tabManager {
+                tabs.select(waiting)
+            }
+        }
+        addSubview(attentionEdge)
         addSubview(sidebarContainer)
         addSubview(splitDropHint)
         addSubview(overlay)
@@ -595,6 +609,8 @@ final class BrowserRootView: SpaceFrameView {
                 }
             }
         }
+        // A question arriving (or being answered) can bring the edge glow on, or take it away.
+        attentionToken = PendingQuestions.changed.observe { [weak self] _ in self?.needsLayout = true }
         resizeHandle.onBegin = { [weak self] in
             guard let self else { return }
             self.widthBeforeDrag = self.sidebarWidth
@@ -933,6 +949,11 @@ final class BrowserRootView: SpaceFrameView {
     }
 
     /// The resize handle, on the sidebar's edge that faces the page.
+    /// Where the waiting glow goes while the sidebar is hidden: the window's own edge on the sidebar's side.
+    static func attentionEdgeFrame(in bounds: NSRect, onRight: Bool) -> NSRect {
+        AttentionEdge.frame(forPage: bounds, sidebarOnRight: onRight)
+    }
+
     static func resizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
         let width = Tokens.Metric.resizeHandleWidth
         return mirrored(NSRect(x: bounds.minX + sidebarWidth - width / 2, y: bounds.minY, width: width, height: bounds.height), in: bounds, if: onRight)
@@ -980,6 +1001,13 @@ final class BrowserRootView: SpaceFrameView {
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         resizeHandle.frame = Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
+        // The glow sits on the window's edge where the sidebar comes back from, while the sidebar is out of sight and a
+        // question is waiting. Not at the resize handle: with the sidebar hidden that is the sidebar's width into the
+        // page, a line through what you are reading.
+        attentionEdge.frame = Self.attentionEdgeFrame(in: bounds, onRight: sidebarOnRight)
+        let waiting = waitingTabs
+        attentionEdge.waiting = waiting.count
+        attentionEdge.isHidden = sidebarVisible || waiting.isEmpty
         overlay.frame = bounds
         onLayoutChange?()
     }
@@ -987,6 +1015,15 @@ final class BrowserRootView: SpaceFrameView {
     /// Full screen with the frame on: the page runs edge to edge while the sidebar is hidden, so the frame comes and
     /// goes with the sidebar, and the bar above the page moves down and up by its inset as it does.
     private var frameComesWithSidebar: Bool { !Self.isBorderless && window?.styleMask.contains(.fullScreen) == true }
+
+    /// The tabs in this window with a question waiting that nothing here is showing: a background tab, or a hidden
+    /// window. They are what the sidebar's edge glows for while the sidebar is out of sight.
+    private var waitingTabs: [Tab] {
+        guard let tabs = (window?.windowController as? BrowserWindowController)?.tabManager.allTabs else { return [] }
+        let host = window?.windowController as? PromptHost
+        let visible = window?.isVisible == true
+        return tabs.filter { PendingQuestions.waits(tabID: $0.id, isFront: host?.promptShows($0) ?? false, windowVisible: visible) }
+    }
 
     /// How far down the docked sidebar's top row sits, to stay on the middle line of the bar above the page. Not
     /// where the frame comes and goes with the sidebar: there the row would move as the sidebar is shown, and its

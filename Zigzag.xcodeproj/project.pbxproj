@@ -307,6 +307,7 @@
 		99F89444C80043DB635C413D /* PageHolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21702A8A7329B5CA2639717B /* PageHolderTests.swift */; };
 		9BB31B25E3F5A6DCF01CF154 /* PaneSiteControlsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48773DEB7199082B9EDA7805 /* PaneSiteControlsTests.swift */; };
 		9C1698F934167B4C7F79D557 /* ExtensionSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14C20474FB5E7187A87874B1 /* ExtensionSecurityTests.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* AttentionEdge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D2E3F40516273849A5B6C7 /* AttentionEdge.swift */; };
 		9CB768C6CFD15DC9C6468A77 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAEBEA6141A8688342F56A56 /* SidebarView.swift */; };
 		9D02F7D07BA7EFB165D985AE /* AutoPictureInPictureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD0F5740003190746ACD4D73 /* AutoPictureInPictureTests.swift */; };
 		9D13ADE0196E39606D06C145 /* PageTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F7FCA5586EF97D50AF36363 /* PageTranslator.swift */; };
@@ -942,6 +943,7 @@
 		C8FFB5AD301BF667E4A2669C /* AgentControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentControl.swift; sourceTree = "<group>"; };
 		C9102393493293F365ECD5D6 /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
 		C928420068829E660FA04DC9 /* FormSheetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormSheetTests.swift; sourceTree = "<group>"; };
+		C1D2E3F40516273849A5B6C7 /* AttentionEdge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionEdge.swift; sourceTree = "<group>"; };
 		CAEBEA6141A8688342F56A56 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		CC0E8F62B17A23075DFB3BF5 /* FavoritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesView.swift; sourceTree = "<group>"; };
 		CC57DDCE27AFE0FDF383357E /* ExtensionSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionSearch.swift; sourceTree = "<group>"; };
@@ -1185,6 +1187,7 @@
 		45578458512E00D5EB7061BF /* Sidebar */ = {
 			isa = PBXGroup;
 			children = (
+				C1D2E3F40516273849A5B6C7 /* AttentionEdge.swift */,
 				192303361A76A758A8F9346F /* FaviconView.swift */,
 				CC0E8F62B17A23075DFB3BF5 /* FavoritesView.swift */,
 				6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */,
@@ -2305,6 +2308,7 @@
 				ED98E29840EB4D47CE0DB5DE /* SettingsView.swift in Sources */,
 				A1B187BBCB414BDCB56CB3D0 /* SharedSoundGate.swift in Sources */,
 				2519AB56C923531EC8C11096 /* Shortcuts.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* AttentionEdge.swift in Sources */,
 				793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */,
 				A6B3999818FDB11071ED1832 /* SidebarMenus.swift in Sources */,
 				D2C57092BCC2EE225A2762E1 /* SidebarRows.swift in Sources */,

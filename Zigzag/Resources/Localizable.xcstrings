@@ -1712,6 +1712,17 @@
         }
       }
     },
+    "%lld tabs need your answer" : {
+      "comment" : "Tooltip of the glow along the sidebar's edge when more than one page is waiting for an answer. The placeholder is how many.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个标签页在等你回答"
+          }
+        }
+      }
+    },
     "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step." : {
       "comment" : "Steps in the note from the 1Password extension's button. Keep each step on its own line starting with its number and a period (1. 2. 3.); the line after the blank line is a note. Settings › Browser and Add Browser are names in 1Password.",
       "localizations" : {
@@ -1906,6 +1917,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "用一个小窗口快速看一眼页面。按 Esc 关闭，按 ⌘O 移到浏览器窗口中留下。"
+          }
+        }
+      }
+    },
+    "A tab needs your answer" : {
+      "comment" : "Tooltip of the glow along the sidebar's edge when one page is waiting for an answer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一个标签页在等你回答"
           }
         }
       }

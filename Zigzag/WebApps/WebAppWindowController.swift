@@ -36,7 +36,18 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     private lazy var linkStatus = LinkStatusController(overlay: overlay)
     private var tokens: [SignalToken] = []
     private let pageGone = Signal<Void>()
+    /// Sent when this window becomes, or stops being, the one you're in: its one page's "in front" turning on and off,
+    /// which is when a held question of its own goes up or is put away.
+    private let promptFrontChanged = Signal<Void>()
     private var isClosing = false
+
+    /// How many questions are waiting for this page while it can't be shown here: the window isn't the one you're in,
+    /// or isn't on screen. That is what the edge glow is for.
+    private var questionsWaitingForPage: Int {
+        guard let window, !isClosing else { return 0 }
+        guard PendingQuestions.waits(tabID: tab.id, isFront: window.isKeyWindow, windowVisible: window.isVisible) else { return 0 }
+        return PendingQuestions.count(tabID: tab.id)
+    }
 
     /// Shows the app's window, opening it if it isn't, and brings it forward on its own.
     /// `sender`: the process that asked, if known.
@@ -98,6 +109,10 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         strip.menuEntries = root.dragStrip.menuEntries
         root.card.show(tab.ensureWebView())
         root.card.hidePlaceholder()
+        // A question waiting for this page while the window isn't the one you're in: the edge glows, and clicking it
+        // brings the window forward, where the question goes up.
+        root.attentionWaiting = { [weak self] in self?.questionsWaitingForPage ?? 0 }
+        root.attentionClicked = { [weak self] in self?.bringForward() }
         refreshStrip()
         refreshBar(animated: false)
         strip.trafficLightsWidth = window.trafficLightsWidth
@@ -155,6 +170,16 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         if !NSApp.isActive { MiniLinkWake.activatingForOneWindow() }
         NSApp.activate()
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        // Now the window you're in, a question held for this page goes up.
+        promptFrontChanged.send()
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        // No longer the window you're in, a question goes back to waiting, and the edge glows.
+        promptFrontChanged.send()
     }
 
     private func tabChanged(_ change: Tab.Change) {
@@ -370,10 +395,21 @@ extension WebAppWindowController: PromptHost {
     var focusedPaneFrame: NSRect { overlay.bounds }
     var promptFrontTab: Tab? { isClosing ? nil : tab }
     func promptHolds(_ tab: Tab) -> Bool { tab === self.tab && !isClosing }
-    func promptShows(_ tab: Tab) -> Bool { promptHolds(tab) }
+    /// Its one page is in front only while this window is the one you're in: a question asked while you're elsewhere
+    /// waits, and the window's edge glows until you come to it, rather than going up unseen.
+    func promptShows(_ tab: Tab) -> Bool { promptHolds(tab) && window?.isKeyWindow == true }
     var promptIsPrivate: Bool { false }
     var promptAccent: NSColor { Brand.Theme.of(space).accent }
-    func observePromptTabs(_ body: @escaping () -> Void) -> SignalToken? { pageGone.observe { _ in body() } }
+    /// Its one page never changes places; what changes is whether this is the window you're in, which is when a held
+    /// question goes up (see `promptShows`).
+    func observePromptTabs(_ body: @escaping () -> Void) -> SignalToken? {
+        let gone = pageGone.observe { _ in body() }
+        let front = promptFrontChanged.observe { _ in body() }
+        return SignalToken {
+            gone.cancel()
+            front.cancel()
+        }
+    }
     var promptPageViews: [NSView] { [root.card] }
     func clearForPrompt() { linkStatus.hide() }
     var promptIsCovered: Bool { false }
@@ -391,6 +427,17 @@ final class WebAppRootView: ColorView {
     let dragStrip = WebAppDragStrip()
     let overlay = PassthroughView()
     let barLayer = PassthroughView()
+    /// Along the edge the sidebar would be on, while a question waits for this page and this isn't the window you're
+    /// in: there is no sidebar here to wear the dot, so the window's own edge says it instead.
+    let attentionEdge = AttentionEdge()
+    /// How many questions are waiting for this page while it can't be shown here (0 when it can).
+    var attentionWaiting: (() -> Int)?
+    /// Clicking the glow: come to the window, where the question goes up.
+    var attentionClicked: (() -> Void)?
+
+    private var tokens: [SignalToken] = []
+    private var keyTokens: [NSObjectProtocol] = []
+
     var showsToolbar = true {
         didSet {
             guard showsToolbar != oldValue else { return }
@@ -404,20 +451,47 @@ final class WebAppRootView: ColorView {
     init() {
         super.init(color: Tokens.Color.cardBackground)
         dragStrip.isHidden = true
-        [bar, strip, card, dragStrip, overlay, barLayer].forEach(addSubview)
+        [bar, strip, card, dragStrip, overlay].forEach(addSubview)
+        addSubview(attentionEdge)
+        addSubview(barLayer)
+        attentionEdge.isHidden = true
+        attentionEdge.onClick = { [weak self] in self?.attentionClicked?() }
         card.isEdgeToEdge = true
+        // A question arriving (or being answered) can bring the edge glow on, or take it away.
+        tokens.append(PendingQuestions.changed.observe { [weak self] _ in self?.needsLayout = true })
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Whether this is the window you're in decides whether a waiting question shows or glows, so the glow follows the
+    /// window's key state as well as the questions themselves.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        let centre = NotificationCenter.default
+        keyTokens.forEach(centre.removeObserver)
+        keyTokens = []
+        guard let window else { return }
+        keyTokens = [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification].map { name in
+            centre.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.needsLayout = true }
+            }
+        }
+        needsLayout = true
+    }
 
     override func layout() {
         super.layout()
         let top = showsToolbar ? Tokens.Metric.miniStripHeight : 0
         bar.frame = NSRect(x: 0, y: 0, width: bounds.width, height: top)
         strip.frame = bar.frame
-        card.frame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
+        let cardFrame = NSRect(x: 0, y: top, width: bounds.width, height: max(0, bounds.height - top))
+        card.frame = cardFrame
         dragStrip.frame = NSRect(x: 0, y: 0, width: bounds.width, height: min(bounds.height, Tokens.Metric.webAppTitleBarHeight))
-        overlay.frame = card.frame
+        overlay.frame = cardFrame
+        attentionEdge.frame = AttentionEdge.frame(forPage: cardFrame, sidebarOnRight: BrowserRootView.sidebarOnRight)
+        let waiting = attentionWaiting?() ?? 0
+        attentionEdge.waiting = waiting
+        attentionEdge.isHidden = waiting == 0
         barLayer.frame = bounds
     }
 }
