@@ -120,3 +120,24 @@ extension PDFDarkPagesTests {
         #expect(!PDFViewerView.isTooLarge(said: 0))
     }
 }
+
+extension PDFDarkPagesTests {
+    /// A title or heading is measured in UTF-16 units: combining marks piled on a few letters count, and the helper
+    /// cuts a long one at a whole character so it still fits.
+    @Test func titlesAreCappedByTheirUTF16Length() {
+        let piled = "a" + String(repeating: "\u{301}", count: 5_000)
+        #expect(piled.count == 1)
+        let size = Data([300.0, 400.0].flatMap { value in withUnsafeBytes(of: value) { Array($0) } })
+        #expect(!RemotePDFInfo(pageCount: 1, sizes: size, title: piled, outline: [], allowsCopying: true).isWellFormed)
+        #expect(!RemoteOutlineEntry(title: piled, level: 0, page: 0, y: .nan).isWellFormed(pages: 1))
+        #expect(RemotePDFInfo(pageCount: 1, sizes: size, title: "Report", outline: [], allowsCopying: true).isWellFormed)
+
+        #expect(PDFLimits.clippedTitle("Report") == "Report")
+        #expect(PDFLimits.clippedTitle(piled).isEmpty)
+        let emoji = String(repeating: "😀", count: 700)
+        let clipped = PDFLimits.clippedTitle(emoji)
+        #expect(clipped.utf16.count == PDFLimits.maxTitle)
+        #expect(clipped == String(repeating: "😀", count: 500))
+        #expect(RemoteOutlineEntry(title: clipped, level: 0, page: 0, y: .nan).isWellFormed(pages: 1))
+    }
+}

@@ -57,7 +57,21 @@ nonisolated enum PDFLimits {
     static let maxPageText = 500_000
     static let maxLinks = 5_000
     static let maxOutline = 10_000
+    /// In UTF-16 units, as the page text is, so combining marks piled on one character can't get past it.
     static let maxTitle = 1_000
+
+    /// `text` cut to `maxTitle` UTF-16 units, at a whole character.
+    static func clippedTitle(_ text: String) -> String {
+        guard text.utf16.count > maxTitle else { return text }
+        var clipped = "", used = 0
+        for character in text {
+            let length = character.utf16.count
+            guard used + length <= maxTitle else { break }
+            clipped.append(character)
+            used += length
+        }
+        return clipped
+    }
 
     /// Seconds each request may run in the helper before it ends itself.
     static let openTime: TimeInterval = 20
@@ -117,7 +131,7 @@ nonisolated enum PDFLimits {
     /// The pages' sizes, read once, if everything sent is within the limits; nil otherwise.
     func checkedPageSizes() -> [CGSize]? {
         guard (1...PDFLimits.maxPages).contains(pageCount), sizes.count == pageCount * 16,
-              outline.count <= PDFLimits.maxOutline, (title?.count ?? 0) <= PDFLimits.maxTitle else { return nil }
+              outline.count <= PDFLimits.maxOutline, (title?.utf16.count ?? 0) <= PDFLimits.maxTitle else { return nil }
         let side = 1.0...PDFLimits.maxPageSide
         let pageSizes = self.pageSizes
         guard pageSizes.allSatisfy({ side.contains($0.width) && side.contains($0.height) }),
@@ -159,7 +173,7 @@ nonisolated enum PDFLimits {
     }
 
     func isWellFormed(pages: Int) -> Bool {
-        title.count <= PDFLimits.maxTitle && (0...64).contains(level) && (-1..<pages).contains(page) && (y.isNaN || y.isFinite)
+        title.utf16.count <= PDFLimits.maxTitle && (0...64).contains(level) && (-1..<pages).contains(page) && (y.isNaN || y.isFinite)
     }
 }
 

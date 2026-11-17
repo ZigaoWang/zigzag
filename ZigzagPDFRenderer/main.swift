@@ -52,7 +52,7 @@ final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
                 withUnsafeBytes(of: Double(size.height)) { packed.append(contentsOf: $0) }
             }
             let title = (document.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String)
-                .map { String($0.prefix(PDFLimits.maxTitle)) }
+                .map(PDFLimits.clippedTitle)
             reply(RemotePDFInfo(pageCount: sizes.count, sizes: packed, title: title, outline: outline(of: document),
                                 allowsCopying: document.allowsCopying))
         }
@@ -233,7 +233,7 @@ final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
                 guard entries.count < PDFLimits.maxOutline, let child = item.child(at: i) else { return }
                 let destination = child.destination ?? (child.action as? PDFActionGoTo)?.destination
                 let place = destination.flatMap { self.place(of: $0, in: document) }
-                entries.append(RemoteOutlineEntry(title: String((child.label ?? "").prefix(PDFLimits.maxTitle)), level: level,
+                entries.append(RemoteOutlineEntry(title: PDFLimits.clippedTitle(child.label ?? ""), level: level,
                                                   page: place?.page ?? -1, y: place?.y ?? .nan))
                 add(child, level: level + 1)
             }
