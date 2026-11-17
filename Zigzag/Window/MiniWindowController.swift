@@ -610,12 +610,26 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     private func moveIntoZigzag() {
         let target = Self.browserWindow()
-        let spaceID = space.id
+        // A site you chose a space for goes there (#286): the page itself when that space is on the same profile,
+        // else afresh in it, with that space's sign-ins.
+        let routed = tab.url.flatMap { SiteRoutes.target(for: $0, arrival: .fromMini, from: space.id, place: .mini, routes: Library.shared.siteRoutes) }
+            .flatMap { Library.shared.space($0) != nil ? $0 : nil }
+        if let routed, let url = tab.url, Library.shared.profileID(ofSpace: routed) != Library.shared.profileID(ofSpace: space.id) {
+            // This page has the other profile's cookies: it closes with this window, and opens again over there.
+            window?.close()
+            target.tabManager.switchToSpace(routed)
+            target.tabManager.newTab(url: url, spaceID: routed, by: .zigzag)
+            target.window?.makeKeyAndOrderFront(nil)
+            target.toastRouted(to: routed)
+            return
+        }
+        let spaceID = routed ?? space.id
         letGo()
         target.tabManager.switchToSpace(spaceID)
         target.tabManager.insertAsNewTab(tab)
         window?.close()
         target.window?.makeKeyAndOrderFront(nil)
+        if let routed { target.toastRouted(to: routed) }
     }
 
     /// The page is leaving for a browser window: this window lets go of it, and closing leaves it open.

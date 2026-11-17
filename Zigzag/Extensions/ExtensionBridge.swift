@@ -189,7 +189,35 @@ enum ExtensionBridgeScript {
     }()
 
     /// Where WebKit answers differently from Chrome, made to answer as Chrome does (webkit-differences.js).
-    static let differences: String = webLocks + "\n" + differencesSource
+    static let differences: String = keepsBrowser + "\n" + webLocks + "\n" + differencesSource
+
+    /// Keeps the global `browser` WebKit's extension API, in the extension's background, its pages and its content
+    /// scripts. WebKit finds an extension's listeners through that global each time it delivers something (a message,
+    /// a port, an event); Chrome's delivery looks up no global at all. So an extension that puts something else in
+    /// its place cuts itself off from everything sent to it. Proton Pass hides its API from other scripts once it has
+    /// started, swapping `chrome` and `browser` for stand-ins that answer nothing: its background then heard nothing
+    /// its popup asked, and the popup said the browser was having difficulties (#287). Chrome has no `browser` of
+    /// its own, so what an extension sets there was never what Chrome delivers through: here `browser` stays
+    /// WebKit's and setting it does nothing. `chrome` is left to the extension, as WebKit doesn't deliver through it.
+    nonisolated static let keepsBrowser = """
+    (() => {
+      const keep = () => {
+        const native = globalThis.browser;
+        if (!native || typeof native !== 'object' || !native.runtime) return false;
+        const own = Object.getOwnPropertyDescriptor(globalThis, 'browser');
+        if (own && (own.get || own.configurable === false)) return true;
+        try {
+          Object.defineProperty(globalThis, 'browser', { get: () => native, set: () => {}, configurable: true, enumerable: own ? own.enumerable : false });
+        } catch (e) {}
+        return true;
+      };
+      if (keep() || typeof document === 'undefined') return;
+      // An extension page may get its API a moment after this runs; this still comes before the page's own timers.
+      let tries = 0;
+      const again = () => { if (!keep() && ++tries < 100) setTimeout(again, 20); };
+      setTimeout(again, 0);
+    })();
+    """
 
     /// The stand-in for navigator.locks (web-locks.js); also goes in front of worker scripts that use it.
     static let webLocks: String = {

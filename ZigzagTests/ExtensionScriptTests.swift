@@ -214,6 +214,51 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("chrome.runtime.OnInstalledReason.INSTALL")?.toString() == "install")
     }
 
+    /// Proton Pass swaps `chrome` and `browser` for stand-ins that answer nothing once it has started. WebKit delivers
+    /// messages through `browser`, so its background heard nothing and its popup said the browser was having
+    /// difficulties (#287). `browser` stays WebKit's; `chrome` is the extension's to replace, as in Chrome.
+    @Test func browserStaysWebKitsWhenAnExtensionReplacesIt() {
+        let protonsGuard = """
+        (() => {
+          'use strict';
+          for (const name of ['chrome', 'browser']) {
+            globalThis[name] = new Proxy(globalThis[name], { get: (target, key) => (key === 'app' ? target.app : undefined), set: () => false });
+          }
+        })();
+        """
+        for script in [ExtensionBridgeScript.differences, ExtensionStore.contentScriptsFirst] {
+            let context = JSContext()!
+            context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+            context.evaluateScript("var __background = true, __page = null, __backgroundPort = null; var __toBackground = () => {}, __connectToBackground = () => {};")
+            context.evaluateScript(Self.fakeWorld)
+            // As WebKit has it: an own property of the global object, the same API as `chrome`.
+            context.evaluateScript("Object.defineProperty(globalThis, 'browser', { value: chrome, writable: true, configurable: true, enumerable: true }); var __native = browser;")
+            context.evaluateScript(script)
+            context.evaluateScript("__flush()")
+            context.evaluateScript(protonsGuard)
+            #expect(context.evaluateScript("browser === __native && browser.runtime.id === 'x'")?.toBool() == true)
+            #expect(context.evaluateScript("chrome.runtime === undefined")?.toBool() == true)
+            // Setting it again, plainly or in strict code, is no error and changes nothing.
+            #expect(context.evaluateScript("(() => { 'use strict'; browser = {}; return browser === __native; })()")?.toBool() == true)
+        }
+        // The loaded copy's content scripts get it first, ahead of the reconnect guard.
+        #expect(ExtensionStore.contentScriptsFirst.hasPrefix(ExtensionBridgeScript.keepsBrowser))
+    }
+
+    @Test func browserIsKeptOnceAnExtensionPageGetsIt() {
+        // An extension page may get its API a moment after Zigzag's scripts run: kept then, before the page's own timers.
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = [], document = {};
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        """)
+        context.evaluateScript(ExtensionBridgeScript.keepsBrowser)
+        context.evaluateScript("Object.defineProperty(globalThis, 'browser', { value: { runtime: { id: 'x' } }, writable: true, configurable: true }); var __native = browser;")
+        context.evaluateScript("__timers.push(() => { browser = undefined; }); for (let i = 0; i < 5 && __timers.length; i++) __timers.splice(0).forEach((f) => f());")
+        #expect(context.evaluateScript("browser === __native")?.toBool() == true)
+    }
+
     @Test func tabMessagesReachTheExtensionsOwnFramesInThatTab() throws {
         // WebKit sends tabs.sendMessage to content scripts only; Chrome also to the extension's own pages in that
         // tab, which is how 1Password tells its sign-in banner on a site to close.

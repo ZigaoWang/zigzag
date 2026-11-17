@@ -898,6 +898,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let searchGroup = FormGroup()
     private let blockingGroup = FormGroup()
     private let spacesGroup = FormGroup()
+    /// How a space you make starts: on a profile of its own or not (#291).
+    private let newSpacesGroup = FormGroup()
+    private let ownProfileToggle = Toggle()
+    /// Sites that always open in a space (#286).
+    private let routesGroup = FormGroup()
     private let profilesGroup = FormGroup()
     private let appearanceGroup = FormGroup()
     private let miniGroup = FormGroup()
@@ -1081,6 +1086,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let translateInto = DropdownButton()
     private var languages: [(id: String, name: String)] = []
     private let addSpaceButton = PillButton(title: String(localized: "New Space", comment: "Button beside Your Spaces in Settings › Spaces."))
+    private let addRouteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space."))
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Install from Folder…", comment: "Button in Settings › Extensions: installs an extension from a folder on this Mac, one you're building or one that came with an app."))
@@ -1505,7 +1511,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                               control: pinOfferToggle))
 
         // Spaces
+        ownProfileToggle.onChange = { on in Library.newSpacesGetOwnProfile = on }
+        let ownProfileRow = FormRow(title: String(localized: "Give new spaces their own profile", comment: "A setting in Settings › Spaces: a space you make gets a new profile of its own, named after the space."),
+                                    detail: String(localized: "A space you make gets a profile named after it, with its own sign-ins, extensions and history. Spaces you have now stay on theirs.",
+                                                   comment: "Explanation under “Give new spaces their own profile” in Settings › Spaces."),
+                                    control: ownProfileToggle)
+        ownProfileRow.keywords = String(localized: "separate profile per space each own container isolate new space", comment: "Words that find the Give new spaces their own profile setting with Find a setting in Settings. Not shown.")
+        newSpacesGroup.add(ownProfileRow)
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
+        addRouteButton.onClick = { [weak self] _ in if let self { SiteRouteSheet.add(in: self) } }
         addProfileButton.onClick = { [weak self] _ in if let self { ProfileSheets.new(in: self) } }
         profilePicker.onSelect = { [weak self] index in self?.choseProfile(at: index) }
         refreshProfilePicker()
@@ -2259,7 +2273,40 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// Settings › Spaces' Sites in Spaces: each site with the space it opens in, to change or remove.
+    private func reloadRoutes() {
+        routesGroup.removeAllRows()
+        let routes = Library.shared.siteRoutes.sorted { $0.site < $1.site }
+        if routes.isEmpty {
+            routesGroup.add(FormRow(title: String(localized: "None yet", comment: "A row under Sites in Spaces in Settings › Spaces, shown when no site always opens in a space."),
+                                    detail: String(localized: "To always open a site in a space, choose it under Open in, in the site’s controls.", comment: "Explanation under “None yet” in Settings › Spaces › Sites in Spaces. Open in is the row in the site panel."),
+                                    control: NSView()))
+        }
+        let spaces = Library.shared.spaces
+        for route in routes {
+            let site = route.site
+            let choice = DropdownButton()
+            choice.options = spaces.map { DropdownButton.Option(title: $0.name) }
+            choice.selectedIndex = spaces.firstIndex { $0.id == route.spaceID } ?? 0
+            choice.setAccessibilityLabel(String(localized: "Space for \(site)", comment: "VoiceOver name of the space menu on a row in Settings › Spaces › Sites in Spaces: a site, like youtube.com."))
+            choice.onSelect = { index in
+                guard spaces.indices.contains(index) else { return }
+                Library.shared.setSiteRoute(site, to: spaces[index].id)
+            }
+            let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again."))
+            remove.setAccessibilityLabel(String(localized: "Remove \(site)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
+            remove.onClick = { _ in Library.shared.setSiteRoute(site, to: nil) }
+            let stack = NSStackView(views: [remove, choice])
+            stack.spacing = Tokens.Space.x2
+            let favicon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            let row = FormRow(title: site, icon: favicon, control: stack)
+            row.revealsOnHover(remove)
+            routesGroup.add(row)
+        }
+    }
+
     private func reloadSpaces() {
+        reloadRoutes()
         spacesGroup.removeAllRows()
         spaceRows = Library.shared.spaces.map { space in
             let row = SpaceSettingsRow(space: space)
@@ -2585,6 +2632,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var featureFlagsHeading: String { String(localized: "Feature Flags", comment: "A heading in Settings › Developer, as Safari's Develop menu names them: WebKit's switches for new and experimental features.") }
     private static var scriptsHeading: String { String(localized: "Scripts", comment: "A heading in Settings › Automation: what AppleScript and Shortcuts may do in Zigzag.") }
     private static var spacesHeading: String { String(localized: "Your Spaces", comment: "A heading in Settings › Spaces.") }
+    private static var routesHeading: String { String(localized: "Sites in Spaces", comment: "A heading in Settings › Spaces, over the sites that always open in a space you chose, whatever space or app the link came from.") }
     private static var profilesHeading: String { String(localized: "Your Profiles", comment: "A heading in Settings › Profiles.") }
     private static var unlistedHeading: String { String(localized: "Not Listed", comment: "A heading in Settings › Profiles, over data left on this Mac by profiles that are no longer in the list.") }
     private static var sitesHeading: String { String(localized: "Site Permissions", comment: "A heading in Settings › Privacy: camera, location, pop-ups and other choices made for single sites.") }
@@ -2628,7 +2676,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .tabs: [(nil, tabsGroup)]
         case .search: [(nil, searchGroup)]
         case .mini: [(nil, miniGroup)]
-        case .spaces: [(Self.spacesHeading, spacesGroup)]
+        case .spaces: [(nil, newSpacesGroup), (Self.spacesHeading, spacesGroup)] + (Library.shared.spaces.count > 1 ? [(Self.routesHeading, routesGroup)] : [])
         case .profiles: [(Self.profilesHeading, profilesGroup), (Self.unlistedHeading, unlistedGroup)]
         case .passwords: [(nil, passwordsWindowGroup), (savingHeading, passwordsGroup)] + (hasManyProfiles ? [(Self.formsHeading, cardGroup)] : [])
         case .privacy: [(nil, blockingGroup), (Self.sitesHeading, sitesGroup)] + (SettingsPane.websiteData(manyProfiles: hasManyProfiles) == .privacy ? websiteDataGroups : [])
@@ -2786,10 +2834,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .general, .appearance, .tabs, .search, .mini, .automation:
             for (title, group) in groups(of: pane) { section(title, group) }
         case .spaces:
+            section(nil, newSpacesGroup)
             section(Self.spacesHeading, spacesGroup, accessory: addSpaceButton)
             // Said once, under the list, and only when there's an order to change.
             if spaceRows.count > 1 {
                 note(String(localized: "Drag a space to change its order.", comment: "Hint under Your Spaces in Settings › Spaces."))
+                section(Self.routesHeading, routesGroup, accessory: addRouteButton)
+                note(String(localized: "A site opens in its space wherever its link comes from: another app, the command bar or another space. It covers the site’s subdomains. When a space is removed, its sites open in any space again.",
+                            comment: "Under Sites in Spaces in Settings › Spaces."))
             }
         case .profiles:
             section(Self.profilesHeading, profilesGroup, accessory: addProfileButton)
@@ -3267,6 +3319,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
         shareTabsToggle.isOn = TabStore.windowsShareTabs
+        ownProfileToggle.isOn = Library.newSpacesGetOwnProfile
         swipeToggle.isOn = SwipeNavigator.isOn
         miniToggle.isOn = MiniWindowController.opensExternalLinks
         miniKeys.keys = Shortcuts.allItems.first { $0.action == #selector(AppDelegate.newMiniWindow(_:)) }.map(Shortcuts.caps) ?? []
@@ -3413,15 +3466,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// the sidebar's does: to name it, and to give it a profile of its own there (#201).
     private func addSpace() {
         let profile = browser?.tabManager.profile.id ?? Profile.defaultID
+        let own = Library.newSpacesGetOwnProfile
         var made: SpaceInfo?
-        BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) { made = Library.shared.addSpace(profile: profile) }
+        BrowserWindowController.changeLibrary(String(localized: "New Space", comment: "What Edit › Undo undoes after a space is added.")) {
+            made = Library.shared.addSpace(profile: profile, ownProfile: own)
+        }
         // Made here rather than from the sidebar, it's still the guide's "make a space" step.
         Tutorial.complete("space")
         guard let made else { return }
+        let madeProfile = own ? Library.shared.profileID(ofSpace: made.id) : nil
         DispatchQueue.main.async { [weak self] in
             guard let self, let row = self.spaceRows.first(where: { $0.spaceID == made.id }) else { return }
             row.scrollToVisible(row.bounds)
             row.openEditor()
+            if let madeProfile, SpaceEditorPanel.current?.spaceID == made.id { SpaceEditorPanel.current?.follow(madeProfile: madeProfile) }
         }
     }
 

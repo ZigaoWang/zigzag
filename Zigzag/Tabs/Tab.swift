@@ -14,10 +14,14 @@ protocol TabHost: AnyObject {
     func tabWantsToBeShown(_ tab: Tab)
     /// Swiped back or forward in its page: in a split, that page becomes the one you're in, as a click on it would.
     func tabWantsFocus(_ tab: Tab)
+    /// A link you clicked or opened in a new tab: true when a route sent it to another space (#286), which opened
+    /// it there, so the page here stays as it is. Only a browser window routes.
+    func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool
 }
 
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
+    func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
 }
 
 enum OpenDisposition {
@@ -1616,6 +1620,13 @@ extension Tab: WKNavigationDelegate {
         // where WebKit holds it to what the page may reach.
         if isLinkClick && isMainFrame && Self.route(forPageLink: url, from: self.url) == .load {
             let flags = navigationAction.modifierFlags
+            // A site you chose a space for opens there (#286): a click, or a link to a new tab. Not a peek (⇧) or a
+            // download (⌥), and never what the page does on its own.
+            let opensTab = navigationAction.buttonNumber == 4 || flags.contains(.command)
+            if userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
+               host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
+                return (.cancel, preferences)
+            }
             if navigationAction.buttonNumber == 4 /* middle click */ || flags.contains(.command) {
                 host?.tab(self, openURL: url, disposition: flags.contains(.shift) ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
