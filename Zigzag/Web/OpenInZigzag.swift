@@ -34,7 +34,8 @@ nonisolated enum OpenInZigzag {
         case newTab
         case mini
 
-        /// The destinations the question's dropdown offers, in the order it shows them.
+        /// The destinations the question's dropdown offers, in the order it shows them. The hand-off card puts This
+        /// Tab first instead (`DownloadHandoff.cardPlaces`): its dropdown is answered in a hurry.
         static var destinations: [Choice] { [.defaultBrowser, .thisTab, .newTab, .mini] }
 
         /// The place inside Zigzag, or nil for Ask and the Mac's default browser.

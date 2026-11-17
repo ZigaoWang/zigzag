@@ -720,6 +720,64 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
     }
 
+    // MARK: The place the hand-off card asks for
+
+    /// The hand-off card asks where its web address opens only when the rule hasn't been told, and it is answered in a
+    /// hurry: the dropdown's first entry is the answer a press of Hand Off sends without the dropdown being touched.
+    /// That entry is This Tab, which keeps the link inside Zigzag; the Mac's browser is still offered. The separate
+    /// "Where should this open" question and the rule sheet keep their order — the browser first — because they are
+    /// about a rule, not about this one hand-off.
+    @Test func theHandOffCardStartsWithThisTabInZigzag() {
+        #expect(DownloadHandoff.cardPlaces.map(\.rawValue) == ["thisTab", "defaultBrowser", "newTab", "mini"])
+        #expect(DownloadHandoff.cardPlaces.first == .thisTab)
+        // The first entry is what the card's dropdown starts on: `DropdownButton` selects index 0 until it is touched,
+        // and the card reads the selected entry when Hand Off is pressed.
+        let dropdown = DropdownButton()
+        dropdown.options = DownloadHandoff.cardPlaces.map { DropdownButton.Option(title: $0.title) }
+        #expect(dropdown.selectedIndex == 0)
+        #expect(dropdown.options.first?.title == OpenInZigzag.Choice.thisTab.title)
+        // The question the rule itself asks, and the sheet, are unchanged: the browser is the first destination
+        // offered, and Ask is still the sheet's first choice.
+        #expect(OpenInZigzag.Choice.destinations.map(\.rawValue) == ["defaultBrowser", "thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Choice.allCases.map(\.rawValue) == ["ask", "defaultBrowser", "thisTab", "newTab", "mini"])
+    }
+
+    /// A place picked in the hand-off card opens that hand-off and nothing else: the rule is left exactly as it was,
+    /// so a rule that hadn't been told (`.ask`) is still asking next time.
+    @Test func aCardsPlaceOpensOneHandOffAndNeverBecomesTheRules() {
+        var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.action.urlTemplate = "https://mirror.example.com/{filename}"
+        #expect(rule.action.openIn == .ask)
+
+        let request = DownloadHandoff.Request(url: URL(string: "https://example.com/a.zip")!, place: .thisTab)
+        #expect(DownloadHandoff.opening(rule, at: request.place) == .thisTab, "this hand-off opens where the card says")
+        #expect(DownloadHandoff.ruleToKeep(rule, choice: .thisTab, always: false) == nil, "nothing is written on the rule")
+        #expect(rule.action.openIn == .ask, "and the rule is still asking")
+
+        // Told in its sheet, the rule opens there without a card, and a card's place still overrides this one only.
+        var told = rule
+        told.action.openIn = .mini
+        #expect(DownloadHandoff.opening(told, at: nil) == .mini)
+        #expect(DownloadHandoff.opening(told, at: .newTab) == .newTab)
+        #expect(told.action.openIn == .mini)
+    }
+
+    /// The separate question's two answers: Always keeps the place on the rule, Once opens it there and leaves the rule
+    /// asking. The answer is a rule to save, never a rule changed in place — the caller writes it.
+    @Test func onlyAlwaysKeepsThePlaceOnTheRule() {
+        var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.action.urlTemplate = "https://mirror.example.com/{filename}"
+        #expect(rule.action.openIn == .ask)
+
+        #expect(DownloadHandoff.ruleToKeep(rule, choice: .mini, always: false) == nil)
+        let kept = DownloadHandoff.ruleToKeep(rule, choice: .mini, always: true)
+        #expect(kept?.id == rule.id)
+        #expect(kept?.action.openIn == .mini)
+        #expect(rule.action.openIn == .ask, "the rule the question asked about is not changed in place")
+    }
+
     /// Everything holding a rule's Add button back, in the order the form is filled in: the button's own words and the
     /// fields it marks come from this one list, so the two can never disagree.
     @Test func aRuleSaysEverythingHoldingAddBack() {

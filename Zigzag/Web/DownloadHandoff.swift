@@ -23,8 +23,8 @@ enum DownloadHandoff {
         /// The tab that asked, where one did: its page keeps the answer for as long as it is on the page, and an Open
         /// URL rule opening a web address in Zigzag opens it in relation to this tab ("This Tab" is this one).
         var tab: Tab?
-        /// Where the handoff question was told to open a web address, when it offered that choice in the same card.
-        /// The rule's own answer is written down on the rule; this one is for this handoff only.
+        /// Where the handoff question was told to open a web address, when it offered that choice in the same card:
+        /// this hand-off's place, never the rule's. Only the separate question's Always writes one on the rule.
         var place: OpenInZigzag.Choice?
         /// Whether you clicked the link that led here. A click may send this page's cookies to the target; a page
         /// that starts a download or a navigation on its own may not.
@@ -76,8 +76,8 @@ enum DownloadHandoff {
     enum HandoffGate: Equatable { case handOff, browser, cancel }
 
     /// What a handoff question answered: the gate, and, where the same card offered a place to open a web address,
-    /// the place it picked. The place travels with this handoff only; the rule keeps it when the rule is the one that
-    /// asked, which is what makes a rule ask once.
+    /// the place it picked. The place travels with this handoff only: a card's answer is never written on the rule. A
+    /// rule's own place comes from its sheet, or from the separate question's Always.
     struct Decision {
         let gate: HandoffGate
         var place: OpenInZigzag.Choice? = nil
@@ -97,6 +97,12 @@ enum DownloadHandoff {
 
     /// The key a page answer is kept under: per rule, so two rules on one page keep their own answers.
     static func handoffKind(_ rule: DownloadRule) -> String { "handoff:\(rule.id.uuidString)" }
+
+    /// The places the hand-off card's dropdown offers, This Tab first. The card's buttons answer the question and the
+    /// dropdown only says where, so its first entry is the place Hand Off sends without the dropdown being looked at:
+    /// This Tab keeps the link inside Zigzag. The rule's own question, and the sheet, keep `Choice.destinations`'
+    /// order, where the Mac's browser is first — they are about the rule, not about one hurried hand-off.
+    static let cardPlaces: [OpenInZigzag.Choice] = [.thisTab] + OpenInZigzag.Choice.destinations.filter { $0 != .thisTab }
 
     /// Asks where a handoff should go, unless this page already answered for this rule. The question asks in the
     /// page's own window; with no window to ask in, nothing is handed off and the link or download stays as it is.
@@ -140,7 +146,7 @@ enum DownloadHandoff {
                     : String(localized: "Open in Browser", comment: "Button that lets a link stay in the browser instead of running a download rule.")),
                 PermissionAction(id: "handOff", title: String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."), isDeny: false, isProminent: true)
             ],
-            chooser: asksPlace ? OpenInZigzag.Choice.destinations.map { .alternate($0.rawValue, $0.title) } : [],
+            chooser: asksPlace ? cardPlaces.map { .alternate($0.rawValue, $0.title) } : [],
             canRemember: false,
             answered: {
                 // Asked while another question was up: the page may have answered this one in the meantime.
@@ -307,9 +313,10 @@ enum DownloadHandoff {
     }
 
     /// An Open URL action. A web address is Zigzag's own: it opens where the rule says, and a rule that hasn't been
-    /// told yet asks once — here, over the page — and keeps the answer on itself, since an automation that asked every
-    /// time wouldn't be one. Any other address (mpv://, a magnet, a mail link) belongs to the app that handles it and
-    /// is handed on exactly as it always was.
+    /// told yet asks — in the hand-off card, or in the separate question when there was no card. The card's place is
+    /// that one hand-off's alone and is never written on the rule; only the separate question's Always keeps one
+    /// there. Any other address (mpv://, a magnet, a mail link) belongs to the app that handles it and is handed on
+    /// exactly as it always was.
     private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
                                 request: Request, rule: DownloadRule) async -> Outcome {
         let text = DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)
@@ -317,15 +324,9 @@ enum DownloadHandoff {
             return .failed(String(localized: "The URL isn’t valid.", comment: "Why a download rule failed: the URL it was told to open can't be made."))
         }
         guard OpenInZigzag.handles(url) else { return openWithTheSystem(url) }
-        // The hand-off card asked for the place, so this is the answer that becomes the rule's own: asked once, then
-        // written down, the way a rule that was told in its sheet is. A place asked in the separate question is kept
-        // there only when its answer was Always.
-        if let place = request.place, rule.action.openIn == .ask {
-            var remembered = rule
-            remembered.action.openIn = place
-            DownloadRulesStore.shared.update(remembered)
-        }
-        var choice = request.place ?? action.openIn
+        // The card's place is this hand-off's own (see `opening`), so nothing here writes the rule: a rule that asked
+        // is still asking afterwards, and asks again the next time it fires.
+        var choice = opening(rule, at: request.place)
         if choice == .ask { choice = await askWhereToOpen(rule: rule, request: request) ?? .ask }
         switch choice {
         case .defaultBrowser:
@@ -338,6 +339,23 @@ enum DownloadHandoff {
         case .ask:
             return .noMatch
         }
+    }
+
+    /// Where one hand-off opens: the place its card picked for this time, or the rule's own answer. The card's place is
+    /// never written on the rule, whichever it is: the card is answered in a hurry, and its dropdown says what happens
+    /// to this link or file, not what the rule should do. A rule's own place comes from its sheet, or from the separate
+    /// question's Always.
+    static func opening(_ rule: DownloadRule, at cardPlace: OpenInZigzag.Choice?) -> OpenInZigzag.Choice {
+        cardPlace ?? rule.action.openIn
+    }
+
+    /// The rule the separate question's answer leaves behind: Always writes the picked place down, Once leaves the rule
+    /// asking. Nil is "the rule stays exactly as it is", so a caller saves only what it is given.
+    static func ruleToKeep(_ rule: DownloadRule, choice: OpenInZigzag.Choice, always: Bool) -> DownloadRule? {
+        guard always else { return nil }
+        var kept = rule
+        kept.action.openIn = choice
+        return kept
     }
 
     /// An address Zigzag doesn't own, handed to whatever on this Mac does.
@@ -364,10 +382,8 @@ enum DownloadHandoff {
             canRemember: false)
         guard let answer, let choice = OpenInZigzag.Choice(rawValue: answer.choice ?? "") else { return nil }
         // "Once" opens it where it was asked for and asks again next time; "Always" writes it on the rule.
-        if answer.action != "once" {
-            var remembered = rule
-            remembered.action.openIn = choice
-            DownloadRulesStore.shared.update(remembered)
+        if let kept = ruleToKeep(rule, choice: choice, always: answer.action != "once") {
+            DownloadRulesStore.shared.update(kept)
         }
         return choice
     }
