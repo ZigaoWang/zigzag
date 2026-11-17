@@ -227,7 +227,7 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         else { return false }
         tab.permissionAnswers.note(false, key: origin, kind: noticeKind)
         Diagnostics.note("WebRTC", site: SiteOrigin.label(origin), "blocked, the page tried to use it", isPrivate: tab.isPrivate)
-        guard let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }),
+        guard let controller = WindowManager.shared.window(of: tab),
               controller.promptShows(tab) else { return true }
         noticed.insert(origin)
         Toast.show(String(localized: "This site tried to use WebRTC, which you’ve blocked.", comment: "Notice over a page when WebRTC is off for it (Settings › Privacy › Protect IP address from WebRTC) and the page tried to use it, as a call site like Google Meet does. WebRTC is a name: keep it as it is."),
@@ -245,7 +245,7 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     /// Takes the notice down for the question, which says the same and more.
     private static func hideNotice(in tab: Tab) {
-        guard let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }) else { return }
+        guard let controller = WindowManager.shared.window(of: tab) else { return }
         Toast.hide(for: noticeOwner, in: controller)
     }
 

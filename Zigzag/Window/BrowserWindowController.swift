@@ -1284,7 +1284,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// for what that tab is playing (`NowPlayingChoice`). `hiding`: the tab whose card you just hid.
     private func updateNowPlaying(hiding: UUID? = nil) {
         let selected = tabManager.selectedTab
-        let tabs = tabManager.recentTabs
+        // While windows share their tabs (#162), the cards of the tabs in this window: one in another window, on screen
+        // there or last there, has its card there.
+        let tabs = tabManager.recentTabs.filter { holds($0) && !tabManager.isShownElsewhere($0) }
         let candidates = tabs.map {
             NowPlayingChoice.Candidate(id: $0.id, page: NowPlayingChoice.page(of: $0.url),
                                        sounding: NowPlayingChoice.isSounding(playing: $0.isPlayingAudio, pausedFromCard: $0.isPlaybackPaused, inMiniPlayer: miniPlayer.holds($0)),

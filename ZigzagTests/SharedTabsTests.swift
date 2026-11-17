@@ -116,6 +116,36 @@ import Testing
         }
     }
 
+    @Test func historysRecentlyClosedListsEachClosedTabOnceInEveryWindow() {
+        let store = TabStore()
+        let a = TabManager(spaceID: space, store: store)
+        let b = TabManager(spaceID: space, store: store)
+        let hidden = TabManager(spaceID: space, isPrivate: true, store: store)
+        defer {
+            hidden.invalidate()
+            b.invalidate()
+            a.invalidate()
+        }
+        let one = a.newTab(url: URL(string: "about:blank#one"), spaceID: space, select: false)
+        let two = b.newTab(url: URL(string: "about:blank#two"), spaceID: space, select: false)
+        let secret = hidden.newTab(url: URL(string: "about:blank#secret"), spaceID: space, select: false)
+        a.close(one)
+        b.close(two)
+        hidden.close(secret)
+        // History › Recently Closed, from either window: both tabs, newest first, each once; never the private one.
+        #expect(a.recentlyClosedTabs.map(\.id) == [two.id, one.id])
+        #expect(b.recentlyClosedTabs.map(\.id) == a.recentlyClosedTabs.map(\.id))
+        #expect(!a.recentlyClosedTabs.contains { $0.id == secret.id })
+        // Reopened from one window, it's gone from the list in both, and open in both, once.
+        let back = b.reopenClosedTab(one.id, select: false)
+        #expect(back != nil)
+        #expect(a.recentlyClosedTabs.map(\.id) == [two.id])
+        #expect(a.tabs(in: space).filter { $0.url == one.url }.count == 1)
+        #expect(a.tab(with: back!.id) === back)
+        // Closing one of the sharing windows leaves tabs open elsewhere: it isn't a window to reopen.
+        #expect(!b.isLastView)
+    }
+
     @Test func closingOneWindowKeepsTheTabsInTheOther() {
         let store = TabStore()
         let a = TabManager(spaceID: space, store: store)
