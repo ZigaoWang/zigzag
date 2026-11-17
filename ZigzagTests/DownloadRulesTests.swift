@@ -326,22 +326,21 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.expand("{mime}", with: values) == "_-o/tmp/x")
     }
 
-    /// Cookies go to a local app or script, and to an RPC service wherever it is — a NAS or a build box is a thing you
-    /// may mean, and the editor warns first. An Open URL may be a custom scheme or a local http(s) address; a remote
-    /// address gets none, since a page that talks a rule into firing must not also choose where its cookies go.
-    @Test func cookiesGoToAppsAndServicesButNotARemoteWebAddress() {
+    /// Cookies go only to a target on this Mac: a script or app runs here, an RPC service must be local, and an Open
+    /// URL may be a custom scheme or a local http(s) address. A remote address gets none.
+    @Test func cookiesOnlyGoToATargetOnThisMac() {
         let values = HandoffValues(link: URL(string: "https://site.example/f")!)
         func action(_ kind: DownloadRuleAction.Kind, _ field: (inout DownloadRuleAction) -> Void) -> DownloadRuleAction {
             var action = DownloadRuleAction(kind: kind)
             field(&action)
             return action
         }
-        #expect(DownloadHandoff.targetMayCarryCookies(action(.runScript) { $0.scriptPath = "/tmp/x.sh" }, values: values))
-        #expect(DownloadHandoff.targetMayCarryCookies(action(.openURL) { $0.urlTemplate = "myapp://add?u={encoded_link}" }, values: values))
-        #expect(DownloadHandoff.targetMayCarryCookies(action(.openURL) { $0.urlTemplate = "http://127.0.0.1:8080/add?u={encoded_link}" }, values: values))
-        #expect(!DownloadHandoff.targetMayCarryCookies(action(.openURL) { $0.urlTemplate = "https://evil.example/?c={cookie_header}" }, values: values))
-        #expect(DownloadHandoff.targetMayCarryCookies(action(.jsonRPC) { $0.rpcEndpoint = "https://seedbox.example/rpc" }, values: values))
-        #expect(DownloadHandoff.targetMayCarryCookies(action(.jsonRPC) { $0.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc" }, values: values))
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.runScript) { $0.scriptPath = "/tmp/x.sh" }, values: values))
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "myapp://add?u={encoded_link}" }, values: values))
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "http://127.0.0.1:8080/add?u={encoded_link}" }, values: values))
+        #expect(!DownloadHandoff.targetIsOnThisMac(action(.openURL) { $0.urlTemplate = "https://evil.example/?c={cookie_header}" }, values: values))
+        #expect(!DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "https://seedbox.example/rpc" }, values: values))
+        #expect(DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc" }, values: values))
     }
 
     /// A boolean is a boolean over XML-RPC, not an integer: JSONSerialization gives both back as NSNumbers.

@@ -156,14 +156,16 @@ enum DownloadHandoff {
         return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
     }
 
-    /// Whether a rule's target may carry the site's cookies. A script or an app runs here; an RPC service may be on
-    /// another machine, since a NAS or a build box is a thing you may mean and the editor warns first. An Open URL
-    /// may carry them only to a custom scheme (which this Mac's own handler takes) or an http(s) address on this Mac:
-    /// a page that talks a rule into firing can't also choose somewhere off the Mac for the cookies to go.
-    static func targetMayCarryCookies(_ action: DownloadRuleAction, values: HandoffValues) -> Bool {
+    /// Whether a rule's target is on this Mac. A script or an app runs here; an RPC service must be local; an Open URL
+    /// may carry cookies only to a custom scheme (which this Mac's own handler takes) or an http(s) address on this
+    /// Mac. A remote address never gets the site's sign-in, whatever the template says: a page that talks a rule into
+    /// firing can't also choose somewhere off the Mac for the cookies to go.
+    static func targetIsOnThisMac(_ action: DownloadRuleAction, values: HandoffValues) -> Bool {
         switch action.kind {
-        case .openApp, .runScript, .jsonRPC:
+        case .openApp, .runScript:
             return true
+        case .jsonRPC:
+            return serviceIsOnThisMac(action.rpcEndpoint)
         case .openURL:
             let text = DownloadTokens.expand(action.urlTemplate, with: values, query: true)
             guard let url = URL(string: text), let scheme = url.scheme?.lowercased() else { return false }
@@ -181,12 +183,9 @@ enum DownloadHandoff {
                                    mime: request.mime, space: request.space)
         let secret = rule.action.kind == .jsonRPC ? (HandoffSecrets.secret(for: rule.id) ?? "") : ""
         var cookieFile: URL?
-        // The site's sign-in may go to a target of its own, or to one you clicked through to. A service on another
-        // machine is a thing you may mean — a NAS, a build box — so a JSON-RPC rule's remote endpoint is not refused
-        // here; the editor warns before a rule starts sending cookies off this Mac. What doesn't move is the page: a
-        // page that names another site on its own still gets none of its cookies, and an Open URL to a remote address
-        // is still not given them.
-        let cookiesMayLeave = maySendCookies(request) && targetMayCarryCookies(rule.action, values: values)
+        // The site's sign-in may go to a target of its own, or to one you clicked through to, and only to a target on
+        // this Mac: a remote address or service never gets it, whichever rule it names.
+        let cookiesMayLeave = maySendCookies(request) && targetIsOnThisMac(rule.action, values: values)
         if rule.needsCookies {
             // A rule that names the cookie file always gets one, empty where the cookies may not leave: a service or
             // a script that insists on a jar still runs, and no site's sign-in goes where it shouldn't.

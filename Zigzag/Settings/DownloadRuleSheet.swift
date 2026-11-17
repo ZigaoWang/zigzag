@@ -51,11 +51,6 @@ enum DownloadRuleSheet {
         var scriptField: FilledField?
         var argumentView: MultilineField?
         var endpointField: FilledField?
-        /// The line under the parameters saying where the site's cookies would go, kept so one icon and a few words
-        /// can turn from a calm state into a warning as the endpoint changes.
-        var cookieStatus: StatusLabel?
-        /// Which of its two things it is saying, so it's only re-said when that changes.
-        var cookiesLeaveThisMac: Bool?
         var methodField: FilledField?
         var parametersView: MultilineField?
         var secretField: FilledField?
@@ -185,10 +180,6 @@ enum DownloadRuleSheet {
             actionRows.append(FormSheet.Row(label: String(localized: "Token", comment: "Label of the token field in a JSON-RPC download rule's sheet."), view: secret))
             actionRows.append(.note(String(localized: "A JSON array. Tokens are filled in.",
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
-            let status = StatusLabel(String(localized: "Cookies stay on this Mac",
-                                            comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it."))
-            cookieStatus = status
-            actionRows.append(FormSheet.Row(label: nil, view: status, height: Tokens.Metric.controlHeight))
         case .saveToFolder, .openFile:
             // A destination's own two things: what happens to a file of this type, and, when it is saved, where.
             // The row that picks the kind is the one the panel's "Add File Type…" opens on; the folder row is
@@ -287,23 +278,6 @@ enum DownloadRuleSheet {
             return rule
         }
 
-        /// Where the site's cookies would go, as a state said calmly: an icon and five words that turn into a warning
-        /// the moment the endpoint leaves this Mac. No paragraph under it — the endpoint is yours to write, and what
-        /// it hands over is worth a glance as you write it, not an essay read once.
-        func refreshCookieStatus(_ rule: DownloadRule?) {
-            guard let status = cookieStatus else { return }
-            let offThisMac = rule?.sendsCookiesOffThisMac ?? false
-            guard cookiesLeaveThisMac != offThisMac else { return }
-            cookiesLeaveThisMac = offThisMac
-            status.say(offThisMac
-                       ? String(localized: "Cookies leave this Mac",
-                                comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint isn't on this Mac: the site's cookies would go to another machine.")
-                       : String(localized: "Cookies stay on this Mac",
-                                comment: "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it."),
-                       symbol: offThisMac ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
-                       color: offThisMac ? Tokens.Color.warning : nil)
-        }
-
         /// Mark the fields holding Add back: the pattern, and the action's own field. `all` also marks the two you
         /// may simply not have reached yet — a name and a pattern that is still empty — which is what the pointer over
         /// the dead button asks for. One list serves the markers, the tooltips and the button's own answer, so the
@@ -333,8 +307,6 @@ enum DownloadRuleSheet {
 
         let valid = {
             let rule = ruleFromFields()
-            // Where the cookies would go is said as the endpoint is written, whether or not the rule is ready.
-            refreshCookieStatus(rule)
             markHeldUp(rule)
             return rule.map(isValid) ?? false
         }
@@ -379,23 +351,7 @@ enum DownloadRuleSheet {
                     DownloadRulesStore.shared.update(rule)
                 }
             }
-            // The site's sign-in leaving this Mac is worth one deliberate answer, the moment a rule starts doing it:
-            // Add isn't dead and the rule isn't refused — but this isn't a Return meant for a field either, since
-            // the sheet won't go ahead on Return, so sending them takes a click. A rule that already did this is
-            // asked about once, when it started, not again on every later edit.
-            let alreadyRemote = existing?.sendsCookiesOffThisMac ?? false
-            guard rule.sendsCookiesOffThisMac, !alreadyRemote else { return save() }
-            let place = URL(string: rule.action.rpcEndpoint)?.host() ?? rule.action.rpcEndpoint
-            ConfirmSheet.show(in: host,
-                              title: String(localized: "Send the site’s cookies off this Mac?",
-                                            comment: "Title of the sheet that asks before saving a download rule which would send the site's cookies to another machine."),
-                              message: String(localized: "“\(rule.name)” sends them to \(place).",
-                                              comment: "Message of the sheet that asks before saving a download rule that sends the site's cookies to another machine. The placeholders are the rule's name and the machine its endpoint is on."),
-                              confirmTitle: String(localized: "Send Anyway",
-                                                   comment: "Button of the sheet that asks before saving a download rule that sends the site's cookies to another machine."),
-                              destructive: true) { sure in
-                if sure { save() }
-            }
+            save()
         }
         sheetRef = sheet
         // Hovering the dead Add button marks every field holding it up, and the button says the first of them for

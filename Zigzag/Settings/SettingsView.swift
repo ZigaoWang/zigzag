@@ -849,7 +849,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let downloadPlaceRules = DropdownButton()
     private let downloadRulesGroup = FormGroup()
     private let downloadTestGroup = FormGroup()
-    private let downloadRuleTest = FilledField(placeholder: String(localized: "https://example.com/file.zip", comment: "Placeholder of the test address in Settings › Downloads: an address to see which rule takes it."))
+    private let downloadRuleTest: FilledField = {
+        let field = FilledField(placeholder: String(localized: "https://example.com/file.zip", comment: "Placeholder of the test address in Settings › Downloads: an address to see which rule takes it."))
+        // Rows size their control by its fitting size: a fixed width, wide enough for an address.
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.widthAnchor.constraint(equalToConstant: Tokens.Page.searchWidth).isActive = true
+        field.heightAnchor.constraint(equalToConstant: Tokens.Page.controlHeight).isActive = true
+        return field
+    }()
     private var downloadRuleTestRow: FormRow?
     private let addDownloadRuleButton = PillButton(title: String(localized: "Add Rule…", comment: "Button beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from."))
     private var downloadRulesToken: SignalToken?

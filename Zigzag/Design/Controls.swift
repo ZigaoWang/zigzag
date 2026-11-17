@@ -1186,13 +1186,6 @@ final class FilledField: NSView {
     /// Its padding is the field's: a press there types, never drags the window.
     override var mouseDownCanMoveWindow: Bool { false }
 
-    /// A field is filled by the space it's given, so it draws at the size its holder hands it — a sheet's row. But
-    /// a Settings row puts its control at the control's own width, and a stack beside a button has nothing else to
-    /// size it by, and both asked this: no answer, so no width, so no field at all.
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: Tokens.Page.searchWidth, height: Tokens.Metric.controlHeight)
-    }
-
     /// Capsule ends instead of the field's corners: a search or address field standing on its own in a panel.
     var isPill = false { didSet { needsLayout = true } }
 
@@ -2070,9 +2063,6 @@ final class MenuPanel: FloatingPanelView {
 final class StatusLabel: NSView {
     private let check = NSImageView()
     private let label: Label
-    /// The colour it was last told to say itself in; nil is its window's accent.
-    private var tint: NSColor?
-
     init(_ text: String, symbol: String = "checkmark.circle.fill") {
         label = Label(text, font: Tokens.Font.body(.medium), color: Tokens.Color.textSecondary)
         super.init(frame: .zero)
@@ -2082,18 +2072,9 @@ final class StatusLabel: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Says something else, in another colour: one line can be a calm state at rest and a warning when it matters.
-    func say(_ text: String, symbol: String, color: NSColor? = nil) {
-        label.stringValue = text
-        check.image = Tokens.Symbol.image(symbol, size: Tokens.TypeSize.body)
-        tint = color
-        check.contentTintColor = color ?? Brand.Theme.for(self).accent
-        needsLayout = true
-    }
-
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        check.contentTintColor = tint ?? Brand.Theme.for(self).accent
+        check.contentTintColor = Brand.Theme.for(self).accent
     }
 
     override var intrinsicContentSize: NSSize { NSSize(width: 16 + Tokens.Space.x2 + label.inkWidth + Label.inset, height: Tokens.Space.x7Height) }

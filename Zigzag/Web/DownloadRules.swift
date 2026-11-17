@@ -195,14 +195,6 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// What the row says it does, in a few words.
     var actionSummary: String { action.summary }
 
-    /// Whether this rule would send the site's cookies to a service another machine could be answering at. `{cookies}`
-    /// and `{cookie_header}` carry the site's own sign-in, so a JSON-RPC endpoint that isn't on this Mac is worth
-    /// saying out loud — but it's a thing you may mean (a NAS, a build box), so this only raises the warning; it
-    /// doesn't refuse the rule.
-    var sendsCookiesOffThisMac: Bool {
-        action.kind == .jsonRPC && needsCookies && !action.endpointIsLocal
-    }
-
     /// What a file-type destination's row says it does: the types it names, and where they go.
     var destinationSentence: String {
         let types = Match.extensions(in: pattern).joined(separator: ", ")
@@ -217,11 +209,12 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     }
 
     /// The rule in a sentence, as its row in Settings › Downloads says it: "Files ending in .torrent go to
-    /// rTorrent". The name is your own, so a rule you named reads with it.
+    /// rTorrent". It ends where the rule's action puts things — an app, a folder or a service — not with the rule's
+    /// own name, which the row already shows above.
     var summarySentence: String {
         // A file-type rule is a per-extension destination, whose row says the types and where they go.
         if match == .fileType { return destinationSentence }
-        let goes = name.isEmpty ? action.summary : name
+        let goes = action.summary
         if match == .any {
             return applies == .downloads
                 ? String(localized: "Everything you download goes to \(goes)",
@@ -434,13 +427,6 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .saveToFolder: []
         case .openFile: []
         }
-    }
-
-    /// Whether the service answers on this Mac. Any other host — a name, an address on the network — is a machine
-    /// that is not this one, whatever it's called, so only these three count.
-    var endpointIsLocal: Bool {
-        guard let host = URL(string: rpcEndpoint)?.host()?.lowercased(), !host.isEmpty else { return false }
-        return host == "localhost" || host == "127.0.0.1" || host == "::1"
     }
 
     var summary: String {

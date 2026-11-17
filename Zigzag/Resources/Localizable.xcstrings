@@ -6163,6 +6163,17 @@
         }
       }
     },
+    "The first rule that matches an address wins. Rules run from the top of the list." : {
+      "comment" : "Explanation in a download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一条匹配地址的规则生效。规则按列表从上到下运行。"
+          }
+        }
+      }
+    },
     "Windows share a space’s tabs" : {
       "comment" : "A setting in Settings › Tabs: every window showing the same space lists the same open tabs, as in Arc, instead of each window having tabs of its own.",
       "localizations" : {
@@ -7357,17 +7368,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文件扩展名"
-          }
-        }
-      }
-    },
-    "file type" : {
-      "comment" : "A rule's kind, in its row in Settings › Downloads: it catches a file by its extension.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文件类型"
           }
         }
       }
@@ -21101,17 +21101,6 @@
         }
       }
     },
-    "any address" : {
-      "comment" : "A download rule matches any address, in a sentence.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "任意地址"
-          }
-        }
-      }
-    },
     "applescript osascript shortcuts apple events" : {
       "comment" : "Words that find the Allow JavaScript from Apple Events setting with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -21196,17 +21185,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查 预览 规则 测试 check preview rule test"
-          }
-        }
-      }
-    },
-    "contains" : {
-      "comment" : "A download rule matches addresses containing its pattern, in a sentence.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "包含"
           }
         }
       }
@@ -21397,17 +21375,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电子邮件"
-          }
-        }
-      }
-    },
-    "ends with" : {
-      "comment" : "A download rule matches addresses ending with its pattern, in a sentence.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "结尾为"
           }
         }
       }
@@ -21987,17 +21954,6 @@
         }
       }
     },
-    "matches" : {
-      "comment" : "A download rule matches addresses by a regular expression, in a sentence.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匹配"
-          }
-        }
-      }
-    },
     "mcp ai agent automation api" : {
       "comment" : "Words that find Settings › Automation with Find a setting, separated by spaces. Add your language's words for them. Not shown.",
       "localizations" : {
@@ -22384,17 +22340,6 @@
         }
       }
     },
-    "starts with" : {
-      "comment" : "A download rule matches addresses starting with its pattern, in a sentence.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开头为"
-          }
-        }
-      }
-    },
     "startup launch on start restore reopen session close quit" : {
       "comment" : "Words that find the Ask before quitting setting with Find a setting in Settings. Zigzag has no startup setting (tabs always come back), so words about starting up find this row. Not shown.",
       "localizations" : {
@@ -22679,17 +22624,6 @@
         }
       }
     },
-    "The first rule that matches wins." : {
-      "comment" : "Under the title of the sheet that makes a download rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一个匹配的规则生效。"
-          }
-        }
-      }
-    },
     "A JSON array. Tokens are filled in." : {
       "comment" : "Under the parameters of a JSON-RPC download rule.",
       "localizations" : {
@@ -22697,28 +22631,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一个 JSON 数组。令牌会自动填入。"
-          }
-        }
-      }
-    },
-    "Cookies leave this Mac" : {
-      "comment" : "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint isn't on this Mac: the site's cookies would go to another machine.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookie 会离开这台 Mac"
-          }
-        }
-      }
-    },
-    "Cookies stay on this Mac" : {
-      "comment" : "Beside an icon, under the parameters of a JSON-RPC download rule whose endpoint is on this Mac: the site's cookies would go no further than it.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookie 留在这台 Mac 上"
           }
         }
       }
@@ -22745,17 +22657,6 @@
         }
       }
     },
-    "Not run through a shell" : {
-      "comment" : "Beside an icon, under the arguments of a Run Script download rule: the arguments can never become part of a command line.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不经由 shell 运行"
-          }
-        }
-      }
-    },
     "One argument a line. The link and the cookies arrive in ZIGZAG_LINK and ZIGZAG_COOKIES." : {
       "comment" : "Under the arguments of a Run Script download rule: one argument a line, and the names the link and the cookies arrive under.",
       "localizations" : {
@@ -22763,45 +22664,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每行一个参数。链接和 Cookie 通过 ZIGZAG_LINK 和 ZIGZAG_COOKIES 传入。"
-          }
-        }
-      }
-    },
-    "Send Anyway" : {
-      "comment" : "Button of the sheet that asks before saving a download rule that sends the site's cookies to another machine.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仍然发送"
-          }
-        }
-      }
-    },
-    "Send the site’s cookies off this Mac?" : {
-      "comment" : "Title of the sheet that asks before saving a download rule which would send the site's cookies to another machine.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要把网站的 Cookie 发送到其他机器吗？"
-          }
-        }
-      }
-    },
-    "“%@” sends them to %@." : {
-      "comment" : "Message of the sheet that asks before saving a download rule that sends the site's cookies to another machine. The placeholders are the rule's name and the machine its endpoint is on.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "“%1$@” sends them to %2$@."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%1$@”会把它们发送到 %2$@。"
           }
         }
       }

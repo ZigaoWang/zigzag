@@ -181,14 +181,6 @@ struct SettingsLayoutTests {
         }
     }
 
-    /// The size no view can be drawn at is none, and a field is laid out by asking it: its own size has to be
-    /// a size.
-    @Test func aFieldHasASizeOfItsOwn() {
-        let field = FilledField(placeholder: "example.com")
-        #expect(field.intrinsicContentSize.width > 0)
-        #expect(field.intrinsicContentSize.height > 0)
-    }
-
     /// A form sheet lays its rows out by frame. A row holding a field with a Choose… button beside it must give the
     /// button its width inside the row: `NSStackView(views:)` turns autoresizing off, so a stack left to itself sizes
     /// to its content (the field's own width plus the button) and the button is drawn past the row's end, unseen.
