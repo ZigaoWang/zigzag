@@ -238,7 +238,7 @@ final class Updater {
 
     /// One session for every look at the feed, with no cookies or cache kept: a session made per look is never
     /// let go of.
-    private static let feedSession = URLSession(configuration: .ephemeral)
+    private static let feedSession = URLSession.cookieless
 
     /// The newest version on the feed Sparkle reads, or nil when it can't be read.
     private func newestOnFeed(_ done: @escaping (UpdateFeed.Item?) -> Void) {

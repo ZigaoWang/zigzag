@@ -145,7 +145,7 @@ final class WebStoreOffer: FloatingPanelView {
                 guard let string = result as? String, let url = URL(string: string), url.scheme == "https" else { return }
                 Task { @MainActor [weak self] in
                     // Read by the sandboxed picture helper, like any picture a site sends.
-                    guard let (data, _) = try? await URLSession.shared.data(from: url),
+                    guard let (data, _) = try? await URLSession.cookieless.data(from: url),
                           let image = await SafePictures.shared.decode(data, maxSide: 256)?.nsImage, let self else { return }
                     self.icon.image = image
                     self.icon.contentTintColor = nil

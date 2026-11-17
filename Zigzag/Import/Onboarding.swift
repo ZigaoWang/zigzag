@@ -1658,7 +1658,7 @@ private struct Suggestion {
     guard first else { return }
     Task { @MainActor in
         // Read by the sandboxed picture helper, like any picture a site sends.
-        guard let (data, _) = try? await URLSession.shared.data(from: source),
+        guard let (data, _) = try? await URLSession.cookieless.data(from: source),
               let image = await SafePictures.shared.decode(data, maxSide: 256)?.nsImage else {
             iconWaiters[source] = nil
             return

@@ -504,7 +504,7 @@ enum ExtensionStore {
 
     /// A package's bytes, or nil once they pass `limit`: a server can't fill memory by sending without end. Read
     /// off the main actor (`@concurrent`): a package of a few hundred megabytes is read a byte at a time.
-    @concurrent nonisolated static func fetch(_ url: URL, limit: Int = maxPackageBytes, session: URLSession = .shared) async throws -> (Data?, URLResponse) {
+    @concurrent nonisolated static func fetch(_ url: URL, limit: Int = maxPackageBytes, session: URLSession = .cookieless) async throws -> (Data?, URLResponse) {
         let (bytes, response) = try await session.bytes(from: url)
         if response.expectedContentLength > Int64(limit) { bytes.task.cancel(); return (nil, response) }
         var data = Data()
@@ -718,7 +718,7 @@ enum ExtensionStore {
             .init(name: "acceptformat", value: "crx3"),
             .init(name: "x", value: "id=\(id)&v=\(current)&uc"),
         ]
-        guard let url = components.url, let (data, response) = try? await URLSession.shared.data(from: url),
+        guard let url = components.url, let (data, response) = try? await URLSession.cookieless.data(from: url),
               (response as? HTTPURLResponse)?.statusCode == 200, let xml = String(data: data, encoding: .utf8),
               let check = xml.range(of: "<updatecheck[^>]*>", options: .regularExpression) else { return nil }
         let tag = String(xml[check])

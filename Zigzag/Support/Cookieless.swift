@@ -16,3 +16,9 @@ nonisolated extension URLSessionConfiguration {
         httpCookieAcceptPolicy = .never
     }
 }
+
+nonisolated extension URLSession {
+    /// For Zigzag's own fetches (extension packages and updates, the update feed, store logos, onboarding icons):
+    /// unlike `.shared`, nothing a server sets is kept or sent back, so no fetch can be linked to the one before.
+    static let cookieless = URLSession(configuration: .cookieless)
+}

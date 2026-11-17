@@ -99,6 +99,14 @@ struct FaviconSessionTests {
         #expect(configuration.httpCookieAcceptPolicy == .never)
         #expect(URLSessionConfiguration.ephemeral.httpCookieStorage != nil)
     }
+
+    /// Extension packages, the update feed, store logos and onboarding icons use the shared cookieless session.
+    @Test func zigzagsOwnFetchesKeepNoCookies() {
+        let configuration = URLSession.cookieless.configuration
+        #expect(configuration.httpCookieStorage == nil)
+        #expect(!configuration.httpShouldSetCookies)
+        #expect(configuration.httpCookieAcceptPolicy == .never)
+    }
 }
 
 /// A page picks its icon links, and Zigzag fetches them itself: only from the web or the page, never this Mac's files,
