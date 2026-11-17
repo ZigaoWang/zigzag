@@ -1377,7 +1377,7 @@ extension ExtensionStore {
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(in: folder, version: state.version)
         // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
-        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill + ConnectGuard.source
+        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill + contentScriptsFirst
         // Asked for twice at once (a profile's extensions starting as one is added): made once.
         if let making = overlaysMaking[overlay.path] { return await making.value }
         let fill = fills
@@ -1391,6 +1391,10 @@ extension ExtensionStore {
     }
 
     private static var overlaysMaking: [String: Task<URL?, Never>] = [:]
+
+    /// What runs ahead of the extension's content scripts in their world (ConnectGuard.file): `browser` kept WebKit's,
+    /// as in its background and pages (ExtensionBridgeScript.keepsBrowser), then the reconnect guard.
+    nonisolated static let contentScriptsFirst = ExtensionBridgeScript.keepsBrowser + "\n" + ConnectGuard.source
 
     /// One of a shim's patches, as plain text for making an overlay off the main thread.
     nonisolated struct OverlayPatch: Sendable {
@@ -1559,7 +1563,7 @@ extension ExtensionStore {
             try out.write(to: overlay.appendingPathComponent("manifest.json"))
             try entry.write(to: overlay.appendingPathComponent("zigzag-entry.js"), atomically: true, encoding: .utf8)
             try prelude.write(to: overlay.appendingPathComponent("zigzag-prelude.js"), atomically: true, encoding: .utf8)
-            if scripts != nil { try ConnectGuard.source.write(to: overlay.appendingPathComponent(ConnectGuard.file), atomically: true, encoding: .utf8) }
+            if scripts != nil { try contentScriptsFirst.write(to: overlay.appendingPathComponent(ConnectGuard.file), atomically: true, encoding: .utf8) }
             return true
         } catch {
             return false
