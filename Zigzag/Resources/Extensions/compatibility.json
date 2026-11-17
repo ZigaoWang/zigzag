@@ -385,8 +385,8 @@
       "group": "dnr",
       "members": {
         "updateStaticRules": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:dnr",
           "group": "dnrStaticRules"
         },
         "getDisabledRuleIds": {

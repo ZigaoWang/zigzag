@@ -1160,8 +1160,9 @@
       };
       if (typeof dnr.getAvailableStaticRuleCount !== 'function') setMember(['declarativeNetRequest'], 'getAvailableStaticRuleCount', answer(dnr.GUARANTEED_MINIMUM_STATIC_RULES || 30000));
       if (typeof dnr.getDisabledRuleIds !== 'function') setMember(['declarativeNetRequest'], 'getDisabledRuleIds', answer([]));
-      // Switching off single built-in rules (an ad blocker's exceptions) isn't something WebKit does, and returning
-      // success would leave the extension believing the rules changed; the surface's unsupported member reports it.
+      // Switching off single built-in rules (an ad blocker's exceptions) isn't something WebKit does: the call goes
+      // through, and the rule sets stay as they were, rather than the extension stopping on it.
+      if (typeof dnr.updateStaticRules !== 'function') setMember(['declarativeNetRequest'], 'updateStaticRules', answer(undefined));
       // WebKit takes regular expressions in rules but answers the question with nothing (DuckDuckGo asks first).
       const isRegexSupported = typeof dnr.isRegexSupported === 'function' ? dnr.isRegexSupported.bind(dnr) : null;
       setMember(['declarativeNetRequest'], 'isRegexSupported', (options, callback) => {

@@ -379,6 +379,31 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
     }
 
+    /// declarativeNetRequest.updateStaticRules: WebKit does not switch single built-in rules off. Main answers the
+    /// call quietly, the rule sets stay as they were, rather than failing it and stopping a background that treats
+    /// switching its exceptions off as fatal. PR A keeps main's quiet answer; only PR B's error layer reports it.
+    @Test func unknownStaticRuleSwitchingKeepsMainsQuietAnswer() {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("var __background = true, __page = null, __backgroundPort = null; var __toBackground = () => {}, __connectToBackground = () => {};")
+        context.evaluateScript(Self.fakeWorld)
+        context.evaluateScript("chrome.declarativeNetRequest = { GUARANTEED_MINIMUM_STATIC_RULES: 30000 };")
+        context.evaluateScript(ExtensionBridgeScript.differences)
+        context.evaluateScript("""
+        var __args = -1, __value = 'unset', __during = 'unset';
+        chrome.declarativeNetRequest.updateStaticRules({ ruleIds: [1], enabled: false }, (...args) => {
+          __args = args.length; __value = args[0]; __during = chrome.runtime.lastError;
+        });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__args").toInt32() == 1)
+        #expect(context.evaluateScript("__value === undefined").toBool())
+        #expect(context.evaluateScript("__during === undefined").toBool())
+        context.evaluateScript("var __resolved = false; chrome.declarativeNetRequest.updateStaticRules({ ruleIds: [1], enabled: false }).then(() => { __resolved = true; }, () => { __resolved = 'rejected'; });")
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__resolved").toBool())
+    }
+
     @Test func anUnsupportedCallbackGetsNoResultAndNoZigzagLastError() throws {
         let context = try Self.surfaceWorld()
         #expect(context.evaluateScript("typeof chrome.history.search")?.toString() == "function")
