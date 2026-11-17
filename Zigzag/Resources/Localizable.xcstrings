@@ -22810,6 +22810,744 @@
           }
         }
       }
+    },
+    "extension.limit.tabGroups" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: grouping tabs.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tab groups"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页组"
+          }
+        }
+      }
+    },
+    "extension.limit.tabActions" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: discarding, highlighting or scripting tabs.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Some tab actions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分标签页操作"
+          }
+        }
+      }
+    },
+    "extension.limit.windowsPopup" : {
+      "comment" : "A Chrome extension feature Zigzag limits: extension windows opened as popups.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Popup windows"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "弹出式窗口"
+          }
+        }
+      }
+    },
+    "extension.limit.runtime" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: restarting the browser or reading its package folder.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Restarting Zigzag"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动 Zigzag"
+          }
+        }
+      }
+    },
+    "extension.limit.action" : {
+      "comment" : "A Chrome extension feature Zigzag limits: badge text colour and toolbar button settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Toolbar button settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具栏按钮设置"
+          }
+        }
+      }
+    },
+    "extension.limit.notifications" : {
+      "comment" : "A Chrome extension feature Zigzag limits: notification buttons and settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Notifications"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
+          }
+        }
+      }
+    },
+    "extension.limit.sidePanel" : {
+      "comment" : "A Chrome extension feature Zigzag limits: the side panel's layout and open/close events.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Side panel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏面板"
+          }
+        }
+      }
+    },
+    "extension.limit.systemDisplay" : {
+      "comment" : "A Chrome extension feature Zigzag limits: changing display settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Display information"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示器信息"
+          }
+        }
+      }
+    },
+    "extension.limit.power" : {
+      "comment" : "A Chrome extension feature Zigzag limits: reporting activity to keep the Mac awake.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Keeping your Mac awake"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 Mac 保持唤醒"
+          }
+        }
+      }
+    },
+    "extension.limit.signIn" : {
+      "comment" : "A Chrome extension feature Zigzag limits: Chrome's own Google account sign-in.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Signing in with your account"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用你的账户登录"
+          }
+        }
+      }
+    },
+    "extension.limit.bookmarks" : {
+      "comment" : "A Chrome extension feature Zigzag limits: bookmark import and reorder events.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your bookmarks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的书签"
+          }
+        }
+      }
+    },
+    "extension.limit.downloads" : {
+      "comment" : "A Chrome extension feature Zigzag limits: the download shelf, danger prompts and filename events.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Downloads"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载"
+          }
+        }
+      }
+    },
+    "extension.limit.tabCapture" : {
+      "comment" : "A Chrome extension feature Zigzag limits: tab video capture; audio is captured.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recording tabs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制标签页"
+          }
+        }
+      }
+    },
+    "extension.limit.tabVideoCapture" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: recording a tab's video; audio capture works.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tab video capture"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制标签页视频"
+          }
+        }
+      }
+    },
+    "extension.limit.cookies" : {
+      "comment" : "A Chrome extension feature Zigzag limits: cookie partition keys.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cookie details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 详情"
+          }
+        }
+      }
+    },
+    "extension.limit.hostAccessRequests" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Site access requests"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站访问请求"
+          }
+        }
+      }
+    },
+    "extension.limit.storage" : {
+      "comment" : "A Chrome extension feature Zigzag emulates: managed extension storage.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Stored extension settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展存储的设置"
+          }
+        }
+      }
+    },
+    "extension.limit.storageSync" : {
+      "comment" : "A Chrome extension feature Zigzag limits: storage.sync keeps its settings on this Mac.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings that stay on this Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只保存在这台 Mac 上的设置"
+          }
+        }
+      }
+    },
+    "extension.limit.localScripts" : {
+      "comment" : "A Chrome extension feature Zigzag limits: registered content scripts that name file: pages.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Scripts on local files"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地文件上的脚本"
+          }
+        }
+      }
+    },
+    "extension.limit.blockingRules" : {
+      "comment" : "A Chrome extension feature Zigzag limits: switching individual network rules on and off.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blocking rules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拦截规则"
+          }
+        }
+      }
+    },
+    "extension.limit.webRequestBlocking" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: blocking web requests with webRequest.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blocking requests the old way"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用旧方式拦截请求"
+          }
+        }
+      }
+    },
+    "extension.limit.languageDetection" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: i18n.detectLanguage.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Language detection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言检测"
+          }
+        }
+      }
+    },
+    "extension.limit.legacyExtension" : {
+      "comment" : "A Chrome extension feature Chrome removed: the old chrome.extension namespace.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Legacy extension APIs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旧版扩展 API"
+          }
+        }
+      }
+    },
+    "extension.limit.sessions" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the sessions API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Closed tabs and sessions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭的标签页和会话"
+          }
+        }
+      }
+    },
+    "extension.limit.search" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the search API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Search settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索设置"
+          }
+        }
+      }
+    },
+    "extension.limit.debugger" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the debugger API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Debugging pages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调试页面"
+          }
+        }
+      }
+    },
+    "extension.limit.fontSettings" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the fontSettings API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Font settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字体设置"
+          }
+        }
+      }
+    },
+    "extension.limit.privacySettings" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: changing the browser's privacy settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Privacy settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私设置"
+          }
+        }
+      }
+    },
+    "extension.limit.management" : {
+      "comment" : "A Chrome extension feature Zigzag limits: listing and changing other extensions.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Managing other extensions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理其他扩展"
+          }
+        }
+      }
+    },
+    "extension.limit.pageCapture" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: saving a page as MHTML.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saving pages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储页面"
+          }
+        }
+      }
+    },
+    "extension.limit.desktopCapture" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the desktopCapture API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recording your screen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制你的屏幕"
+          }
+        }
+      }
+    },
+    "extension.limit.addressBarKeyword" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: an omnibox keyword.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Address bar keyword"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址栏关键词"
+          }
+        }
+      }
+    },
+    "extension.limit.publicSuffix" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the publicSuffix API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Domain names"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "域名"
+          }
+        }
+      }
+    },
+    "extension.limit.devtools" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: extension DevTools panels.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Developer tools"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者工具"
+          }
+        }
+      }
+    },
+    "extension.limit.contentSettings" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the contentSettings API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Content settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容设置"
+          }
+        }
+      }
+    },
+    "extension.limit.readingList" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the readingList API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reading list"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读列表"
+          }
+        }
+      }
+    },
+    "extension.limit.tts" : {
+      "comment" : "A Chrome extension feature Zigzag limits: extensions that are themselves a text-to-speech engine.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reading aloud"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "朗读"
+          }
+        }
+      }
+    },
+    "extension.limit.geolocation" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the geolocation permission.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your location"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的位置"
+          }
+        }
+      }
+    },
+    "extension.limit.clipboardRead" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: reading the clipboard.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reading what you copy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取你拷贝的内容"
+          }
+        }
+      }
+    },
+    "extension.limit.proxyScripts" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: proxy auto-config scripts, which choose a proxy for each site.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Proxy scripts (PAC)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理脚本（PAC）"
+          }
+        }
+      }
+    },
+    "extension.limit.deprecatedChannel" : {
+      "comment" : "A Chrome extension feature Chrome removed: its old Google messaging channels.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Deprecated Google APIs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已弃用的 Google API"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
