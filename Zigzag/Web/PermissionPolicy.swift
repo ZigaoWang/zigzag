@@ -31,14 +31,19 @@ nonisolated struct PermissionAction {
 nonisolated struct PermissionAnswer {
     let action: String
     let remember: Bool
+    /// The entry a question's own dropdown had picked, where it offers one to choose rather than to answer itself:
+    /// a rule's web address picks where to open it, then the buttons say whether to go ahead. Nil for a question with
+    /// no such dropdown, and for the answers that are the dropdown's own (a pop-up's destination).
+    let choice: String?
     /// Which of the question's durations was chosen, where it offered more than the usual two. Zero is This time, so
     /// every existing answer keeps its meaning.
     let scopeIndex: Int
 
-    init(action: String, remember: Bool, scopeIndex: Int = 0) {
+    init(action: String, remember: Bool, scopeIndex: Int = 0, choice: String? = nil) {
         self.action = action
         self.remember = remember
         self.scopeIndex = scopeIndex
+        self.choice = choice
     }
 }
 

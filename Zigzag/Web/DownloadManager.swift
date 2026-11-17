@@ -176,6 +176,10 @@ final class DownloadManager: NSObject {
 
     /// Where a download was already told to go (Save Page As picked the place), so it isn't asked again.
     private var chosenDestinations: [ObjectIdentifier: URL] = [:]
+    /// Downloads a rule opened the page for: the rule that took the address must not take the file it became.
+    private var ruleOpenedDownloads: Set<ObjectIdentifier> = []
+    /// Downloads whose handoff question was put off: the download manager must not ask the same rule again.
+    private var ruleDeclinedDownloads: Set<ObjectIdentifier> = []
 
     /// Whether this download came from a private window, as its data store tells it.
     private static func isPrivate(_ download: WKDownload) -> Bool {
@@ -183,7 +187,11 @@ final class DownloadManager: NSObject {
     }
 
 @discardableResult
-    func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil) -> DownloadItem {
+    func track(_ download: WKDownload, window: NSWindow?, saveTo destination: URL? = nil,
+               openedByRule: Bool = false, rulesAlreadyDeclined: Bool = false) -> DownloadItem {
+        let identifier = ObjectIdentifier(download)
+        if openedByRule { ruleOpenedDownloads.insert(identifier) } else { ruleOpenedDownloads.remove(identifier) }
+        if rulesAlreadyDeclined { ruleDeclinedDownloads.insert(identifier) } else { ruleDeclinedDownloads.remove(identifier) }
         if let destination { chosenDestinations[ObjectIdentifier(download)] = destination }
         download.delegate = self
         if let window { windows[ObjectIdentifier(download)] = window }
@@ -556,19 +564,29 @@ extension DownloadManager: WKDownloadDelegate {
         // copy and takes its row out of the list.
         // Only a download WebKit made for a page can be handed off: a pop-up and an extension have no page of their
         // own to answer the question, so their downloads stay Zigzag's, as they did before rules existed.
+        // A rule-opened page's own download, and one whose question was just put off, are not offered to a rule
+        // again: that is how a rule that opened a file it also matches would otherwise run for ever.
+        let identifier = ObjectIdentifier(download)
+        defer {
+            ruleOpenedDownloads.remove(identifier)
+            ruleDeclinedDownloads.remove(identifier)
+        }
+        let ruleMayAsk = !ruleOpenedDownloads.contains(identifier) && !ruleDeclinedDownloads.contains(identifier)
         let owner = (download.webView as? BrowserWebView)?.owner
-        if let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
+        if ruleMayAsk, let owner, chosenDestinations[ObjectIdentifier(download)] == nil,
            let url = download.originalRequest?.url,
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: false, filename: name,
                                                  isPrivate: !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)) {
-            let handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
+            var handoff = DownloadHandoff.Request(url: url, referrer: download.originalRequest?.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) },
                                                   pageOrigin: startedAt ?? SiteOrigin.of(owner.url ?? download.webView?.url),
                                                   filename: DownloadTokens.filename(for: url, suggested: name),
                                                   space: Library.shared.space(owner.spaceID)?.name ?? "",
                                                   dataStore: download.webView?.configuration.websiteDataStore,
                                                   isPrivate: Self.isPrivate(download),
                                                   window: window, tab: owner)
-            switch await DownloadHandoff.decide(rule, request: handoff, tab: owner, forDownload: true) {
+            let decision = await DownloadHandoff.decide(rule, request: handoff, tab: owner, forDownload: true)
+            handoff.place = decision.place
+            switch decision.gate {
             case .handOff:
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
                 if outcome == .handedOff {
@@ -578,6 +596,7 @@ extension DownloadManager: WKDownloadDelegate {
                     return nil
                 }
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+                // A rule that was matched but didn't take it leaves the download to Zigzag, which saves it as usual.
             case .browser:
                 // Left to Zigzag: WebKit's download goes on and is saved as usual.
                 break

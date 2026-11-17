@@ -406,6 +406,12 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     var appPath = ""
     /// Open URL: the URL to open, with tokens such as `{encoded_link}`.
     var urlTemplate = ""
+    /// Open URL: where a *web* address opens. Ask is a rule that has not been told yet: the hand-off card picks a place
+    /// for that one hand-off only, and the separate "Where should this open" question's Always is what keeps a place
+    /// here. Default Browser is what these rules did before Zigzag had places of its own, and is what a rule from an
+    /// older file keeps. An address that isn't the web's (mpv://, a magnet) belongs to the app that handles it and
+    /// ignores this.
+    var openIn: OpenInZigzag.Choice = .ask
     /// Run Script: the executable, or a `.sh` file run by `/bin/sh`.
     var scriptPath = ""
     /// Run Script: one argv value each. A token is substituted into its own argument, never joined into a shell line.
@@ -488,7 +494,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     init(kind: Kind) { self.kind = kind }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, appPath, urlTemplate, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle, folderPath
+        case kind, appPath, urlTemplate, openIn, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle, folderPath
     }
 
     init(from decoder: Decoder) throws {
@@ -497,7 +503,6 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             guard let container else { return nil }
             return try? container.decodeIfPresent(type, forKey: key)
         }
-        func wasSet(_ key: CodingKeys) -> Bool { container?.contains(key) ?? false }
         if let rawKind = value(String.self, .kind) {
             if let known = Kind(rawValue: rawKind) { kind = known } else { kind = .openURL; wasDecodedFromUnknownKind = true }
         } else {
@@ -507,6 +512,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
         appPath = value(String.self, .appPath) ?? ""
         urlTemplate = value(String.self, .urlTemplate) ?? ""
+        openIn = value(OpenInZigzag.Choice.self, .openIn) ?? .defaultBrowser
         scriptPath = value(String.self, .scriptPath) ?? ""
         arguments = value([String].self, .arguments) ?? []
         rpcEndpoint = value(String.self, .rpcEndpoint) ?? ""

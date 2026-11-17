@@ -163,15 +163,20 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     /// A page's pop-up opened later, from the question about it (or from its remembered destination): a small window
     /// of its own showing `url`, on the page's own data store where one is given, so it is still signed in.
-    static func viewer(url: URL, configuration: WKWebViewConfiguration, parent: NSWindow?) -> PopupWindowController {
+    static func viewer(url: URL, configuration: WKWebViewConfiguration, parent: NSWindow?,
+                       by sender: Tab.LoadSender = .page) -> PopupWindowController {
         let controller = PopupWindowController(configuration: configuration,
                                                pageSize: Tokens.Metric.popupDefaultSize, origin: nil, parent: parent)
+        controller.openedByRule = sender == .rule
         Self.open.insert(controller)
         controller.webView.load(URLRequest(url: url))
         controller.showWindow(nil)
         if #available(macOS 15.4, *), !controller.isPrivate { ExtensionCenter.popupOpened(controller) }
         return controller
     }
+
+    /// True while this viewer's page got here because a download rule opened it: that rule must not catch it again.
+    private var openedByRule = false
 
     private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?, opener: Tab? = nil) {
         // Preferences of its own, never its opener's: its WebRTC switch is set for each page it goes to.
@@ -498,6 +503,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // The rule-opened page is here: its own links and downloads are its own again.
+        openedByRule = false
         PageDialogs.pageLoaded(webView)
         shownURL = webView.url
         errorShownFor = ErrorPage.consume(webView) ? webView.url : nil
@@ -506,6 +513,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     /// A page that never arrived says why, as a tab does, rather than leave the window blank.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // A page that never arrived leaves no rule-opened navigation to carry to the next one.
+        openedByRule = false
         // It never came: the header stays on the page still showing.
         shownURL = webView.url
         updateHeader()
@@ -615,6 +624,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// Runs the first rule that catches `url`. True means the popup's page should not load or download it.
     private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, filename: String? = nil,
                                  mime: String = "", wasClicked: Bool = false) async -> Bool {
+        // A page a rule opened in this viewer is the rule's own doing: the rule must not take it again.
+        guard !openedByRule else { return false }
         // Zigzag's own pages and an extension's are never a rule's to take.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Tab.isExtensionPage(url) else { return false }
         // A download's own name is what an earlier file-type destination matches; a link has none.
@@ -629,10 +640,13 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               window: parentWindow, tab: nil, wasClicked: wasClicked, mayAsk: false)
         // A pop-up has no page store of its own to keep an answer in, and its opener's is another page's. Until the
         // permission card gives pop-ups a host, their links and downloads are Zigzag's own.
-        switch await DownloadHandoff.decide(rule, request: handoff, tab: nil, forDownload: !appliesToLinks) {
+        let decision = await DownloadHandoff.decide(rule, request: handoff, tab: nil, forDownload: !appliesToLinks)
+        switch decision.gate {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
+            // A rule that was matched but didn't take it leaves the pop-up's page as it was.
+            if case .noMatch = outcome { return false }
             return true
         case .browser:
             return false
