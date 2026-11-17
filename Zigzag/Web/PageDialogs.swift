@@ -254,16 +254,17 @@ enum AuthenticationPrompt {
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {
             return (.performDefaultHandling, nil)
         }
+        // Only the site you're on (or going to) signs in over its page. Something from another site inside it (an
+        // image, a frame) neither puts a sign-in sheet over a page that isn't its own nor gets a name and password
+        // saved for its site sent along: it's asked before anything saved is looked at.
+        let pageHost = await MainActor.run { page?.url?.host() }
+        guard Self.mayAnswer(pageHost: pageHost, askingHost: challenge.protectionSpace.host) else {
+            return (.cancelAuthenticationChallenge, nil)
+        }
         if challenge.previousFailureCount == 0, let saved = URLCredentialStorage.shared.defaultCredential(for: challenge.protectionSpace) {
             return (.useCredential, saved)
         }
         guard let window else { return (.cancelAuthenticationChallenge, nil) }
-        // Only the site you're on (or going to) asks for a password over its page. Something from another site
-        // inside it (an image, a frame) doesn't get to put a sign-in sheet over a page that isn't its own.
-        let pageHost = await MainActor.run { page?.url?.host()?.lowercased() }
-        if let pageHost, !pageHost.isEmpty, !Self.sameSite(pageHost, challenge.protectionSpace.host.lowercased()) {
-            return (.cancelAuthenticationChallenge, nil)
-        }
         // Several loads asking for the same sign-in at once (a page and its images): one question, one answer for all.
         let space = challenge.protectionSpace
         let key = "\(ObjectIdentifier(store).hashValue)|\(space.host):\(space.port)|\(space.realm ?? "")"
@@ -295,6 +296,13 @@ enum AuthenticationPrompt {
         let answer = await task.value
         if signingIn[key] === attempt { signingIn[key] = nil }
         return answer
+    }
+
+    /// Whether a sign-in asked for by `askingHost` may be answered on the page at `pageHost`, with a saved name and
+    /// password or a sheet: only on its own site. With no page to go by, it may.
+    nonisolated static func mayAnswer(pageHost: String?, askingHost: String) -> Bool {
+        guard let pageHost = pageHost?.lowercased(), !pageHost.isEmpty else { return true }
+        return sameSite(pageHost, askingHost.lowercased())
     }
 
     nonisolated private static func sameSite(_ a: String, _ b: String) -> Bool {
