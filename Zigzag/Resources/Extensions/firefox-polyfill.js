@@ -11,9 +11,11 @@
 // older applications), a Chrome one has neither. Without them, whatever `browser` was found is left exactly as it
 // was — an extension in a Chrome package keeps Chrome's API and its callbacks.
 (() => {
-  // The app's own version, written in by ExtensionBridge.swift: what a Firefox extension asking getBrowserInfo is
-  // told as the browser's version. Not the extension manifest's.
+  // The app's own version and machine architecture, written in by ExtensionBridge.swift: what a Firefox extension
+  // asking getBrowserInfo is told as the browser's version, and what the platform answer falls back to. Neither is
+  // the extension manifest's.
   const appVersion = __ZIGZAG_VERSION__;
+  const appArch = __ZIGZAG_ARCH__;
   let done = false;
   const start = () => {
     if (done) return true;
@@ -80,8 +82,9 @@
     // is made Firefox's. Where it doesn't, the API surface has already stood an `unavailable` stand-in in its place,
     // and that stand-in answers with a rejection ("chrome.runtime.getPlatformInfo isn't available in Zigzag"). A
     // rejection or a throw means WebKit has none, so Firefox's own answer stands — the surface's refusal must not
-    // reach the extension in its place.
-    const FIREFOX_PLATFORM = { os: 'mac', arch: 'aarch64' };
+    // reach the extension in its place. That answer is the app's own architecture, in Firefox's spelling, written in
+    // by ExtensionBridge.swift: a build on another machine says its own, never a literal.
+    const FIREFOX_PLATFORM = { os: 'mac', arch: appArch };
     // Firefox's spelling of the machine's architecture (WebKit reports Chrome's).
     const firefoxArch = (arch) => arch === 'arm64' ? 'aarch64'
       : (arch === 'x86-64' || arch === 'x86_64') ? 'x86-64'

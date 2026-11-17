@@ -23,8 +23,10 @@ struct FirefoxSurfaceTests {
     /// A fake extension background: WebKit's `chrome`, a native bridge answering one call of `history`, and the bridge
     /// itself. `extra` runs before the bridge, as an extension page's own setup would. With `surface`, the real
     /// api-surface.js runs in its place — after the bridge, as in the prelude — so the stand-ins it fills are present
-    /// when the polyfill runs, exactly as they are in the app.
-    private static func firefoxWorld(manifest: String, extra: String = "", surface: Bool = false) -> JSContext {
+    /// when the polyfill runs, exactly as they are in the app. `polyfill` replaces the injected script, for a test
+    /// that injects something of its own.
+    private static func firefoxWorld(manifest: String, extra: String = "", surface: Bool = false,
+                                     polyfill: String? = nil) -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -51,7 +53,7 @@ struct FirefoxSurfaceTests {
         context.evaluateScript(extra)
         context.evaluateScript(ExtensionBridgeScript.source)
         if surface { context.evaluateScript(ExtensionBridgeScript.surface) }
-        context.evaluateScript(ExtensionBridgeScript.firefoxPolyfill)
+        context.evaluateScript(polyfill ?? ExtensionBridgeScript.firefoxPolyfill)
         return context
     }
 
@@ -141,7 +143,8 @@ struct FirefoxSurfaceTests {
     }
 
     @Test func getPlatformInfoFallsBackToFirefoxsWhenAbsent() {
-        // No chrome.runtime.getPlatformInfo at all: Firefox's own answer, and no rejection.
+        // No chrome.runtime.getPlatformInfo at all: Firefox's own answer, and no rejection. The arch is the app's
+        // own, injected from ExtensionBridge.swift — not a literal.
         let context = Self.firefoxWorld(manifest: Self.firefoxManifest)
         context.evaluateScript("""
         var __platform = null, __failed = false;
@@ -149,7 +152,20 @@ struct FirefoxSurfaceTests {
         """)
         #expect(context.evaluateScript("__failed")?.toBool() == false)
         #expect(context.evaluateScript("__platform.os")?.toString() == "mac")
-        #expect(context.evaluateScript("__platform.arch")?.toString() == "aarch64")
+        #expect(context.evaluateScript("__platform.arch")?.toString() == ExtensionBridgeScript.firefoxAppArch)
+    }
+
+    /// The fallback architecture is the app's own, injected from ExtensionBridge.swift, not a literal: a build for
+    /// another machine must tell Firefox's binding design its own arch. Injecting a different one into the raw script
+    /// must be followed.
+    @Test func theFallbackArchComesFromTheAppNotALiteral() throws {
+        let url = try #require(Bundle.main.url(forResource: "firefox-polyfill", withExtension: "js"))
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        let injected = raw.replacingOccurrences(of: "__ZIGZAG_ARCH__", with: "\"x86-64\"")
+            .replacingOccurrences(of: "__ZIGZAG_VERSION__", with: "\"\"")
+        let context = Self.firefoxWorld(manifest: Self.firefoxManifest, polyfill: injected)
+        context.evaluateScript("var __platform = null; browser.runtime.getPlatformInfo().then((info) => { __platform = info; });")
+        #expect(context.evaluateScript("__platform.arch")?.toString() == "x86-64")
     }
 
     @Test func aRealPlatformAnswerIsMadeFirefoxs() {
@@ -182,7 +198,7 @@ struct FirefoxSurfaceTests {
         #expect(context.evaluateScript("__nativeFailed")?.toBool() == true)
         #expect(context.evaluateScript("__failed")?.toBool() == false)
         #expect(context.evaluateScript("__platform.os")?.toString() == "mac")
-        #expect(context.evaluateScript("__platform.arch")?.toString() == "aarch64")
+        #expect(context.evaluateScript("__platform.arch")?.toString() == ExtensionBridgeScript.firefoxAppArch)
         #expect(context.evaluateScript("__info.name")?.toString() == "Zigzag")
         #expect(context.evaluateScript("__info.vendor")?.toString() == "Lakeland97")
     }
