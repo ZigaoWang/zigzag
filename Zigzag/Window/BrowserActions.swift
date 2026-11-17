@@ -252,7 +252,7 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func actualSize(_ sender: Any?) {
         if zoomReader(0) { return }
         if let pdf = selectedTab?.pdfViewer { pdf.actualSize(); return }
-        setZoom(1)
+        setZoom(ZoomLevels.defaultZoom)
         selectedWebView?.magnification = 1
     }
 
@@ -261,7 +261,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         webView.pageZoom = zoom
         // A private window's zoom lasts only as long as the page: nothing about the site is saved.
         if !tabManager.isPrivate { ZoomLevels.set(zoom, for: url) }
-        Toast.show("\(Int((zoom * 100).rounded()))%", symbol: zoom < 1 ? "minus.magnifyingglass" : zoom > 1 ? "plus.magnifyingglass" : "magnifyingglass", in: self)
+        Toast.show(ZoomLevels.percent(zoom), symbol: zoom < 1 ? "minus.magnifyingglass" : zoom > 1 ? "plus.magnifyingglass" : "magnifyingglass", in: self)
     }
 
     /// The page in front's Web Inspector. There is no public API to open it; WebKit's private one is stable and widely used.
@@ -733,10 +733,33 @@ enum ZoomLevels {
     /// A zoom as people read it: "125%".
     static func percent(_ zoom: CGFloat) -> String { "\(Int((zoom * 100).rounded()))%" }
 
-    static func zoom(for url: URL) -> CGFloat {
-        let levels = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
-        return CGFloat(levels[HistoryStore.normalizedHost(url)] ?? 1)
+    /// The zoom of every site that has none of its own: Settings › Appearance › Page zoom, 100% unless changed.
+    /// Actual Size goes back to it, as Chrome's and Safari's reset do.
+    static var defaultZoom: CGFloat {
+        get {
+            let zoom = UserDefaults.standard.double(forKey: defaultKey)
+            return steps.contains { abs($0 - zoom) < 0.001 } ? CGFloat(zoom) : 1
+        }
+        set {
+            let old = defaultZoom
+            if abs(newValue - 1) < 0.001 { UserDefaults.standard.removeObject(forKey: defaultKey) } else { UserDefaults.standard.set(Double(newValue), forKey: defaultKey) }
+            // Open pages that were at the old default follow the new one now, not on their next load. One zoomed by
+            // hand, saved for its site or only for now in a private window, stays as it is.
+            for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
+                guard let webView = tab.webView, let url = tab.url, !hasOwnZoom(url),
+                      abs(webView.pageZoom - old) < 0.001 else { continue }
+                webView.pageZoom = newValue
+            }
+        }
     }
+    private static let defaultKey = "DefaultZoom"
+
+    static func zoom(for url: URL) -> CGFloat {
+        CGFloat(all[HistoryStore.normalizedHost(url)] ?? Double(defaultZoom))
+    }
+
+    /// Whether the site has a zoom of its own, rather than the default.
+    static func hasOwnZoom(_ url: URL) -> Bool { all[HistoryStore.normalizedHost(url)] != nil }
 
     /// How many sites have their own zoom.
     static var count: Int { (UserDefaults.standard.dictionary(forKey: key) ?? [:]).count }
@@ -755,7 +778,8 @@ enum ZoomLevels {
     static func set(_ zoom: CGFloat, for url: URL) {
         var levels = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
         let host = HistoryStore.normalizedHost(url)
-        if abs(zoom - 1) < 0.001 { levels[host] = nil } else { levels[host] = Double(zoom) }
+        // The default needs no entry; anything else, 100% included when the default isn't, is the site's own.
+        if abs(zoom - defaultZoom) < 0.001 { levels[host] = nil } else { levels[host] = Double(zoom) }
         UserDefaults.standard.set(levels, forKey: key)
     }
 }

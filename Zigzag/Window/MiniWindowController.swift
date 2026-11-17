@@ -683,7 +683,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc func actualSize(_ sender: Any?) {
-        setZoom(1)
+        setZoom(ZoomLevels.defaultZoom)
         tab.webView?.magnification = 1
     }
 

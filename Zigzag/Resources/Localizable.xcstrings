@@ -2461,13 +2461,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom goes back to 100%, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放会恢复为 100%，深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
           }
         }
       }
@@ -5800,6 +5800,17 @@
         }
       }
     },
+    "default zoom size bigger larger smaller scale text" : {
+      "comment" : "Words that find the Page zoom setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认 缩放 大小 放大 缩小 文字"
+          }
+        }
+      }
+    },
     "Delete" : {
       "comment" : "Button of the sheet that deletes data left by a profile that's no longer listed.\nButton on a saved login in the Passwords window.\nTooltip of the trash button in Settings › Profiles, on data left by a profile that's no longer listed.",
       "localizations" : {
@@ -7882,6 +7893,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用说明"
+          }
+        }
+      }
+    },
+    "How large websites are shown. A site you zoom with ⌘+ or ⌘− keeps its own zoom." : {
+      "comment" : "Explanation under “Page zoom” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站显示的大小。用 ⌘+ 或 ⌘− 缩放过的网站会保留它自己的缩放。"
           }
         }
       }
@@ -11549,6 +11571,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "牛血红"
+          }
+        }
+      }
+    },
+    "Page zoom" : {
+      "comment" : "A setting in Settings › Appearance: the zoom websites open at, like 110%.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页缩放"
           }
         }
       }
