@@ -59,6 +59,7 @@ enum ErrorPage {
     /// `noWayPast`: why a certificate warning has no "Visit anyway", said in its place.
     static func show(error: NSError, url: URL?, in webView: WKWebView, proceedNonce: String? = nil, noWayPast: NoWayPast? = nil) {
         guard let url else { return }
+        let error = ClientCertificates.explain(error, url: url, store: webView.configuration.websiteDataStore)
         pending.add(webView)
         let kind = Self.kind(of: error, url: url)
         // For a certificate you know is fine (your router, a dev server), a quiet way through, with the reason first.

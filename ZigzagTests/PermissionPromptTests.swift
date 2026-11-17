@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -80,5 +80,16 @@ struct PermissionPromptTests {
         dropdown.layout()
         #expect(dropdown.alphaValue == Tokens.Opacity.disabled)
         #expect(dropdown.toolTip == "Private windows don’t remember answers.")
+    }
+
+    /// The card is light or dark as the page under it, not as the window: a light space's window puts a dark card
+    /// on a dark page (#300). With no page color yet, the look the page is drawn in; with neither, the window's.
+    @Test func theCardTakesItsPagesLook() {
+        let black = NSColor(srgbRed: 0.1, green: 0.1, blue: 0.1, alpha: 1)
+        #expect(PermissionPrompt.look(pageColor: black, pageLook: .aqua) == .darkAqua)
+        #expect(PermissionPrompt.look(pageColor: .white, pageLook: .darkAqua) == .aqua)
+        #expect(PermissionPrompt.look(pageColor: nil, pageLook: .darkAqua) == .darkAqua)
+        #expect(PermissionPrompt.look(pageColor: nil, pageLook: .aqua) == .aqua)
+        #expect(PermissionPrompt.look(pageColor: nil, pageLook: nil) == nil)
     }
 }

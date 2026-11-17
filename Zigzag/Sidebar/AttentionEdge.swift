@@ -46,6 +46,12 @@ final class AttentionEdge: NSView {
         if !didFadeIn { didFadeIn = true; fadeIn() }
     }
 
+    /// Its colors are set in `layout`: laid out again for the other mode.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsLayout = true
+    }
+
     /// In once, then still: something to notice, nothing to watch.
     private func fadeIn() {
         guard !Tokens.Motion.reduceMotion else { return }

@@ -692,6 +692,17 @@
         }
       }
     },
+    "%@ wants a certificate to identify you." : {
+      "comment" : "Message in the sheet a site asks for a certificate with. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 要求提供证书来确认你的身份。"
+          }
+        }
+      }
+    },
     "%@ wants more access" : {
       "comment" : "Title of the sheet shown when an extension asks for more access. The name is the extension's.\nTitle of the sheet shown when an extension's update asks for more access. The name is the extension's.",
       "localizations" : {
@@ -873,23 +884,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@，已固定标签页已隐藏"
-          }
-        }
-      }
-    },
-    "%@, split with %@" : {
-      "comment" : "Accessibility label of a split view's row in the sidebar: the two pages' titles.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@, split with %2$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@，与 %2$@ 分屏"
           }
         }
       }
@@ -2181,7 +2175,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
+      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2615,6 +2609,17 @@
         }
       }
     },
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
+      "comment" : "Message of the sheet that forgets the choices made for single sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
+          }
+        }
+      }
+    },
     "Advanced" : {
       "comment" : "A heading in the column of Settings, over Extensions, Shortcuts, Automation and Developer.",
       "localizations" : {
@@ -2952,6 +2957,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "总是翻译%@"
+          }
+        }
+      }
+    },
+    "Always use this certificate for %@" : {
+      "comment" : "Choice in the sheet a site asks for a certificate with. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终为 %@ 使用这个证书"
           }
         }
       }
@@ -6306,6 +6322,17 @@
         }
       }
     },
+    "Split view: %@" : {
+      "comment" : "Accessibility label of a split view's row in the sidebar: its pages' titles, as a list (“Split view: Wikipedia, Example and Google”).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分屏：%@"
+          }
+        }
+      }
+    },
     "That folder isn’t there. Choose one that is." : {
       "comment" : "Tooltip on the folder field of a per-extension destination whose folder has gone or is a file, so its Add button is greyed.",
       "localizations" : {
@@ -7309,6 +7336,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "展开分组"
+          }
+        }
+      }
+    },
+    "Expires %@" : {
+      "comment" : "Under a certificate's name in the sheet a site asks for one with. The placeholder is the date it expires.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@过期"
           }
         }
       }
@@ -8950,6 +8988,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "颁发者"
+          }
+        }
+      }
+    },
+    "Issued by %@" : {
+      "comment" : "Under a certificate's name in the sheet a site asks for one with. The placeholder is who issued it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %@ 颁发"
+          }
+        }
+      }
+    },
+    "Issued by %@, expires %@" : {
+      "comment" : "Under a certificate's name in the sheet a site asks for one with. The placeholders are who issued it and the date it expires.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %@ 颁发，%@过期"
           }
         }
       }
@@ -11476,6 +11536,17 @@
         }
       }
     },
+    "Off, so nothing fills passwords." : {
+      "comment" : "Under “iCloud Passwords extension” in Settings › Passwords, when the extension is turned off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭，所以不会填写密码。"
+          }
+        }
+      }
+    },
     "Offer %@ as your search engine" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings. The name is the search engine's, like ChatGPT.",
       "localizations" : {
@@ -12681,6 +12752,17 @@
         }
       }
     },
+    "Password manager" : {
+      "comment" : "A setting in Settings › Passwords: whether Zigzag or Apple's iCloud Passwords extension saves and fills passwords.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码管理器"
+          }
+        }
+      }
+    },
     "Password saved" : {
       "comment" : "Toast after the save-password prompt saved a password.",
       "localizations" : {
@@ -12710,6 +12792,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "密码"
+          }
+        }
+      }
+    },
+    "Passwords are filled by the iCloud Passwords extension. Click its icon by the address and enter the code from macOS to connect." : {
+      "comment" : "Under “Password manager” in Settings › Passwords, with iCloud Passwords chosen. iCloud Passwords is Apple's extension, by the name Apple gives it; the code is the one the Passwords app on the Mac shows when the extension connects.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "密码由 iCloud 密码扩展填写。点按地址栏旁它的图标，输入 macOS 显示的验证码即可连接。"
           }
         }
       }
@@ -14313,6 +14406,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已移除 1 个固定页面"
+          }
+        }
+      }
+    },
+    "Removed, so nothing fills passwords." : {
+      "comment" : "Under “iCloud Passwords extension” in Settings › Passwords, when the extension was removed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已移除，所以不会填写密码。"
           }
         }
       }
@@ -17619,6 +17723,17 @@
         }
       }
     },
+    "The iCloud Passwords extension is installed too. You can remove it in Settings › Extensions." : {
+      "comment" : "Under “Password manager” in Settings › Passwords, with Zigzag chosen while Apple's iCloud Passwords extension is still installed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 密码扩展也已安装，你可以在“设置 › 扩展”中移除它。"
+          }
+        }
+      }
+    },
     "The language you read." : {
       "comment" : "Explanation under “Translate pages into” in Settings › Translation.",
       "localizations" : {
@@ -18918,7 +19033,7 @@
       }
     },
     "Turn On" : {
-      "comment" : "Button in the toast that offers to archive unused tabs.",
+      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19472,7 +19587,7 @@
       }
     },
     "Use" : {
-      "comment" : "Button in the toast offering an extension's search engine: makes it the one Zigzag searches with.",
+      "comment" : "Button in the toast offering an extension's search engine: makes it the one Zigzag searches with.\nButton in the toast offering iCloud Passwords: it fills passwords instead of Zigzag.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19566,6 +19681,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请使用一个网址，并在搜索词所在的位置放上 %s。"
+          }
+        }
+      }
+    },
+    "Use iCloud Passwords instead of Zigzag’s?" : {
+      "comment" : "Toast after adding Apple's iCloud Passwords extension while Zigzag itself still saves and fills passwords. iCloud Passwords is the extension's name, as Apple writes it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要改用 iCloud 密码，而不用 Zigzag 自己的密码功能吗？"
           }
         }
       }
@@ -21266,17 +21392,6 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
-      "comment" : "Message of the sheet that forgets the choices made for single sites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
-          }
-        }
-      }
-    },
     "an extension" : {
       "comment" : "Stands in for an extension's name when it has none, inside a sentence like “an extension is listening to this tab”.",
       "localizations" : {
@@ -21350,6 +21465,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "纯黑 黑色 深色模式 OLED AMOLED black pure"
+          }
+        }
+      }
+    },
+    "certificate: %@" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: the certificate from your Keychain it's always sent, by name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书：%@"
           }
         }
       }
@@ -21744,6 +21870,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "https://example.com/file.zip"
+          }
+        }
+      }
+    },
+    "iCloud Passwords" : {
+      "comment" : "A choice for “Password manager” in Settings › Passwords: Apple's iCloud Passwords extension, by the name Apple gives it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 密码"
+          }
+        }
+      }
+    },
+    "iCloud Passwords extension" : {
+      "comment" : "A row in Settings › Passwords, with iCloud Passwords chosen but its extension off or removed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 密码扩展"
+          }
+        }
+      }
+    },
+    "icloud apple keychain passwords app extension autofill manager" : {
+      "comment" : "Words that find the Password manager setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "icloud apple keychain 钥匙串 密码 app 扩展 自动填充 密码管理器 苹果"
           }
         }
       }
@@ -22694,6 +22853,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取脚本…"
+          }
+        }
+      }
+    },
+    "Choose a certificate" : {
+      "comment" : "Title of the sheet a site asks for a certificate from your Keychain with.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择证书"
           }
         }
       }

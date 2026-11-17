@@ -1699,6 +1699,12 @@ enum DebugBridge {
             controller.peek.tab?.webView?.evaluateJavaScript(arg) { result, error in
                 debugLog("peekjs => \(String(describing: result).prefix(500)) \(error.map { String(describing: $0) } ?? "")")
             }
+        case "textcheck":
+            // textcheck [<selector>]: sends a spelling or substitution toggle (toggleAutomaticSpellingCorrection:) to
+            // the selected page as Edit › Spelling and Grammar would, then writes WebKit's choices as the app keeps them.
+            if !arg.isEmpty { controller.selectedWebView?.perform(NSSelectorFromString(arg), with: nil) }
+            let values = PageTextChecking.shared.current().sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }
+            debugLog("textcheck \(values.joined(separator: " ")) system=\(NSSpellChecker.isAutomaticSpellingCorrectionEnabled) sent=\(PageTextChecking.shared.sent)")
         case "js":
             controller.selectedWebView?.evaluateJavaScript(arg) { result, error in
                 debugLog("js => \(String(describing: result).prefix(1500)) \(error.map { String(describing: $0) } ?? "")")
@@ -2219,6 +2225,13 @@ enum DebugBridge {
             if let data = try? JSONSerialization.data(withJSONObject: PageDialogSheet.debugState(), options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "dialogsaved": PageDialogSheet.debugShowSaved()
         case "dialogcancel": PageDialogSheet.debugCancel()
+        case "dialogchoose":
+            // dialogchoose <index> [on|off]: picks a choice in the sheet showing, sets its "always" choice, and continues.
+            let f = arg.split(separator: " ")
+            PageDialogSheet.debugChoose(Int(f.first ?? "") ?? 0, remember: f.count > 1 ? f[1] == "on" : nil)
+        case "clientcerts":
+            // clientcerts: the certificates kept for sites, in the debug log.
+            debugLog("clientcerts \(ClientCertificates.sites.sorted().map { "\($0)=\(ClientCertificates.kept(host: $0)?.name ?? "")" })")
         case "windowshot":
             // windowshot <path>: the window's own drawing, as a PNG; web content may be blank.
             guard let view = controller.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
@@ -2252,6 +2265,8 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // passwordfiller zigzag|iCloud: Settings › Passwords › Password manager in the Settings tab in front (#248).
+        case "passwordfiller": controller.tabManager.selectedTab?.settingsView?.debugChoosePasswordFiller(arg)
         // sitedata seed <count> | bench <path>: made-up sites in the profile of the space in front, or Settings'
         // list of what websites keep timed (#207).
         case "sitedata":

@@ -371,10 +371,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Made the first time a part of this row is zoomed.
     private var zoomMarkView: ColorView?
 
-    /// The part lit under its page: the one zoomed over the rest, or else, in the row you're on, the page you're in,
-    /// so a row of several pages says which one has you, as the page area does.
+    /// The part lit under its page: the one zoomed over the rest, or else, in the row you're on whose parts show
+    /// their icons alone, the page you're in (with titles, its title's ink says so), so a row of several pages says
+    /// which one has you, as the page area does.
     private func layoutZoomMark() {
-        guard let part = zoomedPart ?? (isSelected ? focusedHalf : nil), isSplit else {
+        guard let part = zoomedPart ?? (isSelected && !showsPartTitles ? focusedHalf : nil), isSplit else {
             zoomMarkView?.isHidden = true
             return
         }
@@ -583,8 +584,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// A split row reads out both of its pages.
     private func refreshAccessibilityLabel() {
-        let others = extraCount == 0 ? partnerTitle.stringValue : Words.list([partnerTitle.stringValue] + extraTitles)
-        setAccessibilityLabel(!isSplit ? title.stringValue : String(localized: "\(title.stringValue), split with \(others)", comment: "Accessibility label of a split view's row in the sidebar: the two pages' titles."))
+        let names = [title.stringValue, partnerTitle.stringValue] + extraTitles
+        setAccessibilityLabel(!isSplit ? title.stringValue : String(localized: "Split view: \(Words.list(names))", comment: "Accessibility label of a split view's row in the sidebar: its pages' titles, as a list (“Split view: Wikipedia, Example and Google”)."))
         // What VoiceOver says after the name: the tab you're on, and whether either page is playing or muted.
         func sound(_ tab: Tab?, _ name: String?) -> String? {
             if tab?.isMuted == true {
@@ -611,16 +612,16 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// Which page the point is over: 0 for this row's own, 1 for its partner, 2 and 3 for a tile group's others.
     func half(at point: NSPoint) -> Int {
-        guard extraCount == 0 else {
-            let count = segmentCount
-            // The parts as laid out, each reaching to the middle of the gap on either side of it.
-            guard partEdges.count == count - 1 else { return min(count - 1, max(0, Int(point.x / max(1, bounds.width / CGFloat(count))))) }
-            return partEdges.filter { point.x >= $0 }.count
-        }
-        return isSplit && (point.x > bounds.midX) != partnerLeads ? 1 : 0
+        guard isSplit else { return 0 }
+        let count = segmentCount
+        // The part as laid out, left to right, each reaching to the hairline on either side of it.
+        let spatial = partEdges.count == count - 1 ? partEdges.filter { point.x >= $0 }.count
+            : min(count - 1, max(0, Int(point.x / max(1, bounds.width / CGFloat(count)))))
+        // In a split of two the partner's half can lead.
+        return extraCount == 0 && partnerLeads ? 1 - spatial : spatial
     }
 
-    /// Where one part of a split or tile group's row ends and the next begins (the middle of the gap between them).
+    /// Where one part of a split or tile group's row ends and the next begins (its hairline).
     private var partEdges: [CGFloat] = []
 
     /// Each part's span across the row, in the row's order of parts (the partner's half first when it leads).
@@ -665,21 +666,24 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return pages.indices.contains(index) ? pages[index] ?? tab : tab
     }
 
-    /// A row split into `count` parts from `start` to `end`, each `gap` short of the next; with two, the halves meet in
-    /// the middle of the whole row (`mid`), as a split's always have.
-    static func segments(count: Int, start: CGFloat, end: CGFloat, mid: CGFloat, gap: CGFloat) -> [(start: CGFloat, end: CGFloat)] {
-        guard count > 1 else { return [(start, end)] }
-        if count == 2 { return [(start, mid - gap), (mid, end)] }
-        let width = (end - start) / CGFloat(count)
-        return (0..<count).map { i in
-            let from = start + CGFloat(i) * width
-            return (round(from), round(i == count - 1 ? end : from + width - gap))
-        }
+    /// A row of `count` pages split into parts of one width from its start to `end`, each meeting the next (where a
+    /// hairline parts them), in whole points.
+    static func splitParts(count: Int, end: CGFloat) -> [(start: CGFloat, end: CGFloat)] {
+        guard count > 1 else { return [(0, end)] }
+        let width = end / CGFloat(count)
+        return (0..<count).map { i in (round(CGFloat(i) * width), i == count - 1 ? end : round(CGFloat(i + 1) * width)) }
     }
 
-    /// Whether a part this wide has room for its title beside its icon, or shows the icon alone.
-    /// A title cut to its first letter or two reads as noise: only where a few words fit.
-    static func segmentShowsTitle(width: CGFloat) -> Bool { width >= 84 }
+    /// The narrowest part that shows its title beside its icon: its icon a row's inset in from the part's start, the
+    /// gap a tab's title has, a few letters, and the inset again before the next part.
+    static func segmentMinWidth(for size: Tokens.Sidebar.Size = Tokens.Sidebar.size) -> CGFloat {
+        inset * 2 + Tokens.Sidebar.favicon(for: size) + Tokens.Sidebar.iconGap + Tokens.Sidebar.splitTitleMin(for: size)
+    }
+
+    /// Whether a part this wide has room for its title beside its icon, or shows the icon alone, in its middle.
+    static func segmentShowsTitle(width: CGFloat, size: Tokens.Sidebar.Size = Tokens.Sidebar.size) -> Bool {
+        width >= segmentMinWidth(for: size)
+    }
 
     required init?(coder: NSCoder) { fatalError() }
 
@@ -773,11 +777,15 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     private func refreshTitleColor() {
         // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
-        let ink = Brand.Theme.for(self).rowInk
-        title.textColor = ink
-        // One weight always: selection shows in the fill, never by text getting wider and shifting.
-        partnerTitle.textColor = ink
-        extraViews?.forEach { $0.title.textColor = ink }
+        let theme = Brand.Theme.for(self)
+        let ink = theme.rowInk
+        // One weight always: selection shows in the fill, never by text getting wider and shifting. In the split
+        // you're on, the page you're in has its title in the row's ink and the others are quieter, as the page area
+        // says which pane has you.
+        func inked(part: Int) -> NSColor { isSplit && isSelected && focusedHalf != part ? theme.quietInk : ink }
+        title.textColor = inked(part: 0)
+        partnerTitle.textColor = inked(part: 1)
+        extraViews?.enumerated().forEach { $1.title.textColor = inked(part: $0 + 2) }
         dropHalf.color = Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropAlpha)
         dropHalf.layer?.borderColor = cgColor(Tokens.Color.accent.withAlphaComponent(Tokens.Color.dropEdgeAlpha))
     }
@@ -927,10 +935,17 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private func layoutTitleFade() {
         let covered = closeOverlays && !closeButton.isHidden && title.frame.maxX > closeButton.frame.minX
         // Clear from a little before the button, so the text never runs into it.
-        title.fadeTail(endingAt: covered ? closeButton.frame.minX - Self.buttonGap - title.frame.minX : nil)
+        if !isSplit { title.fadeTail(endingAt: covered ? closeButton.frame.minX - Self.buttonGap - title.frame.minX : nil) }
         if isAway { pinLabel.fadeTail() }
-        partnerTitle.fadeTail()
-        extraViews?.forEach { $0.title.fadeTail() }
+        // In a split, the last part's title fades just before the close button (or ⌘'s number) coming over it.
+        let blocker: NSView? = !isSplit || !overlaysPartEnd ? nil : !closeButton.isHidden ? closeButton : showsNumber ? numberHint : nil
+        for label in [partnerTitle] + (extraViews ?? []).map(\.title) + (isSplit ? [title] : []) {
+            if label === lastPartTitle, let blocker, label.frame.maxX > blocker.frame.minX {
+                label.fadeTail(endingAt: blocker.frame.minX - Self.buttonGap - label.frame.minX)
+            } else {
+                label.fadeTail()
+            }
+        }
     }
 
     private func layoutButtonsAndHalves() {
@@ -958,70 +973,81 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
         guard isSplit else {
             partEdges = []
+            // Its title, set aside while it showed a split's icons alone, back unless it's being renamed.
+            title.isHidden = renameField != nil
             audioButton.frame.origin = NSPoint(x: end - size.width, y: y)
             return
         }
-        // A split shows both pages in one row: two halves with a hairline between, each with its icon, its title
-        // and, while that page plays or is muted, its own speaker at the half's end. The row's close is at its end.
-        let mid = bounds.midX
-        divider.frame = NSRect(x: mid, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
-        let iconY = icon.frame.minY, side = icon.frame.width
+        // A split shows its pages in one row, a part of one width for each, in the order they're on screen, a
+        // hairline between: in each its icon where a tab's sits in its row, its title, faded where it's cut, and,
+        // while that page plays or is muted, its speaker at the part's end. Where the parts are too narrow for a few
+        // letters, each shows its icon alone in its middle.
+        let pieces: [(icon: FaviconView, title: Label, audio: IconButton)] = {
+            let own = (icon, title, audioButton), other = (partnerIcon, partnerTitle, partnerAudioButton)
+            let extras = (extraViews ?? []).prefix(extraCount).map { ($0.icon, $0.title, $0.audio) }
+            return (extraCount == 0 && partnerLeads ? [other, own] : [own, other]) + extras
+        }()
+        let lines = [divider] + (extraViews ?? []).prefix(extraCount).map(\.divider)
+        let count = pieces.count
+        // The parts run to the row's end, and the close button (or the number while ⌘ is held) comes over the last
+        // one's faded title as it does over a tab's, so nothing moves as the pointer comes and goes or the row is
+        // chosen. The button's room is kept for good where it would cover too much: an icon alone, a speaker in the
+        // last part, or the last part's whole title, as in a narrow part (from the row's width, never its state).
+        let kept = bounds.width - edge - max(endSlot, size.width) - Self.buttonGap
+        let side = icon.frame.width
+        var titles = Self.segmentShowsTitle(width: bounds.width / CGFloat(count))
+        let lastStart = Self.splitParts(count: count, end: bounds.width).last?.start ?? 0
+        let titleUnderClose = kept - (lastStart + Self.inset + side + Tokens.Sidebar.iconGap)
+        let keepsRoom = !titles || !(pieces.last?.audio.isHidden ?? true) || titleUnderClose < Tokens.Sidebar.splitTitleMin()
+        if keepsRoom { titles = Self.segmentShowsTitle(width: kept / CGFloat(count)) }
+        let contentEnd = keepsRoom ? kept : bounds.width
+        overlaysPartEnd = !keepsRoom
+        showsPartTitles = titles
+        lastPartTitle = pieces.last?.title
+        let parts = Self.splitParts(count: count, end: contentEnd)
+        partEdges = parts.dropFirst().map(\.start)
+        let iconY = icon.frame.minY
         let titleY = title.frame.minY, titleH = title.frame.height
-        func place(icon: NSView, title: NSView, audio: IconButton, from start: CGFloat, to stop: CGFloat) {
-            icon.frame = NSRect(x: start + Self.inset, y: iconY, width: side, height: side)
-            var textEnd = stop
-            if !audio.isHidden {
-                audio.frame.origin = NSPoint(x: stop - size.width, y: y)
-                textEnd = audio.frame.minX - Self.buttonGap
-            }
-            let x = icon.frame.maxX + Self.titleOffset
-            title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd + Label.inset - x), height: titleH)
-        }
-        let leadEnd = mid - edge, trailEnd = end
-        partEdges = [mid]
-        if extraCount > 0, let views = extraViews {
-            // A tile group: a part for each page, in its order, a hairline between; a title only where it has room.
-            let parts = Self.segments(count: segmentCount, start: 0, end: trailEnd, mid: mid, gap: edge)
-            partEdges = parts.dropFirst().map { round($0.start - edge / 2) }
-            let lines = [divider] + views.map(\.divider)
-            let pieces: [(NSView, NSView, IconButton)] = [(icon, title, audioButton), (partnerIcon, partnerTitle, partnerAudioButton)]
-                + views.map { ($0.icon, $0.title, $0.audio) }
-            // Every part the same: titles in all of them or in none. With titles, each part's icon sits where a tab's
-            // does in its row, its part's inset in from where the part starts, as a split of two's do; without, each
-            // icon is centered in its part, the speaker after it while that page plays. Pointing at a part names its
-            // page.
-            let titles = parts.first.map { Self.segmentShowsTitle(width: $0.end - $0.start) } ?? false
-            for (i, part) in parts.enumerated() where i < pieces.count {
-                let (icon, title, audio) = pieces[i]
-                if titles {
-                    place(icon: icon, title: title, audio: audio, from: part.start, to: part.end)
-                } else {
-                    // No room for titles: each icon in the middle of its part, as in a segmented control, so it sits
-                    // in the middle of its part's light when that page is the one you're in, and the row reads evenly.
-                    // The last part runs on to the row's end where the others stop a gap short: measured as wide
-                    // as the others, so the icons stay evenly apart.
-                    let room = audio.isHidden ? side : side + Self.buttonGap + size.width
-                    let partEnd = i == parts.count - 1 ? part.end - edge : part.end
-                    icon.frame = NSRect(x: round((part.start + partEnd - room) / 2), y: iconY, width: side, height: side)
-                    if !audio.isHidden { audio.frame.origin = NSPoint(x: icon.frame.maxX + Self.buttonGap, y: y) }
-                    title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
+        let renaming = renameField == nil ? nil : partTitles.indices.contains(renamingPart) ? partTitles[renamingPart] : nil
+        for (i, part) in parts.enumerated() {
+            let (icon, title, audio) = pieces[i]
+            let last = i == count - 1
+            if titles {
+                icon.frame = NSRect(x: part.start + Self.inset, y: iconY, width: side, height: side)
+                // As far from the next part's hairline as the icon is from its own; the last part's title ends where a
+                // tab's does, or where the close button's kept room starts.
+                var textEnd = !last ? part.end - Self.inset + Label.inset : keepsRoom ? contentEnd : bounds.width - Self.inset + Label.inset
+                if !audio.isHidden {
+                    let audioEnd = last ? contentEnd : part.end - Self.buttonEdge
+                    audio.frame.origin = NSPoint(x: audioEnd - size.width, y: y)
+                    textEnd = audio.frame.minX - Self.buttonGap
                 }
-                // In the middle of the gap between two parts, only between titles: lone icons are apart enough.
-                if i > 0 {
-                    lines[i - 1].frame = NSRect(x: partEdges[i - 1], y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
-                    lines[i - 1].isHidden = !titles
-                }
+                let x = icon.frame.maxX + Self.titleOffset
+                title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd - x), height: titleH)
+            } else {
+                // Each icon in the middle of its part, as in a segmented control, the speaker after it while that
+                // page plays.
+                let room = audio.isHidden ? side : side + Self.buttonGap + size.width
+                icon.frame = NSRect(x: round((part.start + part.end - room) / 2), y: iconY, width: side, height: side)
+                if !audio.isHidden { audio.frame.origin = NSPoint(x: icon.frame.maxX + Self.buttonGap, y: y) }
+                title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
             }
-            return
-        }
-        if partnerLeads {
-            place(icon: partnerIcon, title: partnerTitle, audio: partnerAudioButton, from: 0, to: leadEnd)
-            place(icon: icon, title: title, audio: audioButton, from: mid, to: trailEnd)
-        } else {
-            place(icon: icon, title: title, audio: audioButton, from: 0, to: leadEnd)
-            place(icon: partnerIcon, title: partnerTitle, audio: partnerAudioButton, from: mid, to: trailEnd)
+            title.isHidden = !titles || title === renaming
+            // A hairline on the line between this part and the one before, shorter than the row by a margin each end.
+            if i > 0, lines.indices.contains(i - 1) {
+                let line = NSRect(x: part.start - Tokens.Metric.hairline / 2, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
+                lines[i - 1].frame = backingAlignedRect(line, options: .alignAllEdgesNearest)
+                lines[i - 1].isHidden = false
+            }
         }
     }
+
+    /// Whether the close button comes over the last part of a split's row, rather than having its room kept.
+    private var overlaysPartEnd = false
+    /// Whether a split's parts show their titles, or each its icon alone.
+    private var showsPartTitles = true
+    /// The title of the part at a split row's end, whose fade the close button can cut short.
+    private weak var lastPartTitle: Label?
 }
 
 /// "New Tab" at the top of the tab list.

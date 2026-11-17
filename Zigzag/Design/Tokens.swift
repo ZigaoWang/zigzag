@@ -196,9 +196,9 @@ enum Tokens {
         private static var current: Size = UserDefaults.standard.string(forKey: "SidebarSize").flatMap(Size.init(rawValue:)) ?? .medium
 
         /// A Medium size at the size chosen, in whole points.
-        static func scaled(_ value: CGFloat) -> CGFloat { (value * current.scale).rounded() }
+        static func scaled(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size ?? current).scale).rounded() }
         /// The same for a height or an icon, in even points, so what's centered in it lands on whole points.
-        static func scaledEven(_ value: CGFloat) -> CGFloat { (value * current.scale / 2).rounded() * 2 }
+        static func scaledEven(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size ?? current).scale / 2).rounded() * 2 }
 
         /// From the sidebar's edges to its rows, favorites and address.
         static let edge: CGFloat = 6
@@ -213,6 +213,9 @@ enum Tokens {
         static let rowGap: CGFloat = 2
         /// A row's favicon, or the symbol in its place.
         static var favicon: CGFloat { scaledEven(16) }
+        static func favicon(for size: Size) -> CGFloat { scaledEven(16, for: size) }
+        /// The least title a part of a split's row shows beside its icon: a few letters. Narrower, its icon alone.
+        static func splitTitleMin(for size: Size? = nil) -> CGFloat { scaled(20, for: size) }
         /// From a row's edge to its icon, and from the icon to its title's first letter.
         static let rowInset: CGFloat = 6
         static let iconGap: CGFloat = Space.x2

@@ -184,6 +184,36 @@ struct DarkPagesSeenTests {
         }
     }
 
+    /// A light site with a dark bar across its top (star-history.com), its root and body painting nothing, is light on
+    /// its own: where dark pages leave it alone it's never kept as dark, and one kept dark before (as Dark Reader's
+    /// gray, from the bar) is let go of once it's looked at, rather than loading on that gray for good, which showed
+    /// through the page and left its dark text on it.
+    @Test func aLightSiteWithADarkBarIsNotKeptDark() async throws {
+        try await withDefaults { () async throws in
+            let name = site(), kept = site()
+            defer { DarkSeen.forget(scope: "default", site: name); DarkSeen.forget(scope: "default", site: kept) }
+            for each in [name, kept] { DarkPages.setSiteChoice(.off, for: URL(string: "https://\(each)/")) }
+            let html = """
+            <html><head><style>body { margin: 0; color: #333 } header { height: 56px; background: #2b2b2b; color: #eee }
+            main { min-height: 900px }</style></head><body><header>Nav</header><main><p>Light.</p></main></body></html>
+            """
+            let first = await page(html, at: "https://" + name)
+            let looked = await until { (try? await first.callAsyncJavaScript("return window.__zigzagDark.state().native", arguments: [:], in: nil,
+                                                                              contentWorld: DarkPages.world)) as? Bool == false }
+            #expect(looked)
+            try? await Task.sleep(for: .milliseconds(2500))
+            #expect(DarkSeen.site(name, in: "default") == nil)
+            #expect(first.value(forKey: "drawsBackground") as? Bool == true)
+
+            DarkSeen.set(kept, DarkSeen.Site(color: nil, marker: nil, looks: [Self.aqua: "#181a1b"], onlyLooks: true, date: Date()), in: "default")
+            let second = await page(html, at: "https://" + kept)
+            let forgotten = await until { DarkSeen.site(kept, in: "default") == nil }
+            #expect(forgotten)
+            let light = await until { second.value(forKey: "drawsBackground") as? Bool == true }
+            #expect(light)
+        }
+    }
+
     // MARK: What a page starts with
 
     @Test func thePrepaintIsTheSitesOwnDark() {

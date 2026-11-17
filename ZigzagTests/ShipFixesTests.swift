@@ -844,6 +844,106 @@ struct PageTextSubstitutionTests {
     }
 }
 
+/// A spelling or substitution choice made in one page reaches every page already open, not only that one (#296).
+@MainActor
+struct PageTextCheckingTests {
+    private func page(_ site: String) async throws -> (WKWebView, NSWindow) {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+        let window = NSWindow(contentRect: webView.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = webView
+        webView.loadHTMLString("<textarea id=t></textarea>", baseURL: URL(string: site))
+        for _ in 0..<100 where webView.isLoading { try await Task.sleep(for: .milliseconds(20)) }
+        try await Task.sleep(for: .milliseconds(100))
+        return (webView, window)
+    }
+
+    private func type(_ text: String, in webView: WKWebView, window: NSWindow) async throws -> String? {
+        window.makeFirstResponder(webView)
+        return try await webView.evaluateJavaScript("""
+            (() => { const t = document.getElementById('t'); t.value = ''; t.focus(); for (const c of \(String(reflecting: text))) document.execCommand('insertText', false, c); return t.value })()
+            """) as? String
+    }
+
+    @Test func aChoiceInOnePageReachesTheOthers() async throws {
+        UserDefaults.standard.register(defaults: AppDelegate.pageTextDefaults)
+        let key = "WebAutomaticDashSubstitutionEnabled"
+        let domain = Bundle.main.bundleIdentifier ?? ""
+        let saved = UserDefaults.standard.persistentDomain(forName: domain)?[key]
+        let (first, firstWindow) = try await page("https://example.com")
+        let (second, secondWindow) = try await page("https://example.org")
+        first.perform(#selector(NSTextView.toggleAutomaticDashSubstitution(_:)), with: nil)
+        let on = UserDefaults.standard.bool(forKey: key)
+        let expected = on ? "a — b" : "a -- b"
+        let inFirst = try await type("a -- b", in: first, window: firstWindow)
+        let inSecond = try await type("a -- b", in: second, window: secondWindow)
+        first.perform(#selector(NSTextView.toggleAutomaticDashSubstitution(_:)), with: nil)
+        if let saved { UserDefaults.standard.set(saved, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
+        #expect(inFirst == expected)
+        #expect(inSecond == expected)
+    }
+
+    private func scratchDefaults() -> (UserDefaults, String) {
+        let name = "PageTextCheckingTests-\(UUID().uuidString)"
+        return (UserDefaults(suiteName: name)!, name)
+    }
+
+    @Test func correctingFollowsTheMacUntilYouChoose() {
+        // Registered defaults are the whole app's, whichever UserDefaults sets them: only the Mac's own value here.
+        let mac = NSSpellChecker.isAutomaticSpellingCorrectionEnabled
+        let registered = UserDefaults.standard.volatileDomain(forName: UserDefaults.registrationDomain)
+        #expect(registered[PageTextChecking.spellingCorrectionKey] as? Bool == mac)
+        let (defaults, name) = scratchDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        let checking = PageTextChecking(defaults: defaults, center: NotificationCenter(), systemCorrects: { mac })
+        checking.start()
+        #expect(defaults.bool(forKey: PageTextChecking.spellingCorrectionKey) == mac)
+        // Your choice, once made, stands over the Mac's.
+        defaults.set(!mac, forKey: PageTextChecking.spellingCorrectionKey)
+        checking.followSystem()
+        #expect(defaults.bool(forKey: PageTextChecking.spellingCorrectionKey) == !mac)
+    }
+
+    @Test func aChangedChoiceIsSentToThePagesOnce() async throws {
+        let (defaults, name) = scratchDefaults()
+        defer { defaults.removePersistentDomain(forName: name) }
+        // The one UserDefaults says a change on.
+        let center = NotificationCenter.default
+        var posted = 0
+        let watch = center.addObserver(forName: NSSpellChecker.didChangeAutomaticSpellingCorrectionNotification, object: nil, queue: nil) { _ in posted += 1 }
+        defer { center.removeObserver(watch) }
+        let checking = PageTextChecking(defaults: defaults, center: center, systemCorrects: { NSSpellChecker.isAutomaticSpellingCorrectionEnabled })
+        checking.start()
+        func settle() async throws { try await Task.sleep(for: .milliseconds(100)) }
+        defaults.set(true, forKey: "WebAutomaticDashSubstitutionEnabled")
+        try await settle()
+        #expect(checking.sent == 1)
+        #expect(posted >= 1)
+        defaults.set(true, forKey: "WebAutomaticDashSubstitutionEnabled")
+        defaults.set("x", forKey: "SomethingElse")
+        try await settle()
+        #expect(checking.sent == 1)
+        defaults.set(false, forKey: "WebContinuousSpellCheckingEnabled")
+        try await settle()
+        defaults.set(false, forKey: PageTextChecking.spellingCorrectionKey)
+        try await settle()
+        #expect(checking.sent == 3)
+        #expect(posted >= 3)
+    }
+
+    @Test func zigzagsOwnFieldsKeepTheirChoices() {
+        let field = MultilineField(text: "")
+        func textView(in view: NSView) -> NSTextView? {
+            if let found = view as? NSTextView { return found }
+            return view.subviews.lazy.compactMap { textView(in: $0) }.first
+        }
+        NotificationCenter.default.post(name: NSSpellChecker.didChangeAutomaticSpellingCorrectionNotification, object: nil)
+        let view = textView(in: field)
+        #expect(view != nil)
+        #expect(view?.isAutomaticSpellingCorrectionEnabled == false)
+        #expect(view?.isAutomaticQuoteSubstitutionEnabled == false)
+    }
+}
+
 /// Every control's menu reaches the keyboard and VoiceOver, not only the mouse.
 @MainActor
 struct ControlMenuTests {

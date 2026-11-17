@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: Self.pageTextDefaults)
+        // And a spelling or substitution choice holds for every page, the Mac's until you make one (#296).
+        PageTextChecking.shared.start()
         // A second copy (one opened from the disk image while the installed one runs) would load the same data
         // and save over it: it hands over to the one already running and goes, before reading anything.
         if !Self.isHostingTests, !SingleCopy.claim() {
