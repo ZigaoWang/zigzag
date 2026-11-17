@@ -651,6 +651,14 @@ enum DebugBridge {
         case "enter": controller.commandBar.debugEnter()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
+        // bardrag <dx> <dy> [hold]: as dragging the open bar by its edge that far (hold: not let go yet, the guides
+        // stay); barreset: as double-clicking its edge; barframe: where it is, in the debug log.
+        case "bardrag":
+            let f = arg.split(separator: " ")
+            let n = f.prefix(2).compactMap { Double($0) }
+            if n.count == 2 { controller.commandBar.debugDrag(n[0], n[1], ending: f.dropFirst(2).first != "hold") }
+        case "barreset": controller.commandBar.debugResetPosition()
+        case "barframe": debugLog("barframe \(NSStringFromRect(controller.commandBar.debugPanelFrame)) overlay=\(NSStringFromRect(controller.root.overlay.bounds)) page=\(NSStringFromRect(controller.root.cardFrame))")
         case "permprompt":
             if arg == "app" {
                 Task { _ = await PermissionPrompt.ask(host: "meeting.tencent.com", what: "Calendar", symbol: "arrow.up.forward.app",

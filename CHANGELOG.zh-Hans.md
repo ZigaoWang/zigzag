@@ -21,6 +21,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “设置 › 外观 › 网页缩放”可以设置所有网站默认的缩放比例，和 Chrome、Safari 一样。用 ⌘+ 或 ⌘− 缩放过的网站会保留自己的缩放，“实际大小”会回到默认值。感谢 [Lakeland97](https://github.com/Lakeland97)。([#273](https://github.com/ZigaoWang/zigzag/issues/273))
 - 隐藏边栏时，用 ⌘ 点按、中键点按或“在新标签页中打开链接”在后台打开的链接，会在边栏那一侧短暂显示一条提示，带着新标签页的图标和标题。点一下就切到那个标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#272](https://github.com/ZigaoWang/zigzag/issues/272))
 - “历史记录”菜单更像 Safari 了：“最近关闭”里列出最近关掉的标签页和窗口，可以挑一个重新打开；下面是今天访问过的网页，再往下是过去七天每天一个子菜单。点网页会在当前标签页打开，按住 ⌘ 点会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#271](https://github.com/ZigaoWang/zigzag/issues/271))
+- ⌘T 的命令栏可以拖到窗口里任何地方，边栏上面也行：按住它的边缘或文字周围的空白拖动就好，和 Raycast 一样，放下后会一直待在那里。拖动时会出现参考线，标出它默认的位置，也就是窗口正中和平常的高度，靠近时会吸附上去，想放回去很容易。双击它的边缘就能回到默认位置。感谢 [miateo](https://github.com/miateo)。([#280](https://github.com/ZigaoWang/zigzag/issues/280))
 
 ### 修复
 - 全屏时，跟着菜单栏一起出现的关闭、最小化和全屏按钮后面又有了一条栏，隐藏边栏时不会再直接浮在网页上。

@@ -558,15 +558,22 @@ class FloatingPanelView: NSView {
     /// Walking up from the hit view, anything that handles a press itself ends the walk as not bare: a control, a text
     /// view, a field's own padding or bezel (the view around it that focuses it on a press), anything that takes first
     /// responder or has a mouseDown of its own. Words that are only words (a label) are surface.
-    static func isBareSurface(_ hit: NSView?) -> Bool {
+    static func isBareSurface(_ hit: NSView?) -> Bool { bareSurfacePanel(hit) != nil }
+
+    /// The panel whose own surface a press landed on, or nil when it landed on one of its controls (`isBareSurface`).
+    static func bareSurfacePanel(_ hit: NSView?) -> FloatingPanelView? {
         var view = hit
         while let current = view {
-            if current is FloatingPanelView { return true }
-            if handlesPress(current) { return false }
+            if let panel = current as? FloatingPanelView { return panel }
+            if handlesPress(current) { return nil }
             view = current.superview
         }
-        return false
+        return nil
     }
+
+    /// Hears a left press on the panel's own surface, which the window otherwise keeps from everything (the command
+    /// bar is moved this way).
+    var onBarePress: ((NSEvent) -> Void)?
 
     private static func handlesPress(_ view: NSView) -> Bool {
         if let field = view as? NSTextField, isLabel(field) { return false }

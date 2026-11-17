@@ -3069,6 +3069,7 @@ extension BrowserWindowController: CommandBarHost {
         return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }
     var commandBarTabs: TabManager? { tabManager }
+    var commandBarIsMovable: Bool { true }
     var commandBarProfile: Profile { tabManager.profile }
     var commandBarTab: Tab? { tabManager.selectedTab }
     var commandBarSpace: SpaceInfo? { tabManager.currentSpace }
