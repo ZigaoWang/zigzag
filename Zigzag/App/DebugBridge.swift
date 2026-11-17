@@ -222,7 +222,15 @@ enum DebugBridge {
             }
         case "minianswer":
             guard let host: PromptHost = mini ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { break }
-            PermissionPrompt.debugAnswer(arg == "allow" ? .allow : arg == "always" ? .always : arg == "alternate" ? .alternate : arg == "deny" ? .deny : .notNow, in: host)
+            let answer: PermissionAnswer?
+            switch arg {
+            case "allow": answer = PermissionAnswer(action: "allow", remember: false)
+            case "always": answer = PermissionAnswer(action: "allow", remember: true)
+            case "alternate": answer = PermissionAnswer(action: "screen", remember: false)
+            case "deny": answer = PermissionAnswer(action: "deny", remember: false)
+            default: answer = nil
+            }
+            PermissionPrompt.debugAnswer(answer, in: host)
         case "minisave": SavePasswordPrompt.debugAnswer(saved: arg == "save")
         case "minieval":
             // minieval <path> <script>: the script's result (it may await), written to the file.
@@ -667,8 +675,7 @@ enum DebugBridge {
             if arg == "app" {
                 Task { _ = await PermissionPrompt.ask(host: "meeting.tencent.com", what: "Calendar", symbol: "arrow.up.forward.app",
                                                       icon: NSWorkspace.shared.icon(forFile: "/System/Applications/Calendar.app"),
-                                                      in: controller, title: "Open Calendar", allowTitle: "Open",
-                                                      denyTitle: "Don’t Open") }
+                                                      in: controller, title: "Open Calendar", actions: [.deny, .allow]) }
             } else {
                 Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", in: controller) }
             }

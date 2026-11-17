@@ -41,6 +41,20 @@ struct DeveloperModeRowTests {
         }
     }
 
+    /// The waiting dot takes the chip's own corner, and moves to the icon's other top corner while the chip is there,
+    /// so the two states never draw over each other.
+    @MainActor @Test func theWaitingDotKeepsClearOfTheDeveloperChip() {
+        for side: CGFloat in [14, 16, 18, 20, 22] {
+            #expect(FaviconView.attentionFrame(side: side, overBadge: false) == FaviconView.badgeFrame(side: side))
+            let clear = FaviconView.attentionFrame(side: side, overBadge: true)
+            #expect(clear.size == FaviconView.badgeFrame(side: side).size)
+            #expect(clear.intersects(FaviconView.badgeFrame(side: side)) == false)
+            // Mirrored to the top corner: same trailing edge, above the icon's middle.
+            #expect(clear.minX == FaviconView.badgeFrame(side: side).minX)
+            #expect(clear.minY > side - clear.height - 3.5 && clear.minY < side)
+        }
+    }
+
     /// The chip takes the space's accent where that holds 3:1 against the frame, and the row's ink where it wouldn't:
     /// on every curated color, light and dark, and on custom colors from every part of the wheel and every depth.
     @MainActor @Test func theChipReadsOnEverySpace() {

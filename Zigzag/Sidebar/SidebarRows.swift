@@ -168,6 +168,10 @@ final class SelectionCardView: NSView {
 final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private(set) var tab: Tab?
     private var token: SignalToken?
+    private var attentionToken: SignalToken?
+    /// How many questions were waiting for this row's pages when it last drew its dots, so one arriving for another
+    /// row doesn't refresh every row in the sidebar.
+    private var waitingQuestions = 0
     let closeButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
     /// The speaker beside the page that's playing (or muted): this row's own, and in a split, its partner's beside
     /// the partner's half. Clicking one mutes or unmutes that page.
@@ -595,7 +599,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let development = showsDeveloperMode ? DeveloperTool.modeName : nil
         // What its ring shows: its page isn't running.
         let unloaded = showsUnloaded(tab) ? String(localized: "not loaded", comment: "Spoken by VoiceOver after a tab row's name: the tab's page isn't running (put to sleep, or not loaded yet since Zigzag reopened); it loads when you click it.") : nil
-        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
+        let waiting = ([tab, partner] + extraPages).compactMap { $0 }.contains { PendingQuestions.hasPending(tabID: $0.id) }
+            ? String(localized: "needs your answer", comment: "Spoken by VoiceOver after a tab row's name, and shown in its tooltip: a question is waiting for that page.")
+            : nil
+        let state = ([isSelected ? String(localized: "current tab", comment: "Spoken by VoiceOver after a tab row's name: it's the tab you're on.") : nil, unloaded, development, waiting, sound(tab, split ? title.stringValue : nil), sound(partner, partnerTitle.stringValue)]
             + zip(extraPages, extraTitles).map { sound($0, $1) })
             .compactMap { $0 }.joined(separator: String(localized: "accessibility.state-separator", defaultValue: ", ", comment: "Separates the states VoiceOver reads after a tab row's name, like “current tab, playing audio”."))
         setAccessibilityValue(state.isEmpty ? nil : state)
@@ -643,7 +650,12 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let name = partTitles.indices.contains(index) ? partTitles[index].stringValue : title.stringValue
         // A part in Developer Mode says so under its name, with its host.
         let pages = [tab, partner] + extraPages
-        return developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
+        let described = developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
+        // A part with a question waiting for it says that too, so a question can't be missed in a background tab.
+        if pages.indices.contains(index), let page = pages[index], PendingQuestions.hasPending(tabID: page.id) {
+            return "\(described)\n\(String(localized: "needs your answer", comment: "Shown in a tab row's tooltip, and spoken by VoiceOver after its name: a question is waiting for that page."))"
+        }
+        return described
     }
 
     /// The page the point is over.
@@ -675,6 +687,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         guard tab !== self.tab || token == nil else { refresh(); return }
         self.tab = tab
         token = tab?.changed.observe { [weak self] change in self?.tabChanged(change) }
+        // A question arriving for one of this row's pages (or being answered) marks or unmarks its icon; a question
+        // for another row leaves this one alone, however many there are.
+        if attentionToken == nil {
+            attentionToken = PendingQuestions.changed.observe { [weak self] _ in
+                guard let self, self.pendingForRow != self.waitingQuestions else { return }
+                self.refresh()
+            }
+        }
         refresh()
     }
 
@@ -771,6 +791,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         refreshDeveloperMode()
+        refreshAttention()
         partnerAudioButton.isHidden = !isSplit || !partnerShowsAudio || renameField != nil
         for (i, views) in (extraViews ?? []).enumerated() {
             let page = extraPages.indices.contains(i) ? extraPages[i] : nil
@@ -795,6 +816,35 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             // A row of several pages names each in its own tooltip; a row of one says it on its icon.
             view.toolTip = on && !isSplit ? Self.developerTip(for: pages.indices.contains(i) ? pages[i]?.url : nil) : nil
         }
+    }
+
+    /// Marks each page of the row that has a question waiting for it that can't be shown yet — its tab isn't in
+    /// front, or its window is hidden — with one dot in the space's accent, however many questions are waiting.
+    private func refreshAttention() {
+        let pages = [tab, partner] + extraPages
+        let icons = [icon, partnerIcon] + (extraViews ?? []).map(\.icon)
+        let accent = Brand.Theme.for(self).badge
+        for (i, view) in icons.enumerated() {
+            guard pages.indices.contains(i), let page = pages[i], waitsItself(page) else {
+                view.attentionColor = nil
+                continue
+            }
+            view.attentionColor = accent
+        }
+        waitingQuestions = pendingForRow
+    }
+
+    /// How many questions are waiting for this row's pages, whether they can be shown or not: the count its dots
+    /// follow, so a question for another row never draws this one again.
+    private var pendingForRow: Int {
+        pages.reduce(0) { $0 + PendingQuestions.count(tabID: $1.id) }
+    }
+
+    /// A question is waiting for `page` and nothing is showing it: a tab that isn't in front, or a hidden window.
+    /// Once the tab is brought forward the banner is on screen, so the dot goes.
+    private func waitsItself(_ page: Tab) -> Bool {
+        let front = (window?.windowController as? PromptHost)?.promptShows(page) ?? false
+        return PendingQuestions.waits(tabID: page.id, isFront: front, windowVisible: window?.isVisible == true)
     }
 
     private func layoutRenameField() {

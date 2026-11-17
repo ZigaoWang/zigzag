@@ -2039,7 +2039,68 @@ extension Tab: WKNavigationDelegate {
 extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Peek always opens; a page's own request needs a click or your say.
-        guard BrowserWebView.pendingDisposition(for: webView) != nil || PopupNotice.allows(navigationAction, from: url, isPrivate: isPrivate) else { return nil }
+        if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
+            // A page's own pop-up: a destination remembered for the site opens there with no question, otherwise the
+            // banner asks and nothing opens now. Zigzag's own pages never open this way.
+            guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
+            // A blank `window.open()` is a page link too: an allowed site keeps the open-blank-then-navigate pattern
+            // sign-ins and payments use. WebKit hands it over as a scheme-less address, not nil.
+            let (target, isBlank) = PopupNotice.popupTarget(navigationAction.request.url)
+            // A page's pop-up is a page link like any other, kept answer or not: an app's address asks its own
+            // question, and anything the web may not open top-level (data:, a script, a file) opens nowhere.
+            switch PopupNotice.route(target, from: url) {
+            case .refuse:
+                Diagnostics.note("Refused a page's pop-up", site: url?.host(), "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                return nil
+            case .app:
+                // A frame's pop-up stays blocked quietly, as before the card: an ad in an iframe does not get an
+                // app question the page itself would have to answer for.
+                guard navigationAction.sourceFrame.isMainFrame else {
+                    Diagnostics.note("Blocked a frame's pop-up", site: url?.host(),
+                                     "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                    return nil
+                }
+                openFromPage(target, isClick: false, asker: navigationAction.sourceFrame.securityOrigin)
+                return nil
+            case .open:
+                break
+            }
+            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included,
+            // but only Allow and Zigzag Mini may open those: This Tab or New Tab from a frame or a blank window would
+            // move the page without a click.
+            if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(url)) {
+                let destination = PopupNotice.destination(for: stored)
+                guard PopupNotice.storedDestinationMayOpen(destination, forBlankOrFrame: isBlank || !navigationAction.sourceFrame.isMainFrame) else {
+                    return nil
+                }
+                switch destination {
+                case .deny:
+                    return nil
+                case .automatic:
+                    // A legacy allow, or Allow in Site Controls: a plain window.open opens a real tab and a sized one
+                    // a real pop-up, exactly as a site that was allowed pop-ups opened them before the card.
+                    return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
+                case .viewer:
+                    // WebKit is still offering the pop-up here, so it is made the real thing: `window.opener` and
+                    // everything the page does with the new window keep working.
+                    return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: webView.window, opener: self)
+                case .thisTab, .newTab:
+                    if let promptHost = host as? PromptHost {
+                        PopupNotice.open(target, action: stored, from: self, in: promptHost)
+                    }
+                    return nil
+                }
+            }
+            // Only the page itself asks, and only for an address: a frame's pop-up — an ad in an iframe, say — is
+            // blocked without a word, and there is nothing to ask about a blank window yet.
+            guard !isBlank, navigationAction.sourceFrame.isMainFrame else {
+                Diagnostics.note("Blocked a frame's or a blank pop-up", site: url?.host(),
+                                 "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
+                return nil
+            }
+            return PopupNotice.ask(navigationAction, from: url, isPrivate: isPrivate, tab: self, in: host as? PromptHost,
+                                   configuration: configuration, features: windowFeatures)
+        }
         // Zigzag's own pages never open as a page's new window: Settings would show over it before anything loaded.
         guard Self.mayOpenInNewWebView(navigationAction.request.url) else {
             _ = BrowserWebView.takePendingDisposition(for: webView)

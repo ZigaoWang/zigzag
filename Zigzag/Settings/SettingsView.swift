@@ -3471,6 +3471,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             forget.onClick = { [weak self] _ in
                 if let origin {
                     SitePermissions.forgetEverything(origin: origin)
+                    // Session answers the card reads (a put-off or denied app, the rows Site Controls lists) go too.
+                    ExternalLinks.forgetAnswers(origin: origin)
+                    PopupNotice.forgetAnswers(origin: origin)
                     WebNotifications.shared.removeAll(origin: origin)
                 }
                 ContentBlocker.allowedSites.remove(site)

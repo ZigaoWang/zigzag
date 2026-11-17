@@ -34,17 +34,23 @@ protocol PromptHost: AnyObject {
 }
 
 extension WindowManager {
-    /// The window a page in `window` asks its questions in: a browser window, or Zigzag Mini.
+    /// The window a page in `window` asks its questions in: a browser window, Zigzag Mini, or an installed app's own
+    /// window. Without the last, a web app's camera, location or notification request would be answered no without
+    /// being asked.
     func promptHost(for window: NSWindow?) -> PromptHost? {
         guard let window else { return nil }
         if let controller = controller(for: window) { return controller }
-        return MiniWindowController.all.first { $0.window === window }
+        if let mini = MiniWindowController.all.first(where: { $0.window === window }) { return mini }
+        return WebAppWindowController.all.first { $0.window === window }
     }
 
-    /// The window `tab` lives in, wherever it's showing.
+    /// The window `tab` lives in, wherever it's showing: the same three `promptHost(for:)` answers, found by the page
+    /// instead of by the window. An installed app's window was missing here, so a login captured in one offered to be
+    /// saved in a window that was never looked for, and the offer never came up.
     func promptHost(holding tab: Tab) -> PromptHost? {
         if let controller = window(of: tab) { return controller }
-        return MiniWindowController.all.first { $0.tab === tab }
+        if let mini = MiniWindowController.all.first(where: { $0.tab === tab }) { return mini }
+        return WebAppWindowController.all.first { $0.tab === tab }
     }
 }
 

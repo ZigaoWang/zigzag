@@ -966,6 +966,8 @@ final class SitePanel: FloatingPanelView {
         if resetPermissions == nil, let origin {
             let row = PanelLinkRow(String(localized: "Reset Permissions", comment: "Row under a site's permissions in the site panel: forgets every answer given to the site, so it asks again.")) { [weak self] in
                 SitePermissions.reset(origin: origin)
+                self?.tab.permissionAnswers.forget()
+                PopupNotice.forgetAnswers(origin: origin)
                 self?.tab.webRTCHere[origin] = nil
                 self?.rebuildRows()
                 // Nothing left to show there.

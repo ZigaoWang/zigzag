@@ -25,15 +25,27 @@ struct PageLinkTests {
 
     @Test func blockAlwaysHolds() {
         // Block holds even for an address you typed: being yours only spares the question.
-        #expect(ExternalLinks.verdict(byYou: true, decision: false, clickedHere: true, scheme: "zoommtg") == .block)
-        #expect(ExternalLinks.verdict(byYou: false, decision: false, clickedHere: true, scheme: "mailto") == .block)
-        #expect(ExternalLinks.verdict(byYou: true, decision: nil, clickedHere: false, scheme: "smb") == .open)
+        #expect(ExternalLinks.verdict(byYou: true, clickedHere: true, scheme: "zoommtg", stored: "deny") == .block)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: true, scheme: "mailto", stored: "deny") == .block)
+        #expect(ExternalLinks.verdict(byYou: true, clickedHere: false, scheme: "smb", stored: nil) == .open)
         // From a page, an app asks, unless the site was told it may.
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: false, scheme: "smb") == .ask)
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: true, scheme: "smb") == .ask)
-        #expect(ExternalLinks.verdict(byYou: false, decision: true, clickedHere: false, scheme: "smb") == .open)
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: true, scheme: "mailto") == .open)
-        #expect(ExternalLinks.verdict(byYou: false, decision: nil, clickedHere: false, scheme: "mailto") == .ask)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "smb", stored: nil) == .ask)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: true, scheme: "smb", stored: nil) == .ask)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "smb", stored: "allow") == .open)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: true, scheme: "mailto", stored: nil) == .open)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "mailto", stored: nil) == .ask)
+    }
+
+    /// A kept answer is trusted, and a question only writes one where it may live. An Allow on an http origin can
+    /// only have been chosen in Site Controls — a question never writes one there — so it opens without asking, while
+    /// nothing on an insecure page, in a foreign frame or in a private window can ever be written.
+    @Test func anAnswerIsKeptOnlyWhereItMayBe() {
+        #expect(ExternalLinks.saves(isPrivate: false, origin: "https://example.com", canRemember: true) == true)
+        #expect(ExternalLinks.saves(isPrivate: true, origin: "https://example.com", canRemember: true) == false)
+        #expect(ExternalLinks.saves(isPrivate: false, origin: nil, canRemember: true) == false)
+        #expect(ExternalLinks.saves(isPrivate: false, origin: "http://example.com", canRemember: false) == false)
+        #expect(ExternalLinks.saves(isPrivate: false, origin: "https://example.com", canRemember: false) == false)
+        #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "allow") == .open)
     }
 
     @Test func everydayAppsOpenOnlyForALinkClickInThePage() {

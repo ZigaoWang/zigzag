@@ -308,7 +308,8 @@ struct SiteOriginPermissionTests {
             defaults.set(true, forKey: "UnrelatedSetting")
             SitePermissions.migrateHostOnlyAnswers()
             let now = defaults.dictionary(forKey: "SitePermissions") as? [String: Bool]
-            // An answer already kept for the origin stays as it was.
+            // An answer already kept for the origin stays as it was; a denial given to a host on its own is kept for
+            // its https site, and an allow given that way is not.
             #expect(now == ["https://localhost|camera": false, "https://kept.com|camera": true, "https://example.com|notifications": true])
             #expect(SitePermissions.decision(origin: "http://localhost", type: .microphone) == nil)
             #expect(SitePermissions.decision(origin: "https://localhost", type: .microphone) == nil)
@@ -409,24 +410,6 @@ struct PageNoticeTests {
         #expect(!Toast.acceptsAction(shownAt: shown, now: shown))
         #expect(!Toast.acceptsAction(shownAt: shown, now: shown.addingTimeInterval(0.4)))
         #expect(Toast.acceptsAction(shownAt: shown, now: shown.addingTimeInterval(0.6)))
-    }
-
-    @Test func aBlockedPopupIsSaidOnceInAWhile() {
-        let key = "test-\(UUID().uuidString)|https://example.com", now = Date()
-        #expect(PopupNotice.shouldNotice(key, now: now))
-        #expect(!PopupNotice.shouldNotice(key, now: now.addingTimeInterval(1)))
-        #expect(!PopupNotice.shouldNotice(key, now: now.addingTimeInterval(PopupNotice.noticeInterval - 1)))
-        #expect(PopupNotice.shouldNotice("test-\(UUID().uuidString)|https://other.example", now: now.addingTimeInterval(1)))
-        #expect(PopupNotice.shouldNotice(key, now: now.addingTimeInterval(PopupNotice.noticeInterval + 1)))
-    }
-
-    @Test func onlyWebPopupsAreOffered() throws {
-        let page = try #require(URL(string: "https://pay.example/checkout"))
-        #expect(PopupNotice.offered(page) == (true, page))
-        #expect(PopupNotice.offered(nil) == (true, nil))
-        #expect(PopupNotice.offered(URL(string: "about:blank")) == (true, nil))
-        #expect(PopupNotice.offered(URL(string: "javascript:alert(1)")) == (false, nil))
-        #expect(PopupNotice.offered(URL(string: "data:text/html,hi")) == (false, nil))
     }
 
     @Test func iconsComeOnlyFromPublicAddresses() {
