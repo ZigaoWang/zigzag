@@ -1,6 +1,14 @@
 import AppKit
 import WebKit
 
+/// Which browser an extension's package was built for, as its record keeps it. A Chrome package (the store's, or a
+/// folder) is `chromium`; a Firefox one (.xpi) is `firefox`. The kind words an install sheet: the claims over
+/// `chrome-api.json` are Chrome's, and Firefox's own say what its APIs do (Task 6).
+nonisolated enum ExtensionKind: String, Codable, Sendable {
+    case chromium
+    case firefox
+}
+
 /// What an extension will be able to do, and what it asks for that Zigzag can't give it, in plain words.
 /// Shown before installing and in Settings.
 ///
@@ -9,6 +17,10 @@ import WebKit
 /// WebKit drops is still named, by the permission itself.
 @available(macOS 15.4, *)
 struct ExtensionReport {
+    /// Which browser's extension this is. The lines a Firefox package gets come from its own overlay; a Chrome
+    /// package's are the ones above. Task 6 reads it; nothing worded here depends on it yet.
+    var kind: ExtensionKind = .chromium
+
     struct Line: Hashable {
         let symbol: String
         let text: String
@@ -29,7 +41,8 @@ struct ExtensionReport {
         var ids: Set<String> = []
     }
 
-    init(extension ext: WKWebExtension, manifest: [String: Any], id: String) {
+    init(extension ext: WKWebExtension, manifest: [String: Any], id: String, kind: ExtensionKind = .chromium) {
+        self.kind = kind
         let requested = Self.strings(manifest, ["permissions", "optional_permissions"])
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
         // Not a permission, but worth saying up front: it changes what ⌘T does.
