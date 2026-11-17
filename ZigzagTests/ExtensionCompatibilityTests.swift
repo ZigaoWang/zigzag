@@ -129,7 +129,8 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func aPartialClaimMayInheritFromItsNamespace() throws {
-        // history.search has no claim of its own; the history claim covers it, and the sheet still gets its line.
+        // history.search has no claim of its own; the history claim covers it, and the overlay still validates. In
+        // PR A the partial row produces no line (main's noise level), though the claim it names stays on record.
         let overlay = try overlay(claims: """
         {"history": {"status": "bridged", "implementation": "swift:history", "group": "privacy"}}
         """, groups: """
@@ -141,10 +142,7 @@ struct ExtensionCompatibilityTests {
                                                           implementations: implementations)
         #expect(problems.isEmpty)
         let limits = ExtensionCompatibility(overlay: overlay).limits(forPermissions: ["history"], manifestKeys: [])
-        #expect(limits.count == 1)
-        #expect(limits.first?.catalogKey == "extension.limit.privacySettings")
-        #expect(limits.first?.status == .partial)
-        #expect(limits.first?.source == "history.search")
+        #expect(limits.isEmpty)
     }
 
     @Test func aPartialClaimOutsideTheUniverseIsRejected() throws {
@@ -157,8 +155,8 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func aPartialRowMayNameAnUnsupportedMemberAsItsGap() throws {
-        // A partial permission's line may name the member that cannot work: that is the gap the sheet states, and it
-        // is narrower than the whole namespace. The row's line is partial, as the row is.
+        // A partial permission may name the member that cannot work, and the overlay still validates. PR A gives
+        // that row no line of its own: the gap it states is for a later PR, once the error it describes is real.
         let overlay = try overlay(claims: """
         {"history": {"status": "unsupported", "reason": "webkitMissing", "group": "privacy"}}
         """, groups: """
@@ -170,9 +168,7 @@ struct ExtensionCompatibilityTests {
                                                           implementations: implementations)
         #expect(problems.isEmpty)
         let limits = ExtensionCompatibility(overlay: overlay).limits(forPermissions: ["history"], manifestKeys: [])
-        #expect(limits.count == 1)
-        #expect(limits.first?.status == .partial)
-        #expect(limits.first?.catalogKey == "extension.limit.privacySettings")
+        #expect(limits.isEmpty)
     }
 
     @Test func aPartialRowThatStatesNothingIsRejected() throws {
@@ -275,7 +271,7 @@ struct ExtensionCompatibilityTests {
         #expect(CompatibilityText.text(for: "extension.limit.unwritten", fallback: "Tab groups") == "Tab groups")
     }
 
-    @Test func installLinesCarryThePermissionStatusAndShareACatalogOnce() throws {
+    @Test func unsupportedAndDeprecatedPermissionsShareACatalogOnce() throws {
         let overlay = try overlay(claims: """
         {"tabs": {"status": "bridged", "implementation": "swift:tabs", "members": {
             "group": {"status": "unsupported", "reason": "webkitMissing", "group": "tabGroups"}
@@ -299,17 +295,17 @@ struct ExtensionCompatibilityTests {
         """)
         let limits = ExtensionCompatibility(overlay: overlay)
             .limits(forPermissions: ["proxy", "tabs", "history", "downloads", "alarms"], manifestKeys: ["omnibox"])
-        // A shared catalog is one line, with a deterministic source, and a supported permission has no line.
-        #expect(limits.count == 4)
-        #expect(Set(limits.compactMap(\.catalogKey)) == ["extension.limit.proxyScripts", "extension.limit.tabGroups",
-                                                         "extension.limit.privacySettings", "extension.limit.gone"])
+        // The two partial rows and the supported one are silent; a shared catalog is one line, with a
+        // deterministic source.
+        #expect(limits.count == 2)
+        #expect(Set(limits.compactMap(\.catalogKey)) == ["extension.limit.proxyScripts", "extension.limit.gone"])
         let byCatalog = Dictionary(uniqueKeysWithValues: limits.compactMap { limit in
             limit.catalogKey.map { ($0, limit) }
         })
         #expect(byCatalog["extension.limit.proxyScripts"]?.source == "omnibox")
-        #expect(byCatalog["extension.limit.tabGroups"]?.status == .partial)
-        #expect(byCatalog["extension.limit.privacySettings"]?.status == .partial)
         #expect(byCatalog["extension.limit.gone"]?.status == .deprecated)
+        #expect(!byCatalog.keys.contains("extension.limit.tabGroups"))
+        #expect(!byCatalog.keys.contains("extension.limit.privacySettings"))
         #expect(!byCatalog.keys.contains("extension.limit.omnibox"))
     }
 
@@ -457,25 +453,25 @@ struct ExtensionCompatibilityTests {
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
-    /// One feature is one line however many members ask: tabCapture's permission row and its capture claim both name
-    /// tab video capture, so the claims path hands the sheet a single line.
-    @Test func oneFeatureIsOneLineHoweverManyMembersAsk() throws {
+    /// A permission whose row is partial is silent in PR A, however many members its claims name: main's noise
+    /// level, with the claims kept on record for the sheet PR B will show.
+    @Test func aPartialPermissionRowIsSilent() throws {
         let (overlay, _) = try shipped()
-        let limits = ExtensionCompatibility(overlay: overlay)
+        let tabCapture = ExtensionCompatibility(overlay: overlay)
             .limits(forPermissions: ["tabCapture"], manifestKeys: [])
-        #expect(limits.count == 1)
-        #expect(limits.first?.catalogKey == "extension.limit.tabVideoCapture")
-        #expect(limits.first?.text == "Tab video capture")
-        #expect(limits.first?.source == "tabCapture")
+        #expect(tabCapture.isEmpty)
+        // What the row would have said is still the narrow one, ready for PR B.
+        #expect(overlay.permissions["tabCapture"]?.status == .partial)
+        let capture = try #require(overlay.claims["tabCapture"]?.members?["capture"])
+        #expect(capture.group == "tabVideoCapture")
     }
 
-    @Test func theStorageLimitReachesTheSheet() throws {
+    @Test func thePartialStorageRowIsSilent() throws {
         let (overlay, _) = try shipped()
         let limits = ExtensionCompatibility(overlay: overlay).limits(forPermissions: ["storage"], manifestKeys: [])
-        #expect(limits.count == 1)
-        #expect(limits.first?.catalogKey == "extension.limit.storageSync")
-        #expect(limits.first?.status == .partial)
-        #expect(limits.first?.text == "Settings synced between Macs")
+        #expect(limits.isEmpty)
+        #expect(overlay.permissions["storage"]?.status == .partial)
+        #expect(overlay.permissions["storage"]?.catalog == "extension.limit.storageSync")
     }
 
     @Test func everyGroupResolvesToACatalogEntry() throws {
@@ -599,11 +595,9 @@ struct ExtensionCompatibilityTests {
         for (name, row) in overlay.permissions {
             let limits = compatibility.limits(forPermissions: [name], manifestKeys: [])
             switch row.status {
-            case .supported:
-                #expect(limits.isEmpty, "\(name) is supported but has a limit line")
-            case .partial:
-                #expect(!limits.isEmpty, "\(name) is partial but has no limit line")
-                #expect(limits.allSatisfy { $0.status == .partial }, "\(name) has a line that is not partial")
+            case .supported, .partial:
+                // PR A's noise rule: only unsupported and deprecated permissions get a line.
+                #expect(limits.isEmpty, "\(name) is \(row.status.rawValue) but has a limit line")
             case .unsupported, .deprecated:
                 #expect(limits.count == 1, "\(name) should have one line, not \(limits.count)")
                 #expect(limits.first?.status == row.status)
@@ -620,13 +614,9 @@ struct ExtensionCompatibilityTests {
             #expect(compatibility.limits(forPermissions: [name], manifestKeys: []).isEmpty,
                     "\(name) should have no line")
         }
-        // Tab video capture is the one covered row that keeps a limit; tab audio capture works.
+        // Tab video capture's row is partial and silent; its narrow wording stays for PR B.
         #expect(overlay.permissions["tabCapture"]?.status == .partial)
-        let capture = compatibility.limits(forPermissions: ["tabCapture"], manifestKeys: [])
-        #expect(capture.count == 1)
-        #expect(capture.first?.catalogKey == "extension.limit.tabVideoCapture")
-        #expect(capture.first?.status == .partial)
-        #expect(capture.first?.text == "Tab video capture")
+        #expect(compatibility.limits(forPermissions: ["tabCapture"], manifestKeys: []).isEmpty)
         let omnibox = compatibility.limits(forPermissions: [], manifestKeys: ["omnibox"])
         #expect(omnibox.count == 1)
         #expect(omnibox.first?.catalogKey == "extension.limit.addressBarKeyword")

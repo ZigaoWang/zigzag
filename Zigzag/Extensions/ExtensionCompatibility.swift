@@ -186,10 +186,10 @@ nonisolated enum CompatibilityText {
                           comment: "A Chrome extension feature Zigzag limits: runtime.getContexts reports background, popup, side panel and offscreen contexts only; tabs, subframes, developer tools and real document IDs are not reported.")
         case "extension.limit.backgroundPage":
             return String(localized: "extension.limit.backgroundPage", defaultValue: "The background page (Manifest V2 only; Manifest V3 pages get “You do not have a background page.”)",
-                          comment: "A Chrome extension feature Zigzag limits: runtime.getBackgroundPage answers Manifest V2 only; a Manifest V3 page gets “You do not have a background page.” and a Manifest V3 worker has no member.")
+                          comment: "A Chrome extension feature Zigzag limits: runtime.getBackgroundPage answers Manifest V2 only; a Manifest V3 page gets “You do not have a background page.” A Manifest V3 worker keeps WebKit's member, visible rather than absent.")
         case "extension.limit.action":
             return String(localized: "extension.limit.action", defaultValue: "Toolbar button settings",
-                          comment: "A Chrome extension feature Zigzag limits: badge text colour and toolbar button settings.")
+                          comment: "A Chrome extension feature Zigzag limits: badge text color and toolbar button settings.")
         case "extension.limit.notifications":
             return String(localized: "extension.limit.notifications", defaultValue: "Notifications",
                           comment: "A Chrome extension feature Zigzag limits: notification buttons and settings.")
@@ -628,35 +628,20 @@ nonisolated struct ExtensionCompatibility {
         registry = overlay.map { CompatibilityRegistry(overlay: $0) }
     }
 
-    /// The install sheet's lines for an extension asking for these permissions and manifest keys: one per distinct
-    /// catalog key, in the overlay's order. A supported permission or key has no line, and one the overlay does not
-    /// mention has none either.
+    /// The install sheet's lines for an extension asking for these permissions and manifest keys, one per distinct
+    /// catalog key in the overlay's order. A supported or partial permission or key has no line, and one the overlay
+    /// does not mention has none either.
     func limits(forPermissions permissions: Set<String>, manifestKeys: Set<String>) -> [CompatibilityLimit] {
-        guard let overlay, let registry else { return [] }
+        guard let overlay else { return [] }
         var lines: [(order: Int, source: String, limit: CompatibilityLimit)] = []
 
         func add(_ row: CompatibilityPermission, named name: String) {
             switch row.status {
-            case .supported:
+            case .supported, .partial:
+                // Main's noise level: a permission that partly works gets no line here. The claims that word its
+                // narrower gaps are still recorded, and PR B's sheet can name them once the errors they describe are
+                // real in WebKit pages.
                 return
-            case .partial:
-                if let catalog = row.catalog {
-                    let group = row.group ?? name
-                    let order = row.order ?? overlay.groups[group]?.order ?? 0
-                    lines.append((order, name, CompatibilityLimit(catalogKey: catalog, group: group,
-                                                                  reason: row.reason ?? .notImplemented,
-                                                                  status: .partial, source: name)))
-                }
-                for path in row.claims ?? [] {
-                    guard let claim = registry.claim(for: path), claim.status != .native,
-                          let group = claim.group, let entry = overlay.groups[group] else { continue }
-                    let order = row.order ?? entry.order ?? 0
-                    // The row is partial, so its line is a caveat about this permission however the member itself is
-                    // answered; an unsupported member names the exact gap rather than the whole namespace.
-                    lines.append((order, path, CompatibilityLimit(catalogKey: entry.catalog, group: group,
-                                                                  reason: claim.reason ?? row.reason ?? .notImplemented,
-                                                                  status: .partial, source: path)))
-                }
             case .unsupported, .deprecated:
                 let group = row.group ?? name
                 let catalog = row.catalog ?? overlay.groups[group]?.catalog

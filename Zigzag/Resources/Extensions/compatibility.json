@@ -202,8 +202,8 @@
       "status": "native",
       "members": {
         "detectLanguage": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:detectLanguage",
           "group": "language"
         }
       }
@@ -232,8 +232,8 @@
           "group": "tabGroups"
         },
         "ungroup": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:ungroup",
           "group": "tabGroups"
         },
         "createSplit": {
@@ -247,13 +247,13 @@
           "group": "tabActions"
         },
         "discard": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:discard",
           "group": "tabHousekeeping"
         },
         "highlight": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:highlight",
           "group": "tabHousekeeping"
         }
       }
@@ -308,18 +308,18 @@
       "group": "action",
       "members": {
         "setBadgeTextColor": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:setBadgeTextColor",
           "group": "action"
         },
         "getBadgeTextColor": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:getBadgeTextColor",
           "group": "action"
         },
         "getUserSettings": {
-          "status": "unsupported",
-          "reason": "notImplemented",
+          "status": "emulated",
+          "implementation": "js:getUserSettings",
           "group": "action"
         },
         "onUserSettingsChanged": {
@@ -716,7 +716,19 @@
     "sessions": {
       "status": "unsupported",
       "reason": "notImplemented",
-      "group": "sessions"
+      "group": "sessions",
+      "members": {
+        "getRecentlyClosed": {
+          "status": "emulated",
+          "implementation": "js:getRecentlyClosed",
+          "group": "sessions"
+        },
+        "getDevices": {
+          "status": "emulated",
+          "implementation": "js:getDevices",
+          "group": "sessions"
+        }
+      }
     },
     "search": {
       "status": "unsupported",
@@ -726,17 +738,58 @@
     "debugger": {
       "status": "unsupported",
       "reason": "webkitMissing",
-      "group": "debugger"
+      "group": "debugger",
+      "members": {
+        "detach": {
+          "status": "emulated",
+          "implementation": "js:detach",
+          "group": "debugger"
+        },
+        "getTargets": {
+          "status": "emulated",
+          "implementation": "js:getTargets",
+          "group": "debugger"
+        }
+      }
     },
     "tabGroups": {
       "status": "unsupported",
       "reason": "notImplemented",
-      "group": "tabGroups"
+      "group": "tabGroups",
+      "members": {
+        "query": {
+          "status": "emulated",
+          "implementation": "js:query",
+          "group": "tabGroups"
+        }
+      }
     },
     "fontSettings": {
       "status": "unsupported",
       "reason": "webkitMissing",
-      "group": "fontSettings"
+      "group": "fontSettings",
+      "members": {
+        "getFontList": {
+          "status": "emulated",
+          "implementation": "js:getFontList",
+          "group": "fontSettings"
+        },
+        "getFont": {
+          "status": "emulated",
+          "implementation": "js:getFont",
+          "group": "fontSettings"
+        },
+        "setFont": {
+          "status": "emulated",
+          "implementation": "js:setFont",
+          "group": "fontSettings"
+        },
+        "clearFont": {
+          "status": "emulated",
+          "implementation": "js:clearFont",
+          "group": "fontSettings"
+        }
+      }
     },
     "publicSuffix": {
       "status": "unsupported",
@@ -751,6 +804,11 @@
         "getSelf": {
           "status": "emulated",
           "implementation": "js:getSelf",
+          "group": "management"
+        },
+        "getAll": {
+          "status": "emulated",
+          "implementation": "js:getAll",
           "group": "management"
         }
       }

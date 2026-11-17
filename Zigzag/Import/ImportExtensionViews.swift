@@ -124,8 +124,8 @@ final class ImportExtensionsReview: NSView, ImportListItem {
             name.lineBreakMode = .byTruncatingTail
             var limits: NSTextField?
             if !prepared.report.limits.isEmpty {
-                // As the install sheet says it, one sentence with the names in lower case.
-                let names = prepared.report.limits.map { $0.text.prefix(1).lowercased() + $0.text.dropFirst() }
+                // As the install sheet says it, one sentence with English names in lower case.
+                let names = prepared.report.limits.map { Words.lowercasedForList($0.text) }
                 let list = Words.list(names)
                 let text = NSTextField(wrappingLabelWithString: String(localized: "Won’t work in Zigzag: \(list).",
                                                                        comment: "In the extension install sheet. The placeholder lists features the extension uses that Zigzag lacks, like “side panel and notifications”."))

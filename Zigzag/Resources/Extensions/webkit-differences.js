@@ -1090,14 +1090,16 @@
     // Chrome's exact words when an extension has no background page to hand over.
     const noBackgroundPage = 'You do not have a background page.';
     // runtime.getBackgroundPage: only an MV2 extension has a background page. In MV3 Chrome keeps the member on a
-    // page, but it always fails with these words, and its service worker has no member at all; WebKit answers null
-    // where there's no page. So an MV3 page is always told so, an MV2 page's null becomes the same error, and a
-    // worker's member goes. A callback hears the error through runtime.lastError only while it runs, as from WebKit.
+    // page, but it always fails with these words; WebKit answers null where there's no page. So an MV3 page is always
+    // told so, and an MV2 page's null becomes the same error. A callback hears the error through runtime.lastError
+    // only while it runs, as from WebKit.
+    //
+    // A worker keeps whatever member WebKit gave it: hiding the member there needed a stand-in for the whole runtime
+    // object, which every MV3 worker then carried into its keepalive port. So it is plainly visible in an MV3 worker,
+    // answering as WebKit does rather than as Chrome's absent member would; only the page is corrected.
     const correctGetBackgroundPage = (manifestV3) => {
       const noBackgroundError = () => new Error(noBackgroundPage);
-      if (isWorker) {
-        if (manifestV3) removeMember(['runtime'], 'getBackgroundPage');
-      } else {
+      if (!isWorker) {
         const webKits = manifestV3 ? null : (typeof api.runtime.getBackgroundPage === 'function' ? api.runtime.getBackgroundPage.bind(api.runtime)
           : api.extension && typeof api.extension.getBackgroundPage === 'function' ? api.extension.getBackgroundPage.bind(api.extension) : null);
         if (manifestV3 || webKits) setMember(['runtime'], 'getBackgroundPage', (callback) => {

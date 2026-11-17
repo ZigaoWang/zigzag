@@ -464,16 +464,15 @@ struct ExtensionSecurityTests {
 // MARK: Install sheets
 
 extension ExtensionSecurityTests {
-    /// The install sheet's limits come from the compatibility claims, not from what WebKit happens to recognize: a
-    /// permission WebKit supplies still gets the line its claim names, and one the claims support gets none.
+    /// The install sheet's limits come from the compatibility claims. In PR A a permission whose row is partial is
+    /// silent (main's noise level), as is one the claims support, and neither becomes a raw-name line.
     @Test func limitsComeFromClaimsNotFromWebKit() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let manifest: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
                                        "permissions": ["storage", "sidePanel"]]
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
-        #expect(report.limits.map(\.catalogKey) == ["extension.limit.storageSync"])
-        #expect(report.limits.map(\.text) == ["Settings synced between Macs"])
+        #expect(report.limits.isEmpty)
         // sidePanel is supported by the claims, so the old table's "Side panel" is gone even though WebKit supplies it.
         #expect(!report.limits.map(\.text).contains("Side panel"))
     }
@@ -506,7 +505,8 @@ extension ExtensionSecurityTests {
         #expect(!legacyReport.limits.map(\.source).contains("<all_urls>"))
     }
 
-    /// Every line a person saw before the claims either still reads the same or is one the claims now say works.
+    /// Every line a person saw before the claims that the claims still call a gap reads the same. A partial row is
+    /// silent in PR A, so the narrower lines it names are not in the sheet yet.
     @Test func theInstallSheetLimitsReadAsTheyDidBefore() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let permissions = ["sidePanel", "identity", "identity.email", "notifications", "downloads", "downloads.open",
@@ -518,16 +518,16 @@ extension ExtensionSecurityTests {
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
         #expect(Set(report.limits.map(\.text)) == [
-            "Tab groups", "Signing in with your account", "Tab video capture", "Blocking requests the old way",
-            "Debugging pages", "Font settings", "Privacy settings", "Managing other extensions", "Saving pages",
-            "Recording your screen", "Address bar keyword", "Reading aloud", "Your location", "Reading what you copy",
-            "Proxy scripts (PAC)",
+            "Tab groups", "Blocking requests the old way", "Debugging pages", "Font settings", "Privacy settings",
+            "Saving pages", "Recording your screen", "Address bar keyword", "Reading aloud", "Your location",
+            "Reading what you copy",
         ])
-        // The seven permission rows the claims now call supported keep the old table's lines out, and tabCapture's
-        // line is the video-specific one rather than the old "Recording tabs".
+        // The permission rows the claims call supported, and the partial ones (management, tabCapture, proxy,
+        // identity.email) that name a narrower gap, keep their lines out of the sheet in PR A.
         for gone in ["Side panel", "Your browsing history", "Your bookmarks", "Your top sites", "Notifications",
                      "Downloads", "Knowing when you’re away", "Background audio and clipboard", "Recording tabs",
-                     "Display information", "Keeping your Mac awake"] {
+                     "Display information", "Keeping your Mac awake", "Signing in with your account",
+                     "Tab video capture", "Managing other extensions", "Proxy scripts (PAC)"] {
             #expect(!report.limits.map(\.text).contains(gone), "\(gone)")
         }
     }
@@ -551,26 +551,25 @@ extension ExtensionSecurityTests {
     }
 
     /// A shim's prelude stands in for the permissions it covers, so the lines those permissions would add are
-    /// suppressed; the claims still word every other line.
+    /// suppressed; the claims still word every other line, and PR A's partial rows add none.
     @Test func aShimCoveredPermissionIsNotReported() async throws {
         let manifest: [String: Any] = ["manifest_version": 3, "name": "1Password", "version": "1.0",
                                        "permissions": ["management", "privacy", "storage"]]
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest,
                                      id: ExtensionStore.onePasswordID)
-        #expect(report.limits.map(\.text) == ["Settings synced between Macs"])
+        #expect(report.limits.isEmpty)
     }
 
-    /// An extension asking for permissions it mostly uses gets the gap named, not its whole namespace: "Won't work
-    /// in Zigzag" may not read as "tabs do not work" when only discarding and highlighting do not.
+    /// A permission that mostly works keeps its whole namespace out of the sheet: partial rows are silent in PR A, so
+    /// "Won't work in Zigzag" never reads as "tabs do not work" when only some member does not.
     @Test func aCommonPermissionNamesItsGapNotItsNamespace() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let manifest: [String: Any] = ["manifest_version": 3, "name": "Tab Tool", "version": "1.0",
                                        "permissions": ["tabs", "cookies", "declarativeNetRequest", "storage"]]
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
-        #expect(report.limits.map(\.text) == ["Discarding and highlighting tabs", "Cookie partition details",
-                                              "Settings synced between Macs", "Changes to static blocking rules"])
+        #expect(report.limits.isEmpty)
         #expect(!report.limits.map(\.text).contains("Some tab actions"))
         #expect(!report.limits.map(\.text).contains("Cookie details"))
         #expect(!report.limits.map(\.text).contains("Blocking rules"))

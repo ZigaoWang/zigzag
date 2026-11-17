@@ -96,18 +96,17 @@ struct ExtensionContextClaimsTests {
         let context = try Self.surfaceWorld(version: 3)
         #expect(context.evaluateScript("chrome.runtime.ContextType.SIDE_PANEL").toString() == "SIDE_PANEL")
         #expect(context.evaluateScript("Object.isFrozen(chrome.runtime.ContextType)").toBool())
-        // The surface has no native handler: without the bridge the member still fails loudly, as Chrome's would.
+        // The surface has no native handler: in PR A its stand-in answers quietly, as main's did, and the promise
+        // form still rejects with the error naming the member.
         #expect(context.evaluateScript("typeof chrome.runtime.getContexts").toString() == "function")
         context.evaluateScript("""
-        var __message = null, __args = -1;
-        chrome.runtime.getContexts({}, (...args) => {
-          __message = chrome.runtime.lastError && chrome.runtime.lastError.message;
-          __args = args.length;
-        });
+        var __called = 0, __args = -1, __lastError = 'unset';
+        chrome.runtime.getContexts({}, (...args) => { __called++; __args = args.length; __lastError = chrome.runtime.lastError; });
         """)
         context.evaluateScript("__flush()")
-        #expect(context.evaluateScript("__message").toString() == "chrome.runtime.getContexts isn't available in Zigzag")
+        #expect(context.evaluateScript("__called").toInt32() == 1)
         #expect(context.evaluateScript("__args").toInt32() == 0)
+        #expect(context.evaluateScript("__lastError === undefined").toBool())
         context.evaluateScript("var __error = null; chrome.runtime.getContexts({}).catch((e) => { __error = e.message; });")
         #expect(context.evaluateScript("__error").toString() == "chrome.runtime.getContexts isn't available in Zigzag")
     }

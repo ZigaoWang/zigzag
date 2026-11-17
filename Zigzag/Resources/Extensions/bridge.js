@@ -134,21 +134,12 @@
     };
   }
 
-  // Chrome's lastError is there only while a failing callback runs. WebKit keeps one of its own on the runtime, so
-  // save it, stand a getter in its place for the callback, and put it back even when the callback throws.
-  const callWithError = (callback, error) => {
-    const runtime = api.runtime;
-    const before = Object.getOwnPropertyDescriptor(runtime, 'lastError');
-    try { Object.defineProperty(runtime, 'lastError', { get: () => ({ message: String((error && error.message) || error) }), configurable: true, enumerable: true }); } catch (e) {}
-    try { callback(); } finally { try { if (before) Object.defineProperty(runtime, 'lastError', before); else delete runtime.lastError; } catch (e) {} }
-  };
-
   // A Chrome-style method: a promise, or the trailing callback Chrome extensions often pass instead.
   const method = (ns, fn, { before, after } = {}) => (...args) => {
     const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
     const result = send(ns, fn, before ? before(args) : args).then((value) => (after ? after(value, args) : value));
     if (!callback) return result;
-    result.then((value) => callback(value), (error) => { console.warn(`chrome.${ns}.${fn}:`, error.message); callWithError(callback, error); });
+    result.then((value) => callback(value), (error) => { console.warn(`chrome.${ns}.${fn}:`, error.message); callback(undefined); });
   };
 
   // Events: one port for all of them, opened the first time anything listens, reopened if it drops.
@@ -355,7 +346,7 @@
     getAuthToken: (...args) => {
       const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
       const error = new Error("Chrome's own account sign-in isn't available in Zigzag; use launchWebAuthFlow");
-      if (callback) { setTimeout(() => callWithError(callback, error), 0); return; }
+      if (callback) { setTimeout(() => callback(undefined), 0); return; }
       return Promise.reject(error);
     },
     removeCachedAuthToken: method('identity', 'getRedirectURL', { after: () => undefined }),
@@ -707,7 +698,7 @@
     capture: (options, callback) => {
       const result = send('tabCapture', 'capture', [{ ...(options || {}), page: location.pathname }]).then(async (tap) => { const stream = captureStream(tap.id); await afterEarlierMessages(); return stream; });
       if (typeof callback !== 'function') return result;
-      result.then((stream) => callback(stream), (error) => { console.warn('chrome.tabCapture.capture:', error.message); callWithError(callback, error); });
+      result.then((stream) => callback(stream), (error) => { console.warn('chrome.tabCapture.capture:', error.message); callback(null); });
     },
     getCapturedTabs: method('tabCapture', 'getCapturedTabs'),
     getMediaStreamId: method('tabCapture', 'getMediaStreamId'),
@@ -747,7 +738,7 @@
       if (check) check(...args);
       const result = serial(() => work(...args));
       if (!callback) return result;
-      result.then((value) => callback(value), (error) => { console.warn(`chrome.userScripts.${fn}:`, error.message); callWithError(callback, error); });
+      result.then((value) => callback(value), (error) => { console.warn(`chrome.userScripts.${fn}:`, error.message); callback(undefined); });
     };
     const inBackground = !inPage || (api.extension && typeof api.extension.getBackgroundPage === 'function' && api.extension.getBackgroundPage() === window);
     // Earlier versions registered user scripts with WebKit as content scripts ("zz-us-"); any still there go.
@@ -913,6 +904,12 @@
     if (tabs && typeof tabs.sendMessage === 'function') {
       const sendToTab = tabs.sendMessage.bind(tabs);
       const from = (() => { try { return { id: api.runtime.id, url: location.href, origin: location.origin }; } catch (e) { return { id: api.runtime.id }; } })();
+      const callWithError = (callback, error) => {
+        const runtime = api.runtime;
+        const before = Object.getOwnPropertyDescriptor(runtime, 'lastError');
+        try { Object.defineProperty(runtime, 'lastError', { get: () => ({ message: String((error && error.message) || error) }), configurable: true }); } catch (e) {}
+        try { callback(); } finally { try { if (before) Object.defineProperty(runtime, 'lastError', before); else delete runtime.lastError; } catch (e) {} }
+      };
       try {
         tabs.sendMessage = (tabId, message, ...rest) => {
           const callback = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;

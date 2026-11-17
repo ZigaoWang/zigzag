@@ -2168,7 +2168,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             // not build a whole report for them.
             let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id)
             if let first = limits.first {
-                let names = Words.list([first.text] + limits.dropFirst().map { $0.text.prefix(1).lowercased() + $0.text.dropFirst() })
+                let names = Words.list([first.text] + limits.dropFirst().map { Words.lowercasedForList($0.text) })
                 let note = String(localized: "\(names) won’t work in Zigzag.",
                                   comment: "Under an extension's name in Settings › Extensions, after its version: the features it uses that Zigzag lacks, like “Side panel and notifications won’t work in Zigzag.”")
                 summary = summary.isEmpty ? note : summary + "\n" + note

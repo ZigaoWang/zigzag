@@ -4,10 +4,9 @@
 // Chrome namespace with its functions, events, constants, enums and objects (chrome-api.json, written from Chrome's
 // own definitions by scripts/chrome-api.py). Anything WebKit, the bridge or the compatibility layer already provides
 // is left as it is; what's still missing is added, for namespaces the extension asked permission for: constants and
-// enums with Chrome's values, events that never fire but remember their listeners, and functions that fail as
-// Chrome's do when an API is missing: a callback runs asynchronously with `runtime.lastError` set and no result, or a
-// promise rejects with an `Error`. Such a call is noted once in the extensions log, so what an extension needed and
-// didn't get is on record.
+// enums with Chrome's values, events that never fire, and functions that say they aren't available (a rejected
+// promise, or the callback with nothing). Such a call is noted once in the extensions log, so what an extension
+// needed and didn't get is on record.
 (() => {
   const surface = __SURFACE__;
   const start = () => {
@@ -32,67 +31,18 @@
       noted.add(name);
       try { api.runtime.sendNativeMessage('zigzag.diagnostics', { where: 'surface', kind: 'unavailable', text: name }); } catch (e) {}
     };
-    // The runtime objects as they are now: an extension may hold one of these while its global `chrome` changes.
-    const runtimes = [];
-    for (const target of [globalThis.chrome, globalThis.browser]) {
-      try {
-        if (target && target.runtime && !runtimes.includes(target.runtime)) runtimes.push(target.runtime);
-      } catch (e) {}
-    }
-    const errorFor = (name) => ({ message: `${name} isn't available in Zigzag` });
-    // Chrome's lastError is there only while a failing callback runs. WebKit keeps one of its own on the runtime, so
-    // save it, stand a getter in its place for the callback, and put it back even when the callback throws.
-    const withLastError = (name, run) => {
-      const error = errorFor(name);
-      const saved = runtimes.map((runtime) => [runtime, Object.getOwnPropertyDescriptor(runtime, 'lastError')]);
-      try {
-        for (const runtime of runtimes) {
-          try {
-            Object.defineProperty(runtime, 'lastError', { get: () => error, configurable: true, enumerable: true });
-          } catch (e) {
-            // One WebKit won't let us shadow: assign it where we can, and say so.
-            try { runtime.lastError = error; } catch (e2) {}
-            note('runtime.lastError (unshadowed)');
-          }
-        }
-        run();
-      } finally {
-        for (const [runtime, descriptor] of saved) {
-          try {
-            if (descriptor) Object.defineProperty(runtime, 'lastError', descriptor);
-            else delete runtime.lastError;
-          } catch (e) {}
-        }
-      }
-    };
     const unavailable = (name) => (...args) => {
       note(name);
       const callback = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
-      if (callback) {
-        setTimeout(() => {
-          try { withLastError(name, () => callback()); } catch (e) { console.error(e); }
-        }, 0);
-        return undefined;
-      }
-      return Promise.reject(new Error(errorFor(name).message));
+      if (callback) { setTimeout(() => { try { callback(); } catch (e) { console.error(e); } }, 0); return undefined; }
+      return Promise.reject(new Error(`${name} isn't available in Zigzag`));
     };
-    // An event that can't fire still takes and remembers its listeners, as an extension registering at the top of
-    // its background expects.
-    const event = () => {
-      const listeners = new Set();
-      const later = (run) => setTimeout(() => {
-        try { withLastError('rules', run); } catch (e) { console.error(e); }
-      }, 0);
-      return {
-        addListener(listener) { if (typeof listener === 'function') listeners.add(listener); },
-        removeListener(listener) { listeners.delete(listener); },
-        hasListener(listener) { return listeners.has(listener); },
-        hasListeners() { return listeners.size > 0; },
-        addRules(rules, callback) { if (typeof callback === 'function') later(() => callback([])); },
-        getRules(ids, callback) { const cb = typeof ids === 'function' ? ids : callback; if (typeof cb === 'function') later(() => cb([])); },
-        removeRules(ids, callback) { const cb = typeof ids === 'function' ? ids : callback; if (typeof cb === 'function') later(() => cb()); },
-      };
-    };
+    const event = () => ({
+      addListener() {}, removeListener() {}, hasListener: () => false, hasListeners: () => false,
+      addRules(rules, callback) { if (typeof callback === 'function') setTimeout(() => callback([]), 0); },
+      getRules(ids, callback) { const cb = typeof ids === 'function' ? ids : callback; if (typeof cb === 'function') setTimeout(() => cb([]), 0); },
+      removeRules(ids, callback) { const cb = typeof ids === 'function' ? ids : callback; if (typeof cb === 'function') setTimeout(() => cb(), 0); },
+    });
     // WebKit names some features with nothing behind them: `in` isn't enough, and plain assignment can fail quietly.
     // (Where WebKit won't let the member be set, webkit-differences.js stands in for the object holding it.)
     const setMember = globalThis.__zigzagSetMember;
@@ -119,6 +69,9 @@
       }
       for (const fn of spec.functions || []) {
         if (!mv3 && name === 'chrome.runtime' && fn === 'getContexts') continue;
+        // A storage area's calls are WebKit's own: where WebKit has none of one, the extension sees none, as on main.
+        // A stand-in here would defeat feature detection (`setAccessLevel` would stop reading as undefined).
+        if (name.startsWith('chrome.storage.')) continue;
         if (typeof target[fn] !== 'function') put(target, fn, unavailable(`${name}.${fn}`), path);
       }
       for (const ev of spec.events || []) put(target, ev, event(), path);
