@@ -28,11 +28,15 @@ nonisolated enum FirefoxManifest {
         let version = (out["manifest_version"] as? NSNumber)?.intValue ?? 2
 
         // Firefox's MV3 background is a list of scripts, as MV2's was. A package built for Chrome has the worker
-        // already; one built for Firefox gets a worker that loads its scripts in order.
+        // already; one built for Firefox gets a worker that loads its scripts in order. A module worker imports
+        // them, and only a module worker may say it is one.
         if version >= 3, var background = out["background"] as? [String: Any],
            let scripts = background["scripts"] as? [String], !scripts.isEmpty,
            background["service_worker"] == nil {
             background["service_worker"] = workerFile
+            if (background["type"] as? String) != "module" {
+                background.removeValue(forKey: "type")
+            }
             out["background"] = background
         }
 
@@ -59,9 +63,13 @@ nonisolated enum FirefoxManifest {
         return out
     }
 
-    /// The worker's body: Firefox's scripts loaded in the order its manifest named them, as JavaScript strings.
-    static func workerSource(scripts: [String]) -> String {
-        "importScripts(\(scripts.map(quoted).joined(separator: ", ")));"
+    /// The worker's body: Firefox's scripts loaded in the order its manifest named them, as JavaScript strings. A
+    /// module background imports each one instead, because `importScripts` is not available to a module worker.
+    static func workerSource(scripts: [String], module: Bool = false) -> String {
+        if module {
+            return scripts.map { "import \"./\(escaped($0))\";\n" }.joined()
+        }
+        return "importScripts(\(scripts.map(quoted).joined(separator: ", ")));"
     }
 
     /// A host match pattern rather than an API permission's name. Firefox allows patterns in both permission lists.
@@ -83,6 +91,11 @@ nonisolated enum FirefoxManifest {
 
     /// One script path as a double-quoted JavaScript string, with the characters that would end it escaped.
     private static func quoted(_ script: String) -> String {
+        "\"\(escaped(script))\""
+    }
+
+    /// A script path with the characters that would end a double-quoted JavaScript string escaped.
+    private static func escaped(_ script: String) -> String {
         var escaped = ""
         for character in script {
             switch character {
@@ -93,6 +106,6 @@ nonisolated enum FirefoxManifest {
             default: escaped.append(character)
             }
         }
-        return "\"\(escaped)\""
+        return escaped
     }
 }

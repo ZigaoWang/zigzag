@@ -4,8 +4,9 @@ import Testing
 
 struct FirefoxManifestTests {
     /// A manifest as text, so two of them compare deeply whatever their nesting.
-    private func text(_ manifest: [String: Any]) -> String {
-        let data = try! JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
+    private func text(_ manifest: [String: Any]) throws -> String {
+        let data = try #require(try? JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys]),
+                                "manifest is not valid JSON: \(manifest)")
         return String(decoding: data, as: UTF8.self)
     }
 
@@ -18,7 +19,35 @@ struct FirefoxManifestTests {
         let background = normalized["background"] as? [String: Any]
         #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
         #expect(background?["scripts"] as? [String] == ["a.js", "b.js"])
+        #expect(background?["type"] == nil)
         #expect(FirefoxManifest.workerSource(scripts: ["a.js", "b.js"]) == #"importScripts("a.js", "b.js");"#)
+    }
+
+    @Test func mv3ModuleBackgroundGetsModuleImports() {
+        let scripts = ["a.js", #"quo"te.js"#]
+        let manifest: [String: Any] = [
+            "manifest_version": 3,
+            "background": ["scripts": scripts, "type": "module"],
+        ]
+        let normalized = FirefoxManifest.normalized(manifest)
+        let background = normalized["background"] as? [String: Any]
+        #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
+        #expect(background?["type"] as? String == "module")
+        #expect(background?["scripts"] as? [String] == scripts)
+        #expect(FirefoxManifest.workerSource(scripts: scripts, module: true)
+                == "import \"./a.js\";\nimport \"./quo\\\"te.js\";\n")
+    }
+
+    @Test func mv3ClassicBackgroundDropsAStaleType() {
+        let manifest: [String: Any] = [
+            "manifest_version": 3,
+            "background": ["scripts": ["a.js"], "type": "classic"],
+        ]
+        let normalized = FirefoxManifest.normalized(manifest)
+        let background = normalized["background"] as? [String: Any]
+        #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
+        #expect(background?["type"] == nil)
+        #expect(FirefoxManifest.workerSource(scripts: ["a.js"]) == #"importScripts("a.js");"#)
     }
 
     @Test func workerSourceEscapesQuotes() {
@@ -26,12 +55,12 @@ struct FirefoxManifestTests {
                 == #"importScripts("a\"b.js", "c\\d.js");"#)
     }
 
-    @Test func mv2BackgroundScriptsAreUnchanged() {
+    @Test func mv2BackgroundScriptsAreUnchanged() throws {
         let manifest: [String: Any] = [
             "manifest_version": 2,
             "background": ["scripts": ["a.js", "b.js"]],
         ]
-        #expect(text(FirefoxManifest.normalized(manifest)) == text(manifest))
+        #expect(try text(FirefoxManifest.normalized(manifest)) == text(manifest))
     }
 
     @Test func sidebarActionGainsASidePanelTwin() {
@@ -52,6 +81,21 @@ struct FirefoxManifestTests {
         #expect(sidebar?["default_icon"] as? String == "icon.png")
     }
 
+    @Test func existingWorkerAndSidePanelAreKept() {
+        let manifest: [String: Any] = [
+            "manifest_version": 3,
+            "background": ["scripts": ["a.js"], "service_worker": "own-worker.js", "type": "module"],
+            "sidebar_action": ["default_panel": "panel.html"],
+            "side_panel": ["default_path": "own-panel.html"],
+        ]
+        let normalized = FirefoxManifest.normalized(manifest)
+        let background = normalized["background"] as? [String: Any]
+        #expect(background?["service_worker"] as? String == "own-worker.js")
+        #expect(background?["type"] as? String == "module")
+        let panel = normalized["side_panel"] as? [String: Any]
+        #expect(panel?["default_path"] as? String == "own-panel.html")
+    }
+
     @Test func mv3HostPatternsMoveOutOfPermissions() {
         let manifest: [String: Any] = [
             "manifest_version": 3,
@@ -65,6 +109,18 @@ struct FirefoxManifestTests {
         #expect(normalized["optional_host_permissions"] as? [String] == ["*://*.example.org/*"])
     }
 
+    @Test func hostPatternsMergeWithExistingOnes() {
+        let manifest: [String: Any] = [
+            "manifest_version": 3,
+            "permissions": ["storage", "https://a.example/*", "https://b.example/*", "https://a.example/*"],
+            "host_permissions": ["https://existing.example/*", "https://b.example/*"],
+        ]
+        let normalized = FirefoxManifest.normalized(manifest)
+        #expect(normalized["host_permissions"] as? [String]
+                == ["https://existing.example/*", "https://b.example/*", "https://a.example/*"])
+        #expect(normalized["permissions"] as? [String] == ["storage"])
+    }
+
     @Test func mv3StringContentSecurityPolicyBecomesAPagePolicy() {
         let manifest: [String: Any] = [
             "manifest_version": 3,
@@ -75,12 +131,12 @@ struct FirefoxManifestTests {
         #expect(policy?["extension_pages"] as? String == "script-src 'self'; object-src 'self'")
     }
 
-    @Test func mv2ContentSecurityPolicyIsUnchanged() {
+    @Test func mv2ContentSecurityPolicyIsUnchanged() throws {
         let manifest: [String: Any] = [
             "manifest_version": 2,
             "content_security_policy": "script-src 'self'; object-src 'self'",
         ]
-        #expect(text(FirefoxManifest.normalized(manifest)) == text(manifest))
+        #expect(try text(FirefoxManifest.normalized(manifest)) == text(manifest))
     }
 
     @Test func mv2WebAccessibleResourcesBecomeObjects() {
@@ -95,17 +151,17 @@ struct FirefoxManifestTests {
         #expect(resources?.first?["matches"] as? [String] == ["<all_urls>"])
     }
 
-    @Test func mv3WebAccessibleResourcesAreUnchanged() {
+    @Test func mv3WebAccessibleResourcesAreUnchanged() throws {
         let manifest: [String: Any] = [
             "manifest_version": 3,
             "web_accessible_resources": [
                 ["resources": ["a.js"], "matches": ["https://example.com/*"]],
             ],
         ]
-        #expect(text(FirefoxManifest.normalized(manifest)) == text(manifest))
+        #expect(try text(FirefoxManifest.normalized(manifest)) == text(manifest))
     }
 
-    @Test func normalizingTwiceChangesNothing() {
+    @Test func normalizingTwiceChangesNothing() throws {
         let manifest: [String: Any] = [
             "manifest_version": 3,
             "background": ["scripts": ["a.js", "b.js"]],
@@ -115,10 +171,18 @@ struct FirefoxManifestTests {
             "content_security_policy": "script-src 'self'",
         ]
         let once = FirefoxManifest.normalized(manifest)
-        #expect(text(FirefoxManifest.normalized(once)) == text(once))
+        #expect(try text(FirefoxManifest.normalized(once)) == text(once))
+
+        let mv2: [String: Any] = [
+            "manifest_version": 2,
+            "web_accessible_resources": ["a.js", "b.css"],
+            "sidebar_action": ["default_panel": "panel.html"],
+        ]
+        let mv2Once = FirefoxManifest.normalized(mv2)
+        #expect(try text(FirefoxManifest.normalized(mv2Once)) == text(mv2Once))
     }
 
-    @Test func normalizingLeavesItsInputAlone() {
+    @Test func normalizingLeavesItsInputAlone() throws {
         let manifest: [String: Any] = [
             "manifest_version": 3,
             "background": ["scripts": ["a.js", "b.js"]],
@@ -127,9 +191,9 @@ struct FirefoxManifestTests {
             "optional_permissions": ["<all_urls>", "alarms"],
             "content_security_policy": "script-src 'self'",
         ]
-        let before = text(manifest)
+        let before = try text(manifest)
         _ = FirefoxManifest.normalized(manifest)
-        #expect(text(manifest) == before)
+        #expect(try text(manifest) == before)
     }
 
     @Test func firefoxIDComesFromEitherSettingsKey() {
