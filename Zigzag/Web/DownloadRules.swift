@@ -925,6 +925,9 @@ final class DownloadRulesStore {
     func remove(id: UUID) {
         rules.removeAll { $0.id == id }
         HandoffSecrets.removeSecret(for: id)
+        // The answers sites gave this rule go with it: kept under its id, nothing else could ever read them again.
+        let subject = PermissionSubject.handoff(id)
+        for site in SitePermissions.sites(prefix: subject) { SitePermissions.remember(nil, subject: subject, origin: site) }
         save()
     }
 
