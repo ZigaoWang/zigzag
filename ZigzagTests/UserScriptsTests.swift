@@ -401,7 +401,7 @@ struct UserScriptsTests {
     // MARK: At the extension
 
     /// The bridge in an extension's background, with WebKit's API stood in for: what its listeners hear.
-    private func background(worker: Bool = false, popup: Bool = false) -> JSContext {
+    private func background(worker: Bool = false, popup: Bool = false, before: String = "") -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -431,6 +431,7 @@ struct UserScriptsTests {
         }
         // One of the extension's own pages that isn't its background, such as its popup.
         if popup { context.evaluateScript("var window = globalThis; chrome.extension = { getBackgroundPage: () => null };") }
+        if !before.isEmpty { context.evaluateScript(before) }
         context.evaluateScript(ExtensionBridgeScript.source)
         // What runs after the bridge in a background, which wraps the same events again.
         if worker { context.evaluateScript(ExtensionBridgeScript.differences) }
@@ -452,6 +453,29 @@ struct UserScriptsTests {
         #expect(context.evaluateScript("__own.join()").toString() == "plain")
         #expect(context.evaluateScript("__user").toInt32() == 1)
         #expect(context.evaluateScript("__ownMessages.length").toInt32() == 0)
+    }
+
+    /// `browser` with events of its own, and an event whose addListener can't simply be set: the extension's
+    /// listeners still never hear what user scripts send.
+    @Test func userScriptsStayHiddenOnBrowserAndOnEventsThatResistBeingSet() {
+        let context = background(before: """
+        globalThis.browser = { runtime: Object.assign({}, chrome.runtime, { onMessage: event(), onConnect: event() }) };
+        const stubborn = chrome.runtime.onMessage, original = stubborn.addListener;
+        Object.defineProperty(stubborn, 'addListener', { get() { return this.__add || original; }, set() {}, configurable: true });
+        """)
+        context.evaluateScript("""
+        var __own = [], __browserOwn = [];
+        chrome.runtime.onMessage.addListener((m) => { __own.push(m.cmd || 'user'); });
+        browser.runtime.onMessage.addListener((m) => { __browserOwn.push(m.cmd || 'user'); });
+        const sender = { id: 'x', tab: { id: 4 }, frameId: 0, url: 'https://example.com/' };
+        const user = { __zigzagUserScript: { kind: 'message', key: 'k', world: 'w', message: { cmd: 'GM_setValue' } } };
+        chrome.runtime.onMessage.fire(user, sender, () => {});
+        browser.runtime.onMessage.fire(user, sender, () => {});
+        chrome.runtime.onMessage.fire({ cmd: 'own' }, sender, () => {});
+        browser.runtime.onMessage.fire({ cmd: 'own' }, sender, () => {});
+        """)
+        #expect(context.evaluateScript("__own.join()").toString() == "own")
+        #expect(context.evaluateScript("__browserOwn.join()").toString() == "own")
     }
 
     @Test func whatUserScriptsSendReachesOnlyTheUserScriptListeners() async throws {
