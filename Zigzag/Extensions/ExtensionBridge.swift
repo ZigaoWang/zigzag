@@ -42,6 +42,10 @@ final class ExtensionBridge {
     /// nobody wrote.
     static let handlerNames: Set<String> = Set(handlerTypes.map { $0.name })
 
+    /// The handler classes' own names (`BridgeContexts`), which a claim may name instead of the namespace an
+    /// extension calls (`contexts`). Both name the same code; neither is a second list of what the bridge answers.
+    static let handlerTypeNames: Set<String> = Set(handlerTypes.map { String(describing: $0) })
+
     /// One handler per namespace. `init` makes the ones a profile owns; the rest are made for each profile too.
     private static let handlerTypes: [any BridgeNamespace.Type] = [
         BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self,

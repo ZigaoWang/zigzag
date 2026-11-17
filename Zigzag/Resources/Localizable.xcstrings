@@ -22883,6 +22883,42 @@
         }
       }
     },
+    "extension.limit.runtimeContexts" : {
+      "comment" : "A Chrome extension feature Zigzag limits: runtime.getContexts reports background, popup, side panel and offscreen contexts only; tabs, subframes, developer tools and real document IDs are not reported.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Open pages (background, popup, side panel and offscreen only; no tabs, subframes, developer tools or document IDs)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开的页面（仅后台、弹出窗口、边栏面板和离屏页面；不含标签页、子框架、开发者工具或文档 ID）"
+          }
+        }
+      }
+    },
+    "extension.limit.backgroundPage" : {
+      "comment" : "A Chrome extension feature Zigzag limits: runtime.getBackgroundPage answers Manifest V2 only; a Manifest V3 page gets “You do not have a background page.” and a Manifest V3 worker has no member.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The background page (Manifest V2 only; Manifest V3 pages get “You do not have a background page.”)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台页面（仅 Manifest V2；Manifest V3 页面会收到“You do not have a background page.”）"
+          }
+        }
+      }
+    },
     "extension.limit.action" : {
       "comment" : "A Chrome extension feature Zigzag limits: badge text colour and toolbar button settings.",
       "extractionState" : "extracted_with_value",

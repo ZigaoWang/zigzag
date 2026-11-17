@@ -18,6 +18,14 @@
       "catalog": "extension.limit.runtime",
       "order": 40
     },
+    "runtimeContexts": {
+      "catalog": "extension.limit.runtimeContexts",
+      "order": 45
+    },
+    "runtimeBackgroundPage": {
+      "catalog": "extension.limit.backgroundPage",
+      "order": 46
+    },
     "action": {
       "catalog": "extension.limit.action",
       "order": 50
@@ -268,7 +276,13 @@
         },
         "getContexts": {
           "status": "bridged",
-          "implementation": "swift:contexts"
+          "implementation": "swift:BridgeContexts",
+          "group": "runtimeContexts"
+        },
+        "getBackgroundPage": {
+          "status": "patched",
+          "implementation": "js:correctGetBackgroundPage",
+          "group": "runtimeBackgroundPage"
         }
       }
     },

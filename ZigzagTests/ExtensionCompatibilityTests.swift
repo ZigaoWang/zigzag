@@ -510,6 +510,8 @@ struct ExtensionCompatibilityTests {
             "extension.limit.tabActions": "Some tab actions",
             "extension.limit.windowsPopup": "Popup windows",
             "extension.limit.runtime": "Restarting Zigzag",
+            "extension.limit.runtimeContexts": "Open pages (background, popup, side panel and offscreen only; no tabs, subframes, developer tools or document IDs)",
+            "extension.limit.backgroundPage": "The background page (Manifest V2 only; Manifest V3 pages get “You do not have a background page.”)",
             "extension.limit.action": "Toolbar button settings",
             "extension.limit.notifications": "Notifications",
             "extension.limit.sidePanel": "Side panel",
