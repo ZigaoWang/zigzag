@@ -46,6 +46,8 @@ final class BrowserWebView: WKWebView {
     /// menu takes ⌘A before the page sees it, so it's handed on here; with something typed in the page's search
     /// field, that text is what's selected, as usual.
     override func selectAll(_ sender: Any?) {
+        // After a click in the sidebar, ⌘A picks its tabs (#302).
+        if (window as? BrowserWindow)?.selectAllInSidebar() == true { return }
         // A PDF from the web is in WebKit's own viewer, which takes Select All only once its plugin has the page's
         // focus, as a click in it gives: a PDF just opened has none, and ⌘A selected nothing (#219).
         if isPDF, owner?.pdfViewer == nil {
@@ -457,5 +459,34 @@ enum PictureInPicture {
         if window.collectionBehavior != behavior { window.collectionBehavior = behavior }
         if window.level < .floating { window.level = .floating }
         if window.hidesOnDeactivate { window.hidesOnDeactivate = false }
+    }
+}
+
+/// A page's web view Zigzag is done with (its tab closed, slept or rebuilt): kept until the next turn of the main
+/// loop, closed, then let go. Never freed inside a WebKit callback: WebKit in macOS 26.5 can be in the middle of
+/// putting the page's next site in a new process when its view goes, and then crashes without it (#305,
+/// https://bugs.webkit.org/show_bug.cgi?id=316686). Closed first, so a page something else still holds stops there.
+@MainActor
+enum PageRetirement {
+    private static var retiring: [WKWebView] = []
+
+    static func retire(_ webView: WKWebView) {
+        retiring.append(webView)
+        guard retiring.count == 1 else { return }
+        DispatchQueue.main.async { MainActor.assumeIsolated { closeRetired() } }
+    }
+
+    private static func closeRetired() {
+        let going = retiring
+        retiring = []
+        going.forEach(close)
+    }
+
+    private static let closeSelector = NSSelectorFromString("_close")
+
+    private static func close(_ webView: WKWebView) {
+        guard webView.responds(to: closeSelector) else { return }
+        typealias Close = @convention(c) (AnyObject, Selector) -> Void
+        unsafeBitCast(webView.method(for: closeSelector), to: Close.self)(webView, closeSelector)
     }
 }

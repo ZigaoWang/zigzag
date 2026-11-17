@@ -495,6 +495,7 @@ final class Tab: NSObject {
         // Zigzag's own pages go by their names wherever the chrome names them.
         if SettingsPage.isSettings(url) { return String(localized: "Settings", comment: "The name of the tab showing Zigzag's Settings.") }
         if HistoryPage.isHistory(url) { return String(localized: "History", comment: "The name of the tab showing Zigzag's History.") }
+        if ArchivePage.isArchive(url) { return ArchivePage.title }
         if !title.isEmpty { return title }
         // A file on your Mac, or a PDF from the web, is called by its name: it has no title of its own.
         if let url, let name = HistoryStore.fileName(of: url) { return name }
@@ -635,6 +636,9 @@ final class Tab: NSObject {
         guard sleepTicket == ticket, self.webView === webView else { return }
         sleepTicket += 1
         guard state?.hasTypedText != true else { return }
+        // A page on its way (a site sending it on after the Mac wakes) is let finish: the next look tries again (#305).
+        // Not one stuck in a loop.
+        guard !webView.isLoading || reason == EnergyWatch.sleepReason else { return }
         captureSnapshot { [weak self] in
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
@@ -732,6 +736,7 @@ final class Tab: NSObject {
         webView.owner = nil
         webView.removeFromSuperview()
         self.webView = nil
+        PageRetirement.retire(webView)
         isLoading = false
         isLeavingPage = false
         isPlayingAudio = false

@@ -1267,18 +1267,20 @@ final class SidebarListView: NSView {
     }
 
     /// Edit › Select All (⌘A) while rows are picked: every row of the section they're in, or both when they're in
-    /// both.
+    /// both. After a plain click in the sidebar, with none picked: every tab (#302).
     override func selectAll(_ sender: Any?) {
         let all = Self.rowsToPick(all: items.filter(\.isPickable), marked: marked)
         guard all.count > 1 else { return }
         marked = all
+        takeFocus()
         refreshRows()
     }
 
-    /// The rows ⌘A picks: the tabs when only tabs are picked, the pinned pages when only those are, else all of them.
+    /// The rows ⌘A picks: the tabs when none or only tabs are picked, the pinned pages when only those are, else all
+    /// of them. Tabs hidden in a shut group or under a folded tab aren't rows, so they aren't picked.
     nonisolated static func rowsToPick(all: [SidebarItem], marked: [SidebarItem]) -> [SidebarItem] {
         func isTab(_ item: SidebarItem) -> Bool { if case .tab = item { true } else { false } }
-        if !marked.isEmpty, marked.allSatisfy(isTab) { return all.filter(isTab) }
+        if marked.allSatisfy(isTab) { return all.filter(isTab) }
         if !marked.isEmpty, !marked.contains(where: isTab) { return all.filter { !isTab($0) } }
         return all
     }

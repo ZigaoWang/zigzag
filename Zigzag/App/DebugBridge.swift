@@ -1761,6 +1761,20 @@ enum DebugBridge {
             NSApp.terminate(nil)
         case "materials": MaterialsShowcase.debug(arg)
         case "history": HistoryPage.open(in: controller)
+        case "archive": ArchivePage.open(in: controller)
+        case "seedarchive":
+            // seedarchive [n]: n archived tabs (6 by default) spread over the spaces and the last few days, as if
+            // they'd tidied themselves away; no tab is opened for them.
+            let spaces = Library.shared.spaces.filter { Library.shared.profileID(ofSpace: $0.id) == controller.tabManager.profile.id }
+            let sites = [("https://www.apple.com/", "Apple"), ("https://github.com/", "GitHub"), ("https://en.wikipedia.org/wiki/Zigzag", "Zigzag - Wikipedia"),
+                         ("https://news.ycombinator.com/", "Hacker News"), ("https://developer.apple.com/documentation/webkit", "WebKit | Apple Developer Documentation"),
+                         ("https://www.example.com/", "Example Domain")]
+            let n = Int(arg) ?? 6
+            TabArchive.shared.add(contentsOf: (0..<n).reversed().compactMap { i in
+                let site = sites[i % sites.count]
+                guard let url = URL(string: site.0 + (i < sites.count ? "" : "?\(i)")), let space = spaces.isEmpty ? nil : spaces[i % spaces.count] else { return nil }
+                return ArchivedTab(url: url, title: site.1, spaceID: space.id, archivedAt: Date().addingTimeInterval(-Double(i) * 16 * 3600 - 600))
+            })
         case "clearhistory":
             // Clears the history of the profile you're in, undoably, as the menu's Clear History does once confirmed.
             controller.historyChange(HistoryPage.clearHistory) { [tabManager = controller.tabManager] in tabManager.profile.history.remove() }

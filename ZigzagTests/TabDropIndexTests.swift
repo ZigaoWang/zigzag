@@ -35,7 +35,7 @@ struct TabDropIndexTests {
     }
 }
 
-/// ⌘A with rows picked picks the rest of the section they're in.
+/// ⌘A with rows picked picks the rest of the section they're in; with none, every tab (#302).
 struct PickAllTests {
     let a = UUID(), b = UUID(), c = UUID(), d = UUID()
     var all: [SidebarItem] { [.bookmark(a), .bookmark(b), .tab(c), .tab(d)] }
@@ -50,6 +50,14 @@ struct PickAllTests {
 
     @Test func bothPickEverything() {
         #expect(SidebarListView.rowsToPick(all: all, marked: [.bookmark(a), .tab(d)]) == all)
+    }
+
+    @Test func noneAfterAClickInTheSidebarPicksEveryTab() {
+        #expect(SidebarListView.rowsToPick(all: all, marked: []) == [.tab(c), .tab(d)])
+    }
+
+    @Test func noTabsPicksNothing() {
+        #expect(SidebarListView.rowsToPick(all: [.bookmark(a), .bookmark(b)], marked: []).isEmpty)
     }
 }
 

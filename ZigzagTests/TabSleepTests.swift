@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 import Testing
 @testable import Zigzag
 
@@ -41,6 +42,14 @@ struct TabSleepTests {
     @Test func typedTextAndTabsInUseNeverSleep() {
         let tabs = [tab(5 * 60 * minute, typed: true), tab(5 * 60 * minute, mustStay: true)]
         #expect(TabSleep.sleepers(tabs, awake: 40, memory: .low).isEmpty)
+    }
+
+    @Test func aPageOnItsWayIsLetArriveFirst() {
+        // Put to sleep as a site sent it on after the Mac woke, WebKit crashed committing the new site's page (#305).
+        var loading = tab(5 * 60 * minute)
+        loading.isLoading = true
+        let other = tab(5 * 60 * minute)
+        #expect(TabSleep.sleepers([loading, other], awake: 40, memory: .critical) == [other.id])
     }
 
     @Test func aFavoriteStaysAwakeHoweverLongUnseenOrManyAwake() {
@@ -215,5 +224,41 @@ struct KeepAwakeTests {
         #expect(KeepAwake.isOffered(for: URL(string: "http://localhost:3000/"), isPrivate: false))
         #expect(!KeepAwake.isOffered(for: URL(string: "webkit-extension://abc/popup.html"), isPrivate: false))
         #expect(!KeepAwake.isOffered(for: nil, isPrivate: false))
+    }
+}
+
+/// A web view let go of outlives the callback it was let go in, and goes at the next turn of the main loop (#305).
+@MainActor
+struct PageRetirementTests {
+    @Test func aRetiredWebViewGoesOnlyAtTheNextTurn() async {
+        weak var gone: WKWebView?
+        do {
+            let webView = WKWebView(frame: .zero)
+            gone = webView
+            PageRetirement.retire(webView)
+        }
+        // Still there where it was let go, as inside a WebKit callback.
+        #expect(gone != nil)
+        for _ in 0..<50 where gone != nil {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(gone == nil)
+    }
+
+    @Test func severalRetiredTogetherAllGo() async {
+        weak var first: WKWebView?
+        weak var second: WKWebView?
+        do {
+            let a = WKWebView(frame: .zero), b = WKWebView(frame: .zero)
+            first = a
+            second = b
+            PageRetirement.retire(a)
+            PageRetirement.retire(b)
+        }
+        #expect(first != nil && second != nil)
+        for _ in 0..<50 where first != nil || second != nil {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(first == nil && second == nil)
     }
 }

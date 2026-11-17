@@ -66,6 +66,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         window.contentView = root
+        window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
         // A width saved before the toolbar's buttons grew can be narrower than they now need.

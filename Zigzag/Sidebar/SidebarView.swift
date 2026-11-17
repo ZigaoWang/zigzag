@@ -418,6 +418,8 @@ final class AddressView: InteractiveView {
             return ext.displayName ?? String(localized: "Extension", comment: "The address bar's name for an extension's own page, when the extension has no name.")
         } else if HistoryPage.isHistory(url) {
             return String(localized: "History", comment: "The address bar's name for Zigzag's History page.")
+        } else if ArchivePage.isArchive(url) {
+            return ArchivePage.title
         } else if SettingsPage.isSettings(url) {
             return String(localized: "Settings", comment: "The address bar's name for Zigzag's Settings page.")
         } else if let url, let host = url.host() {

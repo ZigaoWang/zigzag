@@ -207,6 +207,8 @@ enum MainMenu {
         let history = submenu(String(localized: "History", comment: "A menu in the menu bar."), [
             // One History, as in Chrome: the window, with its own search.
             item(String(localized: "Show History", comment: "History menu item."), #selector(AppDelegate.showHistory(_:)), "y"),
+            // Arc's Archive: the tabs that tidied themselves away, beside History, where pages you've left are.
+            item(String(localized: "Show Archive", comment: "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs."), #selector(AppDelegate.showArchive(_:)), ""),
             item(String(localized: "Reopen Closed Tab", comment: "History menu item."), #selector(C.reopenClosedTab(_:)), "t", [.command, .shift]),
             item(String(localized: "Reopen Closed Window", comment: "History menu item."), #selector(AppDelegate.reopenClosedWindow(_:)), ""),
             // Then, filled each time it opens, the tabs and windows closed lately and the pages visited by day (#271).

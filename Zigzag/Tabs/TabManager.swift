@@ -2345,7 +2345,7 @@ final class TabManager {
             TabSleep.Candidate(id: $0.id, unseen: now.timeIntervalSince($0.lastActivated),
                                mustStay: selectedIDs.contains($0.id) || $0.isPlayingAudio || $0.isInUse || $0.notifiesUser,
                                hasTypedText: $0.pageState?.hasTypedText == true, isFavorite: $0.isFavorite,
-                               keptAwake: KeepAwake.isOn(for: $0.url))
+                               keptAwake: KeepAwake.isOn(for: $0.url), isLoading: $0.isLoading)
         }
         let byID = Dictionary(live.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for id in TabSleep.sleepers(candidates, awake: live.count, memory: memory) {

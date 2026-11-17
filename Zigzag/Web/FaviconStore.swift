@@ -99,6 +99,7 @@ final class FaviconStore {
         }
         // Zigzag's own pages wear a symbol.
         if SettingsPage.isSettings(url) { return Tokens.Symbol.image("gearshape", size: Tokens.Symbol.row) }
+        if ArchivePage.isArchive(url) { return Tokens.Symbol.image("archivebox", size: Tokens.Symbol.row) }
         if url.scheme == HistoryPage.scheme { return Tokens.Symbol.image("clock.arrow.circlepath", size: Tokens.Symbol.row) }
         guard let key = key(for: url) else { return nil }
         if let image = memory[key] { return image }
