@@ -507,6 +507,7 @@ struct ExtensionCompatibilityTests {
             "extension.limit.bookmarks": "Your bookmarks",
             "extension.limit.downloads": "Downloads",
             "extension.limit.tabCapture": "Recording tabs",
+            "extension.limit.tabVideoCapture": "Tab video capture",
             "extension.limit.cookies": "Cookie details",
             "extension.limit.hostAccessRequests": "Site access requests",
             "extension.limit.storage": "Stored extension settings",
@@ -578,6 +579,20 @@ struct ExtensionCompatibilityTests {
                 #expect(limit.text != "", "\(name) has an empty line")
             }
         }
+        let coveredSupported = ["bookmarks", "downloads", "identity", "notifications",
+                                "power", "sidePanel", "system.display"]
+        for name in coveredSupported {
+            #expect(overlay.permissions[name]?.status == .supported, "\(name) should be supported")
+            #expect(compatibility.limits(forPermissions: [name], manifestKeys: []).isEmpty,
+                    "\(name) should have no line")
+        }
+        // Tab video capture is the one covered row that keeps a limit; tab audio capture works.
+        #expect(overlay.permissions["tabCapture"]?.status == .partial)
+        let capture = compatibility.limits(forPermissions: ["tabCapture"], manifestKeys: [])
+        #expect(capture.count == 1)
+        #expect(capture.first?.catalogKey == "extension.limit.tabVideoCapture")
+        #expect(capture.first?.status == .partial)
+        #expect(capture.first?.text == "Tab video capture")
         let omnibox = compatibility.limits(forPermissions: [], manifestKeys: ["omnibox"])
         #expect(omnibox.count == 1)
         #expect(omnibox.first?.catalogKey == "extension.limit.addressBarKeyword")

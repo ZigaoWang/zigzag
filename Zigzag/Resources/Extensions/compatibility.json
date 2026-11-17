@@ -54,6 +54,10 @@
       "catalog": "extension.limit.tabCapture",
       "order": 130
     },
+    "tabVideoCapture": {
+      "catalog": "extension.limit.tabVideoCapture",
+      "order": 135
+    },
     "cookies": {
       "catalog": "extension.limit.cookies",
       "order": 140
@@ -572,7 +576,7 @@
         "capture": {
           "status": "bridged",
           "implementation": "swift:tabCapture",
-          "group": "tabCapture"
+          "group": "tabVideoCapture"
         }
       }
     },
@@ -904,7 +908,12 @@
       "status": "supported"
     },
     "tabCapture": {
-      "status": "supported"
+      "status": "partial",
+      "catalog": "extension.limit.tabVideoCapture",
+      "group": "tabVideoCapture",
+      "claims": [
+        "tabCapture.capture"
+      ]
     },
     "tabGroups": {
       "status": "unsupported",

@@ -215,6 +215,9 @@ nonisolated enum CompatibilityText {
         case "extension.limit.tabCapture":
             return String(localized: "extension.limit.tabCapture", defaultValue: "Recording tabs",
                           comment: "A Chrome extension feature Zigzag limits: tab video capture; audio is captured.")
+        case "extension.limit.tabVideoCapture":
+            return String(localized: "extension.limit.tabVideoCapture", defaultValue: "Tab video capture",
+                          comment: "A Chrome extension feature Zigzag cannot provide: recording a tab's video; audio capture works.")
         case "extension.limit.cookies":
             return String(localized: "extension.limit.cookies", defaultValue: "Cookie details",
                           comment: "A Chrome extension feature Zigzag limits: cookie partition keys.")

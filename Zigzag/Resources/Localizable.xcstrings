@@ -23045,6 +23045,24 @@
         }
       }
     },
+    "extension.limit.tabVideoCapture" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: recording a tab's video; audio capture works.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tab video capture"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制标签页视频"
+          }
+        }
+      }
+    },
     "extension.limit.cookies" : {
       "comment" : "A Chrome extension feature Zigzag limits: cookie partition keys.",
       "extractionState" : "extracted_with_value",
