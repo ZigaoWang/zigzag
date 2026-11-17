@@ -248,8 +248,15 @@ enum ExtensionBridgeScript {
         Bundle.main.url(forResource: "webkit-differences", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
     }()
 
+    /// Firefox's Promise `browser` API, built over the Chrome surface (firefox-polyfill.js). It gates itself on the
+    /// package's own manifest — a Firefox package carries browser_specific_settings or applications, a Chrome one
+    /// neither — since the prelude is injected per profile, not per package.
+    static let firefoxPolyfill: String = {
+        Bundle.main.url(forResource: "firefox-polyfill", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+    }()
+
     /// Everything Zigzag puts before an extension's own code, after the bridge and the compatibility layer.
-    static var afterCompatibility: String { differences + "\n" + surface }
+    static var afterCompatibility: String { differences + "\n" + surface + "\n" + firefoxPolyfill }
 
     /// The rest of Chrome's API, from Chrome's own definitions (api-surface.js over chrome-api.json): runs after the
     /// bridge and the compatibility layer, and fills only what's still missing.
