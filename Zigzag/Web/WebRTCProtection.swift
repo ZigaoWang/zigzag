@@ -196,6 +196,9 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     /// Sites whose question or notice was put away without an answer, this session.
     private static var putAway: Set<String> = []
+    /// Sites the notice has shown for this session: once each, since many sites look for WebRTC on every page load
+    /// (analytics, fingerprinting) and a notice on each would get in the way. Site Controls still has the switch.
+    private static var noticed: Set<String> = []
 
     private static let kind = "webRTC"
     private static let noticeKind = "webRTCNotice"
@@ -204,7 +207,7 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
 
     /// Whether a page that looked for WebRTC on its own, while it's blocked, says so: only the page itself (not a frame
     /// in it, an ad's), once a page load, never once the page asked (its question says it), and never for a site
-    /// you've chosen Block for or put the notice away for this session.
+    /// you've chosen Block for, or that has shown or put the notice away this session.
     nonisolated static func notices(allowed: Bool, chosen: Bool?, isMainFrame: Bool, noticedHere: Bool, askedHere: Bool,
                                     putAway: Bool) -> Bool {
         !allowed && chosen != false && isMainFrame && !noticedHere && !askedHere && !putAway
@@ -219,12 +222,14 @@ final class WebRTCProtection: NSObject, WKScriptMessageHandler {
         guard isAvailable, let origin = SiteOrigin.of(here),
               notices(allowed: allows(here, in: tab), chosen: tab.webRTCHere[origin] ?? SitePermissions.webRTC(origin: origin),
                       isMainFrame: isMainFrame, noticedHere: tab.permissionAnswers.answer(key: origin, kind: noticeKind) != nil,
-                      askedHere: tab.permissionAnswers.answer(key: origin, kind: kind) != nil, putAway: putAway.contains(origin))
+                      askedHere: tab.permissionAnswers.answer(key: origin, kind: kind) != nil,
+                      putAway: putAway.contains(origin) || noticed.contains(origin))
         else { return false }
         tab.permissionAnswers.note(false, key: origin, kind: noticeKind)
         Diagnostics.note("WebRTC", site: SiteOrigin.label(origin), "blocked, the page tried to use it", isPrivate: tab.isPrivate)
         guard let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.allTabs.contains { $0 === tab } }),
               controller.promptShows(tab) else { return true }
+        noticed.insert(origin)
         Toast.show(String(localized: "This site tried to use WebRTC, which you’ve blocked.", comment: "Notice over a page when WebRTC is off for it (Settings › Privacy › Protect IP address from WebRTC) and the page tried to use it, as a call site like Google Meet does. WebRTC is a name: keep it as it is."),
                    symbol: "phone.fill",
                    action: (String(localized: "Allow for This Site", comment: "Button on the notice that a site tried to use blocked WebRTC: allows WebRTC for the site and reloads the page."), { [weak tab] in
