@@ -247,10 +247,8 @@ nonisolated struct ContextFilter {
 nonisolated final class ContextNames {
     private var names: [String: String] = [:]
 
-    /// The name of a context held by this object: its background, its offscreen page, its side panel.
+    /// The name of a context held by this object: its background, its offscreen page, its side panel, its popup.
     func name(of object: AnyObject) -> String { name("object:\(ObjectIdentifier(object))") }
-    /// The name of a context known only by its page, as a popup is.
-    func name(ofPage url: URL?) -> String { name("page:\(url?.absoluteString ?? "")") }
 
     /// Forgets every context that has closed.
     func keeping(_ live: Set<String>) {
@@ -290,9 +288,8 @@ final class BridgeContexts: BridgeNamespace {
         if let page = host.bridge.offscreen.page(for: extensionID) {
             contexts.append(Context(type: .offscreenDocument, contextID: names.name(of: page), documentURL: page.url))
         }
-        if let page = host.shownPopupPage(for: extensionID) {
-            let url = URL(string: page, relativeTo: context.baseURL)?.absoluteURL
-            contexts.append(Context(type: .popup, contextID: names.name(ofPage: url), documentURL: url))
+        if let popup = host.shownPopup(for: extensionID) {
+            contexts.append(Self.popup(popup, contextID: names.name(of: popup)))
         }
         // A private window has no extension controller, and its side panel is never one to report.
         for controller in WindowManager.shared.controllers
@@ -303,6 +300,11 @@ final class BridgeContexts: BridgeNamespace {
         }
         names.keeping(Set(contexts.map(\.contextID)))
         return Self.matching(contexts, filter: args.object(0)).map(\.dictionary)
+    }
+
+    /// Chrome's POPUP context for a showing popup: the page's live address, query and all, and no tab of its own.
+    static func popup(_ view: WKWebView, contextID: String) -> Context {
+        Context(type: .popup, contextID: contextID, documentURL: view.url)
     }
 
     /// Chrome's context for an extension's background, when its manifest declares one: an MV3 service worker, which

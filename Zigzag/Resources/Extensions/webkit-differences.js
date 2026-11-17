@@ -248,6 +248,40 @@
       extras.set(standIn, own);
       return setMemberIn(root, path.slice(0, -1), path[path.length - 1], standIn);
     };
+    // Takes a member away from chrome and browser alike, as Chrome has none where WebKit, the bridge or the API
+    // surface put one. A property the object won't give up is hidden behind a stand-in for the object that holds it:
+    // it is not there to `in`, to `typeof`, or to a read, and everything else passes through as before.
+    const removeMember = (path, key) => {
+      for (const root of roots) {
+        const parent = path.reduce((object, part) => { kept.add(object); return object && object[part]; }, root);
+        kept.add(parent);
+        if (!parent || (typeof parent !== 'object' && typeof parent !== 'function')) continue;
+        const added = extras.get(parent);
+        if (added && Object.prototype.hasOwnProperty.call(added, key)) delete added[key];
+        try { delete parent[key]; } catch (e) {}
+        if (!(key in parent)) continue;
+        // A fresh target, not the object itself: a proxy may not report a non-configurable property of its target as
+        // missing. Everything else is read from, and written to, the real object.
+        const hidden = new Proxy({}, {
+          get(target, name) {
+            if (name === key) return undefined;
+            const member = Reflect.get(parent, name);
+            if (typeof member !== 'function') return member;
+            if (!bound.has(member)) bound.set(member, member.bind(parent));
+            return bound.get(member);
+          },
+          has(target, name) { return name !== key && name in parent; },
+          set(target, name, value) { return Reflect.set(parent, name, value); },
+          defineProperty(target, name, descriptor) { return Reflect.defineProperty(parent, name, descriptor); },
+          deleteProperty(target, name) { return Reflect.deleteProperty(parent, name); },
+          ownKeys() { return Reflect.ownKeys(parent).filter((name) => name !== key); },
+          getOwnPropertyDescriptor(target, name) {
+            return name === key ? undefined : Reflect.getOwnPropertyDescriptor(parent, name);
+          },
+        });
+        setMemberIn(root, path.slice(0, -1), path[path.length - 1], hidden);
+      }
+    };
 
     // Chrome's named constants for its tabs and windows (chrome.tabs.TabStatus.LOADING and the like): WebKit's objects
     // have none of them, so code that reads one stops at once (Coupert's background, so its popup never loaded). Each
@@ -1023,7 +1057,7 @@
     const noBackgroundPage = 'You do not have a background page.';
     const noBackgroundError = () => new Error(noBackgroundPage);
     if (isWorker) {
-      if (manifestV3) { try { delete api.runtime.getBackgroundPage; } catch (e) {} }
+      if (manifestV3) removeMember(['runtime'], 'getBackgroundPage');
     } else {
       const webKits = manifestV3 ? null : (typeof api.runtime.getBackgroundPage === 'function' ? api.runtime.getBackgroundPage.bind(api.runtime)
         : api.extension && typeof api.extension.getBackgroundPage === 'function' ? api.extension.getBackgroundPage.bind(api.extension) : null);
@@ -1035,7 +1069,10 @@
           const lastError = { message: String((failure && failure.message) || failure) };
           const runtimes = [...new Set(roots.map((root) => root.runtime))].filter(Boolean);
           const before = runtimes.map((runtime) => Object.getOwnPropertyDescriptor(runtime, 'lastError'));
-          for (const runtime of runtimes) { try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); } catch (e) {} }
+          for (const runtime of runtimes) {
+            try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); }
+            catch (e) { try { runtime.lastError = lastError; } catch (e2) {} }
+          }
           try { callback(); } finally {
             runtimes.forEach((runtime, index) => {
               try { if (before[index]) Object.defineProperty(runtime, 'lastError', before[index]); else delete runtime.lastError; } catch (e) {}
@@ -1045,6 +1082,8 @@
         return undefined;
       });
     }
+    // Manifest V2 never had runtime.getContexts: not from WebKit, the bridge, or the API surface, which leaves it out.
+    if (!manifestV3) removeMember(['runtime'], 'getContexts');
     if (api.privacy) {
       for (const group of Object.keys(api.privacy)) {
         const settings = api.privacy[group];

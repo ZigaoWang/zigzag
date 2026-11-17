@@ -546,6 +546,17 @@ struct ExtensionContextsTests {
     /// The extension's origin, as Chrome reports it: its actual scheme, query and all.
     private var origin: String { String(base.dropLast()) }
 
+    /// A popup's page as WebKit holds it. Its address is the page's own, not a path rebuilt by anyone else.
+    private final class PopupPage: WKWebView {
+        private let address: URL?
+        override var url: URL? { address }
+        init(_ address: URL?) {
+            self.address = address
+            super.init(frame: .zero, configuration: WKWebViewConfiguration())
+        }
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+    }
+
     /// The pages an extension has open: its background, its offscreen page, and a side panel opened for one tab.
     private var contexts: [Context] {
         [Context(type: .background, contextID: "background", documentURL: URL(string: base + "zigzag-entry.js")),
@@ -654,10 +665,14 @@ struct ExtensionContextsTests {
         let first = names.name(of: panel)
         #expect(names.name(of: panel) == first)
         #expect(names.name(of: NSObject()) != first)
-        #expect(names.name(ofPage: URL(string: base + "popup.html")) == names.name(ofPage: URL(string: base + "popup.html")))
+        // Two popups showing the same page are two contexts, with two names.
+        let url = URL(string: base + "popup.html")!
+        let one = PopupPage(url), two = PopupPage(url)
+        let oneID = names.name(of: one)
+        #expect(names.name(of: two) != oneID)
         // A context that closes is forgotten, so one that opens again is a new one.
-        names.keeping([names.name(of: NSObject())])
-        #expect(names.name(of: panel) != first)
+        names.keeping([names.name(of: two)])
+        #expect(names.name(of: one) != oneID)
     }
 
     @Test func documentIdsAreNotInvented() throws {
@@ -677,11 +692,17 @@ struct ExtensionContextsTests {
     }
 
     @Test func aPopupKeepsItsQueryString() throws {
-        let url = try #require(URL(string: base + "popup.html?tabId=770&view=side"))
-        let popup = Context(type: .popup, contextID: "popup", documentURL: url)
+        // The address is the page's own (`WKWebView.url`), not the path `shownPopupPage` gives tab capture.
+        let address = try #require(URL(string: base + "popup.html?tabId=770&view=side"))
+        let page = PopupPage(address)
+        let names = ContextNames()
+        let popup = BridgeContexts.popup(page, contextID: names.name(of: page))
+        #expect(popup.documentURL?.absoluteString == base + "popup.html?tabId=770&view=side")
         #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html?tabId=770&view=side")
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html?tabId=770&view=side"]]).count == 1)
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html"]]).isEmpty)
+        // Its identity is the page itself, not its address.
+        #expect(names.name(of: page) == popup.contextID)
     }
 }
 

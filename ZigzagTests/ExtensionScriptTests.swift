@@ -157,7 +157,8 @@ struct ExtensionScriptTests {
 
     /// A fake extension world for api-surface.js: WebKit's runtime with the manifest and the diagnostics channel an
     /// extension's background has, and none of the API namespaces the surface must fill.
-    private static func surfaceWorld(_ surface: String? = nil) throws -> JSContext {
+    private static func surfaceWorld(_ surface: String? = nil, version: Int? = nil) throws -> JSContext {
+        let manifest = version.map { "{ permissions: ['history'], manifest_version: \($0) }" } ?? "{ permissions: ['history'] }"
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -173,7 +174,7 @@ struct ExtensionScriptTests {
         var chrome = {
           runtime: {
             id: 'x',
-            getManifest: () => ({ permissions: ['history'] }),
+            getManifest: () => (\(manifest)),
             sendNativeMessage: (host, message) => { __notes.push({ host, ...message }); return Promise.resolve(); },
           },
         };
@@ -1030,6 +1031,20 @@ struct ExtensionScriptTests {
         }
     }
 
+    /// The API surface fills every missing runtime function, but not Chrome's MV3-only `getContexts` in an MV2
+    /// extension: there it must stay absent, so feature detection takes Chrome's path.
+    @Test func theAPISurfaceLeavesGetContextsOutOfMV2() throws {
+        let v2 = try Self.surfaceWorld(version: 2)
+        #expect(v2.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
+        #expect(v2.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
+        let v3 = try Self.surfaceWorld(version: 3)
+        #expect(v3.evaluateScript("typeof chrome.runtime.getContexts").toString() == "function")
+        // In the app the bridge answers; where only the surface ran, the member still fails loudly rather than doing
+        // nothing.
+        v3.evaluateScript("var __error = null; chrome.runtime.getContexts({}).catch((e) => { __error = e.message; });")
+        #expect(v3.evaluateScript("__error").toString() == "chrome.runtime.getContexts isn't available in Zigzag")
+    }
+
     /// An MV3 extension has no background page, and Chrome says so rather than handing back WebKit's null. Its page
     /// still has the member, by promise or callback, with `runtime.lastError` only for as long as the callback runs.
     @Test func anMV3PageIsToldThereIsNoBackgroundPage() {
@@ -1047,6 +1062,25 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
         // The error lives only while the callback runs.
         #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// WebKit's own `runtime.lastError` is there before the failing callback and again after it, as the surface's
+    /// unavailable calls already keep it.
+    @Test func theBackgroundPageErrorPutsWebKitsLastErrorBack() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
+        chrome.runtime.getBackgroundPage = () => null;
+        var __nativeLastError = () => ({ message: 'native' });
+        Object.defineProperty(chrome.runtime, 'lastError', { get: __nativeLastError, configurable: true, enumerable: true });
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        var __during = null;
+        chrome.runtime.getBackgroundPage(() => { __during = chrome.runtime.lastError && chrome.runtime.lastError.message; });
+        """)
+        #expect(page.evaluateScript("__during").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get === __nativeLastError").toBool())
+        #expect(page.evaluateScript("chrome.runtime.lastError.message").toString() == "native")
     }
 
     /// An MV2 page still has its background page, and gets it by promise and by callback alike.
@@ -1081,14 +1115,36 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
     }
 
-    /// Chrome's MV3 service worker has no `getBackgroundPage` at all: neither WebKit's nor the API surface's stand-in.
+    /// Chrome's MV3 service worker has no `getBackgroundPage` at all, on either global, even where WebKit's property
+    /// won't be deleted: the runtime is stood in for by one that doesn't have it.
     @Test func anMV3WorkerHasNoBackgroundPageMember() {
         let worker = Self.workerWorld(worker: true, setup: """
         chrome.runtime.getManifest = () => ({ manifest_version: 3 });
-        chrome.runtime.getBackgroundPage = () => null;
+        Object.defineProperty(chrome.runtime, 'getBackgroundPage', { value: () => null, configurable: false });
+        var browser = { runtime: { getManifest: () => ({ manifest_version: 3 }) } };
+        Object.defineProperty(browser.runtime, 'getBackgroundPage', { value: () => null, configurable: false });
         """)
         worker.evaluateScript("__zigzagAfterSurface()")
-        #expect(worker.evaluateScript("'getBackgroundPage' in chrome.runtime").toBool() == false)
+        for root in ["chrome", "browser"] {
+            #expect(worker.evaluateScript("'getBackgroundPage' in \(root).runtime").toBool() == false, "\(root)")
+            #expect(worker.evaluateScript("typeof \(root).runtime.getBackgroundPage").toString() == "undefined", "\(root)")
+            #expect(worker.evaluateScript("\(root).runtime.getBackgroundPage === undefined").toBool(), "\(root)")
+        }
+        // The stand-in takes nothing else away.
+        #expect(worker.evaluateScript("typeof chrome.runtime.getManifest").toString() == "function")
+        #expect(worker.evaluateScript("browser.runtime.getManifest().manifest_version").toInt32() == 3)
+    }
+
+    /// An MV2 page has no `getContexts` even where WebKit's property can't be deleted, and the rest of runtime stays.
+    @Test func anMV2PageHasNoGetContextsEvenWhenWebKitWontGiveItUp() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        Object.defineProperty(chrome.runtime, 'getContexts', { value: () => [], configurable: false });
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        #expect(page.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
+        #expect(page.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
+        #expect(page.evaluateScript("typeof chrome.runtime.getManifest").toString() == "function")
     }
 }
 
