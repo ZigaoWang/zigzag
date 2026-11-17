@@ -1143,6 +1143,8 @@ final class PermissionPrompt: FloatingPanelView {
             prompt.tabsToken = controller.observePromptTabs { [weak prompt] in prompt?.followTab() }
             // The tab went to another site: this question was that site's, so it's put off.
             prompt.urlToken = asking?.changed.observe { [weak prompt, weak asking] change in
+                // The page turned dark or light (its colors, dark pages, the Mac's mode): the card turns with it.
+                if [.themeColor, .darkPage, .pdf, .settings, .webView].contains(change) { prompt?.matchPage() }
                 guard change == .url, let prompt, let url = asking?.url else { return }
                 if let origin = prompt.askingOrigin {
                     if SiteOrigin.of(url) != origin { prompt.finish(nil) }
@@ -1221,6 +1223,7 @@ final class PermissionPrompt: FloatingPanelView {
     /// Always on the page that asked, at the top in the middle (over the pane that asked, in a split): the same
     /// place whether the sidebar is out or not, so it never moves away from the page it belongs to.
     private func place(in controller: PromptHost) {
+        matchPage()
         surfaceTint = nil
         tintStrength = nil
         isElevated = true
@@ -1230,6 +1233,18 @@ final class PermissionPrompt: FloatingPanelView {
         let measured = answersWidth + Self.pad * 2
         let width = min(max(Self.width, measured), min(Self.maxWidth, area.width - Tokens.Space.x6))
         frame = NSRect(x: round(area.midX - width / 2), y: area.minY + Tokens.Space.x3, width: width, height: height(for: width))
+    }
+
+    /// Light or dark as the page it sits on, as the bar above a page is (`PageBar.inkAppearance`): a light space's
+    /// window doesn't put a light card on a dark page (#300). The page's color, else the look its web view is drawn
+    /// in (the Mac's, or dark pages'), else nil for the window's own.
+    static func look(pageColor: NSColor?, pageLook: NSAppearance.Name?) -> NSAppearance.Name? {
+        PageBar.inkAppearance(on: pageColor) ?? pageLook.map { NSAppearance(named: $0)?.isDark == true ? .darkAqua : .aqua }
+    }
+
+    private func matchPage() {
+        let name = Self.look(pageColor: askingTab?.pageColor, pageLook: askingTab?.webView?.appearance?.name)
+        if appearance?.name != name { appearance = name.flatMap(NSAppearance.init(named:)) }
     }
 
     /// In from above the page's top edge, eased to a stop, as every notice comes (`slidesFromTop`): something new
@@ -1260,6 +1275,8 @@ final class PermissionPrompt: FloatingPanelView {
             DropdownButton.Option(title: String(localized: "Always on this site", comment: "Duration choice on a site's permission question: the answer is remembered for this site."))
         ]
         duration.selectedIndex = 0
+        duration.menuTakesOwnLook = true
+        answerMenu.menuTakesOwnLook = true
         [badge, picture, request, asker, closeButton, duration].forEach { addSubview($0) }
         onLayout = { [weak self] in self?.layoutContent() }
     }
