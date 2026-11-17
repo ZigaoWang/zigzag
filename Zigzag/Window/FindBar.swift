@@ -724,9 +724,17 @@ class FloatingPanelView: NSView {
     /// Above the window's top edge: where a top-edge panel comes from and goes back to.
     private var offstage: CGFloat { frame.maxY + 12 }
 
+    /// For a note that belongs to the sidebar's side of the window (a link opened in a new tab while it's hidden): it
+    /// slides in from beyond that edge, `.minX` or `.maxX`, and leaves back out the same way.
+    var slidesFromSide: NSRectEdge?
+
     /// Where it comes from and goes back to.
     private func origin(_ arrival: Arrival) -> Tokens.Motion.Origin {
         if slidesFromTop { return .offstage(.minY, offstage) }
+        if let side = slidesFromSide {
+            let width = superview?.bounds.width ?? frame.maxX
+            return .offstage(side, (side == .maxX ? width - frame.minX : frame.maxX) + 12)
+        }
         if let attachedEdge { return .edge(attachedEdge) }
         // What came without moving leaves without moving.
         return arrival == .fade || arrival == .instant ? .inPlace : .point(growsFrom)
@@ -797,7 +805,7 @@ class FloatingPanelView: NSView {
 
 /// A brief confirmation pill at the top of the page ("Link Copied", "90%"). Shown at once, gone in a moment;
 /// pressing the same shortcut again updates it in place instead of stacking another.
-final class ToastView: FloatingPanelView {
+class ToastView: FloatingPanelView {
     let icon = NSImageView()
     let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     let actionButton = PillButton(style: .plain)
@@ -953,7 +961,7 @@ enum Toast {
     }
 
     /// Over the page, or with the desk open, over the desk, clear of its search field.
-    private static func area(in controller: BrowserWindowController) -> NSRect {
+    static func area(in controller: BrowserWindowController) -> NSRect {
         if let desk = controller.desk.toastArea { return desk }
         // Under the bar of an AI app using the page, if there is one.
         var page = controller.root.cardFrame

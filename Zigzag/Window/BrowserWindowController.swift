@@ -51,6 +51,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Inside a `pageChange`: the steps it's made of (pin, then into a folder) are its own, one ⌘Z and one redo.
     var isInPageChange = false
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
+    /// With the sidebar hidden, says a link opened in a new tab behind the page (#272).
+    lazy var newTabNote = NewTabNote(controller: self)
     lazy var peek = PeekController(controller: self)
     /// A playing video you've left, in a small card over the page.
     lazy var miniPlayer = MiniPlayer(controller: self)
@@ -77,6 +79,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
             Toast.reposition(in: self)
+            self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
             if self.floatingDownloads.superview != nil {
                 if self.root.sidebarVisible { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
@@ -88,6 +91,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.sidebarSliding(duration)
             PermissionPrompt.reposition(in: self, slide: duration, timing: timing)
             Toast.reposition(in: self, slide: duration, timing: timing)
+            self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
         }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
@@ -2198,7 +2202,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .foregroundTab:
             tabManager.newTab(url: url, opener: opener, by: sender, httpFallback: httpFallback)
         case .backgroundTab:
-            tabManager.newTab(url: url, select: false, opener: opener, by: sender, httpFallback: httpFallback)
+            let tab = tabManager.newTab(url: url, select: false, opener: opener, by: sender, httpFallback: httpFallback)
+            // A link you opened behind the page: with the sidebar hidden, nothing else would say so. Not one Zigzag
+            // opened on its own (the guide's, a restored one).
+            if sender == .page { newTabNote.show(tab) }
         case .peek:
             showPeek(url: url, configuration: nil, by: sender)
         case .newWindow:
@@ -2288,6 +2295,7 @@ extension BrowserWindowController: TabHost {
            let history = tab.interactionStateForSaving {
             let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host(), site: url)
             newTab.restoreHistory(history, thenLoad: url, by: .page)
+            if disposition == .backgroundTab { newTabNote.show(newTab, site: url) }
             return
         }
         open(url, disposition: disposition, opener: tab, allowSwitch: false, by: .page)
@@ -2307,6 +2315,7 @@ extension BrowserWindowController: TabHost {
                 return nil
             }
             let newTab = tabManager.newTab(url: nil, select: false, configuration: configuration, opener: tab, site: action.request.url)
+            if pending == .backgroundTab { newTabNote.show(newTab, site: action.request.url) }
             return newTab.ensureWebView()
         }
         // Peeked pages open their links in the card itself, as the page's doing: an app's link asks, as it would

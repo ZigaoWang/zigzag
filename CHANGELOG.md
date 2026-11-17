@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Drag a tab onto a split's row in the sidebar to add it as a third or fourth page, as dragging one tab onto another makes a split. It takes a quarter on the side of the row you drop it on, and four make a grid. ⌘Z puts it back.
 - The bottom of the sidebar shows a Now Playing card for every tab playing sound in the background, up to three, instead of only one, so you can pause or mute each of them when several start at once. A new card goes on top, so the others stay put. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#274](https://github.com/ZigaoWang/zigzag/issues/274))
 - Settings › Appearance › Page zoom sets the zoom every website opens at, as in Chrome and Safari. A site you zoom with ⌘+ or ⌘− keeps its own zoom, and Actual Size goes back to the default. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#273](https://github.com/ZigaoWang/zigzag/issues/273))
+- With the sidebar hidden, a link you open in a new tab behind the page, with a ⌘-click, a middle click or Open Link in New Tab, shows a note at the sidebar's edge for a moment with the new tab's icon and title. Click it to go to the tab. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#272](https://github.com/ZigaoWang/zigzag/issues/272))
 
 ### Fixed
 - In full screen, the close, minimize and full screen buttons that come down with the menu bar have a bar behind them again, instead of floating over the page when the sidebar is hidden.

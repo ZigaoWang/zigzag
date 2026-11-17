@@ -11421,6 +11421,17 @@
         }
       }
     },
+    "Opened in new tab: %@" : {
+      "comment" : "Said by VoiceOver when a link opens in a new tab behind the page while the sidebar is hidden. The placeholder is the tab's title, or its site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已在新标签页中打开：%@"
+          }
+        }
+      }
+    },
     "Opening your passwords…" : {
       "comment" : "Shown in the Passwords window while the saved passwords are read.",
       "localizations" : {
