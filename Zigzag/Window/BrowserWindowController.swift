@@ -2259,7 +2259,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         switch disposition {
         case .currentTab:
-            if let tab = tabManager.selectedTab {
+            // The tab that asked, never the selected one: in a split they are different panes.
+            if let tab = opener ?? tabManager.selectedTab {
                 tab.load(url, by: sender, httpFallback: httpFallback)
             } else {
                 tabManager.newTab(url: url, by: sender, httpFallback: httpFallback)
@@ -2351,19 +2352,19 @@ extension BrowserWindowController: SwipeArrowHost {
 extension BrowserWindowController: TabHost {
     var hostWindow: NSWindow? { window }
 
-    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // Inside peek, another peek just navigates the card.
         // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
-        if tab.isPeek, disposition == .peek { tab.load(url, by: .page); return }
+        if tab.isPeek, disposition == .peek { tab.load(url, by: sender); return }
         // A result opened from a search page keeps the search one Back away.
         if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
            let history = tab.interactionStateForSaving {
             let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host(), site: url)
-            newTab.restoreHistory(history, thenLoad: url, by: .page)
+            newTab.restoreHistory(history, thenLoad: url, by: sender)
             if disposition == .backgroundTab { newTabNote.show(newTab, site: url) }
             return
         }
-        open(url, disposition: disposition, opener: tab, allowSwitch: false, by: .page)
+        open(url, disposition: disposition, opener: tab, allowSwitch: false, by: sender)
     }
 
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool {

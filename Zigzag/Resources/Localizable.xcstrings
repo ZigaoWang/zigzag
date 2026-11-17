@@ -1981,6 +1981,17 @@
         }
       }
     },
+    "A rule that hasn’t been told asks the first time it fires, and keeps your answer." : {
+      "comment" : "Tooltip on the Open in choice of an Open URL download rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没指定位置的规则会在第一次触发时询问，并记住你的选择。"
+          }
+        }
+      }
+    },
     "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too." : {
       "comment" : "Under the list in Settings › Developer.",
       "localizations" : {
@@ -2104,6 +2115,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你正在看的视频会在其他 App 和桌面上方的小播放器里继续播放；回到它的页面时，再回到页面里。"
+          }
+        }
+      }
+    },
+    "A web address opens in Zigzag or your default browser. Anything else opens in its own app." : {
+      "comment" : "Under the Open in choice of an Open URL download rule: only the web's own addresses are Zigzag's to open.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页地址在 Zigzag 或默认浏览器中打开，其他地址在各自的 App 中打开。"
           }
         }
       }
@@ -3248,7 +3270,7 @@
       }
     },
     "Ask" : {
-      "comment" : "A choice in a permission's dropdown in Site Controls: the site asks each time.",
+      "comment" : "A choice in a permission's dropdown in Site Controls: the site asks each time.\nChoice in an Open URL download rule's Open in dropdown: the rule asks where to open the first time it fires, and keeps the answer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6241,6 +6263,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "默认"
+          }
+        }
+      }
+    },
+    "Default Browser" : {
+      "comment" : "Choice in an Open URL download rule's Open in dropdown: opens the web address in the Mac's default browser, as these rules did before Zigzag had its own places.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认浏览器"
           }
         }
       }
@@ -11767,6 +11800,17 @@
         }
       }
     },
+    "Once" : {
+      "comment" : "Button on a download rule's question: open it where the dropdown says this one time, and ask again next time.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此一次"
+          }
+        }
+      }
+    },
     "Only %@’s history is cleared; other profiles keep theirs." : {
       "comment" : "Added to the message of a sheet that asks before clearing History, when there's more than one profile. The placeholder is the profile's name.",
       "localizations" : {
@@ -12192,6 +12236,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在上方打开"
+          }
+        }
+      }
+    },
+    "Open in" : {
+      "comment" : "Label of the choice of where a web address opens, in an Open URL download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开位置"
           }
         }
       }
@@ -20469,6 +20524,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mac 为深色时"
+          }
+        }
+      }
+    },
+    "Where should this open" : {
+      "comment" : "A download rule's question the first time an Open URL rule fires on a web address: which of Zigzag's own places to open it in. The card adds the question mark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要在哪里打开"
           }
         }
       }
