@@ -2183,7 +2183,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if let manifest = ExtensionStore.manifest(for: id) {
             // The lines only: the overlay is decoded once, behind ExtensionCompatibility.shared(for:), and each row
             // does not build a whole report for them. A Firefox package reads its own overlay.
-            let kind = ExtensionStore.package(id).flatMap { ExtensionKind(rawValue: $0.kind) } ?? .chromium
+            let kind = ExtensionStore.kind(of: id)
             let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id, kind: kind)
             if let first = limits.first {
                 let names = Words.list([first.text] + limits.dropFirst().map { Words.lowercasedForList($0.text) })

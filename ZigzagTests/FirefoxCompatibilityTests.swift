@@ -47,7 +47,7 @@ struct FirefoxCompatibilityTests {
     @Test func theFirefoxOverlayValidatesWithNoDiagnostics() throws {
         let (overlay, universe) = try Self.shipped(.firefox)
         let problems = CompatibilityValidator.diagnostics(overlay: overlay, universe: universe,
-                                                          implementations: .shipped())
+                                                          implementations: .shipped(kind: .firefox))
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
@@ -55,7 +55,7 @@ struct FirefoxCompatibilityTests {
     /// polyfill included, since `getBrowserInfo` and `getPlatformInfo` live there and nowhere else.
     @Test func everyFirefoxClaimedImplementationExists() throws {
         let (overlay, universe) = try Self.shipped(.firefox)
-        let implementations = CompatibilityImplementations.shipped()
+        let implementations = CompatibilityImplementations.shipped(kind: .firefox)
         var problems: [String] = []
         for (path, claim) in flatten(overlay.claims) {
             if !universe.contains(path) { problems.append("\(path) is not in Firefox's API") }
@@ -241,16 +241,52 @@ struct FirefoxCompatibilityTests {
 
     // MARK: Kind threads through the report
 
+    /// An actual Chrome report reads `compatibility.json`: it names Chrome's own line for a Chrome-only permission
+    /// and never Firefox's line for a Firefox-only one.
     @Test func aChromePackageStillUsesTheChromeOverlay() throws {
-        let (chrome, chromeUniverse) = try Self.shipped(.chromium)
-        let (firefox, firefoxUniverse) = try Self.shipped(.firefox)
-        // `tabCapture` is Chrome's and only Chrome's: the two overlays are two files.
-        #expect(chrome.claims["tabCapture"] != nil)
-        #expect(firefox.claims["tabCapture"] == nil)
-        #expect(chromeUniverse.contains("tabCapture"))
-        #expect(!firefoxUniverse.contains("tabCapture"))
-        #expect(chrome.permissions["storage"]?.catalog == "extension.limit.storageSync")
-        #expect(firefox.permissions["storage"]?.catalog == "extension.limit.storageSync")
+        let id = "abcdefghijklmnopabcdefghijklmnop"
+        let chrome = ExtensionReport(requesting: ["tabGroups", "contextualIdentities"], id: id, kind: .chromium)
+        #expect(chrome.limits.map(\.catalogKey).contains("extension.limit.tabGroups"))
+        #expect(!chrome.limits.map(\.catalogKey).contains("extension.limit.contextualIdentities"))
+        // The overlays are two files: `tabCapture` is Chrome's and only Chrome's.
+        #expect(try Self.shipped(.chromium).overlay.claims["tabCapture"] != nil)
+        #expect(try Self.shipped(.firefox).overlay.claims["tabCapture"] == nil)
+    }
+
+    /// The "wants more access" sheets read the package's own kind from its record, as Settings' row does: a Firefox
+    /// package words Firefox's limits, a Chrome package Chrome's. Both `ExtensionHost` sites build the report through
+    /// `ExtensionStore.kind(of:)`, which is what this test exercises.
+    @Test func theWantsMoreSheetReadsThePackageRecordsOverlay() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zigzag-firefox-kind-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let previous = ExtensionStore.rootOverride
+        ExtensionStore.rootOverride = root
+        ExtensionStore.forgetWhatWasRead()
+        defer {
+            ExtensionStore.rootOverride = previous
+            ExtensionStore.forgetWhatWasRead()
+            try? FileManager.default.removeItem(at: root)
+        }
+        let firefoxID = "abcdefghijklmnopabcdefghijklmnop"
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0", kind: "firefox", firefoxID: "more@zigzag.test"), for: firefoxID)
+        let chromeID = "ponmlkjihgfedcbaponmlkjihgfedcba"
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0"), for: chromeID)
+
+        // The record's kind, as the sheets read it: a Firefox record is Firefox's, a record without one is Chrome's.
+        #expect(ExtensionStore.kind(of: firefoxID) == .firefox)
+        #expect(ExtensionStore.kind(of: chromeID) == .chromium)
+
+        // Asked for a Firefox-only permission and a Chrome-only one, a Firefox package names Firefox's line and not
+        // Chrome's; a Chrome package the other way round.
+        let firefox = ExtensionReport(requesting: ["contextualIdentities", "tabGroups"], id: firefoxID,
+                                      kind: ExtensionStore.kind(of: firefoxID))
+        #expect(firefox.limits.map(\.catalogKey).contains("extension.limit.contextualIdentities"))
+        #expect(!firefox.limits.map(\.catalogKey).contains("extension.limit.tabGroups"))
+        let chrome = ExtensionReport(requesting: ["contextualIdentities", "tabGroups"], id: chromeID,
+                                     kind: ExtensionStore.kind(of: chromeID))
+        #expect(chrome.limits.map(\.catalogKey).contains("extension.limit.tabGroups"))
+        #expect(!chrome.limits.map(\.catalogKey).contains("extension.limit.contextualIdentities"))
     }
 
     // MARK: The install sheet

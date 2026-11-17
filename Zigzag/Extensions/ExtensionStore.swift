@@ -110,6 +110,12 @@ enum ExtensionStore {
 
     static func package(_ id: String) -> Package? { read(Package.self, from: stateFile(for: id)) }
 
+    /// The kind a package's record keeps, for wording its sheets and rows. A record without one — every record
+    /// written before Firefox packages existed — is Chrome's.
+    static func kind(of id: String) -> ExtensionKind {
+        package(id).flatMap { ExtensionKind(rawValue: $0.kind) } ?? .chromium
+    }
+
     static func save(_ package: Package, for id: String) {
         try? FileManager.default.createDirectory(at: folder(for: id), withIntermediateDirectories: true)
         write(package, keys: Package.keys, to: stateFile(for: id))
@@ -562,8 +568,7 @@ enum ExtensionStore {
               let old = packageDirectory(for: id), let newManifest = manifest(in: new), let oldManifest = manifest(in: old),
               let ext = try? await WKWebExtension(resourceBaseURL: new) else { return nil }
         // The record's kind words the sheet: a Firefox package's update reads Firefox's overlay, not Chrome's.
-        let kind = package(id).flatMap { ExtensionKind(rawValue: $0.kind) } ?? .chromium
-        return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id, kind: kind))
+        return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id, kind: kind(of: id)))
     }
 
     /// The ID of an extension read from a folder: from the folder's path, the way Chrome makes it, so loading the

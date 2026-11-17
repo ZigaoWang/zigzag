@@ -121,14 +121,14 @@ nonisolated struct CompatibilityOverlay: Codable, Sendable {
 
     enum LoadError: LocalizedError {
         case missingResource(String)
-        case malformed(String)
+        case malformed(String, String)
 
         var errorDescription: String? {
             switch self {
             case .missingResource(let name):
                 return "\(name).json is missing from the app"
-            case .malformed(let reason):
-                return "compatibility.json is malformed: \(reason)"
+            case .malformed(let name, let reason):
+                return "\(name).json is malformed: \(reason)"
             }
         }
     }
@@ -148,7 +148,7 @@ nonisolated struct CompatibilityOverlay: Codable, Sendable {
         do {
             return try JSONDecoder().decode(CompatibilityOverlay.self, from: Data(contentsOf: url))
         } catch {
-            throw LoadError.malformed(error.localizedDescription)
+            throw LoadError.malformed(name, error.localizedDescription)
         }
     }
 }
@@ -358,15 +358,26 @@ nonisolated struct CompatibilityImplementations: Sendable {
     /// `storage.managed`), so an `emulated` claim names it rather than a correction it never wrote.
     @MainActor
     static func shipped(bundle: Bundle = .main) -> CompatibilityImplementations {
+        shipped(kind: .chromium, bundle: bundle)
+    }
+
+    /// The code one kind's claims may name. `webkit-differences.js` and the compatibility shim answer both kinds;
+    /// `firefox-polyfill.js` answers only Firefox's, where `getBrowserInfo`, `getPlatformInfo` and the Promise facade
+    /// live. Scoping the scan by kind keeps a Chrome claim from validating against a Firefox-only symbol, and the
+    /// other way round.
+    @MainActor
+    static func shipped(kind: ExtensionKind, bundle: Bundle = .main) -> CompatibilityImplementations {
         let differences = bundle.url(forResource: "webkit-differences", withExtension: "js")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-        // Firefox's own answers (`getBrowserInfo`, `getPlatformInfo`, the Promise facade) live only in the polyfill,
-        // so a Firefox claim may name them: the scan reads the code that would do the work, as it does for Chrome.
-        let polyfill = bundle.url(forResource: "firefox-polyfill", withExtension: "js")
-            .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        var script = differences + "\n" + ExtensionShims.compatibility
+        if kind == .firefox {
+            let polyfill = bundle.url(forResource: "firefox-polyfill", withExtension: "js")
+                .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+            script += "\n" + polyfill
+        }
         return CompatibilityImplementations(handlers: ExtensionBridge.handlerNames
                                                 .union(ExtensionBridge.handlerTypeNames),
-                                            script: differences + "\n" + ExtensionShims.compatibility + "\n" + polyfill)
+                                            script: script)
     }
 
     /// Whether an implementation names something that exists. A dotted `js:` name is checked part by part, as in
