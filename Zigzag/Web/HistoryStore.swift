@@ -236,9 +236,12 @@ final class HistoryStore {
     /// from the same `asker` took over: it's stopped where it was, as its answer would only be dropped.
     func search<T: Sendable>(_ query: String, limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
         guard let reader else { return then(search(query, limit: limit)) }
+        // Its place in line is taken now, as it's asked: two asked a moment apart can come back from the wait below in
+        // either order, and the later one taking the older place would be dropped as typed over, with no answer at all.
+        let ticket = reader.claim(asker)
         // What was recorded just before is in by then.
         await database.written()
-        return await reader.search(Self.words(query), limit: limit, asker: asker, then: then)
+        return await reader.search(Self.words(query), limit: limit, asker: asker, ticket: ticket, then: then)
     }
 
     nonisolated fileprivate static func runSearch(_ words: [String], limit: Int, in db: OpaquePointer?) -> [HistoryEntry] {
@@ -266,8 +269,9 @@ final class HistoryStore {
             return found.isEmpty ? Self.runCompletionSites(prefix, afterSubdomain: true, limit: 8, in: db) : found
         }
         guard let reader else { return database.sync { lookup($0) } }
+        let ticket = reader.claim(asker)
         await database.written()
-        return await reader.read(asker: asker, lookup) { $0 }
+        return await reader.read(asker: asker, ticket: ticket, lookup) { $0 }
     }
 
     nonisolated fileprivate static func runCompletionSites(_ prefix: String, afterSubdomain: Bool, limit: Int,
@@ -556,19 +560,25 @@ nonisolated final class HistoryReader: @unchecked Sendable {
 
     deinit { sqlite3_close(db) }
 
-    func search<T: Sendable>(_ words: [String], limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
-        await read(asker: asker, { HistoryStore.runSearch(words, limit: limit, in: $0) }, then: then)
+    func search<T: Sendable>(_ words: [String], limit: Int, asker: Int, ticket: Int? = nil, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
+        await read(asker: asker, ticket: ticket, { HistoryStore.runSearch(words, limit: limit, in: $0) }, then: then)
     }
 
-    /// Any read, the same way: `lookup` on this connection (nil when the file can't be opened), then `then` on its answer.
-    func read<R, T: Sendable>(asker: Int, _ lookup: @escaping @Sendable (OpaquePointer?) -> R, then: @escaping @Sendable (R) -> T) async -> T? {
-        let ticket: Int = lock.withLock {
+    /// A read's place in line for `asker`, taken as it's asked: the newest from now on, and the same asker's last
+    /// read, still going, is stopped, since its answer would be dropped.
+    func claim(_ asker: Int) -> Int {
+        lock.withLock {
             tickets += 1
             newest[asker] = tickets
-            // The same asker's last read, still going: stopped, since its answer would be dropped.
             if let running, running.asker == asker { sqlite3_interrupt(db) }
             return tickets
         }
+    }
+
+    /// Any read, the same way: `lookup` on this connection (nil when the file can't be opened), then `then` on its
+    /// answer. `ticket`: its place in line, if it was claimed when asked; else it's claimed now.
+    func read<R, T: Sendable>(asker: Int, ticket: Int? = nil, _ lookup: @escaping @Sendable (OpaquePointer?) -> R, then: @escaping @Sendable (R) -> T) async -> T? {
+        let ticket = ticket ?? claim(asker)
         return await withCheckedContinuation { continuation in
             queue.async {
                 continuation.resume(returning: self.run(lookup, asker: asker, ticket: ticket, then: then))
