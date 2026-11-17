@@ -136,7 +136,7 @@ struct DownloadRuleTests {
         let json = """
         [
           {"name":"Known","match":"contains","pattern":"a","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
-          {"name":"Future","match":"fileType","pattern":"pdf","action":{"kind":"saveToFolder","folderPath":"/tmp"}},
+          {"name":"Future","match":"futureMatch","pattern":"pdf","action":{"kind":"futureKind","folderPath":"/tmp"}},
           {"name":"Broken","applies":7,"match":{},"action":{"kind":"nonsense"}},
           {"name":"WrongMatch","match":7,"pattern":"","action":{"kind":"openURL","urlTemplate":"x://{link}"}},
           {"name":"WrongKind","match":"contains","pattern":"x","action":{"kind":7}},
@@ -360,6 +360,282 @@ struct DownloadRuleTests {
         #expect(body.contains("&amp;"))
         #expect(!body.contains("x=1&y=2"))
         #expect(body.contains("<string></string>"))
+    }
+
+    // MARK: Per-extension destinations
+
+    /// A per-extension destination as the panel makes one: a download rule whose match is the file's type, and an
+    /// action that says where a file of it lands.
+    private func destination(_ extensions: String, _ kind: DownloadRuleAction.Kind = .saveToFolder,
+                             folder: String = "/Users/me/Documents", enabled: Bool = true) -> DownloadRule {
+        var action = DownloadRuleAction(kind: kind)
+        action.folderPath = kind == .saveToFolder ? folder : ""
+        var rule = DownloadRule(name: "", applies: .downloads, match: .fileType, pattern: extensions, action: action)
+        rule.isEnabled = enabled
+        return rule
+    }
+
+    /// A file's type is its own name, never the address: that is what lets a per-extension destination be written as
+    /// an ordinary rule and still read the right thing.
+    @Test func aFileTypeMatchesByNameAndNeverByAddress() {
+        let type = rule(.fileType, "pdf, epub")
+        #expect(type.matches(filename: "report.pdf"))
+        #expect(type.matches(filename: "report.PDF"))
+        #expect(type.matches(filename: "book.EPUB"))
+        #expect(!type.matches(filename: "report.txt"))
+        // An address on its own is never a file's name, so a type rule catches nothing without one.
+        #expect(!type.matches(file))
+        #expect(!type.matches(file, filename: ""))
+    }
+
+    @Test func aFileTypeTakesADotAndTwoParts() {
+        #expect(rule(.fileType, ".pdf").matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "pdf").matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "pdf,epub").matches(filename: "b.epub"))
+        #expect(rule(.fileType, "tar.gz").matches(filename: "backup.tar.gz"))
+        #expect(!rule(.fileType, "gz").matches(filename: "backup.tar.xz"))
+        // The dot is what makes an extension an extension.
+        #expect(!rule(.fileType, "pdf").matches(filename: "pdf"))
+        #expect(!rule(.fileType, "").matches(filename: "a.pdf"))
+        #expect(!rule(.fileType, "pdf", enabled: false).matches(filename: "a.pdf"))
+    }
+
+    @Test func aFileTypeFollowsTheCaseSwitch() {
+        #expect(rule(.fileType, "PDF", caseSensitive: true).matches(filename: "a.PDF"))
+        #expect(!rule(.fileType, "PDF", caseSensitive: true).matches(filename: "a.pdf"))
+        #expect(rule(.fileType, "PDF", caseSensitive: false).matches(filename: "a.pdf"))
+    }
+
+    /// The download path reads the file's name, so a type rule catches its download — and, since a link has no name,
+    /// never a link.
+    @Test func aDownloadIsCaughtByItsTypeAndALinkIsNot() {
+        let type = rule(.fileType, "pdf")
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: false)?.id == type.id)
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "", appliesToLinks: false) == nil)
+        #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: true) == nil)
+    }
+
+    /// Where a download lands is the first destination that matches, in the same order a handoff is tried — and a
+    /// handoff rule for the same file is not a destination, so it is left to the handoff path.
+    @Test func aDestinationIsTheFirstThatMatches() {
+        let pdf = destination("pdf", folder: "/Users/me/Documents")
+        let books = destination("pdf, epub", .openFile)
+        #expect(DownloadRulesStore.destination(in: [pdf, books], url: file, filename: "a.pdf")?.destination == .folder("/Users/me/Documents"))
+        #expect(DownloadRulesStore.destination(in: [books, pdf], url: file, filename: "a.pdf")?.destination == .open)
+        #expect(DownloadRulesStore.destination(in: [rule(.fileType, "pdf")], url: file, filename: "a.pdf") == nil)
+        #expect(DownloadRulesStore.destination(in: [], url: file, filename: "a.pdf") == nil)
+        #expect(DownloadRulesStore.destination(in: [destination("pdf")], url: file, filename: "a.epub") == nil)
+        #expect(DownloadRulesStore.destination(in: [destination("pdf", enabled: false)], url: file, filename: "a.pdf") == nil)
+    }
+
+    // MARK: Where a destination puts the file
+
+    /// A folder destination saves into the folder the rule names, under the file's own name; there is nothing to
+    /// decide when the folder is empty or has gone, and Zigzag's own showing saves where it always would.
+    @Test func aDestinationIsReadAsAPlaceToSave() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zz-dest-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let there = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
+        #expect(there?.destination == folder.appendingPathComponent("report.pdf"))
+        #expect(there?.openWhenFinished == false, "a folder destination saves, it never opens")
+
+        // The file's name is made safe, as every download's is.
+        #expect(DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "a/b:c.pdf")?.destination
+                == folder.appendingPathComponent("a-b-c.pdf"))
+
+        // A name already taken there is not overwritten.
+        let taken = folder.appendingPathComponent("report.pdf")
+        try Data("one".utf8).write(to: taken)
+        let second = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
+        #expect(second?.destination == folder.appendingPathComponent("report 2.pdf"))
+
+        // A folder still being downloaded into is not chosen either.
+        let busy = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf",
+                                         avoiding: [folder.appendingPathComponent("report 2.pdf").path])
+        #expect(busy?.destination == folder.appendingPathComponent("report 3.pdf"))
+
+        // Nothing to decide: no folder named, one that doesn't exist, and one that is really a file.
+        #expect(DownloadManager.place(for: .folder(""), folder: "", filename: "a.pdf") == nil)
+        #expect(DownloadManager.place(for: .folder("/no/such/folder"), folder: "/no/such/folder", filename: "a.pdf") == nil)
+        let aFile = folder.appendingPathComponent("notafolder")
+        try Data("x".utf8).write(to: aFile)
+        #expect(DownloadManager.place(for: .folder(aFile.path), folder: aFile.path, filename: "a.pdf") == nil)
+
+        // Open saves where it would have gone anyway, and says to open it once it's here.
+        let shown = DownloadManager.place(for: .open, folder: "ignored", filename: "report.pdf")
+        #expect(shown?.openWhenFinished == true)
+        #expect(shown?.destination.lastPathComponent == "report.pdf")
+        // A private window keeps the file but never hands it to another app, unless the rule was let in.
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "report.pdf", canOpen: false)?.openWhenFinished == false)
+    }
+    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be opened by the
+    /// Mac's own app.
+    @Test func aDestinationSaysWhatItIsAndNeedsItsFolder() {
+        #expect(DownloadRuleAction.Kind.saveToFolder.isDestination)
+        #expect(DownloadRuleAction.Kind.openFile.isDestination)
+        #expect(!DownloadRuleAction.Kind.openURL.isDestination)
+        #expect(!DownloadRuleAction.Kind.runScript.isDestination)
+
+        var folder = DownloadRuleAction(kind: .saveToFolder)
+        #expect(!folder.isComplete)
+        folder.folderPath = "/Users/me/Documents"
+        #expect(folder.isComplete)
+        #expect(DownloadRuleAction(kind: .openFile).isComplete)
+    }
+
+    @Test func aDestinationReadsAsASentence() {
+        #expect(destination("pdf, epub", folder: "/Users/me/Documents").destinationSentence
+                == "Files of type pdf, epub are saved to Documents")
+        #expect(destination("pdf", .openFile).destinationSentence == "Files of type pdf open in your Mac’s app")
+    }
+
+    /// A file-type Open never offers or performs an app, a script, an installer or an archive. The lookup skips such
+    /// a rule, and a later Save rule for the same type still decides where the file lands.
+    @Test func anOpenNeverTakesAnAppScriptOrArchive() {
+        #expect(DownloadOpening.isRefused("dmg"))
+        #expect(DownloadOpening.isRefused("APP"))
+        #expect(DownloadOpening.isRefused("mpkg"))
+        #expect(DownloadOpening.isRefused("iso"))
+        #expect(DownloadOpening.isRefused("xip"))
+        #expect(DownloadOpening.isRefused("tar.gz"))
+        #expect(DownloadOpening.isRefused("pdf,dmg"))
+        #expect(DownloadOpening.isRefused(""))
+        #expect(!DownloadOpening.isRefused("pdf"))
+        #expect(DownloadOpening.isRefused(pattern: "pdf, tar.gz"))
+        #expect(DownloadOpening.isRefused("report.pdf,dmg"))
+        #expect(DownloadOpening.isRefused(pattern: "pdf, dmg"))
+        #expect(!DownloadOpening.isRefused("pdf"))
+
+        // What else runs, loads, or sends the Mac somewhere when opened: location files, web pages, plug-ins,
+        // workflows and macro documents.
+        for type in ["fileloc", "inetloc", "webloc", "url", "html", "svg", "webarchive", "js", "wflow", "shortcut",
+                     "scptd", "plugin", "dylib", "qtz", "jnlp", "class", "ipa", "docm", "xlsm", "term", "tool"] {
+            #expect(DownloadOpening.isRefused(type), "\(type) must not open")
+        }
+        #expect(DownloadOpening.isRefused(pattern: "epub, fileloc"))
+        // A type the list doesn't name is still refused when the Mac calls it a script or an archive.
+        for type in ["sparseimage", "cpgz", "xar", "phtml", "pyc"] {
+            #expect(!DownloadOpening.refused.contains(type))
+            #expect(DownloadOpening.isRefused(type), "\(type) must not open")
+        }
+        // The ordinary documents and media Open is for.
+        for type in ["pdf", "epub", "txt", "rtf", "md", "csv", "json", "png", "jpg", "heic", "mp3", "mp4", "mov",
+                     "docx", "xlsx", "pptx", "pages", "key", "numbers", "ics", "vcf"] {
+            #expect(!DownloadOpening.isRefused(type), "\(type) should be able to open")
+        }
+
+        let url = URL(string: "https://example.com/tool.dmg")!
+        var open = destination("dmg", .openFile)
+        open.name = "Open"
+        #expect(DownloadRulesStore.destination(in: [open], url: url, filename: "tool.dmg") == nil)
+
+        var save = destination("dmg", .saveToFolder, folder: "/tmp")
+        save.name = "Save"
+        let found = DownloadRulesStore.destination(in: [open, save], url: url, filename: "tool.dmg")
+        #expect(found?.rule.name == "Save")
+        #expect(found?.destination == .folder("/tmp"))
+
+        // The same for an installer and a compound archive, both of which the card would otherwise offer.
+        let installer = URL(string: "https://example.com/tool.mpkg")!
+        let installerOpen = destination("mpkg", .openFile)
+        #expect(DownloadRulesStore.destination(in: [installerOpen], url: installer, filename: "tool.mpkg") == nil)
+        let archive = URL(string: "https://example.com/bundle.tar.gz")!
+        let archiveOpen = destination("tar.gz", .openFile)
+        #expect(DownloadRulesStore.destination(in: [archiveOpen], url: archive, filename: "bundle.tar.gz") == nil)
+    }
+
+    /// The list has one order: a file type before a catch-all handoff decides, and a refused Open is no match, so a
+    /// handoff behind it can still take the file.
+    @Test func aTypeRuleBeforeACatchAllHandoffWins() {
+        var type = destination("pdf", .saveToFolder, folder: "/tmp")
+        type.name = "Type"
+        var catchAll = rule(.any)
+        catchAll.name = "Catch-all"
+        let url = URL(string: "https://example.com/file.pdf")!
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [type, catchAll], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false) == nil)
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [catchAll, type], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false)?.name == "Catch-all")
+
+        var refused = destination("dmg", .openFile)
+        refused.name = "Open DMG"
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [refused, catchAll],
+                                                     url: URL(string: "https://example.com/x.dmg")!, filename: "x.dmg",
+                                                     appliesToLinks: false)?.name == "Catch-all")
+
+        // A Save destination still stands in a private window even with its switch off: only Open and handoffs need it.
+        var privateCatchAll = catchAll
+        privateCatchAll.runsInPrivateWindows = true
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [type, privateCatchAll], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false, isPrivate: true) == nil)
+
+        // A hand-edited links-and-downloads destination is not a download destination, so it cannot block a handoff.
+        var linkDestination = destination("pdf", .saveToFolder, folder: "/tmp")
+        linkDestination.applies = .linksAndDownloads
+        linkDestination.name = "Link destination"
+        #expect(DownloadRulesStore.firstHandoffMatch(in: [linkDestination, catchAll], url: url, filename: "file.pdf",
+                                                     appliesToLinks: false)?.name == "Catch-all")
+    }
+
+    /// The last word on Open: an app, a script, an installer, an archive or a file with no type is saved, while a PDF
+    /// may open.
+    @Test func aNewFileTypeGoesBeforeTheHandoffRules() {
+        var aria2 = rule(.any)
+        aria2.name = "aria2"
+        var pdf = destination("pdf", .openFile)
+        pdf.name = "PDF"
+        var epub = destination("epub", .saveToFolder, folder: "/tmp")
+        epub.name = "EPUB"
+        #expect(DownloadRulesStore.placeForNewFileType(in: []) == 0)
+        #expect(DownloadRulesStore.placeForNewFileType(in: [aria2]) == 0)
+        #expect(DownloadRulesStore.placeForNewFileType(in: [pdf, aria2]) == 1)
+        #expect(DownloadRulesStore.placeForNewFileType(in: [pdf, epub]) == 2)
+
+        // Added that way, a type behind a downloader preset's catch-all still decides its own files.
+        var rules = [aria2]
+        rules.insert(pdf, at: DownloadRulesStore.placeForNewFileType(in: rules))
+        #expect(DownloadRulesStore.firstHandoffMatch(in: rules, url: URL(string: "https://example.com/a.pdf")!,
+                                                     filename: "a.pdf", appliesToLinks: false) == nil)
+        #expect(DownloadRulesStore.firstHandoffMatch(in: rules, url: URL(string: "https://example.com/a.zip")!,
+                                                     filename: "a.zip", appliesToLinks: false)?.name == "aria2")
+    }
+
+    @MainActor @Test func placingAnOpenNeverOpensARefusedType() {
+        let unique = UUID().uuidString
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique).pdf")?.openWhenFinished == true)
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique).dmg")?.openWhenFinished == false)
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique).mpkg")?.openWhenFinished == false)
+        #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique)")?.openWhenFinished == false)
+    }
+
+    /// A file type is named by its extensions, so it needs no name of its own — where an address rule has nothing to
+    /// read without one — and only the destination that saves the file needs a folder to save it into.
+    @Test func aFileTypeNeedsItsExtensionsAndOnlyAFolderToSaveInto() {
+        var save = destination("", .saveToFolder, folder: "")
+        #expect(save.pattern.isEmpty)
+        #expect(!save.action.isComplete)
+        save.pattern = "pdf, epub"
+        #expect(!save.action.isComplete)
+        save.action.folderPath = "/Users/me/Downloads/PDFs"
+        #expect(save.action.isComplete)
+
+        // Opening the file needs nothing more than the type.
+        var show = destination("pdf", .openFile)
+        show.name = ""
+        #expect(show.action.isComplete)
+        #expect(show.name.isEmpty)
+    }
+
+    @Test func aDestinationSurvivesItsJSON() throws {
+        var rule = destination("pdf")
+        rule.action.folderPath = "/Users/me/Downloads/PDFs"
+        let data = try JSONEncoder().encode([rule])
+        let decoded = try JSONDecoder().decode([DownloadRule].self, from: data)
+        #expect(decoded == [rule])
+        #expect(decoded.first?.action.kind == .saveToFolder)
+        #expect(decoded.first?.action.destination == .folder("/Users/me/Downloads/PDFs"))
     }
 
     // MARK: The file a rule is saved in
