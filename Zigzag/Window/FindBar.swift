@@ -960,10 +960,11 @@ enum Toast {
     }
 
     /// `closes` adds a close button, for an offer you may want gone before it goes on its own. `owner`: what it's
-    /// about, for `hide(for:in:)`.
+    /// about, for `hide(for:in:)`. `onClose`: run when it's put away with its close button.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, in controller: BrowserWindowController) {
-        show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller))
+                     duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, onClose: (() -> Void)? = nil,
+                     in controller: BrowserWindowController) {
+        show(text, symbol: symbol, action: action, duration: duration, closes: closes, over: controller.root.overlay, area: area(in: controller), onClose: onClose)
         state(for: controller.root.overlay).owner = owner
     }
 
@@ -1014,7 +1015,8 @@ enum Toast {
 
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
-                     duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false) {
+                     duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
+                     onClose: (() -> Void)? = nil) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1050,6 +1052,7 @@ enum Toast {
             state.hideWork?.cancel()
             toast?.dismiss()
             state.toast = nil
+            onClose?()
         }
         place(toast, in: area)
         if isNew {

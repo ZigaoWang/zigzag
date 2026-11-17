@@ -2659,6 +2659,17 @@
         }
       }
     },
+    "Allow for This Site" : {
+      "comment" : "Button on the notice that a site tried to use blocked WebRTC: allows WebRTC for the site and reloads the page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为此网站允许"
+          }
+        }
+      }
+    },
     "Allow it only if it needs this for what you just asked it to do." : {
       "comment" : "Under the title of the sheet shown when an extension asks for more access.",
       "localizations" : {
@@ -17604,6 +17615,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此网站响应时间过长"
+          }
+        }
+      }
+    },
+    "This site tried to use WebRTC, which you’ve blocked." : {
+      "comment" : "Notice over a page when WebRTC is off for it (Settings › Privacy › Protect IP address from WebRTC) and the page tried to use it, as a call site like Google Meet does. WebRTC is a name: keep it as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此网站尝试使用 WebRTC，但你已将其阻止。"
           }
         }
       }

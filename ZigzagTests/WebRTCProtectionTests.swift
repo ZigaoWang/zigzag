@@ -171,6 +171,68 @@ struct WebRTCProtectionTests {
         }
     }
 
+    // MARK: A page that tries on its own (#276)
+
+    @Test func whenTheNoticeShows() {
+        // Blocked, nothing chosen, the page itself, the first time: it says so.
+        #expect(WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
+        // WebRTC allowed: nothing to say.
+        #expect(!WebRTCProtection.notices(allowed: true, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
+        #expect(!WebRTCProtection.notices(allowed: true, chosen: true, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
+        // Blocked for the site by choice: blocked without a word, as chosen.
+        #expect(!WebRTCProtection.notices(allowed: false, chosen: false, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
+        // A frame in the page (an ad's): quiet.
+        #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: false, noticedHere: false, askedHere: false, putAway: false))
+        // Once a page, and not once its question was asked.
+        #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: true, askedHere: false, putAway: false))
+        #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: true, putAway: false))
+        // Put away this session: not again.
+        #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: false, putAway: true))
+    }
+
+    @Test func theNoticeShowsOnceAPage() async throws {
+        guard WebRTCProtection.isAvailable else { return }
+        try await withDefaults {
+            let origin = "https://once-\(UUID().uuidString.lowercased()).example.com"
+            let tab = Tab(url: URL(string: origin + "/call"), title: "Call", spaceID: UUID())
+            // Off: every site has WebRTC, nothing to say.
+            #expect(!WebRTCProtection.notice(in: tab, isMainFrame: true))
+            WebRTCProtection.isOn = true
+            #expect(!WebRTCProtection.notice(in: tab, isMainFrame: false))
+            #expect(WebRTCProtection.notice(in: tab, isMainFrame: true))
+            #expect(!WebRTCProtection.notice(in: tab, isMainFrame: true))
+            // The next page load says so again.
+            tab.permissionAnswers.forget()
+            #expect(WebRTCProtection.notice(in: tab, isMainFrame: true))
+        }
+    }
+
+    @Test func allowFromTheNoticeKeepsItForTheSite() async throws {
+        guard WebRTCProtection.isAvailable else { return }
+        try await withDefaults {
+            WebRTCProtection.isOn = true
+            let origin = "https://allow-\(UUID().uuidString.lowercased()).example.com"
+            let tab = Tab(url: URL(string: origin), title: "Call", spaceID: UUID())
+            #expect(WebRTCProtection.notice(in: tab, isMainFrame: true))
+            // What Allow for This Site does: kept for the site, as Site Controls' row shows it.
+            WebRTCProtection.choose(true, origin: origin, in: tab)
+            #expect(SitePermissions.webRTC(origin: origin) == true)
+            #expect(SitePermissions.choice(.webRTC, origin: origin) == .allow)
+            tab.permissionAnswers.forget()
+            #expect(!WebRTCProtection.notice(in: tab, isMainFrame: true))
+            // In a private window, for that tab alone.
+            let other = "https://private-\(UUID().uuidString.lowercased()).example.com"
+            let privateTab = Tab(url: URL(string: other), title: "Call", spaceID: UUID())
+            privateTab.privateStore = .nonPersistent()
+            #expect(WebRTCProtection.notice(in: privateTab, isMainFrame: true))
+            WebRTCProtection.choose(true, origin: other, in: privateTab)
+            #expect(SitePermissions.webRTC(origin: other) == nil)
+            #expect(privateTab.webRTCHere[other] == true)
+            privateTab.permissionAnswers.forget()
+            #expect(!WebRTCProtection.notice(in: privateTab, isMainFrame: true))
+        }
+    }
+
     /// Loads a fresh page and reads `typeof RTCPeerConnection` in it.
     private static func peerConnectionType(in webView: WKWebView) async throws -> String? {
         let token = UUID().uuidString
