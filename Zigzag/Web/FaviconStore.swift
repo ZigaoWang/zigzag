@@ -572,7 +572,7 @@ enum SnapshotStore {
     nonisolated private static func writeJPEG(_ bitmap: CGImage, to url: URL) {
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil) else { return }
         CGImageDestinationAddImage(destination, bitmap, [kCGImageDestinationLossyCompressionQuality: 0.7] as CFDictionary)
-        CGImageDestinationFinalize(destination)
+        if CGImageDestinationFinalize(destination) { Paths.makePrivate(url) }
     }
 
     static func remove(_ id: UUID) {

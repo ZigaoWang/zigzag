@@ -4,6 +4,25 @@ import WebKit
 import os
 @testable import Zigzag
 
+struct PrivateFoldersTests {
+    /// Page pictures and back/forward lists are readable by you alone, in a folder made by an older Zigzag too.
+    @Test func snapshotsAndTabStatesAreYoursAlone() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("Private-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: base) }
+        try FileManager.default.createDirectory(at: base.appendingPathComponent("Old"), withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o755])
+        func mode(_ url: URL) throws -> Int { (try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)?.intValue ?? -1 }
+        #expect(try mode(Paths.privateDirectory("New", in: base)) == 0o700)
+        #expect(try mode(Paths.privateDirectory("Old", in: base)) == 0o700)
+        let file = base.appendingPathComponent("New/state")
+        try Data("x".utf8).write(to: file, options: .atomic)
+        Paths.makePrivate(file)
+        #expect(try mode(file) == 0o600)
+        #expect(try mode(Paths.tabState) == 0o700)
+        #expect(try mode(Paths.snapshots) == 0o700)
+    }
+}
+
 struct MoveToApplicationsTests {
     /// Only a copy signed as this app is gets its quarantine taken off.
     @Test func onlyACopySignedLikeTheAppPasses() throws {

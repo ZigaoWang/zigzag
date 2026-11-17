@@ -32,8 +32,20 @@ nonisolated enum Paths {
     static let favicons = directory("Favicons")
     /// Icons that clearing history set aside, so ⌘Z can put them back. Emptied when Zigzag starts.
     static let setAsideIcons = support.appendingPathComponent("Cleared Icons", isDirectory: true)
-    static let tabState = directory("TabState")
-    static let snapshots = directory("Snapshots")
+    static let tabState = privateDirectory("TabState")
+    static let snapshots = privateDirectory("Snapshots")
+
+    /// A folder only you can open (0700), for what shows where you've been: pictures of pages and their back and
+    /// forward lists. One made by an older Zigzag, readable by everyone, is closed up too.
+    static func privateDirectory(_ name: String, in base: URL = support) -> URL {
+        let dir = base.appendingPathComponent(name, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        chmod(dir.path, 0o700)
+        return dir
+    }
+
+    /// A file just written there, readable by you alone (0600).
+    static func makePrivate(_ file: URL) { chmod(file.path, 0o600) }
 
     // MARK: Scripts
 

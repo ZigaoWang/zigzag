@@ -474,7 +474,11 @@ final class WindowManager {
 
     /// Runs off the main thread: writes changed back/forward lists and removes ones for closed tabs.
     nonisolated private static func writeTabStates(_ writes: [(URL, Data)], keeping keep: Set<UUID>, in directory: URL) {
-        for (url, data) in writes { try? data.write(to: url, options: .atomic) }
+        for (url, data) in writes {
+            // In a folder only you can open, and readable by you alone: a tab's back and forward list is history.
+            guard (try? data.write(to: url, options: .atomic)) != nil else { continue }
+            Paths.makePrivate(url)
+        }
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         for file in files where UUID(uuidString: file.lastPathComponent).map({ !keep.contains($0) }) ?? true {
             try? FileManager.default.removeItem(at: file)
