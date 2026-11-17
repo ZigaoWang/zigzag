@@ -128,6 +128,47 @@ struct ExtensionCompatibilityTests {
         #expect(problems.count == 4)
     }
 
+    @Test func aPartialClaimMayInheritFromItsNamespace() throws {
+        // history.search has no claim of its own; the history claim covers it, and the sheet still gets its line.
+        let overlay = try overlay(claims: """
+        {"history": {"status": "bridged", "implementation": "swift:history", "group": "privacy"}}
+        """, groups: """
+        {"privacy": {"catalog": "extension.limit.privacySettings"}}
+        """, permissions: """
+        {"history": {"status": "partial", "claims": ["history.search"]}}
+        """)
+        let problems = CompatibilityValidator.diagnostics(overlay: overlay, universe: try universe(),
+                                                          implementations: implementations)
+        #expect(problems.isEmpty)
+        let limits = ExtensionCompatibility(overlay: overlay).limits(forPermissions: ["history"], manifestKeys: [])
+        #expect(limits.count == 1)
+        #expect(limits.first?.catalogKey == "extension.limit.privacySettings")
+        #expect(limits.first?.status == .partial)
+        #expect(limits.first?.source == "history.search")
+    }
+
+    @Test func aPartialClaimOutsideTheUniverseIsRejected() throws {
+        let problems = try diagnostics(claims: "{}", permissions: """
+        {"history": {"status": "partial", "claims": ["history.notAChromeMember"]}}
+        """)
+        #expect(problems.count == 1)
+        #expect(problems.first?.contains("history.notAChromeMember") == true)
+        #expect(problems.first?.contains("Chrome's API does not have") == true)
+    }
+
+    @Test func aPartialClaimUnderAnUnsupportedNamespaceIsRejected() throws {
+        let problems = try diagnostics(claims: """
+        {"history": {"status": "unsupported", "reason": "webkitMissing", "group": "privacy"}}
+        """, groups: """
+        {"privacy": {"catalog": "extension.limit.privacySettings"}}
+        """, permissions: """
+        {"history": {"status": "partial", "claims": ["history.search"]}}
+        """)
+        #expect(problems.count == 1)
+        #expect(problems.first?.contains("history.search") == true)
+        #expect(problems.first?.contains("unsupported") == true)
+    }
+
     @Test func everyClaimedImplementationExists() throws {
         let problems = try diagnostics(claims: """
         {"tabs": {"status": "patched", "implementation": "js:setMember"},

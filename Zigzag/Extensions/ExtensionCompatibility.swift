@@ -314,8 +314,11 @@ nonisolated enum CompatibilityValidator {
             guard let claim = claimed[path] else { continue }
             checkNamespace(path, claim, claims: claimed, diagnostics: &diagnostics)
         }
-        check(overlay.permissions, at: "permissions", in: overlay, claims: claimed, diagnostics: &diagnostics)
-        check(overlay.manifest, at: "manifest", in: overlay, claims: claimed, diagnostics: &diagnostics)
+        let registry = CompatibilityRegistry(overlay: overlay)
+        check(overlay.permissions, at: "permissions", in: overlay, universe: universe,
+              registry: registry, diagnostics: &diagnostics)
+        check(overlay.manifest, at: "manifest", in: overlay, universe: universe,
+              registry: registry, diagnostics: &diagnostics)
         return diagnostics
     }
 
@@ -380,10 +383,11 @@ nonisolated enum CompatibilityValidator {
     }
 
     /// A permission or manifest key's four-value answer, and what each value needs: a partial one names the claims it
-    /// turns into lines, and an unsupported or deprecated one says why and where its line belongs.
+    /// turns into lines, and an unsupported or deprecated one says why and where its line belongs. A named claim is
+    /// read the way the install sheet reads it, through the registry, so a member covered by its namespace is enough.
     private static func check(_ rows: [String: CompatibilityPermission], at section: String,
-                              in overlay: CompatibilityOverlay, claims: [String: CompatibilityClaim],
-                              diagnostics: inout [String]) {
+                              in overlay: CompatibilityOverlay, universe: ChromeUniverse,
+                              registry: CompatibilityRegistry, diagnostics: inout [String]) {
         for (name, row) in rows.sorted(by: { $0.key < $1.key }) {
             let path = "\(section).\(name)"
             if let group = row.group, !hasCatalog(group, in: overlay) {
@@ -397,8 +401,15 @@ nonisolated enum CompatibilityValidator {
                 if named.isEmpty {
                     diagnostics.append("\(path) is partial but names no claims")
                 }
-                for claim in named where claims[claim] == nil {
-                    diagnostics.append("\(path) names the claim \(claim), which the overlay does not make")
+                for claim in named {
+                    guard universe.contains(claim) else {
+                        diagnostics.append("\(path) names the claim \(claim), which Chrome's API does not have")
+                        continue
+                    }
+                    guard let resolved = registry.claim(for: claim), resolved.status != .unsupported else {
+                        diagnostics.append("\(path) names the claim \(claim), which the overlay resolves to unsupported")
+                        continue
+                    }
                 }
             case .unsupported, .deprecated:
                 if row.reason == nil {
