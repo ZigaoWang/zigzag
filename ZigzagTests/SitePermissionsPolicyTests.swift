@@ -17,6 +17,19 @@ import WebKit
         try body(defaults)
     }
 
+    /// The same, for the tests that await the question itself.
+    private func withDefaultsAsync(_ body: () async throws -> Void) async throws {
+        let suite = "SitePermissionsPolicyTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try await body()
+    }
+
     @Test func remembersAnActionPerSubjectAndOrigin() throws {
         try withDefaults { _ in
             SitePermissions.remember("mini", subject: PermissionSubject.popups, origin: "https://example.com")
@@ -107,6 +120,202 @@ import WebKit
                                                tab: privateTab, isPrivate: false)
             #expect(SitePermissions.action(PermissionSubject.location, origin: "https://a.com") == nil)
             #expect(privateTab.permissionAnswers.answer(key: "https://a.com", kind: "location") == true)
+        }
+    }
+
+    // MARK: Downloads: whether a site may save files at all
+
+    /// Asking is off by default, as Chrome and Arc leave a site's first download alone, and the one place the factory
+    /// answer lives says so.
+    @Test func askingBeforeADownloadIsOffByDefault() throws {
+        #expect(!SitePermissions.asksBeforeDownloadsByDefault)
+        try withDefaults { _ in
+            #expect(!SitePermissions.asksBeforeDownloads)
+        }
+    }
+
+    /// Turned off in Settings, a site nobody has answered for saves files as it always did: no card, no refusal. A
+    /// stored Block still wins, and asking back on asks again.
+    @Test func aTurnedOffSettingAnswersYesWithoutAsking() async throws {
+        try await withDefaultsAsync {
+            SitePermissions.asksBeforeDownloads = false
+            #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
+            #expect(await SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
+
+            // Asking back on asks again, whatever the factory answer is.
+            SitePermissions.asksBeforeDownloads = true
+            #expect(await !SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
+        }
+    }
+
+    /// A page with no site of its own (an about:blank pop-up a site wrote a file into) saves as it always did while
+    /// asking is off; only with asking on is it refused, having no site to ask about. A local file always saves.
+    @Test func aPageWithoutASiteSavesAsBeforeWithAskingOff() throws {
+        try withDefaults { _ in
+            SitePermissions.asksBeforeDownloads = false
+            #expect(SitePermissions.pageWithoutSiteMayDownload(isFile: false))
+            #expect(SitePermissions.pageWithoutSiteMayDownload(isFile: true))
+            SitePermissions.asksBeforeDownloads = true
+            #expect(!SitePermissions.pageWithoutSiteMayDownload(isFile: false))
+            #expect(SitePermissions.pageWithoutSiteMayDownload(isFile: true))
+        }
+    }
+
+    /// Asking on: the first download asks, and the site's Allow is kept, so the next file is decided without a card.
+    @Test func askingOnceKeepsTheAnswerForTheSite() async throws {
+        try await withDefaultsAsync {
+            let origin = "https://files.example"
+            SitePermissions.asksBeforeDownloads = true
+            #expect(SitePermissions.asksBeforeDownloads)
+            #expect(SitePermissions.downloads(origin: origin) == nil)
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: true),
+                                               subject: PermissionSubject.downloads, origin: origin,
+                                               tab: nil, isPrivate: false)
+            #expect(SitePermissions.downloads(origin: origin) == true)
+            #expect(await SitePermissions.downloadsAllowed(origin: origin, window: nil, isPrivate: false, tab: nil))
+        }
+    }
+
+    /// A Block kept for the site still refuses with asking off, and a page's own "This time" block does too.
+    @Test func aStoredBlockWinsWithTheSettingOff() async throws {
+        try await withDefaultsAsync {
+            SitePermissions.asksBeforeDownloads = false
+            SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: "https://files.example")
+            #expect(await !SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
+
+            let tab = Tab(url: URL(string: "https://page.example"), spaceID: UUID())
+            tab.permissionAnswers.note("deny", key: "https://page.example", kind: PermissionSubject.downloads)
+            #expect(await !SitePermissions.downloadsAllowed(origin: "https://page.example", window: nil, isPrivate: false, tab: tab))
+        }
+    }
+
+    /// A page-started download is the flow policy's, never the site question's: asking on or off, the first one goes
+    /// through and a stream is held back exactly as before. At the permission layer it is allowed without a card, and
+    /// a Block kept for the site still refuses it.
+    @MainActor @Test func aPageStartedDownloadNeverAsks() async throws {
+        try await withDefaultsAsync {
+            for asking in [true, false] {
+                SitePermissions.asksBeforeDownloads = asking
+                let policy = DownloadPolicy()
+                let now = Date()
+                #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now) == .download)
+                #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true,
+                                      now: now.addingTimeInterval(1)) == .cancel)
+            }
+
+            let origin = "https://page.example"
+            #expect(await SitePermissions.downloadsAllowed(origin: origin, window: nil, isPrivate: false, tab: nil,
+                                                           asking: false))
+            SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: origin)
+            #expect(await !SitePermissions.downloadsAllowed(origin: origin, window: nil, isPrivate: false, tab: nil,
+                                                            asking: false))
+        }
+    }
+
+    /// The downloads question is one answer kept like every other, and never asks once it has one.
+    @Test func aStoredDownloadAnswerIsUsedWithoutAskingAnything() async throws {
+        try await withDefaultsAsync {
+            // Asking on: a site with no answer would be refused, so the stored answers are what decide these.
+            SitePermissions.asksBeforeDownloads = true
+            SitePermissions.remember("allow", subject: PermissionSubject.downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == true)
+            #expect(await SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
+
+            SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == false)
+            #expect(await !SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
+
+            // A site nobody has answered for has said nothing; with nowhere to ask, the file is refused rather than
+            // saved unasked.
+            #expect(SitePermissions.downloads(origin: "https://other.example") == nil)
+            #expect(await !SitePermissions.downloadsAllowed(origin: "https://other.example", window: nil, isPrivate: false, tab: nil))
+        }
+    }
+
+    /// "This time" is the page's answer, not the site's: another tab is asked.
+    @Test func thisTimeDownloadAnswerHoldsForThePageNotTheSite() throws {
+        try withDefaults { _ in
+            let tab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: false),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: tab, isPrivate: false)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == true)
+            #expect(SitePermissions.action(PermissionSubject.downloads, origin: "https://files.example") == nil)
+            #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
+        }
+    }
+
+    /// Allow Once on a blocked download's notice: the answer is kept for the page, exactly as "This time" is, and
+    /// never for the site.
+    @Test func allowOnceOnANoticeHoldsForThePage() throws {
+        try withDefaults { _ in
+            let tab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: false),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: tab, isPrivate: false)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == false)
+
+            SitePermissions.allowThisDownload(origin: "https://files.example", tab: tab)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == true)
+            #expect(SitePermissions.action(PermissionSubject.downloads, origin: "https://files.example") == nil)
+
+            // A site blocked outright stays blocked: the offer is one file at a time, so the next one is refused again.
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: nil, isPrivate: false)
+            SitePermissions.allowThisDownload(origin: "https://files.example", tab: tab)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == false)
+
+            // With no page to keep it on (a tab already gone) nothing is written, and nothing is said about the site.
+            SitePermissions.remember(nil, subject: PermissionSubject.downloads, origin: "https://files.example")
+            SitePermissions.allowThisDownload(origin: "https://files.example", tab: nil)
+            #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
+        }
+    }
+
+    /// "Always" keeps a deny for the site, and a private window keeps nothing whatever the answer says.
+    @Test func aDownloadDenyIsKeptForTheSiteAndAPrivateTabKeepsNothing() throws {
+        try withDefaults { _ in
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: nil, isPrivate: false)
+            #expect(SitePermissions.downloads(origin: "https://files.example") == false)
+
+            let privateTab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
+            privateTab.privateStore = WKWebsiteDataStore.nonPersistent()
+            SitePermissions.remember(nil, subject: PermissionSubject.downloads, origin: "https://files.example")
+            _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: true),
+                                               subject: PermissionSubject.downloads, origin: "https://files.example",
+                                               tab: privateTab, isPrivate: false)
+            #expect(SitePermissions.action(PermissionSubject.downloads, origin: "https://files.example") == nil)
+            #expect(privateTab.permissionAnswers.answer(key: "https://files.example", kind: "downloads") == true)
+            #expect(SitePermissions.downloads(origin: "https://files.example", tab: privateTab) == true)
+        }
+    }
+
+    /// One answer, in the two places it is chosen: the question and the site's own row. Allow, Block and Ask in Site
+    /// Controls are the same decision the question makes, so neither can drift from the other.
+    @Test func theSiteControlsDownloadRowIsTheSameAnswerAsTheQuestion() throws {
+        try withDefaults { _ in
+            SitePermissions.setChoice(.block, for: .downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == false)
+            SitePermissions.setChoice(.allow, for: .downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == true)
+            SitePermissions.setChoice(.ask, for: .downloads, origin: "https://files.example")
+            #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
+        }
+    }
+
+    /// Its row is offered once the site has an answer, in a private window too (which asks and keeps nothing), and it
+    /// offers the same three choices as every other row.
+    @Test func downloadsAreARowInSiteControlsOnceTheSiteHasAnAnswer() throws {
+        #expect(SitePermission.downloads.kinds == ["downloads"])
+        #expect(SitePermission.downloads.choices == PermissionChoice.allCases)
+        #expect(SitePermission.downloads.inPrivate, "a private window still asks")
+        try withDefaults { _ in
+            SitePermissions.remember("deny", subject: PermissionSubject.downloads, origin: "https://files.example")
+            #expect(SitePermissions.shown(origin: "https://files.example", isPrivate: false).contains(.downloads))
+            #expect(SitePermissions.shown(origin: "https://files.example", isPrivate: true).contains(.downloads))
         }
     }
 

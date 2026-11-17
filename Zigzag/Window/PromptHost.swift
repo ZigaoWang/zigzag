@@ -29,8 +29,28 @@ protocol PromptHost: AnyObject {
     var promptIsCovered: Bool { get }
     /// The address the question hangs from: a click there doesn't put it off.
     var promptAnchor: NSView? { get }
-    /// A short notice over the page.
-    func promptToast(_ text: String, symbol: String, duration: TimeInterval)
+    /// Where a short notice over the page goes: the flipped layer over the pages, and the room in it. A window with
+    /// something else over its page (the desk, an AI app's bar) says so by answering this; everything else about a
+    /// notice comes from `promptToast` below, so every window says one the same way.
+    var promptToastPlace: (over: NSView, area: NSRect) { get }
+}
+
+extension PromptHost {
+    /// Where a notice goes by default: over the pages, edge to edge, under a question that is already there.
+    var promptToastPlace: (over: NSView, area: NSRect) {
+        (promptOverlay, PageQuestions.area(promptOverlay.bounds, below: PageQuestions.occupied(in: promptOverlay)))
+    }
+
+    /// A short notice over the page. `action` adds a button — a title and what pressing it does — for a notice with
+    /// something to offer (Allow Once, Try Again); one of those stays long enough to read and act on, and a `closes`
+    /// × for an offer you may want gone before it goes on its own. The button takes no click for its first half
+    /// second, so a click meant for the page can't land on it.
+    func promptToast(_ text: String, symbol: String, duration: TimeInterval,
+                     action: (title: String, run: () -> Void)? = nil, closes: Bool = false) {
+        let place = promptToastPlace
+        Toast.show(text, symbol: symbol, action: action, duration: duration, closes: closes,
+                   over: place.over, area: place.area)
+    }
 }
 
 extension WindowManager {
@@ -77,7 +97,8 @@ extension BrowserWindowController: PromptHost {
     }
     var promptIsCovered: Bool { commandBar.isVisible }
     var promptAnchor: NSView? { sidebar.address }
-    func promptToast(_ text: String, symbol: String, duration: TimeInterval) { Toast.show(text, symbol: symbol, duration: duration, in: self) }
+    /// A notice in a browser window keeps clear of the desk when it's open, and of an AI app's bar over the page.
+    var promptToastPlace: (over: NSView, area: NSRect) { (root.overlay, Toast.area(in: self)) }
 }
 
 /// The top of a page holds one thing at a time. A page's questions (a site's permission, Save password?) take turns
@@ -116,9 +137,14 @@ extension BrowserWindowController: PromptHost {
 
     /// A question came up: the update note, which only informs, makes way for it, and a toast showing moves under it.
     static func cameUp(in host: PromptHost) {
-        guard let controller = host as? BrowserWindowController else { return }
-        WhatsNewOffer.close(in: controller)
-        Toast.reposition(in: controller)
+        if let controller = host as? BrowserWindowController {
+            WhatsNewOffer.close(in: controller)
+            Toast.reposition(in: controller)
+        } else {
+            // Zigzag Mini and an installed app's window have no desk or agent bar, but their notice still moves under
+            // the question rather than sitting over it.
+            Toast.reposition(in: host)
+        }
     }
 
     /// A question went, or stepped aside for another tab: the oldest one waiting for this page comes up, and a toast
@@ -131,5 +157,6 @@ extension BrowserWindowController: PromptHost {
             (view as? SavePasswordPrompt)?.followTab()
         }
         if let controller = host as? BrowserWindowController { Toast.reposition(in: controller) }
+        else { Toast.reposition(in: host) }
     }
 }

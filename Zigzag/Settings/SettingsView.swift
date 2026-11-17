@@ -938,6 +938,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let blockingToggle = Toggle()
     private let webRTCToggle = Toggle()
     private let javaScript = DropdownButton()
+    private let downloadsAskToggle = Toggle()
     private let cookieBanners = DropdownButton()
     private let pipToggle = Toggle()
     private let leavePipToggle = Toggle()
@@ -3338,6 +3339,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func reloadPrivacy() {
         privacyGroup.removeAllRows()
         sitesGroup.removeAllRows()
+        // The site permissions' own setting: ask on a site's first download, or save as Zigzag always has.
+        downloadsAskToggle.isOn = SitePermissions.asksBeforeDownloads
+        downloadsAskToggle.onChange = { SitePermissions.asksBeforeDownloads = $0 }
+        let downloadsAskRow = FormRow(
+            title: String(localized: "Ask before a site downloads files", comment: "A setting in Settings › Privacy, under Site Permissions: whether a site's first download gets a question."),
+            detail: String(localized: "With this on, the first file a site sends asks whether it may. A site you allow keeps its answer; with this off, downloads save as they always did.", comment: "Explanation under “Ask before a site downloads files” in Settings › Privacy."),
+            control: downloadsAskToggle)
+        downloadsAskRow.keywords = String(localized: "downloads files save block allow site permission ask", comment: "Words that find the Ask before a site downloads files setting. Not shown.")
+        sitesGroup.add(downloadsAskRow)
         let history = PillButton(title: String(localized: "Clear History…", comment: "Button in Settings › Privacy."))
         history.onClick = { [weak self, weak history] _ in
             guard let profile = self?.profile else { return }

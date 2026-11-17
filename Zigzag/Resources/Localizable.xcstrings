@@ -2637,6 +2637,17 @@
         }
       }
     },
+    "Allow Once" : {
+      "comment" : "Button in the notice saying a site’s download was blocked: asks the site for the file again and saves it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许一次"
+          }
+        }
+      }
+    },
     "Allow Saving" : {
       "comment" : "Button for a Never Saved site in the Passwords window: offer to save its passwords again.",
       "localizations" : {
@@ -2666,6 +2677,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许并更新"
+          }
+        }
+      }
+    },
+    "Allow downloads from this site" : {
+      "comment" : "A site's permission question, without its question mark. The site is sending a file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许此网站下载文件"
           }
         }
       }
@@ -3022,6 +3044,17 @@
         }
       }
     },
+    "Ask before a site downloads files" : {
+      "comment" : "A setting in Settings › Privacy, under Site Permissions: whether a site's first download gets a question.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载文件前先询问网站"
+          }
+        }
+      }
+    },
     "Ask before quitting" : {
       "comment" : "A setting in Settings › General.",
       "localizations" : {
@@ -3370,6 +3403,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "拦截页面上的内容"
+          }
+        }
+      }
+    },
+    "Blocked a download from this site" : {
+      "comment" : "Toast when a site is not allowed to save files and sends one anyway.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已阻止此网站的下载"
           }
         }
       }
@@ -16971,6 +17015,17 @@
         }
       }
     },
+    "With this on, the first file a site sends asks whether it may. A site you allow keeps its answer; with this off, downloads save as they always did." : {
+      "comment" : "Explanation under “Ask before a site downloads files” in Settings › Privacy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启后，网站发来第一个文件时会先询问是否允许。允许过的网站会记住答案；关闭后，下载会和以前一样直接保存。"
+          }
+        }
+      }
+    },
     "The Last Hour…" : {
       "comment" : "Item in the Clear History menu on the History page.",
       "localizations" : {
@@ -21046,6 +21101,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "devtools web development localhost 开发 开发者 调试 本地"
+          }
+        }
+      }
+    },
+    "downloads files save block allow site permission ask" : {
+      "comment" : "Words that find the Ask before a site downloads files setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载 文件 保存 阻止 允许 网站 权限 询问 downloads files save block allow site permission ask"
           }
         }
       }
