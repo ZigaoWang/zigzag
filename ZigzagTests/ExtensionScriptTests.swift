@@ -1003,6 +1003,93 @@ struct ExtensionScriptTests {
     private static func quoted(_ text: String) -> String {
         String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
     }
+
+    // MARK: - runtime contexts (Task 8a: getContexts and getBackgroundPage)
+
+    /// `runtime.getContexts` is Chrome's MV3 member; an MV2 extension never had it, so the bridge doesn't give it one.
+    @Test func contextsAreAnMV3MemberOnly() {
+        for (version, present) in [(3, true), (2, false)] {
+            let context = JSContext()!
+            context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+            context.evaluateScript("""
+            var window = globalThis;
+            var __timers = [];
+            var setTimeout = (f) => { __timers.push(f); return __timers.length; }, clearTimeout = () => {};
+            var setInterval = () => 0, clearInterval = () => {};
+            var console = { warn: () => {}, error: () => {}, log: () => {} };
+            var navigator = { userAgent: 'Chrome/140.0.0.0 Safari/537.36' };
+            const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false });
+            var chrome = {
+              runtime: { id: 'x', getManifest: () => ({ manifest_version: \(version) }), onMessage: event(), onConnect: event(),
+                         sendNativeMessage: () => Promise.resolve({ value: [] }) },
+            };
+            """)
+            context.evaluateScript(ExtensionBridgeScript.source)
+            #expect(context.evaluateScript("typeof chrome.runtime.getContexts").toString() == (present ? "function" : "undefined"),
+                    "manifest \(version)")
+        }
+    }
+
+    /// An MV3 extension has no background page, and Chrome says so rather than handing back WebKit's null. Its page
+    /// still has the member, by promise or callback, with `runtime.lastError` only for as long as the callback runs.
+    @Test func anMV3PageIsToldThereIsNoBackgroundPage() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
+        chrome.runtime.getBackgroundPage = () => null;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        #expect(page.evaluateScript("typeof chrome.runtime.getBackgroundPage").toString() == "function")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then(() => { globalThis.__promise = 'page'; }, (e) => { globalThis.__promise = e.message; });
+        chrome.runtime.getBackgroundPage(() => { globalThis.__heard = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none'; });
+        """)
+        #expect(page.evaluateScript("__promise").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
+        // The error lives only while the callback runs.
+        #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// An MV2 page still has its background page, and gets it by promise and by callback alike.
+    @Test func anMV2PageKeepsItsBackgroundPage() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        globalThis.__background = { isBackgroundPage: true };
+        chrome.runtime.getBackgroundPage = () => __background;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then((p) => { globalThis.__promise = !!p.isBackgroundPage; });
+        chrome.runtime.getBackgroundPage((p) => { globalThis.__heard = !!p.isBackgroundPage; });
+        """)
+        #expect(page.evaluateScript("__promise").toBool())
+        #expect(page.evaluateScript("__heard").toBool())
+        #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// An MV2 page whose background isn't running hears the same words Chrome uses, not WebKit's null.
+    @Test func anMV2PageWithoutABackgroundHearsChrome() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        chrome.runtime.getBackgroundPage = () => null;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then(() => { globalThis.__promise = 'page'; }, (e) => { globalThis.__promise = e.message; });
+        chrome.runtime.getBackgroundPage(() => { globalThis.__heard = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none'; });
+        """)
+        #expect(page.evaluateScript("__promise").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
+    }
+
+    /// Chrome's MV3 service worker has no `getBackgroundPage` at all: neither WebKit's nor the API surface's stand-in.
+    @Test func anMV3WorkerHasNoBackgroundPageMember() {
+        let worker = Self.workerWorld(worker: true, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
+        chrome.runtime.getBackgroundPage = () => null;
+        """)
+        worker.evaluateScript("__zigzagAfterSurface()")
+        #expect(worker.evaluateScript("'getBackgroundPage' in chrome.runtime").toBool() == false)
+    }
 }
 
 /// At launch extensions' service worker registrations go, so their backgrounds start afresh; sites' stay.

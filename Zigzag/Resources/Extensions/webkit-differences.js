@@ -733,10 +733,13 @@
     const onConnect = api.runtime.onConnect;
     const connectRaw = onConnect && typeof onConnect.addListener === 'function' ? onConnect.addListener.bind(onConnect) : null;
     let keepOpen = null;
-    if (isWorker && onConnect && typeof onConnect.addListener === 'function' && typeof api.runtime.getBackgroundPage === 'function') {
+    // Kept now, before afterSurface takes the member away in a worker as Chrome has none there: this is how WebKit
+    // wakes the background to answer.
+    const askBackground = typeof api.runtime.getBackgroundPage === 'function' ? api.runtime.getBackgroundPage.bind(api.runtime) : null;
+    if (isWorker && onConnect && typeof onConnect.addListener === 'function' && askBackground) {
       const open = new Set();
       let beat = null;
-      const ask = () => { try { const asked = api.runtime.getBackgroundPage(); if (asked && asked.catch) asked.catch(() => {}); } catch (e) {} };
+      const ask = () => { try { const asked = askBackground(); if (asked && asked.catch) asked.catch(() => {}); } catch (e) {} };
       const settle = () => {
         if (open.size && !beat) beat = setInterval(ask, 20000);
         if (!open.size && beat) { clearInterval(beat); beat = null; }
@@ -1012,6 +1015,36 @@
       safeBrowsingEnabled: true, searchSuggestEnabled: true, spellingServiceEnabled: false, translationServiceEnabled: false };
     // privacy and omnibox are WebKit-less namespaces the API surface adds, so these answers go on after it has.
     const afterSurface = () => {
+    // runtime.getBackgroundPage: only an MV2 extension has a background page. In MV3 Chrome keeps the member on a
+    // page, but it always fails with these words, and its service worker has no member at all; WebKit answers null
+    // where there's no page. So an MV3 page is always told so, an MV2 page's null becomes the same error, and a
+    // worker's member goes. A callback hears the error through runtime.lastError only while it runs, as from WebKit.
+    const manifestV3 = (() => { try { return api.runtime.getManifest().manifest_version === 3; } catch (e) { return false; } })();
+    const noBackgroundPage = 'You do not have a background page.';
+    const noBackgroundError = () => new Error(noBackgroundPage);
+    if (isWorker) {
+      if (manifestV3) { try { delete api.runtime.getBackgroundPage; } catch (e) {} }
+    } else {
+      const webKits = manifestV3 ? null : (typeof api.runtime.getBackgroundPage === 'function' ? api.runtime.getBackgroundPage.bind(api.runtime)
+        : api.extension && typeof api.extension.getBackgroundPage === 'function' ? api.extension.getBackgroundPage.bind(api.extension) : null);
+      if (manifestV3 || webKits) setMember(['runtime'], 'getBackgroundPage', (callback) => {
+        const answer = (webKits ? Promise.resolve().then(webKits) : Promise.reject(noBackgroundError()))
+          .then((page) => (page ? page : Promise.reject(noBackgroundError())));
+        if (typeof callback !== 'function') return answer;
+        answer.then((page) => callback(page), (failure) => {
+          const lastError = { message: String((failure && failure.message) || failure) };
+          const runtimes = [...new Set(roots.map((root) => root.runtime))].filter(Boolean);
+          const before = runtimes.map((runtime) => Object.getOwnPropertyDescriptor(runtime, 'lastError'));
+          for (const runtime of runtimes) { try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); } catch (e) {} }
+          try { callback(); } finally {
+            runtimes.forEach((runtime, index) => {
+              try { if (before[index]) Object.defineProperty(runtime, 'lastError', before[index]); else delete runtime.lastError; } catch (e) {}
+            });
+          }
+        });
+        return undefined;
+      });
+    }
     if (api.privacy) {
       for (const group of Object.keys(api.privacy)) {
         const settings = api.privacy[group];
