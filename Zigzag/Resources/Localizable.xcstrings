@@ -8669,17 +8669,6 @@
         }
       }
     },
-    "Extensions come from Chrome and browsers built on it. Firefox and Safari get theirs from stores of their own." : {
-      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "扩展只能从 Chrome 及基于它的浏览器导入。Firefox 和 Safari 的扩展来自它们各自的商店。"
-          }
-        }
-      }
-    },
     "Extensions, sign-ins and history kept on this Mac" : {
       "comment" : "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list.",
       "localizations" : {
@@ -24602,12 +24591,74 @@
       }
     },
     "Install from File…" : {
-      "comment" : "Button in Settings › Extensions: installs an extension from a folder or a package file (.crx, .xpi) on this Mac.",
+      "comment" : "Button in Settings › Extensions: installs an extension from a folder or a Firefox package file (.xpi) on this Mac.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "从文件安装…"
+          }
+        }
+      }
+    },
+    "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s own are listed above; Safari’s come from its own store." : {
+      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展来自 Chrome 及基于它的浏览器，经由 Chrome 网上应用店。Firefox 自己的扩展列在上方；Safari 的扩展来自它自己的商店。"
+          }
+        }
+      }
+    },
+    "extension.limit.sidebarAction" : {
+      "comment" : "A Firefox extension feature Zigzag limits: the side panel from sidebar_action is shown, but nothing answers browser.sidebarAction's open, close, toggle and other controls.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Side panel toolbar controls (the panel itself is shown)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏面板工具栏控件（面板本身会显示）"
+          }
+        }
+      }
+    },
+    "Zigzag isn’t Firefox, so an extension that checks for Firefox will see Zigzag." : {
+      "comment" : "Under the title of the sheet that asks before adding a Firefox extension: runtime.getBrowserInfo answers Zigzag, so an extension that checks for Firefox takes its other path.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 不是 Firefox，因此检查 Firefox 的扩展会看到 Zigzag。"
+          }
+        }
+      }
+    },
+    "Signed by Mozilla" : {
+      "comment" : "Under a Firefox extension's name in Settings › Extensions: its package carries Mozilla's signature. Recorded, never trusted as authority.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已由 Mozilla 签名"
+          }
+        }
+      }
+    },
+    "Not signed" : {
+      "comment" : "Under a Firefox extension's name in Settings › Extensions: its package carries no Mozilla signature.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未签名"
           }
         }
       }

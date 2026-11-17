@@ -107,31 +107,36 @@ struct FirefoxImportTests {
         #expect(found.first?.version == "2.0")
     }
 
-    /// What an import row does when its Add is pressed: the extension goes in through the store's own install path,
-    /// and the record it leaves says Firefox with its gecko ID.
-    @Test func theImportRowInstallsThroughInstallXPIAndRecordsFirefox() async throws {
+    /// The import row's own path, without the review sheet it puts up first: `ImportView.addFirefox` prepares the
+    /// package and, once the sheet is confirmed (`ExtensionSheet.offer`), finishes the install. The record it leaves
+    /// says Firefox with its gecko ID. The sheet itself is UI, so it is left out here.
+    @Test func theImportRowsPreparedInstallRecordsFirefox() async throws {
         let work = try Work()
         defer { work.cleanUp() }
         try work.profile("abc.default", xpis: [("one.xpi", try XPIArchive.xpi(XPIArchive.manifest("one@example.com", "1.0")))])
 
         let found = try #require(FirefoxImporter.found(in: work.root).first)
-        let name = try Self.installed(await FirefoxImporter.install(found, in: work.profile))
+        guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(at: found.path) else {
+            Issue.record("expected a prepared install")
+            return
+        }
+        let name = try Self.installed(await ExtensionStore.finishInstall(prepared, in: work.profile))
         #expect(name == "Test")
 
-        let id = ExtensionStore.xpiID(forGeckoID: "one@example.com", at: found.path)
+        let id = ExtensionStore.xpiID(forGeckoID: "one@example.com", data: Data())
         let record = try #require(ExtensionStore.package(id))
         #expect(record.kind == "firefox")
         #expect(record.firefoxID == "one@example.com")
     }
 
-    /// The extension file picker still offers a folder, and now offers a Firefox package as well as Chrome's — the
-    /// one Chrome install path and the one Firefox one.
-    @Test func theExtensionFilePickerAllowsXPIAsWellAsCRXAndFolders() {
+    /// The extension file picker offers a folder and a Firefox package (.xpi). A Chrome package (.crx) is not offered:
+    /// no .crx install path exists here, so a picked one had no way in.
+    @Test func theExtensionFilePickerAllowsXPIAsWellAsFolders() {
         let types = ExtensionFilePicker.types
         #expect(types.contains(.folder))
         let extensions = types.compactMap(\.preferredFilenameExtension)
-        #expect(extensions.contains("crx"))
         #expect(extensions.contains("xpi"))
+        #expect(!extensions.contains("crx"))
     }
 
     /// A Firefox package's row in Settings › Extensions says it is one and names the gecko ID it has in Firefox. A

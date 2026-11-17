@@ -66,7 +66,7 @@ nonisolated struct XPIPackage {
     }
 
     /// `browser_specific_settings.gecko.id`, or the legacy `applications.gecko.id` before it.
-    private static func geckoID(of manifest: [String: Any]) -> String? {
+    static func geckoID(of manifest: [String: Any]) -> String? {
         func id(under key: String) -> String? {
             ((manifest[key] as? [String: Any])?["gecko"] as? [String: Any])?["id"] as? String
         }

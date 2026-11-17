@@ -3,9 +3,12 @@ import Testing
 @testable import Zigzag
 
 /// An XPI made byte by byte: stored entries, then the central index and its end record. Shared by every test that
-/// needs one — `FirefoxInstallTests` and `FirefoxImportTests` — so there is one zip writer, not a copy per file. The
-/// local gate compiles the requested suites together (and CI compiles the whole target), so a declaration here
-/// reaches the other suites.
+/// needs one — `FirefoxInstallTests`, `FirefoxImportTests`, `FirefoxCompatibilityTests` and `XPIPackageTests` — so
+/// there is one zip writer, not a copy per file. The local gate compiles the requested suites together (and CI
+/// compiles the whole target), so a declaration here reaches the other suites.
+///
+/// Kept in this file rather than a file of its own: the local gate copies only the files that declare a suite it was
+/// asked for, so a standalone fixture file would not be compiled. (Reported to the reviewer.)
 nonisolated struct XPIArchive {
     struct Entry {
         var name: String
@@ -141,7 +144,7 @@ struct FirefoxInstallTests {
         let name = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
         #expect(name == "Test")
 
-        let id = ExtensionStore.xpiID(forGeckoID: "one@example.com", at: url)
+        let id = ExtensionStore.xpiID(forGeckoID: "one@example.com", data: Data())
         // Chrome's own alphabet, the shape the rest of the store assumes.
         #expect(id.count == 32)
         #expect(id.allSatisfy { ("a"..."p").contains($0) })
@@ -159,7 +162,7 @@ struct FirefoxInstallTests {
         _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(try Self.xpi(Self.manifest("same@example.com", "1.0"))), in: work.profile))
         _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(try Self.xpi(Self.manifest("same@example.com", "2.0"))), in: work.profile))
 
-        let id = ExtensionStore.xpiID(forGeckoID: "same@example.com", at: work.root)
+        let id = ExtensionStore.xpiID(forGeckoID: "same@example.com", data: Data())
         #expect(ExtensionStore.packageIDs == [id])
         #expect(work.record(id)?.version == "2.0")
         let versions = try FileManager.default.contentsOfDirectory(atPath: work.root.appendingPathComponent(id).appendingPathComponent("versions").path)
@@ -198,7 +201,7 @@ struct FirefoxInstallTests {
         ])))
         _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
 
-        let id = ExtensionStore.xpiID(forGeckoID: "hosts@example.com", at: url)
+        let id = ExtensionStore.xpiID(forGeckoID: "hosts@example.com", data: Data())
         let folder = try #require(ExtensionStore.packageDirectory(for: id))
         let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
         // The host patterns moved where WebKit reads site access; the API permission stayed where it was.
@@ -223,7 +226,7 @@ struct FirefoxInstallTests {
         let url = try work.xpiFile(xpi)
         let name = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
         #expect(name == "Rescued")
-        let id = ExtensionStore.xpiID(forGeckoID: "rescued@example.com", at: url)
+        let id = ExtensionStore.xpiID(forGeckoID: "rescued@example.com", data: Data())
         #expect(work.record(id)?.kind == "firefox")
     }
 
@@ -251,7 +254,7 @@ struct FirefoxInstallTests {
         let url = try work.xpiFile(try Self.xpi(Self.manifest("letters@example.com", "1.0.0b1")))
         _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
 
-        let id = ExtensionStore.xpiID(forGeckoID: "letters@example.com", at: url)
+        let id = ExtensionStore.xpiID(forGeckoID: "letters@example.com", data: Data())
         #expect(work.record(id)?.version == "1.0.0b1")
         let versions = try FileManager.default.contentsOfDirectory(atPath: work.root.appendingPathComponent(id).appendingPathComponent("versions").path)
         #expect(versions == ["1.0.0b1"])
@@ -277,7 +280,7 @@ struct FirefoxInstallTests {
         ]), files: ["a.js": Data("let a = 1;".utf8), "b.js": Data("let b = 2;".utf8)]))
         _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
 
-        let id = ExtensionStore.xpiID(forGeckoID: "module@example.com", at: url)
+        let id = ExtensionStore.xpiID(forGeckoID: "module@example.com", data: Data())
         let folder = try #require(ExtensionStore.packageDirectory(for: id))
         let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
         let written = try #require(onDisk["background"] as? [String: Any])
@@ -296,7 +299,7 @@ struct FirefoxInstallTests {
         ]), files: ["a.js": Data("let a = 1;".utf8)]))
         _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
 
-        let id = ExtensionStore.xpiID(forGeckoID: "classic@example.com", at: url)
+        let id = ExtensionStore.xpiID(forGeckoID: "classic@example.com", data: Data())
         let folder = try #require(ExtensionStore.packageDirectory(for: id))
         let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
         let written = try #require(onDisk["background"] as? [String: Any])
@@ -330,5 +333,83 @@ struct FirefoxInstallTests {
         ExtensionStore.save(ExtensionStore.Package(version: "1.0"), for: id)
         #expect(work.record(id)?.kind == "chromium")
         #expect(work.record(id)?.firefoxID == nil)
+    }
+
+    /// No gecko ID: the package is named by its bytes, so the same file at two paths is one record. Its signature
+    /// (none here) is recorded, and Settings says so.
+    @Test func anXPIWithNoGeckoIDIsNamedByItsBytesSoTheSameFileAtTwoPathsIsOneRecord() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let bytes = try Self.xpi(Self.manifest(nil, "1.0"))
+        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(bytes), in: work.profile))
+        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(bytes), in: work.profile))
+
+        let id = ExtensionStore.xpiID(forGeckoID: nil, data: bytes)
+        #expect(ExtensionStore.packageIDs == [id])
+        #expect(work.record(id)?.firefoxID == nil)
+        #expect(work.record(id)?.hasSignature == false)
+        #expect(SettingsView.packageKindDetail(id).contains("Not signed"))
+    }
+
+    /// A package Mozilla signed has that recorded and shown; it is a record of the signature file's presence, never a
+    /// check that the signature is valid.
+    @Test func aSignedXPIHasItsSignatureRecordedAndShown() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let bytes = XPIArchive(entries: [
+            .init(name: "manifest.json", data: try XPIArchive.json(Self.manifest("signed@example.com", "1.0"))),
+            .init(name: "META-INF/mozilla.rsa", data: Data("signature".utf8)),
+        ]).data
+        _ = try Self.installed(await ExtensionStore.installXPI(at: try work.xpiFile(bytes), in: work.profile))
+
+        let id = ExtensionStore.xpiID(forGeckoID: "signed@example.com", data: Data())
+        #expect(work.record(id)?.hasSignature == true)
+        #expect(SettingsView.packageKindDetail(id).contains("Signed by Mozilla"))
+    }
+
+    /// The manifest Zigzag stores is the normalized copy, and it still carries the keys the Promise facade gates on:
+    /// a key-pruning step that dropped them would silently darken every Firefox extension.
+    @Test func theInstalledManifestKeepsTheKeysTheFacadeGatesOn() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let url = try work.xpiFile(try Self.xpi(Self.manifest("keys@example.com", "1.0", ["background": ["scripts": ["a.js"]]])))
+        _ = try Self.installed(await ExtensionStore.installXPI(at: url, in: work.profile))
+
+        let id = ExtensionStore.xpiID(forGeckoID: "keys@example.com", data: Data())
+        let folder = try #require(ExtensionStore.packageDirectory(for: id))
+        let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
+        #expect(FirefoxManifest.isFirefox(onDisk))
+        #expect((onDisk["browser_specific_settings"] as? [String: Any])?["gecko"] != nil)
+    }
+
+    /// A folder installed from disk that carries Firefox's own keys is recorded as Firefox with its gecko ID, so its
+    /// record, its sheet and the facade agree — and the person's own folder is left exactly as it is, never
+    /// normalized. A folder without those keys stays Chrome's.
+    @Test func aFirefoxFolderIsRecordedFirefoxWithItsGeckoIDAndLeftAsItIs() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let folder = work.folder.appendingPathComponent("firefox-folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var manifest = Self.manifest("folder@example.com", "1.0", ["permissions": ["contextualIdentities"]])
+        manifest["sidebar_action"] = ["default_panel": "panel.html"]
+        try XPIArchive.json(manifest).write(to: folder.appendingPathComponent("manifest.json"))
+
+        let record = ExtensionStore.unpackedPackage(for: folder)
+        #expect(record.kind == "firefox")
+        #expect(record.firefoxID == "folder@example.com")
+        #expect(record.unpackedPath == folder.standardizedFileURL.path)
+        // The sheet reads Firefox's overlay for it, as its record says.
+        let reviewed = try #require(await ExtensionStore.reviewUnpacked(folder))
+        #expect(reviewed.report.limits.map(\.text).contains("Containers"))
+        // Nothing was written back: no normalized side_panel twin in the person's own folder.
+        let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
+        #expect(onDisk["side_panel"] == nil)
+
+        let chromeFolder = work.folder.appendingPathComponent("chrome-folder", isDirectory: true)
+        try FileManager.default.createDirectory(at: chromeFolder, withIntermediateDirectories: true)
+        try Data(#"{"manifest_version":2,"name":"Chrome","version":"1.0"}"#.utf8).write(to: chromeFolder.appendingPathComponent("manifest.json"))
+        let chrome = ExtensionStore.unpackedPackage(for: chromeFolder)
+        #expect(chrome.kind == "chromium")
+        #expect(chrome.firefoxID == nil)
     }
 }

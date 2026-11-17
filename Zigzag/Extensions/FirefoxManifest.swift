@@ -11,15 +11,10 @@ nonisolated enum FirefoxManifest {
     /// The worker the loaded copy runs where Firefox ran `background.scripts`.
     static let workerFile = "zigzag-firefox-worker.js"
 
-    /// The extension's Firefox ID: the modern `browser_specific_settings.gecko.id`, or the older
-    /// `applications.gecko.id` before it.
-    static func firefoxID(_ manifest: [String: Any]) -> String? {
-        for key in ["browser_specific_settings", "applications"] {
-            if let id = ((manifest[key] as? [String: Any])?["gecko"] as? [String: Any])?["id"] as? String {
-                return id
-            }
-        }
-        return nil
+    /// Whether a manifest is a Firefox one: it carries the keys only Firefox writes, which the Promise facade gates
+    /// on and the store records a package's kind by. The gecko ID itself is read by `XPIPackage`.
+    static func isFirefox(_ manifest: [String: Any]) -> Bool {
+        manifest["browser_specific_settings"] != nil || manifest["applications"] != nil
     }
 
     /// The manifest as WebKit loads it. The caller's dictionary and everything in it stay as they were.

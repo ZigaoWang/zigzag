@@ -70,6 +70,11 @@ nonisolated enum FirefoxImporter {
     nonisolated(unsafe) static var rootOverride: URL?
 
     /// Firefox's profiles folder: `~/Library/Application Support/Firefox/Profiles`, each subfolder a profile.
+    ///
+    /// Deliberately its own discovery, not `profiles(of:)`'s `profiles.ini` (which covers Zen, Developer Edition and
+    /// Nightly for passwords, bookmarks and history): an extension folder is a plain directory, so the scan reads
+    /// only `Firefox/Profiles`. The consequence is that a profile whose ini `Path` points elsewhere is not scanned,
+    /// and Zen's extensions — a separate `zen` root — are out of reach here today.
     static var profilesRoot: URL {
         rootOverride ?? BrowserFolders.applicationSupport.appendingPathComponent("Firefox/Profiles", isDirectory: true)
     }
@@ -97,7 +102,7 @@ nonisolated enum FirefoxImporter {
         for profile in profiles(in: root) {
             for var one in found(inProfile: profile) {
                 // The same gecko ID is the same extension: the first profile's (by name) is kept, the rest left out.
-                // One with no gecko ID is named by its path, which is its own file and so never collides.
+                // One with no gecko ID is keyed by its own path, which is its own file and so never collides.
                 let key = one.firefoxID ?? one.path.standardizedFileURL.path
                 guard seen.insert(key).inserted else { continue }
                 one.source = profile.lastPathComponent
@@ -124,12 +129,6 @@ nonisolated enum FirefoxImporter {
                 return Found(firefoxID: package.firefoxID, name: name, version: version, path: url, source: source)
             }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-    }
-
-    /// Installs a found extension into a profile, through the store's own path — the same package checks and the same
-    /// record a picked `.xpi` gets. The review sheet is shown by the caller, before this runs.
-    static func install(_ found: Found, in profile: Profile) async -> Result<String, ExtensionStore.InstallError> {
-        await ExtensionStore.installXPI(at: found.path, in: profile)
     }
 
     static func read(_ browser: Browser, _ choice: ChromiumImporter.Choice, primaryPassword: String = "") -> ImportBatch {

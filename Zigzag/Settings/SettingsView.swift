@@ -1101,7 +1101,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let addRouteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space."))
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
-    private let loadUnpackedButton = PillButton(title: String(localized: "Install from File…", comment: "Button in Settings › Extensions: installs an extension from a folder or a package file (.crx, .xpi) on this Mac."))
+    private let loadUnpackedButton = PillButton(title: String(localized: "Install from File…", comment: "Button in Settings › Extensions: installs an extension from a folder or a Firefox package file (.xpi) on this Mac."))
     private var spaceRows: [SpaceSettingsRow] = []
     /// The download rules' rows, top to bottom, each with the rule it stands for: dragging one moves that rule.
     private var downloadRuleRows: [(id: UUID, row: DraggableRow)] = []
@@ -2135,12 +2135,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// What a package's record says about where it came from, beyond its version: a Firefox package says it is one
-    /// and names the gecko ID it has in Firefox. A Chrome package adds nothing.
+    /// What a package's record says about where it came from, beyond its version: a Firefox package says it is one,
+    /// names the gecko ID it has in Firefox and whether Mozilla signed it. A folder read where it is has no signature
+    /// to speak of. A Chrome package adds nothing.
     static func packageKindDetail(_ id: String) -> [String] {
-        guard ExtensionStore.kind(of: id) == .firefox else { return [] }
+        guard ExtensionStore.kind(of: id) == .firefox, let record = ExtensionStore.package(id) else { return [] }
         var lines = [String(localized: "Firefox", comment: "Under an extension's name in Settings › Extensions: it is a Firefox extension (.xpi).")]
-        if let geckoID = ExtensionStore.package(id)?.firefoxID, !geckoID.isEmpty { lines.append(geckoID) }
+        if let geckoID = record.firefoxID, !geckoID.isEmpty { lines.append(geckoID) }
+        if record.unpackedPath == nil {
+            lines.append(record.hasSignature
+                ? String(localized: "Signed by Mozilla", comment: "Under a Firefox extension's name in Settings › Extensions: its package carries Mozilla's signature. Recorded, never trusted as authority.")
+                : String(localized: "Not signed", comment: "Under a Firefox extension's name in Settings › Extensions: its package carries no Mozilla signature."))
+        }
         return lines
     }
 
@@ -2221,7 +2227,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let profile = profile
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
-            // A Firefox package is installed from its file; a folder (and a .crx, which no path here takes) as before.
+            // A Firefox package is installed from its file; a folder as before.
             if url.pathExtension.lowercased() == "xpi" { installPickedXPI(url, in: profile); return }
             confirmUnpacked(url, from: nil) { [weak self] in
                 if await ExtensionStore.loadUnpacked(url, in: profile) == nil, let host = self {

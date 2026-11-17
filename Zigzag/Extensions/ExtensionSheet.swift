@@ -2,11 +2,12 @@ import AppKit
 import UniformTypeIdentifiers
 import WebKit
 
-/// The kinds of file the extension picker offers: a folder to read in place, a Chrome package, or a Firefox
-/// package. Neither package has a system type of its own on every Mac, so both are named by their extension.
+/// The kinds of file the extension picker offers: a folder to read in place, or a Firefox package (.xpi). A Chrome
+/// package (.crx) has no install path here, so it isn't offered. Neither file has a system type of its own on every
+/// Mac, so both are named by their extension.
 nonisolated enum ExtensionFilePicker {
     static var types: [UTType] {
-        [.folder] + ["crx", "xpi"].compactMap { UTType(filenameExtension: $0) }
+        [.folder] + ["xpi"].compactMap { UTType(filenameExtension: $0) }
     }
 }
 
@@ -250,8 +251,10 @@ extension ExtensionSheet {
             icon: info.icon(for: NSSize(width: 40, height: 40)),
             title: info.displayName.map { String(localized: "Add \($0)?", comment: "Title of the sheet that asks before adding an extension. The name is the extension's.") }
                 ?? String(localized: "Add this extension?", comment: "Title of the sheet that asks before adding an extension that has no name."),
-            subtitle: String(localized: "Firefox extension, version \(prepared.version)",
-                             comment: "Under the title of the sheet that asks before adding a Firefox extension (.xpi)."),
+            subtitle: Words.sentences(String(localized: "Firefox extension, version \(prepared.version)",
+                                              comment: "Under the title of the sheet that asks before adding a Firefox extension (.xpi)."),
+                                      String(localized: "Zigzag isn’t Firefox, so an extension that checks for Firefox will see Zigzag.",
+                                             comment: "Under the title of the sheet that asks before adding a Firefox extension: runtime.getBrowserInfo answers Zigzag, so an extension that checks for Firefox takes its other path.")),
             heading: String(localized: "It will be able to", comment: "Heading over the list of what an extension can do, in the sheet that asks before adding it."),
             report: prepared.report,
             confirm: String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first."),

@@ -122,6 +122,29 @@ struct FirefoxCompatibilityTests {
         }
     }
 
+    /// `sidebarAction` is a stated limit, not a facade: the panel from `sidebar_action` is shown (the manifest is
+    /// normalized to a `side_panel` twin), but nothing answers its toolbar controls at run time. The sheet words one
+    /// line for it, and every member the extension might call is unsupported.
+    @Test func sidebarActionIsAStatedLimitAndTheSheetWordsOneLine() throws {
+        let (overlay, universe) = try Self.shipped(.firefox)
+        let claim = try #require(overlay.claims["sidebarAction"])
+        #expect(claim.status == .unsupported)
+        #expect(claim.reason != nil)
+        #expect(claim.group == "sidebarAction")
+        #expect(overlay.groups["sidebarAction"]?.catalog == "extension.limit.sidebarAction")
+        let registry = CompatibilityRegistry(overlay: overlay)
+        for member in ["open", "close", "toggle", "isOpen", "setPanel", "setTitle", "setIcon", "getPanel"] {
+            #expect(universe.contains("sidebarAction.\(member)"), "sidebarAction.\(member) is not Firefox's")
+            #expect(registry.claim(for: "sidebarAction.\(member)")?.status == .unsupported, "sidebarAction.\(member)")
+        }
+        // The manifest row is what puts the line in the sheet, for a package carrying sidebar_action.
+        #expect(overlay.manifest["sidebar_action"]?.status == .unsupported)
+        let limits = ExtensionCompatibility.shared(for: .firefox).limits(forPermissions: [], manifestKeys: ["sidebar_action"])
+        #expect(limits.count == 1)
+        #expect(limits.first?.catalogKey == "extension.limit.sidebarAction")
+        #expect(limits.first?.text == "Side panel toolbar controls (the panel itself is shown)")
+    }
+
     // MARK: Permission rows
 
     @Test func everyFirefoxPermissionRowFollowsTheNoiseRule() throws {
@@ -206,6 +229,7 @@ struct FirefoxCompatibilityTests {
             "extension.limit.pkcs11": "Security modules",
             "extension.limit.dns": "DNS resolution",
             "extension.limit.theme": "Themes",
+            "extension.limit.sidebarAction": "Side panel toolbar controls (the panel itself is shown)",
         ]
         #expect(keys == Set(expectedEnglish.keys))
         for key in keys.sorted() {
@@ -235,7 +259,8 @@ struct FirefoxCompatibilityTests {
         for row in chrome.permissions.values { if let catalog = row.catalog { chromeKeys.insert(catalog) } }
         for row in chrome.manifest.values { if let catalog = row.catalog { chromeKeys.insert(catalog) } }
         let firefoxOnly: Set<String> = ["extension.limit.contextualIdentities", "extension.limit.browserSettings",
-                                        "extension.limit.pkcs11", "extension.limit.dns", "extension.limit.theme"]
+                                        "extension.limit.pkcs11", "extension.limit.dns", "extension.limit.theme",
+                                        "extension.limit.sidebarAction"]
         #expect(keys.subtracting(chromeKeys) == firefoxOnly)
     }
 
@@ -328,39 +353,7 @@ struct FirefoxCompatibilityTests {
 
     // MARK: Fixture
 
-    /// An XPI made byte by byte, as FirefoxInstallTests writes one: stored entries, central index and end record.
-    private struct TestXPI {
-        struct Entry { var name: String; var data = Data(); var mode: UInt32 = 0o100644 }
-        var entries: [Entry]
-
-        var data: Data {
-            var archive = Data(), index = Data()
-            func u16(_ value: UInt16, into bytes: inout Data) { withUnsafeBytes(of: value.littleEndian) { bytes.append(contentsOf: $0) } }
-            func u32(_ value: UInt32, into bytes: inout Data) { withUnsafeBytes(of: value.littleEndian) { bytes.append(contentsOf: $0) } }
-            for entry in entries {
-                let name = Data(entry.name.utf8), crc = PackageZip.crc32([UInt8](entry.data)), offset = UInt32(archive.count)
-                u32(0x0403_4B50, into: &archive); u16(20, into: &archive); u16(0, into: &archive); u16(0, into: &archive)
-                u16(0, into: &archive); u16(0, into: &archive); u32(crc, into: &archive)
-                u32(UInt32(entry.data.count), into: &archive); u32(UInt32(entry.data.count), into: &archive)
-                u16(UInt16(name.count), into: &archive); u16(0, into: &archive); archive.append(name); archive.append(entry.data)
-                u32(0x0201_4B50, into: &index); u16(0x0314, into: &index); u16(20, into: &index); u16(0, into: &index)
-                u16(0, into: &index); u16(0, into: &index); u16(0, into: &index); u32(crc, into: &index)
-                u32(UInt32(entry.data.count), into: &index); u32(UInt32(entry.data.count), into: &index)
-                u16(UInt16(name.count), into: &index); u16(0, into: &index); u16(0, into: &index)
-                u16(0, into: &index); u16(0, into: &index); u32(entry.mode << 16, into: &index); u32(offset, into: &index)
-                index.append(name)
-            }
-            let start = UInt32(archive.count)
-            archive.append(index)
-            u32(0x0605_4B50, into: &archive); u16(0, into: &archive); u16(0, into: &archive)
-            u16(UInt16(entries.count), into: &archive); u16(UInt16(entries.count), into: &archive)
-            u32(UInt32(index.count), into: &archive); u32(start, into: &archive); u16(0, into: &archive)
-            return archive
-        }
-    }
-
     private static func xpi(_ manifest: [String: Any]) throws -> Data {
-        let json = try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys])
-        return TestXPI(entries: [.init(name: "manifest.json", data: json)]).data
+        try XPIArchive.xpi(manifest)
     }
 }

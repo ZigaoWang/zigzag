@@ -63,11 +63,11 @@ final class ImportView: NSView {
     /// What Sign-ins means, in a line, while it's offered.
     private let signInsNote = NSTextField(wrappingLabelWithString: String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
                                                                               comment: "Note under the choices in the Import window, explaining Sign-ins."))
-    /// The note's lines: what Sign-ins are, and, with Firefox or Safari chosen too, that extensions come only from
-    /// Chrome and its kin.
+    /// The note's lines: what Sign-ins are, and, with Firefox or Safari chosen too, where each browser's extensions
+    /// come from.
     private static let signInsText = String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
                                             comment: "Note under the choices in the Import window, explaining Sign-ins.")
-    private static let extensionsText = String(localized: "Extensions come from Chrome and browsers built on it. Firefox and Safari get theirs from stores of their own.",
+    private static let extensionsText = String(localized: "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s own are listed above; Safari’s come from its own store.",
                                                comment: "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.")
     /// The extensions coming over, under the browsers, once there are any.
     private let extensionsRow = ImportExtensionsRow()
@@ -75,6 +75,9 @@ final class ImportView: NSView {
     private let firefoxHeading = ImportSectionHeading(String(localized: "Extensions in Firefox",
                                                              comment: "Heading over the extensions Firefox already downloaded, in the Import window."))
     private var firefoxRows: [FirefoxExtensionRow] = []
+    /// Which Firefox scan is current: a reload starts a new one, and an older, slower one that finishes late adds
+    /// nothing.
+    private var firefoxScan = 0
     /// The one question before they're added, in place of the list while it's asked.
     private var review: ImportExtensionsReview?
     private var reviewAnswer: CheckedContinuation<Bool, Never>?
@@ -189,24 +192,31 @@ final class ImportView: NSView {
     }
 
     /// The extensions Firefox already downloaded, offered beside the browsers. Only in its own window, and only
-    /// when Firefox is one of the browsers found, so a run without one never opens its profiles.
+    /// when Firefox is one of the browsers found, so a run without one never opens its profiles. Reading and
+    /// inflating every `.xpi` takes a moment, so the scan runs off the main actor, as the other rows' previews do.
     private func loadFirefoxExtensions() {
+        firefoxScan += 1
+        let scan = firefoxScan
         firefoxRows.forEach { $0.removeFromSuperview() }
         firefoxRows = []
         firefoxHeading.removeFromSuperview()
         guard presentation == .window,
               sources.contains(where: { if case .firefox = $0.kind { true } else { false } }) else { return }
-        let found = FirefoxImporter.found()
-        guard !found.isEmpty else { return }
-        rowList.addSubview(firefoxHeading)
-        firefoxRows = found.map { one in
-            let row = FirefoxExtensionRow(one)
-            row.onAdd = { [weak self, weak row] in
-                guard let self, let row else { return }
-                self.addFirefox(one, row: row)
+        Task { @MainActor [weak self] in
+            let found = await Task.detached(priority: .utility) { FirefoxImporter.found() }.value
+            guard let self, self.firefoxScan == scan, self.stage == .choose, !found.isEmpty else { return }
+            self.rowList.addSubview(self.firefoxHeading)
+            self.firefoxRows = found.map { one in
+                let row = FirefoxExtensionRow(one)
+                row.onAdd = { [weak self, weak row] in
+                    guard let self, let row else { return }
+                    self.addFirefox(one, row: row)
+                }
+                self.rowList.addSubview(row)
+                return row
             }
-            rowList.addSubview(row)
-            return row
+            self.needsLayout = true
+            self.fitWindow()
         }
     }
 

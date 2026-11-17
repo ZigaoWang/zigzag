@@ -196,11 +196,21 @@ struct FirefoxManifestTests {
         #expect(try text(manifest) == before)
     }
 
-    @Test func firefoxIDComesFromEitherSettingsKey() {
-        let modern: [String: Any] = ["browser_specific_settings": ["gecko": ["id": "modern@example.org"]]]
+    /// The keys the Promise facade gates on survive normalization: a Firefox package the store installed is still
+    /// recognized as Firefox, so the facade is built for its pages.
+    @Test func normalizingKeepsTheKeysTheFacadeGatesOn() {
+        let modern: [String: Any] = [
+            "manifest_version": 3,
+            "background": ["scripts": ["a.js"]],
+            "browser_specific_settings": ["gecko": ["id": "modern@example.org"]],
+        ]
+        #expect(FirefoxManifest.isFirefox(modern))
+        #expect(FirefoxManifest.isFirefox(FirefoxManifest.normalized(modern)))
+
         let older: [String: Any] = ["applications": ["gecko": ["id": "older@example.org"]]]
-        #expect(FirefoxManifest.firefoxID(modern) == "modern@example.org")
-        #expect(FirefoxManifest.firefoxID(older) == "older@example.org")
-        #expect(FirefoxManifest.firefoxID([:]) == nil)
+        #expect(FirefoxManifest.isFirefox(older))
+        #expect(FirefoxManifest.isFirefox(FirefoxManifest.normalized(older)))
+
+        #expect(!FirefoxManifest.isFirefox(["manifest_version": 2]))
     }
 }

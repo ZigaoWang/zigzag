@@ -203,6 +203,9 @@ nonisolated enum CompatibilityText {
         case "extension.limit.sidePanel":
             return String(localized: "extension.limit.sidePanel", defaultValue: "Side panel",
                           comment: "A Chrome extension feature Zigzag limits: the side panel's layout and open/close events.")
+        case "extension.limit.sidebarAction":
+            return String(localized: "extension.limit.sidebarAction", defaultValue: "Side panel toolbar controls (the panel itself is shown)",
+                          comment: "A Firefox extension feature Zigzag limits: the side panel from sidebar_action is shown, but nothing answers browser.sidebarAction's open, close, toggle and other controls.")
         case "extension.limit.systemDisplay":
             return String(localized: "extension.limit.systemDisplay", defaultValue: "Display information",
                           comment: "A Chrome extension feature Zigzag limits: changing display settings.")

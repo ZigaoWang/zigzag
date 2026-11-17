@@ -83,19 +83,23 @@ enum ExtensionStore {
         var kind: String = ExtensionKind.chromium.rawValue
         /// A Firefox package's gecko ID (`browser_specific_settings.gecko.id`), which names it to Firefox.
         var firefoxID: String?
+        /// Whether a Firefox package carries Mozilla's signature file. A record without this key — every record
+        /// written before signing was recorded — reads as unsigned. Chrome packages leave it false.
+        var hasSignature: Bool = false
 
-        fileprivate static let keys = ["version", "pendingVersion", "unpackedPath", "kind", "firefoxID"]
+        fileprivate static let keys = ["version", "pendingVersion", "unpackedPath", "kind", "firefoxID", "hasSignature"]
 
         init(version: String, pendingVersion: String? = nil, unpackedPath: String? = nil,
-             kind: String = ExtensionKind.chromium.rawValue, firefoxID: String? = nil) {
+             kind: String = ExtensionKind.chromium.rawValue, firefoxID: String? = nil, hasSignature: Bool = false) {
             self.version = version
             self.pendingVersion = pendingVersion
             self.unpackedPath = unpackedPath
             self.kind = kind
             self.firefoxID = firefoxID
+            self.hasSignature = hasSignature
         }
 
-        private enum CodingKeys: String, CodingKey { case version, pendingVersion, unpackedPath, kind, firefoxID }
+        private enum CodingKeys: String, CodingKey { case version, pendingVersion, unpackedPath, kind, firefoxID, hasSignature }
 
         /// A record that has no `kind` is a Chrome one, as every record written before Firefox packages existed.
         init(from decoder: Decoder) throws {
@@ -105,6 +109,7 @@ enum ExtensionStore {
             unpackedPath = try fields.decodeIfPresent(String.self, forKey: .unpackedPath)
             kind = try fields.decodeIfPresent(String.self, forKey: .kind) ?? ExtensionKind.chromium.rawValue
             firefoxID = try fields.decodeIfPresent(String.self, forKey: .firefoxID)
+            hasSignature = try fields.decodeIfPresent(Bool.self, forKey: .hasSignature) ?? false
         }
     }
 
@@ -394,6 +399,8 @@ enum ExtensionStore {
         let kind: ExtensionKind
         /// A Firefox package's gecko ID, for the record; nil for a Chrome one.
         let firefoxID: String?
+        /// Whether a Firefox package carries Mozilla's signature file; false for a Chrome one.
+        let hasSignature: Bool
         fileprivate let folder: URL
         let extensionInfo: WKWebExtension
         let report: ExtensionReport
@@ -419,7 +426,7 @@ enum ExtensionStore {
         }
         let report = ExtensionReport(extension: ext, manifest: manifest, id: id)
         return .success(PreparedInstall(id: id, version: package.version, kind: .chromium, firefoxID: nil,
-                                        folder: package.folder, extensionInfo: ext, report: report))
+                                        hasSignature: false, folder: package.folder, extensionInfo: ext, report: report))
     }
 
     /// Prepares a Firefox package (.xpi) the person chose: read with the package rules, unpacked to a staging
@@ -428,7 +435,7 @@ enum ExtensionStore {
     @available(macOS 15.4, *)
     static func prepareInstallXPI(at url: URL) async -> Result<PreparedInstall, InstallError> {
         guard let data = try? Data(contentsOf: url), let package = try? XPIPackage(data) else { return .failure(.unpack) }
-        let id = xpiID(forGeckoID: package.firefoxID, at: url)
+        let id = xpiID(forGeckoID: package.firefoxID, data: data)
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("\(xpiStagingPrefix)\(UUID().uuidString)")
         do {
             try package.unpack(into: staging)
@@ -463,17 +470,23 @@ enum ExtensionStore {
         }
         let report = ExtensionReport(extension: ext, manifest: normalized, id: id, kind: .firefox)
         return .success(PreparedInstall(id: id, version: version, kind: .firefox, firefoxID: package.firefoxID,
-                                        folder: staging, extensionInfo: ext, report: report))
+                                        hasSignature: package.hasSignature, folder: staging, extensionInfo: ext, report: report))
     }
 
     /// The folder a Firefox package is unpacked into while it's prepared and verified, before it's installed.
     private static let xpiStagingPrefix = "zigzag-xpi-"
 
     /// The 32-character ID a Firefox package installs as. Its gecko ID names it to Firefox and to us: hashed, so the
-    /// same extension from any folder is the same record. One without a gecko ID is named by its path, as an unpacked
-    /// folder is. Chrome's own alphabet (a–p), which `isExtensionID` and the rest of the store assume.
-    static func xpiID(forGeckoID geckoID: String?, at url: URL) -> String {
-        CRXPackage.extensionID(Array(SHA256.hash(data: Data((geckoID ?? url.standardizedFileURL.path).utf8)).prefix(16)))
+    /// same extension from any folder is the same record. One with no gecko ID is named by its bytes, so the same
+    /// file at two paths is still one record. Chrome's own alphabet (a–p), which `isExtensionID` and the rest of the
+    /// store assume.
+    static func xpiID(forGeckoID geckoID: String?, data: Data) -> String {
+        CRXPackage.extensionID(Array(SHA256.hash(data: Data((geckoID ?? Self.bytesKey(for: data)).utf8)).prefix(16)))
+    }
+
+    /// A package's bytes as a stable string: SHA-256, hex, for an XPI whose manifest names no gecko ID.
+    private static func bytesKey(for data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     /// Writes the normalized manifest over the extracted one in staging. False if it won't write.
@@ -494,7 +507,9 @@ enum ExtensionStore {
         return (try? source.write(to: folder.appendingPathComponent(FirefoxManifest.workerFile), atomically: true, encoding: .utf8)) != nil
     }
 
-    /// Installs a Firefox package the person chose, in a profile and loads it there. Returns its name.
+    /// Installs a Firefox package the person chose, in a profile and loads it there. Returns its name. Installs
+    /// directly, without the review sheet: a caller shows that first (as the import row and the file picker do,
+    /// through `ExtensionSheet.offer`), then calls this.
     static func installXPI(at url: URL, in profile: Profile) async -> Result<String, InstallError> {
         guard #available(macOS 15.4, *) else { return .failure(.download) }
         switch await prepareInstallXPI(at: url) {
@@ -516,7 +531,8 @@ enum ExtensionStore {
         let kind = prepared.kind == .firefox ? ExtensionKind.firefox
             : (existing.flatMap { ExtensionKind(rawValue: $0.kind) } ?? .chromium)
         save(Package(version: prepared.version, kind: kind.rawValue,
-                     firefoxID: prepared.firefoxID ?? existing.flatMap(\.firefoxID)), for: id)
+                     firefoxID: prepared.firefoxID ?? existing.flatMap(\.firefoxID),
+                     hasSignature: prepared.hasSignature), for: id)
         var next = installs.state(id) ?? ExtensionInstalls.State()
         // Approved just now, from what the sheet showed.
         next.grantedPermissions = nil
@@ -578,11 +594,13 @@ enum ExtensionStore {
     }
 
     /// What an extension in a folder asks for, for the same sheet a store package shows before it's added. Nil when
-    /// the folder holds nothing WebKit can read (loading it then says so).
+    /// the folder holds nothing WebKit can read (loading it then says so). A folder carrying Firefox's own keys is
+    /// worded from Firefox's overlay, as its record will be.
     @available(macOS 15.4, *)
     static func reviewUnpacked(_ url: URL) async -> (extension: WKWebExtension, report: ExtensionReport)? {
         guard let manifest = manifest(in: url), let ext = try? await WKWebExtension(resourceBaseURL: url) else { return nil }
-        return (ext, ExtensionReport(extension: ext, manifest: manifest, id: unpackedID(for: url)))
+        return (ext, ExtensionReport(extension: ext, manifest: manifest, id: unpackedID(for: url),
+                                     kind: FirefoxManifest.isFirefox(manifest) ? .firefox : .chromium))
     }
 
     /// Loads an extension from a folder on disk (Install from Folder, or one that comes inside an app), read where it
@@ -592,12 +610,23 @@ enum ExtensionStore {
               FileManager.default.fileExists(atPath: url.appendingPathComponent("manifest.json").path) else { return nil }
         let id = unpackedID(for: url)
         if !profile.installs.hasRecord(id) { profile.installs.newlyInstalled.insert(id) }
-        save(Package(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path), for: id)
+        save(unpackedPackage(for: url), for: id)
         // Loaded again from its folder, it starts as a new install would: on, with what it asks for approved afresh.
         profile.installs.save(ExtensionInstalls.State(), for: id)
         removedIDs.remove(id)
         let context = await profile.extensions.load(id)
         return context?.webExtension.displayName
+    }
+
+    /// The record a folder's manifest calls for. A folder carrying Firefox's own keys is Firefox with its gecko ID,
+    /// so the record, its sheet and the Promise facade agree; the folder itself is never normalized — it is the
+    /// person's, read where it is.
+    static func unpackedPackage(for url: URL) -> Package {
+        let manifest = manifest(in: url) ?? [:]
+        let isFirefox = FirefoxManifest.isFirefox(manifest)
+        return Package(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path,
+                       kind: isFirefox ? ExtensionKind.firefox.rawValue : ExtensionKind.chromium.rawValue,
+                       firefoxID: isFirefox ? XPIPackage.geckoID(of: manifest) : nil)
     }
 
     /// Re-reads an unpacked extension's files, in every profile running it.
@@ -723,7 +752,9 @@ enum ExtensionStore {
         }
     }
 
-    /// The current version's manifest.
+    /// The current version's manifest, as Zigzag keeps it: a Chrome package's own, untouched, or a Firefox package's
+    /// the normalized copy written at extract time (its MV3 host patterns moved to `host_permissions`, which WebKit
+    /// reads, and its background replaced by the generated worker). Read once per version.
     static func manifest(for id: String) -> [String: Any]? {
         if let cached = manifests[id] { return cached }
         let read = packageDirectory(for: id).flatMap(manifest(in:))
@@ -732,8 +763,9 @@ enum ExtensionStore {
         return read
     }
 
-    /// What the extension asked for in its own manifest (the package's, not the loaded copy's, which adds native
-    /// messaging for Zigzag's bridge). Read once per version.
+    /// What the extension asked for in its stored manifest: the API permission names in `permissions` and
+    /// `optional_permissions`. WebKit's own loaded copy of the manifest may differ — Zigzag's bridge adds native
+    /// messaging to it. Read once per version.
     static func declaredPermissions(_ id: String) -> (required: Set<String>, optional: Set<String>) {
         let version = package(id)?.version ?? ""
         if let cached = declaredCache[id], cached.version == version { return (cached.required, cached.optional) }

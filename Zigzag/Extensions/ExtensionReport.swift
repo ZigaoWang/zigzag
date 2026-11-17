@@ -17,10 +17,6 @@ nonisolated enum ExtensionKind: String, Codable, Sendable {
 /// WebKit drops is still named, by the permission itself.
 @available(macOS 15.4, *)
 struct ExtensionReport {
-    /// Which browser's extension this is. The lines a Firefox package gets come from its own overlay; a Chrome
-    /// package's are the ones above. Task 6 reads it; nothing worded here depends on it yet.
-    var kind: ExtensionKind = .chromium
-
     struct Line: Hashable {
         let symbol: String
         let text: String
@@ -42,7 +38,6 @@ struct ExtensionReport {
     }
 
     init(extension ext: WKWebExtension, manifest: [String: Any], id: String, kind: ExtensionKind = .chromium) {
-        self.kind = kind
         let requested = Self.strings(manifest, ["permissions", "optional_permissions"])
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
         // Not a permission, but worth saying up front: it changes what ⌘T does.

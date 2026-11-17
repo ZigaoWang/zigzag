@@ -30,6 +30,10 @@
       "catalog": "extension.limit.backgroundPage",
       "order": 46
     },
+    "sidebarAction": {
+      "catalog": "extension.limit.sidebarAction",
+      "order": 48
+    },
     "action": {
       "catalog": "extension.limit.action",
       "order": 50
@@ -612,6 +616,11 @@
       "status": "unsupported",
       "reason": "notImplemented",
       "group": "theme"
+    },
+    "sidebarAction": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "sidebarAction"
     }
   },
   "permissions": {
@@ -746,6 +755,11 @@
       "status": "unsupported",
       "reason": "notImplemented",
       "group": "omnibox"
+    },
+    "sidebar_action": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "sidebarAction"
     }
   }
 }
