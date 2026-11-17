@@ -307,15 +307,14 @@ enum DownloadRuleSheet {
         } else {
             sheetTitle = existing == nil ? String(localized: "Add Download Rule", comment: "Title of the sheet that makes a download rule.")
                                          : String(localized: "Edit Download Rule", comment: "Title of the sheet that changes a download rule.")
-            sheetMessage = String(localized: "The first rule that matches wins.",
+            sheetMessage = String(localized: "The first rule that matches an address wins. Rules run from the top of the list.",
                                   comment: "Under the title of the sheet that makes a download rule.")
         }
 
         let sheet = FormSheet.show(in: host,
                                    title: sheetTitle,
                                    symbol: action.kind.symbol,
-                                   message: isDestination ? sheetMessage : String(localized: "The first rule that matches an address wins. Rules run from the top of the list.",
-                                                                                   comment: "Under the title of the sheet that makes a download rule."),
+                                   message: sheetMessage,
                                    rows: rows,
                                    confirmTitle: existing == nil ? String(localized: "Add", comment: "Button of the sheet that makes a download rule.")
                                                                  : String(localized: "Save", comment: "Button of the sheet that changes a download rule."),

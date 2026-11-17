@@ -515,23 +515,6 @@
         }
       }
     },
-    "%@ of type %@" : {
-      "comment" : "Part of a download rule's sentence: what it catches by file extension. The first placeholder is “Files” or “Files and links”, the second the extensions, like “pdf, epub”.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ of type %2$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "类型为 %2$@ 的%1$@"
-          }
-        }
-      }
-    },
     "%@ on %@" : {
       "comment" : "Under an installed app in Settings › General with more than one profile: the site, then the profile it uses, like “github.com on Work”.",
       "localizations" : {
@@ -6709,7 +6692,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "所有下载都会保存到上方文件夹，无论文件是什么类型。"
+            "value" : "所有下载都会存储到上方文件夹，无论文件是什么类型。"
           }
         }
       }
@@ -7059,28 +7042,6 @@
         }
       }
     },
-    "Files" : {
-      "comment" : "The subject of a download rule's sentence, for a rule that catches downloads but not links.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文件"
-          }
-        }
-      }
-    },
-    "Files and links" : {
-      "comment" : "The subject of a download rule's sentence, for a rule that catches links as well as downloads.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "文件和链接"
-          }
-        }
-      }
-    },
     "Files of this type are saved where downloads go again." : {
       "comment" : "Message of the sheet that deletes a per-extension destination.",
       "localizations" : {
@@ -7113,7 +7074,8 @@
           }
         }
       }
-    },    "Fill forms from My Card" : {
+    },
+    "Fill forms from My Card" : {
       "comment" : "A setting in Settings › Passwords.",
       "localizations" : {
         "zh-Hans" : {
@@ -9144,17 +9106,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "来自其他 App 的链接会在这里打开。"
-          }
-        }
-      }
-    },
-    "List the file extensions this rule catches, like pdf, epub." : {
-      "comment" : "Tooltip on the extensions field of a download rule with none yet, so its Add button can't be pressed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "列出这条规则要匹配的文件扩展名，例如 pdf、epub。"
           }
         }
       }
@@ -14592,17 +14543,6 @@
         }
       }
     },
-    "Saved somewhere of its own, instead of with everything else." : {
-      "comment" : "Under the title of the sheet that makes a per-extension destination.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保存到它自己的位置，而不是与其他文件放在一起。"
-          }
-        }
-      }
-    },
     "Saved to your Keychain for %@" : {
       "comment" : "Under Use Strong Password in the fill-password menu. The placeholder is a site, like github.com.",
       "localizations" : {
@@ -16894,17 +16834,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这就是切换空间"
-          }
-        }
-      }
-    },
-    "The first rule that matches wins." : {
-      "comment" : "Under the title of the sheet that makes a download rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一条匹配的规则生效。"
           }
         }
       }
@@ -19505,6 +19434,17 @@
         }
       }
     },
+    "What happens to files of this type." : {
+      "comment" : "Under the title of the sheet that makes a per-extension destination.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此类型的文件如何处理。"
+          }
+        }
+      }
+    },
     "What stopped it is below, with a way to fix it." : {
       "comment" : "Import window when nothing came over because of a problem.",
       "localizations" : {
@@ -20937,7 +20877,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "扩展名 类型 pdf epub 保存 目的地"
+            "value" : "扩展名 类型 pdf epub 存储 保存 目的地"
           }
         }
       }
@@ -21709,7 +21649,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "笔记本电脑"
-
           }
         }
       }
