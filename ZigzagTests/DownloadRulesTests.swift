@@ -674,9 +674,13 @@ struct DownloadRuleTests {
         #expect(again.first?.action.openIn == .mini)
 
         // An older file has no openIn at all: those rules went to the default browser, and still do.
-        let older = String(decoding: data, as: UTF8.self).replacingOccurrences(of: ",\"openIn\":\"mini\"", with: "")
-        #expect(older != String(decoding: data, as: UTF8.self))
-        let fromOlder = try JSONDecoder().decode([DownloadRule].self, from: Data(older.utf8))
+        // Taken out of the object itself: JSONEncoder's key order isn't fixed, so the text may not have a comma before it.
+        var objects = try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        var action = try #require(objects[0]["action"] as? [String: Any])
+        #expect(action.removeValue(forKey: "openIn") != nil)
+        objects[0]["action"] = action
+        let older = try JSONSerialization.data(withJSONObject: objects)
+        let fromOlder = try JSONDecoder().decode([DownloadRule].self, from: older)
         #expect(fromOlder.first?.action.openIn == .defaultBrowser)
     }
 
