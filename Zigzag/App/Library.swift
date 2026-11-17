@@ -618,15 +618,23 @@ final class Library {
 
     func index(of id: UUID) -> Int? { spaces.firstIndex { $0.id == id } }
 
-    /// A new space, on `profile`: where you made it from, so a space made among separate ones stays with them.
+    /// Settings › Spaces: a space you make with + or New Space gets a profile of its own, named after it (#291). Off
+    /// unless you turn it on. Spaces made before, and ones an import makes, stay as they are.
+    static var newSpacesGetOwnProfile: Bool {
+        get { UserDefaults.standard.bool(forKey: "NewSpacesGetOwnProfile") }
+        set { UserDefaults.standard.set(newValue, forKey: "NewSpacesGetOwnProfile") }
+    }
+
+    /// A new space, on `profile`: where you made it from, so a space made among separate ones stays with them. With
+    /// `ownProfile`, on a new profile of its own instead, named after it (`newSpacesGetOwnProfile`).
     @discardableResult
-    func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID) -> SpaceInfo {
+    func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID, ownProfile: Bool = false) -> SpaceInfo {
         let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
         var space = SpaceInfo(name: name ?? String(localized: "Space \(spaces.count + 1)", comment: "The name of a new space: its number. People can rename it."),
                               color: pick)
         space.defaultColor = pick
         spaces.append(space)
-        directory.assign(space: space.id, to: profile)
+        directory.place(newSpace: space, on: profile, ownProfile: ownProfile, usedColors: profiles.map { self.color(of: $0) })
         commit()
         return space
     }
@@ -1603,8 +1611,7 @@ final class Library {
     @discardableResult
     func addProfile(forSpace id: UUID) -> ProfileInfo? {
         guard let space = space(id) else { return nil }
-        let used = profiles.map { color(of: $0) }
-        let pick = space.color.isNeutral || used.contains(space.color) ? SpaceColor.next(unused: used) : space.color
+        let pick = ProfileDirectory.ownColor(for: space.color, used: profiles.map { color(of: $0) })
         let info = directory.addOwn(for: id, named: space.name, taken: profiles.map(\.displayName), color: pick)
         commit()
         return info

@@ -118,6 +118,21 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
         return info
     }
 
+    /// A space you just made goes on `profile`, or, with `ownProfile` (Settings › Spaces › Give new spaces their own
+    /// profile, #291), on a new profile of its own: named after it, in its color as `ownColor` picks. That profile, if
+    /// one was made. `usedColors` are the colors the profiles have now.
+    @discardableResult
+    @MainActor mutating func place(newSpace space: SpaceInfo, on profile: UUID, ownProfile: Bool, usedColors: [SpaceColor]) -> ProfileInfo? {
+        guard ownProfile else { assign(space: space.id, to: profile); return nil }
+        return addOwn(for: space.id, named: space.name, taken: all.map(\.displayName), color: Self.ownColor(for: space.color, used: usedColors))
+    }
+
+    /// The color of a profile made for a space: the space's, when that's one a profile can have and no profile has
+    /// it yet, else the next one no profile has.
+    @MainActor static func ownColor(for spaceColor: SpaceColor, used: [SpaceColor]) -> SpaceColor {
+        spaceColor.isNeutral || used.contains(spaceColor) ? SpaceColor.next(unused: used) : spaceColor
+    }
+
     /// `name`, or with a number after it when a profile is already called that, so two profiles never read alike.
     static func freshName(_ name: String, taken: [String]) -> String {
         let base = name.trimmingCharacters(in: .whitespacesAndNewlines)
