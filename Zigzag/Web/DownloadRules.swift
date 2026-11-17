@@ -400,10 +400,11 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     var appPath = ""
     /// Open URL: the URL to open, with tokens such as `{encoded_link}`.
     var urlTemplate = ""
-    /// Open URL: where a *web* address opens in Zigzag itself. Nil is a rule that has not been told yet — Zigzag asks
-    /// the first time the rule fires and keeps the answer here, so it asks once rather than every time. An address
-    /// that isn't the web's (mpv://, a magnet) belongs to the app that handles it and ignores this.
-    var openIn: OpenInZigzag.Place?
+    /// Open URL: where a *web* address opens. Ask is a rule that has not been told yet: Zigzag asks the first time
+    /// the rule fires and keeps the answer here, so it asks once rather than every time. Default Browser is what these
+    /// rules did before Zigzag had places of its own, and is what a rule from an older file keeps. An address that
+    /// isn't the web's (mpv://, a magnet) belongs to the app that handles it and ignores this.
+    var openIn: OpenInZigzag.Choice = .ask
     /// Run Script: the executable, or a `.sh` file run by `/bin/sh`.
     var scriptPath = ""
     /// Run Script: one argv value each. A token is substituted into its own argument, never joined into a shell line.
@@ -504,7 +505,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
         appPath = value(String.self, .appPath) ?? ""
         urlTemplate = value(String.self, .urlTemplate) ?? ""
-        openIn = value(OpenInZigzag.Place.self, .openIn)
+        openIn = value(OpenInZigzag.Choice.self, .openIn) ?? .defaultBrowser
         scriptPath = value(String.self, .scriptPath) ?? ""
         arguments = value([String].self, .arguments) ?? []
         rpcEndpoint = value(String.self, .rpcEndpoint) ?? ""

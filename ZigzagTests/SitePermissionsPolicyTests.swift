@@ -507,11 +507,13 @@ import WebKit
         let popup = URL(string: "https://example.com/pop-up")!
 
         PopupNotice.open(popup, action: "thisTab", from: tab, in: host)
+        #expect(recorder.opened.first?.tab === tab, "the asking tab, not whichever pane is selected")
         #expect(recorder.opened.map { $0.url } == [popup.absoluteString])
         #expect(recorder.opened.map { $0.disposition } == ["currentTab"])
 
         recorder.opened.removeAll()
         PopupNotice.open(popup, action: "newTab", from: tab, in: host)
+        #expect(recorder.opened.first?.tab === tab)
         #expect(recorder.opened.map { $0.disposition } == ["foregroundTab"])
 
         recorder.opened.removeAll()
@@ -702,10 +704,10 @@ import WebKit
 /// The tab that asked a pop-up's question, recording what its host was told to open.
 @MainActor
 private final class RecordingTabHost: TabHost {
-    var opened: [(url: String, disposition: String, sender: Tab.LoadSender)] = []
+    var opened: [(tab: Tab, url: String, disposition: String, sender: Tab.LoadSender)] = []
     var hostWindow: NSWindow? { nil }
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender) {
-        opened.append((url.absoluteString, "\(disposition)", sender))
+        opened.append((tab, url.absoluteString, "\(disposition)", sender))
     }
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction,
              features: WKWindowFeatures) -> WKWebView? { nil }

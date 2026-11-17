@@ -48,12 +48,11 @@ enum DownloadRuleSheet {
         var actionRows: [FormSheet.Row] = []
         var appField: FilledField?
         var urlField: FilledField?
-        /// Open URL: where a web address opens in Zigzag, as the dropdown shows it. Nil is the rule that will ask the
-        /// first time it fires, so the choices are read with that first entry in mind.
+        /// Open URL: where a web address opens, as the dropdown shows it. Ask is the rule that will ask the first time
+        /// it fires; Default Browser is what these rules did before Zigzag had places of its own.
         var openInField: DropdownButton?
-        /// The three places a web address may open, and, before them, the rule that hasn't been told: what each index
-        /// of `openInField` stands for.
-        let openInChoices: [OpenInZigzag.Place?] = [nil] + OpenInZigzag.Place.allCases.map { Optional($0) }
+        /// Every choice the Open in dropdown offers, in order: Ask, the Mac's browser, then Zigzag's three places.
+        let openInChoices = OpenInZigzag.Choice.allCases
         var scriptField: FilledField?
         var argumentView: MultilineField?
         var endpointField: FilledField?
@@ -112,17 +111,16 @@ enum DownloadRuleSheet {
             field.stringValue = action.urlTemplate
             urlField = field
             actionRows.append(FormSheet.Row(label: String(localized: "URL", comment: "Label of the URL field in a download rule's sheet."), view: field))
-            // Where a *web* address opens, inside Zigzag: the same three places a page's pop-up question offers. An
-            // address that isn't the web's (mpv://, a magnet) belongs to its own app, which the note says.
+            // Where a *web* address opens: the Mac's browser, or one of Zigzag's three places. An address that isn't
+            // the web's (mpv://, a magnet) belongs to its own app, which the note says.
             let place = DropdownButton()
-            place.options = [DropdownButton.Option(title: String(localized: "Ask", comment: "Choice in an Open URL download rule's Open in dropdown: the rule asks where to open the first time it fires, and keeps the answer."))]
-                + OpenInZigzag.Place.allCases.map { DropdownButton.Option(title: $0.title) }
+            place.options = OpenInZigzag.Choice.allCases.map { DropdownButton.Option(title: $0.title) }
             place.selectedIndex = openInChoices.firstIndex(of: action.openIn) ?? 0
             place.toolTip = String(localized: "A rule that hasn’t been told asks the first time it fires, and keeps your answer.", comment: "Tooltip on the Open in choice of an Open URL download rule.")
             openInField = place
             actionRows.append(FormSheet.Row(label: String(localized: "Open in", comment: "Label of the choice of where a web address opens, in an Open URL download rule's sheet."),
                                             view: place))
-            actionRows.append(.note(String(localized: "A web address opens in Zigzag. Anything else opens in its own app.",
+            actionRows.append(.note(String(localized: "A web address opens in Zigzag or your default browser. Anything else opens in its own app.",
                                            comment: "Under the Open in choice of an Open URL download rule: only the web's own addresses are Zigzag's to open.")))
         case .runScript:
             let field = FilledField(placeholder: String(localized: "Choose a script…", comment: "Placeholder of the script field in a download rule's sheet."))

@@ -653,26 +653,31 @@ struct DownloadRuleTests {
         #expect(!OpenInZigzag.handles(URL(string: "file:///Users/me/a.pdf")!))
     }
 
-    /// A rule that hasn't been told where to open keeps nothing, and one that has keeps it across its file. The ids
-    /// are the pop-up question's own ("thisTab", "newTab", "mini"), so an answer that question returns is one a rule
-    /// can be given, and a value from anywhere else is not a place at all.
+    /// A new rule asks where to open; a rule from before the choice existed keeps opening in the Mac's default
+    /// browser, which is what every Open URL rule did before Zigzag had places of its own.
     @Test func aRuleRemembersWhereItsWebAddressOpens() throws {
         var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
                                 action: DownloadRuleAction(kind: .openURL))
         rule.action.urlTemplate = "https://mirror.example.com/{filename}"
-        #expect(rule.action.openIn == nil)
+        #expect(rule.action.openIn == .ask)
 
         let plain = try JSONEncoder().encode([rule])
-        #expect(!String(decoding: plain, as: UTF8.self).contains("openIn"))
+        #expect(String(decoding: plain, as: UTF8.self).contains("\"openIn\":\"ask\""))
         let told = try JSONDecoder().decode([DownloadRule].self, from: plain)
         #expect(told == [rule])
-        #expect(told.first?.action.openIn == nil)
+        #expect(told.first?.action.openIn == .ask)
 
         rule.action.openIn = .mini
         let data = try JSONEncoder().encode([rule])
         let again = try JSONDecoder().decode([DownloadRule].self, from: data)
         #expect(again == [rule])
         #expect(again.first?.action.openIn == .mini)
+
+        // An older file has no openIn at all: those rules went to the default browser, and still do.
+        let older = String(decoding: data, as: UTF8.self).replacingOccurrences(of: ",\"openIn\":\"mini\"", with: "")
+        #expect(older != String(decoding: data, as: UTF8.self))
+        let fromOlder = try JSONDecoder().decode([DownloadRule].self, from: Data(older.utf8))
+        #expect(fromOlder.first?.action.openIn == .defaultBrowser)
     }
 
     @Test func everyPlaceIsOneTheQuestionKnows() {
@@ -685,6 +690,14 @@ struct DownloadRuleTests {
         #expect(OpenInZigzag.Place(rawValue: "viewer") == nil)
         #expect(OpenInZigzag.Place(rawValue: "") == nil)
         #expect(OpenInZigzag.Place.allCases.allSatisfy { !$0.title.isEmpty })
+
+        // A rule's own choice adds Ask and the Mac's default browser, but the question only offers destinations.
+        #expect(OpenInZigzag.Choice.allCases.map(\.rawValue) == ["ask", "defaultBrowser", "thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Choice.destinations.map(\.rawValue) == ["defaultBrowser", "thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Choice.ask.place == nil)
+        #expect(OpenInZigzag.Choice.defaultBrowser.place == nil)
+        #expect(OpenInZigzag.Choice.mini.place == .mini)
+        #expect(OpenInZigzag.Choice.allCases.allSatisfy { !$0.title.isEmpty })
     }
 
     /// An Open URL rule that opens the web's own address still needs nothing but that address: where it opens has an
@@ -695,7 +708,7 @@ struct DownloadRuleTests {
         action.urlTemplate = "https://example.com/{filename}"
         #expect(action.isComplete)
         #expect(DownloadRuleSheet.actionHoldUp(action) == nil)
-        #expect(action.openIn == nil)
+        #expect(action.openIn == .ask)
         // Nothing to answer about where it opens, so the only thing a rule could be held up by is what it catches.
         var mine = DownloadRule(name: "Mirror", match: .any, action: action)
         #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
@@ -815,11 +828,11 @@ struct DownloadRuleTests {
         let request = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!, pageOrigin: origin)
 
         tab.permissionAnswers.note("deny", key: origin, kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .cancel)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .cancel)
         tab.permissionAnswers.note("handOff", key: origin, kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .handOff)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .handOff)
         tab.permissionAnswers.note("browser", key: origin, kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .browser)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .browser)
     }
 
     /// A page with no site of its own (a file, a data URL) is asked every time: an answer kept against the target's
@@ -831,7 +844,7 @@ struct DownloadRuleTests {
         let kind = DownloadHandoff.handoffKind(rule)
         tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
         let request = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .browser)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .browser)
     }
 
     /// A pop-up may not ask (its window can sit behind the browser's), but a page's kept answer still holds there.
@@ -843,9 +856,9 @@ struct DownloadRuleTests {
         var quiet = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!,
                                             pageOrigin: "https://example.com")
         quiet.mayAsk = false
-        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .browser)
+        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true).gate == .browser)
         tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .cancel)
+        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true).gate == .cancel)
     }
 
     // MARK: The App field's menu

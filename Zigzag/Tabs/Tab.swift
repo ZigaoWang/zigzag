@@ -850,6 +850,13 @@ final class Tab: NSObject {
     /// Carries the address it was for: only the main frame's decision for that address is Zigzag's (or yours), never
     /// one the page had on its way when you pressed Return.
     private var ownLoadPending: OwnLoad?
+    /// True while the page in this tab got here because a download rule opened it: that rule must not take the
+    /// navigation it just made, and that includes a download the navigation turns into. Cleared when the page
+    /// commits, fails, or becomes a download.
+    private var openedByRule = false
+    /// True when the handoff question for this navigation or download was put off. WebKit still makes the download,
+    /// and the download manager must not put the same question up a second time for it.
+    private var declinedRuleDownload = false
     struct OwnLoad: Equatable {
         let sender: LoadSender
         let url: URL
@@ -1502,6 +1509,15 @@ extension Tab: WKNavigationDelegate {
         let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
+            // A download this page or its rule already asked about is not asked twice. A load a rule opened is the
+            // rule's own page, so no rule may take it, whether it becomes a page or a download. A new navigation the
+            // page or you start clears that; a redirect keeps it.
+            declinedRuleDownload = false
+            if ownSender == .rule {
+                openedByRule = true
+            } else if [.linkActivated, .formSubmitted, .backForward, .reload].contains(navigationAction.navigationType) {
+                openedByRule = false
+            }
             ownLoadPending = nil
             ownHistoryTarget = nil
             // A fallback over http is for the address it was given for: any other the main frame goes to ends it.
@@ -1841,7 +1857,9 @@ extension Tab: WKNavigationDelegate {
     private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, webView: WKWebView,
                                  filename: String? = nil, mime: String = "", wasClicked: Bool = false,
                                  pageOrigin: String? = nil) async -> Bool {
-        // Zigzag's own pages and an extension's are never a rule's to take.
+        // Zigzag's own pages and an extension's are never a rule's to take. A page a rule opened is the rule's own
+        // doing: the rule that took the address must not take it again, whether the page becomes a load or a download.
+        guard !openedByRule else { return false }
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
         // A link has no file name; a download's own name is what an earlier file-type destination matches, so the
         // handoff scan must see it and stand aside for that destination.
@@ -1849,18 +1867,26 @@ extension Tab: WKNavigationDelegate {
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
                                                     isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
-                                              filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
+        var handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
+                                              filename: DownloadTokens.filename(for: url, suggested: ""),
                                               mime: mime, space: Library.shared.space(spaceID)?.name ?? "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
                                               window: host?.hostWindow, tab: self, wasClicked: wasClicked)
-        switch await DownloadHandoff.decide(rule, request: handoff, tab: self, forDownload: !appliesToLinks) {
+        let decision = await DownloadHandoff.decide(rule, request: handoff, tab: self, forDownload: !appliesToLinks)
+        handoff.place = decision.place
+        // A question put off for a download leaves the file to Zigzag, and the download manager must not ask again.
+        if decision.declined, !appliesToLinks { declinedRuleDownload = true }
+        switch decision.gate {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
             // A rule that was matched but didn't take it — an Open URL rule whose question was put off — leaves the
-            // link or the download as it was, exactly as if no rule had matched.
-            if case .noMatch = outcome { return false }
+            // link or the download as it was, exactly as if no rule had matched. A download it left behind must not
+            // be offered to the same rule again by the download manager.
+            if case .noMatch = outcome {
+                if !appliesToLinks { declinedRuleDownload = true }
+                return false
+            }
             // A tab opened just for this link has nothing left to show.
             closeIfOnlyADownload(webView)
             return true
@@ -1873,12 +1899,20 @@ extension Tab: WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
-        DownloadManager.shared.track(download, window: host?.hostWindow)
+        let byRule = openedByRule
+        let declined = declinedRuleDownload
+        openedByRule = false
+        declinedRuleDownload = false
+        DownloadManager.shared.track(download, window: host?.hostWindow, openedByRule: byRule, rulesAlreadyDeclined: declined)
         closeIfOnlyADownload(webView)
     }
 
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
-        DownloadManager.shared.track(download, window: host?.hostWindow)
+        let byRule = openedByRule
+        let declined = declinedRuleDownload
+        openedByRule = false
+        declinedRuleDownload = false
+        DownloadManager.shared.track(download, window: host?.hostWindow, openedByRule: byRule, rulesAlreadyDeclined: declined)
         closeIfOnlyADownload(webView)
     }
 
@@ -1899,6 +1933,10 @@ extension Tab: WKNavigationDelegate {
         isLeavingPage = false
         // A page arrived: nothing is left to fall back from.
         pendingHTTPFallback = nil
+        // The rule-opened page is here, so its own links and downloads are its own again; a question declined for
+        // this navigation has been answered by the page arriving.
+        openedByRule = false
+        declinedRuleDownload = false
         forgetPageErrors()
         // The new page is here: its address shows.
         addressWaitsForCommit = false
@@ -2029,6 +2067,9 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLeavingPage = false
         addressWaitsForCommit = false
+        // A page that never arrived leaves no rule-opened or declined navigation to carry to the next one.
+        openedByRule = false
+        declinedRuleDownload = false
         // Over http instead: the address stays as you gave it until that load shows its own.
         if fallBackToHTTP(after: error as NSError, in: webView) { return }
         // It never came: the address goes back to the page still showing.
@@ -2222,13 +2263,16 @@ extension Tab: WKUIDelegate {
     private func handOffInNewWindow(_ rule: DownloadRule, url: URL, request: URLRequest, webView: WKWebView,
                                     pageOrigin: String?, wasClicked: Bool) {
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
-        let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
-                                              filename: DownloadTokens.filename(for: url, suggested: ""),
-                                              space: Library.shared.space(spaceID)?.name ?? "",
-                                              dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
-                                              window: host?.hostWindow, tab: self, wasClicked: wasClicked)
+        let base = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: pageOrigin ?? SiteOrigin.of(webView.url ?? self.url),
+                                           filename: DownloadTokens.filename(for: url, suggested: ""),
+                                           space: Library.shared.space(spaceID)?.name ?? "",
+                                           dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
+                                           window: host?.hostWindow, tab: self, wasClicked: wasClicked)
         Task { @MainActor in
-            switch await DownloadHandoff.decide(rule, request: handoff, tab: self) {
+            var handoff = base
+            let decision = await DownloadHandoff.decide(rule, request: handoff, tab: self)
+            handoff.place = decision.place
+            switch decision.gate {
             case .handOff:
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }

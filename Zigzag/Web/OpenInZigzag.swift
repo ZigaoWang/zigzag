@@ -19,7 +19,39 @@ nonisolated enum OpenInZigzag {
             switch self {
             case .thisTab: String(localized: "This Tab", comment: "Choice in the pop-up question's menu, and in a download rule's Open in choice: loads the address in the tab you are in.")
             case .newTab: String(localized: "New Tab", comment: "Choice in the pop-up question's menu, and in a download rule's Open in choice: opens the address in a new tab.")
-            case .mini: String(localized: "Mini", comment: "Choice in the pop-up question's menu, and in a download rule's Open in choice: opens the address in the small pop-up viewer window.")
+            case .mini: String(localized: "Zigzag Mini", comment: "Choice in the pop-up question's menu, and in a download rule's Open in choice: opens the address in Zigzag's small window for one page, which the app calls Zigzag Mini everywhere else.")
+            }
+        }
+    }
+
+    /// Where an Open URL rule opens a web address: one of Zigzag's places, the Mac's default browser, or Ask — the
+    /// rule that has not been told yet. The sheet offers all five; the question offers the four destinations, never
+    /// Ask, because its buttons already decide whether the rule runs at all.
+    enum Choice: String, Codable, CaseIterable, Sendable {
+        case ask
+        case defaultBrowser
+        case thisTab
+        case newTab
+        case mini
+
+        /// The destinations the question's dropdown offers, in the order it shows them.
+        static var destinations: [Choice] { [.defaultBrowser, .thisTab, .newTab, .mini] }
+
+        /// The place inside Zigzag, or nil for Ask and the Mac's default browser.
+        var place: Place? {
+            switch self {
+            case .thisTab: .thisTab
+            case .newTab: .newTab
+            case .mini: .mini
+            case .ask, .defaultBrowser: nil
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .ask: String(localized: "Ask", comment: "Choice in an Open URL download rule's Open in dropdown: the rule asks where to open the first time it fires, and keeps the answer. Also a choice in Site Controls' permission dropdown: the site asks each time.")
+            case .defaultBrowser: String(localized: "Default Browser", comment: "Choice in an Open URL download rule's Open in dropdown: opens the web address in the Mac's default browser, as these rules did before Zigzag had its own places.")
+            case .thisTab, .newTab, .mini: place?.title ?? ""
             }
         }
     }
@@ -45,7 +77,7 @@ nonisolated enum OpenInZigzag {
         case .mini:
             // The small window that shows one page of its own, on the same data store where there is one to share.
             guard let configuration = configuration ?? tab?.webView?.configuration else { return }
-            PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window)
+            PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window, by: sender)
         }
     }
 

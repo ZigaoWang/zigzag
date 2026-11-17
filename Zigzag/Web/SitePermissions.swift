@@ -1294,7 +1294,7 @@ final class PermissionPrompt: FloatingPanelView {
 
     private func finish(_ choice: PermissionAnswer?) {
         // The disabled duration control also guards debug answers: a private or one-time question never returns Always.
-        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled) }
+        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled, choice: $0.choice) }
         stopListening()
         let answer = self.answer
         self.answer = nil
@@ -1427,7 +1427,7 @@ final class PermissionPrompt: FloatingPanelView {
         let each = max(Tokens.Dialog.minButtonWidth,
                        (available - menuWidth - Self.buttonGap * CGFloat(max(0, buttons.count - 1))) / CGFloat(max(1, buttons.count)))
         var x = w - pad
-        if oneLine {
+        if oneLine, !duration.isHidden {
             let size = duration.intrinsicContentSize
             x -= size.width
             duration.frame = NSRect(x: x, y: y, width: size.width, height: Tokens.Page.controlHeight)

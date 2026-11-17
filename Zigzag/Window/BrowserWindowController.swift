@@ -2238,7 +2238,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         switch disposition {
         case .currentTab:
-            if let tab = tabManager.selectedTab {
+            // The tab that asked, never the selected one: in a split they are different panes.
+            if let tab = opener ?? tabManager.selectedTab {
                 tab.load(url, by: sender, httpFallback: httpFallback)
             } else {
                 tabManager.newTab(url: url, by: sender, httpFallback: httpFallback)
