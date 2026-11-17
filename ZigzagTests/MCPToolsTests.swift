@@ -137,6 +137,25 @@ struct MCPToolsTests {
         #expect(!control.isStopped(first.id))
     }
 
+    /// A tool that began before Stop, or before the setting went off and on again, finds it stopped once its wait
+    /// ends, even though the setting is on again and no tab is stopped any more.
+    @Test func aToolFromBeforeStopNeverActsAfter() {
+        let control = AgentControl()
+        let tab = Tab(url: URL(string: "https://example.com"), spaceID: UUID())
+        let began = control.generation
+        #expect(!control.stopped(since: began))
+        control.touch(tab, by: MCPClient(key: "s1", name: "Inspector"))
+        control.stop(tab.id)
+        #expect(control.stopped(since: began))
+        control.reset()
+        #expect(!control.isStopped(tab.id))
+        #expect(control.stopped(since: began))
+        let again = control.generation
+        #expect(!control.stopped(since: again))
+        control.reset()
+        #expect(control.stopped(since: again))
+    }
+
     // MARK: The page script, in a real page
 
     private final class Loading: NSObject, WKNavigationDelegate {

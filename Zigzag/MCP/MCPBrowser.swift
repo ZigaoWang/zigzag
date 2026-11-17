@@ -22,6 +22,8 @@ enum MCPBrowser {
     static func run(_ command: MCPCommand, client: MCPClient) async -> MCPToolResult {
         // Turned off while the request was on its way: nothing happens.
         guard MCPService.isOn else { return .error("Zigzag's MCP server was turned off in Settings.") }
+        // Stop, or the setting turned off and on again, while this waits: it never goes on after that.
+        let generation = AgentControl.shared.generation
         switch command {
         case .listTabs:
             if case .success(let front) = locate(nil) { noteListing(front.tab, by: client) }
@@ -78,23 +80,23 @@ enum MCPBrowser {
             await waitForLoad(tab, from: nil, expectStart: true)
             return .data(info(tab, in: found.controller))
         case .read(_, let maxChars):
-            return await page(tab) { webView in
+            return await page(tab, since: generation) { webView in
                 switch await MCPPageScript.run("read", ["maxChars": maxChars], in: webView) {
                 case .failure(let error): return .error(error.message)
                 case .success(let object): return .data(json(object))
                 }
             }
         case .links(_, let max):
-            return await page(tab) { webView in
+            return await page(tab, since: generation) { webView in
                 switch await MCPPageScript.run("links", ["max": max], in: webView) {
                 case .failure(let error): return .error(error.message)
                 case .success(let object): return .data(json(object))
                 }
             }
         case .screenshot:
-            return await page(tab) { webView in await screenshot(webView, tab: tab, in: found.controller) }
+            return await page(tab, since: generation) { webView in await screenshot(webView, tab: tab, in: found.controller) }
         case .click(_, let selector, let text):
-            return await page(tab) { webView in
+            return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
                 var args: [String: Any] = [:]
                 if let selector { args["selector"] = selector }
@@ -110,7 +112,7 @@ enum MCPBrowser {
                 }
             }
         case .type(_, let selector, let text, let clear, let submit):
-            return await page(tab) { webView in
+            return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
                 switch await MCPPageScript.run("type", ["selector": selector, "text": text, "clear": clear, "submit": submit], in: webView) {
                 case .failure(let error):
@@ -121,7 +123,7 @@ enum MCPBrowser {
                 }
             }
         case .scroll(_, let dy, let selector):
-            return await page(tab) { webView in
+            return await page(tab, since: generation) { webView in
                 var args: [String: Any] = ["dy": dy]
                 if let selector { args["selector"] = selector }
                 switch await MCPPageScript.run("scroll", args, in: webView) {
@@ -130,9 +132,9 @@ enum MCPBrowser {
                 }
             }
         case .waitFor(_, let condition, let timeoutMs):
-            return await waitFor(condition, timeout: TimeInterval(timeoutMs) / 1000, in: tab, controller: found.controller)
+            return await waitFor(condition, timeout: TimeInterval(timeoutMs) / 1000, in: tab, controller: found.controller, since: generation)
         case .pressKey(_, let press, let selector):
-            return await page(tab) { webView in
+            return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
                 var args: [String: Any] = [:]
                 if let selector { args["selector"] = selector }
@@ -148,7 +150,7 @@ enum MCPBrowser {
                     return .error("The focus is in a frame from another site inside the page, where Zigzag can't tell what the key would do. Click or focus something in the page itself first.")
                 }
                 // The page answered after a wait: still allowed, on the same kind of page?
-                if let refusal = refusal(for: tab, webView: webView) { return .error(MCPSafety.message(refusal)) }
+                if let refusal = refusal(for: tab, webView: webView, since: generation) { return .error(MCPSafety.message(refusal)) }
                 let after = await MCPKeyDelivery.press(press, in: webView)
                 if press.mayNavigate { await waitForLoad(tab, from: before, grace: 0.6) }
                 var result: [String: JSON] = ["pressed": .string(press.name)]
@@ -162,10 +164,10 @@ enum MCPBrowser {
     }
 
     /// wait_for: the tab woken if it slept, then the page watches for the condition, for `timeout` at most.
-    private static func waitFor(_ condition: MCPWaitCondition, timeout: TimeInterval, in tab: Tab, controller: BrowserWindowController) async -> MCPToolResult {
+    private static func waitFor(_ condition: MCPWaitCondition, timeout: TimeInterval, in tab: Tab, controller: BrowserWindowController, since generation: Int) async -> MCPToolResult {
         let webView: WKWebView
         if let awakeView = tab.webView { webView = awakeView } else { webView = await awake(tab) }
-        if let refusal = refusal(for: tab, webView: webView) {
+        if let refusal = refusal(for: tab, webView: webView, since: generation) {
             return .error(MCPSafety.message(refusal))
         }
         let wait = MCPWait(condition, in: webView, timeout: timeout) { [weak tab, weak webView] in
@@ -173,7 +175,7 @@ enum MCPBrowser {
             guard let webView, tab.webView === webView else { return "The tab went to sleep while waiting, so the wait ended." }
             if !MCPService.isOn { return MCPWait.stoppedMessage }
             // Stopped, or now on a page no tool may use (the load it waited for went to one).
-            if let refusal = refusal(for: tab, webView: webView) {
+            if let refusal = refusal(for: tab, webView: webView, since: generation) {
                 return MCPSafety.message(refusal)
             }
             return nil
@@ -260,18 +262,19 @@ enum MCPBrowser {
     // MARK: Pages
 
     /// Runs `body` on the tab's page once it's awake and loaded, if it's still a page a tool may use by then.
-    private static func page(_ tab: Tab, _ body: @MainActor (WKWebView) async -> MCPToolResult) async -> MCPToolResult {
+    private static func page(_ tab: Tab, since generation: Int, _ body: @MainActor (WKWebView) async -> MCPToolResult) async -> MCPToolResult {
         let webView = await awake(tab)
         // Woken or done loading, it may be on another page now, or AI apps turned off meanwhile: checked again.
-        if let refusal = refusal(for: tab, webView: webView) {
+        if let refusal = refusal(for: tab, webView: webView, since: generation) {
             return .error(MCPSafety.message(refusal))
         }
         return await body(webView)
     }
 
     /// Why a tool can't go on with the tab's page now, after a wait: checked again each time one ends.
-    private static func refusal(for tab: Tab, webView: WKWebView) -> MCPSafety.Refusal? {
-        MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate, stopped: AgentControl.shared.isStopped(tab.id),
+    private static func refusal(for tab: Tab, webView: WKWebView, since generation: Int) -> MCPSafety.Refusal? {
+        MCPSafety.refusal(url: webView.url ?? tab.url, isPrivate: tab.isPrivate,
+                          stopped: AgentControl.shared.isStopped(tab.id) || AgentControl.shared.stopped(since: generation),
                           errorPage: tab.showsErrorPage, on: MCPService.isOn)
     }
 
