@@ -854,18 +854,38 @@ enum ExtensionShims {
     }
 
     /// Every extension gets the compatibility layer first; some get their own fixes on top.
-    static func shim(for id: String) -> Shim? {
+    /// `keepsAlive`: whether the background should hold itself awake (a service worker, or a persistent background
+    /// page). An MV2 event page may suspend, so its prelude leaves the keepalive out.
+    static func shim(for id: String, keepsAlive: Bool = true) -> Shim? {
         var shim = shims[id] ?? Shim()
-        // Errors reported first (a background that stops as it starts says why), then the bridge (real answers from
-        // Zigzag), then stand-ins for what's still missing. Every background gets the WebSocket stand-in: one opened
-        // the WebKit way freezes the extension's pages along with it (MyBib's popup never came up).
-        shim.backgroundPrelude = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + webSocketShim + "\n" + nativeKeepAlive + "\n" + (shim.backgroundPrelude ?? "")
+        shim.backgroundPrelude = backgroundPrelude(keepsAlive: keepsAlive) + (shim.backgroundPrelude ?? "")
         #if DEBUG
         // Testing builds say each background got past Zigzag's own scripts, so a quiet log means quiet, not broken.
         let started = "try { (globalThis.chrome || globalThis.browser).runtime.sendNativeMessage('\(diagnosticsHost)', { where: 'background', kind: 'started', text: 'ok' }); } catch (e) {}\n"
         shim.backgroundPrelude = errorRecorder + (shim.backgroundPrelude ?? "") + started
         #endif
         return shim
+    }
+
+    /// What every background gets before the extension's own code: errors reported first (a background that stops
+    /// as it starts says why), then the bridge, stand-ins for what's still missing, and the WebSocket shim. The
+    /// WebSocket stand-in is in every copy but steps aside in a background page, which has real ones; only a service
+    /// worker may open Zigzag's socket port (`usesWebSocketShim`).
+    ///
+    /// `keepsAlive`: a service worker or a persistent MV2 page keeps a port to Zigzag open and answers each beat, so
+    /// WebKit doesn't stop it; an MV2 event page (`persistent: false`) must be allowed to suspend, so it gets none.
+    static func backgroundPrelude(keepsAlive: Bool) -> String {
+        let base = diagnostics + ExtensionBridgeScript.source + "\n" + compatibility + "\n" + ExtensionBridgeScript.afterCompatibility + "\n" + webSocketShim + "\n"
+        return keepsAlive ? base + nativeKeepAlive + "\n" : base
+    }
+
+    /// Whether a background is meant to stay running. Chrome keeps a service worker and an MV2 background page
+    /// running by default, but an event page (`persistent: false`) suspends between events.
+    static func keepsAlive(manifest: [String: Any]?) -> Bool {
+        guard let background = manifest?["background"] as? [String: Any] else { return false }
+        if background["service_worker"] is String { return true }
+        guard background["page"] is String || background["scripts"] is [String] else { return false }
+        return (background["persistent"] as? Bool) != false
     }
 
     #if DEBUG
@@ -1371,16 +1391,16 @@ extension ExtensionStore {
     /// reads and rewrites its scripts: done off the main thread, which it held up for seconds (#89).
     static func loadDirectory(for id: String, copyIn folder: URL) async -> URL? {
         guard let package = packageDirectory(for: id), let state = self.package(id) else { return nil }
-        let shim = ExtensionShims.shim(for: id)
+        let packageManifest = manifest(in: package)
+        let shim = ExtensionShims.shim(for: id, keepsAlive: ExtensionShims.keepsAlive(manifest: packageManifest))
         let prelude = shim?.backgroundPrelude
         let patches = (shim?.patches ?? []).map { OverlayPatch(file: $0.file, find: $0.find, replace: $0.replace, pattern: $0.pattern) }
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(in: folder, version: state.version)
-        // What this overlay was made from: rebuilt whenever the prelude, a patch or the language fill changes.
-        let signature = (prelude ?? "") + patches.map { $0.file + $0.find + $0.replace }.joined() + languageFill + contentScriptsFirst
+        let fill = fills
+        let signature = overlaySignature(prelude: prelude, patches: patches, fill: fill, package: package)
         // Asked for twice at once (a profile's extensions starting as one is added): made once.
         if let making = overlaysMaking[overlay.path] { return await making.value }
-        let fill = fills
         let making = Task.detached(priority: .userInitiated) {
             makeOverlay(overlay, from: package, prelude: prelude, patches: patches, signature: signature, fill: fill, id: id)
         }
@@ -1391,6 +1411,37 @@ extension ExtensionStore {
     }
 
     private static var overlaysMaking: [String: Task<URL?, Never>] = [:]
+
+    /// What the overlay's marker records. A new format version, the prelude, a patch, the language fill, or a changed
+    /// background manifest or page makes it differ once, so the loaded copy is rebuilt. Nothing an install report says
+    /// is in it: the report may change without the files to load changing.
+    nonisolated static func overlaySignature(prelude: String?, patches: [OverlayPatch], fill: Fills, package: URL) -> String {
+        var parts = ["overlay format \(overlayFormatVersion)", prelude ?? ""]
+        parts += patches.map { [$0.file, $0.find, $0.replace, $0.pattern ? "pattern" : "text"].joined(separator: "\u{0}") }
+        parts += [fill.language, fill.webLocks, fill.webLocksMark, contentScriptsFirst]
+        parts.append(backgroundDigest(in: package))
+        return parts.joined(separator: "\u{1}")
+    }
+
+    /// Marks overlays made by this version of the writer. It is in the signature so a marker written by an older
+    /// format is rebuilt once, even when its text happens to match.
+    nonisolated static let overlayFormatVersion = 1
+
+    /// The background part of the package's manifest and, for a background page, the page's own bytes. The package is
+    /// never written to, so this stays stable until the extension's own files change.
+    nonisolated private static func backgroundDigest(in package: URL) -> String {
+        guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
+              let manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let background = manifest["background"] as? [String: Any] else { return "no background" }
+        var digest = Data()
+        if let encoded = try? JSONSerialization.data(withJSONObject: background, options: [.sortedKeys]) { digest.append(encoded) }
+        // A page is copied into the overlay; editing it in an unpacked extension must rebuild the copy once.
+        if let page = background["page"] as? String, let path = packagePath(page),
+           let contents = try? Data(contentsOf: package.appendingPathComponent(path)) {
+            digest.append(contents)
+        }
+        return SHA256.hash(data: digest).map { String(format: "%02x", $0) }.joined()
+    }
 
     /// What runs ahead of the extension's content scripts in their world (ConnectGuard.file): `browser` kept WebKit's,
     /// as in its background and pages (ExtensionBridgeScript.keepsBrowser), then the reconnect guard.
@@ -1535,20 +1586,62 @@ extension ExtensionStore {
         return true
     }
 
-    nonisolated private static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
+    /// A path from the manifest, inside the package: root-relative with `/` separators. `..` is refused, so a lookup
+    /// can never climb out; Chrome writes `js/background.js` and `/js/background.js` for the same file, and both
+    /// normalize to the former. Backslashes and empty paths are refused too.
+    nonisolated static func packagePath(_ path: String) -> String? {
+        var text = path
+        if text.hasPrefix("/") { text.removeFirst() }
+        guard !text.isEmpty, !text.contains("\\"), !text.contains("\u{0}") else { return nil }
+        var parts: [String] = []
+        for part in text.split(separator: "/", omittingEmptySubsequences: false) {
+            if part.isEmpty || part == "." { continue }
+            guard part != ".." else { return nil }
+            parts.append(String(part))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: "/")
+    }
+
+    /// The loaded copy's manifest, and the files its background needs before the extension's own code. False when the
+    /// manifest can't be read or names something outside the package, in which case WebKit loads the package itself.
+    ///
+    /// - `background.service_worker`: `zigzag-entry.js` runs the prelude and then the worker, as before.
+    /// - `background.page`: the page is copied with one prelude script before its first script; the key stays.
+    /// - `background.scripts`: the prelude runs first, then the extension's scripts in their order.
+    /// - No background: the manifest is still written, so patches and the language fill apply to an extension whose
+    ///   content scripts or own pages need them.
+    nonisolated static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
         guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
-              var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              var background = manifest["background"] as? [String: Any],
-              let worker = background["service_worker"] as? String else { return false }
-        // Manifests write the worker as "js/background.js" or "/js/background.js"; both mean the extension's root.
-        let path = worker.hasPrefix("/") ? String(worker.dropFirst()) : worker
-        let entry = (background["type"] as? String) == "module"
-            ? "import './zigzag-prelude.js';\nimport './\(path)';\n"
-            : "importScripts('zigzag-prelude.js', '\(path)');\n"
-        background["service_worker"] = "zigzag-entry.js"
-        manifest["background"] = background
+              var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        var entry: String?
+        var page: (path: String, text: String)?
+        if var background = manifest["background"] as? [String: Any] {
+            if let worker = background["service_worker"] as? String {
+                guard let path = packagePath(worker) else { return false }
+                entry = (background["type"] as? String) == "module"
+                    ? "import './zigzag-prelude.js';\nimport './\(path)';\n"
+                    : "importScripts('zigzag-prelude.js', '\(path)');\n"
+                background["service_worker"] = "zigzag-entry.js"
+            } else if let pageFile = background["page"] as? String {
+                guard let path = packagePath(pageFile),
+                      let html = try? String(contentsOf: package.appendingPathComponent(path), encoding: .utf8) else { return false }
+                page = (path, pageWithPrelude(html))
+            } else if let scripts = background["scripts"] as? [String] {
+                var ordered: [String] = []
+                var seen = Set<String>()
+                for script in scripts {
+                    guard let path = packagePath(script) else { return false }
+                    if seen.insert(path).inserted { ordered.append(path) }
+                }
+                background["scripts"] = ["zigzag-prelude.js"] + ordered.filter { $0 != "zigzag-prelude.js" }
+            } else {
+                return false
+            }
+            manifest["background"] = background
+        }
         // The loaded copy may message Zigzag's own bridge (ExtensionBridge), which stands in for Chrome APIs WebKit
-        // lacks. Real native hosts stay out of reach unless the extension asked for them itself (ExtensionHost).
+        // lacks. Real native hosts stay out of reach unless the extension asked for them itself (ExtensionHost). The
+        // package's own manifest, which says what the person agreed to, is never changed.
         var permissions = manifest["permissions"] as? [String] ?? []
         if !permissions.contains("nativeMessaging") { permissions.append("nativeMessaging") }
         // Its content scripts run after the guard that holds back a reconnect loop (ConnectGuard).
@@ -1561,12 +1654,46 @@ extension ExtensionStore {
         guard let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) else { return false }
         do {
             try out.write(to: overlay.appendingPathComponent("manifest.json"))
-            try entry.write(to: overlay.appendingPathComponent("zigzag-entry.js"), atomically: true, encoding: .utf8)
             try prelude.write(to: overlay.appendingPathComponent("zigzag-prelude.js"), atomically: true, encoding: .utf8)
+            if let entry { try entry.write(to: overlay.appendingPathComponent("zigzag-entry.js"), atomically: true, encoding: .utf8) }
+            if let page {
+                let target = overlay.appendingPathComponent(page.path)
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                // The package's page stays exactly as it was: the overlay's link becomes a copy with the prelude.
+                try? FileManager.default.removeItem(at: target)
+                try page.text.write(to: target, atomically: true, encoding: .utf8)
+            }
             if scripts != nil { try contentScriptsFirst.write(to: overlay.appendingPathComponent(ConnectGuard.file), atomically: true, encoding: .utf8) }
             return true
         } catch {
             return false
         }
+    }
+
+    /// A background page with one prelude script before its first script. The page's own bytes, CSP and script order
+    /// stay as they were; the prelude is at the package root, so `/zigzag-prelude.js` works from a page in any folder.
+    nonisolated static func pageWithPrelude(_ html: String) -> String {
+        guard !html.contains("data-zigzag-prelude") else { return html }
+        let tag = #"<script src="/zigzag-prelude.js" data-zigzag-prelude="1"></script>"#
+        if let script = firstScript(in: html) {
+            return html.replacingCharacters(in: script.lowerBound..<script.lowerBound, with: tag)
+        }
+        if let body = html.range(of: "</body>", options: [.caseInsensitive, .backwards]) {
+            return html.replacingCharacters(in: body.lowerBound..<body.lowerBound, with: tag)
+        }
+        return html + tag
+    }
+
+    /// The first real `<script` in a page, not one named inside an HTML comment.
+    nonisolated private static func firstScript(in html: String) -> Range<String.Index>? {
+        var search = html.startIndex
+        while search < html.endIndex {
+            let script = html.range(of: "<script", options: [.caseInsensitive], range: search..<html.endIndex)
+            guard let comment = html.range(of: "<!--", options: [.caseInsensitive], range: search..<html.endIndex),
+                  comment.lowerBound < (script?.lowerBound ?? html.endIndex) else { return script }
+            guard let end = html.range(of: "-->", options: [.caseInsensitive], range: comment.upperBound..<html.endIndex) else { return script }
+            search = end.upperBound
+        }
+        return nil
     }
 }
