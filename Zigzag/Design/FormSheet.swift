@@ -16,7 +16,7 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         var height: CGFloat = Tokens.Metric.controlHeight
         /// A row that isn't wanted right now: it takes no room and isn't laid out, and Tab skips it. The form is told
         /// while it's up with `setHidden(_:forRow:)` — a choice that makes another row pointless (a folder for a
-        /// destination that saves nothing) takes it out rather than leaving it there greyed.
+        /// destination that saves nothing) takes it out rather than leaving it there grayed.
         var isHidden = false
 
         /// A quiet line of words, wrapped to the form's width.

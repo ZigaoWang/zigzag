@@ -2878,7 +2878,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             toggle.onChange = { isOn in DownloadRulesStore.shared.setEnabled(isOn, for: rule.id) }
             toggle.setAccessibilityLabel(String(localized: "Turn \(rule.name) on or off", comment: "A download rule's switch for VoiceOver. The placeholder is the rule's name."))
 
-            // The list shows only handoff rules, so its places are not the store's: move by the neighbouring rule's
+            // The list shows only handoff rules, so its places are not the store's: move by the neighboring rule's
             // id, not by the row's number.
             let previous = index > 0 ? rules[index - 1].id : nil
             let next = index < rules.count - 1 ? rules[index + 1].id : nil
@@ -2927,7 +2927,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The per-extension destinations, one row each, under Save downloads to: the file types a rule names, and where
     /// those files go instead of the folder everything else goes to. Each is a rule like any other — the same switch,
     /// the same Change and Delete — because that is what it is; only its matcher (the file's own name) and its
-    /// action (a folder, or Zigzag showing it) are its own.
+    /// action (a folder, or the Mac's own app opening it) are its own.
     private func reloadDownloadTypes() {
         downloadTypesGroup.removeAllRows()
         let rules = DownloadRulesStore.shared.rules.filter { $0.action.kind.isDestination }

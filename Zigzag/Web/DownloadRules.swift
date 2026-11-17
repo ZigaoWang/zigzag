@@ -5,9 +5,9 @@ import WebKit
 
 // MARK: - A rule
 
-/// Where a file goes, for a rule whose destination is not another app: saved into a folder of its own, or shown by
-/// Zigzag itself. A destination never cancels the download — it decides *where the file lands* — so it is read in the
-/// response decision and honoured when the download is made, never run through `DownloadHandoff`.
+/// Where a file goes, for a rule whose destination is not another app: saved into a folder of its own, or opened in
+/// the Mac's own app for its type. A destination never cancels the download — it decides *where the file lands* — so
+/// it is read in the response decision and honored when the download is made, never run through `DownloadHandoff`.
 nonisolated enum DownloadDestination: Equatable, Sendable {
     /// Save into this folder, as chosen in the panel. Empty asks for the default, which is nothing to decide.
     case folder(String)
@@ -365,7 +365,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
 
     var kind: Kind = .openURL
     /// Where this action sends the file, for the two destination kinds that don't hand it to another app: a folder of
-    /// its own, or Zigzag showing it. Nil for the four handoff actions, which `DownloadHandoff` runs.
+    /// its own, or the Mac's own app opening it. Nil for the four handoff actions, which `DownloadHandoff` runs.
     var destination: DownloadDestination? {
         switch kind {
         case .saveToFolder: .folder(folderPath)
