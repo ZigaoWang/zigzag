@@ -35,6 +35,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 没有打开网页的空间不再是纯白或纯黑，而是铺上一层很淡的空间颜色，像是边栏的浅色版。空间编辑器里新增了“背景”一行：点按“选取图像…”可以在字标后面放一张你自己的图像，点按“移除”就去掉。Zigzag 会保存一份按你的屏幕大小缩好的副本，所以就算原图被移走或删掉，图像也还在。无痕浏览窗口保持原样。
 - “设置 › 密码 › 密码管理器”可以选择由谁存储和填写密码：Zigzag，或 Apple 的 iCloud 密码扩展。选择 iCloud 密码会照常弹出确认后添加这个扩展，把它的按钮固定在地址栏旁，并在这份个人资料里关掉 Zigzag 自己的存储和填写，两边不会同时弹出提示。点按扩展的按钮，输入 macOS 显示的验证码就能连接。改回 Zigzag 后，存储和填写会恢复成原来的样子，扩展会留着，不需要的话可以在“设置 › 扩展”里移除。自己从 Chrome 网上应用店添加这个扩展时，也会问一次要不要切换。“密码”窗口两种情况下都能用。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
 - 网站要求提供证书来确认你的身份时（有些单位的 Outlook、Microsoft 登录和内网就是这样），Zigzag 会像 Safari 一样从你的钥匙串里提供证书。页面上会出现一个面板，列出网站能接受的证书，写明每个是谁颁发的、什么时候过期，还有“始终为此网站使用这个证书”，默认打开，下次就不用再选了。“设置 › 隐私 › 网站”会列出每个网站用的证书，可以忘掉。证书删掉或过期后会重新询问，点“取消”就不带证书继续；无痕浏览窗口每次都会问，选择只保留到窗口关闭。要添加证书，在“钥匙串访问”里打开它的 .p12 文件就行；macOS 可能会问一次是否允许 Zigzag 使用它的密钥。感谢 [ldhieu](https://github.com/ldhieu)。([#297](https://github.com/ZigaoWang/zigzag/issues/297))
+- 在边栏里点一下之后，按 ⌘A 会选中“标签页”部分的所有标签页，和 Arc、Finder 一样，可以一起关闭、移动、固定或分屏。收起的分组里和折叠起来的标签页下面的标签页不会被选中，按 Esc 取消选择。在网页、地址栏或重命名框里按 ⌘A，还是选中那里的文字。感谢 [Kevoin](https://github.com/Kevoin)。([#302](https://github.com/ZigaoWang/zigzag/issues/302))
 
 ### 修复
 - 在 macOS 15 上，Bitwarden 能用了，不会再一打开就说不支持 WebAssembly。macOS 15 自带的 WebKit 会忽略扩展运行 WebAssembly 的许可，Bitwarden 的密码库代码离不开它，于是被拒绝了。现在 Zigzag 会用这个 WebKit 认得的写法给这类扩展这个许可，脚本能从哪里载入的限制不变。macOS 26 及以后的版本不受影响。感谢 [ldhieu](https://github.com/ldhieu)。([#298](https://github.com/ZigaoWang/zigzag/issues/298))

@@ -24,6 +24,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         if commandBar.isVisible && commandBar.mode == .editCurrent { commandBar.dismiss(); return }
         commandBar.show(mode: .editCurrent)
     }
+    /// Edit › Select All with no page or field to take it, after a click in the sidebar: its tabs (#302).
+    override func selectAll(_ sender: Any?) {
+        if (window as? BrowserWindow)?.selectAllInSidebar() != true { NSSound.beep() }
+    }
     @objc func closeTab(_ sender: Any?) {
         if commandBar.isVisible { commandBar.dismiss(); return }
         // On the desk, the card you're on.
@@ -624,6 +628,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             return false
         }
         switch item.action {
+        case #selector(selectAll(_:)): return (window as? BrowserWindow)?.sidebarHasTheClick == true
         case #selector(openDocument(_:)):
             // Zigzag Mini names it Open in Zigzag while it's in front; here it's itself again.
             item.title = Self.openFileTitle

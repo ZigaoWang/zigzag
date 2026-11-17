@@ -1037,6 +1037,8 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
     }
 
     override func selectAll(_ sender: Any?) {
+        // After a click in the sidebar, ⌘A picks its tabs (#302).
+        if (window as? BrowserWindow)?.selectAllInSidebar() == true { return }
         Task { @MainActor [weak self] in
             guard let self, let strings = await self.allStrings(), let last = strings.indices.last else { return }
             let length = (strings[last] as NSString).length
@@ -1046,7 +1048,7 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(copy(_:)) { return selection != nil && allowsCopying }
-        if item.action == #selector(selectAll(_:)) { return document != nil }
+        if item.action == #selector(selectAll(_:)) { return document != nil || (window as? BrowserWindow)?.sidebarHasTheClick == true }
         return true
     }
 

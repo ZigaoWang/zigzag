@@ -46,6 +46,8 @@ final class BrowserWebView: WKWebView {
     /// menu takes ⌘A before the page sees it, so it's handed on here; with something typed in the page's search
     /// field, that text is what's selected, as usual.
     override func selectAll(_ sender: Any?) {
+        // After a click in the sidebar, ⌘A picks its tabs (#302).
+        if (window as? BrowserWindow)?.selectAllInSidebar() == true { return }
         // A PDF from the web is in WebKit's own viewer, which takes Select All only once its plugin has the page's
         // focus, as a click in it gives: a PDF just opened has none, and ⌘A selected nothing (#219).
         if isPDF, owner?.pdfViewer == nil {
