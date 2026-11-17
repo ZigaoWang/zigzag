@@ -148,19 +148,23 @@ struct XPIPackageTests {
         #expect(throws: XPIPackage.Failure.unsafeName("../escaped.txt")) { try XPIPackage(data) }
     }
 
-    /// Reading a package only decompresses its manifest, so the temporary folder is left exactly as it was.
-    @Test func readsTheManifestWithoutTouchingTheTemporaryFolder() throws {
-        let before = Self.temporaryXPIFolders()
-        _ = try XPIPackage(TestXPI(entries: [.init(name: "manifest.json", data: try Self.json(Self.manifest))]).data)
-        #expect(Self.temporaryXPIFolders() == before)
-        let missing = TestXPI(entries: [.init(name: "background.js", data: Data("x".utf8))]).data
-        #expect(throws: XPIPackage.Failure.missingManifest) { try XPIPackage(missing) }
-        #expect(Self.temporaryXPIFolders() == before)
-    }
+    /// A package whose sibling entry is corrupt: reading it reads the manifest alone, while unpacking it reads the
+    /// sibling and refuses. The corrupt entry is stored with a stale checksum, which the index checks only when the
+    /// entry's bytes are read, so `entries` itself still accepts it.
+    @Test func readsOnlyTheManifestOfAPackageWhoseSiblingIsCorrupt() throws {
+        let marker = Data("corrupt-sibling-marker".utf8)
+        var data = TestXPI(entries: [
+            .init(name: "manifest.json", data: try Self.json(Self.manifest)),
+            .init(name: "notes.txt", data: marker),
+        ]).data
+        let found = try #require(data.range(of: marker))
+        data[found.lowerBound] ^= 0xFF
 
-    private static func temporaryXPIFolders() -> Set<String> {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path)) ?? []
-        return Set(names.filter { $0.lowercased().hasPrefix("zigzag-xpi-") })
+        let package = try XPIPackage(data)
+        #expect(package.manifest["name"] as? String == "Test")
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("XPIPackageTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        #expect(throws: XPIPackage.Failure.damaged) { try package.unpack(into: folder) }
     }
 
     @Test func unpacksItsFilesIntoANewFolder() throws {
