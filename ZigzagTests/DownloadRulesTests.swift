@@ -581,6 +581,27 @@ struct DownloadRuleTests {
 
     /// The last word on Open: an app, a script, an installer, an archive or a file with no type is saved, while a PDF
     /// may open.
+    @Test func aNewFileTypeGoesBeforeTheHandoffRules() {
+        var aria2 = rule(.any)
+        aria2.name = "aria2"
+        var pdf = destination("pdf", .openFile)
+        pdf.name = "PDF"
+        var epub = destination("epub", .saveToFolder, folder: "/tmp")
+        epub.name = "EPUB"
+        #expect(DownloadRulesStore.placeForNewFileType(in: []) == 0)
+        #expect(DownloadRulesStore.placeForNewFileType(in: [aria2]) == 0)
+        #expect(DownloadRulesStore.placeForNewFileType(in: [pdf, aria2]) == 1)
+        #expect(DownloadRulesStore.placeForNewFileType(in: [pdf, epub]) == 2)
+
+        // Added that way, a type behind a downloader preset's catch-all still decides its own files.
+        var rules = [aria2]
+        rules.insert(pdf, at: DownloadRulesStore.placeForNewFileType(in: rules))
+        #expect(DownloadRulesStore.firstHandoffMatch(in: rules, url: URL(string: "https://example.com/a.pdf")!,
+                                                     filename: "a.pdf", appliesToLinks: false) == nil)
+        #expect(DownloadRulesStore.firstHandoffMatch(in: rules, url: URL(string: "https://example.com/a.zip")!,
+                                                     filename: "a.zip", appliesToLinks: false)?.name == "aria2")
+    }
+
     @MainActor @Test func placingAnOpenNeverOpensARefusedType() {
         let unique = UUID().uuidString
         #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique).pdf")?.openWhenFinished == true)

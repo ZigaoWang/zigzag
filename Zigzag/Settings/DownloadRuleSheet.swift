@@ -324,7 +324,12 @@ enum DownloadRuleSheet {
             sheetRef = nil
             guard confirmed, let rule = ruleFromFields(), isValid(rule) else { return }
             if let secret = secretField?.stringValue, action.kind == .jsonRPC { HandoffSecrets.setSecret(secret, for: rule.id) }
-            if existing == nil { DownloadRulesStore.shared.add(rule) } else { DownloadRulesStore.shared.update(rule) }
+            if existing == nil {
+                let store = DownloadRulesStore.shared
+                store.add(rule, at: rule.action.kind.isDestination ? DownloadRulesStore.placeForNewFileType(in: store.rules) : nil)
+            } else {
+                DownloadRulesStore.shared.update(rule)
+            }
         }
         sheetRef = sheet
         // The folder belongs to one of the two destinations. Choosing the other takes the row out of the form

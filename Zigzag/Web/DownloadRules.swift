@@ -873,6 +873,13 @@ final class DownloadRulesStore {
         save()
     }
 
+    /// Where a new file type goes: after the file types already there and before the first rule that hands something
+    /// off. Settings lists the file types above the handoff rules, so that is the order they are tried in; appended
+    /// at the end, a new type would sit behind a catch-all handoff (a downloader preset) and never decide anything.
+    nonisolated static func placeForNewFileType(in rules: [DownloadRule]) -> Int {
+        rules.firstIndex { !$0.action.kind.isDestination } ?? rules.count
+    }
+
     func add(_ rule: DownloadRule, at index: Int? = nil) {
         let place = min(max(0, index ?? rules.count), rules.count)
         rules.insert(rule, at: place)
