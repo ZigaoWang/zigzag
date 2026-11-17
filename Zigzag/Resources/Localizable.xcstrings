@@ -692,6 +692,17 @@
         }
       }
     },
+    "%@ wants a certificate to identify you." : {
+      "comment" : "Message in the sheet a site asks for a certificate with. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 要求提供证书来确认你的身份。"
+          }
+        }
+      }
+    },
     "%@ wants more access" : {
       "comment" : "Title of the sheet shown when an extension asks for more access. The name is the extension's.\nTitle of the sheet shown when an extension's update asks for more access. The name is the extension's.",
       "localizations" : {
@@ -2598,6 +2609,17 @@
         }
       }
     },
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
+      "comment" : "Message of the sheet that forgets the choices made for single sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
+          }
+        }
+      }
+    },
     "Advanced" : {
       "comment" : "A heading in the column of Settings, over Extensions, Shortcuts, Automation and Developer.",
       "localizations" : {
@@ -2935,6 +2957,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "总是翻译%@"
+          }
+        }
+      }
+    },
+    "Always use this certificate for %@" : {
+      "comment" : "Choice in the sheet a site asks for a certificate with. The placeholder is the site's host name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终为 %@ 使用这个证书"
           }
         }
       }
@@ -7307,6 +7340,17 @@
         }
       }
     },
+    "Expires %@" : {
+      "comment" : "Under a certificate's name in the sheet a site asks for one with. The placeholder is the date it expires.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@过期"
+          }
+        }
+      }
+    },
     "Export" : {
       "comment" : "Button in the Passwords window that exports passwords to a file.\nButton in the sheet that confirms exporting passwords.",
       "localizations" : {
@@ -8944,6 +8988,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "颁发者"
+          }
+        }
+      }
+    },
+    "Issued by %@" : {
+      "comment" : "Under a certificate's name in the sheet a site asks for one with. The placeholder is who issued it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %@ 颁发"
+          }
+        }
+      }
+    },
+    "Issued by %@, expires %@" : {
+      "comment" : "Under a certificate's name in the sheet a site asks for one with. The placeholders are who issued it and the date it expires.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 %@ 颁发，%@过期"
           }
         }
       }
@@ -21326,17 +21392,6 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background." : {
-      "comment" : "Message of the sheet that forgets the choices made for single sites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置和通知，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠。"
-          }
-        }
-      }
-    },
     "an extension" : {
       "comment" : "Stands in for an extension's name when it has none, inside a sentence like “an extension is listening to this tab”.",
       "localizations" : {
@@ -21410,6 +21465,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "纯黑 黑色 深色模式 OLED AMOLED black pure"
+          }
+        }
+      }
+    },
+    "certificate: %@" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: the certificate from your Keychain it's always sent, by name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "证书：%@"
           }
         }
       }
@@ -22787,6 +22853,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取脚本…"
+          }
+        }
+      }
+    },
+    "Choose a certificate" : {
+      "comment" : "Title of the sheet a site asks for a certificate from your Keychain with.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择证书"
           }
         }
       }

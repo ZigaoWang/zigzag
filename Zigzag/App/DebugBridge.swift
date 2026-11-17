@@ -2225,6 +2225,13 @@ enum DebugBridge {
             if let data = try? JSONSerialization.data(withJSONObject: PageDialogSheet.debugState(), options: [.prettyPrinted]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "dialogsaved": PageDialogSheet.debugShowSaved()
         case "dialogcancel": PageDialogSheet.debugCancel()
+        case "dialogchoose":
+            // dialogchoose <index> [on|off]: picks a choice in the sheet showing, sets its "always" choice, and continues.
+            let f = arg.split(separator: " ")
+            PageDialogSheet.debugChoose(Int(f.first ?? "") ?? 0, remember: f.count > 1 ? f[1] == "on" : nil)
+        case "clientcerts":
+            // clientcerts: the certificates kept for sites, in the debug log.
+            debugLog("clientcerts \(ClientCertificates.sites.sorted().map { "\($0)=\(ClientCertificates.kept(host: $0)?.name ?? "")" })")
         case "windowshot":
             // windowshot <path>: the window's own drawing, as a PNG; web content may be blank.
             guard let view = controller.window?.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }

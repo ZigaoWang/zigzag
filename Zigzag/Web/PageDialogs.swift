@@ -251,6 +251,10 @@ enum AuthenticationPrompt {
                                                    leaf: CertificateExceptions.leaf(of: trust), askedBy: page?.url, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
+        // A site asking for a certificate that identifies you: one from your Keychain, as Safari offers.
+        if method == NSURLAuthenticationMethodClientCertificate {
+            return await ClientCertificates.respond(to: challenge, window: window, store: store, page: page)
+        }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {
             return (.performDefaultHandling, nil)
         }
