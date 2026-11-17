@@ -756,6 +756,9 @@ enum DebugBridge {
         // editornewprofile: the space editor's New Profile, as its menu item does. editorname <name>: types that name.
         case "editornewprofile": SpaceEditorPanel.current?.debugNewProfile()
         case "editorname": SpaceEditorPanel.current?.debugType(arg)
+        // editorbackground <path>: Background › Choose Image… with that file picked; editorbackground (none): Remove.
+        case "editorbackground":
+            if arg.isEmpty { SpaceEditorPanel.current?.debugRemoveBackground() } else { SpaceEditorPanel.current?.debugSetBackground(URL(fileURLWithPath: arg)) }
         case "tourskip": Tutorial.skip()
         case "tourend": Tutorial.isHidden = true; controller.root.overlay.subviews.compactMap { $0 as? GuidedTour }.forEach { $0.removeFromSuperview() }
         case "fullscreen": controller.window?.toggleFullScreen(nil)

@@ -1521,6 +1521,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let profileNote = NSTextField.dialogText(ProfileChoice.spaceNote, font: Tokens.Font.detail())
     /// A profile New Profile made here, still called after the space: it takes the name as you type it.
     private var namedProfile: UUID?
+    /// The picture the space's empty page shows, in place of its soft wash (`EmptyPage`).
+    private let backgroundLabel = SpaceLookEditor.rowLabel(String(localized: "Background", comment: "Label in a space's editor, before the buttons that choose or remove the picture its empty page shows."))
+    private let chooseBackground = PillButton(title: String(localized: "Choose Image…", comment: "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page."))
+    private let removeBackground = PillButton(title: String(localized: "Remove", comment: "Button in a space's editor, on the Background row: takes the picture off the space's empty page and deletes Zigzag's copy of it."), style: .quiet)
     /// While a question it asked is up (moving the space's tabs to another profile), clicks and keys are that
     /// question's: the editor stays as it is under it.
     private var isAsking = false
@@ -1541,8 +1545,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.row
-        [nameBackground, nameField, editor, iconButton, profileLabel, profileButton, profileNote].forEach { addSubview($0) }
+        [nameBackground, nameField, editor, iconButton, profileLabel, profileButton, profileNote,
+         backgroundLabel, chooseBackground, removeBackground].forEach { addSubview($0) }
         refreshProfiles()
+        refreshBackground()
+        chooseBackground.onClick = { [weak self] _ in self?.pickBackground() }
+        removeBackground.onClick = { [weak self] _ in self?.clearBackground() }
         profileButton.onSelect = { [weak self] index in self?.chooseProfile(at: index) }
         profileButton.actions = [DropdownButton.Action(title: ProfileChoice.newForSpace, symbol: "plus") { [weak self] in
             self?.newProfile()
@@ -1577,7 +1585,10 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private var profileRowHeight: CGFloat { Tokens.Page.controlHeight + Tokens.Space.x1 + profileNoteHeight + Tokens.Space.x3 }
     private var profileNoteHeight: CGFloat { profileNote.wrappedHeight(Self.width - pad * 2) }
 
-    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + profileRowHeight + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
+    /// The Background row, with the space under it.
+    private var backgroundRowHeight: CGFloat { Tokens.Page.controlHeight + Tokens.Space.x3 }
+
+    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + profileRowHeight + backgroundRowHeight + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
 
     private func refreshIconButton(_ icon: String?) {
         iconButton.glyph = icon.map { IconChoice.image($0, size: Tokens.Symbol.compactGlyph) }
@@ -1644,7 +1655,22 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let menuWidth = min(profileButton.intrinsicContentSize.width, width - editor.labelWidth)
         profileButton.frame = NSRect(x: pad + width - menuWidth, y: rowY, width: menuWidth, height: rowH)
         profileNote.frame = NSRect(x: pad, y: rowY + rowH + Tokens.Space.x1, width: width, height: profileNoteHeight)
-        let below = rowY + profileRowHeight
+        // The background, under the profile: Choose Image… at the column's end, or with a picture, Remove there, quiet
+        // text whose words end on the column's edge (it reaches out by its padding, as Use Default Colors does).
+        let backgroundY = rowY + profileRowHeight
+        let bh = ceil(backgroundLabel.intrinsicContentSize.height)
+        backgroundLabel.frame = NSRect(x: pad, y: backgroundY + backgroundLabel.centeredY(in: rowH), width: editor.labelWidth, height: bh)
+        var buttonsEnd = pad + width
+        if !removeBackground.isHidden {
+            let removeWidth = ceil(removeBackground.fittingWidth), reach = Tokens.Space.x3
+            removeBackground.frame = NSRect(x: buttonsEnd - removeWidth + reach, y: backgroundY, width: removeWidth, height: rowH)
+            buttonsEnd = removeBackground.frame.minX - Tokens.Space.x1
+        }
+        // Its own width, short of the label's words: "Background" runs past the look's label column in some languages.
+        let labelEnd = pad + ceil(backgroundLabel.intrinsicContentSize.width) + Tokens.Space.x2
+        let chooseWidth = min(ceil(chooseBackground.fittingWidth), buttonsEnd - labelEnd)
+        chooseBackground.frame = NSRect(x: buttonsEnd - chooseWidth, y: backgroundY, width: chooseWidth, height: rowH)
+        let below = backgroundY + backgroundRowHeight
         editor.frame = NSRect(x: pad, y: below, width: width, height: editor.preferredHeight)
         iconGrid?.frame = NSRect(x: pad, y: below, width: width, height: IconGrid.height)
     }
@@ -1797,6 +1823,68 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
             self.refreshProfiles()
         }
     }
+
+    // MARK: Background
+
+    /// Remove is there only while the space has a picture that's still kept.
+    private func refreshBackground() {
+        let name = Library.shared.space(spaceID)?.backgroundImage
+        removeBackground.isHidden = name.map { !SpaceBackground.isKept($0) } ?? true
+        needsLayout = true
+    }
+
+    /// Choose Image…: a picture from anywhere, copied into Zigzag's folder at the size the screen needs.
+    private func pickBackground() {
+        guard let host = controller?.window ?? window else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks a picture for a space's empty page.")
+        panel.message = String(localized: "Choose a picture for this space’s empty page.", comment: "Message of the panel that picks a picture for a space's empty page, from Background in the space's editor.")
+        isAsking = true
+        let id = spaceID
+        panel.beginSheetModal(for: host) { [weak self] response in
+            self?.isAsking = false
+            guard response == .OK, let url = panel.url else { return }
+            let screen = SpaceBackground.screenPixels
+            DispatchQueue.global(qos: .userInitiated).async {
+                let name = SpaceBackground.store(url, for: id, screen: screen)
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated {
+                        guard let name else {
+                            if let host = self?.sheetHost {
+                                ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t use this picture", comment: "Title of the notice when a picture chosen for a space's empty page can't be read."),
+                                                    message: String(localized: "Zigzag can’t read that file as a picture. Choose a photo or an image file, like a JPEG, PNG or HEIC.", comment: "Message of the notice when a picture chosen for a space's empty page can't be read."))
+                            }
+                            return
+                        }
+                        Library.shared.setBackgroundImage(name, forSpace: id)
+                        self?.edited = true
+                        self?.refreshBackground()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Remove: the soft wash again, and Zigzag's copy of the picture deleted.
+    private func clearBackground() {
+        Library.shared.setBackgroundImage(nil, forSpace: spaceID)
+        edited = true
+        refreshBackground()
+    }
+
+    #if DEBUG
+    /// For the debug bridge: Choose Image… with a file already picked.
+    func debugSetBackground(_ url: URL) {
+        guard let name = SpaceBackground.store(url, for: spaceID, screen: SpaceBackground.screenPixels) else { return }
+        Library.shared.setBackgroundImage(name, forSpace: spaceID)
+        edited = true
+        refreshBackground()
+    }
+    func debugRemoveBackground() { clearBackground() }
+    #endif
 
     /// A profile made with the space (Settings › Spaces › Give new spaces their own profile, #291): it takes the
     /// space's name as you type it, as one New Profile made here does.

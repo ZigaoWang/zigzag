@@ -1339,6 +1339,13 @@ enum Tokens {
         static let surfaceGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
         static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06),
             highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.30))
+        /// The wordmark on a space's picture (its empty page's Background): white letters, light or dark, with one
+        /// soft shadow (`Shadow.liftRadius`, `liftDrop`) under them, so they read on a busy picture, as a Mac's own
+        /// lock screen does. Stronger with Increase Contrast.
+        static let markOnPicture = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0xFFFFFF, alpha: 0.86),
+            highLight: hex(0xFFFFFF, alpha: 1), highDark: hex(0xFFFFFF, alpha: 1))
+        static let markOnPictureShadow = dynamic(light: hex(0x000000, alpha: 0.32), dark: hex(0x000000, alpha: 0.45),
+            highLight: hex(0x000000, alpha: 0.55), highDark: hex(0x000000, alpha: 0.65))
         /// Behind a PDF's pages and in its sidebar: a shade off the card, so each page stands out as paper.
         static let pdfBackdrop = dynamic(light: hex(0xEDEDF0), dark: hex(0x161618))
         /// Between a PDF's pages while they're drawn dark: a shade lighter than the dark paper, so each still reads as one.

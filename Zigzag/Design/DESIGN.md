@@ -495,6 +495,11 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   shape of its own on white with room around it, or the name's first letter on the site's color.
 - **Empty states** (`Tokens.EmptyState`, the same in HTML through `PageStyle`): the wordmark 120pt wide at 8%, 16pt
   to a quiet line no wider than 360, 24pt to an optional action. History, Passwords and the error page share it.
+- **A space with no page open** (`EmptyPage`): the page card stays, in the space's wash (`Theme.wash`, the sidebar's
+  color a few steps lighter by day, deep and calm at night), with the wordmark engraved in its middle. White, grays,
+  black and private windows keep the plain card. A picture chosen in the space's editor (Background) fills the card
+  instead, aspect fill and centered, read only while the page is empty; on it the wordmark is laid on in white with
+  one soft shadow (`Color.markOnPicture`), since an engraving can't read over every picture.
 - **Built-in pages** (History, Settings, Passwords): one plain `Color.surface` (the column of places in Settings and
   Passwords in a light tint of their window's space, `Brand.Theme.for(view).wash`), `PageTitleView` (wordmark, hairline,
   title) at the top left, `PageHeader` with search and actions at the right, `ListItem` for a column of places,
