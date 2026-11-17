@@ -347,19 +347,19 @@ struct TileLayoutTests {
     }
 
     @MainActor @Test func theRowSplitsIntoAPartForEachPage() {
-        // Two: halves meeting in the middle, as a split's row always had.
-        let two = TabRowView.segments(count: 2, start: 0, end: 220, mid: 125, gap: 4)
-        #expect(two.count == 2 && two[0] == (0, 121) && two[1] == (125, 220))
-        // Three and four: even parts, a gap between, the last reaching the end.
-        let four = TabRowView.segments(count: 4, start: 0, end: 220, mid: 125, gap: 4)
-        #expect(four.count == 4 && four[0].start == 0 && four[3].end == 220)
-        for i in 1..<4 { #expect(four[i].start >= four[i - 1].end) }
-        #expect(TabRowView.segments(count: 1, start: 0, end: 220, mid: 125, gap: 4).count == 1)
-        // Titles only where a few words fit: in thirds of a wide sidebar, not a usual one's thirds or quarters,
-        // whose parts show their icons alone.
-        #expect(TabRowView.segmentShowsTitle(width: 300 / 3 - 4))
-        #expect(!TabRowView.segmentShowsTitle(width: 220 / 3 - 4))
-        #expect(!TabRowView.segmentShowsTitle(width: 220 / 4 - 4))
+        // Parts of one width, each meeting the next, the first at the row's start and the last at its end.
+        for count in 2...4 {
+            let parts = TabRowView.splitParts(count: count, end: 220)
+            #expect(parts.count == count && parts[0].start == 0 && parts[count - 1].end == 220)
+            for i in 1..<count { #expect(parts[i].start == parts[i - 1].end) }
+            let widths = parts.map { $0.end - $0.start }
+            #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 1)
+        }
+        #expect(TabRowView.splitParts(count: 1, end: 220).count == 1)
+        // Titles while a part has room for a few letters: a usual sidebar's thirds and quarters, not much narrower.
+        #expect(TabRowView.segmentShowsTitle(width: 228 / 3, size: .medium))
+        #expect(TabRowView.segmentShowsTitle(width: 228 / 4, size: .medium))
+        #expect(!TabRowView.segmentShowsTitle(width: 200 / 4, size: .medium))
     }
 
     @MainActor @Test func theHintSaysWhereThePageGoes() {

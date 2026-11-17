@@ -877,23 +877,6 @@
         }
       }
     },
-    "%@, split with %@" : {
-      "comment" : "Accessibility label of a split view's row in the sidebar: the two pages' titles.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@, split with %2$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@，与 %2$@ 分屏"
-          }
-        }
-      }
-    },
     "%@. %@." : {
       "comment" : "A save that failed, then why, as two sentences: “Couldn’t save the page. Not enough space on your Mac.”",
       "localizations" : {
@@ -6302,6 +6285,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 的空间"
+          }
+        }
+      }
+    },
+    "Split view: %@" : {
+      "comment" : "Accessibility label of a split view's row in the sidebar: its pages' titles, as a list (“Split view: Wikipedia, Example and Google”).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分屏：%@"
           }
         }
       }
