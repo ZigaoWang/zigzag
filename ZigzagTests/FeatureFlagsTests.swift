@@ -79,6 +79,37 @@ struct FeatureFlagsTests {
         }
     }
 
+    private static let sixty = FeatureFlags.Flag(key: "PreferPageRenderingUpdatesNear60FPSEnabled", name: "Prefer Page Rendering Updates near 60fps",
+                                                 details: "", status: .stable, defaultValue: true)
+
+    @Test func pagesDrawAtTheScreensRateUnlessChanged() throws {
+        try with([Self.anchors, Self.sixty]) { engine in
+            // Off on every page, Developer Mode or not, and listed as off by default.
+            DeveloperTools.isOn = false
+            FeatureFlags.apply(to: WKPreferences())
+            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false"])
+            let listed = try #require(FeatureFlags.flags?.first { $0.key == Self.sixty.key })
+            #expect(!listed.defaultValue && !FeatureFlags.isOn(listed) && !FeatureFlags.isChanged(listed))
+            // Turned on in Settings: kept as a change, and set after Zigzag's own default.
+            DeveloperTools.isOn = true
+            FeatureFlags.set(true, for: listed)
+            #expect(FeatureFlags.overrides == ["PreferPageRenderingUpdatesNear60FPSEnabled": true])
+            engine.applied = []
+            FeatureFlags.apply(to: WKPreferences())
+            #expect(engine.applied.map { "\($0.key) \($0.on)" } == ["PreferPageRenderingUpdatesNear60FPSEnabled false", "PreferPageRenderingUpdatesNear60FPSEnabled true"])
+            // Back off is back to the default: forgotten.
+            FeatureFlags.set(false, for: listed)
+            #expect(FeatureFlags.overrides.isEmpty)
+        }
+    }
+
+    @Test func thisMacsWebKitStillHasTheSixtyFPSFlag() {
+        // Zigzag's own default names a flag WebKit has; renamed, it would quietly stop applying.
+        let keys = Set((WebKitFeatures().flags ?? []).map(\.key))
+        guard !keys.isEmpty else { return }
+        #expect(keys.contains("PreferPageRenderingUpdatesNear60FPSEnabled"))
+    }
+
     @Test func resetForgetsEveryChange() {
         with { _ in
             FeatureFlags.set(false, for: Self.anchors)

@@ -35,6 +35,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 没有打开网页的空间不再是纯白或纯黑，而是铺上一层很淡的空间颜色，像是边栏的浅色版。空间编辑器里新增了“背景”一行：点按“选取图像…”可以在字标后面放一张你自己的图像，点按“移除”就去掉。Zigzag 会保存一份按你的屏幕大小缩好的副本，所以就算原图被移走或删掉，图像也还在。无痕浏览窗口保持原样。
 
 ### 修复
+- 高刷新率屏幕上滚动和动画更流畅了。网页现在按屏幕的完整刷新率绘制，在 ProMotion 屏幕上每秒最多 120 次，和 Chrome 一样，不再最多 60 次；以前网站自己的平滑滚动、动画和随滚动移动的内容看起来会一顿一顿的。想换回原来的刷新率，可以在“设置 › 开发者 › 功能标志”里打开 Prefer Page Rendering Updates near 60fps。
 - 从 Arc 导入时，收藏会留在所显示空间所属的个人资料中，不再混入从其他 Mac 同步来的收藏或旧列表。每份个人资料里的同一页面只会添加一次。感谢 [adagradschool](https://github.com/adagradschool)。([#290](https://github.com/ZigaoWang/zigzag/pull/290))
 - 全屏时，显示边栏并打开“无边框页面”的情况下，网页碰到屏幕边缘的角现在是直角，不再是圆角、在右上角和右下角露出一小块边栏颜色的三角，没有打开网页或网页载入时最明显。在窗口里，网页的圆角跟着窗口本身的圆角走，不管 macOS 把窗口画得多圆。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))
 - HLTV（hltv.org）不再显示博彩广告：网页两侧的广告栏、点一下就会打开博彩网站的背景图，以及标志旁边和侧栏里的横幅和赔率框都去掉了。新闻、比赛、比分和视频照常。感谢 [alextend](https://github.com/alextend)。([#283](https://github.com/ZigaoWang/zigzag/issues/283))

@@ -8,7 +8,7 @@ import WebKit
 /// Only a flag someone changed is kept (its key and whether it's on); every other one stays WebKit's default, which can
 /// change with each macOS update. The changes are Zigzag's, for every profile, as Safari's are its own, and they're
 /// set on every page Zigzag makes (`WebKitSetup.configure`) while Developer Mode is on. Turning a flag back to its
-/// default, or Reset to Defaults, forgets it.
+/// default, or Reset to Defaults, forgets it. A few start where Zigzag wants them, not WebKit (`ownDefaults`).
 ///
 /// WebKit lists its flags only through unpublished API (`+[WKPreferences _features]`, `_WKFeature`,
 /// `-[WKPreferences _setEnabled:forFeature:]`), so every call is made only when WebKit still answers it, and with no
@@ -69,9 +69,23 @@ enum FeatureFlags {
 
     private static let key = "WebKitFeatureFlags"
 
+    /// Where Zigzag starts a flag otherwise than WebKit does, on every page, Developer Mode or not. Settings shows
+    /// these as the flag's default, so turning one back is a change that's kept.
+    ///
+    /// Prefer Page Rendering Updates near 60fps: off, as in Chrome. On, a page draws at most 60 times a second on a
+    /// 120 Hz display: its animations, a site's own smooth scrolling and anything that moves as you scroll step along
+    /// at half the screen's rate, which reads as stutter next to the system's own scrolling.
+    static let ownDefaults: [String: Bool] = ["PreferPageRenderingUpdatesNear60FPSEnabled": false]
+
     /// The flags you can change, the ones WebKit keeps to itself left out; nil when there's no list to show.
     static var flags: [Flag]? {
-        engine.flags.map { $0.filter { $0.status != .embedder && !$0.name.isEmpty } }
+        engine.flags.map { $0.filter { $0.status != .embedder && !$0.name.isEmpty }.map(withOwnDefault) }
+    }
+
+    /// A flag with Zigzag's own default, where it has one.
+    private static func withOwnDefault(_ flag: Flag) -> Flag {
+        guard let own = ownDefaults[flag.key], own != flag.defaultValue else { return flag }
+        return Flag(key: flag.key, name: flag.name, details: flag.details, status: flag.status, defaultValue: own)
     }
 
     /// Whether Settings has the group: WebKit lists its flags, and lets them be set.
@@ -115,6 +129,9 @@ enum FeatureFlags {
     /// What a new page is made with: every change, while Developer Mode is on. A flag this WebKit no longer has is
     /// kept and passed over.
     static func apply(to preferences: WKPreferences) {
+        // Zigzag's own defaults first, for the flags this WebKit has, so a change made in Settings comes after them.
+        let listed = Set((engine.flags ?? []).map(\.key))
+        for (key, on) in ownDefaults.sorted(by: { $0.key < $1.key }) where listed.contains(key) { engine.set(on, key: key, in: preferences) }
         guard DeveloperTools.isOn else { return }
         let all = overrides
         guard !all.isEmpty else { return }
