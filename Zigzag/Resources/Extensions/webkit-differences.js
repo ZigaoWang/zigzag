@@ -357,6 +357,8 @@
     }
 
     Object.defineProperty(globalThis, '__zigzagSetMember', { value: setMember, configurable: true });
+    // The API surface takes MV3-only members out of an MV2 world even where WebKit won't give one up.
+    Object.defineProperty(globalThis, '__zigzagRemoveMember', { value: removeMember, configurable: true });
 
     // A page asked to connect to its worker (below), when the worker looks for its clients.
     if (workerPage && api.runtime.onMessage && typeof api.runtime.onMessage.addListener === 'function') {
@@ -1085,41 +1087,45 @@
     const defaults = { webRTCIPHandlingPolicy: 'default', networkPredictionEnabled: true, hyperlinkAuditingEnabled: true,
       referrersEnabled: true, doNotTrackEnabled: false, thirdPartyCookiesAllowed: true, alternateErrorPagesEnabled: false,
       safeBrowsingEnabled: true, searchSuggestEnabled: true, spellingServiceEnabled: false, translationServiceEnabled: false };
-    // privacy and omnibox are WebKit-less namespaces the API surface adds, so these answers go on after it has.
-    const afterSurface = () => {
+    // Chrome's exact words when an extension has no background page to hand over.
+    const noBackgroundPage = 'You do not have a background page.';
     // runtime.getBackgroundPage: only an MV2 extension has a background page. In MV3 Chrome keeps the member on a
     // page, but it always fails with these words, and its service worker has no member at all; WebKit answers null
     // where there's no page. So an MV3 page is always told so, an MV2 page's null becomes the same error, and a
     // worker's member goes. A callback hears the error through runtime.lastError only while it runs, as from WebKit.
-    const manifestV3 = (() => { try { return api.runtime.getManifest().manifest_version === 3; } catch (e) { return false; } })();
-    const noBackgroundPage = 'You do not have a background page.';
-    const noBackgroundError = () => new Error(noBackgroundPage);
-    if (isWorker) {
-      if (manifestV3) removeMember(['runtime'], 'getBackgroundPage');
-    } else {
-      const webKits = manifestV3 ? null : (typeof api.runtime.getBackgroundPage === 'function' ? api.runtime.getBackgroundPage.bind(api.runtime)
-        : api.extension && typeof api.extension.getBackgroundPage === 'function' ? api.extension.getBackgroundPage.bind(api.extension) : null);
-      if (manifestV3 || webKits) setMember(['runtime'], 'getBackgroundPage', (callback) => {
-        const answer = (webKits ? Promise.resolve().then(webKits) : Promise.reject(noBackgroundError()))
-          .then((page) => (page ? page : Promise.reject(noBackgroundError())));
-        if (typeof callback !== 'function') return answer;
-        answer.then((page) => callback(page), (failure) => {
-          const lastError = { message: String((failure && failure.message) || failure) };
-          const runtimes = [...new Set(roots.map((root) => root.runtime))].filter(Boolean);
-          const before = runtimes.map((runtime) => Object.getOwnPropertyDescriptor(runtime, 'lastError'));
-          for (const runtime of runtimes) {
-            try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); }
-            catch (e) { try { runtime.lastError = lastError; } catch (e2) {} }
-          }
-          try { callback(); } finally {
-            runtimes.forEach((runtime, index) => {
-              try { if (before[index]) Object.defineProperty(runtime, 'lastError', before[index]); else delete runtime.lastError; } catch (e) {}
-            });
-          }
+    const correctGetBackgroundPage = (manifestV3) => {
+      const noBackgroundError = () => new Error(noBackgroundPage);
+      if (isWorker) {
+        if (manifestV3) removeMember(['runtime'], 'getBackgroundPage');
+      } else {
+        const webKits = manifestV3 ? null : (typeof api.runtime.getBackgroundPage === 'function' ? api.runtime.getBackgroundPage.bind(api.runtime)
+          : api.extension && typeof api.extension.getBackgroundPage === 'function' ? api.extension.getBackgroundPage.bind(api.extension) : null);
+        if (manifestV3 || webKits) setMember(['runtime'], 'getBackgroundPage', (callback) => {
+          const answer = (webKits ? Promise.resolve().then(webKits) : Promise.reject(noBackgroundError()))
+            .then((page) => (page ? page : Promise.reject(noBackgroundError())));
+          if (typeof callback !== 'function') return answer;
+          answer.then((page) => callback(page), (failure) => {
+            const lastError = { message: String((failure && failure.message) || failure) };
+            const runtimes = [...new Set(roots.map((root) => root.runtime))].filter(Boolean);
+            const before = runtimes.map((runtime) => Object.getOwnPropertyDescriptor(runtime, 'lastError'));
+            for (const runtime of runtimes) {
+              try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); }
+              catch (e) { try { runtime.lastError = lastError; } catch (e2) {} }
+            }
+            try { callback(); } finally {
+              runtimes.forEach((runtime, index) => {
+                try { if (before[index]) Object.defineProperty(runtime, 'lastError', before[index]); else delete runtime.lastError; } catch (e) {}
+              });
+            }
+          });
+          return undefined;
         });
-        return undefined;
-      });
-    }
+      }
+    };
+    // privacy and omnibox are WebKit-less namespaces the API surface adds, so these answers go on after it has.
+    const afterSurface = () => {
+    const manifestV3 = (() => { try { return api.runtime.getManifest().manifest_version === 3; } catch (e) { return false; } })();
+    correctGetBackgroundPage(manifestV3);
     // Manifest V2 never had runtime.getContexts: not from WebKit, the bridge, or the API surface, which leaves it out.
     if (!manifestV3) removeMember(['runtime'], 'getContexts');
     if (api.privacy) {

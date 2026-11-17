@@ -89,8 +89,9 @@ nonisolated enum CompatibilityReason: String, Codable, Hashable, Sendable {
 /// One claim: a status, and whatever that status needs to say why and how.
 nonisolated struct CompatibilityClaim: Codable, Sendable {
     var status: CompatibilityStatus
-    /// Required for patched, bridged and emulated: `swift:` names an `ExtensionBridge` handler, `js:` a symbol in
-    /// `webkit-differences.js` or the compatibility shim (`ExtensionShims.compatibility`).
+    /// Required for patched, bridged and emulated: `swift:` names an `ExtensionBridge` handler by its namespace
+    /// (`contexts`) or its class (`BridgeContexts`), `js:` a symbol in `webkit-differences.js` or the compatibility
+    /// shim (`ExtensionShims.compatibility`).
     var implementation: String?
     /// Required for unsupported and deprecated.
     var reason: CompatibilityReason?
@@ -188,6 +189,12 @@ nonisolated enum CompatibilityText {
         case "extension.limit.runtime":
             return String(localized: "extension.limit.runtime", defaultValue: "Restarting Zigzag",
                           comment: "A Chrome extension feature Zigzag cannot provide: restarting the browser or reading its package folder.")
+        case "extension.limit.runtimeContexts":
+            return String(localized: "extension.limit.runtimeContexts", defaultValue: "Open pages (background, popup, side panel and offscreen only; no tabs, subframes, developer tools or document IDs)",
+                          comment: "A Chrome extension feature Zigzag limits: runtime.getContexts reports background, popup, side panel and offscreen contexts only; tabs, subframes, developer tools and real document IDs are not reported.")
+        case "extension.limit.backgroundPage":
+            return String(localized: "extension.limit.backgroundPage", defaultValue: "The background page (Manifest V2 only; Manifest V3 pages get “You do not have a background page.”)",
+                          comment: "A Chrome extension feature Zigzag limits: runtime.getBackgroundPage answers Manifest V2 only; a Manifest V3 page gets “You do not have a background page.” and a Manifest V3 worker has no member.")
         case "extension.limit.action":
             return String(localized: "extension.limit.action", defaultValue: "Toolbar button settings",
                           comment: "A Chrome extension feature Zigzag limits: badge text colour and toolbar button settings.")
@@ -310,7 +317,7 @@ nonisolated enum CompatibilityText {
 /// listed a second time here. `emulated` claims name the compatibility shim's members (`js:getSelf`,
 /// `js:managed`), which is where an emulation with no Chrome service lives.
 nonisolated struct CompatibilityImplementations: Sendable {
-    /// The bridge's handler names, by the namespace an extension calls.
+    /// The bridge's handler names: each namespace an extension calls, and each handler class's own name.
     let handlers: Set<String>
     /// The corrections scripts' own source: `webkit-differences.js` and the compatibility shim.
     let script: String
@@ -330,7 +337,8 @@ nonisolated struct CompatibilityImplementations: Sendable {
     static func shipped(bundle: Bundle = .main) -> CompatibilityImplementations {
         let differences = bundle.url(forResource: "webkit-differences", withExtension: "js")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-        return CompatibilityImplementations(handlers: ExtensionBridge.handlerNames,
+        return CompatibilityImplementations(handlers: ExtensionBridge.handlerNames
+                                                .union(ExtensionBridge.handlerTypeNames),
                                             script: differences + "\n" + ExtensionShims.compatibility)
     }
 
