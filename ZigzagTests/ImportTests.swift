@@ -157,6 +157,20 @@ struct CSVImportTests {
         #expect(batch.problems.count == 1)
     }
 
+    /// Zigzag's own export guards formula-like text with a ' (see PasswordExport.field); importing it gives the text back.
+    @Test func zigzagsOwnExportComesBackAsItWas() throws {
+        let row = ["Site", "https://a.test", "=sam", "-pw", "@note", "'quoted"].map { PasswordExport.field($0, neutralized: $0 != "-pw") }
+        let (format, own) = try logins("name,url,username,password,note,otpauth\n" + row.joined(separator: ",") + "\n")
+        #expect(format == .chrome)
+        #expect(own[0].username == "=sam")
+        #expect(own[0].password.matches(SecretString("-pw")))
+        #expect(own[0].notes == "@note")
+        #expect(own[0].otpAuth == "'quoted")
+        // Another app's file is taken as written.
+        let (_, other) = try logins("name,url,username,password,note\nSite,https://a.test,'=sam,p,\n")
+        #expect(other[0].username == "'=sam")
+    }
+
     @Test func refusesAnUnknownFile() {
         if case .success = CSVImporter.parse("a,b,c\n1,2,3") { Issue.record("should not parse") }
     }

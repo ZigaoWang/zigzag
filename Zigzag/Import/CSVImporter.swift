@@ -50,15 +50,18 @@ nonisolated enum CSVImporter {
             return .failure(.unknownFormat)
         }
         let notesIndex = index(columns.notes), otpIndex = index(columns.otp)
+        // Zigzag's own export puts a ' before text a spreadsheet would run as a formula; it comes off again here.
+        let isOwnExport = header == zigzagExportHeader
+        func restore(_ text: String) -> String { isOwnExport ? unneutralized(text) : text }
         var batch = ImportBatch()
         var skipped = 0
         for row in table.dropFirst() where row.count > max(urlIndex, userIndex, passIndex) {
             let password = row[passIndex]
             guard !password.isEmpty, let url = URL(string: row[urlIndex].trimmingCharacters(in: .whitespaces)),
                   url.scheme == "https" || url.scheme == "http" else { skipped += 1; continue }
-            var login = ImportBatch.Login(url: url, username: row[userIndex], password: SecretString(password), created: nil)
-            if let notesIndex, notesIndex < row.count { login.notes = row[notesIndex] }
-            if let otpIndex, otpIndex < row.count { login.otpAuth = row[otpIndex] }
+            var login = ImportBatch.Login(url: url, username: restore(row[userIndex]), password: SecretString(password), created: nil)
+            if let notesIndex, notesIndex < row.count { login.notes = restore(row[notesIndex]) }
+            if let otpIndex, otpIndex < row.count { login.otpAuth = restore(row[otpIndex]) }
             batch.logins.append(login)
         }
         if skipped > 0 {
@@ -67,6 +70,15 @@ nonisolated enum CSVImporter {
                                                 fix: .none))
         }
         return batch.logins.isEmpty && skipped == 0 ? .failure(.empty) : .success((format, batch))
+    }
+
+    /// The header row of Passwords' own export (`PasswordExport`), which no other app writes.
+    static let zigzagExportHeader = ["name", "url", "username", "password", "note", "otpauth"]
+
+    /// Takes off the ' that `PasswordExport.field` put before =, +, -, @, a tab or a return; any other ' is the text's own.
+    static func unneutralized(_ text: String) -> String {
+        guard text.hasPrefix("'"), let next = text.unicodeScalars.dropFirst().first, "=+-@\t\r".unicodeScalars.contains(next) else { return text }
+        return String(text.dropFirst())
     }
 
     /// RFC 4180: quoted fields may hold commas, quotes ("") and line breaks.
