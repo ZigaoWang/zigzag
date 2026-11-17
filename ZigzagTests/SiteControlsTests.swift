@@ -590,7 +590,7 @@ struct SitePanelRowsTests {
     private typealias Context = SitePanelRows.Context
 
     @Test func anOrdinaryPage() {
-        #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .javaScript, .darkPage, .keepAwake])
         // The connection is a line under the site's name (#221), not a row into a page.
         #expect(SitePanelRows.links(Context()).isEmpty)
     }
@@ -601,7 +601,7 @@ struct SitePanelRowsTests {
         var c = Context()
         #expect(!SitePanelRows.rows(c).contains(.extensions))
         c.hasExtensions = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .extensions])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .javaScript, .darkPage, .keepAwake, .extensions])
         var privately = c
         privately.isPrivate = true
         privately.extensionHost = false
@@ -615,7 +615,7 @@ struct SitePanelRowsTests {
         var c = Context()
         c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .javaScript, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
     }
 
     /// Cookie banners (#175): there once a pop-up was found or a choice kept, under Ad blocking; never in a private
@@ -624,10 +624,10 @@ struct SitePanelRowsTests {
         var c = Context()
         #expect(!SitePanelRows.rows(c).contains(.cookieBanners))
         c.cookieBanners = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .cookieBanners, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .cookieBanners, .javaScript, .darkPage, .keepAwake])
         // Apart from ad blocking: there with ad blocking off too.
         c.adBlocking = false
-        #expect(SitePanelRows.rows(c) == [.zoom, .cookieBanners, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(c) == [.zoom, .cookieBanners, .javaScript, .darkPage, .keepAwake])
         var privately = c
         privately.isPrivate = true
         #expect(!SitePanelRows.rows(privately).contains(.cookieBanners))
@@ -641,7 +641,7 @@ struct SitePanelRowsTests {
         var c = Context()
         c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .javaScript, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
     }
 
     @Test func noZoomOverReaderOrAPDF() {
@@ -655,7 +655,8 @@ struct SitePanelRowsTests {
         c.isPrivate = true
         c.siteChoices = false
         c.extensionHost = false
-        #expect(SitePanelRows.rows(c) == [.zoom])
+        // JavaScript is there, chosen for the tab alone (#282).
+        #expect(SitePanelRows.rows(c) == [.zoom, .javaScript])
         #expect(SitePanelRows.links(c).isEmpty)
     }
 

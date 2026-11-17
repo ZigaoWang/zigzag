@@ -937,6 +937,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let defaultStatus = StatusLabel(String(localized: "Zigzag is your default browser", comment: "In Settings › General, in place of Set as Default once it's done."))
     private let blockingToggle = Toggle()
     private let webRTCToggle = Toggle()
+    private let javaScript = DropdownButton()
     private let cookieBanners = DropdownButton()
     private let pipToggle = Toggle()
     private let leavePipToggle = Toggle()
@@ -1501,6 +1502,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         // Pages already open keep what they loaded with until they load again (`WebRTCProtection`).
         webRTCToggle.onChange = { on in WebRTCProtection.isOn = on }
+        // The same for JavaScript (#282): pages already open keep their scripts, or go without, until they load again.
+        javaScript.options = [SitePanel.javaScriptAllowed, SitePanel.javaScriptNotAllowed].map { DropdownButton.Option(title: $0) }
+        javaScript.onSelect = { index in SiteJavaScript.isAllowed = index == 0 }
         cookieBanners.options = CookieBanners.Mode.allCases.map { mode in
             let title = switch mode {
             case .reject: String(localized: "Reject When Possible", comment: "A choice for “Cookie banners” in Settings › Privacy: Zigzag says no to a site's cookie consent pop-up, or hides one that only needs hiding.")
@@ -2254,6 +2258,13 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             webRTCRow.keywords = String(localized: "webrtc ip address leak proxy vpn calls privacy", comment: "Words that find the Protect IP address from WebRTC setting with Find a setting in Settings. Not shown.")
             blockingGroup.add(webRTCRow)
         }
+        javaScript.selectedIndex = SiteJavaScript.isAllowed ? 0 : 1
+        let javaScriptRow = FormRow(title: String(localized: "JavaScript", comment: "A setting in Settings › Privacy: whether pages may run their scripts. A name: keep it as it is."),
+                                    detail: String(localized: "Whether pages may run their scripts. Sites you change in Site Controls keep their own choice.",
+                                                   comment: "Explanation under “JavaScript” in Settings › Privacy. Site Controls is the panel from the address."),
+                                    control: javaScript)
+        javaScriptRow.keywords = String(localized: "javascript js scripts disable block noscript privacy", comment: "Words that find the JavaScript setting with Find a setting in Settings. Not shown.")
+        blockingGroup.add(javaScriptRow)
     }
 
     private func reloadPasswords() {
@@ -3183,6 +3194,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         defaultButton.isHidden = isDefault
         blockingToggle.isOn = ContentBlocker.isEnabled
         webRTCToggle.isOn = WebRTCProtection.isOn
+        javaScript.selectedIndex = SiteJavaScript.isAllowed ? 0 : 1
         cookieBanners.selectedIndex = CookieBanners.Mode.allCases.firstIndex(of: CookieBanners.mode) ?? 0
         pipToggle.isOn = PictureInPicture.followsTabs
         leavePipToggle.isOn = AutoPictureInPicture.isOn
@@ -3388,11 +3400,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
+            && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location and notifications, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -3403,6 +3416,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 KeepAwake.sites = []
                 PageFullScreen.forgetAll()
                 CookieBanners.forgetAll()
+                SiteJavaScript.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -3420,6 +3434,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
+            .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -3438,6 +3453,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
             if ExtensionStore.extensionsOffSites.contains(site) {
                 said.append(String(localized: "extensions off", comment: "A choice made for a site in Settings › Privacy, in a list of them."))
+            }
+            if let javaScript = SiteJavaScript.choice(forSite: site) {
+                said.append(javaScript ? String(localized: "JavaScript on", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages run their scripts, whatever Settings › Privacy › JavaScript says.")
+                                       : String(localized: "JavaScript off", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages don't run their scripts."))
             }
             if let zoom = ZoomLevels.all[site] {
                 let percent = Int((zoom * 100).rounded())
@@ -3487,6 +3506,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 KeepAwake.sites = awake
                 PageFullScreen.setChoice(nil, for: URL(string: "https://\(site)"))
                 CookieBanners.setChoice(nil, for: URL(string: "https://\(site)"))
+                SiteJavaScript.forget(site: site)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }

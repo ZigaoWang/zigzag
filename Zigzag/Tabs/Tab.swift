@@ -227,6 +227,9 @@ final class Tab: NSObject {
     /// WebRTC allowed or blocked for a site in this tab alone, by origin: a private window's choice, never kept
     /// (`WebRTCProtection`).
     var webRTCHere: [String: Bool] = [:]
+    /// JavaScript allowed or not for a site in this tab alone, by site: a private window's choice, never kept
+    /// (`SiteJavaScript`).
+    var javaScriptHere: [String: Bool] = [:]
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
         guard !isPrivate, let origin = SiteOrigin.of(url) else { return false }
@@ -1509,6 +1512,11 @@ extension Tab: WKNavigationDelegate {
         }
 
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
+        // The page's own scripts, as Settings › Privacy › JavaScript and the site's choice say (`SiteJavaScript`), for
+        // the page being gone to; a frame's follow the page it's in, as WebKit decides each frame on its own. An error
+        // page Zigzag puts in its place keeps its own.
+        SiteJavaScript.apply(to: preferences, for: decidesMainFrame ? url : webView.url, here: javaScriptHere,
+                             errorPage: decidesMainFrame && ErrorPage.pending.contains(webView))
         // JavaScript turned off with the developer tools is off for a development page: decided for the page being
         // gone to, so one anywhere else never loads without its scripts.
         if decidesMainFrame, developerInEffect(at: url).javaScriptOff { preferences.allowsContentJavaScript = false }

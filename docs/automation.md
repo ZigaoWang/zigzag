@@ -11,8 +11,8 @@ Both live in Settings › Automation.
 
 ## AI apps (MCP)
 
-Zigzag 0.8.5 and later has a small MCP server built in. It listens on this Mac only (127.0.0.1), never on your network, and only while
-you have it turned on. Off, nothing listens at all.
+Zigzag has a small MCP server built in. It listens on this Mac only (127.0.0.1), never on your network, and only
+while you have it turned on. Off, nothing listens at all.
 
 ### Turning it on
 
@@ -68,6 +68,10 @@ Either one holds your key. Treat it as you would a password: paste it only into 
 An app starts with MCP's `initialize`, and Zigzag answers with a session id in the `Mcp-Session-Id` header. Every
 request after that has to send it back, as the transport says; one without it gets 400, and one with a session that
 has ended (after Reset Key, say) gets 404 and starts over with `initialize`. MCP apps do this on their own.
+Zigzag takes the protocol versions from 2025-03-26 to 2025-11-25 this way. An app on version 2026-07-28 skips
+`initialize` and sessions, and sends the version, method and tool name in its headers with every request instead.
+
+A tool that takes longer than 60 seconds is given up, and the app gets an error saying so.
 
 A request without the right key, from a web page or to the wrong path is answered and its connection closed. Zigzag
 keeps at most 64 connections open, and only a few of them may be ones that haven't sent the key yet, so connections

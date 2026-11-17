@@ -719,6 +719,20 @@ struct PasswordSafetyTests {
         #expect(AuthenticationPrompt.prefill([exact, login("https://router.example.com", "guest")], for: here) == nil)
     }
 
+    @Test func savedSignInsAnswerOnlyTheirOwnSite() {
+        // The page's own site, its other hosts included: answered, saved name and password or sheet.
+        #expect(AuthenticationPrompt.mayAnswer(pageHost: "intranet.example.com", askingHost: "intranet.example.com"))
+        #expect(AuthenticationPrompt.mayAnswer(pageHost: "www.example.com", askingHost: "files.example.com"))
+        #expect(AuthenticationPrompt.mayAnswer(pageHost: "WWW.Example.com", askingHost: "files.example.com"))
+        // Something from another site on the page: nothing saved is sent, and nothing asks.
+        #expect(!AuthenticationPrompt.mayAnswer(pageHost: "evil.example", askingHost: "router.example.com"))
+        // Another app on a shared host is another site.
+        #expect(!AuthenticationPrompt.mayAnswer(pageHost: "evil.vercel.app", askingHost: "myapp.vercel.app"))
+        // No page to go by: as before.
+        #expect(AuthenticationPrompt.mayAnswer(pageHost: nil, askingHost: "router.example.com"))
+        #expect(AuthenticationPrompt.mayAnswer(pageHost: "", askingHost: "router.example.com"))
+    }
+
     private func logins(_ items: [AutofillMenu.Item]) -> [String] {
         items.map { item in
             switch item {

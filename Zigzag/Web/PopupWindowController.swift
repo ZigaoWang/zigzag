@@ -44,6 +44,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         if let opener { openerWebRTCChoices = opener.webRTCHere }
         return openerWebRTCChoices
     }
+    /// The same for JavaScript (`SiteJavaScript`).
+    private var openerJavaScriptChoices: [String: Bool] = [:]
+    var javaScriptChoices: [String: Bool] {
+        if let opener { openerJavaScriptChoices = opener.javaScriptHere }
+        return openerJavaScriptChoices
+    }
     /// The strip at the top with the traffic lights and whose page it is.
     static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
     private var lastCrash: Date?
@@ -173,6 +179,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         webView = WKWebView(frame: .zero, configuration: configuration)
         self.opener = opener
         openerWebRTCChoices = opener?.webRTCHere ?? [:]
+        openerJavaScriptChoices = opener?.javaScriptHere ?? [:]
         let placed = Self.frame(for: NSSize(width: max(320, pageSize.width), height: max(240, pageSize.height) + Self.headerHeight), origin: origin, parent: parent)
         let size = placed.size
         let origin = placed.origin
@@ -427,13 +434,23 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         await PageDialogs.openPanel(parameters: parameters, window: window)
     }
 
-    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async -> WKNavigationActionPolicy {
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
+        let policy = await decide(navigationAction, in: webView)
+        // The page's own scripts as in a tab (`SiteJavaScript`), a frame's as its page's, with the opener's private choices.
+        if policy == .allow {
+            let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true
+            SiteJavaScript.apply(to: preferences, for: mainFrame ? navigationAction.request.url : webView.url, here: javaScriptChoices,
+                                 errorPage: mainFrame && ErrorPage.pending.contains(webView))
+        }
+        return (policy, preferences)
+    }
+
+    private func decide(_ navigationAction: WKNavigationAction, in webView: WKWebView) async -> WKNavigationActionPolicy {
         // A pop-up waiting on its answer: the address is kept, never fetched. WebKit loads the request into the view
         // it was handed before anyone has answered, and a denied pop-up must not have asked for its page.
         if isHoldingFirstLoad {
             // Keep the first address only. A subframe load, or the opener sending the held window somewhere else
             // after `window.open('/a.html')`, must not change what the card asked about or what is revealed.
-            // The first top-level address only: a subframe load must not become what the card asked about.
             if heldRequest == nil, navigationAction.targetFrame?.isMainFrame ?? true {
                 heldRequest = navigationAction.request
             }
