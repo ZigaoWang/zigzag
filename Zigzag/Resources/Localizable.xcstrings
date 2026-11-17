@@ -2934,6 +2934,28 @@
         }
       }
     },
+    "Always for this rule" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The rule has no name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此规则始终如此"
+          }
+        }
+      }
+    },
+    "Always for “%@”" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”始终如此"
+          }
+        }
+      }
+    },
     "Always on this site" : {
       "comment" : "Duration choice on a site's permission question: the answer is remembered for this site.",
       "localizations" : {
@@ -7830,6 +7852,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "忘记"
+          }
+        }
+      }
+    },
+    "Forget %@" : {
+      "comment" : "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忘记 %@"
+          }
+        }
+      }
+    },
+    "Forget the answer for every site" : {
+      "comment" : "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忘记对所有网站的选择"
           }
         }
       }
