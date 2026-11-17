@@ -25,6 +25,13 @@ OUT=build/release
 # Tidier build output when xcbeautify is installed; otherwise just the lines that matter.
 pretty() { if command -v xcbeautify >/dev/null; then xcbeautify; else grep -E "error:|ARCHIVE|EXPORT|BUILD" || true; fi; }
 rm -rf "$OUT" && mkdir -p "$OUT/updates"
+# Scratch files of this run's own, never a fixed name in /tmp another user or process could have made first.
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+# Everything is signed by this team alone (scripts/ExportOptions.plist): its Developer ID, never another one that
+# happens to be in the keychain.
+TEAM=$(/usr/libexec/PlistBuddy -c "Print :teamID" scripts/ExportOptions.plist)
+[[ "$TEAM" =~ '^[A-Z0-9]{10}$' ]] || { echo "scripts/ExportOptions.plist has no teamID"; exit 1; }
 
 # The notes come first: CHANGELOG.md needs a section for the version being released, or nothing is built.
 PLANNED=$(awk -F'"' '/MARKETING_VERSION:/ {print $2; exit}' project.yml)
@@ -56,13 +63,13 @@ if $PUBLISHING; then
   for FEED in appcast beta; do
     # Only a missing feed (404) means "nothing live yet": any other failure stops here, rather than publishing a
     # build number that may be no higher than the live one.
-    STATUS=$(curl -sS --retry 6 --retry-all-errors --retry-delay 5 --max-time 30 -o /tmp/zigzag-live-$FEED.xml -w '%{http_code}' "https://$SITE_HOST/updates/$FEED.xml" || echo 000)
+    STATUS=$(curl -sS --retry 6 --retry-all-errors --retry-delay 5 --max-time 30 -o "$WORK/live-$FEED.xml" -w '%{http_code}' "https://$SITE_HOST/updates/$FEED.xml" || echo 000)
     if [[ "$STATUS" != 200 && "$STATUS" != 404 ]]; then
       echo "Couldn't read the live $FEED feed (HTTP $STATUS), so the build number can't be checked. Try again."
       exit 1
     fi
     LIVE=""
-    [[ "$STATUS" == 200 ]] && LIVE=$(grep -oE 'sparkle:version="?>?[0-9]+' /tmp/zigzag-live-$FEED.xml | grep -oE '[0-9]+$' | sort -n | tail -1 || true)
+    [[ "$STATUS" == 200 ]] && LIVE=$(grep -oE 'sparkle:version="?>?[0-9]+' "$WORK/live-$FEED.xml" | grep -oE '[0-9]+$' | sort -n | tail -1 || true)
     if [[ -n "$LIVE" && "$BUILD" -le "$LIVE" ]]; then
       echo "CURRENT_PROJECT_VERSION is $BUILD but the $FEED feed already has build $LIVE. Raise it in project.yml, then release."
       exit 1
@@ -97,7 +104,9 @@ VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$APP/Co
 
 echo "Verifying signature…"
 codesign --verify --deep --strict --verbose=2 "$APP"
-codesign -dvv "$APP" 2>&1 | grep -E "Authority=Developer ID|TeamIdentifier"
+APP_SIGNATURE=$(codesign -dvv "$APP" 2>&1 || true)
+print -r -- "$APP_SIGNATURE" | grep -E "Authority=Developer ID|TeamIdentifier" || true
+[[ "$APP_SIGNATURE" == *"TeamIdentifier=$TEAM"* ]] || { echo "Zigzag isn't signed by team $TEAM"; exit 1; }
 # The helpers read what websites send (the picture helper their pictures, the PDF helper their PDFs): each must be
 # signed like the app, with the hardened runtime, and sandboxed. Exporting signs them with the app; a release where
 # one isn't stops here.
@@ -108,8 +117,13 @@ for HELPER_LABEL HELPER_BUNDLE in "picture helper" ZigzagImageDecoder "PDF helpe
   HELPER_SIGNATURE=$(codesign -dvv "$HELPER" 2>&1 || true)
   HELPER_ENTITLEMENTS=$(codesign -d --entitlements - --xml "$HELPER" 2>/dev/null || true)
   [[ "$HELPER_SIGNATURE" == *"Authority=Developer ID Application"* ]] || { echo "The $HELPER_LABEL isn't signed with Developer ID"; exit 1; }
+  [[ "$HELPER_SIGNATURE" == *"TeamIdentifier=$TEAM"* ]] || { echo "The $HELPER_LABEL isn't signed by team $TEAM"; exit 1; }
   [[ "$HELPER_SIGNATURE" =~ "flags=[^ ]*runtime" ]] || { echo "The $HELPER_LABEL lacks the hardened runtime"; exit 1; }
-  [[ "$HELPER_ENTITLEMENTS" == *"com.apple.security.app-sandbox"* ]] || { echo "The $HELPER_LABEL isn't sandboxed"; exit 1; }
+  # Exactly the sandbox, on, and nothing else: not merely the word somewhere (it could be false, or have company).
+  print -r -- "$HELPER_ENTITLEMENTS" > "$WORK/entitlements.plist"
+  HELPER_GRANTS=$(/usr/libexec/PlistBuddy -c Print "$WORK/entitlements.plist" 2>/dev/null || true)
+  [[ "$HELPER_GRANTS" == $'Dict {\n    com.apple.security.app-sandbox = true\n}' ]] || {
+    echo "The $HELPER_LABEL's entitlements should be only com.apple.security.app-sandbox = true. They're:"; echo "$HELPER_GRANTS"; exit 1; }
 done
 
 if [[ "${1:-}" == "--local" ]]; then
@@ -197,7 +211,9 @@ create-dmg --volname "Zigzag" --volicon "$APP/Contents/Resources/AppIcon.icns" \
   --icon-size 112 --icon "Zigzag.app" 180 200 --hide-extension "Zigzag.app" --app-drop-link 460 200 \
   --no-internet-enable --format UDZO "$DMG" "$STAGE" >/dev/null
 rm -rf "$STAGE"
-IDENTITY=$(security find-identity -v -p codesigning | awk -F'"' '/Developer ID Application/ {print $2; exit}')
+# The identity's own hash, for the team's Developer ID only.
+IDENTITY=$(security find-identity -v -p codesigning | awk -v team="($TEAM)\"" 'index($0, "\"Developer ID Application: ") && index($0, team) {print $2; exit}')
+[[ -n "$IDENTITY" ]] || { echo "No Developer ID Application identity for team $TEAM in the keychain"; exit 1; }
 codesign --sign "$IDENTITY" --timestamp "$DMG"
 echo "Notarizing the DMG…"
 notarize "$DMG"
