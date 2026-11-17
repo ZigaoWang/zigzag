@@ -125,7 +125,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 交给 %@"
+            "value" : "%@交给 %@"
           }
         }
       }
@@ -136,7 +136,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 保存到 %@"
+            "value" : "%@会保存到 %@"
           }
         }
       }
@@ -208,7 +208,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 以 %@ 结尾"
+            "value" : "以 %2$@ 结尾的%1$@"
           }
         }
       }
@@ -264,7 +264,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 交给 %@"
+            "value" : "%@交给 %@"
           }
         }
       }
@@ -459,7 +459,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 匹配 %@"
+            "value" : "匹配 %2$@ 的%1$@"
           }
         }
       }
@@ -593,7 +593,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 在 %@ 中打开"
+            "value" : "%@在 %@ 中打开"
           }
         }
       }
@@ -604,7 +604,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 用你 Mac 上的 App 打开"
+            "value" : "%@会在 Mac 上的 App 中打开"
           }
         }
       }
@@ -659,7 +659,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 以 %@ 开头"
+            "value" : "以 %2$@ 开头的%1$@"
           }
         }
       }
@@ -709,7 +709,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "地址包含 %@ 的 %@"
+            "value" : "地址包含 %2$@ 的%1$@"
           }
         }
       }
@@ -4372,7 +4372,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择这条规则用来打开链接的应用。"
+            "value" : "选择这条规则用来打开链接的 App。"
           }
         }
       }
