@@ -201,7 +201,9 @@ enum DownloadRuleSheet {
                 } else {
                     panel.directoryURL = DownloadManager.folder
                 }
-                choose(panel, into: folder)
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                folder.stringValue = url.path
+                sheetRef?.revalidate()
             }
             folderActionRow = actionRows.count
             actionRows.append(FormSheet.Row(label: String(localized: "Folder", comment: "Label of the folder field in a per-extension destination's sheet: which folder files of this type are saved into."),
