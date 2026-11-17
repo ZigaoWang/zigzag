@@ -330,7 +330,9 @@ enum ImportCoordinator {
     /// (allowing access to a browser's passwords).
     ///
     /// `into`: the profile that gets it all (left out, the first): its history and sign-ins, and the spaces
-    /// and favorites made for what came over. Passwords go into the one vault every profile shares.
+    /// and favorites made for what came over. Passwords go into the one vault every profile shares. From Arc, with
+    /// its spaces on more than one of its profiles, `into` gets its default profile's, and each of its own profiles'
+    /// go to the profile here with its name (`ArcImporter.importSidebar`).
     static func run(_ source: Source, _ choice: Choice, primaryPassword: String = "", into target: Profile? = nil) async -> Summary {
         let choice = choice.intersection(source.offers)
         let profile = target ?? Profiles.shared.default
@@ -349,6 +351,11 @@ enum ImportCoordinator {
         // Arc's spaces, pinned tabs, favorites, open tabs and history come through its own importer, which knows its
         // sidebar.
         var arcReading = reading
+        // Each of Arc's own profiles kept apart (by folder) and the profile here it went to: its history and
+        // sign-ins go there too. Each is held while this writes into it, as `profile` is.
+        var arcProfiles: [String: UUID] = [:]
+        var held: Set<UUID> = []
+        defer { for id in held { Profiles.shared.done(id) } }
         // Only the parts you chose, each on its own: the sidebar for spaces, Favorites (Arc's bookmarks) and open
         // tabs, history for history.
         if isArc {
@@ -359,14 +366,29 @@ enum ImportCoordinator {
                 summary.bookmarks = result.bookmarks
                 summary.tabs = result.tabs
                 summary.problems += result.problems
+                arcProfiles = result.profiles
+            } else if choice.contains(.history) || choice.contains(.signIns) {
+                // Without the sidebar, only to profiles an earlier import made for them; none is made now.
+                arcProfiles = ArcImporter.knownProfiles()
+            }
+            // One that went to `profile` goes with the rest; one already deleted gets nothing of its own.
+            arcProfiles = arcProfiles.filter { _, id in
+                guard id != profile.id else { return false }
+                guard !held.contains(id) else { return true }
+                guard Profiles.shared.hold(id) else { return false }
+                held.insert(id)
+                return true
             }
             if choice.contains(.history) {
-                let read = await Task.detached(priority: .userInitiated) { () -> Swift.Result<[(URL, String, Int, Date)], Error> in
-                    Swift.Result { try ArcImporter.readHistory() }
+                let apart = arcProfiles
+                let read = await Task.detached(priority: .userInitiated) { () -> Swift.Result<[UUID?: [(URL, String, Int, Date)]], Error> in
+                    Swift.Result { try ArcImporter.readHistory(apart: apart) }
                 }.value
                 switch read {
-                case .success(let entries):
-                    summary.history = profile.history.importVisits(entries)
+                case .success(let byProfile):
+                    summary.history = byProfile.reduce(0) { sum, entry in
+                        sum + (entry.key.map { Profiles.shared.profile($0) } ?? profile).history.importVisits(entry.value)
+                    }
                 case .failure(let error):
                     summary.problems.append(ArcImporter.historyProblem(error))
                 }
@@ -419,7 +441,13 @@ enum ImportCoordinator {
         // Only ever a profile's own store: private windows each have their own, which nothing imported reaches.
         if choice.contains(.signIns) {
             var applied = SignInImporter.Applied()
-            if !batch.cookies.isEmpty { applied = await SignInImporter.apply(batch.cookies, to: profile.store.httpCookieStore) }
+            for (target, cookies) in cookieGroups(batch, apart: isArc ? arcProfiles : [:], into: profile.id) {
+                let one = await SignInImporter.apply(cookies, to: Profiles.shared.profile(target).store.httpCookieStore)
+                applied.sites += one.sites
+                applied.cookies += one.cookies
+                applied.kept += one.kept
+                applied.failed += one.failed
+            }
             summary.signedInSites = applied.sites
             if let note = SignInImporter.note(unreadable: batch.unreadableCookies + applied.failed,
                                               broughtAny: applied.cookies + applied.kept > 0, from: source.name) {
@@ -427,6 +455,24 @@ enum ImportCoordinator {
             }
         }
         return summary
+    }
+
+    /// The sign-ins brought, by the profile here each goes to: a browser profile's in `apart` (Arc's own, by
+    /// folder) to its own, the rest to `into`, first.
+    static func cookieGroups(_ batch: ImportBatch, apart: [String: UUID], into: UUID) -> [(profile: UUID, cookies: [SignInImporter.Cookie])] {
+        guard !batch.cookies.isEmpty else { return [] }
+        var targets = [UUID](repeating: into, count: batch.cookies.count)
+        for (folder, ranges) in batch.cookieProfiles {
+            guard let id = apart[folder] else { continue }
+            for range in ranges { for i in range where i < targets.count { targets[i] = id } }
+        }
+        var order: [UUID] = [into]
+        var groups: [UUID: [SignInImporter.Cookie]] = [:]
+        for (cookie, id) in zip(batch.cookies, targets) {
+            if !order.contains(id) { order.append(id) }
+            groups[id, default: []].append(cookie)
+        }
+        return order.compactMap { id in groups[id].map { (id, $0) } }
     }
 
     /// New logins are saved. A login already here is replaced only when the imported password is known to be

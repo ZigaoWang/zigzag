@@ -11,6 +11,9 @@ enum ArcImporter {
         /// Open tabs that came over, not loaded until they're clicked.
         var tabs = 0
         var historyEntries = 0
+        /// Each of Arc's own profiles the sidebar's import kept apart, by folder ("Profile 1"), and the profile here
+        /// it went to; empty when Arc's spaces were on one profile. Its history and sign-ins follow it.
+        var profiles: [String: UUID] = [:]
         /// What stopped part of the import, said plainly; nothing is ever dropped silently.
         var problems: [ImportProblem] = []
     }
@@ -97,27 +100,81 @@ enum ArcImporter {
     /// the space you're in, so open tabs never bring a space you didn't ask for.
     struct Plan {
         var favorites: [Bookmark] = []
+        /// `favorites`, each Arc profile's together: nil for the profile everything else goes to (`Sidebar.favoriteGroups`).
+        var favoriteGroups: [(profile: String?, favorites: [Bookmark])] = []
         var spaces: [SpaceInfo] = []
         var openTabs: [(space: UUID?, tabs: [OpenTab])] = []
     }
 
-    static func plan(_ sidebar: Sidebar, parts: Parts, existing: [SpaceInfo]) -> Plan {
+    /// `wants`: the profile here a space or favorite of Arc's goes to, nil when any will do (one Arc profile in use,
+    /// or its own not made here). `profileOf`: the profile a space here is on.
+    static func plan(_ sidebar: Sidebar, parts: Parts, existing: [SpaceInfo], wants: (UUID) -> UUID? = { _ in nil },
+                     profileOf: (UUID) -> UUID = { _ in Profile.defaultID }) -> Plan {
         var plan = Plan()
-        if parts.contains(.favorites) { plan.favorites = sidebar.favorites }
+        if parts.contains(.favorites) { plan.favorites = sidebar.favorites; plan.favoriteGroups = sidebar.favoriteGroups }
         if parts.contains(.spaces) { plan.spaces = sidebar.spaces }
         if parts.contains(.openTabs) {
             plan.openTabs = sidebar.spaces.compactMap { space in
                 guard let tabs = sidebar.openTabs[space.id], !tabs.isEmpty else { return nil }
-                let here = existing.first { $0.name == space.name }?.id
+                let here = match(space, in: existing, wants: wants(space.id), profileOf: profileOf)?.id
                 return (here ?? (parts.contains(.spaces) ? space.id : nil), tabs)
             }
         }
         return plan
     }
 
+    /// The space here an Arc space merges into when importing again: the one with its name on the profile it goes
+    /// to, else one with its name on any (as an import from before Arc's profiles were kept put them all on one).
+    static func match(_ incoming: SpaceInfo, in existing: [SpaceInfo], wants: UUID?, profileOf: (UUID) -> UUID) -> SpaceInfo? {
+        let named = existing.filter { $0.name == incoming.name }
+        if let wants, let same = named.first(where: { profileOf($0.id) == wants }) { return same }
+        return named.first
+    }
+
+    /// An Arc profile's name: the one Arc shows (`names`, by folder, from its Local State), else its folder's.
+    static func profileName(_ folder: String, names: [String: String]) -> String {
+        names[folder].flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 } ?? folder
+    }
+
+    /// The profile here with a name, any case, if there's one.
+    static func profile(named name: String, in profiles: [ProfileInfo]) -> ProfileInfo? {
+        let wanted = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return profiles.first { $0.displayName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == wanted }
+    }
+
+    /// Each of Arc's own profiles in use (`Sidebar.profilesInUse`) and the profile here it goes to: the one with its
+    /// name, else, with `create`, one made for it. Without `create`, one with no profile here isn't in the list.
+    /// Empty when Arc's spaces are on one profile.
+    static func profiles(for sidebar: Sidebar, create: Bool) -> [String: UUID] {
+        let inUse = sidebar.profilesInUse
+        guard !inUse.isEmpty else { return [:] }
+        let arc = ChromiumImporter.browsers.first { $0.name == "Arc" }
+        let names = arc.map { Dictionary(ChromiumImporter.profileNames(of: $0).map { ($0.folder, $0.name) }, uniquingKeysWith: { a, _ in a }) } ?? [:]
+        var targets: [String: UUID] = [:]
+        for folder in inUse {
+            let name = profileName(folder, names: names)
+            if let here = profile(named: name, in: Library.shared.profiles) {
+                targets[folder] = here.id
+            } else if create {
+                let library = Library.shared
+                targets[folder] = library.addProfile(name: name, color: SpaceColor.next(unused: library.profiles.map { library.color(of: $0) })).id
+            }
+        }
+        return targets
+    }
+
+    /// The profiles here Arc's own already went to, by folder ("Profile 1"), for history and sign-ins brought
+    /// without the sidebar. Empty when its spaces are on one profile, or the sidebar can't be read.
+    static func knownProfiles() -> [String: UUID] {
+        guard let sidebar = try? readSidebar() else { return [:] }
+        return profiles(for: sidebar, create: false)
+    }
+
     /// The `parts` of Arc's sidebar chosen: spaces and their pinned tabs, Favorites, each space's open tabs. `into`:
-    /// the profile the new spaces are put on and the favorites go to. A space already here that gains pages stays on
-    /// its own. Arc's profiles aren't recreated.
+    /// the profile the new spaces are put on and the favorites go to. With Arc's spaces on more than one of its
+    /// profiles, each of Arc's own profiles goes to the profile here with its name, made if there's none, and its
+    /// spaces and favorites with it; Arc's default profile is `into`. A space already here that gains pages stays
+    /// on its own.
     @discardableResult
     static func importSidebar(into profile: UUID = Profile.defaultID, parts: Parts = .all) -> (result: Result, firstSpace: UUID?) {
         var result = Result()
@@ -128,16 +185,29 @@ enum ArcImporter {
             result.problems.append(problem(reading: .sidebar, error))
             sidebar = Sidebar()
         }
-        let plan = plan(sidebar, parts: parts, existing: Library.shared.spaces)
+        // Profiles are made only for what's brought into them: spaces or favorites, not open tabs alone.
+        let targets = profiles(for: sidebar, create: parts.contains(.spaces) || parts.contains(.favorites))
+        result.profiles = targets
+        let inUse = sidebar.profilesInUse
+        func wants(_ id: UUID) -> UUID? {
+            guard !inUse.isEmpty else { return nil }
+            guard let folder = sidebar.profile(of: id, inUse: inUse) else { return profile }
+            return targets[folder]
+        }
+        let library = Library.shared
+        let plan = plan(sidebar, parts: parts, existing: library.spaces, wants: wants, profileOf: library.profileID(ofSpace:))
         var newSpaces = plan.spaces
-        let addedFavorites = plan.favorites.isEmpty ? 0 : Library.shared.appendFavorites(plan.favorites, in: profile)
+        var addedFavorites = 0
+        for group in plan.favoriteGroups {
+            addedFavorites += library.appendFavorites(group.favorites, in: group.profile.flatMap { targets[$0] } ?? profile)
+        }
         for favorite in plan.favorites { FaviconStore.shared.prefetch(for: favorite.url) }
 
         // Importing again merges: spaces with the same name gain only the bookmarks they don't have yet, in their Arc
         // folders, and pages already there but in no folder move into theirs (an earlier merge left them loose).
         var merged = 0
         newSpaces = newSpaces.filter { incoming in
-            guard let existing = Library.shared.spaces.first(where: { $0.name == incoming.name }) else { return true }
+            guard let existing = match(incoming, in: library.spaces, wants: wants(incoming.id), profileOf: library.profileID(ofSpace:)) else { return true }
             let folders = incoming.folders ?? []
             func path(of id: UUID) -> [String] {
                 var names: [String] = []
@@ -176,7 +246,7 @@ enum ArcImporter {
                 space.bookmarks.isEmpty && WindowManager.shared.controllers.allSatisfy { $0.tabManager.tabs(in: space.id).isEmpty }
             } : []
             Library.shared.appendSpaces(newSpaces)
-            for space in newSpaces { Library.shared.setProfile(profile, forSpace: space.id) }
+            for space in newSpaces { Library.shared.setProfile(wants(space.id) ?? profile, forSpace: space.id) }
             for space in pristine where Library.shared.spaces.count > 1 { Library.shared.removeSpace(space.id) }
             for bookmark in newSpaces.flatMap(\.bookmarks) { FaviconStore.shared.prefetch(for: bookmark.url) }
         }
@@ -209,6 +279,34 @@ enum ArcImporter {
         var spaces: [SpaceInfo] = []
         var favorites: [Bookmark] = []
         var openTabs: [UUID: [OpenTab]] = [:]
+        /// The Arc profile each space and favorite on one made in Arc is on, by its id here: the profile's folder
+        /// ("Profile 1"). Those on Arc's default profile aren't here.
+        var profiles: [UUID: String] = [:]
+
+        /// The folders of Arc's own profiles that have spaces, in the order of their first space, when Arc's spaces
+        /// are on more than one profile. Empty with one profile in use: everything then goes to one profile here.
+        var profilesInUse: [String] {
+            guard Set(spaces.map { profiles[$0.id] }).count > 1 else { return [] }
+            var folders: [String] = []
+            for space in spaces { if let folder = profiles[space.id], !folders.contains(folder) { folders.append(folder) } }
+            return folders
+        }
+
+        /// The Arc profile a space or favorite is kept apart on: its folder, or nil for the profile everything else
+        /// goes to (Arc's default profile, a profile with no spaces, or every profile when only one is in use).
+        func profile(of id: UUID, inUse: [String]? = nil) -> String? {
+            guard let folder = profiles[id] else { return nil }
+            return (inUse ?? profilesInUse).contains(folder) ? folder : nil
+        }
+
+        /// The favorites, each profile's together in Arc's order: nil first, the profile everything else goes to.
+        var favoriteGroups: [(profile: String?, favorites: [Bookmark])] {
+            let inUse = profilesInUse
+            return ([nil] + inUse.map(Optional.some)).compactMap { folder in
+                let mine = favorites.filter { profile(of: $0.id, inUse: inUse) == folder }
+                return mine.isEmpty ? nil : (folder, mine)
+            }
+        }
     }
 
     private static func readSidebar() throws -> Sidebar {
@@ -341,6 +439,7 @@ enum ArcImporter {
 
         var spaces: [SpaceInfo] = []
         var open: [UUID: [OpenTab]] = [:]
+        var profiles: [UUID: String] = [:]
         for space in spaceList {
             let name = (space["title"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Space \(spaces.count + 1)", comment: "Name of an imported space that had none in Arc: Space 1, Space 2…")
             let containerIDs = space["containerIDs"] as? [Any] ?? []
@@ -397,17 +496,46 @@ enum ArcImporter {
                 folders = folders.filter { !folders.pages(in: $0.id).isEmpty }
                 if !folders.isEmpty { info.folders = folders }
             }
+            if let folder = arcProfile(space["profile"]) { profiles[info.id] = folder }
             spaces.append(info)
         }
 
         var favorites: [Bookmark] = []
         var topIDs: [String] = []
+        var topProfile: [String: String] = [:]
         for copy in copies.reversed() {
-            // IDs, between the markers that say whose they are; only IDs name an item.
-            for case let id as String in copy.top where items[id] != nil && !topIDs.contains(id) { topIDs.append(id) }
+            // Each profile's marker, then the ID of its Favorites container; only IDs name an item.
+            var current: String?
+            for value in copy.top {
+                if let id = value as? String, items[id] != nil {
+                    guard !topIDs.contains(id) else { continue }
+                    topIDs.append(id)
+                    if let current { topProfile[id] = current }
+                } else if !(value is String) {
+                    current = arcProfile(value)
+                }
+            }
         }
-        for id in topIDs { favorites += bookmarks(under: id) }
-        return Sidebar(spaces: spaces, favorites: favorites, openTabs: open)
+        for id in topIDs {
+            let inside = bookmarks(under: id)
+            favorites += inside
+            if let folder = topProfile[id] { for favorite in inside { profiles[favorite.id] = folder } }
+        }
+        return Sidebar(spaces: spaces, favorites: favorites, openTabs: open, profiles: profiles)
+    }
+
+    /// The Arc profile a space's `profile` or a Favorites marker names: its folder ("Profile 1") for one made in
+    /// Arc, nil for Arc's default. Arc writes it as {"custom": {"_0": {"directoryBasename": "Profile 1"}}} or
+    /// {"default": {}}, sometimes wrapped once more.
+    static func arcProfile(_ marker: Any?, depth: Int = 0) -> String? {
+        guard depth < 6, let dict = marker as? [String: Any] else { return nil }
+        if let folder = dict["directoryBasename"] as? String {
+            return folder.isEmpty || folder == "Default" ? nil : folder
+        }
+        for (key, value) in dict where key != "default" {
+            if let folder = arcProfile(value, depth: depth + 1) { return folder }
+        }
+        return nil
     }
 
     // MARK: Open tabs
@@ -491,18 +619,26 @@ enum ArcImporter {
     /// Reads Arc's Chromium history, off the main thread: the file can be hundreds of megabytes. Every profile's, as
     /// Arc's spaces can live in any of them ("Default", "Profile 1"…); the newest visit of a page wins.
     nonisolated static func readHistory() throws -> [(URL, String, Int, Date)] {
+        try readHistory(apart: [:])[nil] ?? []
+    }
+
+    /// Arc's history by the profile here it goes to: each of Arc's profiles' in `apart` (by folder, as
+    /// `Result.profiles`) to its own, the rest to nil, the profile importing.
+    /// The newest visit of a page in each wins.
+    nonisolated static func readHistory(apart: [String: UUID]) throws -> [UUID?: [(URL, String, Int, Date)]] {
         let userData = arcSupport.appendingPathComponent("User Data", isDirectory: true)
         let profiles = ((try? FileManager.default.contentsOfDirectory(atPath: userData.path)) ?? [])
             .filter { $0 == "Default" || $0.hasPrefix("Profile ") }.sorted()
-        var newest: [URL: (URL, String, Int, Date)] = [:]
+        var newest: [UUID?: [URL: (URL, String, Int, Date)]] = [:]
         for profile in profiles {
             let source = userData.appendingPathComponent(profile).appendingPathComponent("History")
             guard FileManager.default.fileExists(atPath: source.path) else { continue }
-            for entry in readHistory(at: source) where newest[entry.0].map({ $0.3 < entry.3 }) ?? true {
-                newest[entry.0] = entry
+            let target: UUID? = apart[profile]
+            for entry in readHistory(at: source) where newest[target]?[entry.0].map({ $0.3 < entry.3 }) ?? true {
+                newest[target, default: [:]][entry.0] = entry
             }
         }
-        return newest.values.sorted { $0.3 > $1.3 }
+        return newest.mapValues { $0.values.sorted { $0.3 > $1.3 } }
     }
 
     /// One profile's history, through a private copy with its write-ahead log (Arc keeps the file locked while
