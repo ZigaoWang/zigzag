@@ -5,9 +5,10 @@ import PDFKit
 // no files, and answers its viewer in plain numbers, strings and pixels (PDFService.swift). Only Zigzag itself can
 // reach it: an XPC service bundled in the app is visible to that app alone.
 //
-// Each connection holds one PDF, until Zigzag lets the connection go. A request stuck past its time limit (a PDF
-// made to hang PDFKit) ends the helper; Zigzag starts it again and sends the PDFs that were open again. A PDF that
-// brings it down with the helper to itself fails alone; one that shared it is sent alone next time (SafePDF.swift).
+// Each connection holds one PDF, until Zigzag lets the connection go. Each PDF's connection asks for an instance of
+// the helper of its own (`_MultipleInstances` in Info.plist), so one process holds one PDF, and a PDF that takes it
+// over reaches no other. A request stuck past its time limit (a PDF made to hang PDFKit) ends the helper, and that
+// PDF fails (SafePDF.swift).
 
 /// One PDF, and the answers about it.
 final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
@@ -18,6 +19,8 @@ final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
     private var sizes: [CGSize] = []
     /// Where each page asked for dark paints its pictures, found once (`PictureAreas`).
     private var pictures: [Int: [[CGPoint]]] = [:]
+
+    func ownInstance() { Listener.shared.isOwnInstance() }
 
     func open(_ data: Data, reply: @escaping @Sendable (RemotePDFInfo?) -> Void) {
         run(PDFLimits.openTime) { [self] in
@@ -404,16 +407,35 @@ final class Flag: @unchecked Sendable {
     func set() { lock.withLock { value = true } }
 }
 
-final class Listener: NSObject, NSXPCListenerDelegate {
+/// Takes Zigzag's connections. A helper of a PDF's own (told so by `ownInstance`) ends once its connection goes: the
+/// system keeps an XPC service running after its last connection, and it would stay on, holding nothing, long after
+/// its PDF closed. The one helper every PDF shares isn't told, and stays on for the next PDF, as the system likes.
+final class Listener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
+    static let shared = Listener()
+    private let lock = NSLock()
+    private var open = 0
+    private var own = false
+
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection) -> Bool {
         connection.exportedInterface = PDFService.interface()
         connection.exportedObject = Renderer()
+        lock.withLock { open += 1 }
+        connection.invalidationHandler = { [weak self] in self?.closed() }
         connection.resume()
         return true
     }
+
+    func isOwnInstance() { lock.withLock { own = true } }
+
+    private func closed() {
+        let ends = lock.withLock {
+            open -= 1
+            return own && open == 0
+        }
+        if ends { exit(0) }
+    }
 }
 
-let delegate = Listener()
 let listener = NSXPCListener.service()
-listener.delegate = delegate
+listener.delegate = Listener.shared
 listener.resume()

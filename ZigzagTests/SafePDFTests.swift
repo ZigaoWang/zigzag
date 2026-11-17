@@ -371,24 +371,154 @@ import WebKit
     }
 
     // Each PDF made to crash the helper is its own bytes: one that crashed it is remembered, and never sent again.
-    @Test @MainActor func aPDFThatBringsTheHelperDownFailsAlone() async throws {
-        let good = SafePDF(data: Self.pdf(pages: 2))
+    // In helpers of their own, as Zigzag opens them, and in one shared helper, should the system not give each its own.
+    @Test(arguments: [true, false]) @MainActor func aPDFThatBringsTheHelperDownFailsAlone(ownHelpers: Bool) async throws {
+        let link = { XPCPDFLink(serviceName: PDFService.name, ownHelper: ownHelpers) }
+        let good = SafePDF(data: Self.pdf(pages: 2), makeLink: link)
         _ = try #require(await good.open())
+        let goodHelper = try #require(good.helperProcess)
         var failed = false
-        let bad = SafePDF(data: Data("%PDF-ZIGZAG-TEST-CRASH\nshared".utf8))
+        let bad = SafePDF(data: Data("%PDF-ZIGZAG-TEST-CRASH\n\(ownHelpers ? "own" : "shared")".utf8), makeLink: link)
         bad.onFail = { failed = true }
-        // Both at once: the good one's request is in the helper as it goes down.
+        // Both at once: the good one's request is in a helper as the bad one's goes down.
         async let goodTile = good.render(page: 1, rect: CGRect(x: 0, y: 0, width: 100, height: 100), scale: 1, dark: false)
         async let badInfo = bad.open()
         let (tile, info) = await (goodTile, badInfo)
         #expect(info == nil)
         #expect(bad.hasFailed && failed)
         #expect(tile != nil)
-        // The good one goes on in a helper started afresh, which has it again.
+        // The good one goes on: in its own helper, never touched; in a shared one, started afresh, which has it again.
         #expect(!good.hasFailed)
         #expect(await good.text(page: 0)?.string.contains("Hello") == true)
+        if ownHelpers { #expect(good.helperProcess == goodHelper) }
         // A failed PDF asks nothing more.
         #expect(await bad.strings() == nil)
+        good.close()
+    }
+
+    // MARK: A helper for each PDF
+
+    static func isRunning(_ pid: pid_t) -> Bool { kill(pid, 0) == 0 || errno == EPERM }
+
+    /// Whether `pid` ends within `seconds`.
+    static func ends(_ pid: pid_t, within seconds: Double) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            if !isRunning(pid) { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return !isRunning(pid)
+    }
+
+    static func footprint(_ pid: pid_t) -> UInt64? {
+        var usage = rusage_info_v4()
+        let result = withUnsafeMutablePointer(to: &usage) {
+            $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }
+        }
+        return result == 0 ? usage.ri_phys_footprint : nil
+    }
+
+    /// A PDF taken over in its helper could draw over, or add links to, any other PDF in the same process: each PDF
+    /// has a process of its own, which keeps every request of that PDF and ends when the PDF is let go.
+    @Test @MainActor func eachPDFHasAHelperOfItsOwn() async throws {
+        let rect = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let a = SafePDF(data: Self.pdf(text: "First"))
+        let b = SafePDF(data: Self.pdf(text: "Second"))
+        _ = try #require(await a.open())
+        _ = try #require(await b.open())
+        let helperA = try #require(a.helperProcess)
+        let helperB = try #require(b.helperProcess)
+        #expect(helperA != helperB)
+        #expect(helperA != getpid() && helperB != getpid())
+        // Every request of a PDF goes to its one helper.
+        #expect(await a.render(page: 0, rect: rect, scale: 1, dark: false) != nil)
+        #expect(await a.text(page: 1)?.string.contains("First") == true)
+        #expect(await a.strings() != nil)
+        #expect(a.helperProcess == helperA)
+        #expect(await b.text(page: 0)?.string.contains("Second") == true)
+        #expect(b.helperProcess == helperB)
+        // A closed PDF's helper ends; the other goes on in its own.
+        a.close()
+        #expect(await Self.ends(helperA, within: 5))
+        #expect(Self.isRunning(helperB))
+        #expect(await b.render(page: 1, rect: rect, scale: 2, dark: true) != nil)
+        #expect(b.helperProcess == helperB)
+        b.close()
+        #expect(await Self.ends(helperB, within: 5))
+    }
+
+    /// Ten PDFs open, ten helpers, each small; all of them gone once the PDFs are.
+    @Test @MainActor func tenPDFsTenSmallHelpers() async throws {
+        var documents: [SafePDF] = []
+        for index in 0..<10 {
+            let document = SafePDF(data: Self.pdf(text: "Document \(index)"))
+            _ = try #require(await document.open())
+            #expect(await document.render(page: 0, rect: CGRect(x: 0, y: 0, width: 300, height: 400), scale: 2, dark: false) != nil)
+            documents.append(document)
+        }
+        let helpers = documents.compactMap(\.helperProcess)
+        #expect(Set(helpers).count == 10)
+        let footprints = helpers.compactMap(Self.footprint)
+        let megabytes = footprints.map { Double($0) / 1_048_576 }
+        print("PDF helpers: \(helpers.count), footprint MB each: \(megabytes.map { String(format: "%.1f", $0) })")
+        #expect(megabytes.allSatisfy { $0 < 60 })
+        documents.forEach { $0.close() }
+        for pid in helpers { #expect(await Self.ends(pid, within: 5)) }
+    }
+
+    /// A helper of a PDF's own ends with it; the one shared helper stays on once its PDFs are gone, ready for the
+    /// next (started again, the system would hold it back for seconds).
+    @Test @MainActor func onlyAHelperOfItsOwnEndsWithItsPDF() async throws {
+        let own = SafePDF(data: Self.pdf(text: "Own"))
+        _ = try #require(await own.open())
+        let ownPID = try #require(own.helperProcess)
+        let shared = SafePDF(data: Self.pdf(text: "Shared")) { XPCPDFLink(serviceName: PDFService.name, ownHelper: false) }
+        _ = try #require(await shared.open())
+        let sharedPID = try #require(shared.helperProcess)
+        #expect(ownPID != sharedPID)
+        own.close()
+        shared.close()
+        #expect(await Self.ends(ownPID, within: 5))
+        try await Task.sleep(for: .seconds(2))
+        #expect(Self.isRunning(sharedPID))
+        // And the next shared PDF finds it there.
+        let next = SafePDF(data: Self.pdf(text: "Next")) { XPCPDFLink(serviceName: PDFService.name, ownHelper: false) }
+        _ = try #require(await next.open())
+        #expect(next.helperProcess == sharedPID)
+        next.close()
+    }
+
+    /// Time to a PDF's first page: in a helper of its own against the one shared helper, the first time and after.
+    @Test @MainActor func aHelperOfItsOwnOpensAboutAsFast() async throws {
+        let data = Self.pdf(pages: 4)
+        func firstPage(ownHelper: Bool) async throws -> (SafePDF, Double) {
+            let start = Date()
+            let document = SafePDF(data: data) { XPCPDFLink(serviceName: PDFService.name, ownHelper: ownHelper) }
+            _ = try #require(await document.open())
+            _ = try #require(await document.render(page: 0, rect: CGRect(x: 0, y: 0, width: 300, height: 400), scale: 2, dark: false))
+            return (document, Date().timeIntervalSince(start) * 1000)
+        }
+        // The shared helper, started for the first PDF, then already running for the next ones.
+        let (first, sharedCold) = try await firstPage(ownHelper: false)
+        var sharedWarm: [Double] = []
+        for _ in 0..<5 {
+            let (document, ms) = try await firstPage(ownHelper: false)
+            sharedWarm.append(ms)
+            document.close()
+        }
+        first.close()
+        // Each in a helper of its own, started for it.
+        var own: [Double] = []
+        for _ in 0..<6 {
+            let (document, ms) = try await firstPage(ownHelper: true)
+            own.append(ms)
+            document.close()
+        }
+        let average = { (values: [Double]) in values.reduce(0, +) / Double(values.count) }
+        print(String(format: "PDF first page ms: shared cold %.1f, shared warm %.1f; own first %.1f, own after %.1f",
+                     sharedCold, average(sharedWarm), own[0], average(Array(own.dropFirst()))))
+        // A helper's start is small next to what a PDF takes to arrive.
+        #expect(average(Array(own.dropFirst())) < average(sharedWarm) + 150)
     }
 
     @Test @MainActor func aPDFThatHadTheHelperToItselfFailsAtOnce() async throws {
@@ -767,6 +897,8 @@ nonisolated private final class FakePDFHelper: NSObject, PDFRendering, @unchecke
         self.stringsTime = stringsTime
         self.drawsNothing = drawsNothing
     }
+
+    func ownInstance() {}
 
     private func run(_ name: String, _ work: @escaping @Sendable () -> Void) {
         lock.withLock { inside += 1; mostInside = max(mostInside, inside) }

@@ -14,6 +14,9 @@ import Foundation
 /// The helper's requests, for the one PDF each connection holds. Each reply's last value says whether the helper
 /// has the PDF at all: false when it started afresh since (`open` again, then ask again).
 @objc(ZigzagPDFRendering) nonisolated protocol PDFRendering {
+    /// Sent first, and only when the connection has a helper process of its own: the helper then ends once the
+    /// connection goes. One shared by every PDF isn't told, and stays on.
+    func ownInstance()
     /// Reads the PDF. Nil when it isn't one, is empty, is locked with a password, or is past the limits.
     func open(_ data: Data, reply: @escaping @Sendable (RemotePDFInfo?) -> Void)
     /// A picture of `rect` (in the page's points) on page `page`, `scale` pixels to a point.
