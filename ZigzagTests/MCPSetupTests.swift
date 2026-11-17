@@ -61,9 +61,11 @@ extension MCPSetupTests {
         SettingsView.copy("Authorization: Bearer \(token)", concealed: true, to: board)
         #expect(board.string(forType: .string) == "Authorization: Bearer \(token)")
         #expect(board.types?.contains(marker) == true)
+        #expect(board.types?.contains(Clipboard.transientType) == true)
         SettingsView.copy(address, to: board)
         #expect(board.string(forType: .string) == address)
         #expect(board.types?.contains(marker) == false)
+        #expect(board.types?.contains(Clipboard.transientType) == false)
     }
 
     /// Only a key as Zigzag makes them counts: one written into the key file by hand is replaced.
@@ -81,5 +83,32 @@ extension MCPSetupTests {
         #expect(MCPKeyFile.token(at: url, creating: false) == nil)
         let made = try #require(MCPKeyFile.token(at: url, creating: true))
         #expect(MCPAccess.isZigzagKey(made) && MCPKeyFile.token(at: url, creating: false) == made)
+    }
+}
+
+extension MCPSetupTests {
+    /// A copied password carries its markers in the same write, and goes when Zigzag quits if nothing was copied since.
+    @MainActor @Test func copiedPasswordsAreMarkedAndCleared() {
+        let board = NSPasteboard(name: NSPasteboard.Name("zigzag-test-\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        Clipboard.copy("hunter22", concealed: true, to: board)
+        #expect(board.string(forType: .string) == "hunter22")
+        #expect(board.pasteboardItems?.count == 1)
+        #expect(board.pasteboardItems?.first?.types.contains(Clipboard.concealedType) == true)
+        #expect(board.pasteboardItems?.first?.types.contains(Clipboard.transientType) == true)
+        Clipboard.clearIfStillOurs()
+        #expect(board.string(forType: .string) == nil)
+
+        // Something copied since is left alone.
+        Clipboard.copy("hunter22", concealed: true, to: board)
+        board.clearContents()
+        board.setString("mine", forType: .string)
+        Clipboard.clearIfStillOurs()
+        #expect(board.string(forType: .string) == "mine")
+
+        Clipboard.copy("alice", concealed: false, to: board)
+        #expect(board.types?.contains(Clipboard.concealedType) == false)
+        Clipboard.clearIfStillOurs()
+        #expect(board.string(forType: .string) == "alice")
     }
 }

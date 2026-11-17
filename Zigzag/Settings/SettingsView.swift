@@ -3114,13 +3114,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
-    /// A copy with the AI apps' key in it is marked concealed, so clipboard managers and history apps leave it out.
+    /// A copy with the AI apps' key in it is marked concealed and transient, so clipboard managers and history apps
+    /// leave it out.
     static func copy(_ text: String, concealed: Bool = false, to board: NSPasteboard = .general) {
-        let marker = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
-        // Declared with the text, so it's never on the clipboard unmarked even for a moment.
-        board.declareTypes(concealed ? [.string, marker] : [.string], owner: nil)
-        board.setString(text, forType: .string)
-        if concealed { board.setData(Data(), forType: marker) }
+        Clipboard.write(text, marked: concealed, to: board)
     }
 
     /// The address and key show only while AI apps may use Zigzag; the address says so if the server couldn't start.

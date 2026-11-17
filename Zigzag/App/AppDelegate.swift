@@ -262,6 +262,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         StrictTransport.finishWriting()
         // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
+        // A password copied a moment ago doesn't outlive Zigzag on the clipboard.
+        Clipboard.clearIfStillOurs()
         // Password managers' helpers end with Zigzag, so none are left running.
         if #available(macOS 15.4, *) { NativeMessagingHost.terminateAll() }
         // Quit properly: the next launch knows this wasn't a crash.

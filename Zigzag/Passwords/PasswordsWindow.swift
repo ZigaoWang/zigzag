@@ -1131,19 +1131,45 @@ enum Clipboard {
 
     /// Copies text. A concealed copy is marked so clipboard managers skip it, and is cleared after 90 seconds if
     /// it's still what's on the clipboard.
-    static func copy(_ text: String, concealed: Bool) {
-        let board = NSPasteboard.general
+    static func copy(_ text: String, concealed: Bool, to board: NSPasteboard = .general) {
         // A concealed copy stays on this Mac: Universal Clipboard would hand it to your other devices, where the
         // 90-second clear never reaches.
-        board.prepareForNewContents(with: concealed ? .currentHostOnly : [])
-        board.setString(text, forType: .string)
+        write(text, marked: concealed, to: board, currentHostOnly: concealed)
         clearWork?.cancel()
-        guard concealed else { return }
-        board.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
-        let count = board.changeCount
-        let work = DispatchWorkItem { if NSPasteboard.general.changeCount == count { NSPasteboard.general.clearContents() } }
+        clearWork = nil
+        guard concealed else { ownCopy = nil; return }
+        ownCopy = (board, board.changeCount)
+        let work = DispatchWorkItem { clearIfStillOurs() }
         clearWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 90, execute: work)
+    }
+
+    /// The clipboard's change count right after a concealed copy, while it may still be on the clipboard.
+    private static var ownCopy: (board: NSPasteboard, count: Int)?
+
+    /// The concealed copy goes, if nothing has been copied since: 90 seconds on, or when Zigzag quits before then.
+    static func clearIfStillOurs() {
+        clearWork?.cancel()
+        clearWork = nil
+        defer { ownCopy = nil }
+        guard let own = ownCopy, own.board.changeCount == own.count else { return }
+        own.board.clearContents()
+    }
+
+    static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
+    static let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
+
+    /// Puts `text` on the clipboard in one write. Marked, it carries the concealed and transient markers with it
+    /// (nspasteboard.org), so it's never there unmarked even for a moment and clipboard managers leave it out.
+    static func write(_ text: String, marked: Bool, to board: NSPasteboard, currentHostOnly: Bool = false) {
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        if marked {
+            item.setData(Data(), forType: concealedType)
+            item.setData(Data(), forType: transientType)
+        }
+        board.prepareForNewContents(with: currentHostOnly ? .currentHostOnly : [])
+        board.writeObjects([item])
     }
 }
 
