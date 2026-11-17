@@ -43,9 +43,10 @@ enum DownloadHandoff {
     }
 
     /// The rule that catches `url`, if any, and whether it wants a link (true) or a download (false).
-    static func firstMatch(_ url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+    static func firstMatch(_ url: URL, appliesToLinks: Bool, filename: String = "", isPrivate: Bool = false) -> DownloadRule? {
         guard isHandoffable(url) else { return nil }
-        return DownloadRulesStore.shared.firstMatch(url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+        return DownloadRulesStore.shared.firstHandoffMatch(url: url, filename: filename, appliesToLinks: appliesToLinks,
+                                                           isPrivate: isPrivate)
     }
 
     /// Whether a rule may take this address at all. Zigzag's own pages and the certificate warning's proceed link are
@@ -166,6 +167,9 @@ enum DownloadHandoff {
             let text = DownloadTokens.expand(action.urlTemplate, with: values, query: true)
             guard let url = URL(string: text), let scheme = url.scheme?.lowercased() else { return false }
             return (scheme != "http" && scheme != "https") || serviceIsOnThisMac(text)
+        case .saveToFolder, .openFile:
+            // A destination is not a handoff: it is where the file lands, and it never carries cookies anywhere.
+            return false
         }
     }
 
@@ -204,6 +208,10 @@ enum DownloadHandoff {
         case .jsonRPC:
             outcome = await callService(rule.action, values: values, secret: secret)
             if let cookieFile { HandoffCookies.removeFile(cookieFile) }
+        case .saveToFolder, .openFile:
+            // A destination, not a handoff: where the file lands is decided when the download is made, and the
+            // download is never cancelled for it — so there is nothing to do here but let it be saved.
+            outcome = .noMatch
         }
         return outcome
     }

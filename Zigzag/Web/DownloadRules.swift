@@ -1,8 +1,83 @@
 import Foundation
 import Security
+import UniformTypeIdentifiers
 import WebKit
 
 // MARK: - A rule
+
+/// Where a file goes, for a rule whose destination is not another app: saved into a folder of its own, or opened in
+/// the Mac's own app for its type. A destination never cancels the download — it decides *where the file lands* — so
+/// it is read in the response decision and honored when the download is made, never run through `DownloadHandoff`.
+nonisolated enum DownloadDestination: Equatable, Sendable {
+    /// Save into this folder, as chosen in the panel. Empty asks for the default, which is nothing to decide.
+    case folder(String)
+    /// Save it where downloads go, then hand it to the Mac's own app for its type.
+    case open
+}
+
+/// The file types a file-type **Open** never offers or performs. Each can run code, mount an installer, or hand the
+/// Mac's app an archive or a configuration profile that does: opening one from a download is a double-click you did
+/// not make. A type may still be **saved**; the clamp is on Open only.
+nonisolated enum DownloadOpening {
+    /// Lowercase extensions, without a leading dot. Scripts are included because the Mac's default app for one may
+    /// run it; installers and disk images because opening one mounts or runs what the page sent; archives because
+    /// opening one can hand out an app the archive carries.
+    static let refused: Set<String> = [
+        // Apps and bundles.
+        "app", "prefpane", "kext",
+        // Installers and disk images.
+        "pkg", "mpkg", "xip", "dmg", "iso", "img", "msi", "cab",
+        // Archives.
+        "zip", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "7z", "rar", "zst", "lz", "lzma", "jar",
+        // Scripts and automation.
+        "command", "terminal", "term", "tool", "sh", "bash", "zsh", "fish", "csh", "ksh", "py", "rb", "pl", "php",
+        "js", "mjs", "jxa", "scpt", "scptd", "applescript", "workflow", "wflow", "action", "shortcut",
+        // Plug-ins, helpers and code that loads into another app.
+        "plugin", "bundle", "framework", "dylib", "so", "osax", "appex", "xpc", "saver", "qlgenerator", "mdimporter",
+        "service", "systemextension", "driver", "inputplugin", "ibplugin", "menu", "help", "x11app", "nib", "xib",
+        "qtz", "class", "jnlp", "ipa", "cin", "icp", "gcx", "ipg",
+        // Locations and web pages: opening one sends the Mac to another address or file, or runs a page from disk.
+        "fileloc", "inetloc", "webloc", "url", "afploc", "ftploc", "mailloc", "newsloc",
+        "html", "htm", "shtml", "xhtml", "xht", "mht", "mhtml", "svg", "svgz", "webarchive",
+        // Office documents that carry macros.
+        "docm", "dotm", "xlsm", "xltm", "xlam", "pptm", "potm", "ppsm", "ppam",
+        // Configuration profiles.
+        "mobileconfig"
+    ]
+
+    /// The kinds of file the Mac itself calls risky, for an extension the list above doesn't name: anything that runs,
+    /// a script, an archive or disk image, a web location. macOS's own risk list (CoreTypes' LSRiskCategory) names the
+    /// same families; reading the type keeps an extension the list missed from slipping past.
+    private static let refusedTypes: [UTType] = [.executable, .application, .unixExecutable, .script, .shellScript,
+                                                .archive, .diskImage, .internetLocation, .html]
+
+    static func isRefused(_ type: String) -> Bool {
+        let trimmed = type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // No extension is no type to vouch for: an extensionless file can be a script or a binary, and Open is for a
+        // type, not for "whatever this is". It is saved like any other download.
+        guard !trimmed.isEmpty else { return true }
+        // A compound or comma-carrying type is refused when any part of it is: `tar.gz` is an archive because `tar`
+        // and `gz` are, and a page-supplied `pdf,dmg` cannot smuggle the second one past this check.
+        return trimmed.split(whereSeparator: { $0 == "." || $0 == "," })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .contains(where: isRefusedPart)
+    }
+
+    private static func isRefusedPart(_ part: String) -> Bool {
+        if refused.contains(part) { return true }
+        guard let type = UTType(filenameExtension: part) else { return false }
+        return refusedTypes.contains { type.conforms(to: $0) }
+    }
+
+    /// Whether any extension a file-type pattern names is one an Open must refuse. An Open rule for one of them could
+    /// otherwise arrive from an older build or a hand-edited rules file.
+    static func isRefused(pattern: String) -> Bool {
+        let extensions = DownloadRule.Match.extensions(in: pattern)
+        // No extension at all is no type to vouch for, just as an extensionless file is not.
+        guard !extensions.isEmpty else { return true }
+        return extensions.contains { isRefused($0) }
+    }
+}
 
 /// One thing Zigzag hands to another app: a link you click, or a download a page starts, whose address matches.
 /// Rules are tried top to bottom and the first one that matches wins; a download no rule matches stays WebKit's.
@@ -20,9 +95,11 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    /// How a rule compares the address. `any` is the catch-all that sits at the bottom of the list.
+    /// How a rule compares what it caught. Every kind but `fileType` reads the address; `fileType` reads the file's
+    /// own name, which is how a per-extension destination is written (the file's type *is* its extension). `any` is
+    /// the catch-all that sits at the bottom of the list.
     enum Match: String, Codable, CaseIterable, Sendable {
-        case startsWith, contains, endsWith, regex, any
+        case startsWith, contains, endsWith, regex, fileType, any
 
         var title: String {
             switch self {
@@ -30,6 +107,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             case .contains: String(localized: "Contains", comment: "How a download rule matches an address, in its editor.")
             case .endsWith: String(localized: "Ends with", comment: "How a download rule matches an address, in its editor.")
             case .regex: String(localized: "Regular Expression", comment: "How a download rule matches an address, in its editor.")
+            case .fileType: String(localized: "File Extension", comment: "How a download rule matches a file, in its editor: by the extensions of its own name, such as pdf or epub.")
             case .any: String(localized: "Any address", comment: "How a download rule matches an address: the catch-all, for every address.")
             }
         }
@@ -41,7 +119,18 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             case .contains: String(localized: "contains", comment: "A rule's kind, in its row in Settings › Downloads.")
             case .endsWith: String(localized: "ends with", comment: "A rule's kind, in its row in Settings › Downloads.")
             case .regex: String(localized: "matches", comment: "A rule's kind, in its row in Settings › Downloads, before a regular expression.")
+            case .fileType: String(localized: "file type", comment: "A rule's kind, in its row in Settings › Downloads: it catches a file by its extension.")
             case .any: String(localized: "any address", comment: "A rule's kind, in its row in Settings › Downloads: the catch-all.")
+            }
+        }
+
+        /// The extensions a `fileType` pattern names: comma-separated, whitespace and a leading dot tolerated. The
+        /// extension is the part after the dot (`tar.gz` is one), so a name matches when it ends in `.<extension>`.
+        static func extensions(in pattern: String) -> [String] {
+            pattern.split(separator: ",").compactMap { part in
+                let trimmed = part.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return nil }
+                return trimmed.hasPrefix(".") ? String(trimmed.dropFirst()) : trimmed
             }
         }
     }
@@ -73,6 +162,10 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         switch match {
         case .any:
             return true
+        case .fileType:
+            // A file *type* is a file's own name, which an address on its own never is; `matches(_:filename:)` is what
+            // the download path uses. A link has no name, so a type rule never catches one.
+            return false
         case .startsWith:
             return address.hasPrefix(pattern, caseSensitive: isCaseSensitive)
         case .contains:
@@ -88,6 +181,19 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
+    /// Whether this rule catches a download whose file is named `filename`. Only a `fileType` rule reads the name:
+    /// its pattern is a comma-separated list of extensions, and the name matches when it ends in any of them.
+    func matches(filename: String) -> Bool {
+        guard match == .fileType, isEnabled, !filename.isEmpty else { return false }
+        return Match.extensions(in: pattern).contains { filename.hasSuffix("." + $0, caseSensitive: isCaseSensitive) }
+    }
+
+    /// Whether this rule catches what was caught, in one call: the address for every kind but `fileType`, the file's
+    /// own name for that one. A download passes both; a link passes an empty name.
+    func matches(_ url: URL, filename: String) -> Bool {
+        match == .fileType ? matches(filename: filename) : matches(url)
+    }
+
     /// Whether the chosen action reads the tab's cookies. Only then is the cookie store asked.
     var needsCookies: Bool {
         action.textFields.contains { $0.contains("{cookies}") || $0.contains("{cookie_header}") }
@@ -101,9 +207,23 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// What the row says it does, in a few words.
     var actionSummary: String { action.summary }
 
+    /// What a file-type destination's row says it does: the types it names, and where they go.
+    var destinationSentence: String {
+        let types = Match.extensions(in: pattern).joined(separator: ", ")
+        switch action.kind {
+        case .saveToFolder:
+            return String(localized: "Files of type \(types) are saved to \(action.summary)", comment: "A file-type destination in a sentence: the extensions it names, then the folder they are saved into.")
+        case .openFile:
+            return String(localized: "Files of type \(types) open in your Mac’s app", comment: "A file-type destination in a sentence: the extensions it names, then that the Mac's own app opens them.")
+        default:
+            return action.summary
+        }
+    }
+
     /// What the row says it catches.
     var matchSummary: String {
         switch match {
+        case .fileType: return DownloadRule.Match.extensions(in: pattern).joined(separator: ", ")
         case .any: return Match.any.shortTitle
         case .regex: return "\(Match.regex.shortTitle) \(pattern)"
         default: return "\(match.shortTitle) \(pattern)"
@@ -183,6 +303,17 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case openURL
         case runScript
         case jsonRPC
+        /// A per-extension destination, not a handoff: the file is saved as it always was, into a folder of its own.
+        /// It is decided when WebKit makes the download (`DownloadDestination`), never run from the handoff path.
+        case saveToFolder
+        /// The other per-extension destination: the file is saved where downloads go and then handed to the Mac's own
+        /// app for its type — the one a double-click in Finder would open. Never a chosen app: choosing one is a
+        /// handoff, and a handoff is a different question.
+        case openFile
+
+        /// Whether this kind is a destination rather than a handoff action: it never cancels the download, so it is
+        /// made from the per-extension panel, not from Add Rule's Custom… menu.
+        var isDestination: Bool { self == .saveToFolder || self == .openFile }
 
         var title: String {
             switch self {
@@ -190,6 +321,8 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             case .openURL: String(localized: "Open URL", comment: "An action a download rule can take, in its editor: open a URL, which may point at another app.")
             case .runScript: String(localized: "Run Script", comment: "An action a download rule can take, in its editor: run an executable with the link as an argument.")
             case .jsonRPC: String(localized: "JSON-RPC", comment: "An action a download rule can take, in its editor: send the link to a service such as aria2 or rTorrent.")
+            case .saveToFolder: String(localized: "Save", comment: "A destination a file of a given type can have: saved into a folder, which starts as the one downloads already go to.")
+            case .openFile: String(localized: "Open", comment: "A destination a file of a given type can have: saved where downloads go, then opened in the Mac's own app for that type.")
             }
         }
 
@@ -199,7 +332,21 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             case .openURL: "link"
             case .runScript: "terminal"
             case .jsonRPC: "network"
+            case .saveToFolder: "folder"
+            case .openFile: "arrow.up.forward.app"
             }
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            // "showInZigzag" was this case while it opened the file in a tab. It opens the Mac's app instead now, and
+            // a rule saved then still reads as the nearest thing: open it, not save it and say nothing.
+            if raw == "showInZigzag" { self = .openFile; return }
+            guard let kind = Kind(rawValue: raw) else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown download rule action \(raw).")
+            }
+            self = kind
         }
     }
 
@@ -217,6 +364,16 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     }
 
     var kind: Kind = .openURL
+    /// Where this action sends the file, for the two destination kinds that don't hand it to another app: a folder of
+    /// its own, or the Mac's own app opening it. Nil for the four handoff actions, which `DownloadHandoff` runs.
+    var destination: DownloadDestination? {
+        switch kind {
+        case .saveToFolder: .folder(folderPath)
+        case .openFile: .open
+        case .openApp, .openURL, .runScript, .jsonRPC: nil
+        }
+    }
+
     /// Open App: the app's path, as chosen in the open panel.
     var appPath = ""
     /// Open URL: the URL to open, with tokens such as `{encoded_link}`.
@@ -225,6 +382,9 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     var scriptPath = ""
     /// Run Script: one argv value each. A token is substituted into its own argument, never joined into a shell line.
     var arguments: [String] = []
+    /// Save to Folder: the folder a file of this rule's type lands in, as chosen in the panel. Tokens are allowed, so
+    /// a rule can be pointed at `{space}` if it likes.
+    var folderPath = ""
     /// JSON-RPC: the endpoint, the method, and a JSON array of parameters (tokens allowed inside strings).
     var rpcEndpoint = ""
     var rpcMethod = ""
@@ -242,6 +402,8 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .openURL: [urlTemplate]
         case .runScript: arguments
         case .jsonRPC: [rpcParameters]
+        case .saveToFolder: []
+        case .openFile: []
         }
     }
 
@@ -259,6 +421,11 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             if rpcMethod.isEmpty { return Kind.jsonRPC.title }
             let host = URL(string: rpcEndpoint)?.host() ?? rpcEndpoint
             return host.isEmpty ? rpcMethod : "\(rpcMethod) · \(host)"
+        case .saveToFolder:
+            let name = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath).lastPathComponent
+            return name.isEmpty ? Kind.saveToFolder.title : name
+        case .openFile:
+            return Kind.openFile.title
         }
     }
 
@@ -275,13 +442,17 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             return !scriptPath.isEmpty
         case .jsonRPC:
             return !rpcEndpoint.isEmpty && URL(string: rpcEndpoint) != nil && !rpcMethod.isEmpty
+        case .saveToFolder:
+            return !folderPath.isEmpty
+        case .openFile:
+            return true
         }
     }
 
     init(kind: Kind) { self.kind = kind }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, appPath, urlTemplate, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle
+        case kind, appPath, urlTemplate, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle, folderPath
     }
 
     init(from decoder: Decoder) throws {
@@ -306,6 +477,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         rpcMethod = value(String.self, .rpcMethod) ?? ""
         rpcParameters = value(String.self, .rpcParameters) ?? "[]"
         rpcStyle = value(String.self, .rpcStyle).flatMap(RPCStyle.init(rawValue:)) ?? .json
+        folderPath = value(String.self, .folderPath) ?? ""
     }
 }
 
@@ -623,19 +795,71 @@ final class DownloadRulesStore {
         rules = JSONStore.load([DownloadRule].self, from: Paths.downloadRules) ?? []
     }
 
-    /// The first rule that catches `url`, or none. `appliesToLinks` is false for a download.
-    func firstMatch(url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
-        Self.firstMatch(in: rules, url: url, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+    /// The first rule that catches `url`, or none. `appliesToLinks` is false for a download. `filename` is the
+    /// download's own name, for a rule that matches a file's type; a link passes none.
+    func firstMatch(url: URL, filename: String = "", appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        Self.firstMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
     }
 
     /// The same order, apart from the file, for a list being tested or previewed. A rule not let into private windows
     /// is left out there, so a private window never even asks about it.
-    nonisolated static func firstMatch(in rules: [DownloadRule], url: URL, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+    nonisolated static func firstMatch(in rules: [DownloadRule], url: URL, filename: String = "",
+                                       appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
         rules.first { rule in
             guard rule.applies == .linksAndDownloads || !appliesToLinks else { return false }
             guard !isPrivate || rule.runsInPrivateWindows else { return false }
-            return rule.matches(url)
+            return rule.matches(url, filename: filename)
         }
+    }
+
+    /// The first handoff rule that catches a download, if no earlier rule decides where the file lands. A destination
+    /// earlier in the list wins: the list has one order, and a later catch-all handoff must not take a file a type
+    /// rule has already claimed. An Open that the type clamp refuses is treated as no match, so a later Save or
+    /// handoff can still decide, just as it would if that rule were absent.
+    func firstHandoffMatch(url: URL, filename: String, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        Self.firstHandoffMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
+    }
+
+    nonisolated static func firstHandoffMatch(in rules: [DownloadRule], url: URL, filename: String = "",
+                                              appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
+        for rule in rules {
+            guard rule.applies == .linksAndDownloads || !appliesToLinks else { continue }
+            guard rule.matches(url, filename: filename) else { continue }
+            if let destination = rule.action.destination {
+                // A destination only decides downloads; a hand-edited links-and-downloads one is not one, as
+                // `destination(in:)` also says.
+                guard rule.applies == .downloads else { continue }
+                // A Save destination is not a handoff: it still applies in a private window, switch or no switch.
+                // An Open needs the rule's switch, and stands aside while it is off.
+                if isPrivate, !rule.runsInPrivateWindows, destination == .open { continue }
+                if destination == .open, DownloadOpening.isRefused((filename as NSString).pathExtension) { continue }
+                return nil
+            }
+            guard !isPrivate || rule.runsInPrivateWindows else { continue }
+            return rule
+        }
+        return nil
+    }
+
+    /// The first rule whose destination is this download's, if any: the entry that decides where the file lands. Only
+    /// a rule that *is* a destination (`saveToFolder`, `openFile`) is looked at, so a handoff rule for the same
+    /// name is left for the handoff path to run. First match wins, exactly as it does for handoffs.
+    func destination(for url: URL, filename: String) -> (rule: DownloadRule, destination: DownloadDestination)? {
+        Self.destination(in: rules, url: url, filename: filename)
+    }
+
+    /// The same, apart from the file, for a list being tested or previewed.
+    nonisolated static func destination(in rules: [DownloadRule], url: URL, filename: String)
+        -> (rule: DownloadRule, destination: DownloadDestination)? {
+        for rule in rules {
+            guard rule.applies == .downloads, rule.isEnabled, let destination = rule.action.destination,
+                  rule.matches(url, filename: filename) else { continue }
+            // An Open for an app, a script, an installer or an archive is never performed, even if one was saved by an
+            // older build: the file is saved as if this rule had not matched, and a later Save rule may still take it.
+            if destination == .open, DownloadOpening.isRefused((filename as NSString).pathExtension) { continue }
+            return (rule, destination)
+        }
+        return nil
     }
 
     func replace(_ rules: [DownloadRule]) {
@@ -647,6 +871,13 @@ final class DownloadRulesStore {
         guard let index = rules.firstIndex(where: { $0.id == rule.id }) else { return }
         rules[index] = rule
         save()
+    }
+
+    /// Where a new file type goes: after the file types already there and before the first rule that hands something
+    /// off. Settings lists the file types above the handoff rules, so that is the order they are tried in; appended
+    /// at the end, a new type would sit behind a catch-all handoff (a downloader preset) and never decide anything.
+    nonisolated static func placeForNewFileType(in rules: [DownloadRule]) -> Int {
+        rules.firstIndex { !$0.action.kind.isDestination } ?? rules.count
     }
 
     func add(_ rule: DownloadRule, at index: Int? = nil) {
@@ -661,10 +892,32 @@ final class DownloadRulesStore {
         save()
     }
 
+    /// The rules with the one whose `id` this is moved to just before `before` (`nil` puts it last). Kept apart from
+    /// the store so the order a drag produces can be read without one: a list that shows only some of the rules can't
+    /// number a place in the store, so it names the row it was dropped on instead.
+    nonisolated static func moved(_ rules: [DownloadRule], id: UUID, before beforeID: UUID?) -> [DownloadRule] {
+        guard let from = rules.firstIndex(where: { $0.id == id }) else { return rules }
+        var without = rules
+        let rule = without.remove(at: from)
+        let to = beforeID.flatMap { before in without.firstIndex(where: { $0.id == before }) } ?? without.count
+        guard to != from else { return rules }
+        without.insert(rule, at: min(to, without.count))
+        return without
+    }
+
+    /// Moves the rule at one place in the list to another, as the Up and Down buttons do.
     func move(from: Int, to: Int) {
-        guard rules.indices.contains(from), to >= 0, to < rules.count, from != to else { return }
+        guard rules.indices.contains(from), rules.indices.contains(to), from != to else { return }
         let rule = rules.remove(at: from)
         rules.insert(rule, at: to)
+        save()
+    }
+
+    /// Moves the rule with `id` to just before the rule with `before` (`nil` puts it last).
+    func move(_ id: UUID, before beforeID: UUID?) {
+        let moved = Self.moved(rules, id: id, before: beforeID)
+        guard moved != rules else { return }
+        rules = moved
         save()
     }
 

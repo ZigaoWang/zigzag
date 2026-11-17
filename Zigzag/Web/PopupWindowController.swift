@@ -370,7 +370,10 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                  mime: String = "", wasClicked: Bool = false) async -> Bool {
         // Zigzag's own pages and an extension's are never a rule's to take.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Tab.isExtensionPage(url) else { return false }
-        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, isPrivate: isPrivate) else { return false }
+        // A download's own name is what an earlier file-type destination matches; a link has none.
+        let handoffName = appliesToLinks ? "" : (filename ?? DownloadTokens.filename(for: url, suggested: ""))
+        guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
+                                                    isPrivate: isPrivate) else { return false }
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? webView.url
         let handoff = DownloadHandoff.Request(url: url, referrer: referrer, pageOrigin: SiteOrigin.of(webView.url),
                                               filename: filename ?? DownloadTokens.filename(for: url, suggested: ""),
