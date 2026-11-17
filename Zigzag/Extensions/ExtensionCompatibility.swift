@@ -20,8 +20,8 @@ nonisolated enum CompatibilityStatus: String, Codable, CaseIterable, Hashable, S
     /// Chrome has removed it; answered only where old extensions still call it.
     case deprecated
 
-    /// How much of Chrome's contract the status keeps, best first. A namespace is never presented as better than its
-    /// worst member, so the largest strength under it is the one it shows.
+    /// How much of Chrome's contract the status keeps, best first. Used only to summarize a namespace for a person;
+    /// a claim never inherits through this.
     var strength: Int {
         switch self {
         case .native: return 0
@@ -33,7 +33,7 @@ nonisolated enum CompatibilityStatus: String, Codable, CaseIterable, Hashable, S
         }
     }
 
-    /// The weaker of two: what a namespace shows when one member is unsupported.
+    /// The weaker of two, for a namespace summary. Inheritance never uses it.
     static func worst(_ one: CompatibilityStatus, _ other: CompatibilityStatus) -> CompatibilityStatus {
         one.strength >= other.strength ? one : other
     }
@@ -90,7 +90,7 @@ nonisolated enum CompatibilityReason: String, Codable, Hashable, Sendable {
 nonisolated struct CompatibilityClaim: Codable, Sendable {
     var status: CompatibilityStatus
     /// Required for patched, bridged and emulated: `swift:` names an `ExtensionBridge` handler, `js:` a symbol in
-    /// `webkit-differences.js`.
+    /// `webkit-differences.js` or the compatibility shim (`ExtensionShims.compatibility`).
     var implementation: String?
     /// Required for unsupported and deprecated.
     var reason: CompatibilityReason?
@@ -427,8 +427,8 @@ nonisolated struct CompatibilityImplementations: Sendable {
 }
 
 /// Everything wrong with an overlay against the universe and the code it names: a claim on a member Chrome does not
-/// have, the same path claimed twice, a status missing what it needs, an implementation nobody wrote, a group with
-/// no catalog, or a namespace that presents better than its worst member.
+/// have, the same path claimed twice, a status missing what it needs, an implementation nobody wrote, or a group with
+/// no catalog.
 nonisolated enum CompatibilityValidator {
     /// The problems, in a stable order; empty when the overlay can be believed.
     static func diagnostics(overlay: CompatibilityOverlay, universe: ChromeUniverse,
@@ -437,10 +437,6 @@ nonisolated enum CompatibilityValidator {
         var claimed: [String: CompatibilityClaim] = [:]
         walk(overlay.claims, prefix: "", into: &claimed, universe: universe, overlay: overlay,
              implementations: implementations, diagnostics: &diagnostics)
-        for path in claimed.keys.sorted() {
-            guard let claim = claimed[path] else { continue }
-            checkNamespace(path, claim, claims: claimed, diagnostics: &diagnostics)
-        }
         let registry = CompatibilityRegistry(overlay: overlay)
         check(overlay.permissions, at: "permissions", in: overlay, universe: universe,
               registry: registry, diagnostics: &diagnostics)
@@ -497,18 +493,6 @@ nonisolated enum CompatibilityValidator {
         }
     }
 
-    /// A namespace may only present itself as good as its worst claimed member, or its install-sheet line would say
-    /// more works than does.
-    private static func checkNamespace(_ path: String, _ claim: CompatibilityClaim,
-                                       claims: [String: CompatibilityClaim], diagnostics: inout [String]) {
-        let members = claims.keys.filter { $0.hasPrefix(path + ".") }.compactMap { member -> (String, CompatibilityStatus)? in
-            claims[member].map { (member, $0.status) }
-        }
-        guard let worst = members.max(by: { $0.1.strength < $1.1.strength }),
-              claim.status.strength < worst.1.strength else { return }
-        diagnostics.append("\(path) is \(claim.status.rawValue), better than its member \(worst.0) (\(worst.1.rawValue))")
-    }
-
     /// A permission or manifest key's four-value answer, and what each value needs: a partial one names the claims it
     /// turns into lines, and an unsupported or deprecated one says why and where its line belongs. A named claim is
     /// read the way the install sheet reads it, through the registry, so a member covered by its namespace is enough.
@@ -555,8 +539,8 @@ nonisolated enum CompatibilityValidator {
     }
 }
 
-/// The claims as they apply to one path: its own claim, the namespace claims above it, and every member override on
-/// the way. A namespace is presented as no better than its worst member.
+/// The claims as they apply to one path: the deepest claim on it or above it, with any member override on the way.
+/// A namespace claim is the default for the members it does not override; a member override wins for itself alone.
 nonisolated struct CompatibilityRegistry: Sendable {
     /// Every claim the overlay makes, by canonical path, with the nested members flattened away.
     private let claims: [String: CompatibilityClaim]
@@ -571,7 +555,8 @@ nonisolated struct CompatibilityRegistry: Sendable {
     var claimedPaths: Set<String> { Set(claims.keys) }
 
     /// The claim that applies to `path`: the deepest claim on it or above it, with any member overrides on the way
-    /// taking precedence. Nil where no claim covers it, when the universe's default of unsupported stands.
+    /// taking precedence. A namespace keeps its declared answer for members it does not override. Nil where no
+    /// claim covers the path, when the universe's default of unsupported stands.
     func claim(for path: String) -> CompatibilityClaim? {
         let above = claims.keys.filter { $0 == path || path.hasPrefix($0 + ".") }.sorted { $0.count < $1.count }
         guard !above.isEmpty else { return nil }
@@ -583,12 +568,11 @@ nonisolated struct CompatibilityRegistry: Sendable {
             resolved.reason = claim.reason ?? resolved.reason
             resolved.group = claim.group ?? resolved.group
         }
-        resolved.status = status(of: path)
         return resolved
     }
 
-    /// What the overlay presents for `path`. A claimed namespace shows its worst member; a member without a claim
-    /// of its own keeps its namespace's answer.
+    /// A presentation summary, not the claim anything inherits: the weakest declared status on or under `path`.
+    /// The install sheet reads `claim(for:)`, and no member takes its answer from here.
     func status(of path: String) -> CompatibilityStatus {
         if let own = claims[path] {
             let below = claims.keys.filter { $0.hasPrefix(path + ".") }

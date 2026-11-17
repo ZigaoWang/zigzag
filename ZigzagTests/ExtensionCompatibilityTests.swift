@@ -199,8 +199,8 @@ struct ExtensionCompatibilityTests {
         #expect(implementations.implements("js:real"))
     }
 
-    @Test func aNamespaceIsNeverBetterThanItsWorstMember() throws {
-        let problems = try diagnostics(claims: """
+    @Test func aNamespaceKeepsItsDeclaredStatusWhenAMemberIsWorse() throws {
+        let overlay = try overlay(claims: """
         {"storage": {"status": "native", "members": {
             "local": {"status": "unsupported", "reason": "notImplemented", "group": "storage", "members": {
                 "get": {"status": "unsupported", "reason": "notImplemented", "group": "storage"}
@@ -209,10 +209,16 @@ struct ExtensionCompatibilityTests {
         """, groups: """
         {"storage": {"catalog": "extension.limit.storage"}}
         """)
-        #expect(problems.count == 1)
-        #expect(problems.first?.contains("storage") == true)
-        #expect(problems.first?.contains("storage.local") == true)
-        #expect(problems.first?.contains("unsupported") == true)
+        let problems = CompatibilityValidator.diagnostics(overlay: overlay, universe: try universe(),
+                                                          implementations: implementations)
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+        let registry = CompatibilityRegistry(overlay: overlay)
+        // The namespace is the default for its members; a worse member overrides only itself.
+        #expect(registry.claim(for: "storage")?.status == .native)
+        #expect(registry.claim(for: "storage.local")?.status == .unsupported)
+        #expect(registry.claim(for: "storage.local.get")?.status == .unsupported)
+        // The rollup is a separate summary; nothing inherits it.
+        #expect(registry.status(of: "storage") == .unsupported)
     }
 
     // MARK: The registry
@@ -226,11 +232,13 @@ struct ExtensionCompatibilityTests {
         {"tabGroups": {"catalog": "extension.limit.tabGroups"}}
         """)
         let registry = CompatibilityRegistry(overlay: overlay)
+        #expect(registry.claim(for: "tabs")?.status == .bridged)
+        #expect(registry.claim(for: "tabs")?.implementation == "swift:tabs")
         #expect(registry.claim(for: "tabs.query")?.status == .bridged)
         #expect(registry.claim(for: "tabs.query")?.implementation == "swift:tabs")
         #expect(registry.claim(for: "tabs.group")?.status == .unsupported)
         #expect(registry.claim(for: "tabs.group")?.reason == .webkitMissing)
-        // A namespace shows its worst member, so it cannot look better than the claims under it.
+        // The namespace keeps its declared answer; the rollup is a separate presentation summary.
         #expect(registry.status(of: "tabs") == .unsupported)
     }
 
@@ -401,6 +409,47 @@ struct ExtensionCompatibilityTests {
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
+    @MainActor @Test func theShippedOverlayValidatesWithNoDiagnostics() throws {
+        let (overlay, universe) = try shipped()
+        let problems = CompatibilityValidator.diagnostics(overlay: overlay, universe: universe,
+                                                          implementations: .shipped())
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    @MainActor @Test func unoverriddenMembersOfAClaimedNamespaceKeepItsImplementation() throws {
+        let (overlay, universe) = try shipped()
+        let registry = CompatibilityRegistry(overlay: overlay)
+        let implementations = CompatibilityImplementations.shipped()
+        var problems: [String] = []
+        for (namespace, claim) in overlay.claims {
+            guard [.patched, .bridged, .emulated].contains(claim.status) else { continue }
+            let overridden = claim.members.map { Set($0.keys) } ?? []
+            for path in universe.paths where path.hasPrefix(namespace + ".") {
+                let member = String(path.dropFirst(namespace.count + 1))
+                guard !member.contains("."), !overridden.contains(member) else { continue }
+                guard let resolved = registry.claim(for: path),
+                      [.patched, .bridged, .emulated].contains(resolved.status) else { continue }
+                guard let implementation = resolved.implementation else {
+                    problems.append("\(path) inherits \(resolved.status.rawValue) but names no implementation")
+                    continue
+                }
+                if !implementations.implements(implementation) {
+                    problems.append("\(path) inherits \(implementation), which does not exist")
+                }
+            }
+        }
+        #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
+    }
+
+    @Test func theStorageLimitReachesTheSheet() throws {
+        let (overlay, _) = try shipped()
+        let limits = ExtensionCompatibility(overlay: overlay).limits(forPermissions: ["storage"], manifestKeys: [])
+        #expect(limits.count == 1)
+        #expect(limits.first?.catalogKey == "extension.limit.storageSync")
+        #expect(limits.first?.status == .partial)
+        #expect(limits.first?.text == "Settings that stay on this Mac")
+    }
+
     @Test func everyGroupResolvesToACatalogEntry() throws {
         let (overlay, _) = try shipped()
         var groups: Set<String> = []
@@ -440,46 +489,73 @@ struct ExtensionCompatibilityTests {
         }
         let catalog = try Self.stringCatalog()
         var unwritten: [String] = []
-        var untranslated: [String] = []
-        for key in keys.sorted() {
-            let sentinel = "⟨no catalog text⟩"
-            if CompatibilityText.text(for: key, fallback: sentinel) == sentinel { unwritten.append(key) }
-            let value = ((((catalog[key] as? [String: Any])?["localizations"] as? [String: Any])?["zh-Hans"]
-                as? [String: Any])?["stringUnit"] as? [String: Any])?["value"] as? String
-            if value?.isEmpty != false { untranslated.append(key) }
-        }
-        #expect(!keys.isEmpty)
-        #expect(unwritten.isEmpty, "No CompatibilityText case for: \(unwritten)")
-        #expect(untranslated.isEmpty, "No zh-Hans value for: \(untranslated)")
-
-        // The lines a person already saw keep the old wording as their English.
-        let oldWording: [String: String] = [
-            "extension.limit.sidePanel": "Side panel",
-            "extension.limit.signIn": "Signing in with your account",
-            "extension.limit.notifications": "Notifications",
-            "extension.limit.downloads": "Downloads",
-            "extension.limit.webRequestBlocking": "Blocking requests the old way",
-            "extension.limit.bookmarks": "Your bookmarks",
+        var noChinese: [String] = []
+        var noEnglish: [String] = []
+        var wrongEnglish: [String] = []
+        // The wording a person saw before the overlay, kept as each catalog key's English value.
+        let expectedEnglish: [String: String] = [
             "extension.limit.tabGroups": "Tab groups",
+            "extension.limit.tabActions": "Some tab actions",
+            "extension.limit.windowsPopup": "Popup windows",
+            "extension.limit.runtime": "Restarting Zigzag",
+            "extension.limit.action": "Toolbar button settings",
+            "extension.limit.notifications": "Notifications",
+            "extension.limit.sidePanel": "Side panel",
+            "extension.limit.systemDisplay": "Display information",
+            "extension.limit.power": "Keeping your Mac awake",
+            "extension.limit.signIn": "Signing in with your account",
+            "extension.limit.bookmarks": "Your bookmarks",
+            "extension.limit.downloads": "Downloads",
+            "extension.limit.tabCapture": "Recording tabs",
+            "extension.limit.cookies": "Cookie details",
+            "extension.limit.hostAccessRequests": "Site access requests",
+            "extension.limit.storage": "Stored extension settings",
+            "extension.limit.storageSync": "Settings that stay on this Mac",
+            "extension.limit.localScripts": "Scripts on local files",
+            "extension.limit.blockingRules": "Blocking rules",
+            "extension.limit.webRequestBlocking": "Blocking requests the old way",
+            "extension.limit.languageDetection": "Language detection",
+            "extension.limit.legacyExtension": "Legacy extension APIs",
+            "extension.limit.sessions": "Closed tabs and sessions",
+            "extension.limit.search": "Search settings",
+            "extension.limit.debugger": "Debugging pages",
             "extension.limit.fontSettings": "Font settings",
+            "extension.limit.privacySettings": "Privacy settings",
+            "extension.limit.management": "Managing other extensions",
+            "extension.limit.pageCapture": "Saving pages",
+            "extension.limit.desktopCapture": "Recording your screen",
+            "extension.limit.addressBarKeyword": "Address bar keyword",
+            "extension.limit.publicSuffix": "Domain names",
+            "extension.limit.devtools": "Developer tools",
+            "extension.limit.contentSettings": "Content settings",
+            "extension.limit.readingList": "Reading list",
             "extension.limit.tts": "Reading aloud",
             "extension.limit.geolocation": "Your location",
             "extension.limit.clipboardRead": "Reading what you copy",
-            "extension.limit.management": "Managing other extensions",
-            "extension.limit.privacySettings": "Privacy settings",
-            "extension.limit.debugger": "Debugging pages",
-            "extension.limit.pageCapture": "Saving pages",
-            "extension.limit.desktopCapture": "Recording your screen",
-            "extension.limit.tabCapture": "Recording tabs",
-            "extension.limit.systemDisplay": "Display information",
-            "extension.limit.power": "Keeping your Mac awake",
             "extension.limit.proxyScripts": "Proxy scripts (PAC)",
-            "extension.limit.addressBarKeyword": "Address bar keyword",
+            "extension.limit.deprecatedChannel": "Deprecated Google APIs",
         ]
-        for (key, wording) in oldWording {
-            #expect(CompatibilityText.text(for: key, fallback: "⟨fallback⟩") == wording, "\(key)")
-            #expect(keys.contains(key), "\(key) is not in the catalog")
+        #expect(keys == Set(expectedEnglish.keys))
+        for key in keys.sorted() {
+            let sentinel = "⟨no catalog text⟩"
+            if CompatibilityText.text(for: key, fallback: sentinel) == sentinel { unwritten.append(key) }
+            let localizations = (catalog[key] as? [String: Any])?["localizations"] as? [String: Any]
+            let chinese = (((localizations?["zh-Hans"] as? [String: Any])?["stringUnit"]
+                as? [String: Any])?["value"] as? String)
+            if chinese?.isEmpty != false { noChinese.append(key) }
+            let english = (((localizations?["en"] as? [String: Any])?["stringUnit"]
+                as? [String: Any])?["value"] as? String)
+            if let english, !english.isEmpty {
+                if english != expectedEnglish[key] { wrongEnglish.append("\(key): \(english)") }
+            } else {
+                noEnglish.append(key)
+            }
         }
+        #expect(!keys.isEmpty)
+        #expect(unwritten.isEmpty, "No CompatibilityText case for: \(unwritten)")
+        #expect(noChinese.isEmpty, "No zh-Hans value for: \(noChinese)")
+        #expect(noEnglish.isEmpty, "No en value for: \(noEnglish)")
+        #expect(wrongEnglish.isEmpty, "Wording changed for: \(wrongEnglish)")
     }
 
     @Test func everyPermissionRowWordsItsLines() throws {

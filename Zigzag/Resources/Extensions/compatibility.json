@@ -187,10 +187,6 @@
           "status": "emulated",
           "implementation": "js:managed",
           "group": "storage"
-        },
-        "sync": {
-          "status": "native",
-          "group": "storageSync"
         }
       }
     },
@@ -350,7 +346,7 @@
       }
     },
     "declarativeNetRequest": {
-      "status": "emulated",
+      "status": "patched",
       "implementation": "js:dnr",
       "group": "dnr",
       "members": {
@@ -372,6 +368,26 @@
         "getAvailableStaticRuleCount": {
           "status": "emulated",
           "implementation": "js:dnr",
+          "group": "dnr"
+        },
+        "getMatchedRules": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnr"
+        },
+        "setExtensionActionOptions": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnr"
+        },
+        "testMatchOutcome": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnr"
+        },
+        "onRuleMatchedDebug": {
+          "status": "unsupported",
+          "reason": "notImplemented",
           "group": "dnr"
         }
       }
@@ -753,10 +769,7 @@
   },
   "permissions": {
     "bookmarks": {
-      "status": "partial",
-      "claims": [
-        "bookmarks.getTree"
-      ]
+      "status": "supported"
     },
     "clipboardRead": {
       "status": "unsupported",
@@ -802,10 +815,7 @@
       "group": "desktopCapture"
     },
     "downloads": {
-      "status": "partial",
-      "claims": [
-        "downloads.download"
-      ]
+      "status": "supported"
     },
     "downloads.open": {
       "status": "supported"
@@ -824,10 +834,7 @@
       "status": "supported"
     },
     "identity": {
-      "status": "partial",
-      "claims": [
-        "identity.launchWebAuthFlow"
-      ]
+      "status": "supported"
     },
     "identity.email": {
       "status": "partial",
@@ -848,10 +855,7 @@
       "status": "supported"
     },
     "notifications": {
-      "status": "partial",
-      "claims": [
-        "notifications.create"
-      ]
+      "status": "supported"
     },
     "offscreen": {
       "status": "supported"
@@ -862,10 +866,7 @@
       "group": "pageCapture"
     },
     "power": {
-      "status": "partial",
-      "claims": [
-        "power.requestKeepAwake"
-      ]
+      "status": "supported"
     },
     "privacy": {
       "status": "unsupported",
@@ -889,22 +890,21 @@
       "group": "sessions"
     },
     "sidePanel": {
+      "status": "supported"
+    },
+    "storage": {
       "status": "partial",
+      "catalog": "extension.limit.storageSync",
+      "group": "storageSync",
       "claims": [
-        "sidePanel.open"
+        "storage.sync"
       ]
     },
     "system.display": {
-      "status": "partial",
-      "claims": [
-        "system.display.getInfo"
-      ]
+      "status": "supported"
     },
     "tabCapture": {
-      "status": "partial",
-      "claims": [
-        "tabCapture.capture"
-      ]
+      "status": "supported"
     },
     "tabGroups": {
       "status": "unsupported",
