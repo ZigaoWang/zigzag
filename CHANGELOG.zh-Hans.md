@@ -18,6 +18,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “全屏视频填满”设为“网页”时，填满网页的视频在指针移动时会在右上角显示一个按钮，点一下就进入真正的全屏。感谢 [Lakeland97](https://github.com/Lakeland97)。([#257](https://github.com/ZigaoWang/zigzag/issues/257))
 - 把标签页拖到边栏里分屏那一行上，就能加成第三、第四个页面，就像把一个标签页拖到另一个上面会分屏一样。它会占你放下那一侧的四分之一，四个就是田字格。⌘Z 可以撤销。
 - 边栏底部现在会给每个在后台放声音的标签页都显示一张“正在播放”卡片，最多三张，不再只显示一个，好几个一起响的时候可以一个个暂停或静音。新的卡片放在最上面，其他的不会挪位置。感谢 [Lakeland97](https://github.com/Lakeland97)。([#274](https://github.com/ZigaoWang/zigzag/issues/274))
+- “设置 › 外观 › 网页缩放”可以设置所有网站默认的缩放比例，和 Chrome、Safari 一样。用 ⌘+ 或 ⌘− 缩放过的网站会保留自己的缩放，“实际大小”会回到默认值。感谢 [Lakeland97](https://github.com/Lakeland97)。([#273](https://github.com/ZigaoWang/zigzag/issues/273))
 
 ### 修复
 - 全屏时，跟着菜单栏一起出现的关闭、最小化和全屏按钮后面又有了一条栏，隐藏边栏时不会再直接浮在网页上。
