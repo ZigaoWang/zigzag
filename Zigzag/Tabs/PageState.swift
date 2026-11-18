@@ -51,8 +51,8 @@ nonisolated struct PageState: Equatable, Sendable {
         ["x": Double(scroll.x), "y": Double(scroll.y), "waits": placesItself, "fields": fields.map { [$0.selector, $0.value] }]
     }
 
-    /// A field that was a password while you typed stays secret once "Show password" makes it plain text: the fields
-    /// it notes, `fieldRules` reads. Also noted in the world AI apps read pages in (MCPPageScript.watch).
+    /// A field that was a password while typed stays secret once "Show password" makes it plain text. `fieldRules`
+    /// reads the fields noted, also in the world AI apps read pages in (MCPPageScript.watch).
     static let secretWatch = """
       const secret = window.__zigzagSecret = new WeakSet();
       addEventListener('input', (e) => {

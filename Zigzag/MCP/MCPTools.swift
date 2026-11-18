@@ -227,7 +227,7 @@ nonisolated enum MCPCommand: Equatable, Sendable {
             return ref
         }
 
-        /// The element a tool is pointed at, by one of `keys` (ref, selector, text), if any: never more than one.
+        /// The element a tool points at by one of `keys` (ref, selector, text), if any. Never more than one.
         func target(for tool: String, _ keys: [String]) throws -> MCPTarget? {
             let given = try targets(keys)
             guard given.count <= 1 else { throw MCPArgumentError("\(tool) takes \(Self.either(keys)), not more than one.") }

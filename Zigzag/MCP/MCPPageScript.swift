@@ -5,8 +5,8 @@ import WebKit
 enum MCPPageScript {
     static let world = WKContentWorld.world(name: "app.zigzag.mcp")
 
-    /// From the start of every page, in this world: which fields were passwords while the person typed in them, so
-    /// PageState's rules keep one secret after a site's "Show password" makes it plain text.
+    /// Records which fields were passwords while typed in, so PageState's rules keep them secret after a site's "Show
+    /// password" makes them plain text.
     static let watch = WKUserScript(source: "(() => {\n\(PageState.secretWatch)\n})();", injectionTime: .atDocumentStart,
                                     forMainFrameOnly: true, in: world)
 
@@ -61,9 +61,8 @@ enum MCPPageScript {
     /// The function's body; `op` and `args` are its arguments.
     static let body = #"""
     \#(PageState.fieldRules)
-    // Zigzag's own notes in the page, in this world so the page can't see them: the fields the agent typed into, and
-    // the refs it was given for elements, each with what it stood for.
-    // The page's own refs and its id: Zigzag gives apps refs of its own for them (MCPRefs).
+    // State in this world, hidden from the page: fields the agent typed into, and each ref with what it stood for. Refs
+    // and the page id are page-local: apps get Zigzag's own refs (MCPRefs).
     const zz = globalThis.__zigzagRefs || (globalThis.__zigzagRefs = { typed: new WeakMap(), byEl: new WeakMap(), byRef: new Map(), next: 0,
       page: globalThis.crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36) });
     // A ref as the app has it, for what's said back.
@@ -85,9 +84,9 @@ enum MCPPageScript {
       }
       return sum % 10 === 0;
     };
-    // A value no app is given: a password, a card's details, a one-time code and the like (the rules that keep them out
-    // of what a tab remembers, PageState.fieldRules), a hidden input's, or a card number in any field. A list or a
-    // rich-text field is judged by what it says it holds, as a text field is, and by the words it shows.
+    // A value no app is given: a password, card details, a one-time code and the like (PageState.fieldRules), a hidden
+    // input's value, or a card number in any field. Lists and rich-text fields are judged by what they declare and the
+    // words they show.
     const sensitive = (el) => {
       if (isSecret(el)) return true;
       if (el instanceof HTMLInputElement && el.type === 'hidden') return true;
@@ -98,22 +97,22 @@ enum MCPPageScript {
     };
     // A rich-text field: where its editing starts.
     const editingHost = (el) => !!el.isContentEditable && !isField(el) && !(el.parentElement && el.parentElement.isContentEditable);
-    // What a field holds, before any rule: a list's choice, a rich-text field's words that show, a field's value.
+    // A field's raw value, before any rule: a list's choice, a rich-text field's shown words, or its value.
     const rawValue = (el) => {
       if (el instanceof HTMLSelectElement) return el.selectedOptions.length ? el.selectedOptions[0].text : '';
       if (editingHost(el)) return textOf(el);
       return String(el.value ?? '');
     };
-    // What the person's saved details fill in (their name, email, phone, address): an app is told only that it's filled,
-    // and how long, unless it typed the value itself.
+    // Saved-detail fields (name, email, phone, address): an app learns only that one is filled and its length, unless
+    // it typed the value itself.
     const personal = /\b(name|honorific-prefix|given-name|additional-name|family-name|honorific-suffix|nickname|email|tel(-[a-z-]+)?|street-address|address-line[123]|address-level[1-4]|postal-code|country(-name)?|bday(-[a-z]+)?|organization(-title)?)\b/i;
     const autofilled = (el) => {
       for (const state of [':autofill', ':-webkit-autofill']) { try { if (el.matches(state)) return true; } catch (e) {} }
       return false;
     };
     const savedDetail = (el) => personal.test(el.getAttribute('autocomplete') || '') || autofilled(el);
-    // Characters that change how text reads without showing: controls, direction marks, zero-width characters, soft
-    // hyphens and Unicode tags, the ways hidden instructions ride along in page text.
+    // Characters that change how text reads without showing (controls, direction marks, zero-width, soft hyphens,
+    // Unicode tags): how hidden instructions ride along in page text.
     const unseen = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u00AD\u061C\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu;
     const clip = (s, n) => {
       s = String(s ?? '').replace(unseen, '').replace(/\s+/g, ' ').trim();
@@ -121,14 +120,12 @@ enum MCPPageScript {
       const chars = [...s];
       return chars.length > n ? chars.slice(0, n).join('') + '…' : s;
     };
-    // A field's value as an app may have it, in one order for every kind of field: none for a password or a secret,
-    // only its length for a saved detail the app didn't type itself, otherwise the value (a list's choice, a rich-text
-    // field's words).
+    // A field's value as an app may have it: none for a password or secret, only the length for a saved detail the app
+    // didn't type, otherwise the value.
     const valueOf = (el, max) => {
       if (isSecret(el)) return { password: true };
       const value = rawValue(el);
-      // What the app typed itself, while the field still holds exactly that, is no secret from it. Never a
-      // password, shown or not.
+      // A value the app typed itself and the field still holds is no secret from it. Never a password, shown or not.
       const typedIt = value !== '' && zz.typed.get(el) === value && !(globalThis.__zigzagSecret && globalThis.__zigzagSecret.has(el));
       if (!typedIt && sensitive(el)) return { secret: true };
       if (value && !typedIt && savedDetail(el)) return { filled: [...value].length };
@@ -136,8 +133,8 @@ enum MCPPageScript {
     };
     // A field: a box of its own, holding a value and none of the page's text.
     const isField = (el) => el.localName === 'input' || el.localName === 'textarea' || el.localName === 'select';
-    // What a clip-path's inset() leaves: nothing, when its top and bottom (or left and right) meet. One to four
-    // values, as CSS fills them in; any it can't read (a calc()) counts as leaving something.
+    // Whether a clip-path's inset() leaves nothing: opposite insets meet. An unreadable value (a calc()) counts as
+    // leaving something.
     const insetLeavesNone = (path, box) => {
       const inset = /^inset\(([^)]*?)(?:\s+round\b[^)]*)?\)/.exec(path);
       if (!inset) return false;
@@ -148,8 +145,8 @@ enum MCPPageScript {
       const across = px(left, box.width) + px(right, box.width), down = px(top, box.height) + px(bottom, box.height);
       return (Number.isFinite(across) && across >= box.width) || (Number.isFinite(down) && down >= box.height);
     };
-    // Clipped to nothing, the "visually hidden" way: a clip or clip-path that leaves none of it, or a box of a pixel
-    // or less that hides what overflows it.
+    // Clipped to nothing (the "visually hidden" pattern): a clip or clip-path that leaves nothing, or a box of a pixel
+    // or less that hides its overflow.
     const clipsAway = (el, style, box) => {
       if ((style.position === 'absolute' || style.position === 'fixed') && style.clip && style.clip !== 'auto') {
         const n = style.clip.match(/-?[\d.]+/g);
@@ -162,13 +159,12 @@ enum MCPPageScript {
       if (ellipse && (Number(ellipse[1]) === 0 || Number(ellipse[2]) === 0)) return true;
       return box.width <= 1 && box.height <= 1 && style.overflow !== 'visible';
     };
-    // A thin box: under 4 points (thinner than text is read at, readableStyle) on a side it clips. It shows nothing
-    // of what it holds, whichever way that's shifted; the box itself is still there (a seek bar 3 points high is
-    // seen, and clicked). Not an inline element, which clips nothing, nor a field, which holds nothing to clip.
+    // A thin box: under 4 points (below readable text size, readableStyle) on a side it clips. Its contents never show,
+    // though the box does (a 3-point seek bar). Not inline elements, which clip nothing, nor fields, which hold nothing
+    // to clip.
     const thin = (el, style, box) => (box.width < 4 || box.height < 4) && !isField(el) && style.display !== 'inline'
       && ((box.width < 4 && style.overflowX !== 'visible') || (box.height < 4 && style.overflowY !== 'visible'));
-    // Shrunk to nothing, the "scale(0)" way: by what the transform does (its matrix), so one that only moves or
-    // turns something is never taken for it.
+    // Shrunk to nothing (the "scale(0)" pattern), judged by the transform's matrix so a move or rotation never counts.
     const flattened = (style) => {
       const scale = style.scale;
       if (scale && scale !== 'none' && scale.split(/\s+/).slice(0, 2).some((n) => Math.abs(parseFloat(n)) < 0.01)) return true;
@@ -178,10 +174,10 @@ enum MCPPageScript {
       const [a, b, c, d] = transform.startsWith('matrix3d') ? [n[0], n[1], n[4], n[5]] : n;
       return Math.hypot(a, b) < 0.01 || Math.hypot(c, d) < 0.01;
     };
-    // Outside anything the page can be scrolled to, sideways: a page read right to left scrolls the other way.
+    // Outside the page's sideways scroll range (a right-to-left page scrolls the other way).
     const offSideways = (box) => {
       const page = document.scrollingElement || document.documentElement;
-      // The page scrolls as its root reads, or its body: the body's direction is the window's too.
+      // The root's direction, or the body's, sets the page's scroll direction.
       const rtl = [document.documentElement, document.body].some((el) => el && getComputedStyle(el).direction === 'rtl');
       const wide = Math.max(page.scrollWidth, innerWidth);
       const x = box.left + scrollX;
@@ -193,39 +189,34 @@ enum MCPPageScript {
       const y = box.top + scrollY;
       return offSideways(box) || y + box.height <= 0 || y >= Math.max(page.scrollHeight, innerHeight);
     };
-    // Parked out of sight, the "left: -9999px" way: positioned outside anything that can be scrolled to (a fixed
-    // element, outside the window). What's in the page's flow is never parked: past the end of a scrolling list, it's
-    // still there to scroll to.
+    // Parked out of sight (the "left: -9999px" pattern): positioned outside the scrollable area (for a fixed element,
+    // the window). In-flow content is never parked: it can still be scrolled to.
     const parked = (style, box) => {
       if (style.position === 'fixed') return box.right <= 0 || box.bottom <= 0 || box.left >= innerWidth || box.top >= innerHeight;
       return style.position === 'absolute' && offPage(box);
     };
-    // Tucked away with all it holds: every way a page hides something from people while leaving it in the page, in
-    // one place for whatever asks (a name, a click, a snapshot). What's shrunk to nothing has a box that says so:
-    // only then is its transform read.
+    // Every way a page hides something while leaving it in the page, in one place for all callers. The transform is
+    // read only when the box is under 4 points.
     const tuckedAway = (el, style, box) => clipsAway(el, style, box) || ((box.width < 4 || box.height < 4) && flattened(style)) || parked(style, box);
     // So faint it's as good as see-through.
     const faint = (style) => { const opacity = style.opacity; return opacity !== '1' && parseFloat(opacity) < 0.1; };
     const host = (node) => node.parentElement || (node.parentNode && node.parentNode.host) || null;
-    // Where a node is drawn: in the slot a web component gives it to, if it does, else in what holds it. What's
-    // above it on the page, for whether it's seen, is what's above that.
+    // Where a node is drawn: the slot a web component assigns it to, else its parent. Visibility is judged up that
+    // chain.
     const drawnIn = (node) => node.assignedSlot || host(node);
-    // Up and into, through shadow roots: what holds a node as the page is put together, and whether one holds another.
+    // A node's parent and containment in the composed tree, through shadow roots.
     const composedParent = (node) => node.parentNode instanceof ShadowRoot ? node.parentNode.host : node.parentNode;
     const composedContains = (outer, node) => {
       for (let at = node; at; at = composedParent(at)) if (at === outer) return true;
       return false;
     };
-    // Whether an element placed apart (fixed, absolute) is painted outside the strip a thin box above it leaves: asked
-    // of WebKit, which knows whether that box clips it (whether it's its containing block, by any of the ways CSS
-    // has), with a hit at a point of the element's box beyond the strip. Hit there, it's there to see. A point
-    // outside the window can't be asked, and isn't taken for a yes.
-    // Hit tests asked for in this call: a collapsed box can hold hundreds of placed rows, and past a fair number
-    // the rest aren't asked about, which is a no.
+    // Whether a thin box above fails to clip an element placed apart (fixed, absolute): a WebKit hit test at a point of
+    // its box beyond the strip finds it. A point outside the window can't be tested and counts as a no. Hit tests are
+    // capped per call, as a collapsed box can hold hundreds of placed rows: past the cap the answer is no.
     let hitTests = 0;
     const paintedBeyond = (el, box, strip) => {
       const root = el.getRootNode(), from = root.elementsFromPoint ? root : document;
-      // Hit itself, or in something it holds that isn't placed apart in its turn (that one's answer is its own).
+      // The hit is the element, or a descendant not itself placed apart (which gets its own answer).
       const itsOwn = (hit) => {
         for (let at = hit; at; at = composedParent(at)) {
           if (at === el) return true;
@@ -245,15 +236,13 @@ enum MCPPageScript {
       }
       return false;
     };
-    // What the person sees of an element, said one way for whoever asks (a name, a click, a snapshot), from what it
-    // is itself and what the one above it is:
-    //   GONE     not seen, nor anything in it: see-through, tucked away, or under something that is
-    //   CLIPPED  under a thin box and outside the strip it leaves; something in it may still escape that box
-    //   BOX      its box shows, the text right in it doesn't: a thin box itself, or something over a thin box's strip
+    // What the person sees of an element, for every caller (a name, a click, a snapshot), from itself and its parent:
+    //   GONE     nothing of it or in it: see-through, tucked away, or under something that is
+    //   CLIPPED  under a thin box and outside its strip; something in it may still escape that box
+    //   BOX      its box shows but not its direct text: a thin box, or something over a thin box's strip
     //   SHOWS    all of it
-    // With CLIPPED and BOX comes the strip in force (`strip`: its edges), for what's below. `opacity`: see-through
-    // counts as gone (a click's reach looks past it). Not asked here: whether it's drawn at all (checkVisibility,
-    // which whoever asks does first).
+    // CLIPPED and BOX carry the strip in force (`strip`: its edges) for descendants. `opacity`: see-through counts as
+    // gone (a click's reach ignores it). Callers check first whether it's drawn at all (checkVisibility).
     const GONE = 0, CLIPPED = 1, BOX = 2, SHOWS = 3;
     const ALL = { seen: SHOWS, strip: null }, NONE = { seen: GONE, strip: null };
     const under = (el, style, box, above, opacity) => {
@@ -263,10 +252,9 @@ enum MCPPageScript {
       if (tuckedAway(el, style, box) || (opacity && faint(style))) return NONE;
       let seen = SHOWS, strip = above.strip;
       if (strip) {
-        // Placed apart and painted beyond the strip: the thin box doesn't clip it, and it's as if not under it.
+        // Placed apart and painted beyond the strip: the thin box doesn't clip it.
         if ((style.position === 'fixed' || style.position === 'absolute') && paintedBeyond(el, box, strip)) strip = null;
-        // Over the strip, its box is there (a fill in a thin track): never a field, whose value would be read
-        // though it's clipped like any text.
+        // Over the strip its box shows (a fill in a thin track), except a field, whose clipped value would be read.
         else if (!isField(el) && Math.min(box.right, strip.right) - Math.max(box.left, strip.left) >= 1
           && Math.min(box.bottom, strip.bottom) - Math.max(box.top, strip.top) >= 1) seen = BOX;
         else seen = CLIPPED;
@@ -279,11 +267,9 @@ enum MCPPageScript {
       }
       return seen === SHOWS && !strip ? ALL : { seen, strip };
     };
-    // The answer for an element: `under`, from the top of the page down to it. Up first, one at a time (never by
-    // recursion: a page can nest as deep as it likes), to the top or to one whose answer is kept; then back down.
-    // While a snapshot runs each answer is kept, so each element is looked at once, whoever asks and in whatever
-    // order. (Only what's asked as the person sees it is kept: a click's reach never is.) `style`, `box`: the
-    // element's own, when whoever asks has them already.
+    // Applies `under` from the top of the page down to the element, iteratively (a page can nest arbitrarily deep).
+    // During a snapshot answers are cached so each element is examined once (only with `opacity`: a click's reach is
+    // never cached). `style` and `box` are the element's own, when the caller has them.
     let known = null;
     const whatIs = (e, opacity, style, box) => {
       const keeps = known && opacity;
@@ -313,8 +299,7 @@ enum MCPPageScript {
     const shown = (el) => visibleBox(el, true) >= BOX;
     // Shows, with the text right in it.
     const showsItsText = (el) => visibleBox(el, true) === SHOWS;
-    // Where the person's pointer could reach it, seen or not: an invisible input laid over a picture of one is what a
-    // real click hits.
+    // Reachable by the person's pointer, seen or not: a real click hits an invisible input laid over a picture of one.
     const hittable = (el) => visibleBox(el, false) >= BOX;
     const alpha = (color) => {
       const m = /rgba?\(([^)]*)\)/.exec(color || '');
@@ -322,14 +307,13 @@ enum MCPPageScript {
       const parts = m[1].split(/[\s,\/]+/).filter(Boolean);
       return parts.length > 3 ? parseFloat(parts[3]) : 1;
     };
-    // Text the person can read: on an element that shows, at least 4 points high, and not see-through (unless it's
-    // drawn by its background, as gradient headings are).
+    // Text the person can read: at least 4 points high and not see-through (unless drawn by its background, as gradient
+    // headings are).
     const readableStyle = (style) => parseFloat(style.fontSize) >= 4
       && (alpha(style.webkitTextFillColor || style.color) > 0 || /text/.test(style.webkitBackgroundClip || style.backgroundClip || ''));
-    // What could keep an element's text from being seen once a text-indent pushes it: everything above it that
-    // clips sideways. Null when the indent can't push text out at all (only backwards, or by the width of what
-    // it's set in and more, can): a saving, for the paragraphs of an indented article. Kept for the call, as names
-    // are: every text node of an element asks.
+    // The ancestors that clip sideways and could hide text pushed by a text-indent. Null when the indent can't push
+    // text out (it must be negative, or at least as wide as its block), which spares indented paragraphs. Cached per
+    // call, as every text node asks.
     const pushing = new Map();
     const clipsWhenPushed = (owner, style) => {
       if (pushing.has(owner)) return pushing.get(owner);
@@ -345,7 +329,7 @@ enum MCPPageScript {
       pushing.set(owner, clips);
       return clips;
     };
-    // The reach, sideways, of something that clips: its box, or all it can be scrolled to if it scrolls.
+    // The sideways reach of a clipping element: its box, or its whole scroll width if it scrolls.
     const reaches = new Map();
     const reachOf = (el) => {
       let reach = reaches.get(el);
@@ -358,11 +342,9 @@ enum MCPPageScript {
       }
       return reach;
     };
-    // Whether a piece of text is drawn on the page, where its element's style can't say: text pushed by a
-    // text-indent (the "image replacement" way) off the page, or out of something that clips it; and text of an
-    // element a page draws itself, which a shadow root it keeps closed may leave out. Text right inside a details
-    // that's closed never is: WebKit has a box for it all the same, so there's no asking (an element there is
-    // asked, checkVisibility). Anything else is drawn where its element is.
+    // Whether text is drawn, where its element's style can't say: text pushed by a text-indent ("image replacement")
+    // off the page or out of a clipping ancestor, and a custom element's text, which a closed shadow root may leave
+    // out. Text directly inside a closed details never is, though WebKit still gives it a box.
     let ranger = null;
     const textHasBox = (node, owner, style) => {
       if (!node.data.trim()) return true;
@@ -374,14 +356,14 @@ enum MCPPageScript {
       ranger.selectNodeContents(node);
       const boxes = [...ranger.getClientRects()].filter((box) => box.width > 0 && box.height > 0);
       if (!clips) return boxes.length > 0;
-      // Pushed, it's seen where it can still be: on the page, and within each thing above that clips sideways.
-      // Sticking out of what lets it (a number hung in the margin) is seen like any text.
+      // Pushed text shows only on the page and inside every ancestor that clips sideways. Past one that doesn't clip (a
+      // number hung in the margin) it still shows.
       const within = clips.map(reachOf);
       return boxes.some((box) => !offSideways(box) && within.every(([left, right]) => box.right > left && box.left < right));
     };
     const fold = (s) => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-    // Roles, as screen readers have them: the one a page gives, if it's one they know, or the element's own.
+    // Roles as screen readers have them: the page's if it's a known one, else the element's own.
     const ROLES = new Set(('alert alertdialog application article banner blockquote button caption cell checkbox code columnheader combobox '
       + 'complementary contentinfo definition deletion dialog directory document emphasis feed figure form generic grid gridcell group '
       + 'heading img insertion link list listbox listitem log main mark marquee math menu menubar menuitem menuitemcheckbox menuitemradio '
@@ -398,7 +380,7 @@ enum MCPPageScript {
     const focusable = (el) => el.tabIndex >= 0 && !(el.matches && el.matches(':disabled'));
     const implicitRole = (el) => {
       const tag = el.localName;
-      // Where rich-text editing starts is a field, whatever element the page made it of (a list item, a heading).
+      // A rich-text editing host is a field, whatever its element (a list item, a heading).
       if (editingHost(el)) return 'textbox';
       if (/^h[1-6]$/.test(tag)) return 'heading';
       switch (tag) {
@@ -450,9 +432,9 @@ enum MCPPageScript {
       if (el.localName === 'slot') { const given = el.assignedNodes({ flatten: true }); return given.length ? given : el.childNodes; }
       return el.childNodes;
     };
-    // An element's text, as a name takes it: only what the person can read, unless `hidden` (what a label points at),
-    // with a field inside it giving its value, an image its alt, and never `skip` (the field a label is for).
-    // `textOf.cut`: the last text asked for was longer than a name holds, so it isn't all there.
+    // An element's text for a name: only what the person can read, unless `hidden` (what a label points at). Fields
+    // give their value, images their alt, and `skip` (the field a label is for) is left out. `textOf.cut`: the last
+    // text was longer than a name holds.
     const textOf = (el, { hidden = false, skip = null } = {}) => {
       let out = '', depth = 0, more = false;
       const walk = (node) => {
@@ -476,8 +458,8 @@ enum MCPPageScript {
           return;
         }
         if (node !== el && (tag === 'input' || tag === 'select' || tag === 'textarea')) {
-          // Only a value that shows, as screen readers take it: what's typed in a field, a slider's, a list's choice.
-          // A checkbox's or a radio's value is the page's own word for it, never seen.
+          // Only a value that shows (a field's text, a slider's value, a list's choice). A checkbox's or radio's value
+          // is never seen.
           const shows = tag !== 'input' || kinds.has((node.type || 'text').toLowerCase()) || node.type === 'range';
           const value = shows ? valueOf(node, 100).value : '';
           if (value) out += ' ' + value + ' ';
@@ -508,9 +490,9 @@ enum MCPPageScript {
       if (caption) { const part = el.querySelector(':scope > ' + caption); return part ? textOf(part) : ''; }
       return '';
     };
-    // An element's name, in the order screen readers take it (aria-labelledby, aria-label, its label, its text, its
-    // title), with two departures that keep words the person can't see from an agent: a name from text only takes
-    // text that shows, and when a page labels something differently from what it shows, the shown text wins.
+    // An element's name in screen-reader order (aria-labelledby, aria-label, label, text, title), with two departures
+    // that keep unseen words from an agent: text only counts if it shows, and shown text wins over a label that
+    // differs.
     const names = new Map();
     const nameOf = (el) => {
       if (names.has(el)) return names.get(el);
@@ -525,17 +507,16 @@ enum MCPPageScript {
       const contentCut = !!content && textOf.cut;
       const seen = content || (el.labels && [...el.labels].some(shown) ? native : '');
       let name = authored || native || content;
-      // An icon with no words of its own is named by its SVG's title, as aria-label would name it.
+      // A wordless icon is named by its SVG's title, as by an aria-label.
       if (!name && (INTERACTIVE.has(role) || role === 'img' || el.localName === 'svg' || el.hasAttribute('tabindex'))) {
         const title = el.localName === 'svg' ? el.querySelector(':scope > title') : el.querySelector('svg > title');
         if (title) name = clip(title.textContent, 100);
       }
       if (!name && (INTERACTIVE.has(role) || el.hasAttribute('tabindex'))) name = clip(el.getAttribute('title') || el.getAttribute('placeholder') || '', 100);
-      // What shows wins over a label that says something else, when what shows is words. A sign alone (×, +, ›) is an
-      // icon, and the label is its name, as for a button that shows nothing.
+      // Shown words win over a label that says something else. A lone sign (×, +, ›) is an icon, named by its label.
       const words = /[\p{L}\p{N}]/u.test(seen);
       const named = authored && words && !fold(authored).includes(fold(seen)) ? { name: seen, labelDiffers: true } : { name };
-      // Named by the text it holds, and whether that name holds all of it: a snapshot lists the rest under it.
+      // Named by its own text, and whether the name is partial: a snapshot then lists the rest under it.
       if (named.name && named.name === content) { named.fromContent = true; named.partial = contentCut; }
       names.set(el, named);
       return named;
@@ -585,14 +566,14 @@ enum MCPPageScript {
     const find = (selector) => {
       try { return document.querySelector(selector); } catch (e) { throw new Error('Invalid CSS selector: ' + selector); }
     };
-    // What a ref stands for. If any of it changes, so does the ref: an old ref can't act on something else.
+    // What a ref stands for. Any change gives a new ref, so an old ref can't act on something else.
     const printOf = (el) => [roleOf(el) || el.localName, nameOf(el).name, el.getAttribute('href') || '', el.type || ''].join('\u0001');
     const said = (el) => {
       const name = nameOf(el).name;
       return (roleOf(el) || el.localName) + (name ? ' ' + JSON.stringify(name) : '');
     };
-    // Every so often, the refs to what's left the page are let go of (resolve refuses them anyway), here and, through
-    // refsGone in the answer, in Zigzag (MCPRefs), so a page that lives long doesn't pile them up.
+    // Periodically drops refs to elements that left the page, here and (through refsGone) in Zigzag (MCPRefs), so a
+    // long-lived page doesn't pile them up.
     const letGo = () => {
       for (const [ref, entry] of zz.byRef) {
         const el = entry.el.deref();
@@ -605,7 +586,7 @@ enum MCPPageScript {
       const print = printOf(el);
       const known = zz.byEl.get(el);
       if (known && zz.byRef.get(known)?.print === print) return known;
-      // As it was, it's gone: its old ref is let go, here and (told with the answer) on Zigzag's side.
+      // The element changed: its old ref is dropped here and, with the answer, on Zigzag's side.
       if (known) { zz.byRef.delete(known); (zz.gone || (zz.gone = [])).push(known); }
       const ref = 'e' + (++zz.next);
       if (zz.next % 500 === 0) letGo();
@@ -613,10 +594,10 @@ enum MCPPageScript {
       zz.byRef.set(ref, { el: new WeakRef(el), print, was: said(el) });
       return ref;
     };
-    // An element as the tools name it back: its ref, its role and name as a screen reader has them, and a selector.
+    // An element as tools report it: its ref, screen-reader role and name, and a selector.
     const describe = (el) => ({ ref: refFor(el), role: roleOf(el) || el.localName, name: nameOf(el).name, tag: el.localName, selector: selectorFor(el) });
-    // The element a tool is given: by ref (still the element it was, as it was), by CSS selector, or by the text it
-    // shows (something clickable). Never a guess from a ref's role or name. { el } or { error }.
+    // The element a tool names: by ref (only while unchanged), CSS selector, or shown text (something clickable). Never
+    // guessed from a ref's role or name. { el } or { error }.
     const clickable = 'a, button, input[type=button], input[type=submit], input[type=reset], [role=button], [role=link], [role=tab], '
       + '[role=menuitem], [role=option], [role=checkbox], summary, label, [onclick]';
     const resolve = (args) => {
@@ -640,17 +621,15 @@ enum MCPPageScript {
       }
       return { el: null };
     };
-    // The open dialog on top, which has the person's attention: the one holding the focus (showModal() puts it there,
-    // and what's under the top dialog is inert, so it can't be anywhere else), looking through shadow roots; otherwise
-    // the last one open in the page.
+    // The top open dialog, which has the person's attention: the one holding the focus (showModal() puts it there and
+    // makes the rest inert), through shadow roots, else the last one open.
     const topModal = () => {
       const isModal = (el) => { try { return el.localName === 'dialog' && el.matches(':modal'); } catch (e) { return false; } };
       for (let at = deepActive(); at; at = composedParent(at)) if (at.nodeType === Node.ELEMENT_NODE && isModal(at)) return at;
       const open = document.querySelectorAll('dialog:modal');
       return open.length ? open[open.length - 1] : null;
     };
-    // Set aside, as the person finds it: inside something the page made inert, or outside the dialog on top (all of
-    // which is inert while it's open), looking through shadow roots on the way up.
+    // Set aside: inside something inert, or outside the top dialog (which makes the rest inert), through shadow roots.
     const setAside = (el) => {
       const modal = topModal();
       let inModal = !modal;
@@ -660,8 +639,8 @@ enum MCPPageScript {
       }
       return !inModal;
     };
-    // Out of the person's sight: it doesn't show (checkVisibility looks at what holds it too), or something holding it
-    // is hidden from screen readers or made inert, looking through shadow roots on the way up.
+    // Out of the person's sight: it doesn't show, or an ancestor (through shadow roots) is hidden from screen readers
+    // or inert.
     const outOfSight = (el) => {
       if (!shown(el)) return true;
       for (let at = el; at; at = composedParent(at)) {
@@ -669,24 +648,23 @@ enum MCPPageScript {
       }
       return false;
     };
-    // What keeps the person from using an element at all, by pointer or keyboard: it's disabled (itself, by what
-    // holds it, or by the page's word), or set aside (inert, or behind an open dialog). { error } or null.
+    // What keeps the person from using an element: it's disabled (itself, by an ancestor, or by aria-disabled) or set
+    // aside. { error } or null.
     const blocked = (el, who) => {
       if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') return { error: 'That element is disabled.' };
       if (setAside(el)) return { error: who + ' can’t be used now: something else on the page (a dialog) has the person’s attention.' };
       return null;
     };
-    // Where keys meant for an element go: in rich text, to where its editing starts (a paragraph of an editor
-    // can't take the focus, its editor does); anywhere else, to the element.
+    // Where an element's keys go: in rich text, the editing host (an editor's paragraph can't take the focus), else the
+    // element.
     const keysGoTo = (el) => {
       let at = el;
       if (el.isContentEditable && !isField(el)) while (!editingHost(at) && at.parentElement) at = at.parentElement;
       return at;
     };
-    // Gives the element the keyboard, as the person's click or Tab would, and says whether it took it: WebKit gives
-    // the focus to nothing hidden, disabled or inert. Seen or not: the field a code editor types into isn't. The
-    // last thing before keys go, once nothing else can refuse: it scrolls the page and moves the focus.
-    // { error } or null.
+    // Focuses the element as a click or Tab would, and reports whether it took: WebKit focuses nothing hidden, disabled
+    // or inert. It needn't show (a code editor's input doesn't). Called last, once nothing else can refuse, as it
+    // scrolls and moves the focus. { error } or null.
     const focused = (el, who) => {
       const target = keysGoTo(el);
       const holds = () => { const now = deepActive(); return now === target || target.contains(document.activeElement) || !!(target.shadowRoot && target.shadowRoot.contains(now)); };
@@ -695,9 +673,9 @@ enum MCPPageScript {
       if (!holds() && typeof target.focus === 'function') target.focus({ preventScroll: true });
       return holds() ? null : { error: who + ' can’t take the keyboard focus, so keys would go somewhere else.' };
     };
-    // Whether a click would reach the element as the person's would: nothing keeps them from it, it shows, and
-    // nothing covers it, once scrolled into view. A checkbox or radio a page hides and draws itself is clicked
-    // through its label, as the person does. { target, x, y } or { error }.
+    // Whether a click would reach the element as the person's would: nothing blocks it, it shows, and nothing covers it
+    // once scrolled into view. A checkbox or radio the page hides and draws itself is clicked through its label. {
+    // target, x, y } or { error }.
     const reachable = (el, who) => {
       const stop = blocked(el, who);
       if (stop) return stop;
@@ -707,10 +685,10 @@ enum MCPPageScript {
         if (!label) return { error: who + ' is on the page but doesn’t show, so it can’t be clicked.' };
         target = label;
       }
-      // At once, whatever the page's own scroll-behavior: where it is now is where the click is checked and lands.
+      // Instant, whatever the page's scroll-behavior: the click is checked and lands where the element is now.
       target.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
-      // Each of its boxes in the window in turn (a link over two lines has two, and the middle of both may be on
-      // neither): the first with nothing over its middle is where the click goes.
+      // Clicks the first of its boxes in the window with nothing over its middle (a link over two lines has two, and
+      // the middle of both may be on neither).
       const inView = [...target.getClientRects()]
         .map((box) => ({ left: Math.max(box.left, 0), right: Math.min(box.right, innerWidth), top: Math.max(box.top, 0), bottom: Math.min(box.bottom, innerHeight) }))
         .filter((box) => box.right > box.left && box.bottom > box.top);
@@ -794,9 +772,9 @@ enum MCPPageScript {
       const el = found.el;
       if (isSecret(el)) return { error: 'password' };
       if (!isField(el) && !el.isContentEditable) return { error: 'That element isn’t a field: ' + el.tagName.toLowerCase() + '.' };
-      // Everything that can refuse comes before the focus moves: a refused call leaves the page as it was.
+      // Every refusal comes before the focus moves, so a refused call leaves the page unchanged.
       const who = shownRef || 'That field';
-      // A piece of a rich-text field (a paragraph of an editor) isn't a field: typing goes to the whole of it, and
+      // A piece of a rich-text field (an editor's paragraph) isn't a field: typing goes to the whole field, and
       // clearing would empty it.
       if (!isField(el) && !editingHost(el)) {
         return { error: (shownRef || 'That element') + ' is part of a rich-text field, not a field. Type in the field itself (it has a ref of its own in the snapshot), or click where the text should go and use press_key.' };
@@ -824,8 +802,8 @@ enum MCPPageScript {
       }
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
         const value = args.clear ? args.text : el.value + args.text;
-        // All of it is the app's own when it replaced what was there, or added to what was its own already (or to
-        // nothing). Added to anything else, it's no longer only the app's.
+        // The whole value is the app's own when it replaced what was there, or added to its own text or to nothing.
+        // Added to anything else, it no longer is.
         const allItsOwn = args.clear || el.value === '' || zz.typed.get(el) === el.value;
         const proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
         Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
@@ -961,9 +939,8 @@ enum MCPPageScript {
       });
     }
     case 'snapshot': {
-      // The page as a screen reader has it, for an app to read and act on: its landmarks, headings and text, and each
-      // element it can use, with a ref. Only what shows. MCPSnapshot writes it out; a budget keeps a huge page from
-      // holding the page's thread for long.
+      // The page as a screen reader has it: landmarks, headings, text, and each usable element with a ref. Only what
+      // shows. MCPSnapshot writes it out. A budget keeps a huge page from blocking the page's thread.
       const started = performance.now();
       // The dialog on top, if it's one the person sees; otherwise the whole page.
       const modal = args.ref ? null : [topModal()].find((open) => open && !outOfSight(open)) || null;
@@ -985,12 +962,11 @@ enum MCPPageScript {
         'table', 'tablist', 'tabpanel', 'toolbar', 'tree']);
       const NAMED_ONLY = new Set(['form', 'region', 'group']);
       const VALUED = new Set(['textbox', 'searchbox', 'combobox', 'spinbutton', 'slider']);
-      // Listed with nothing in them, as their name says what they hold; any other landmark or list only when it holds something.
+      // Listed even when empty, as their name says what they hold. Other landmarks and lists need content.
       const ON_THEIR_OWN = new Set(['heading', 'dialog', 'alertdialog', 'alert', 'status']);
       const mixedScripts = (s) => /(?=\S*\p{Script=Latin})(?=\S*\p{Script=Cyrillic}|\S*\p{Script=Greek})\S+/u.test(s || '');
-      // Left out with all it holds, before what the person sees of it is asked (`whatIs`): what a snapshot never
-      // reads, and what isn't drawn at all (what a closed shadow root leaves out has a style like any other, and no
-      // box).
+      // Left out with all it holds, before `whatIs`: what a snapshot never reads, and what isn't drawn (content a
+      // closed shadow root leaves out has a normal style and no box).
       const leftOut = (el, style, box) => {
         if (SKIPPED.has(el.localName) || el.getAttribute('aria-hidden') === 'true' || el.hasAttribute('inert')) return true;
         if (style.display === 'none' || style.contentVisibility === 'hidden') return true;
@@ -1032,7 +1008,7 @@ enum MCPPageScript {
       };
       // What's in `parent`, into `out`: text gathered across inline elements, flushed at each block and node.
       const walk = (parent, out, ctx) => {
-        // A details that's closed shows its summary, and of the rest only what the page still draws.
+        // A closed details shows its summary and only what else the page still draws.
         const closed = parent.localName === 'details' && !parent.open;
         for (const child of childrenOf(parent)) {
           if (cut) return;
@@ -1041,8 +1017,8 @@ enum MCPPageScript {
             const owner = host(child);
             if (owner) {
               const style = styleOf(owner);
-              // The text right in an element shows when all of the element does (in a thin box, it doesn't), and so
-              // does where it's drawn, when that's a slot it was given to (`parent`, then).
+              // Direct text shows only when its whole element does (not in a thin box), and the slot it's drawn in
+              // (`parent`), if any, does too.
               if (style.visibility === 'visible' && readableStyle(style) && (known.get(owner) || ALL).seen === SHOWS
                 && (parent === owner || (known.get(parent) || ALL).seen === SHOWS) && textHasBox(child, owner, style)) ctx.run += child.data;
             }
@@ -1051,8 +1027,7 @@ enum MCPPageScript {
           }
         }
       };
-      // What's inside an element. One named by what it holds (a link, a button, a heading) lists only what can be used
-      // in it: the rest is its name already.
+      // An element's contents. One named by its contents (a link, a button, a heading) lists only what's usable in it.
       const usableOnly = (list) => list.flatMap((item) => {
         if (!item.ref) return usableOnly(item.children || []);
         if (item.children) { const kept = usableOnly(item.children); if (kept.length) item.children = kept; else delete item.children; }
@@ -1064,14 +1039,12 @@ enum MCPPageScript {
         flush(children, ctx);
         return mute ? usableOnly(children) : children;
       };
-      // Whether an element's name stands for all it holds, so only what can be used in it is listed under it. Not when
-      // the name was cut short (a link around a whole card, a long cell), and not a table's row, whose cells are
-      // what's read: what it holds is then listed under it.
+      // Whether a name stands for all the element holds, so only usable descendants are listed. Not when cut short (a
+      // link around a whole card), nor for a table row, whose cells are what's read.
       const rowOfCells = (role, named) => role === 'row' && !!named.fromContent;
       const saysItAll = (role, named) => !!named.name && !named.partial && !rowOfCells(role, named);
-      // The name it's listed with. A row goes without the name its cells' text would give it, and so does anything
-      // an app can't use (a cell, a heading) whose name was cut short: all of it is right under it, once. What can
-      // be used keeps its cut name: it's what the app is told it clicked.
+      // The listed name. None for a row, or for an unusable element (a cell, a heading) whose name was cut: the full
+      // text is listed under it. A usable element keeps its cut name, as the app is told what it clicked.
       const shownName = (role, named, usable) => rowOfCells(role, named) || (named.partial && !usable)
         ? Object.assign({}, named, { name: '' }) : named;
       // An element's node, with a ref if it's one an app can use.
@@ -1092,7 +1065,7 @@ enum MCPPageScript {
         if (flags.length) item.flags = flags;
         return Object.assign(item, extra || {});
       };
-      // Never deeper than 400 elements: what's under that is left out, and the snapshot says it's cut.
+      // At most 400 elements deep: the rest is left out and the snapshot says it's cut.
       let depth = 0, deep = false;
       const visit = (el, out, ctx) => {
         if (depth >= 400) { deep = true; return; }
@@ -1104,10 +1077,10 @@ enum MCPPageScript {
         const style = styleOf(el);
         const box = el.getBoundingClientRect();
         if (leftOut(el, style, box)) return;
-        // What the person sees of it, by the one rule (kept, so its name and what's in it find it there).
+        // What the person sees of it (cached, for its name and its descendants).
         const seen = whatIs(el, true, style, box).seen;
         if (seen === GONE) return;
-        // Under a thin box: nothing of it is listed, but something in it may have escaped that box.
+        // Under a thin box: not listed itself, but something in it may escape that box.
         if (seen === CLIPPED) { walk(el, out, ctx); return; }
         const tag = el.localName;
         if (tag === 'br') { ctx.run += ' '; return; }
@@ -1124,9 +1097,8 @@ enum MCPPageScript {
           }
           return;
         }
-        // A label's words are its field's name, so they aren't listed again, but what can be used in it is (its field,
-        // a link to the terms it agrees to). A checkbox or radio a page hides and draws itself is listed where its
-        // label is, as what the person clicks.
+        // A label's words are its field's name, so only what's usable in it is listed (its field, a link to terms). A
+        // checkbox or radio the page hides and draws itself is listed at its label, which is what the person clicks.
         if (tag === 'label' && el.control) {
           const control = el.control;
           if (shown(control)) {
@@ -1144,7 +1116,7 @@ enum MCPPageScript {
         const pointer = style.cursor === 'pointer' && !(el.parentElement && styleOf(el.parentElement).cursor === 'pointer');
         const usable = shows && role !== 'presentation'
           && (INTERACTIVE.has(role) || editing || (el.hasAttribute('tabindex') && el.tabIndex >= 0) || el.hasAttribute('onclick') || pointer);
-        // A picture or an icon: listed when it has a name, with a ref when it can be used. What's inside isn't read.
+        // A picture or icon: listed when named, with a ref when usable. Its contents aren't read.
         if (tag === 'svg' || role === 'img') {
           const named = nameOf(el);
           if (usable) {
@@ -1177,8 +1149,8 @@ enum MCPPageScript {
           if (url) extra.url = url;
           const named = nameOf(el);
           const item = node(el, role, shownName(role, named, true), el, extra, pointer && !INTERACTIVE.has(role) ? ['pointer'] : null);
-          // Its text is its name, when it has one that says it all; otherwise what it holds is listed under it.
-          // A field holds a value, given above under the rules for values, and nothing else to list.
+          // Contents are listed under it unless its name says it all. A field holds only a value, given above under the
+          // value rules.
           if (!isField(el) && !editing) {
             const children = inside(el, saysItAll(role, named));
             if (children.length) item.children = children;
@@ -1219,7 +1191,7 @@ enum MCPPageScript {
       const nodes = [], ctx = { run: '', mute: false };
       if (root) visit(root, nodes, ctx); else walk(document.body || document.documentElement, nodes, ctx);
       flush(nodes, ctx);
-      // A snapshot of a part (by ref, or only an open dialog) adds to what was seen; one of the page replaces it.
+      // A partial snapshot (by ref, or of an open dialog) adds to what was listed. A full one replaces it.
       zz.listed = root && before ? new Set([...before, ...listed]) : listed;
       known = null;
       return { title: clip(document.title, 200), url: String(location.href).slice(0, 2000), nodes, refs, cut: cut || deep, modal: !!modal };
@@ -1238,10 +1210,9 @@ enum MCPPageScript {
     """#
 }
 
-/// The refs apps are given. Each page numbers the elements it hands out in its own way (e1, e2… for that page, with
-/// an id of its own); these are Zigzag's numbers for them, one counter for every tab. So two tabs never hand out the
-/// same ref, a ref is only taken back on the tab and page it came from, and an element keeps its number while its page
-/// lasts.
+/// The refs apps are given. Each page numbers its own elements (e1, e2…, under a page id), and Zigzag renumbers them
+/// with one counter for all tabs. So two tabs never give the same ref, a ref only works on the tab and page it came
+/// from, and an element keeps its number while its page lasts.
 @MainActor
 enum MCPRefs {
     private struct Local: Hashable {
@@ -1259,7 +1230,7 @@ enum MCPRefs {
     private static var count = 0
     private static var given: [Local: String] = [:]
     private static var owners: [String: Owner] = [:]
-    /// The pages each web view gave refs on, latest first. A few are kept: Back can bring a page back as it was.
+    /// Pages each web view gave refs on, latest first. A few are kept, as Back can restore a page as it was.
     private static var pages: [ObjectIdentifier: [String]] = [:]
     private static let pagesKept = 5
 
@@ -1279,8 +1250,8 @@ enum MCPRefs {
         return .success(args)
     }
 
-    /// The page's answer with each of its refs, wherever it is, swapped for the one apps are given. The refs the page
-    /// let go of (to what's left it) are let go of here too.
+    /// The page's answer with every ref in it swapped for the one apps are given. Refs the page dropped (their elements
+    /// left it) are dropped here too.
     static func outbound(_ answer: [String: Any], for view: WKWebView) -> [String: Any] {
         var answer = answer
         let gone = answer.removeValue(forKey: "refsGone") as? [String] ?? []
@@ -1324,8 +1295,8 @@ enum MCPRefs {
         return ref
     }
 
-    /// A page the web view answered from: the latest first. A page that goes out of the last few, or a web view that's
-    /// gone, takes its refs with it.
+    /// Notes a page the web view answered from, latest first. A page past the last few, or a gone web view, takes its
+    /// refs with it.
     private static func remember(_ page: String, of view: WKWebView) {
         let id = ObjectIdentifier(view)
         var list = pages[id] ?? []

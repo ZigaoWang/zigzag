@@ -1,16 +1,14 @@
 import Foundation
 
-/// A page as snapshot gives it to an AI app: its landmarks, headings and text, and each element the app can use, with
-/// a ref that click, type, scroll and press_key take. The page script collects it (`snapshot` in MCPPageScript);
-/// this reads that and writes it out the way Playwright's snapshots read, which agents know. Plain data, so it's the
-/// same on any queue and tested on its own.
+/// A page as snapshot gives it to an AI app: landmarks, headings and text, and each usable element with a ref that
+/// click, type, scroll and press_key take. Reads what the page script collects (`snapshot` in MCPPageScript) and writes
+/// it out like Playwright's snapshots, which agents know. Plain data: the same on any queue, tested on its own.
 ///
-/// Everything the page wrote (a name, a value, some text, an address) is quoted, so a page can't start a line of
-/// its own or pass something off as Zigzag's; the whole of it is then set apart as page content, as every tool's
-/// answer is (`markedAsPageContent`).
+/// Everything the page wrote (name, value, text, address) is quoted, so a page can't start a line of its own or pass
+/// something off as Zigzag's. The whole is then marked as page content, as is every tool's (`markedAsPageContent`).
 nonisolated struct MCPSnapshot: Equatable, Sendable {
     enum Filter: String, CaseIterable, Sendable {
-        /// The page as it's laid out: landmarks, headings, lists and text, with what can be used among them.
+        /// The page as laid out: landmarks, headings, lists and text, with usable elements among them.
         case all
         /// Only what can be used, one per line.
         case interactive
@@ -59,11 +57,10 @@ nonisolated struct MCPSnapshot: Equatable, Sendable {
 
     // MARK: Reading the page script's answer
 
-    /// Nil when it isn't a snapshot. Read as JSON, so true and 1 stay apart; anything unexpected is left out rather
-    /// than trusted.
+    /// Nil when it isn't a snapshot. Read as JSON so true and 1 stay apart. Anything unexpected is left out.
     init?(_ answer: JSON) {
         guard let nodes = answer["nodes"]?.array else { return nil }
-        // Nested deeper than is read: what's under that is left out, and the snapshot says it's cut.
+        // Nesting deeper than is read is left out, and the snapshot says it's cut.
         var tooDeep = false
         let read = Self.nodes(nodes, depth: 0, tooDeep: &tooDeep)
         self.init(title: answer["title"]?.string ?? "", url: answer["url"]?.string ?? "", nodes: read,
@@ -123,14 +120,13 @@ nonisolated struct MCPSnapshot: Equatable, Sendable {
 
         let whole = (head + lines).joined(separator: "\n")
         guard whole.count > maxChars else { return (whole, false) }
-        // Too long: the start, and the end too, where a dialog's buttons and a page's last links usually are. The room
-        // left once the header and the note (at its longest) are counted, with a line break each.
+        // Too long: keeps the start and the end, where a dialog's buttons and a page's last links usually are. The room
+        // is what's left after the header and the longest note, with a line break each.
         let headText = head.joined(separator: "\n")
         let room = max(0, maxChars - headText.count - Self.cutNote(lines.count).count - 2)
-        // Written again with what the page wrote kept short: a long paragraph first would otherwise leave room for
-        // nothing else. Only its words are cut, inside their quotes: a line keeps its ref and its marks.
-        // An eighth of the room each: a line holds two at most (a name and a value), so with what else is on it, it
-        // fits either part, the smaller one too. Each part is lines in a row, with no gaps: a line under another
+        // Written again with page text kept short, so a long first paragraph doesn't crowd out the rest. Only words
+        // inside quotes are cut: a line keeps its ref and marks. Each gets an eighth of the room: a line holds at most
+        // two (a name and a value), so it fits either part. Each part is consecutive lines, since a line under another
         // belongs to it.
         lines = self.lines(filter: filter, depth: depth, most: max(20, room / 8))
         var top: [String] = [], bottom: [String] = []
@@ -159,7 +155,7 @@ nonisolated struct MCPSnapshot: Equatable, Sendable {
         return (fitting, true)
     }
 
-    /// Its lines. `most`: how long anything the page wrote (a name, some text, a value, an address) may be in them.
+    /// Its lines. `most`: the longest any page text (name, text, value, address) may be in them.
     private func lines(filter: Filter, depth: Int?, most: Int = .max) -> [String] {
         var lines: [String] = []
         switch filter {
@@ -171,11 +167,11 @@ nonisolated struct MCPSnapshot: Equatable, Sendable {
         return lines
     }
 
-    /// Something the page wrote, in quotes, at most about `most` long as written: quoting doubles a string full of
-    /// quotes, so it's what's written that is measured, and the string cut shorter until that fits.
+    /// Something the page wrote, in quotes, at most about `most` long as written. Quoting doubles a string full of
+    /// quotes, so the written form is measured and the string cut until it fits.
     private static func said(_ string: String, most: Int) -> String {
         var written = quote(clipped(string, to: most))
-        // With no limit there's nothing to fit (and nothing to add to it: `most` may be the largest number there is).
+        // With no limit there's nothing to fit, and nothing is added to `most`, which may be the largest Int.
         guard most < string.count * 2 + 2 else { return written }
         var keep = min(most, string.count)
         // The two quotes around it, and the mark that it was cut, come on top of what's kept.
@@ -264,17 +260,17 @@ nonisolated struct MCPSnapshot: Equatable, Sendable {
         return String(address[..<hash])
     }
 
-    /// A link to another site than the page's, by registrable domain: docs.github.com is still GitHub's own, and a
-    /// lookalike (xn--…) never is. A mailto: or tel: link has no site.
+    /// A link to a site other than the page's, by registrable domain: docs.github.com is GitHub's own, a lookalike
+    /// (xn--…) never is. A mailto: or tel: link has no site.
     private func otherSite(_ link: String) -> Bool {
         guard let other = URL(string: link)?.host()?.lowercased() else { return false }
         guard let page = URL(string: url)?.host()?.lowercased() else { return true }
         return (HostText.registrableDomain(of: page) ?? page) != (HostText.registrableDomain(of: other) ?? other)
     }
 
-    /// A link to the page's own origin as its path and query; anywhere else in full, so its host is always seen, and
-    /// without a "user:pass@" that could put another site's name first (AddressText). At most 200 characters: the
-    /// host and path are at the start, where they're read.
+    /// A link to the page's own origin as path and query. Any other in full, so its host always shows, without a
+    /// "user:pass@" that could put another site's name first (AddressText). At most 200 characters: the host and path
+    /// come first.
     private func shownURL(_ link: String) -> String {
         let shown: String
         if let parsed = URL(string: link), parsed.user != nil || parsed.password != nil {
@@ -289,7 +285,7 @@ nonisolated struct MCPSnapshot: Equatable, Sendable {
         return Self.clipped(shown)
     }
 
-    /// At most `limit` characters of something the page wrote: what matters (a host and path, a title's start) is first.
+    /// At most `limit` characters of page text: what matters (a host and path, a title's start) comes first.
     static func clipped(_ string: String, to limit: Int = 200) -> String {
         string.count > limit ? String(string.prefix(limit)) + "…" : string
     }
