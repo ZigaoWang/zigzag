@@ -31,7 +31,12 @@ final class FormGroup: NSView {
         }
         rows.append(row)
         addSubview(row)
-        if let menu = (row as? FormRow)?.control as? DropdownButton { dropdowns.add(menu) }
+        // A menu inside a row's stack (a control beside its own ×) still lines up with the group's.
+        func addMenus(_ view: NSView) {
+            if let menu = view as? DropdownButton { dropdowns.add(menu) }
+            view.subviews.forEach(addMenus)
+        }
+        if let control = (row as? FormRow)?.control { addMenus(control) }
         // A row added to a group already on the page takes the group's width at its next layout.
         needsLayout = true
     }
@@ -3651,6 +3656,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// History, website data, and every per-site decision you've made, in one place. Each button says what it
     /// did, right where you clicked.
     private func reloadPrivacy() {
+        // One profile's choices from beginning to end: a row that changes something must change it there even
+        // when the window moves on, and the choice is read once rather than row by row.
+        let profile = self.profile
         privacyGroup.removeAllRows()
         sitesGroup.removeAllRows()
         // The site permissions' own setting: ask on a site's first download, or save as Zigzag always has.
@@ -3718,7 +3726,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: data))
 
         // The choices made one site at a time, which otherwise have nowhere to be seen.
-        let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
+        let nothingChosen = permissionsChangedHere.isEmpty && ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites(in: profile).isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
             && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
@@ -3731,7 +3739,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
-                ExtensionStore.extensionsOffSites = []
+                ExtensionStore.setExtensionsOffSites([], in: profile)
+                self?.permissionsChangedHere = []
                 SitePermissions.forgetAll()
                 ZoomLevels.resetAll()
                 DarkPages.forgetAll()
@@ -3753,79 +3762,222 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                    control: NSView()))
         }
 
-        // Then each site, with what was chosen for it, and a way to forget just that one.
+        // Then each site, with each of its choices as a row of its own: a permission or a customisation can be
+        // changed here, and its × forgets just that one, not the others kept for the site.
         // Permissions are kept per origin and named by its label: an https site on its own port by its host, so it
         // shares a row with the host's other choices, and anything else in full (http://localhost:3000).
-        let origins = Dictionary(SitePermissions.sites.map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
-        let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
+        // A permission just set back to Ask here keeps its site listed, even when it was the site's only choice:
+        // its row is still the one you just used, and it stays until Settings closes.
+        let origins = Dictionary((SitePermissions.sites + permissionsChangedHere.compactMap { $0.split(separator: "|", maxSplits: 1).first.map(String.init) })
+            .map { (SiteOrigin.label($0), $0) }, uniquingKeysWith: { a, _ in a })
+        let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites(in: profile)).union(ZoomLevels.all.keys)
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
             .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
             .union(SiteIcons.sites)
         var listed = 0, more = 0
         for site in sites.sorted() {
-            var said: [String] = []
             let origin = origins[site]
-            let choices = origin.map { SitePermissions.choices(origin: $0) } ?? [:]
-            // Its permissions get a row each under it, with Ask, Allow and Block, as in its Site Controls.
-            let permissions = origin.map { origin in
-                SitePermission.allCases.filter { SitePermissions.hasDecision($0, origin: origin) || permissionsChangedHere.contains("\(origin)|\($0.rawValue)") }
-            } ?? []
-            for (kind, allowed) in choices.sorted(by: { $0.key < $1.key }) where allowed && kind.hasPrefix("app:") {
-                let app = ExternalLinks.appName(forScheme: String(kind.dropFirst(4)))
-                said.append(String(localized: "opens \(app)", comment: "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name."))
+            let url = URL(string: origin ?? "https://\(site)")
+            var rows: [FormRow] = []
+
+            func makeRow(_ title: String, detail: String? = nil, control: NSView, clear: @escaping () -> Void) -> FormRow {
+                let x = IconButton(symbol: "xmark", size: .compact,
+                                   toolTip: String(localized: "Clear \(title)", comment: "Tooltip of the × on a site's row in Settings › Privacy › Sites: forgets that one choice for the site."))
+                x.onClick = { [weak self] _ in
+                    clear()
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                let stack = NSStackView(views: [control, x])
+                stack.spacing = Tokens.Space.x2
+                let row = FormRow(title: title, detail: detail, control: stack)
+                row.isIndented = true
+                row.keywords = site
+                return row
             }
-            if ContentBlocker.allowedSites.contains(site) {
-                said.append(String(localized: "ads allowed", comment: "A choice made for a site in Settings › Privacy, in a list of them."))
+
+            if let origin {
+                let permissions = SitePermission.allCases.filter {
+                    SitePermissions.hasDecision($0, origin: origin) || permissionsChangedHere.contains("\(origin)|\($0.rawValue)")
+                }
+                for permission in permissions {
+                    let options = permission.choices
+                    let dropdown = DropdownButton()
+                    dropdown.options = options.map { DropdownButton.Option(title: $0.title) }
+                    dropdown.selectedIndex = options.firstIndex(of: SitePermissions.choice(permission, origin: origin)) ?? 0
+                    dropdown.onSelect = { [weak self] index in
+                        SitePermissions.setChoice(options[index], for: permission, origin: origin)
+                        self?.permissionsChangedHere.insert("\(origin)|\(permission.rawValue)")
+                        self?.reloadPrivacy()
+                        self?.layoutDocument()
+                    }
+                    // Open apps says which app the site was told to always open, by name, as one sentence.
+                    var detail: String?
+                    if permission == .apps {
+                        let apps = SitePermissions.choices(origin: origin).sorted { $0.key < $1.key }
+                            .filter { $0.value && $0.key.hasPrefix("app:") }
+                            .map { String(localized: "opens \(ExternalLinks.appName(forScheme: String($0.key.dropFirst(4))))", comment: "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name.") }
+                        if !apps.isEmpty {
+                            let line = apps.joined(separator: String(localized: "site-choices.separator", defaultValue: ", ",
+                                                                     comment: "Between the choices made for a site in Settings › Privacy › Sites, like “camera allowed, zoom 125%”."))
+                            let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
+                            detail = String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
+                                            comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence.")
+                        }
+                    }
+                    rows.append(makeRow(permission.title, detail: detail, control: dropdown) { [weak self] in
+                        SitePermissions.setChoice(.ask, for: permission, origin: origin)
+                        self?.permissionsChangedHere.remove("\(origin)|\(permission.rawValue)")
+                    })
+                }
             }
-            if ExtensionStore.extensionsOffSites.contains(site) {
-                said.append(String(localized: "extensions off", comment: "A choice made for a site in Settings › Privacy, in a list of them."))
-            }
+
+            // JavaScript is a site choice of its own, not one of WebKit's permissions, but it reads and clears here
+            // the same way: Allowed, Not Allowed, or the setting.
             if let javaScript = SiteJavaScript.choice(forSite: site) {
-                said.append(javaScript ? String(localized: "JavaScript on", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages run their scripts, whatever Settings › Privacy › JavaScript says.")
-                                       : String(localized: "JavaScript off", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages don't run their scripts."))
+                let options = [String(localized: "Follow Setting", comment: "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript."),
+                               SitePanel.javaScriptAllowed, SitePanel.javaScriptNotAllowed]
+                let dropdown = DropdownButton()
+                dropdown.options = options.map { DropdownButton.Option(title: $0) }
+                dropdown.selectedIndex = javaScript ? 1 : 2
+                dropdown.onSelect = { [weak self] index in
+                    let setting: Bool? = index == 0 ? nil : index == 1
+                    SiteJavaScript.setChoice(setting, forSite: site)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "JavaScript", comment: "Row in Settings › Privacy › Sites: whether the site's pages run their scripts."),
+                                    control: dropdown) { SiteJavaScript.forget(site: site) })
             }
-            if let zoom = ZoomLevels.all[site] {
-                let percent = Int((zoom * 100).rounded())
-                said.append(String(localized: "zoom \(percent)%", comment: "A choice made for a site in Settings › Privacy, in a list of them: its zoom, like “zoom 125%”."))
+
+            if let zoom = ZoomLevels.all[site], let url {
+                let stepper = ZoomStepper()
+                stepper.zoom = CGFloat(zoom)
+                stepper.onChange = { [weak self] value in
+                    ZoomLevels.set(value, for: url)
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "Zoom", comment: "Row in Settings › Privacy › Sites: this site's page zoom."),
+                                    control: stepper) { ZoomLevels.forget(host: site) })
             }
-            if DarkPages.sitesForced.contains(site) {
-                said.append(String(localized: "dark page forced", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark even though they look dark on their own (Force dark)."))
-            } else if DarkPages.sitesOn.contains(site) {
-                said.append(String(localized: "dark page on", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark."))
-            } else if DarkPages.sitesOff.contains(site) {
-                said.append(String(localized: "dark page off", comment: "A choice made for a site in Settings › Privacy, in a list of them: its pages are never drawn dark."))
+
+            if let url, DarkPages.sitesOn.contains(site) || DarkPages.sitesOff.contains(site) || DarkPages.sitesForced.contains(site) {
+                let choices = DarkPages.SiteChoice.allCases
+                let dropdown = DropdownButton()
+                dropdown.options = choices.map { DropdownButton.Option(title: SitePanel.title(of: $0)) }
+                dropdown.selectedIndex = choices.firstIndex(of: DarkPages.siteChoice(for: url)) ?? 0
+                dropdown.onSelect = { [weak self] index in
+                    DarkPages.setSiteChoice(choices[index], for: url)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "Dark page", comment: "Row in Settings › Privacy › Sites: draws this site's pages dark."),
+                                    control: dropdown) { DarkPages.setChoice(nil, for: url) })
             }
-            if KeepAwake.sites.contains(site) {
-                said.append(String(localized: "tabs kept awake", comment: "A choice made for a site in Settings › Privacy, in a list of them: its tabs never go to sleep in the background."))
+
+            if let url, KeepAwake.sites.contains(site) {
+                let toggle = Toggle(isOn: true)
+                toggle.onChange = { [weak self] on in
+                    KeepAwake.set(on, for: url)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "Keep tabs awake", comment: "Row in Settings › Privacy › Sites: this site's tabs never go to sleep in the background."),
+                                    control: toggle) {
+                    var awake = KeepAwake.sites
+                    awake.remove(site)
+                    KeepAwake.sites = awake
+                })
             }
-            if PageFullScreen.pageSites.contains(site) {
-                said.append(String(localized: "full screen fills the page", comment: "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen fills the page's area instead of the whole screen."))
-            } else if PageFullScreen.screenSites.contains(site) {
-                said.append(String(localized: "full screen fills the screen", comment: "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen covers the whole screen, though the setting says the page."))
+
+            // The same switches as the site's own Site Controls, by the same names.
+            if let url, PageFullScreen.pageSites.contains(site) || PageFullScreen.screenSites.contains(site) {
+                let toggle = Toggle(isOn: PageFullScreen.choice(for: url) == .page)
+                toggle.onChange = { [weak self] on in
+                    PageFullScreen.setChoice(on ? .page : .screen, for: url)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
+                                    control: toggle) { PageFullScreen.setChoice(nil, for: url) })
             }
-            if CookieBanners.sitesHandled.contains(site) {
-                said.append(String(localized: "cookie banners rejected", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are answered with no, though the setting leaves them alone."))
-            } else if CookieBanners.sitesLeft.contains(site) {
-                said.append(String(localized: "cookie banners left alone", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer."))
+
+            if let url, CookieBanners.sitesHandled.contains(site) || CookieBanners.sitesLeft.contains(site) {
+                let toggle = Toggle(isOn: CookieBanners.sitesHandled.contains(site))
+                toggle.onChange = { [weak self] on in
+                    CookieBanners.setChoice(on, for: url)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "Cookie banners", comment: "Row in Settings › Privacy › Sites: what Zigzag does with the site's cookie consent pop-up."),
+                                    control: toggle) { CookieBanners.setChoice(nil, for: url) })
             }
+
+            if let url, ContentBlocker.allowedSites.contains(site) {
+                let toggle = Toggle(isOn: false)
+                toggle.onChange = { [weak self] on in
+                    ContentBlocker.setAllowed(!on, on: url)
+                    self?.reloadPrivacy()
+                    self?.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."),
+                                    control: toggle) {
+                    var allowed = ContentBlocker.allowedSites
+                    allowed.remove(site)
+                    ContentBlocker.allowedSites = allowed
+                })
+            }
+
+            if let url, ExtensionStore.extensionsOffSites(in: profile).contains(site) {
+                let toggle = Toggle(isOn: false)
+                toggle.onChange = { [weak self] on in
+                    guard let self else { return }
+                    var off = ExtensionStore.extensionsOffSites(in: profile)
+                    if on { off.remove(site) } else { off.insert(site) }
+                    ExtensionStore.setExtensionsOffSites(off, in: profile)
+                    self.reloadPrivacy()
+                    self.layoutDocument()
+                }
+                rows.append(makeRow(String(localized: "Extensions", comment: "Row in Settings › Privacy › Sites: whether extensions run on this site."),
+                                    control: toggle) {
+                    var off = ExtensionStore.extensionsOffSites(in: profile)
+                    off.remove(site)
+                    ExtensionStore.setExtensionsOffSites(off, in: profile)
+                })
+            }
+
             if let zaps = SiteBoosts.all[site]?.zaps.count, zaps > 0 {
-                said.append(SiteBoosts.zapped(zaps))
+                rows.append(makeRow(String(localized: "Zapped elements", comment: "Row in Settings › Privacy › Sites: elements hidden on this site."),
+                                    detail: String(localized: "\(zaps) hidden", comment: "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count."),
+                                    control: NSView()) { SiteBoosts.restoreZaps(forSite: site) })
             }
+
             if SiteBoosts.all[site]?.hasStyle == true {
-                said.append(String(localized: "boosted", comment: "A choice made for a site in Settings › Privacy, in a list of them: it has CSS of your own (Edit Style… in Site Controls)."))
+                rows.append(makeRow(String(localized: "Custom style", comment: "Row in Settings › Privacy › Sites: CSS of your own on this site."),
+                                    control: NSView()) {
+                    guard var boost = SiteBoosts.all[site] else { return }
+                    boost.style = ""
+                    SiteBoosts.set(boost, forSite: site)
+                })
             }
             if SiteIcons.all[site] != nil {
-                said.append(String(localized: "custom icon", comment: "A choice made for a site in Settings › Privacy, in a list of them: it has an icon you set in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites."))
+                rows.append(makeRow(String(localized: "Site icon", comment: "Row in Settings › Privacy › Sites: an icon you set for this site in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites."),
+                                    control: NSView()) { SiteIcons.forget(site: site) })
             }
             if let certificate = ClientCertificates.kept(host: site) {
-                said.append(String(localized: "certificate: \(certificate.name)", comment: "A choice made for a site in Settings › Privacy, in a list of them: the certificate from your Keychain it's always sent, by name."))
+                rows.append(makeRow(String(localized: "Certificate", comment: "Row in Settings › Privacy › Sites: the certificate from your Keychain this site is always sent."),
+                                    detail: certificate.name, control: NSView()) {
+                    ClientCertificates.forget(site: site)
+                    ClientCertificates.forgetSessions(site: site)
+                })
             }
-            guard !said.isEmpty || !permissions.isEmpty else { continue }
+
+            guard !rows.isEmpty else { continue }
             // The first 30 by name, as with site data, then the rest on request.
             guard sitesShowAll || listed < 30 else { more += 1; continue }
             listed += 1
-            let forget = PillButton(title: String(localized: "Forget", comment: "Button on a site's row in Settings › Privacy › Sites: forgets the choices made for it."))
+            let forget = PillButton(title: String(localized: "Forget", comment: "Button on a site's row in Settings › Privacy › Sites: forgets every choice made for it."))
             forget.onClick = { [weak self] _ in
                 if let origin {
                     SitePermissions.forgetEverything(origin: origin)
@@ -3834,10 +3986,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     PopupNotice.forgetAnswers(origin: origin)
                     WebNotifications.shared.removeAll(origin: origin)
                 }
+                self?.forgetPermissionsChanged(for: site)
                 ContentBlocker.allowedSites.remove(site)
-                var off = ExtensionStore.extensionsOffSites
+                var off = ExtensionStore.extensionsOffSites(in: profile)
                 off.remove(site)
-                ExtensionStore.extensionsOffSites = off
+                ExtensionStore.setExtensionsOffSites(off, in: profile)
                 ZoomLevels.forget(host: site)
                 DarkPages.setChoice(nil, for: URL(string: "https://\(site)"))
                 var awake = KeepAwake.sites
@@ -3853,30 +4006,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
-            let line = said.joined(separator: String(localized: "site-choices.separator", defaultValue: ", ",
-                                                     comment: "Between the choices made for a site in Settings › Privacy › Sites, like “camera allowed, zoom 125%”."))
             let siteURL = URL(string: origin ?? "https://\(site)")
             let favicon = SiteIcons.all[site].map(IconChoice.pageIcon) ?? siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
-            let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
-            sitesGroup.add(FormRow(title: site,
-                                   detail: said.isEmpty ? nil : String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
-                                                                        comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence."),
-                                   icon: favicon, control: forget))
-            guard let origin else { continue }
-            for permission in permissions {
-                let options = permission.choices
-                let dropdown = DropdownButton()
-                dropdown.options = options.map { DropdownButton.Option(title: $0.title) }
-                dropdown.selectedIndex = options.firstIndex(of: SitePermissions.choice(permission, origin: origin)) ?? 0
-                dropdown.onSelect = { [weak self] index in
-                    SitePermissions.setChoice(options[index], for: permission, origin: origin)
-                    self?.permissionsChangedHere.insert("\(origin)|\(permission.rawValue)")
-                }
-                let row = FormRow(title: permission.title, control: dropdown)
-                row.isIndented = true
-                row.keywords = site
-                sitesGroup.add(row)
-            }
+            sitesGroup.add(FormRow(title: site, icon: favicon, control: forget))
+            for row in rows { sitesGroup.add(row) }
         }
         if more > 0 {
             let all = PillButton(title: String(localized: "Show All", comment: "Button under the first 30 sites in Settings › Privacy."))
@@ -3893,6 +4026,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Privacy has no use for it): when the pane is shown, not each time a site's permission changes.
     private func reloadListedSiteData() {
         if !(pane == .privacy && hasManyProfiles) { reloadSiteData() }
+    }
+
+    /// A site's rows changed in this pane go with the site, so one forgotten doesn't come back for a moment longer.
+    private func forgetPermissionsChanged(for site: String) {
+        permissionsChangedHere = permissionsChangedHere.filter { key in
+            guard let origin = key.split(separator: "|", maxSplits: 1).first.map(String.init) else { return false }
+            return SiteOrigin.label(origin) != site
+        }
     }
 
     /// Settings › Developer's sizes: each with its width and height, and Remove.

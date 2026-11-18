@@ -1223,6 +1223,17 @@
         }
       }
     },
+    "%lld hidden" : {
+      "comment" : "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏 %lld 个"
+          }
+        }
+      }
+    },
     "%lld matches" : {
       "comment" : "Find bar count: how many matches the page has.",
       "localizations" : {
@@ -3799,6 +3810,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "书签和历史记录，需要你的许可"
+          }
+        }
+      }
+    },
+    "Clear %@" : {
+      "comment" : "Tooltip of the × on a site's row in Settings › Privacy › Sites: forgets that one choice for the site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除“%@”"
+          }
+        }
+      }
+    },
+    "Follow Setting" : {
+      "comment" : "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随设置"
+          }
+        }
+      }
+    },
+    "Site icon" : {
+      "comment" : "Row in Settings › Privacy › Sites: an icon you set for this site in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站图标"
+          }
+        }
+      }
+    },
+    "Zapped elements" : {
+      "comment" : "Row in Settings › Privacy › Sites: elements hidden on this site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏的元素"
           }
         }
       }
@@ -24445,17 +24500,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取一张图像用作此网站的图标。"
-          }
-        }
-      }
-    },
-    "custom icon" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: it has an icon you set in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已自定图标"
           }
         }
       }
