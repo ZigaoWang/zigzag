@@ -360,7 +360,7 @@ enum DownloadHandoff {
         case .openURL:
             // A web address that isn't the web's belongs to its own app; a web address goes to the Mac's browser when
             // that's where the rule says, and nowhere near Zigzag's own places, which show themselves.
-            guard let url = URL(string: DownloadTokens.expand(action.urlTemplate, with: values, secret: secret)),
+            guard let url = URL(string: DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)),
                   let scheme = url.scheme else { return nil }
             if !OpenInZigzag.handles(url) { return .app(ExternalLinks.appName(forScheme: scheme)) }
             // A rule that still asks (or was answered in the question) shows the answer as it opens the link, and
