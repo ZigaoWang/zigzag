@@ -1796,6 +1796,20 @@ enum DebugBridge {
                 }
             }
         case "jump": controller.jumpToSelection(nil)
+        case "menuitemkey":
+            // menuitemkey <char>: the menu bar item ⌘<char> is, validated and sent up this window's responder chain
+            // from its first responder, as pressing it in front would; works with the copy behind other apps.
+            func find(_ menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if let sub = item.submenu, let found = find(sub) { return found }
+                    if item.keyEquivalent == arg, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == .command { return item }
+                }
+                return nil
+            }
+            guard let item = NSApp.mainMenu.flatMap(find), let action = item.action, let window = controller.window else { debugLog("menuitemkey \(arg): no item"); break }
+            let enabled = controller.validateMenuItem(item)
+            let sent = enabled && (window.firstResponder ?? window).tryToPerform(action, with: item)
+            debugLog("menuitemkey \(arg): \(item.title) \(action) enabled=\(enabled) sent=\(sent)")
         case "menukey":
             // menukey <char> [cmd shift opt ctrl]: the main menu's own handling of that shortcut, logged.
             let f = arg.split(separator: " ").map(String.init)

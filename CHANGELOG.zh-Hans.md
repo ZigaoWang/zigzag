@@ -18,6 +18,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ### 修复
 - 在扩展弹窗里改的设置不会再自己变回去了。Strongbox 的“填充”开关每次点完显示的都是点之前的状态，重新打开又反过来，因为 WebKit 有时会在扩展上一次保存还没完成时就先读了存储。现在每个扩展的保存和读取都按它调用的顺序完成，和 Chrome 一样。感谢 [bkonia](https://github.com/bkonia)。([#350](https://github.com/ZigaoWang/zigzag/issues/350))
+- 按住分组的名字把整个标签页分组拖到固定标签页那里，现在会把整组固定成一个文件夹，和“固定分组”、⌘D 一样。之前分组那一行根本放不进去，松手后又回到标签页里。单独拖分组里的一个标签页，还是只固定那一个。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 
 ## [0.9.3] - 2026-11-18
 

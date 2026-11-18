@@ -18,6 +18,8 @@ protocol SidebarListDelegate: AnyObject {
     func listSetGroupOpen(_ id: UUID, _ open: Bool)
     func listRenameGroup(_ id: UUID, to name: String)
     func listMoveGroup(_ id: UUID, to index: Int, in spaceID: UUID)
+    /// A group's row dropped among the pinned pages: the whole group pins there as one folder (#325).
+    func listPinGroup(_ id: UUID, at index: Int, in spaceID: UUID, folder: UUID?)
     func listAddToGroup(_ tabs: [Tab], group: UUID)
     func listRenameFolder(_ id: UUID, to name: String)
     /// Puts a pinned page at the end of a folder, or takes it out of any (nil).
@@ -1888,8 +1890,7 @@ final class SidebarListView: NSView {
         if carriedRowShown, let block = drag.carried.compactMap({ shownFrames[$0] }).reduce(nil, { $0?.union($1) ?? $1 }) {
             if y > block.maxY { y -= block.height + rowGap } else if y >= block.minY { y = block.minY }
         }
-        let isGroup = if case .tabGroup = drag.item { true } else { false }
-        return target(at: y, allowsPinned: manager?.isPrivate == false && !isGroup, carried: drag.carried)
+        return target(at: y, allowsPinned: manager?.isPrivate == false, carried: drag.carried)
     }
 
     /// The row as one side of a split drop (see TabManager.canSplit); nil for rows that aren't a page.
@@ -2340,6 +2341,10 @@ final class SidebarListView: NSView {
         case (.tabGroup(let id), .tabs):
             delegate?.listMoveGroup(id, to: listIndex, in: space)
             return rows[.tabGroup(id)]
+        case (.tabGroup(let id), .bookmarks):
+            delegate?.listPinGroup(id, at: drag.targetIndex, in: space, folder: gapFolder)
+            landing = groupTabs.first?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)).flatMap { madeRow(.folder($0.id)) }
+            return landing
         case (.tab, .tabs):
             if let tab { delegate?.listMove(tab, to: listIndex, in: space, nesting: .under(gapParent), grouping: .into(gapGroup)) }
         case (.tab, .bookmarks):

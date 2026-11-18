@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Settings you change in an extension's popup stick. Strongbox's Fill switches showed the setting from before each click and came back the other way when you reopened them, because WebKit could read an extension's storage before an earlier save had finished. Now each extension's saves and reads finish in the order it made them, as in Chrome. Thanks to [bkonia](https://github.com/bkonia). ([#350](https://github.com/ZigaoWang/zigzag/issues/350))
+- Dragging a group of tabs by its name up among your pinned tabs pins the whole group as one folder, as Pin Group and ⌘D do. The group's row couldn't be dropped among the pinned tabs at all, so it went back among the tabs. Dragging one tab of a group still pins just that tab. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 
 ## [0.9.3] - 2026-11-18
 

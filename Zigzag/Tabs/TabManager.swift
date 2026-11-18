@@ -1133,6 +1133,14 @@ final class TabManager {
         return !members.isEmpty && members.allSatisfy { $0.url != nil }
     }
 
+    /// Pins a whole tab group (#325) as one folder at a place among the pinned pages; nil if it can't be pinned whole.
+    @discardableResult
+    func pinGroup(_ id: UUID, at index: Int? = nil, in spaceID: UUID? = nil) -> BookmarkFolder? {
+        guard let first = tabs(inGroup: id).first, pinsGroup(first) else { return nil }
+        bookmarkTab(first, at: index, in: spaceID)
+        return first.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:))
+    }
+
     /// Turns a tab into a bookmark at the given position. Its page stays open behind the bookmark. Half of a split
     /// pins the pair, and a page of a tile group the whole group (#203): every page, side by side as it is, still
     /// open together.
