@@ -58,9 +58,10 @@ final class UpdateCard: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The version that's ready, as people know it (0.9.2).
-    func show(version text: String) {
-        version.stringValue = text
+    /// The version that's ready, as written (0.9.2-beta.1): shown as people read it.
+    func show(version: String) {
+        let text = VersionName.display(version)
+        self.version.stringValue = text
         let sentence = String(localized: "Zigzag \(text) is ready. Restart to update.", comment: "Tooltip and VoiceOver label of the sidebar's update card. The placeholder is the version.")
         toolTip = sentence
         setAccessibilityLabel(sentence)

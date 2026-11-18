@@ -71,6 +71,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Archive (old tabs put away) | 归档 | 存档 | Arc's Chinese users say 归档. |
 | Getting Started (the guide) | 入门 | 新手指南 | Short, Apple-like. |
 | What's New | 新功能 | 更新内容 | Apple uses 新功能. |
+| Beta (a version: 0.9.2 beta 1) | Beta | 测试版, 公测版 | As Settings' Beta 版更新: a version reads 0.9.2 Beta 1, the word in Latin with a capital, as Apple writes its own betas. |
 | Chrome Web Store | Chrome 网上应用店 | Chrome 应用商店 | Google's own Chinese name for it. |
 | Automation (the Settings section) | 自动化 | | macOS's Privacy & Security › Automation is 自动化. |
 | AI apps | AI 应用 | AI 程序, 人工智能应用 | Short, and what people say. MCP stays as it is. |

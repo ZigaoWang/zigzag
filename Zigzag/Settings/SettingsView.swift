@@ -356,8 +356,8 @@ enum SettingsVersionRow {
 
     /// What's under Zigzag's name: its version, and the one that's ready when there is one.
     static func detail(ready: String?) -> String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-        guard let ready else { return String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General.") }
+        let version = VersionName.display(VersionName.running)
+        guard let ready = ready.map(VersionName.display) else { return String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General.") }
         return String(localized: "Version \(ready) is ready to install. You have \(version).",
                       comment: "Under Zigzag's name in Settings › General while an update is ready, beside Restart. The placeholders are the new version and the one running.")
     }

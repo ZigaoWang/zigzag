@@ -126,7 +126,7 @@ final class Updater {
     func restartToUpdate() {
         #if DEBUG
         if stagedForDebug {
-            say(String(localized: "Zigzag would restart into \(readiness.staged?.version ?? "") now.",
+            say(String(localized: "Zigzag would restart into \(VersionName.display(readiness.staged?.version ?? "")) now.",
                        comment: "Debug builds only: toast after Restart on a pretend update. The placeholder is its version."), symbol: "arrow.clockwise")
             return
         }
@@ -167,7 +167,7 @@ final class Updater {
         guard state.stage == .installing else {
             // Asked for, or Restart found its staged update gone and fetches it again.
             if manualCheck || restart == .running {
-                sayWorking(String(localized: "Downloading Zigzag \(update.version)…", comment: "Toast while Check for Updates… downloads a new version. The placeholder is the version."))
+                sayWorking(String(localized: "Downloading Zigzag \(VersionName.display(update.version))…", comment: "Toast while Check for Updates… downloads a new version. The placeholder is the version."))
             }
             reply(.install)
             return
@@ -285,7 +285,7 @@ final class Updater {
     }
 
     private func sayReady() {
-        guard let version = readiness.staged?.version else { return }
+        guard let version = readiness.staged.map({ VersionName.display($0.version) }) else { return }
         say(String(localized: "Zigzag \(version) is ready.", comment: "Toast after Check for Updates… has downloaded a new version. The placeholder is the version."),
             symbol: "arrow.clockwise.circle",
             action: (String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General."),

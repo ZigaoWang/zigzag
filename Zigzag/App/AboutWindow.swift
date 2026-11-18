@@ -62,7 +62,7 @@ private final class AboutView: NSView {
         super.init(frame: frame)
         let info = Bundle.main.infoDictionary
         // As a Mac app's About says it: the version, with the build in brackets for anyone reporting a problem.
-        let short = info?["CFBundleShortVersionString"] as? String ?? ""
+        let short = VersionName.display(info?["CFBundleShortVersionString"] as? String ?? "")
         let build = info?["CFBundleVersion"] as? String
         version.stringValue = build.map { String(localized: "Version \(short) (\($0))", comment: "In the About window: the version, then the build number in brackets.") }
             ?? String(localized: "Version \(short)", comment: "In the About window: the version.")

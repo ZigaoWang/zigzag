@@ -152,6 +152,23 @@
         }
       }
     },
+    "%@ beta %@" : {
+      "comment" : "A beta of Zigzag as people read it: 0.9.2 beta 1. The placeholders are the version and the beta's number.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ beta %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ Beta %2$@"
+          }
+        }
+      }
+    },
     "%@ can be your search engine" : {
       "comment" : "Toast after adding an extension that gives a search engine. The name is the engine's, like ChatGPT.",
       "localizations" : {

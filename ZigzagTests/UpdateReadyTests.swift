@@ -76,6 +76,17 @@ struct UpdateReadyTests {
         #expect(!UpdateReadiness.isNewer("117", than: "117"))
     }
 
+    @Test func versionsReadAsPeopleSayThem() {
+        #expect(VersionName.display("0.9.2-beta.1") == "0.9.2 beta 1")
+        #expect(VersionName.display("1.0.0-beta.12") == "1.0.0 beta 12")
+        #expect(VersionName.display("0.9.2") == "0.9.2")
+        #expect(VersionName.display("1.10") == "1.10")
+        #expect(VersionName.display("") == "")
+        // Anything else after the dash still loses its dash and dots.
+        #expect(VersionName.display("1.0-rc.2") == "1.0 rc 2")
+        #expect(VersionName.display("1.0-beta") == "1.0 beta")
+    }
+
     @MainActor @Test func theMenuSaysRestartToUpdateOnlyWhileOneIsReady() {
         #if DEBUG
         let updater = Updater.shared

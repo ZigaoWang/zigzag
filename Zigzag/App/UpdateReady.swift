@@ -60,6 +60,25 @@ nonisolated struct UpdateReadiness: Equatable, Sendable {
     }
 }
 
+/// Zigzag's version as people read it: 0.9.2-beta.1 is "0.9.2 beta 1", and a stable version stays as it is. Every
+/// place that shows a version to people goes through it; reports and logs keep the version as written.
+nonisolated enum VersionName {
+    /// This copy of Zigzag's version, as written (0.9.2-beta.1).
+    static var running: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
+
+    static func display(_ version: String) -> String {
+        guard let dash = version.firstIndex(of: "-") else { return version }
+        let base = String(version[..<dash])
+        let tag = version[version.index(after: dash)...].split(separator: ".").map(String.init)
+        if tag.count == 2, tag[0].lowercased() == "beta", Int(tag[1]) != nil {
+            let number = tag[1]
+            return String(localized: "\(base) beta \(number)",
+                          comment: "A beta of Zigzag as people read it: 0.9.2 beta 1. The placeholders are the version and the beta's number.")
+        }
+        return ([base] + tag).joined(separator: " ")
+    }
+}
+
 /// How often Zigzag looks for updates on its own, quietly: every few hours while it runs, and on waking from sleep
 /// when it's been a while, never more than once an hour.
 nonisolated enum UpdateSchedule {

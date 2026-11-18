@@ -324,14 +324,14 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     /// "Version 0.7.7, November 10, 2026": the day in the app's own language.
     private static var versionLine: String {
         guard let date = WhatsNew.release.date else {
-            return String(localized: "Version \(WhatsNew.version)", comment: "Under the title of the What’s New sheet: the version number, like 0.5.2.")
+            return String(localized: "Version \(VersionName.display(WhatsNew.version))", comment: "Under the title of the What’s New sheet: the version number, like 0.5.2.")
         }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: Bundle.main.preferredLocalizations.first ?? "en")
         formatter.timeZone = TimeZone(identifier: "UTC")
         formatter.dateStyle = .long
         formatter.timeStyle = .none
-        return String(localized: "Version \(WhatsNew.version), \(formatter.string(from: date))",
+        return String(localized: "Version \(VersionName.display(WhatsNew.version)), \(formatter.string(from: date))",
                       comment: "Under the title of the What’s New sheet: the version number, then the day it was released, like “Version 0.7.7, November 10, 2026”.")
     }
 
@@ -633,7 +633,7 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
 /// by itself after a while, as a notification banner does, but never while the pointer rests on it. The notes are in
 /// Help › What’s New in Zigzag after that.
 final class WhatsNewOffer: FloatingPanelView {
-    private let header = DialogHeader(title: String(localized: "Zigzag updated to \(WhatsNew.version)", comment: "Title of the note shown after an update, with the new version number, like 0.5.2."),
+    private let header = DialogHeader(title: String(localized: "Zigzag updated to \(VersionName.display(WhatsNew.version))", comment: "Title of the note shown after an update, with the new version number, like 0.5.2."),
                                       subtitle: String(localized: "See what’s new and what’s fixed in this version.", comment: "Under “Zigzag updated to 0.7.7” in the note shown after an update."))
     private let buttons = DialogButtons()
     private let notNow = PillButton(title: String(localized: "Not Now", comment: "Button in the note shown after an update: puts it away."), style: .plain)
