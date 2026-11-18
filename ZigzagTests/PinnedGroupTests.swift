@@ -205,6 +205,20 @@ import Testing
         }
     }
 
+    /// A folded group pins as a shut folder that hides its open pages, and comes back folded.
+    @Test func aFoldedGroupPinsShut() throws {
+        try withTabs(["0", "1"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Folded"))
+            manager.setGroupOpen(groupID, false)
+            manager.bookmarkTab(tabs[0], in: space)
+            let folder = try #require(tabs[0].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+            #expect(!folder.isOpen)
+            #expect(Set(folder.tucked ?? []) == Set(folder.bookmarkIDs))
+            manager.unbookmark(folder.bookmarkIDs[0], toIndex: 0)
+            #expect(manager.group(groupID)?.isOpen == false)
+        }
+    }
+
     /// A tab in no group still pins on its own: one page, in no folder.
     @Test func aTabOutsideAGroupStillPinsOnItsOwn() throws {
         try withTabs(["0"]) { manager, tabs, space in

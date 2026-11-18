@@ -1474,6 +1474,8 @@ final class Library {
         var folder = BookmarkFolder(name: name, bookmarkIDs: marks.map(\.id))
         folder.groupID = group
         folder.isOpen = isOpen
+        // Folded, it hides its pages though they're open, as the group did.
+        if !isOpen { folder.tucked = marks.map(\.id).sorted { $0.uuidString < $1.uuidString } }
         spaces[s].folders = (spaces[s].folders ?? []) + [folder]
         if !splits.isEmpty { spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + splits }
         tidyFolders(s)
