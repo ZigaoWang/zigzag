@@ -83,7 +83,7 @@ final class NoticeCard: FloatingPanelView {
     private let spinner = Spinner()
     private let heading = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     private let line = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
-    private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Put This Away", comment: "Tooltip of the × on a notice over the page, like a script's while it runs."))
+    private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Close", comment: "Tooltip of the × on a notice over the page, like a script's while it runs."))
 
     private var notice: ScriptNotice
     /// The tab whose page it belongs to: it shows while that tab is in front, and goes with it.
