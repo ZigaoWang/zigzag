@@ -328,8 +328,9 @@ enum DownloadHandoff {
     /// session: everything else shows itself (see `HandoffNotice.takeLine`).
     private static func announce(_ rule: DownloadRule, request: Request, values: HandoffValues, secret: String) {
         let choice = opening(rule, at: request.place)
-        guard let line = HandoffNotice.takeLine(for: rule, elsewhere: elsewhere(of: rule.action, at: choice, values: values, secret: secret)),
-              let host = handoffHost(for: request) else { return }
+        guard let host = handoffHost(for: request),
+              let line = HandoffNotice.takeLine(for: rule, elsewhere: elsewhere(of: rule.action, at: choice, values: values, secret: secret))
+        else { return }
         host.promptAutomation(line, symbol: rule.action.kind.symbol)
     }
 
