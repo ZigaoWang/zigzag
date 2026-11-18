@@ -12,15 +12,34 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 修复
+- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
+
+## [0.9.3] - 2026-11-18
+
+来自其他 App 的链接会在 Zigzag Mini 中打开；网站可以有自己的图标；空间编辑器更清爽；更新卡片会显示进度；每个网站的设置都能单独修改；另外修复了 Proton Pass、YouTube 上 ⌘ 点击、固定分组、GitHub 上的查找等问题。
+
 ### 新功能
 - 运行脚本的下载规则会在网页上显示进度：运行时显示“正在运行脚本”，结束后显示“脚本运行完成”或“脚本运行失败”，并附上脚本最后输出的一行，规则不会再悄悄运行。把链接交给 App、下载工具或默认浏览器的规则，成功后每次打开 Zigzag 会提示一次。感谢 [Lakeland97](https://github.com/Lakeland97)。([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 - 网站可以有自己的图标。在“网站设置”的 ⋯ 菜单里选“更改网站图标…”，会打开和标签页一样的图标选择，有符号、表情符号和“选取图像…”，这个网站的所有标签页、固定标签页、收藏和历史记录都会用它。标签页自己的图标仍然优先，“使用网站图标”可以换回网站原来的图标。“设置 › 隐私 › 网站”会列出它，可以忘掉；在无痕浏览窗口里设置的只到窗口关闭为止。感谢 [bkonia](https://github.com/bkonia)。([#310](https://github.com/ZigaoWang/zigzag/issues/310))
 - “设置 › 隐私 › 网站”里，给一个网站做的每个选择各占一行，用的是和网站设置里一样的控件，每行都有一个 ×，只忘记那一项，不再是一句话加一个“忘记”。JavaScript 和扩展现在放在网站设置的“权限”页，和摄像头等放在一起；给某个网站关掉扩展会按个人资料分别记住。感谢 [Lakeland97](https://github.com/Lakeland97)。([#311](https://github.com/ZigaoWang/zigzag/issues/311)、[#312](https://github.com/ZigaoWang/zigzag/issues/312)、[#313](https://github.com/ZigaoWang/zigzag/issues/313)、[#314](https://github.com/ZigaoWang/zigzag/issues/314))
+- 空间编辑器更简单了。一排色块里有“使用默认颜色”（空间创建时的颜色）、六个预设、空间的背景图像和“自定”，想要自己的颜色时点“自定”，下面会展开色轮和“明暗”。“效果”在色块下面，“个人资料”移到最下面，只占一行，鼠标停在上面会说明个人资料的作用。背景现在也是一个色块：点按它选取图像，点角上的 × 去掉图像。
 
 ### 修复
+- 固定一个分组时，整个分组会保持完整：固定成一个以分组名称命名的文件夹，里面的标签页按原顺序放好，而不是每个标签页各自固定。取消固定其中任何一个页面，整个分组都会回来。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 - 在 YouTube 上按住 ⌘ 点视频，现在总会在新标签页打开。以前有时会在当前标签页打开，因为 YouTube 自己的脚本把链接接了过去。现在按住 ⌘ 点链接，不管网页怎么处理点按，都会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#317](https://github.com/ZigaoWang/zigzag/issues/317))
-- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
 - 每个 PDF 都在自己单独的辅助进程里打开，这本来是 0.9.2 要做到的：发布的版本里所有 PDF 共用一个，同时打开的 PDF 没能彼此隔开。
+- 扩展的右键菜单能正常显示表情和符号了，比如 📋 和 ⌘，不会再变成“ðŸ“‹”这样的乱码。用后台脚本的扩展（大多数 Firefox 附加组件都是这样）之前文字的编码读错了。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
+- 只在你点按它的那个标签页打开侧边栏的扩展，比如 ChatGPT 的扩展，现在点它的按钮就会打开侧边栏，不会再点了没反应。
+- 来自其他 App 的链接现在默认在 Zigzag Mini 中打开，就像 Arc 的 Little Arc。按 ⌘O 可以把网页移到标签页里，不想要的话可以在“设置 › Zigzag Mini”中关闭。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- 网站设置有了自己的宽度，不再跟着边栏走，边栏很窄时里面的文字不会再被截断或换行。从边栏打开时，边栏太窄它会延伸到网页上；地址栏在网页上方时，它在地址下方以平常的宽度打开。感谢 [Tuszy42](https://github.com/Tuszy42)。([#335](https://github.com/ZigaoWang/zigzag/issues/335))
+- 需要较新 Chrome 的扩展（比如 Heylogin）可以从 Chrome 应用商店安装了，不再显示已下架：Zigzag 之前告诉商店自己是 Chrome 140。感谢 [datarip](https://github.com/datarip)。([#336](https://github.com/ZigaoWang/zigzag/issues/336))
+- 从文件导入现在支持各个浏览器导出的 bookmarks.html，Firefox、LibreWolf、Safari、Chrome 和 Edge 都可以。网页会连同文件夹一起放进单独的空间，和从这台 Mac 上的浏览器导入一样。感谢 [mrfragger](https://github.com/mrfragger)。([#330](https://github.com/ZigaoWang/zigzag/issues/330))
+- 迷你播放器回到标签页的箭头不会再没反应了：它会在标签页现在所在的窗口里找到它，并把那个窗口带到前面；标签页已经在屏幕上时卡片会收起；标签页已经关掉时卡片会直接关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#333](https://github.com/ZigaoWang/zigzag/issues/333))
+- 扩展的弹出窗口打开时就会获得焦点，和 Chrome 一样，所以按钮的提示文字和悬停效果马上就会显示。以前要先在弹出窗口里点一下才会出现。弹出窗口关闭后，焦点回到你之前所在的网页或输入框。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
+- 页内查找现在能标出每一个匹配，包括直接写在按钮里、按弹性盒子排版的行里或紧挨着块元素的文字，比如 GitHub 议题列表里的作者名。WebKit 不在这些地方画高亮，所以匹配只闪一下就没了；现在这些匹配会单独标出来。网页重新绘制的匹配会在一秒内重新标出。感谢 [Lakeland97](https://github.com/Lakeland97)。([#329](https://github.com/ZigaoWang/zigzag/issues/329))
+- Proton Pass 的弹出窗口现在以完整大小打开，能看到项目列表，不会再在搜索栏下面被截断。以前在弹出窗口里，Proton 问自己是不是开在标签页里时，Zigzag 回答的是你当前的标签页，于是它按一个并不存在的标签页去调整了大小。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
+- Proton Pass 现在会在登录输入框里显示它的图标，点输入框时会列出你的登录信息。以前它在网页上的脚本还没找到输入框就停下了，因为它用到的一个浏览器函数（requestIdleCallback）WebKit 没有，现在 Zigzag 像 Chrome 一样给扩展提供这个函数。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
 
 ## [0.9.2] - 2026-11-18
 

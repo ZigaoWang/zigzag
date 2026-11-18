@@ -161,7 +161,7 @@ final class PeekController {
             controller.root.overlay.addSubview(scrim)
             controller.root.overlay.addSubview(panel)
             panel.frame = panelFrame()
-            // The dimming comes with the card, from a key too, as it goes with it.
+            // The scrim comes with the card even from a key, as it leaves with it.
             scrim.show(evenFromKeyboard: true)
             grow()
             // Esc puts the peek away, the way it does a sheet; other keys go to the page as usual.

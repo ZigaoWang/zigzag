@@ -24,8 +24,7 @@ final class ExtensionInstalls {
         var siteAccess: SiteAccess?
         /// For `.sites`: the sites it may use ("github.com"), and for `.click`, the ones clicked on so far.
         var accessSites: [String]?
-        /// Sites where it's off, whatever its site access: turned off there from the notice that it was using a lot of
-        /// energy (EnergyWatch).
+        /// Sites where it's off regardless of site access, set from EnergyWatch's high-energy notice.
         var offSites: [String]?
 
         fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites"]
@@ -120,7 +119,7 @@ final class ExtensionInstalls {
     func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
     func offSites(_ id: String) -> [String] { state(id)?.offSites ?? [] }
 
-    /// Turns the extension off on one site (and its subdomains), or back on there.
+    /// Turns the extension off or back on for one site and its subdomains.
     func setOff(_ id: String, on site: String, _ off: Bool) {
         update(id) {
             var sites = $0.offSites ?? []

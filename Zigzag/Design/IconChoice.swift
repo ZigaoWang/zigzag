@@ -1,7 +1,7 @@
 import AppKit
 
-/// An icon you can give a folder or a space: one of a short list of SF Symbols, or any emoji. A page's can also be an
-/// image file you chose (`PageImageIcon`).
+/// A folder or space icon: an SF Symbol from a short list, or an emoji. Pages may also use an image file
+/// (`PageImageIcon`).
 enum IconChoice {
     /// Enough to tell work, study, money, making things and the rest apart at a glance.
     static let symbols: [String] = [
@@ -18,8 +18,7 @@ enum IconChoice {
     /// An emoji: neither a symbol nor an image file.
     static func isEmoji(_ icon: String) -> Bool { !PageImageIcon.isImage(icon) && !isSymbol(icon) }
 
-    /// The icon at `size`: a symbol as a template, so it takes the color of the text around it; an emoji or an image
-    /// file in its own.
+    /// Symbols as templates, taking the surrounding text color; emoji and images in their own colors.
     static func image(_ icon: String, size: CGFloat) -> NSImage {
         if isSymbol(icon) { return Tokens.Symbol.image(icon, size: size) }
         if PageImageIcon.isImage(icon) { return PageImageIcon.image(icon, points: size) ?? Tokens.Symbol.image("globe", size: size) }
@@ -31,9 +30,8 @@ enum IconChoice {
     private static var pageIcons: [String: NSImage] = [:]
     private static var pageIconIDs: Set<ObjectIdentifier> = []
 
-    /// An icon you gave a tab, a pinned page or a favorite, in a favicon's square: a symbol as a template, so whatever
-    /// draws it gives it the ink around it; an emoji or an image file in its own colors. An image file that's gone
-    /// shows the globe, as a site with no icon does.
+    /// A tab, pinned page or favorite icon in a favicon square: symbols as templates, emoji and images in their own
+    /// colors. A missing image file shows the globe.
     static func pageIcon(_ icon: String) -> NSImage {
         if let made = pageIcons[icon] { return made }
         let side: CGFloat = 16
@@ -376,15 +374,14 @@ final class IconPickerPanel: FloatingPanelView {
     /// How wide it is: the grid and its padding.
     var preferredWidth: CGFloat { IconGrid.width + pad * 2 }
 
-    /// A page's Choose Image… and, once it has an icon, Use Site Icon, under the field (#303); a folder's has neither.
+    /// Pages get Choose Image… and, with an icon set, Use Site Icon (#303); folders get neither.
     private let chooseImage: TextButton?
     private let useSite = TextButton(title: SidebarMenus.useSiteIconTitle)
-    /// The foot's row: as tall as a quiet button, a step from the field and from the panel's edge, its buttons as
-    /// far in from the bottom as from the sides.
+    /// Footer row height: a quiet button with equal padding on all sides.
     private var footHeight: CGFloat { chooseImage == nil ? 0 : Tokens.Space.x1 * 2 + Tokens.Space.x7Height - pad }
     var preferredHeight: CGFloat { IconGrid.height + pad * 2 + footHeight }
 
-    /// `onChooseImage`: a page's picker, which also takes an image file and can go back to the site's icon.
+    /// `onChooseImage`: a page's picker, which also accepts image files and can revert to the site icon.
     init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?,
          onChooseImage: (() -> Void)? = nil, onPick: @escaping (String?) -> Void) {
         grid = IconGrid(noneSymbol: noneSymbol, noneImage: noneImage, noneToolTip: noneToolTip, selected: selected)
@@ -409,7 +406,7 @@ final class IconPickerPanel: FloatingPanelView {
     private func layoutParts() {
         grid.frame = NSRect(x: pad, y: pad, width: IconGrid.width, height: IconGrid.height)
         guard let chooseImage else { return }
-        // Words line up with the grid's edges; the buttons reach out past them by their padding.
+        // Text aligns with the grid; buttons extend past it by their padding.
         let y = pad + IconGrid.height + Tokens.Space.x1, h = Tokens.Space.x7Height
         let chooseWidth = min(ceil(chooseImage.fittingWidth), IconGrid.width / 2)
         chooseImage.frame = NSRect(x: pad - chooseImage.textInset, y: y, width: chooseWidth, height: h)
@@ -422,11 +419,11 @@ final class IconPickerPanel: FloatingPanelView {
     /// Beside the sidebar, level with the row it's for.
     func show(beside row: NSView, in overlay: NSView, x: CGFloat) {
         let rowFrame = row.convert(row.bounds, to: overlay)
-        // Out of the sidebar's side: its left edge, or its right one beside a sidebar on the right.
+        // Opens away from the sidebar edge, left or right.
         show(at: NSPoint(x: x, y: rowFrame.minY - Tokens.Space.x2), in: overlay, growsFrom: CGPoint(x: x < rowFrame.minX ? 1 : 0, y: 0.1))
     }
 
-    /// With its top left corner at `point`, kept inside the overlay: where Site Controls was, for a site's icon (#310).
+    /// Top-left at `point`, clamped to the overlay; where Site Controls was, for site icons (#310).
     func show(at point: NSPoint, in overlay: NSView, growsFrom: CGPoint) {
         IconPickerPanel.current?.close()
         let size = NSSize(width: preferredWidth, height: preferredHeight)

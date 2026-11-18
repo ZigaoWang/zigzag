@@ -276,7 +276,7 @@ final class BridgeUserScripts: BridgeNamespace {
         var usesPage = false
         for id in host.profile.installs.installedIDs {
             guard let context = host.context(for: id) else { continue }
-            // Any extension's content-script world may say its connects were held back (ConnectGuard).
+            // Any extension's content-script world may report throttled connects (ConnectGuard).
             handlers.append((Self.contentScriptWorld(id), ConnectGuard.handlerName))
             guard ExtensionBridge.allows(Self.permission, for: context) else { continue }
             let registry = registry(for: id)
@@ -565,12 +565,11 @@ final class BridgeUserScripts: BridgeNamespace {
         var documentID: String?
     }
     private var frames: [String: Frame] = [:]
-    /// The most worlds that may listen at once in one page, and in all. A page that says it listens again and again
-    /// under new names gets no further than this.
+    /// Max listening worlds per page and in total, so a page re-registering under new names is capped.
     static let maxListenersPerPage = 256
     static let maxListeners = 2_000
 
-    /// Whether one more may listen: one already listening under the key always may; gone pages are let go first.
+    /// Whether one more may listen: an existing key always may; closed pages are released first.
     private static func mayListen(key: String, in webView: WKWebView, frames: inout [String: Frame]) -> Bool {
         if frames[key] != nil { return true }
         if frames.count >= maxListeners { frames = frames.filter { $0.value.webView != nil } }
@@ -638,8 +637,8 @@ final class BridgeUserScripts: BridgeNamespace {
         guard let tab = target["tabId"] as? Int else { return ["reached": 0] }
         let frameID = target["frameId"] as? Int, documentID = target.string("documentId")
         frames = frames.filter { $0.value.webView != nil }
-        // Only while the extension may still use user scripts, and to worlds it still lets talk: either can be
-        // taken back after a world first listened.
+        // Only while the extension still has user scripts and the world may still talk; both can be revoked after it first
+        // listened.
         guard let context = host.context(for: extensionID), ExtensionBridge.allows(Self.permission, for: context) else { return ["reached": 0] }
         let worlds = registry(for: extensionID).worlds
         let reached = frames.filter { _, frame in
@@ -760,7 +759,7 @@ final class BridgeUserScripts: BridgeNamespace {
           try { Object.defineProperty(F.prototype, 'constructor', { value: guarded, writable: true, configurable: true }); } catch (e) {}
           if (F === Function) { try { Object.defineProperty(globalThis, 'Function', { value: guarded, writable: true, configurable: true }); } catch (e) {} }
         }
-        // A string given to a timer is code too. As under Chrome's CSP, it never runs, and nothing throws.
+        // Timer strings are code too: as under Chrome's CSP they never run, and nothing throws.
         for (const name of ['setTimeout', 'setInterval']) {
           const timer = globalThis[name];
           if (typeof timer !== 'function') continue;

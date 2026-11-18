@@ -88,11 +88,10 @@ struct DarkPagesSeenTests {
 
     private static let aqua = NSAppearance.Name.aqua.rawValue, darkAqua = NSAppearance.Name.darkAqua.rawValue
 
-    /// A site seen dark on its own where dark pages leave it alone is kept with its dark for that look only, once its
-    /// page has been looked at; seen light in it, the look goes, and with the last of them the site.
+    /// A natively dark site is remembered per appearance once inspected; seen light, that appearance is dropped.
     @Test func aSitesOwnDarkIsKeptForTheLookItWasSeenIn() {
         let scope = UUID().uuidString, name = site()
-        // Still coming in, it says nothing; a private window keeps nothing.
+        // Still loading, or in a private window: nothing kept.
         DarkPages.learnLook(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name, looked: false), look: .aqua, in: scope)
         DarkPages.learnLook(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name), look: .aqua, in: nil)
         #expect(DarkSeen.site(name, in: scope) == nil)
@@ -100,15 +99,15 @@ struct DarkPagesSeenTests {
         DarkSeen.settle()
         DarkSeen.reload()
         #expect(DarkSeen.site(name, in: scope)?.looks == [Self.aqua: "#0d1117"])
-        // Not one of the sites seen dark: where dark pages are on, it's looked at as any other site is.
+        // Not natively dark: inspected like any site.
         #expect(!DarkPages.nativeSites(in: scope).contains(name))
         #expect(DarkSeen.site(name, in: scope)?.color == nil)
-        // A light color isn't a dark to load on.
+        // A light color isn't a dark ground.
         DarkPages.learnLook(DarkPages.State(darkened: false, native: true, color: .white, site: name), look: .darkAqua, in: scope)
         #expect(DarkSeen.site(name, in: scope)?.looks == [Self.aqua: "#0d1117"])
         DarkPages.learnLook(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name), look: .darkAqua, in: scope)
         #expect(DarkSeen.site(name, in: scope)?.looks == [Self.aqua: "#0d1117", Self.darkAqua: "#0d1117"])
-        // Light in one look, that look goes; light in the last, the site does.
+        // Light in one appearance drops it; in the last, the site.
         DarkPages.learnLook(DarkPages.State(darkened: false, native: false, color: .white, site: name), look: .aqua, in: scope)
         #expect(DarkSeen.site(name, in: scope)?.looks == [Self.darkAqua: "#0d1117"])
         DarkPages.learnLook(DarkPages.State(darkened: false, native: false, color: .white, site: name), look: .darkAqua, in: scope)
@@ -117,46 +116,42 @@ struct DarkPagesSeenTests {
         #expect(DarkSeen.site(name, in: scope) == nil)
     }
 
-    /// A site's looks and its being seen dark where dark pages are on are kept side by side: each comes and goes on
-    /// its own.
+    /// Appearances and native-dark membership are tracked separately.
     @Test func aSitesLooksAndItsSeenDarkAreKeptApart() {
         let scope = UUID().uuidString, name = site()
         DarkPages.learnLook(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name), look: .aqua, in: scope)
         #expect(DarkSeen.site(name, in: scope)?.isNative == false)
-        // Seen dark where dark pages are on: it joins the list, its look kept.
+        // Natively dark: added, appearance kept.
         #expect(DarkPages.learn(DarkPages.State(darkened: false, native: true, color: Self.navy, site: name), in: scope))
         #expect(DarkPages.nativeSites(in: scope).contains(name))
         #expect(DarkSeen.site(name, in: scope)?.looks == [Self.aqua: "#0d1117"])
-        // Seen light there, it leaves the list, and its look stays.
+        // Light: removed, appearance kept.
         #expect(DarkPages.learn(DarkPages.State(darkened: true, native: false, color: nil, site: name), in: scope))
         #expect(!DarkPages.nativeSites(in: scope).contains(name))
         #expect(DarkSeen.site(name, in: scope)?.looks == [Self.aqua: "#0d1117"])
         #expect(DarkSeen.site(name, in: scope)?.color == nil)
         #expect(!DarkPages.learn(DarkPages.State(darkened: true, native: false, color: nil, site: name), in: scope))
-        // Cleared with the site.
         DarkSeen.forget(scope: scope, site: name)
         #expect(DarkSeen.site(name, in: scope) == nil)
     }
 
-    /// The dark a page loads on where dark pages leave it alone: the site's own in this look until the page has been
-    /// looked at, then the page's own dark, or WebKit's once it's found light. None for a site not seen dark in it.
+    /// Loading ground for an untouched page: the site's dark until inspected, then the page's, or WebKit's if light.
     @Test func whatAPageLeftAloneLoadsOn() {
         let name = "example.com"
         let dark = NSColor(srgbRed: 0.1, green: 0.1, blue: 0.1, alpha: 1)
         #expect(DarkPages.loadingGround(nil, site: name, seen: nil) == nil)
         #expect(DarkPages.loadingGround(DarkPages.State(darkened: false, native: true, color: dark, site: name), site: name, seen: nil) == nil)
-        // Not looked at yet, or what's known is another site's page: the site's own dark.
+        // Not inspected yet, or another site's state: the site's dark.
         #expect(DarkPages.loadingGround(nil, site: name, seen: Self.navy) == Self.navy)
         #expect(DarkPages.loadingGround(DarkPages.State(darkened: false, native: false, color: .white, site: name, looked: false), site: name, seen: Self.navy) == Self.navy)
         #expect(DarkPages.loadingGround(DarkPages.State(darkened: false, native: false, color: .white, site: "other.com"), site: name, seen: Self.navy) == Self.navy)
-        // Looked at: its own dark, or WebKit's.
+        // Inspected: its own dark, or WebKit's.
         #expect(DarkPages.loadingGround(DarkPages.State(darkened: false, native: true, color: dark, site: name), site: name, seen: Self.navy) == dark)
         #expect(DarkPages.loadingGround(DarkPages.State(darkened: false, native: false, color: .white, site: name), site: name, seen: Self.navy) == nil)
         #expect(DarkPages.loadingGround(DarkPages.State(darkened: false, native: true, color: .white, site: name), site: name, seen: Self.navy) == nil)
     }
 
-    /// With dark pages on, a dark site turned Off loads on its own dark next time, not white, and the bar above it
-    /// takes it. One that's light in the look it's asked for (it follows the system's) is never kept for it.
+    /// A dark site turned off loads on its dark next time; light in the requested appearance is never kept.
     @Test func aDarkSiteTurnedOffLoadsOnItsOwnDark() async throws {
         try await withDefaults { () async throws in
             let name = site(), light = site()
@@ -184,10 +179,7 @@ struct DarkPagesSeenTests {
         }
     }
 
-    /// A light site with a dark bar across its top (star-history.com), its root and body painting nothing, is light on
-    /// its own: where dark pages leave it alone it's never kept as dark, and one kept dark before (as Dark Reader's
-    /// gray, from the bar) is let go of once it's looked at, rather than loading on that gray for good, which showed
-    /// through the page and left its dark text on it.
+    /// A light site with a dark top bar (star-history.com) isn't kept as dark; a stale dark entry is dropped once inspected.
     @Test func aLightSiteWithADarkBarIsNotKeptDark() async throws {
         try await withDefaults { () async throws in
             let name = site(), kept = site()

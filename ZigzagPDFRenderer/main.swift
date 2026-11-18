@@ -1,14 +1,11 @@
 import AppKit
 import PDFKit
 
-// Zigzag's PDF helper: opens the PDFs Zigzag shows, from the web or your Mac, in the App Sandbox with no network and
-// no files, and answers its viewer in plain numbers, strings and pixels (PDFService.swift). Only Zigzag itself can
-// reach it: an XPC service bundled in the app is visible to that app alone.
-//
-// Each connection holds one PDF, until Zigzag lets the connection go. Each PDF's connection asks for an instance of
-// the helper of its own (`_MultipleInstances` in Info.plist), so one process holds one PDF, and a PDF that takes it
-// over reaches no other. A request stuck past its time limit (a PDF made to hang PDFKit) ends the helper, and that
-// PDF fails (SafePDF.swift).
+// Zigzag's PDF helper: renders PDFs in the App Sandbox with no network or file access, answering in plain numbers,
+// strings and pixels (PDFService.swift). An XPC service bundled in the app, reachable only by Zigzag. One PDF per
+// connection, and each connection gets its own instance (`_MultipleInstances` in Info.plist), so a malicious PDF
+// reaches no other. A request past its time limit (a PDF that hangs PDFKit) kills the helper and that PDF fails
+// (SafePDF.swift).
 
 /// One PDF, and the answers about it.
 final class Renderer: NSObject, PDFRendering, @unchecked Sendable {
@@ -407,9 +404,9 @@ final class Flag: @unchecked Sendable {
     func set() { lock.withLock { value = true } }
 }
 
-/// Takes Zigzag's connections. A helper of a PDF's own (told so by `ownInstance`) ends once its connection goes: the
-/// system keeps an XPC service running after its last connection, and it would stay on, holding nothing, long after
-/// its PDF closed. The one helper every PDF shares isn't told, and stays on for the next PDF, as the system likes.
+/// Accepts Zigzag's connections. A per-PDF helper (told by `ownInstance`) exits when its connection closes, since the
+/// system keeps an XPC service alive after its last connection. The shared helper isn't told and stays for the next
+/// PDF.
 final class Listener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
     static let shared = Listener()
     private let lock = NSLock()

@@ -64,11 +64,10 @@ final class PDFViewerView: NSView {
         get { UserDefaults.standard.bool(forKey: "pdfTwoPages") }
         set { UserDefaults.standard.set(newValue, forKey: "pdfTwoPages") }
     }
-    /// The moon in the bar, pressed for this PDF: dark or light whatever dark pages would have it, until it's closed.
+    /// Set by the bar's moon button: overrides dark pages for this PDF until it closes.
     private var chosenDark: Bool?
-    /// Dark pages' setting or a site's choice changed.
     private var darkPagesToken: SignalToken?
-    /// Whether the pages are drawn dark now, so a change is crossfaded only when there is one.
+    /// So a crossfade only runs on a real change.
     private var shownDark: Bool?
 
     /// Shown at once, blank while the PDF loads; `show(_:info:)` puts the pages in.
@@ -175,7 +174,7 @@ final class PDFViewerView: NSView {
         // Layers keep the color they were given: light or dark, they take it again.
         layer?.backgroundColor = cgColor(Self.around(dark: shownDark ?? false))
         sidebar.layer?.backgroundColor = cgColor(Self.backdrop)
-        // The window turned light or dark (its space, the Mac): the pages follow, as dark pages say.
+        // The window's appearance changed (its space, the Mac).
         followDarkPages()
     }
 
@@ -280,9 +279,8 @@ final class PDFViewerView: NSView {
         twoPagesButton.showsFillAtRest = Self.twoPages
     }
 
-    /// Whether the pages are drawn dark: as dark pages would have a web page at this address (Settings › Appearance ›
-    /// Dark pages, the site's own choice) in the window it's in, light or dark, never the Mac's look behind it; the
-    /// moon pressed for this PDF over all of that.
+    /// Dark as dark pages would show a web page at this address (Settings › Appearance › Dark pages, the site's
+    /// choice) in this window's appearance, not the Mac's; the moon overrides it.
     static func isDark(chosen: Bool?, mode: DarkPages.Mode, windowIsDark: Bool, site: Bool?) -> Bool {
         if let chosen { return chosen }
         return DarkPages.wants(mode: mode, systemIsDark: windowIsDark, site: site)
@@ -292,7 +290,7 @@ final class PDFViewerView: NSView {
         Self.isDark(chosen: chosenDark, mode: DarkPages.mode, windowIsDark: effectiveAppearance.isDark, site: DarkPages.choice(for: url))
     }
 
-    /// The moon: this PDF dark, or light, the other way from how it's shown.
+    /// Flips this PDF from how it's shown.
     private func toggleDarkPages() {
         chosenDark = !isDark
         followDarkPages()
@@ -507,7 +505,7 @@ final class PDFViewerView: NSView {
         // get differently (a link that works once).
         switch await mainResourceData(of: webView, at: url) {
         case .data(let data): return data
-        // Too big for the viewer: fetching it again would only find that out a second time.
+        // Refetching would hit the same limit.
         case .tooLarge: return nil
         case .unavailable: break
         }
@@ -536,7 +534,7 @@ final class PDFViewerView: NSView {
     /// has it). Nil if it can't say, or they aren't a PDF's: the viewer fetches the file itself then.
     private enum MainResource { case data(Data), tooLarge, unavailable }
 
-    /// Whether a response's own length (-1 when it gave none) is past what the viewer takes.
+    /// Whether the response's declared length (-1 if none) exceeds the viewer's limit.
     nonisolated static func isTooLarge(said length: Int64, limit: Int = PDFLimits.maxInputBytes) -> Bool { length > Int64(limit) }
 
     private static func mainResourceData(of webView: WKWebView, at url: URL) async -> MainResource {

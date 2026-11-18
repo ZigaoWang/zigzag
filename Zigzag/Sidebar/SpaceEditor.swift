@@ -431,34 +431,19 @@ struct SpaceLook {
         return true
     }
 
-    /// Two rows of looks taken from real materials, muted, each its own color. First white, black, clear and smoky
-    /// glass, then the deep ones. Then paper and the light ones, warm to cool, the last of them glass. Every one is a
-    /// spot on the wheel, a Shade and the effects, so whatever a preset gives, the controls show and can reach.
+    /// Preset looks in light and deep pairs. Each is reachable from Custom too.
     static let presets: [SpaceLook] = [
         SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0),
         SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1),
-        SpaceLook(name: String(localized: "Glass", comment: "Tooltip and accessibility label of a preset look in the space editor. Clear, see-through glass."), tint: 0, depth: 0.02, seeThrough: 0.7),
-        SpaceLook(name: String(localized: "Smoke", comment: "Tooltip and accessibility label of a preset look in the space editor. Dark, smoky see-through glass."), tint: 0, depth: 0.9, seeThrough: 0.6),
-        fade(String(localized: "Charcoal", comment: "Tooltip and accessibility label of a preset look in the space editor."), 0.08, 0.84, 0.08, 0.94, tint: 0.12, grain: 0.3),
-        fade(String(localized: "Espresso", comment: "Tooltip and accessibility label of a preset look in the space editor."), 0.07, 0.8, 0.07, 0.93, tint: 0.45),
-        fade(String(localized: "Oxblood", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep red."), 0.99, 0.78, 0.99, 0.92, tint: 0.5),
-        fade(String(localized: "Pine", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep green."), 0.42, 0.8, 0.42, 0.93, tint: 0.45),
-        fade(String(localized: "Slate", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray."), 0.62, 0.76, 0.62, 0.9, tint: 0.35),
         SpaceLook(name: String(localized: "Paper", comment: "Tooltip and accessibility label of a preset look in the space editor."), hue: 0.11, tint: 0.55, depth: 0.1, grain: 0.5),
-        fade(String(localized: "Oat", comment: "Tooltip and accessibility label of a preset look in the space editor. A warm pale beige."), 0.1, 0.02, 0.1, 0.26, tint: 0.45),
-        fade(String(localized: "Butter", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale yellow."), 0.13, 0.02, 0.13, 0.26),
-        fade(String(localized: "Clay", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale warm brown."), 0.075, 0.06, 0.06, 0.36, tint: 0.55),
-        fade(String(localized: "Rose", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale pink."), 0.97, 0.04, 0.97, 0.32, tint: 0.55),
-        fade(String(localized: "Matcha", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale green, after the tea."), 0.12, 0.02, 0.27, 0.32),
-        fade(String(localized: "Mint", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale green."), 0.46, 0.03, 0.46, 0.32, tint: 0.55),
+        fade(String(localized: "Espresso", comment: "Tooltip and accessibility label of a preset look in the space editor."), 0.07, 0.8, 0.07, 0.93, tint: 0.45),
         fade(String(localized: "Sky", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale blue."), 0.6, 0.04, 0.6, 0.34, tint: 0.6),
-        fade(String(localized: "Frost", comment: "Tooltip and accessibility label of a preset look in the space editor. A pale, see-through icy blue."), 0.6, 0.02, 0.6, 0.18, tint: 0.3, seeThrough: 0.5),
+        fade(String(localized: "Slate", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray."), 0.62, 0.76, 0.62, 0.9, tint: 0.35),
     ]
 
-    /// A quiet fade, top to bottom, from one color to a shade (or a neighbor) of it.
-    private static func fade(_ name: String, _ hue: Double, _ depth: Double, _ hue2: Double, _ depth2: Double, tint: Double = 1,
-                             grain: Double = 0, seeThrough: Double = 0) -> SpaceLook {
-        SpaceLook(name: name, hue: hue, tint: tint, depth: depth, hue2: hue2, depth2: depth2, angle: 90, seeThrough: seeThrough, grain: grain)
+    /// A top-to-bottom gradient from a color to a shade of it.
+    private static func fade(_ name: String, _ hue: Double, _ depth: Double, _ hue2: Double, _ depth2: Double, tint: Double) -> SpaceLook {
+        SpaceLook(name: name, hue: hue, tint: tint, depth: depth, hue2: hue2, depth2: depth2, angle: 90)
     }
 }
 
@@ -475,15 +460,15 @@ enum Checker {
 }
 
 /// One preset: a round swatch of the look, ringed when it's the one in use. A see-through one shows over a checkerboard,
-/// a grainy one with its grain.
+/// a grainy one with its grain. Without a look it's Custom, painted with the hues around the wheel.
 final class LookSwatch: InteractiveView {
-    let look: SpaceLook
+    let look: SpaceLook?
     private let fill = CAGradientLayer()
     private let checker = CALayer()
     private let grain = CALayer()
     private let ring = CALayer()
 
-    init(look: SpaceLook) {
+    init(look: SpaceLook?, name: String? = nil) {
         self.look = look
         super.init(frame: .zero)
         layer?.addSublayer(ring)
@@ -491,15 +476,21 @@ final class LookSwatch: InteractiveView {
         layer?.addSublayer(fill)
         fill.masksToBounds = true
         checker.masksToBounds = true
-        checker.isHidden = look.seeThrough == 0
+        checker.isHidden = (look?.seeThrough ?? 0) == 0
         checker.backgroundColor = NSColor(patternImage: Checker.image).cgColor
-        grain.isHidden = look.grain == 0
+        grain.isHidden = (look?.grain ?? 0) == 0
         grain.backgroundColor = MaterialImages.grain.cgColor
-        grain.opacity = Float(min(1, look.grain * 0.5))
+        grain.opacity = Float(min(1, (look?.grain ?? 0) * 0.5))
         fill.addSublayer(grain)
-        toolTip = look.name
+        if look == nil {
+            fill.type = .conic
+            fill.startPoint = CGPoint(x: 0.5, y: 0.5)
+            fill.endPoint = CGPoint(x: 0.5, y: 0)
+        }
+        let name = name ?? look?.name ?? ""
+        toolTip = name
         setAccessibilityRole(.radioButton)
-        setAccessibilityLabel(look.name)
+        setAccessibilityLabel(name)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -527,6 +518,13 @@ final class LookSwatch: InteractiveView {
                 fill.cornerRadius = fill.frame.width / 2
                 checker.frame = fill.frame
                 checker.cornerRadius = fill.cornerRadius
+                fill.borderWidth = Tokens.Metric.hairline
+                // A firmer edge than a panel's, so black still reads on a dark panel and white on a light one.
+                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
+                guard let look else {
+                    fill.colors = stride(from: 0.0, through: 1, by: 1.0 / 12).map { SpaceColor.paint(hue: $0, depth: 0.3).cgColor }
+                    return
+                }
                 let space = look.space
                 // Each color at its own strength (the space's dot), so the row reads as distinct colors even in dark
                 // mode, where every frame color is deep; white, grays and black as they are.
@@ -538,9 +536,6 @@ final class LookSwatch: InteractiveView {
                 grain.frame = fill.bounds
                 fill.startPoint = CGPoint(x: 0.2, y: 0.1)
                 fill.endPoint = CGPoint(x: 0.8, y: 0.9)
-                fill.borderWidth = Tokens.Metric.hairline
-                // A firmer edge than a panel's, so black still reads on a dark panel and white on a light one.
-                fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
             }
         }
         setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
@@ -930,25 +925,14 @@ final class ColorChip: InteractiveView {
     }
     private let fill = CALayer()
     private let ring = CALayer()
-    private let badge = CALayer()
-    private let cross = CAShapeLayer()
-    private static let badgeSize: CGFloat = 14
+    private let badge = RemoveBadge()
 
     init(label: String) {
         super.init(frame: .zero)
         layer?.masksToBounds = false
         layer?.addSublayer(ring)
         layer?.addSublayer(fill)
-        // A dark dot with a white ×, edged in white so it lifts off any color, in either mode.
-        badge.backgroundColor = NSColor(white: 0.3, alpha: 1).cgColor
-        badge.borderColor = NSColor.white.cgColor
-        badge.borderWidth = 1.5
-        badge.isHidden = true
-        cross.strokeColor = NSColor.white.cgColor
-        cross.lineWidth = 1.4
-        cross.lineCap = .round
-        badge.addSublayer(cross)
-        layer?.addSublayer(badge)
+        layer?.addSublayer(badge.layer)
         setAccessibilityRole(.radioButton)
         setAccessibilityLabel(label)
     }
@@ -965,14 +949,9 @@ final class ColorChip: InteractiveView {
         stateDidChange(animated: false)
     }
 
-    private var badgeFrame: CGRect {
-        CGRect(x: bounds.maxX - Self.badgeSize + 3, y: -3, width: Self.badgeSize, height: Self.badgeSize)
-    }
-
     /// Whether a click landed on the ×.
     func hitsBadge(_ event: NSEvent) -> Bool {
-        guard onRemove != nil else { return false }
-        return badgeFrame.insetBy(dx: -2, dy: -2).contains(convert(event.locationInWindow, from: nil))
+        onRemove != nil && badge.hits(convert(event.locationInWindow, from: nil))
     }
 
     override func stateDidChange(animated: Bool) {
@@ -989,19 +968,132 @@ final class ColorChip: InteractiveView {
                 fill.borderWidth = Tokens.Metric.hairline
                 fill.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
             }
-            badge.frame = badgeFrame
-            badge.cornerRadius = Self.badgeSize / 2
-            let path = CGMutablePath()
-            let m = Self.badgeSize / 2, r: CGFloat = 2.6
-            path.move(to: CGPoint(x: m - r, y: m - r))
-            path.addLine(to: CGPoint(x: m + r, y: m + r))
-            path.move(to: CGPoint(x: m + r, y: m - r))
-            path.addLine(to: CGPoint(x: m - r, y: m + r))
-            cross.path = path
-            cross.frame = badge.bounds
+            badge.place(in: bounds)
             badge.isHidden = onRemove == nil || !isHovered
         }
         setAccessibilityValue(NSNumber(value: isSelected ? 1 : 0))
+    }
+}
+
+/// The × on a chip's corner that removes what the chip holds.
+final class RemoveBadge {
+    let layer = CALayer()
+    private static let side: CGFloat = 14
+    private let cross = CAShapeLayer()
+    var isHidden: Bool {
+        get { layer.isHidden }
+        set { layer.isHidden = newValue }
+    }
+
+    init() {
+        layer.backgroundColor = NSColor(white: 0.3, alpha: 1).cgColor
+        layer.borderColor = NSColor.white.cgColor
+        layer.borderWidth = 1.5
+        layer.isHidden = true
+        cross.strokeColor = NSColor.white.cgColor
+        cross.lineWidth = 1.4
+        cross.lineCap = .round
+        layer.addSublayer(cross)
+    }
+
+    /// On the top right corner of `bounds`, a little past it.
+    func place(in bounds: CGRect) {
+        let side = Self.side, m = side / 2, r: CGFloat = 2.6
+        layer.frame = CGRect(x: bounds.maxX - side + 3, y: -3, width: side, height: side)
+        layer.cornerRadius = m
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: m - r, y: m - r))
+        path.addLine(to: CGPoint(x: m + r, y: m + r))
+        path.move(to: CGPoint(x: m + r, y: m - r))
+        path.addLine(to: CGPoint(x: m - r, y: m + r))
+        cross.path = path
+        cross.frame = layer.bounds
+    }
+
+    /// Whether `point` (in the superview's coordinates) is on it or close by.
+    func hits(_ point: CGPoint) -> Bool { !layer.isHidden && layer.frame.insetBy(dx: -2, dy: -2).contains(point) }
+}
+
+/// The background picture swatch: an empty slot, or the picture with a remove button on hover.
+final class BackgroundSwatch: InteractiveView {
+    var image: CGImage? {
+        didSet {
+            stateDidChange(animated: false)
+            setAccessibilityCustomActions(image == nil ? nil : [
+                NSAccessibilityCustomAction(name: Self.removeTitle) { [weak self] in self?.onRemove?(); return true },
+            ])
+        }
+    }
+    var onRemove: (() -> Void)?
+    private let outline = CAShapeLayer()
+    private let picture = CALayer()
+    private let glyph = NSImageView()
+    private let badge = RemoveBadge()
+    private static let removeTitle = String(localized: "Remove", comment: "VoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.")
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        layer?.masksToBounds = false
+        outline.fillColor = nil
+        outline.lineWidth = 1.2
+        outline.lineDashPattern = [3, 2.5]
+        layer?.addSublayer(outline)
+        picture.masksToBounds = true
+        picture.contentsGravity = .resizeAspectFill
+        picture.borderWidth = Tokens.Metric.hairline
+        layer?.addSublayer(picture)
+        glyph.image = Tokens.Symbol.image("photo", size: Tokens.Symbol.inline)
+        glyph.imageScaling = .scaleNone
+        addSubview(glyph)
+        layer?.addSublayer(badge.layer)
+        let title = String(localized: "Background", comment: "Tooltip and accessibility label of the swatch in a space's editor that chooses the picture its empty page shows.")
+        toolTip = title
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(title)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    /// Whether a click landed on the ×.
+    func hitsBadge(_ event: NSEvent) -> Bool { badge.hits(convert(event.locationInWindow, from: nil)) }
+
+    /// Delete with keyboard focus here acts like the ×.
+    override func keyDown(with event: NSEvent) {
+        if hasKeyboardFocus, image != nil, [51, 117].contains(event.keyCode) { onRemove?(); return }
+        super.keyDown(with: event)
+    }
+
+    override func layout() {
+        super.layout()
+        stateDidChange(animated: false)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        stateDidChange(animated: false)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        Tokens.Motion.withoutAnimation {
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                let inset: CGFloat = isHovered ? 0 : 2
+                let circle = bounds.insetBy(dx: inset, dy: inset)
+                outline.frame = bounds
+                outline.path = CGPath(ellipseIn: circle.insetBy(dx: 0.6, dy: 0.6), transform: nil)
+                outline.strokeColor = (isHovered ? Tokens.Color.textSecondary : Tokens.Color.textTertiary).cgColor
+                outline.isHidden = image != nil
+                picture.frame = circle
+                picture.cornerRadius = circle.width / 2
+                picture.contents = image
+                picture.isHidden = image == nil
+                picture.borderColor = Tokens.Color.textTertiary.withAlphaComponent(0.3).cgColor
+                glyph.contentTintColor = isHovered ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
+            }
+            glyph.frame = bounds
+            glyph.isHidden = image != nil
+            badge.place(in: bounds)
+            badge.isHidden = image == nil || !isHovered
+        }
     }
 }
 
@@ -1080,6 +1172,7 @@ final class DisclosureRow: InteractiveView {
 
     /// Its name and the chevron after it, and no more.
     var fittingWidth: CGFloat { ceil(label.textWidth) + Tokens.Space.x1 + Tokens.Space.x4 }
+    var capHeight: CGFloat { label.font?.capHeight ?? 0 }
 
     override func layout() {
         super.layout()
@@ -1102,11 +1195,8 @@ final class DisclosureRow: InteractiveView {
     }
 }
 
-/// How a space looks, in one piece, the same wherever it's edited: a row of curated colors first (one tap, tried on
-/// the window while the pointer is on one), then the wheel (around for the hue, out from the middle for how much of
-/// it) and Shade for a color of your own, then Effects, folded until wanted: Colors (a slot to add a second, and the
-/// direction once there are two), See-through and Grain. `onPreview` fires while you drag or point at a preset,
-/// `onCommit` when you let go or pick something.
+/// The space's look: swatches (Default, presets, picture, Custom), the wheel and Shade under Custom, and Effects.
+/// `onPreview` fires while dragging, `onCommit` on release or pick.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
     private let colorsLabel = SpaceLookEditor.rowLabel(String(localized: "Gradient", comment: "A row's label in the space editor's Effects: the space's one or two colors."))
@@ -1116,7 +1206,16 @@ final class SpaceLookEditor: NSView {
     /// Adds a second color for a gradient; the second chip's × takes it away again.
     private let addSlot = AddColorSlot()
     private let dial = DirectionKnob()
+    /// The colors the space was made with, following the Mac.
+    private let defaultSwatch: LookSwatch
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
+    /// The picture the space's empty page shows; the panel picks and removes it.
+    let backgroundSwatch = BackgroundSwatch()
+    /// Ringed when the colors match no other swatch; click toggles the wheel and Shade.
+    private let customSwatch = LookSwatch(look: nil, name: String(localized: "Custom", comment: "Tooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own."))
+    private var showsCustom = false
+    /// In the row's order, for the arrow keys.
+    private var tiles: [InteractiveView] { [defaultSwatch] + swatches + [backgroundSwatch, customSwatch] }
     /// Gradient, see-through and grain: there when you want them, folded away until then.
     private let effects = DisclosureRow(title: String(localized: "Effects", comment: "A folding section of the space editor: gradient, see-through and grain."))
     private var showsEffects = false
@@ -1132,14 +1231,12 @@ final class SpaceLookEditor: NSView {
                                                  .text(String(localized: "Frosted", comment: "In the space editor, for a see-through space: frosted glass, the desktop blurred behind it."))])
     private let grainLabel = SpaceLookEditor.rowLabel(String(localized: "Grain", comment: "A slider in the space editor: how much film grain the color has."))
     private let grainSlider = LookSlider(.grain)
-    /// Puts back the colors the space was made with, there only to use once they've changed.
-    private let defaultsButton = TextButton(title: String(localized: "Use Default Colors", comment: "Button in the space editor, and item in a space's context menu: puts back the colors the space had when it was made."))
-    /// The color the space was made with, which `defaultsButton` goes back to.
+    /// The color the space was made with, which `defaultSwatch` goes back to.
     private let defaultColor: SpaceColor
 
     var onPreview: ((SpaceInfo) -> Void)?
     var onCommit: ((SpaceInfo) -> Void)?
-    /// The editor grew or shrank (Effects opened or folded).
+    /// The editor grew or shrank (Custom or Effects opened or folded).
     var onResize: (() -> Void)?
 
     /// The space as the editor has it right now.
@@ -1160,11 +1257,12 @@ final class SpaceLookEditor: NSView {
         original = space
         draft = space
         colorChosen = space.brightness != nil
+        defaultSwatch = LookSwatch(look: .curated(defaultColor), name: String(localized: "Use Default Colors", comment: "Item in a space's context menu, and tooltip of the first swatch in the space editor: puts back the colors the space had when it was made."))
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, grainLabel, grainSlider, effects, defaultsButton]
+        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, grainLabel, grainSlider, effects]
         showsEffects = space.hue2 != nil || space.isSeeThrough || (space.grain ?? 0) > 0.01
-        (views + chips + swatches).forEach { addSubview($0) }
+        (tiles + views + chips).forEach { addSubview($0) }
 
         wheel.onChange = { [weak self] index, spot, final in
             guard let self else { return }
@@ -1205,6 +1303,8 @@ final class SpaceLookEditor: NSView {
                 self.changed(final: true, animated: true)
             }
         }
+        defaultSwatch.onClick = { [weak self] _ in self?.useDefaultColors() }
+        customSwatch.onClick = { [weak self] _ in self?.toggleCustom() }
         effects.onClick = { [weak self] _ in
             guard let self else { return }
             self.showsEffects.toggle()
@@ -1232,13 +1332,20 @@ final class SpaceLookEditor: NSView {
             self.draft.angle = angle
             self.changed(final: final, animated: false)
         }
-        defaultsButton.onClick = { [weak self] _ in self?.useDefaultColors() }
         sync(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+
+    /// Left and right move keyboard focus along the swatches.
+    override func keyDown(with event: NSEvent) {
+        let tiles = self.tiles
+        guard let arrow = KeyboardFocus.arrow(event), !arrow.vertical,
+              let index = tiles.firstIndex(where: { $0 === window?.firstResponder }) else { super.keyDown(with: event); return }
+        window?.makeFirstResponder(tiles[(index + Int(arrow.step) + tiles.count) % tiles.count])
+    }
 
     static func rowLabel(_ text: String) -> Label {
         Label(text, font: Tokens.Font.body(.light), color: Tokens.Color.textSecondary)
@@ -1275,7 +1382,7 @@ final class SpaceLookEditor: NSView {
         let follows = Self.startingDepth(draft, dark: isDark)
         return index == 0 ? draft.brightness ?? follows : draft.brightness2 ?? draft.brightness ?? follows
     }
-    /// Whether the window looks dark, for where a space that follows the Mac sits on Shade.
+    /// Whether the window is dark, for placing a system-following space on Shade.
     private var isDark: Bool
     /// Where Shade shows the selected color, from 0 (lightest) to 1 (darkest).
     var shownDepth: Double { depth(selected) }
@@ -1285,8 +1392,7 @@ final class SpaceLookEditor: NSView {
         follow(dark: effectiveAppearance.isDark)
     }
 
-    /// Light or dark changed while the editor is open. A space that follows the Mac changed with it, as the sidebar
-    /// shows: its wheel and Shade move to where it is now, so they show the color the space has.
+    /// Appearance changed with the editor open: move a system-following space's wheel and Shade to its current color.
     func follow(dark: Bool) {
         guard dark != isDark else { return }
         isDark = dark
@@ -1344,6 +1450,13 @@ final class SpaceLookEditor: NSView {
         changed(final: true, animated: true)
     }
 
+    /// Custom: the wheel and Shade, shown or folded away.
+    func toggleCustom() {
+        showsCustom.toggle()
+        sync(animated: true)
+        onResize?()
+    }
+
     private func changed(final: Bool, animated: Bool) {
         if final { onCommit?(look) } else { onPreview?(look) }
         sync(animated: animated)
@@ -1362,8 +1475,11 @@ final class SpaceLookEditor: NSView {
             depths.append(depth(1))
         }
         wheel.show(spots, depths: depths, selected: selected, animated: animated)
-        for swatch in swatches { swatch.isSelected = swatch.look.matches(look) }
         let shown = look
+        defaultSwatch.isSelected = shown.hasDefaultColors(defaultColor)
+        for swatch in swatches { swatch.isSelected = !defaultSwatch.isSelected && swatch.look?.matches(shown) == true }
+        customSwatch.isSelected = !defaultSwatch.isSelected && !swatches.contains { $0.isSelected }
+        fade([wheel, shadeLabel, shadeSlider], in: showsCustom, animated: animated)
         let colors = [shown.background] + (shown.background2.map { [$0] } ?? [])
         let spot = spots[selected]
         shadeSlider.value = depth(selected)
@@ -1389,28 +1505,28 @@ final class SpaceLookEditor: NSView {
         for view in [glassLabel, glassSwitch] as [NSView] { view.isHidden = !glassShown }
         if glassShown != showsGlass { showsGlass = glassShown; onResize?() }
         if !showsEffects { chips[1].isHidden = true; addSlot.isHidden = true }
-        defaultsButton.isEnabled = !shown.hasDefaultColors(defaultColor)
-        showDial(two && showsEffects, animated: animated)
+        fade([dial], in: two && showsEffects, animated: animated)
         needsLayout = true
     }
 
-    /// The direction dial fades in beside the two colors.
-    private func showDial(_ show: Bool, animated: Bool) {
-        guard show == dial.isHidden || dial.alphaValue != (show ? 1 : 0) else { return }
-        dial.isHidden = false
+    /// Fades views in or out: the direction dial beside the two colors, the wheel and Shade under Custom.
+    private func fade(_ views: [NSView], in show: Bool, animated: Bool) {
+        let target: CGFloat = show ? 1 : 0
+        let changing = views.filter { $0.isHidden == show || $0.alphaValue != target }
+        guard !changing.isEmpty else { return }
+        changing.forEach { $0.isHidden = false }
         guard animated, !Tokens.Motion.reduceMotion else {
-            dial.alphaValue = show ? 1 : 0
-            dial.isHidden = !show
+            changing.forEach { $0.alphaValue = target; $0.isHidden = !show }
             return
         }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Tokens.Motion.state
             context.timingFunction = Tokens.Motion.easeOut
-            dial.animator().alphaValue = show ? 1 : 0
-        } completionHandler: { [weak self] in
+            changing.forEach { $0.animator().alphaValue = target }
+        } completionHandler: {
             MainActor.assumeIsolated {
-                guard let self, self.draft.hue2 == nil || !self.showsEffects else { return }
-                self.dial.isHidden = true
+                // Unless shown again meanwhile.
+                for view in changing where view.alphaValue == 0 { view.isHidden = true }
             }
         }
     }
@@ -1418,12 +1534,6 @@ final class SpaceLookEditor: NSView {
     // MARK: Layout
 
     private let swatchSize: CGFloat = 24
-    /// The presets sit in rows of nine.
-    private static let swatchesPerRow = 9
-    private var swatchRowsHeight: CGFloat {
-        let rows = CGFloat((swatches.count + Self.swatchesPerRow - 1) / Self.swatchesPerRow)
-        return rows * swatchSize + (rows - 1) * Tokens.Space.x2
-    }
     private let chipSize: CGFloat = 26
     private let sliderHeight: CGFloat = 30
     /// The Colors row: as tall as the dial, a little more than a slider.
@@ -1432,9 +1542,9 @@ final class SpaceLookEditor: NSView {
     /// How tall the wheel is.
     var wheelHeight: CGFloat = 200 { didSet { needsLayout = true } }
 
-    /// The presets first, one tap each; the wheel and Shade for a color of your own; then Effects, folded.
     var preferredHeight: CGFloat {
-        var h = swatchRowsHeight + Tokens.Space.x4 + wheelHeight + Tokens.Space.x3 + sliderHeight + Tokens.Space.x3 + disclosureHeight
+        var h = swatchSize + Tokens.Space.x1 + disclosureHeight
+        if showsCustom { h += customHeight }
         if showsEffects { h += Tokens.Space.x2 + dialSize + Tokens.Space.x3 + (sliderHeight + Tokens.Space.x3) * 2 - Tokens.Space.x3 }
         if showsGlass { h += sliderHeight + Tokens.Space.x3 }
         return h
@@ -1446,27 +1556,28 @@ final class SpaceLookEditor: NSView {
         return max(72, widest + Tokens.Space.x3)
     }
 
+    /// Height under the folded Effects label, counted in the panel's margin.
+    var trailingAir: CGFloat { showsEffects ? 0 : floor((disclosureHeight - effects.capHeight) / 2) }
+
+    /// The wheel and Shade under the swatches.
+    private var customHeight: CGFloat { Tokens.Space.x3 + wheelHeight + Tokens.Space.x3 + sliderHeight }
+
     override func layout() {
         super.layout()
         let width = bounds.width
         var y: CGFloat = 0
-        let perRow = Self.swatchesPerRow
-        let gap = (width - CGFloat(perRow) * swatchSize) / CGFloat(max(perRow - 1, 1))
-        for (i, swatch) in swatches.enumerated() {
-            swatch.frame = NSRect(x: CGFloat(i % perRow) * (swatchSize + gap), y: y + CGFloat(i / perRow) * (swatchSize + Tokens.Space.x2),
-                                  width: swatchSize, height: swatchSize)
+        let tiles = self.tiles
+        let gap = (width - CGFloat(tiles.count) * swatchSize) / CGFloat(tiles.count - 1)
+        for (i, tile) in tiles.enumerated() {
+            tile.frame = NSRect(x: round(CGFloat(i) * (swatchSize + gap)), y: y, width: swatchSize, height: swatchSize)
         }
-        y += swatchRowsHeight + Tokens.Space.x4
-        wheel.frame = NSRect(x: 0, y: y, width: width, height: wheelHeight)
-        y += wheelHeight + Tokens.Space.x3
-        row(shadeLabel, shadeSlider, y: y, height: sliderHeight)
-        y += sliderHeight + Tokens.Space.x3
-        // Use Default Colors at the end of the Effects row, out of the way until wanted.
-        let resetWidth = min(ceil(defaultsButton.fittingWidth), width / 2)
-        // Its words end on the column's edge, where the sliders and swatches do: the button reaches out by its padding.
-        defaultsButton.frame = NSRect(x: width - resetWidth + defaultsButton.textInset, y: y + (disclosureHeight - Tokens.Space.x7Height) / 2,
-                                      width: resetWidth, height: Tokens.Space.x7Height)
-        effects.frame = NSRect(x: 0, y: y, width: width - resetWidth - Tokens.Space.x2, height: disclosureHeight)
+        y += swatchSize
+        // Laid out while folded too, so they fade in place.
+        wheel.frame = NSRect(x: 0, y: y + Tokens.Space.x3, width: width, height: wheelHeight)
+        row(shadeLabel, shadeSlider, y: wheel.frame.maxY + Tokens.Space.x3, height: sliderHeight)
+        if showsCustom { y += customHeight }
+        y += Tokens.Space.x1
+        effects.frame = NSRect(x: 0, y: y, width: width, height: disclosureHeight)
         y += disclosureHeight + Tokens.Space.x2
         // Colors: the space's own, then the slot for a second or, with two, which way they run.
         let lh = ceil(colorsLabel.intrinsicContentSize.height)
@@ -1513,18 +1624,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// The space's icon, at the start of its name; click it to choose one in place of the colors.
     private let iconButton = IconButton(symbol: "circle.dashed", size: .compact, toolTip: String(localized: "Choose Icon", comment: "Tooltip of the icon button before the space's name, in the space editor."))
     private var iconGrid: IconGrid?
-    /// The profile the space is on: its sign-ins, extensions and website data.
+    /// The profile the space uses.
     private let profileLabel = SpaceLookEditor.rowLabel(String(localized: "Profile", comment: "Label in a space's editor, before the choice of the profile the space is on."))
     private let profileButton = DropdownButton()
-    /// What a profile is, in a line under its row: enough to choose one without a trip to Settings. There even with
-    /// one profile: that's when nothing else says spaces share sign-ins (#201).
-    private let profileNote = NSTextField.dialogText(ProfileChoice.spaceNote, font: Tokens.Font.detail())
+    private let profileLine = ColorView(color: Tokens.Color.separator)
     /// A profile New Profile made here, still called after the space: it takes the name as you type it.
     private var namedProfile: UUID?
-    /// The picture the space's empty page shows, in place of its soft wash (`EmptyPage`).
-    private let backgroundLabel = SpaceLookEditor.rowLabel(String(localized: "Background", comment: "Label in a space's editor, before the buttons that choose or remove the picture its empty page shows."))
-    private let chooseBackground = PillButton(title: String(localized: "Choose Image…", comment: "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page."))
-    private let removeBackground = PillButton(title: String(localized: "Remove", comment: "Button in a space's editor, on the Background row: takes the picture off the space's empty page and deletes Zigzag's copy of it."), style: .quiet)
     /// While a question it asked is up (moving the space's tabs to another profile), clicks and keys are that
     /// question's: the editor stays as it is under it.
     private var isAsking = false
@@ -1545,12 +1650,18 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.wantsLayer = true
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.row
-        [nameBackground, nameField, editor, iconButton, profileLabel, profileButton, profileNote,
-         backgroundLabel, chooseBackground, removeBackground].forEach { addSubview($0) }
+        [nameBackground, nameField, editor, iconButton, profileLine, profileLabel, profileButton].forEach { addSubview($0) }
+        // Explains profiles inline (#201).
+        profileLabel.toolTip = ProfileChoice.spaceNote
+        profileButton.toolTip = ProfileChoice.spaceNote
+        profileButton.setAccessibilityLabel(profileLabel.stringValue)
         refreshProfiles()
         refreshBackground()
-        chooseBackground.onClick = { [weak self] _ in self?.pickBackground() }
-        removeBackground.onClick = { [weak self] _ in self?.clearBackground() }
+        editor.backgroundSwatch.onClick = { [weak self] event in
+            guard let self else { return }
+            if self.editor.backgroundSwatch.hitsBadge(event) { self.clearBackground() } else { self.pickBackground() }
+        }
+        editor.backgroundSwatch.onRemove = { [weak self] in self?.clearBackground() }
         profileButton.onSelect = { [weak self] index in self?.chooseProfile(at: index) }
         profileButton.actions = [DropdownButton.Action(title: ProfileChoice.newForSpace, symbol: "plus") { [weak self] in
             self?.newProfile()
@@ -1581,14 +1692,12 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     private let pad = Tokens.Space.x3
     private let nameHeight = Tokens.Metric.rowHeight
 
-    /// The Profile row and its note, with the space under them.
-    private var profileRowHeight: CGFloat { Tokens.Page.controlHeight + Tokens.Space.x1 + profileNoteHeight + Tokens.Space.x3 }
-    private var profileNoteHeight: CGFloat { profileNote.wrappedHeight(Self.width - pad * 2) }
+    /// The line over Profile and the row itself, with the space around the line.
+    private var profileRowHeight: CGFloat { Tokens.Space.x3 + Tokens.Metric.hairline + Tokens.Space.x3 + Tokens.Page.controlHeight }
 
-    /// The Background row, with the space under it.
-    private var backgroundRowHeight: CGFloat { Tokens.Page.controlHeight + Tokens.Space.x3 }
-
-    var contentHeight: CGFloat { pad + nameHeight + Tokens.Space.x3 + profileRowHeight + backgroundRowHeight + (iconGrid != nil ? IconGrid.height : editor.preferredHeight) + pad }
+    var contentHeight: CGFloat {
+        pad + nameHeight + Tokens.Space.x3 + (iconGrid != nil ? IconGrid.height : editor.preferredHeight - editor.trailingAir) + profileRowHeight + pad
+    }
 
     private func refreshIconButton(_ icon: String?) {
         iconButton.glyph = icon.map { IconChoice.image($0, size: Tokens.Symbol.compactGlyph) }
@@ -1648,31 +1757,16 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         iconButton.frame.origin = NSPoint(x: pad + (nameHeight - ib) / 2, y: pad + (nameHeight - ib) / 2)
         let textX = pad + nameHeight
         nameField.frame = NSRect(x: textX, y: pad + (nameHeight - fh) / 2, width: pad + width - textX - Tokens.Space.x2, height: fh)
-        // The profile, under the name: its label in the column the look's labels share, its menu after it.
-        let rowY = pad + nameHeight + Tokens.Space.x3, rowH = Tokens.Page.controlHeight
-        let lh = ceil(profileLabel.intrinsicContentSize.height)
-        profileLabel.frame = NSRect(x: pad, y: rowY + profileLabel.centeredY(in: rowH), width: editor.labelWidth, height: lh)
-        let menuWidth = min(profileButton.intrinsicContentSize.width, width - editor.labelWidth)
-        profileButton.frame = NSRect(x: pad + width - menuWidth, y: rowY, width: menuWidth, height: rowH)
-        profileNote.frame = NSRect(x: pad, y: rowY + rowH + Tokens.Space.x1, width: width, height: profileNoteHeight)
-        // The background, under the profile: Choose Image… at the column's end, or with a picture, Remove there, quiet
-        // text whose words end on the column's edge (it reaches out by its padding, as Use Default Colors does).
-        let backgroundY = rowY + profileRowHeight
-        let bh = ceil(backgroundLabel.intrinsicContentSize.height)
-        backgroundLabel.frame = NSRect(x: pad, y: backgroundY + backgroundLabel.centeredY(in: rowH), width: editor.labelWidth, height: bh)
-        var buttonsEnd = pad + width
-        if !removeBackground.isHidden {
-            let removeWidth = ceil(removeBackground.fittingWidth), reach = Tokens.Space.x3
-            removeBackground.frame = NSRect(x: buttonsEnd - removeWidth + reach, y: backgroundY, width: removeWidth, height: rowH)
-            buttonsEnd = removeBackground.frame.minX - Tokens.Space.x1
-        }
-        // Its own width, short of the label's words: "Background" runs past the look's label column in some languages.
-        let labelEnd = pad + ceil(backgroundLabel.intrinsicContentSize.width) + Tokens.Space.x2
-        let chooseWidth = min(ceil(chooseBackground.fittingWidth), buttonsEnd - labelEnd)
-        chooseBackground.frame = NSRect(x: buttonsEnd - chooseWidth, y: backgroundY, width: chooseWidth, height: rowH)
-        let below = backgroundY + backgroundRowHeight
+        let below = pad + nameHeight + Tokens.Space.x3
         editor.frame = NSRect(x: pad, y: below, width: width, height: editor.preferredHeight)
         iconGrid?.frame = NSRect(x: pad, y: below, width: width, height: IconGrid.height)
+        let lineY = below + (iconGrid != nil ? IconGrid.height : editor.preferredHeight - editor.trailingAir) + Tokens.Space.x3
+        profileLine.frame = NSRect(x: pad, y: lineY, width: width, height: Tokens.Metric.hairline)
+        let rowY = lineY + Tokens.Metric.hairline + Tokens.Space.x3, rowH = Tokens.Page.controlHeight
+        let labelWidth = profileLabel.textWidth
+        profileLabel.frame = NSRect(x: pad, y: rowY + profileLabel.centeredY(in: rowH), width: labelWidth, height: profileLabel.lineHeight)
+        let menuWidth = min(profileButton.intrinsicContentSize.width, width - labelWidth)
+        profileButton.frame = NSRect(x: pad + width - menuWidth, y: rowY, width: menuWidth, height: rowH)
     }
 
     func show(from anchor: NSView? = nil) {
@@ -1826,14 +1920,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     // MARK: Background
 
-    /// Remove is there only while the space has a picture that's still kept.
+    /// Shows the picture while the space still has one.
     private func refreshBackground() {
-        let name = Library.shared.space(spaceID)?.backgroundImage
-        removeBackground.isHidden = name.map { !SpaceBackground.isKept($0) } ?? true
-        needsLayout = true
+        let name = Library.shared.space(spaceID)?.backgroundImage.flatMap { SpaceBackground.isKept($0) ? $0 : nil }
+        editor.backgroundSwatch.image = name.flatMap { SpaceBackground.thumbnail($0, side: 96) }
     }
 
-    /// Choose Image…: a picture from anywhere, copied into Zigzag's folder at the size the screen needs.
+    /// Any picture, copied into Zigzag's folder at screen size.
     private func pickBackground() {
         guard let host = controller?.window ?? window else { return }
         let panel = NSOpenPanel()
@@ -1868,7 +1961,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
-    /// Remove: the soft wash again, and Zigzag's copy of the picture deleted.
+    /// Remove: back to the default wash and delete Zigzag's copy.
     private func clearBackground() {
         Library.shared.setBackgroundImage(nil, forSpace: spaceID)
         edited = true
@@ -1876,7 +1969,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
 
     #if DEBUG
-    /// For the debug bridge: Choose Image… with a file already picked.
+    /// Debug bridge: the Background swatch with a file already picked.
     func debugSetBackground(_ url: URL) {
         guard let name = SpaceBackground.store(url, for: spaceID, screen: SpaceBackground.screenPixels) else { return }
         Library.shared.setBackgroundImage(name, forSpace: spaceID)
@@ -1884,10 +1977,11 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         refreshBackground()
     }
     func debugRemoveBackground() { clearBackground() }
+    func debugToggleCustom() { editor.toggleCustom() }
     #endif
 
-    /// A profile made with the space (Settings › Spaces › Give new spaces their own profile, #291): it takes the
-    /// space's name as you type it, as one New Profile made here does.
+    /// A profile created with the space (Settings › Spaces › Give new spaces their own profile, #291); takes the space name
+    /// as you type, like New Profile here.
     func follow(madeProfile id: UUID) {
         namedProfile = id
         refreshProfiles()
@@ -1939,7 +2033,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
-    /// Use Default Colors, as its button does (the debug bridge).
+    /// Use Default Colors, like its swatch (debug bridge).
     func useDefaultColors() { editor.useDefaultColors() }
 
     #if DEBUG

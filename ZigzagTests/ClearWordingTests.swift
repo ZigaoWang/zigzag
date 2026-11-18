@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// What Clear's tooltip says it will close: never "the other" tabs when none of them is yours (you're on a favorite
-/// or a pinned page), and a lone split view by name rather than as two tabs.
+/// Clear's tooltip: no "other tabs" when on a favorite or pinned page, and a lone split named as one.
 struct ClearWordingTests {
     let a = UUID(), b = UUID(), c = UUID(), d = UUID(), favorite = UUID()
 
@@ -15,9 +14,9 @@ struct ClearWordingTests {
         let step = ClearTabsButton.step(kind: .others, closing: [a, b], current: favorite, listed: [a, b], groups: [])
         #expect(step.kind == .all && step.pages == 2)
         #expect(ClearTabsButton.step(kind: .others, closing: [a], current: nil, listed: [a], groups: []).kind == .all)
-        // On one of the tabs, the rest are the other ones.
+        // On a tab, the rest are "other".
         #expect(ClearTabsButton.step(kind: .others, closing: [b], current: a, listed: [a, b], groups: []).kind == .others)
-        // A pinned page beside a tab in a split: that tab is yours.
+        // A pinned page split with a tab: that tab counts as current.
         #expect(ClearTabsButton.step(kind: .others, closing: [b], current: favorite, listed: [a, b], groups: [[favorite, a]]).kind == .others)
     }
 

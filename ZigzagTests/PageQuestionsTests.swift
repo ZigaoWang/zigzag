@@ -2,7 +2,7 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// The top of a page holds one thing at a time: a page's questions take turns, and a toast goes under the one up.
+/// One item at a time at the top of a page: questions take turns, toasts go below.
 @MainActor
 struct PageQuestionsTests {
     @Test func questionsTakeTurns() {
@@ -12,24 +12,24 @@ struct PageQuestionsTests {
         overlay.addSubview(camera)
         overlay.addSubview(next)
         next.isHidden = true
-        // One is showing: the other waits.
+        // One shows, the other waits.
         #expect(PageQuestions.showing(in: overlay) === camera)
         #expect(!PageQuestions.mayShow(next, in: overlay))
         // The one showing may stay.
         #expect(PageQuestions.mayShow(camera, in: overlay))
-        // Set aside (its tab went behind) or gone: the next one's turn.
+        // Hidden (tab went behind) or removed: next one's turn.
         camera.isHidden = true
         #expect(PageQuestions.mayShow(next, in: overlay))
         camera.isHidden = false
         camera.removeFromSuperview()
         #expect(PageQuestions.mayShow(next, in: overlay))
-        // Anything else floating there (a toast) isn't a question and never holds one up.
+        // Toasts aren't questions and never block one.
         let toast = ToastView(frame: NSRect(x: 400, y: 12, width: 200, height: 36))
         overlay.addSubview(toast)
         #expect(PageQuestions.mayShow(next, in: overlay))
     }
 
-    /// In a split, each pane's top is its own: a question on one pane doesn't hold up a camera question on another.
+    /// In a split each pane has its own top, so questions on different panes show together.
     @Test func questionsOnOtherPanesShowTogether() {
         let overlay = NSView(frame: NSRect(x: 0, y: 0, width: 1200, height: 800))
         let left = PermissionPrompt(frame: NSRect(x: 130, y: 12, width: 340, height: 120))
@@ -38,7 +38,7 @@ struct PageQuestionsTests {
         overlay.addSubview(camera)
         camera.isHidden = true
         #expect(PageQuestions.mayShow(camera, in: overlay))
-        // On the same pane, where they'd cover each other, it waits.
+        // On the same pane they'd overlap, so it waits.
         camera.frame.origin.x = 300
         #expect(!PageQuestions.mayShow(camera, in: overlay))
     }
@@ -47,20 +47,20 @@ struct PageQuestionsTests {
         let page = NSRect(x: 300, y: 40, width: 900, height: 700)
         // Nothing there: the whole page.
         #expect(PageQuestions.area(page, below: nil) == page)
-        // A question at the top of the page: the toast's area starts under it, down to the page's bottom.
+        // A question at the top: the toast area starts below it.
         let question = NSRect(x: 580, y: 52, width: 340, height: 120)
         let under = PageQuestions.area(page, below: question)
         #expect(under.minY == question.maxY)
         #expect(under.maxY == page.maxY)
         #expect(under.minX == page.minX && under.width == page.width)
-        // Something elsewhere in the window (over another page) leaves this one be.
+        // Something over another page leaves this one alone.
         #expect(PageQuestions.area(page, below: NSRect(x: 0, y: 52, width: 200, height: 120)) == page)
     }
 
     @Test func toastsStayLongEnoughToReadAndReach() {
-        // Undo for tabs closed or pins removed: several seconds, as other apps give it, and longer under the pointer.
+        // Undo toasts for closed tabs or removed pins last several seconds, longer under the pointer.
         #expect((6...8).contains(Toast.undoDuration))
-        // "Password saved" outlasts the prompt sliding away under it.
+        // "Password saved" outlasts the prompt sliding away.
         #expect(Toast.confirmationDuration >= 2.5)
     }
 }

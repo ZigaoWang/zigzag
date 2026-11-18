@@ -87,7 +87,7 @@ struct CarriedExtensionStateTests {
     }
 }
 
-/// A store package is read off the main actor, and only up to the cap.
+/// Store packages are read off the main actor, up to the cap.
 struct ExtensionPackageFetchTests {
     @Test func aPackageIsReadUpToTheCap() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-package-\(UUID().uuidString)")

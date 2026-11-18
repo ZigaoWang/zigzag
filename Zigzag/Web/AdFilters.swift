@@ -271,7 +271,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// The downloaded lists and scriptlets as they are now (Zigzag's own list from the app until it's downloaded), or
     /// nil while a list is missing. Without pinned scriptlets the lists are used with none.
     private func inputs() -> (lists: [String], trusted: [Bool], scriptlets: String, checksum: String)? {
-        // Read as one set: never some lists from a download still being written and some from before it.
+        // Read as one consistent set, never mixed with a download in progress.
         listFiles.lock()
         defer { listFiles.unlock() }
         var lists: [String] = []
@@ -292,11 +292,11 @@ nonisolated final class AdEngine: @unchecked Sendable {
     /// Changed whenever ad-engine.js changes what it keeps of the lists.
     private static let readingRevision = "trusted-lists-1"
 
-    /// Held while the lists on disk are read, or a download's written.
+    /// Held while reading lists or writing a download.
     private let listFiles = NSLock()
 
-    /// The set of lists in use or being built, by its checksum. A set is taken once: asked for again (the scriptlets
-    /// and the lists coming at about the same time at launch), it isn't built and swapped in again.
+    /// Checksum of the list set in use or being built, so a duplicate request (scriptlets and lists arriving together
+    /// at launch) doesn't rebuild it.
     private let taken = OSAllocatedUnfairLock<String?>(initialState: nil)
     private func take(_ checksum: String) -> Bool { taken.withLock { if $0 == checksum { return false }; $0 = checksum; return true } }
     private func release(_ checksum: String) { taken.withLock { if $0 == checksum { $0 = nil } } }
@@ -313,7 +313,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
             if let inputs = inputs(), let info = try? Data(contentsOf: engineInfoFile),
                let saved = try? JSONDecoder().decode(EngineInfo.self, from: info),
                saved.version == version, saved.checksum == inputs.checksum {
-                // Being built already (a download came first): that build is the one taken.
+                // Already being built by an earlier download.
                 guard take(inputs.checksum) else { return }
                 if let bytes = try? Data(contentsOf: engineFile), load(bytes, into: context) {
                     adopt(filters: saved.filters, scriptlets: saved.scriptlets, loadedIn: Date().timeIntervalSince(started), builtIn: nil)
@@ -473,7 +473,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
             guard !force, let last = fetched[id], FileManager.default.fileExists(atPath: file.path) else { return true }
             return now.timeIntervalSince(last.checked) >= last.lifetime
         }
-        // What comes is written once all of it has, together.
+        // Written together once everything has arrived.
         var downloaded: [(id: String, data: Data)] = []
         for list in AdFilterSources.lists where due(list.id, listFile(list.id)) {
             for url in list.urls {
@@ -496,8 +496,8 @@ nonisolated final class AdEngine: @unchecked Sendable {
                 if (try? data.write(to: listFile(id), options: .atomic)) != nil { changed = true } else { fetched[id] = nil }
             }
         }
-        // Being asked for already (at launch, on their own): waited for, so the lists and they are built once, together.
-        // To be asked for again shortly (ensureScriptlets): left to that.
+        // Already requested (at launch): wait for it so everything builds once. If ensureScriptlets will ask again
+        // shortly, leave it to that.
         if !force, let asking = withRetry({ $0.running ? $0.last : nil }) {
             if await asking.value { changed = true }
         } else if force || !withRetry({ $0.pending != nil }), await updateScriptlets() {
@@ -549,7 +549,7 @@ nonisolated final class AdEngine: @unchecked Sendable {
         await withRetry { fetch(after: &$0) }.value
     }
 
-    /// Starts a fetch that follows the one before it, inside `withRetry`.
+    /// Chains a fetch after the previous one, inside `withRetry`.
     private func fetch(after state: inout Retry) -> Task<Bool, Never> {
         let previous = state.last
         let task = Task.detached(priority: .utility) { [self] () -> Bool in
@@ -721,13 +721,12 @@ enum PageFilters {
         return scripts
     }
 
-    /// A string as a JavaScript literal.
     nonisolated static func jsString(_ text: String) -> String {
         (try? JSONSerialization.data(withJSONObject: [text])).flatMap { String(data: $0, encoding: .utf8) }.map { String($0.dropFirst().dropLast()) } ?? "\"\""
     }
 
-    /// A script that adds a style sheet to the document as it starts. `keptAs`: a name in the script's world the
-    /// style element is kept under, so running it again replaces the sheet instead of adding another (Boosts).
+    /// Adds a style sheet at document start. `keptAs`: a name in the script's world for the style element, so
+    /// rerunning replaces it instead of adding another (Boosts).
     nonisolated static func styleSource(_ css: String, keptAs name: String? = nil) -> String {
         let made = name.map { "window[\(jsString($0))] || (window[\(jsString($0))] = document.createElement('style'))" } ?? "document.createElement('style')"
         return """

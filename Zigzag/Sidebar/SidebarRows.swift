@@ -24,7 +24,7 @@ class SidebarRowView: InteractiveView {
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
         title.font = Tokens.Font.sidebarRow()
-        // A long title fades out at its end, under the pointer or not (`Label.fadesTail`).
+        // Long titles fade at the end (`Label.fadesTail`).
         title.fadesTail = true
         addSubview(icon)
         addSubview(title)
@@ -36,8 +36,7 @@ class SidebarRowView: InteractiveView {
     /// Space reserved at the trailing edge for accessory buttons.
     var trailingAccessoryWidth: CGFloat { 0 }
 
-    /// Whether `layout` fades the title's end itself; false for a row that places its title further and fades it
-    /// once it's where it goes (a tab's, under its close button).
+    /// Whether `layout` fades the title; false when a subclass places and fades it later (tabs, under the close button).
     var fadesTitleInLayout: Bool { true }
 
     /// From the row's edge to its icon.
@@ -57,7 +56,7 @@ class SidebarRowView: InteractiveView {
         let titleX = icon.frame.maxX + Self.titleOffset
         let titleHeight = title.lineHeight
         let trailing = trailingAccessoryWidth > 0 ? trailingAccessoryWidth + Self.buttonEdge : Self.inset - Label.inset
-        // Its capitals in the middle of the row, level with the icon's middle, not its line box (which sits them low).
+        // Center the caps on the icon, not the line box (which sits low).
         title.frame = NSRect(x: titleX, y: title.centeredY(in: bounds.height), width: max(0, bounds.width - titleX - trailing), height: titleHeight)
         if fadesTitleInLayout { title.fadeTail() }
         if layer?.sublayers?.contains(where: { $0.name == "rim" && !$0.isHidden }) == true { setCardRim(true) }
@@ -115,7 +114,7 @@ class SidebarRowView: InteractiveView {
         }
     }
 
-    /// What fades: the icon and title, and on a split's row every page's.
+    /// The views that fade: icon and title, or every part's on a split row.
     var fadingViews: [NSView] { [icon, title] }
 
     func applyFreshness(animated: Bool = false) {
@@ -169,8 +168,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private(set) var tab: Tab?
     private var token: SignalToken?
     private var attentionToken: SignalToken?
-    /// How many questions were waiting for this row's pages when it last drew its dots, so one arriving for another
-    /// row doesn't refresh every row in the sidebar.
+    /// Question count when the dots last drew, so one for another row doesn't redraw every row.
     private var waitingQuestions = 0
     let closeButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
     /// The speaker beside the page that's playing (or muted): this row's own, and in a split, its partner's beside
@@ -304,8 +302,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var partViews: [[NSView]] {
         [[icon, title], [partnerIcon, partnerTitle]] + (extraViews ?? []).map { [$0.icon, $0.title] }
     }
-    /// A split or group fades as one, every page with the first; while one part is being renamed, the others stay
-    /// set aside.
+    /// A split or group fades as one; while one part is renamed, the others stay hidden.
     override var fadingViews: [NSView] { renameField == nil ? partViews.flatMap { $0 } : super.fadingViews }
 
     /// The pinned page's own name, shown before the mark while it's away: "Apple / MacBook Pro".
@@ -371,9 +368,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Made the first time a part of this row is zoomed.
     private var zoomMarkView: ColorView?
 
-    /// The part lit under its page: the one zoomed over the rest, or else, in the row you're on whose parts show
-    /// their icons alone, the page you're in (with titles, its title's ink says so), so a row of several pages says
-    /// which one has you, as the page area does.
+    /// Highlight the zoomed part, or on the selected icon-only split row, the focused page, matching the page area.
     private func layoutZoomMark() {
         guard let part = zoomedPart ?? (isSelected && !showsPartTitles ? focusedHalf : nil), isSplit else {
             zoomMarkView?.isHidden = true
@@ -614,14 +609,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     func half(at point: NSPoint) -> Int {
         guard isSplit else { return 0 }
         let count = segmentCount
-        // The part as laid out, left to right, each reaching to the hairline on either side of it.
+        // The part's frame, from hairline to hairline.
         let spatial = partEdges.count == count - 1 ? partEdges.filter { point.x >= $0 }.count
             : min(count - 1, max(0, Int(point.x / max(1, bounds.width / CGFloat(count)))))
-        // In a split of two the partner's half can lead.
+        // In a split of two the partner's half can come first.
         return extraCount == 0 && partnerLeads ? 1 - spatial : spatial
     }
 
-    /// Where one part of a split or tile group's row ends and the next begins (its hairline).
+    /// Where a split or tile group part ends (its hairline).
     private var partEdges: [CGFloat] = []
 
     /// Each part's span across the row, in the row's order of parts (the partner's half first when it leads).
@@ -652,7 +647,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // A part in Developer Mode says so under its name, with its host.
         let pages = [tab, partner] + extraPages
         let described = developerParts.indices.contains(index) && developerParts[index] ? "\(name)\n\(Self.developerTip(for: pages[index]?.url))" : name
-        // A part with a question waiting for it says that too, so a question can't be missed in a background tab.
+        // Mark parts with a waiting question so it isn't missed in a background tab.
         if pages.indices.contains(index), let page = pages[index], PendingQuestions.hasPending(tabID: page.id) {
             return "\(described)\n\(String(localized: "needs your answer", comment: "Shown in a tab row's tooltip, and spoken by VoiceOver after its name: a question is waiting for that page."))"
         }
@@ -666,21 +661,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return pages.indices.contains(index) ? pages[index] ?? tab : tab
     }
 
-    /// A row of `count` pages split into parts of one width from its start to `end`, each meeting the next (where a
-    /// hairline parts them), in whole points.
+    /// Splits a row of `count` pages into equal whole-point parts up to `end`, meeting at hairlines.
     static func splitParts(count: Int, end: CGFloat) -> [(start: CGFloat, end: CGFloat)] {
         guard count > 1 else { return [(0, end)] }
         let width = end / CGFloat(count)
         return (0..<count).map { i in (round(CGFloat(i) * width), i == count - 1 ? end : round(CGFloat(i + 1) * width)) }
     }
 
-    /// The narrowest part that shows its title beside its icon: its icon a row's inset in from the part's start, the
-    /// gap a tab's title has, a few letters, and the inset again before the next part.
+    /// Narrowest part that fits a title beside its icon: inset, icon, title gap, a few letters, inset.
     static func segmentMinWidth(for size: Tokens.Sidebar.Size = Tokens.Sidebar.size) -> CGFloat {
         inset * 2 + Tokens.Sidebar.favicon(for: size) + Tokens.Sidebar.iconGap + Tokens.Sidebar.splitTitleMin(for: size)
     }
 
-    /// Whether a part this wide has room for its title beside its icon, or shows the icon alone, in its middle.
+    /// Whether a part this wide shows its title or just a centered icon.
     static func segmentShowsTitle(width: CGFloat, size: Tokens.Sidebar.Size = Tokens.Sidebar.size) -> Bool {
         width >= segmentMinWidth(for: size)
     }
@@ -691,8 +684,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         guard tab !== self.tab || token == nil else { refresh(); return }
         self.tab = tab
         token = tab?.changed.observe { [weak self] change in self?.tabChanged(change) }
-        // A question arriving for one of this row's pages (or being answered) marks or unmarks its icon; a question
-        // for another row leaves this one alone, however many there are.
+        // Only questions for this row's pages update its dots.
         if attentionToken == nil {
             attentionToken = PendingQuestions.changed.observe { [weak self] _ in
                 guard let self, self.pendingForRow != self.waitingQuestions else { return }
@@ -737,15 +729,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The close button's place at the row's end, or the number's while it's there.
     private var endSlot: CGFloat { showsClose ? closeButton.frame.width : showsNumber ? numberHint?.width ?? 0 : 0 }
 
-    /// The close button (or a pinned tab's unload or back button) comes only with the pointer here: it shows over the
-    /// title's faded end instead of taking room from it, so the title never moves or cuts shorter as the pointer comes
-    /// and goes. The tab you're on keeps its close button in view, so it has its room.
+    /// The close button (or a pinned tab's unload/back button) shows on hover over the title's faded end, so the title
+    /// never shifts. The selected tab keeps it visible, so it reserves the room.
     private var closeOverlays: Bool { !isSplit && !(isSelected && !isBookmark) && !reservesClose && !showsNumber && renameField == nil }
-    /// A speaker or a nested tabs' chevron beside it stays put while the close button comes and goes: the button's
-    /// room is kept for it, as a row of several pages keeps it.
+    /// A speaker or nested-tabs chevron next to it stays put; the button's room is reserved, as on multi-page rows.
     private var reservesClose: Bool { !isSplit && (showsAudio || showsNested) }
 
-    /// Faded once it's placed (`layoutTitleFade`), never first where the plain row puts it.
+    /// Faded after placement (`layoutTitleFade`).
     override var fadesTitleInLayout: Bool { false }
 
     override var trailingAccessoryWidth: CGFloat {
@@ -758,7 +748,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     func refresh() {
         title.stringValue = fixedTitle ?? tab?.displayTitle ?? ""
-        // A pinned page's own icon until its page has one: away too, never the globe for a page whose icon is coming.
+        // A pinned page's saved icon until the page has its own; never a globe while one is loading.
         icon.image = tab?.displayIcon ?? (fixedTitle != nil || isAway ? bookmarkIcon : nil)
         icon.isLoading = (tab?.isLoading ?? false) && !(tab?.isSuspended ?? true)
         // Why it isn't running (asleep, and what that freed, or not loaded since Zigzag reopened) is in its hover card
@@ -779,9 +769,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // A pinned tab that isn't loaded reads the same as one that is: faded means old elsewhere in Zigzag.
         let theme = Brand.Theme.for(self)
         let ink = theme.rowInk
-        // One weight always: selection shows in the fill, never by text getting wider and shifting. In the split
-        // you're on, the page you're in has its title in the row's ink and the others are quieter, as the page area
-        // says which pane has you.
+        // Fixed weight so selection never shifts text. In the selected split, the focused page's title uses the row's ink and
+        // the others are dimmer, matching the page area.
         func inked(part: Int) -> NSColor { isSplit && isSelected && focusedHalf != part ? theme.quietInk : ink }
         title.textColor = inked(part: 0)
         partnerTitle.textColor = inked(part: 1)
@@ -826,8 +815,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
     }
 
-    /// Marks each page of the row that has a question waiting for it that can't be shown yet — its tab isn't in
-    /// front, or its window is hidden — with one dot in the space's accent, however many questions are waiting.
+    /// One accent dot on each page with a question that can't show yet (tab in back or window hidden), however many.
     private func refreshAttention() {
         let pages = [tab, partner] + extraPages
         let icons = [icon, partnerIcon] + (extraViews ?? []).map(\.icon)
@@ -842,14 +830,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         waitingQuestions = pendingForRow
     }
 
-    /// How many questions are waiting for this row's pages, whether they can be shown or not: the count its dots
-    /// follow, so a question for another row never draws this one again.
+    /// Waiting question count for this row's pages, shown or not; the dots follow it so other rows' questions don't redraw
+    /// this one.
     private var pendingForRow: Int {
         pages.reduce(0) { $0 + PendingQuestions.count(tabID: $1.id) }
     }
 
-    /// A question is waiting for `page` and nothing is showing it: a tab that isn't in front, or a hidden window.
-    /// Once the tab is brought forward the banner is on screen, so the dot goes.
+    /// A question waits for `page` and nothing shows it (background tab or hidden window). The dot goes once the tab is in
+    /// front.
     private func waitsItself(_ page: Tab) -> Bool {
         let front = (window?.windowController as? PromptHost)?.promptShows(page) ?? false
         return PendingQuestions.waits(tabID: page.id, isFront: front, windowVisible: window?.isVisible == true)
@@ -930,14 +918,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         layoutTitleFade()
     }
 
-    /// While the close button shows over the title's end (`closeOverlays`), the title fades out just before it; at
-    /// rest a long title fades out at its own end, the same way, so the cut looks alike either way.
+    /// The title fades just before the close button while it shows (`closeOverlays`), and at its own end otherwise, with
+    /// the same look.
     private func layoutTitleFade() {
         let covered = closeOverlays && !closeButton.isHidden && title.frame.maxX > closeButton.frame.minX
-        // Clear from a little before the button, so the text never runs into it.
+        // Start the fade a little before the button.
         if !isSplit { title.fadeTail(endingAt: covered ? closeButton.frame.minX - Self.buttonGap - title.frame.minX : nil) }
         if isAway { pinLabel.fadeTail() }
-        // In a split, the last part's title fades just before the close button (or ⌘'s number) coming over it.
+        // In a split, the last part's title fades before the close button (or ⌘ number).
         let blocker: NSView? = !isSplit || !overlaysPartEnd ? nil : !closeButton.isHidden ? closeButton : showsNumber ? numberHint : nil
         for label in [partnerTitle] + (extraViews ?? []).map(\.title) + (isSplit ? [title] : []) {
             if label === lastPartTitle, let blocker, label.frame.maxX > blocker.frame.minX {
@@ -973,15 +961,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
         guard isSplit else {
             partEdges = []
-            // Its title, set aside while it showed a split's icons alone, back unless it's being renamed.
+            // Restore the title hidden for an icon-only split, unless it's being renamed.
             title.isHidden = renameField != nil
             audioButton.frame.origin = NSPoint(x: end - size.width, y: y)
             return
         }
-        // A split shows its pages in one row, a part of one width for each, in the order they're on screen, a
-        // hairline between: in each its icon where a tab's sits in its row, its title, faded where it's cut, and,
-        // while that page plays or is muted, its speaker at the part's end. Where the parts are too narrow for a few
-        // letters, each shows its icon alone in its middle.
+        // A split shows its pages in one row, equal parts in screen order with hairlines between: icon, faded title, and a
+        // speaker while playing or muted. Parts too narrow for a few letters show a centered icon only.
         let pieces: [(icon: FaviconView, title: Label, audio: IconButton)] = {
             let own = (icon, title, audioButton), other = (partnerIcon, partnerTitle, partnerAudioButton)
             let extras = (extraViews ?? []).prefix(extraCount).map { ($0.icon, $0.title, $0.audio) }
@@ -989,10 +975,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }()
         let lines = [divider] + (extraViews ?? []).prefix(extraCount).map(\.divider)
         let count = pieces.count
-        // The parts run to the row's end, and the close button (or the number while ⌘ is held) comes over the last
-        // one's faded title as it does over a tab's, so nothing moves as the pointer comes and goes or the row is
-        // chosen. The button's room is kept for good where it would cover too much: an icon alone, a speaker in the
-        // last part, or the last part's whole title, as in a narrow part (from the row's width, never its state).
+        // Parts run to the row's end and the close button (or ⌘ number) covers the last part's faded title, like a tab, so
+        // nothing shifts on hover or selection. Its room is reserved when it would cover too much (icon only, a speaker in
+        // the last part, or the whole title), decided by width, not state.
         let kept = bounds.width - edge - max(endSlot, size.width) - Self.buttonGap
         let side = icon.frame.width
         var titles = Self.segmentShowsTitle(width: bounds.width / CGFloat(count))
@@ -1014,8 +999,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let last = i == count - 1
             if titles {
                 icon.frame = NSRect(x: part.start + Self.inset, y: iconY, width: side, height: side)
-                // As far from the next part's hairline as the icon is from its own; the last part's title ends where a
-                // tab's does, or where the close button's kept room starts.
+                // Same gap from the next hairline as the icon has from its own; the last title ends where a tab's does or at the
+                // reserved close button room.
                 var textEnd = !last ? part.end - Self.inset + Label.inset : keepsRoom ? contentEnd : bounds.width - Self.inset + Label.inset
                 if !audio.isHidden {
                     let audioEnd = last ? contentEnd : part.end - Self.buttonEdge
@@ -1025,15 +1010,14 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 let x = icon.frame.maxX + Self.titleOffset
                 title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd - x), height: titleH)
             } else {
-                // Each icon in the middle of its part, as in a segmented control, the speaker after it while that
-                // page plays.
+                // Icons centered in their parts, like a segmented control, with the speaker after while playing.
                 let room = audio.isHidden ? side : side + Self.buttonGap + size.width
                 icon.frame = NSRect(x: round((part.start + part.end - room) / 2), y: iconY, width: side, height: side)
                 if !audio.isHidden { audio.frame.origin = NSPoint(x: icon.frame.maxX + Self.buttonGap, y: y) }
                 title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
             }
             title.isHidden = !titles || title === renaming
-            // A hairline on the line between this part and the one before, shorter than the row by a margin each end.
+            // Hairline between this part and the previous, inset from the row's ends.
             if i > 0, lines.indices.contains(i - 1) {
                 let line = NSRect(x: part.start - Tokens.Metric.hairline / 2, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
                 lines[i - 1].frame = backingAlignedRect(line, options: .alignAllEdgesNearest)
@@ -1042,11 +1026,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
     }
 
-    /// Whether the close button comes over the last part of a split's row, rather than having its room kept.
+    /// Whether the close button covers the last split part instead of reserving room.
     private var overlaysPartEnd = false
-    /// Whether a split's parts show their titles, or each its icon alone.
+    /// Whether split parts show titles or icons only.
     private var showsPartTitles = true
-    /// The title of the part at a split row's end, whose fade the close button can cut short.
+    /// The last split part's title, whose fade the close button shortens.
     private weak var lastPartTitle: Label?
 }
 
@@ -1086,8 +1070,8 @@ final class NewTabRowView: SidebarRowView {
     }
 }
 
-/// A folder of pinned pages: a chevron that turns as it opens, a folder, and its name. Click to open or close it;
-/// double-click to rename it. Pinned pages dropped on it go in. A group of tabs (#209) is drawn the same, among the tabs.
+/// A pinned folder: chevron, folder icon and name. Click toggles, double-click renames, pinned pages drop in. Tab groups
+/// (#209) use the same row.
 final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
     private let chevron = NSImageView()
     private let folderIcon = NSImageView()
@@ -1113,7 +1097,7 @@ final class FolderRowView: SidebarRowView, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// A group of tabs rather than a folder of pinned pages: it says so to VoiceOver and as it's renamed.
+    /// A tab group, not a folder; affects VoiceOver and rename text.
     private var isTabGroup = false
 
     func configure(name: String, open: Bool, count: Int, icon: String? = nil, tabGroup: Bool = false) {
@@ -1369,9 +1353,8 @@ final class SpaceHeaderView: InteractiveView {
     }
 }
 
-/// The quiet "Tabs" label above today's tabs, with generous room above it in place of a line. Clear sits at the end
-/// of this row, as in Arc, level with the label: apart from New Tab below and the pinned tabs above, which it leaves
-/// alone, and shown only while the pointer is over the list and there are tabs to clear.
+/// The "Tabs" label above today's tabs, with space above instead of a line. Clear sits at its end, as in Arc, shown only
+/// on hover over the list when there are tabs to clear.
 final class SeparatorRowView: NSView {
     private let label = Label(String(localized: "Tabs", comment: "The quiet label above today's tabs in the sidebar, below the pinned tabs."), font: Tokens.Font.sidebarLabel(), color: Tokens.Color.textTertiary)
     let clearButton = ClearTabsButton()
@@ -1393,7 +1376,7 @@ final class SeparatorRowView: NSView {
     /// With Full Keyboard Access on, Clear stays in the Tab order while there are tabs to clear, see-through until
     /// focus reaches it; otherwise it's hidden whenever it isn't shown.
     private var clearInTabOrder: Bool { NSApp.isFullKeyboardAccessEnabled && hasTabs }
-    /// With the pointer on Clear, or keyboard focus, the list shows what it would close (true) or stops (false).
+    /// Hover or focus on Clear previews what it would close (true) or stops (false).
     var onPreview: ((Bool) -> Void)?
     var isPreviewingClear: Bool { clearButton.isHovered || clearButton.hasKeyboardFocus }
     private func previewChanged() { onPreview?(isPreviewingClear) }
@@ -1440,7 +1423,7 @@ final class SeparatorRowView: NSView {
         // the icons and the space's name.
         let h = label.lineHeight
         let mid = bounds.height - Tokens.Space.x3
-        // Its capitals centered on `mid`, the line Clear's capsule is centered on, so the two read level.
+        // Center the caps on `mid`, Clear's capsule center.
         let capsY = mid - h / 2 - Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarLabel(), lineHeight: h)
         let scale = window?.backingScaleFactor ?? 2
         label.frame = NSRect(x: SidebarRowView.inset - Label.inset, y: (capsY * scale).rounded() / scale, width: label.inkWidth + Label.inset * 2, height: h)
@@ -1526,10 +1509,8 @@ final class ClearTabsButton: InteractiveView {
         stateDidChange(animated: false)
     }
 
-    /// What a click does now, and its tooltip says so: the tabs you haven't been using, then every tab but the one
-    /// you're on, then that one too. On a favorite or a pinned page none of the tabs is yours: it's all of them.
-    /// `pages` counts each page, a split's two included; `oneSplit` is what it closes being a single split view,
-    /// which is named as one.
+    /// What a click does now (also the tooltip): unused tabs, then all but the current one, then that too. On a favorite or
+    /// pinned page, it's all of them. `pages` counts each page (a split's two included); `oneSplit` names a single split.
     struct Step: Equatable {
         enum Kind: Equatable { case unused, others, all, last }
         var kind: Kind
@@ -1543,8 +1524,8 @@ final class ClearTabsButton: InteractiveView {
         }
     }
 
-    /// Clear's step for what it would close in a list: `listed`, the list's tabs; `groups`, the splits and tile
-    /// groups by page; `current`, the page you're on, which may not be among them (a favorite, a pinned page).
+    /// Clear's step for a list: `listed`, its tabs; `groups`, splits and tile groups by page; `current`, the current page,
+    /// which may not be listed (favorite, pinned page).
     nonisolated static func step(kind: TabManager.ClearKind, closing: Set<UUID>, current: UUID?, listed: Set<UUID>, groups: [[UUID]]) -> Step {
         let yoursListed = current.map { id in listed.contains(id) || groups.contains { $0.contains(id) && !listed.isDisjoint(with: $0) } } ?? false
         let oneSplit = closing.count > 1 && groups.contains { Set($0) == closing }

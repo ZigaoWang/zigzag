@@ -1,10 +1,9 @@
 import AppKit
 import WebKit
 
-/// One window's tabs, grouped by space. The tabs themselves are its store's (`TabStore`): the window's own, or, while
-/// Settings › Tabs has windows share a space's tabs (#162), every everyday window's; the space you're in, the tab chosen
-/// in each space and the order you went through them are always this window's own. Views read from it; they never own
-/// web views.
+/// One window's tabs by space. The tabs belong to its `TabStore`: the window's own, or shared by every everyday window
+/// when Settings › Tabs shares them (#162). Current space, selection per space and MRU order are per window. Views read
+/// from it; they never own web views.
 final class TabManager {
     enum Change {
         /// Tabs added, removed or moved, or bookmarks changed.
@@ -15,10 +14,9 @@ final class TabManager {
         case content
     }
 
-    /// The tabs this window shows: its own, or every everyday window's while they share them (#162).
+    /// Its own tabs, or every everyday window's while shared (#162).
     private(set) var store: TabStore
-    // What extensions are told of the tabs is worked out from these three (`extensionList`): any change starts it over,
-    // in every window showing them.
+    // Any change resets the cached extension tab lists (`extensionList`) in every window showing them.
     private(set) var tabsBySpace: [UUID: [Tab]] {
         get { store.tabsBySpace }
         _modify { yield &store.tabsBySpace; store.listsChanged() }
@@ -29,7 +27,7 @@ final class TabManager {
     }
     private var selectedBySpace: [UUID: UUID] = [:]
     private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll() } }
-    /// Most recently used first, in this window. Drives Control+Tab.
+    /// MRU order in this window, for Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
     private var closedTabs: [ClosedTab] {
         get { store.closedTabs }
@@ -40,17 +38,17 @@ final class TabManager {
         get { store.reopenedAs }
         _modify { yield &store.reopenedAs }
     }
-    /// How many closed tabs ⇧⌘T and ⌘Z can bring back (`TabStore.closedLimit`).
+    /// How many closed tabs ⇧⌘T and ⌘Z can reopen (`TabStore.closedLimit`).
     private var closedLimit: Int {
         get { store.closedLimit }
         set { store.closedLimit = newValue }
     }
-    /// The groups of tabs (#209), by id; which tabs are in each, the tabs say (`Tab.groupID`).
+    /// Tab groups (#209) by id; membership is on `Tab.groupID`.
     private(set) var groups: [UUID: TabGroup] {
         get { store.groups }
         _modify { yield &store.groups }
     }
-    /// Groups that went when their last tab closed or left, so ⌘Z or ⇧⌘T bringing a tab back brings its group too.
+    /// Groups removed with their last tab, so reopening the tab restores its group.
     private var emptiedGroups: [UUID: TabGroup] {
         get { store.emptiedGroups }
         _modify { yield &store.emptiedGroups }
@@ -58,7 +56,7 @@ final class TabManager {
 
     weak var host: TabHost? {
         didSet {
-            // Its own tabs: all of them, or, while other windows show them too (#162), those no window has yet.
+            // All its tabs, or with shared tabs (#162) those no window shows yet.
             let alone = store.managers.count <= 1
             allTabs.forEach { if alone || $0.host == nil { $0.host = host } }
         }
@@ -67,7 +65,7 @@ final class TabManager {
 
     private var libraryToken: SignalToken?
 
-    /// Watches a tab so navigation inside it gets saved for crash recovery (`TabStore.watch`).
+    /// Saves navigation for crash recovery (`TabStore.watch`).
     private func watch(_ tab: Tab) { store.watch(tab) }
     private var suspendTimer: Timer?
 
@@ -97,7 +95,7 @@ final class TabManager {
         var childIDs: [UUID] = []
         /// Whether the tabs under it were folded away, so they come back folded.
         var isCollapsed = false
-        /// The group of tabs it was in: brought back, it goes back in, the group with it if that went.
+        /// Its tab group; reopening restores it (and the group if it was removed).
         var groupID: UUID? = nil
     }
 
@@ -105,8 +103,7 @@ final class TabManager {
     var privateStore: WKWebsiteDataStore? { store.privateStore }
     var isPrivate: Bool { privateStore != nil }
 
-    /// `store`: the tabs other windows show, for a window that shows them too (#162); nil makes a store of its own.
-    /// A private window always has its own.
+    /// `store`: a shared store (#162); nil creates one. Private windows always get their own.
     init(spaceID: UUID? = nil, isPrivate: Bool = false, store: TabStore? = nil) {
         self.store = (isPrivate ? nil : store) ?? TabStore(isPrivate: isPrivate)
         let requested = spaceID.flatMap { Library.shared.space($0)?.id }
@@ -125,14 +122,14 @@ final class TabManager {
         suspendTimer?.tolerance = 10
     }
 
-    /// Set once the window is gone: it shows nothing any more.
+    /// Set once the window is closed.
     private(set) var isInvalidated = false
 
-    /// Whether this is the last window showing its tabs: closing it closes them.
+    /// True when no other window shows its tabs; closing it closes them.
     var isLastView: Bool { store.managers.allSatisfy { $0 === self } }
 
-    /// The window closes. The last window of a store closes its tabs; one of several sharing them (#162) leaves them
-    /// to the windows still open, its pages free for them to show and its tabs' links opening there.
+    /// The window closes. The last window of a store closes its tabs; with shared tabs (#162) they stay with the other
+    /// windows, which can now show its pages and get its tabs' links.
     func invalidate() {
         guard !isInvalidated else { return }
         suspendTimer?.invalidate()
@@ -150,7 +147,7 @@ final class TabManager {
             if tab.shownBy === self { tab.shownBy = nil; released.append(tab) }
             if tab.host == nil || tab.host === host { Self.rehost(tab, to: heir.host) }
         }
-        // A page shown here and waiting in another window comes on screen there.
+        // Pages waiting in another window show there now.
         for other in others {
             other.listChanged()
             if released.contains(where: other.isShowing) { other.pageTaken() }
@@ -159,18 +156,17 @@ final class TabManager {
 
     // MARK: Windows sharing their tabs
 
-    /// Set while this window hears of a change another made, so it isn't sent back.
+    /// Set while applying another window's change, so it isn't relayed back.
     private var isRelaying = false
 
-    /// The pages on screen here, as last drawn: a change elsewhere draws the page again only if it changes them.
+    /// Pages on screen at the last draw; another window's change redraws only if they differ.
     private var shownLastTime: [UUID] = []
     private var shownSignature: [UUID] {
         guard let tab = selectedTab else { return [] }
         return [tab.id] + (split(for: tab)?.ids ?? [])
     }
 
-    /// The tab you're on (with the pages beside it) changed. A page this window no longer shows, waiting in another
-    /// window that shares the tabs: it comes on screen there now.
+    /// Selection changed. Pages this window stopped showing appear in any shared window waiting for them.
     private func selectionChanged() {
         let before = shownLastTime
         shownLastTime = shownSignature
@@ -183,8 +179,8 @@ final class TabManager {
         }
     }
 
-    /// Another window changed the tabs: the tab chosen here in a space that lost it is another, and the list (and the
-    /// page, if what's on screen here changed) is drawn again.
+    /// Another window changed the tabs: fix selections that lost their tab and redraw the list (and the page if it
+    /// changed).
     func listChanged() {
         guard !isInvalidated else { return }
         isRelaying = true
@@ -195,8 +191,8 @@ final class TabManager {
         if shownSignature != shownLastTime { selectionChanged() }
     }
 
-    /// Every space's chosen tab still in it: one closed elsewhere, or moved to another space, is replaced by the tab
-    /// you were on before it there (one no other window shows, if there is one), else the first, else none.
+    /// Replaces each space's selection that was closed or moved elsewhere with the previous tab there (preferring one
+    /// no other window shows), else the first, else none.
     private func settleSelection() {
         for (space, id) in selectedBySpace {
             if let tab = tab(with: id), tab.isFavorite || tab.spaceID == space { continue }
@@ -207,37 +203,36 @@ final class TabManager {
         }
     }
 
-    /// Whether this window has the tab's page on screen now: the tab it's on, or a page beside it.
+    /// Whether this window shows the tab's page now (selected or beside it).
     func isShowing(_ tab: Tab) -> Bool {
         guard !isInvalidated, let selected = selectedTab else { return false }
         return selected === tab || panes(of: selected).contains { $0 === tab }
     }
 
-    /// The pages this window has on screen now.
+    /// Pages on screen in this window.
     var allTabsShownNow: [Tab] { selectedTab.map(panes(of:)) ?? [] }
 
-    /// Whether this window has the tab chosen in any space, on screen or not.
+    /// Whether the tab is selected in any space here.
     func hasChosen(_ tab: Tab) -> Bool { selectedBySpace.values.contains(tab.id) }
 
-    /// Another window sharing the tabs has this page on screen: here it shows that, and offers to show it here instead.
+    /// Another sharing window shows this page; this one shows a placeholder offering to bring it here.
     func isShownElsewhere(_ tab: Tab) -> Bool { store.isShared && store.isShownElsewhere(tab, than: self) }
 
-    /// This window puts these pages on screen, taking them from a window that had them. Returns the windows to tell
-    /// once the pages are here: they show the pages are in this window now.
+    /// Takes these pages from the window showing them. Returns the windows to notify once they're here.
     private func claim(_ pages: [Tab]) -> [TabManager] {
         var losers: [TabManager] = []
         for page in pages {
             if let owner = page.shownBy, owner !== self, owner.isShowing(page), !losers.contains(where: { $0 === owner }) { losers.append(owner) }
             own(page)
         }
-        // A video playing in another window's mini player: that window lets it go.
+        // Another window's mini player releases the video.
         if store.isShared, pages.contains(where: \.isInMiniPlayer) {
             for other in store.managers where other !== self && !losers.contains(where: { $0 === other }) { losers.append(other) }
         }
         return losers
     }
 
-    /// Before the window draws a page: whether it may. It takes the page if no other window has it on screen.
+    /// Called before drawing a page; takes it if no other window shows it.
     func mayShow(_ page: Tab) -> Bool {
         guard !isShownElsewhere(page) else { return false }
         own(page)
@@ -249,8 +244,7 @@ final class TabManager {
         Self.rehost(page, to: host)
     }
 
-    /// A tab goes to another window's keeping (it's shown there, or its window closed): its links open there now, and
-    /// extensions hear that it moved.
+    /// Moves a tab to another window: its links open there and extensions are told.
     private static func rehost(_ tab: Tab, to host: TabHost?) {
         guard let host, tab.host !== host else { return }
         let old = tab.host as? BrowserWindowController
@@ -262,15 +256,15 @@ final class TabManager {
         }
     }
 
-    /// Another window took a page this one had on screen.
+    /// Another window took a page shown here.
     private func pageTaken() {
         isRelaying = true
         defer { isRelaying = false }
         selectionChanged()
     }
 
-    /// A window opened beside this one, sharing its tabs: it starts on the tabs this one chose in the other spaces,
-    /// and in the space it opens on, on none (for a new tab or the command bar).
+    /// A new sharing window starts with this one's selections in other spaces and none in its own space (for a new tab
+    /// or the command bar).
     func startSelection(from other: TabManager) {
         guard other.store === store, other !== self else { return }
         selectedBySpace = other.selectedBySpace
@@ -278,9 +272,8 @@ final class TabManager {
         recentTabIDs = other.recentTabIDs
     }
 
-    /// This window's page went to another window sharing the tabs (Move to New Window, a tab dragged out): it goes on
-    /// to the tab you were on before here, one no other window shows if there is one, as if the tab had closed. The
-    /// tab stays open.
+    /// The page moved to another sharing window (Move to New Window, drag out): select the previous tab here,
+    /// preferring one no other window shows, as if closed. The tab stays open.
     func moveOn(from tab: Tab) {
         guard let selected = selectedTab, isShowing(tab) else { return }
         let space = selected.spaceID
@@ -295,7 +288,7 @@ final class TabManager {
         }
     }
 
-    /// Settings › Tabs turned sharing on or off (`TabStore.share`, `unshare`): this window shows `store`'s tabs now.
+    /// Sharing turned on or off in Settings › Tabs (`TabStore.share`, `unshare`); now shows `store`'s tabs.
     func adopt(store new: TabStore) {
         guard new !== store else { return }
         store.detach(self)
@@ -303,13 +296,13 @@ final class TabManager {
         new.attach(self)
     }
 
-    /// The store changed under this window: what it chose that it no longer has is another, and it's drawn again.
+    /// The store changed: fix selections it no longer has and redraw.
     func storeChanged() {
         isRelaying = true
         defer { isRelaying = false }
         extensionLists.removeAll()
         recentTabIDs = recentTabIDs.filter { tab(with: $0) != nil }
-        // A nested tab whose parent went to another window comes to the top level.
+        // Nested tabs whose parent moved to another window move to the top level.
         for space in Array(tabsBySpace.keys) { repairTree(in: space) }
         settleSelection()
         settleGroups()
@@ -358,8 +351,8 @@ final class TabManager {
 
     func bookmarkTab(for bookmarkID: UUID) -> Tab? { bookmarkTabs[bookmarkID] }
 
-    /// Tabs in most-recently-used order across all spaces: as this window went through them, then, while windows
-    /// share their tabs (#162), those it hasn't been on (opened in another window), most recently looked at first.
+    /// MRU across spaces: this window's order, then with shared tabs (#162) tabs opened elsewhere, most recently viewed
+    /// first.
     var recentTabs: [Tab] {
         // One pass to index the tabs, not a search for each id.
         let tabs = allTabs
@@ -465,8 +458,8 @@ final class TabManager {
     private var placedBeside: PlacedBeside?
     private struct PlacedBeside { weak var anchor: Tab?; weak var last: Tab? }
 
-    /// `httpFallback`: `url` is https chosen for an address given without a scheme, tried over http if it can't be
-    /// reached (`CommandRanker.Destination`).
+    /// `httpFallback`: `url` is https for a scheme-less address; retried over http if unreachable
+    /// (`CommandRanker.Destination`).
     @discardableResult
     func newTab(url: URL?, spaceID: UUID? = nil, select: Bool = true, configuration: WKWebViewConfiguration? = nil,
                 opener: Tab? = nil, title: String? = nil, site: URL? = nil, by sender: Tab.LoadSender = .zigzag,
@@ -487,8 +480,7 @@ final class TabManager {
         let place = newTabPlacement(in: space, opener: opener, select: select, site: url ?? site)
         tab.parentID = place.parent
         tabsBySpace[space, default: []].insert(tab, at: place.index)
-        // Opened from a tab in a group, just after the group's last tab: it's in the group too. Among the group's
-        // tabs, or under one of them, it is anyway.
+        // Opened from a grouped tab right after the group's last tab: join the group. Inside the group it joins anyway.
         let anchor = opener ?? (space == currentSpaceID ? selectedTab : nil)
         if let group = anchor?.groupID, anchor?.spaceID == space, place.index > 0, tabs(in: space)[place.index - 1].groupID == group {
             tab.groupID = group
@@ -523,7 +515,7 @@ final class TabManager {
         let childIDs: [UUID]
         /// The split or tile group it was in.
         let split: SplitPair?
-        /// The group of tabs it was in.
+        /// Its tab group.
         var groupID: UUID? = nil
     }
 
@@ -654,7 +646,7 @@ final class TabManager {
     }
 
     func restoreSelection(_ selection: [UUID: UUID], currentSpaceID: UUID) {
-        // Only tabs it has (a window sharing tabs with others chose among theirs, #162).
+        // Only tabs it has (a shared window chose among others', #162).
         selectedBySpace = selection.filter { tab(with: $0.value) != nil }
         if Library.shared.space(currentSpaceID) != nil { self.currentSpaceID = currentSpaceID }
         if let tab = selectedTab { promote(tab) }
@@ -665,9 +657,8 @@ final class TabManager {
 
     // MARK: Selecting
 
-    /// `claiming`: its page comes on screen here even if another window sharing the tabs shows it (#162), which then
-    /// shows it's here now. Without, for a tab chosen for you (the one you were on before the tab you closed), a page
-    /// another window shows stays there, and this window says so.
+    /// `claiming`: show the page here even if another sharing window shows it (#162). Without it (an automatic
+    /// selection after closing), the page stays there and this window shows a placeholder.
     func select(_ tab: Tab, claiming: Bool = true) {
         // A tab closed since (one an old undo step or a stale button still points at) never comes back from here.
         guard !tab.isClosed else { return }
@@ -702,7 +693,7 @@ final class TabManager {
         tab.shown()
         if #available(macOS 15.4, *), previous !== tab { ExtensionCenter.tabActivated(tab, previous: previous) }
         selectionChanged()
-        // After the pages are here, so a window that loses one finds it gone from its own cards.
+        // After the pages arrive, so the losing window sees them gone.
         for loser in losers { loser.pageTaken() }
     }
 
@@ -738,16 +729,13 @@ final class TabManager {
         return favoriteLive + bookmarkLive + currentTabs
     }
 
-    /// The navigable tabs one set of extensions sees, and each one's place among them, for `tabs(for:)` and
-    /// `indexInWindow`: WebKit asks for them with every message an extension sends from a page, and of every tab each
-    /// time an extension lists tabs, and each answer went through the whole list again (#89). Worked out once and kept
-    /// until anything here or in the library changes, or `extensionListLifetime` passes: a loop of messages (thousands
-    /// a second) asked each time.
+    /// Cached navigable tabs per extension set, and their indexes, for `tabs(for:)` and `indexInWindow`. WebKit asks on
+    /// every extension message and tab query, and rebuilding each time was slow (#89). Kept until anything here or in
+    /// the library changes, or `extensionListLifetime` passes.
     private var extensionLists: [ObjectIdentifier: (tabs: [Tab], places: [ObjectIdentifier: Int])] = [:]
     private var extensionListsMade: TimeInterval = 0
     private var placesToken: SignalToken?
-    /// How long a worked-out list stands with no change heard: a backstop for one that isn't announced, short enough
-    /// that an extension never sees an old order for long.
+    /// Max cache age without a change notice: a backstop for unannounced changes.
     static let extensionListLifetime: TimeInterval = 1
 
     private func extensionList(seenBy key: ObjectIdentifier, isSeen: (Tab) -> Bool) -> (tabs: [Tab], places: [ObjectIdentifier: Int]) {
@@ -898,35 +886,31 @@ final class TabManager {
         selectionChanged()
     }
 
-    /// What Clear closes in a space and why. `unused`: the tabs you've drifted away from, keeping the ones you're
-    /// working with now; once there are none, `others`: every tab but the one you're on (and the pages beside it in a
-    /// split or tile group); once those are all that's left, `last`: them too, leaving the space empty.
+    /// What Clear closes in a space. `unused`: tabs not used lately, keeping the current working set; then `others`:
+    /// all but the current tab (and its split or tile group); then `last`: those too, emptying the space.
     ///
-    /// A split or tile group is one unit throughout: its age is its newest page's, and it's kept or closed whole,
-    /// never in part. So is a tab with the tabs nested under it while Clear looks for what you've drifted away from:
-    /// a nest you've used any of lately stays, folded tabs and all, and one you've left alone goes together. Every
-    /// tab but yours means just that, nests included: the tabs nested with yours go then too. Never a unit with a
-    /// tab playing sound or in a call, nor one with a pinned page in it (a pinned page beside a tab): pinned pages
-    /// are bookmarks, and Clear leaves them alone.
+    /// Splits, tile groups and nests (while finding unused tabs) are one unit: aged by their newest page, kept or
+    /// closed whole. `others` includes nests with yours. Units with audio, a call, or a pinned page are never closed:
+    /// pinned pages are bookmarks.
     enum ClearKind { case unused, others, last }
 
     func tabsToClear(in spaceID: UUID, now: Date = Date()) -> (tabs: [Tab], kind: ClearKind) {
         let tabs = self.tabs(in: spaceID)
         let current = selectedTab(in: spaceID)
         let ids = Set(tabs.map(\.id))
-        // Every split or group with a page in this list, a pinned page beside a tab and all.
+        // Splits and groups with a page here, including those with a pinned page.
         let groups = splits.filter { !ids.isDisjoint(with: $0.ids) }.map(\.ids)
         let nested = Dictionary(tabs.compactMap { tab in tab.parentID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a })
-        // A group of tabs (#209) is kept or closed as one, as a nest is.
+        // Tab groups (#209) are kept or closed whole, like nests.
         let parents = TabGroups.clearParents(nested, nodes: treeNodes(in: spaceID), groups: groupIDs(in: spaceID))
-        // What another window sharing the tabs has on screen stays too: it's in use there (#162).
+        // Pages another sharing window shows are in use (#162).
         let busy = Set(tabs.filter { $0.isPlayingAudio || $0.isInUse || isShownElsewhere($0) }.map(\.id))
         let ages = Dictionary(tabs.map { ($0.id, now.timeIntervalSince($0.lastActivated)) }, uniquingKeysWith: { a, _ in a })
         let (closing, kind) = Self.clearing(tabs.map(\.id), current: current?.id, groups: groups, parents: parents, busy: busy, ages: ages)
         return (tabs.filter { closing.contains($0.id) }, kind)
     }
 
-    /// Clear's choice, by id, for a lone tab or a split of two (`partner`, beside `current`).
+    /// Clear's choice by id, for a lone tab or a two-page split (`partner` beside `current`).
     nonisolated static func clearing(_ tabs: [UUID], current: UUID?, partner: UUID?, busy: Set<UUID>,
                                      ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
         clearing(tabs, current: current, partners: partner.map { [$0] } ?? [], busy: busy, ages: ages)
@@ -939,23 +923,21 @@ final class TabManager {
         return clearing(tabs, current: current, groups: groups, parents: [:], busy: busy, ages: ages)
     }
 
-    /// Clear's choice, by id. `groups`: the splits and tile groups, each page by id, any of them not among `tabs` (a
-    /// pinned page) holding the rest open. `parents`: the tab each nested tab sits under. While other tabs are left,
-    /// even only busy ones, yours stay.
+    /// Clear's choice by id. `groups`: splits and tile groups by page id; a member not in `tabs` (pinned) keeps the
+    /// rest open. `parents`: each nested tab's parent. While other tabs remain, even busy ones, yours stay.
     nonisolated static func clearing(_ tabs: [UUID], current: UUID?, groups: [[UUID]], parents: [UUID: UUID],
                                      busy: Set<UUID>, ages: [UUID: TimeInterval]) -> (ids: Set<UUID>, kind: ClearKind) {
         let listed = Set(tabs)
         let pinnedIn = groups.filter { !$0.allSatisfy(listed.contains) }.flatMap { $0 }
-        // A unit stays whole while any page of it plays, is in a call, or sits beside a pinned page.
+        // A unit stays while any page plays, is in a call or is beside a pinned page.
         let held = { (unit: [UUID]) in unit.contains { busy.contains($0) || pinnedIn.contains($0) } }
-        // Yours: the tab you're on and every page on screen with it.
+        // The current tab and every page on screen with it.
         let yours = Set(current.map { id in groups.first { $0.contains(id) } ?? [id] } ?? [])
         let isYours = { (unit: [UUID]) in unit.contains(where: yours.contains) }
         let inGroups = units(tabs, groups: groups, parents: [:])
         let others = inGroups.filter { !isYours($0) }
         guard !others.isEmpty else { return (Set(inGroups.filter { !held($0) }.joined()), .last) }
-        // What you've drifted away from: whole nests, newest first by their newest tab, past the break in how long
-        // ago they were seen. The nest yours is in is yours here.
+        // Unused: whole nests, newest first by their newest tab, past the activity break. Your nest counts as yours.
         let age = { (unit: [UUID]) in unit.map { ages[$0, default: 0] }.min() ?? 0 }
         let nests = units(tabs, groups: groups, parents: parents).filter { !isYours($0) && !held($0) }
         let newestFirst = nests.sorted { age($0) < age($1) }
@@ -964,8 +946,8 @@ final class TabManager {
         return (Set(others.filter { !held($0) }.joined()), .others)
     }
 
-    /// The tabs Clear keeps or closes as one, in list order: each split or group's pages together, and with
-    /// `parents`, each tab with the tabs nested under it. Pages not among `tabs` (pinned ones) are left out.
+    /// Units Clear treats as one, in list order: each split or group, and with `parents` each tab with its nested tabs.
+    /// Pages not in `tabs` (pinned) are left out.
     nonisolated static func units(_ tabs: [UUID], groups: [[UUID]], parents: [UUID: UUID]) -> [[UUID]] {
         var root = Dictionary(tabs.map { ($0, $0) }, uniquingKeysWith: { a, _ in a })
         func find(_ id: UUID) -> UUID {
@@ -993,16 +975,10 @@ final class TabManager {
         return order.map { members[$0] ?? [] }
     }
 
-    /// How many tabs to keep as the ones you're working with now, given how long ago each was last looked at (or
-    /// opened, for one never looked at), newest first. People work in bursts: the tabs of what you're doing now were
-    /// all seen within a short while of each other, and the rest much longer ago. That break shows as the biggest
-    /// jump in age from one tab to the next, measured as a ratio, so 15 minutes against 45 counts as much as 1 hour
-    /// against 3. What counts as "a short while" follows your own pace rather than a fixed time: ages closer together
-    /// than an eighth of the span looked at count as equal, so after hours away a few minutes between tabs is never a
-    /// break, while in a quick session a quarter of an hour can be. Anything seen in the last ten minutes counts as
-    /// now, so a tab you left a few minutes ago is never one you "haven't used in a while", however quick you are.
-    /// The break is looked for among the newest dozen, since no one works with more at once; a jump of less than 3
-    /// times is just steady browsing, with no break, and then the newest five stay.
+    /// How many tabs to keep as the working set, given ages since last viewed (or opened), newest first. The break is
+    /// the biggest ratio jump between neighbors (15m vs 45m equals 1h vs 3h). Ages within an eighth of the span count
+    /// as equal, so the threshold scales with the session. Anything under ten minutes counts as now. Only the newest
+    /// dozen are checked; a jump under 3x means no break, and the newest five stay.
     nonisolated static func keptByActivity(_ ages: [TimeInterval]) -> Int {
         let clearJump = 3.0, mostAtOnce = 12, keptWithoutBreak = 5
         guard let span = ages.prefix(mostAtOnce + 1).last else { return 0 }
@@ -1046,7 +1022,7 @@ final class TabManager {
 
     private func libraryDidChange() {
         guard !isInvalidated else { return }
-        // Every window hears the library change for itself: nothing here is sent on to the others sharing the tabs.
+        // Each window handles library changes itself; nothing is relayed.
         isRelaying = true
         defer { isRelaying = false }
         let spaceIDs = Set(Library.shared.spaces.map(\.id))
@@ -1089,10 +1065,9 @@ final class TabManager {
             changed.send(.space)
             selectionChanged()
         }
-        // A space put on another profile takes its open pages there. Not a favorite that was open in it: that
-        // stays its own profile's, in another of that profile's spaces, and the space shows a page of its own.
-        // (While windows share their tabs, each hears the change: whichever comes first moves them, and each looks
-        // again at what it has chosen.)
+        // A space moved to another profile takes its open pages. Favorites stay in their profile, in another of its
+        // spaces. (With shared tabs each window gets the change; the first moves them and each re-checks its
+        // selection.)
         var reselected = false
         let favorites = Dictionary(bookmarkTabs.values.filter(\.isFavorite).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for (space, id) in selectedBySpace {
@@ -1151,12 +1126,53 @@ final class TabManager {
         return tab
     }
 
+    /// Whether pinning pins the whole group (#209): every page has an address.
+    func pinsGroup(_ tab: Tab) -> Bool {
+        guard tab.bookmarkID == nil, let groupID = tab.groupID, group(groupID) != nil else { return false }
+        let members = tabs(inGroup: groupID)
+        return !members.isEmpty && members.allSatisfy { $0.url != nil }
+    }
+
     /// Turns a tab into a bookmark at the given position. Its page stays open behind the bookmark. Half of a split
     /// pins the pair, and a page of a tile group the whole group (#203): every page, side by side as it is, still
     /// open together.
-    func bookmarkTab(_ tab: Tab, at index: Int? = nil, in spaceID: UUID? = nil) {
+    func bookmarkTab(_ tab: Tab, at index: Int? = nil, in spaceID: UUID? = nil, keepingGroup: Bool = true) {
         guard tab.bookmarkID == nil, let url = tab.url else { return }
         let space = spaceID ?? tab.spaceID
+        // A tab group (#209) pins as one named folder, splits kept.
+        if keepingGroup, pinsGroup(tab), let groupID = tab.groupID, let group = group(groupID) {
+            let members = tabs(inGroup: groupID)
+            let memberIDs = Set(members.map(\.id))
+            // Split pages in order, as a pinned split stores them.
+            var ordered: [Tab] = []
+            var placed: Set<UUID> = []
+            var pairs: [SplitPair] = []
+            for page in members where !placed.contains(page.id) {
+                if let pair = split(for: page), pair.ids.allSatisfy(memberIDs.contains) {
+                    pairs.append(pair)
+                    for id in pair.ids { if let half = self.tab(with: id), placed.insert(id).inserted { ordered.append(half) } }
+                } else {
+                    placed.insert(page.id)
+                    ordered.append(page)
+                }
+            }
+            var markIDs: [UUID: UUID] = [:]
+            let marks = ordered.map { page in
+                let url = page.url ?? url
+                let mark = Bookmark(url: url, title: Self.bookmarkTitle(page.displayTitle, url: url), icon: page.customIcon)
+                removeFromList(page)
+                page.bookmarkID = mark.id
+                page.settleLandingIfLoading()
+                page.setSpace(space)
+                bookmarkTabs[mark.id] = page
+                markIDs[page.id] = mark.id
+                return mark
+            }
+            let layouts = pairs.compactMap { pair in PinnedSplit(pair.ids.compactMap { markIDs[$0] }, as: pair) }
+            Library.shared.addPinnedGroup(marks, splits: layouts, named: group.name, group: groupID, isOpen: group.isOpen, to: space, at: index)
+            structureChanged()
+            return
+        }
         if let pair = split(for: tab), case let pages = pair.ids.compactMap({ self.tab(with: $0) }), pages.count == pair.count,
            pages.allSatisfy({ $0.bookmarkID == nil && $0.url != nil }) {
             let marks = pages.map { page in
@@ -1219,6 +1235,7 @@ final class TabManager {
     func unbookmark(_ bookmarkID: UUID, toIndex index: Int? = nil, in spaceID: UUID? = nil, under parent: UUID? = nil, group: UUID? = nil) -> Tab? {
         let isFavorite = Library.shared.isFavorite(bookmarkID)
         let space = (isFavorite ? spaceID : nil) ?? Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID
+        if let group = Library.shared.pinnedGroup(containing: bookmarkID) { return unpin(group, returning: bookmarkID, toIndex: index, in: space) }
         if let pinned = Library.shared.pinnedSplit(containing: bookmarkID) { return unpin(pinned, returning: bookmarkID, toIndex: index, in: space) }
         if isFavorite {
             bookmarkTabs[bookmarkID]?.setSpace(space)
@@ -1287,6 +1304,53 @@ final class TabManager {
         // A pinned split that was on screen stays there, now as tabs.
         if halves.contains(where: { $0.tab === selectedTab }) { selectionChanged() }
         return halves.first { $0.id == bookmarkID }?.tab
+    }
+
+    /// Unpins a pinned group (#209) back into a tab group, with its folder's name and fold state.
+    private func unpin(_ folder: BookmarkFolder, returning bookmarkID: UUID, toIndex index: Int?, in space: UUID) -> Tab? {
+        let ids = Library.shared.allBookmarkIDs(inFolder: folder.id)
+        var pages: [(id: UUID, tab: Tab)] = []
+        for id in ids {
+            let icon = Library.shared.bookmark(id)?.icon
+            if let tab = bookmarkTabs[id] {
+                bookmarkTabs[id] = nil
+                tab.customIcon = icon
+                tab.bookmarkID = nil
+                tab.isFavorite = false
+                tab.setSpace(space)
+                pages.append((id, tab))
+            } else if let bookmark = Library.shared.bookmark(id) {
+                let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)
+                tab.customIcon = icon
+                tab.host = host
+                watch(tab)
+                pages.append((id, tab))
+            }
+        }
+        let at = min(index ?? 0, tabsBySpace[space]?.count ?? 0)
+        let parent = TabTree.parentForInsertion(at: at, in: treeNodes(in: space))
+        // Restore the original group with the folder's name and fold state.
+        let groupID = folder.groupID
+        if let groupID { groups[groupID] = TabGroup(id: groupID, name: folder.name, isOpen: folder.isOpen) }
+        pages.forEach {
+            $0.tab.parentID = parent
+            $0.tab.groupID = groupID
+        }
+        tabsBySpace[space, default: []].insert(contentsOf: pages.map(\.tab), at: at)
+        // Reopen pinned splits side by side.
+        let tabsByMark = Dictionary(pages.map { ($0.id, $0.tab) }, uniquingKeysWith: { a, _ in a })
+        for pinned in Library.shared.pinnedSplits(in: space) where pinned.ids.allSatisfy({ tabsByMark[$0] != nil }) {
+            let halves = pinned.ids.compactMap { tabsByMark[$0] }
+            guard let pair = pinned.pair(of: halves.map(\.id)) else { continue }
+            halves.forEach { unsplit($0, notify: false) }
+            splits.append(pair)
+        }
+        Library.shared.removeBookmarks(ids)
+        Library.shared.removeFolder(folder.id)
+        structureChanged()
+        // If the pinned group was on screen, keep it there as the tab group.
+        if pages.contains(where: { $0.tab === selectedTab }) { selectionChanged() }
+        return pages.first { $0.id == bookmarkID }?.tab
     }
 
     /// True when a pinned tab has moved on from its pinned page.
@@ -1438,10 +1502,8 @@ final class TabManager {
         return close(tabs)
     }
 
-    /// Where you land after closing the tab you were on: the page it was opened from, else the tab you were on before
-    /// it in this space (as a browser's Back would), else its neighbor in the list. While windows share their tabs
-    /// (#162), one another window has on screen stays there: a tab it isn't showing comes first, and if there's none,
-    /// this window says where that one is.
+    /// After closing the current tab: its opener, else the previous tab in this space, else its list neighbor. With
+    /// shared tabs (#162), prefer one no other window shows; if none, show a placeholder for it.
     private func selectAfterClosing(_ closed: Tab, index: Int) {
         let list = tabs(in: closed.spaceID)
         let recent = recentTabs
@@ -1463,8 +1525,7 @@ final class TabManager {
 
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
 
-    /// The tabs closed in this window that had a page, newest first, for History › Recently Closed; each comes back
-    /// with `reopenClosedTab(id)`.
+    /// Closed tabs with a page, newest first, for History › Recently Closed; reopen with `reopenClosedTab(id)`.
     var recentlyClosedTabs: [(id: UUID, url: URL, title: String)] {
         closedTabs.reversed().compactMap { closed in closed.url.map { (closed.id, $0, closed.customTitle ?? closed.title) } }
     }
@@ -1489,7 +1550,7 @@ final class TabManager {
                                         children: Set(closed.childIDs.map(reopenedID)), in: treeNodes(in: space))
         tabsBySpace[space, default: []].insert(tab, at: at)
         applyTree(nodes, in: space)
-        // Back in its group, which comes back too if it went when the tab closed.
+        // Back in its group, restoring the group if it was removed.
         tab.groupID = space == closed.spaceID ? closed.groupID.flatMap(regroup) : nil
         // A reopened tab is a new tab: its partner, closed with it and back first, is found by the id it had.
         reopenedAs[closed.id] = tab.id
@@ -1553,11 +1614,10 @@ final class TabManager {
         case under(UUID?)
     }
 
-    /// Within its list, a tab moves with every tab nested under it. `index` counts the list without the tab alone,
-    /// as before nesting; a place among its own nested tabs lands just after them. Into another space it goes on its
-    /// own, and the tabs under it stay behind, a level up.
-    /// What a move does with a tab's group (#209): `fit` keeps it in its group if it lands beside the group's tabs, else
-    /// it's in the group it lands among, if any; `into` puts it in that group (nil: none), as a drop says.
+    /// A tab moves with its nested tabs. `index` counts the list without them; a spot among its own nested tabs means
+    /// just after them. To another space it moves alone and its nested tabs move up a level.
+    /// How a move treats a tab's group (#209): `fit` keeps it if it lands beside the group, else joins the group it
+    /// lands in; `into` puts it in that group (nil: none).
     enum Grouping: Equatable {
         case fit
         case into(UUID?)
@@ -1565,7 +1625,7 @@ final class TabManager {
 
     func move(_ tab: Tab, to index: Int, in spaceID: UUID? = nil, nesting: Nesting = .fit, grouping: Grouping = .fit) {
         guard tab.bookmarkID == nil else { return }
-        // Into another space, a tab leaves its group, unless it's put in one there.
+        // Moving to another space leaves the group unless one is given.
         let joining: UUID? = if case .into(let group) = grouping { group } else { nil }
         let target = spaceID ?? tab.spaceID
         // A split of two tabs (or a tile group of more) goes to another space as one, still side by side.
@@ -1609,7 +1669,7 @@ final class TabManager {
             switch grouping {
             case .into(let group): tab.groupID = group
             case .fit:
-                // Still beside its group's tabs, it stays in the group; anywhere else it leaves it.
+                // Stays in the group if still beside its tabs, else leaves it.
                 let list = tabs(in: target)
                 if let group = tab.groupID, let start = list.firstIndex(where: { $0 === tab }) {
                     let end = TabTree.subtreeEnd(at: start, in: treeNodes(in: target))
@@ -1697,7 +1757,7 @@ final class TabManager {
         }
     }
 
-    /// The splits and tile groups: rows of the list, so every window sharing it has them too.
+    /// Splits and tile groups, stored as list rows so sharing windows see them too.
     private(set) var splits: [SplitPair] {
         get { store.splits }
         _modify { yield &store.splits }
@@ -1739,8 +1799,8 @@ final class TabManager {
         return tab.bookmarkID == nil && panes.count == pair.count && panes.allSatisfy { $0.bookmarkID == nil && $0.spaceID == current.spaceID }
     }
 
-    /// How `tab` joins the split `target` is in, dropped on that split's row in the sidebar (`onRight`: the row's
-    /// right half); nil when it can't (not in a split, the split full, or a page that can't tile in).
+    /// How `tab` joins `target`'s split when dropped on its sidebar row (`onRight`: right half); nil if not a split,
+    /// full, or the page can't tile.
     func joining(_ tab: Tab, onto target: Tab, onRight: Bool) -> TileDrop.Kind? {
         guard let pair = split(for: target), canTile(tab, beside: target) else { return nil }
         return TileShape.joining(pair.shape.regions, onRight: onRight)
@@ -1966,7 +2026,7 @@ final class TabManager {
 
     /// The splits and groups a session saved, those whose pages all came back and may still be side by side.
     func restoreSplits(_ pairs: [SplitPair]) {
-        // Those of another window sharing the tabs (#162) stay as they are.
+        // Leave other sharing windows' splits alone (#162).
         var placed = Set(splits.flatMap(\.ids))
         splits += pairs.filter { pair in
             let pages = pair.ids.compactMap { tab(with: $0) }
@@ -1991,11 +2051,11 @@ final class TabManager {
         fileprivate var selected: [UUID: UUID]
         /// Which tab each nested tab is under.
         fileprivate var parents: [UUID: UUID] = [:]
-        /// Which group each tab in one is in, and the groups (#209).
+        /// Group per grouped tab, and the groups (#209).
         fileprivate var groupOf: [UUID: UUID] = [:]
         fileprivate var groups: [UUID: TabGroup] = [:]
 
-        /// The groups' names, the ones tabs here are in: renaming one is a change, folding it isn't.
+        /// Names of the groups in use: a rename counts as a change, folding doesn't.
         fileprivate var groupNames: [UUID: String] { Dictionary(Set(groupOf.values).map { ($0, groups[$0]?.name ?? "") }, uniquingKeysWith: { a, _ in a }) }
 
         /// The same tabs in the same places, whatever else opened since; selection and split sizes don't count.
@@ -2052,7 +2112,7 @@ final class TabManager {
             tab.parentID = tab.bookmarkID == nil ? target.parents[id] : nil
             tab.groupID = tab.bookmarkID == nil ? target.groupOf[id] : nil
         }
-        // The groups as they were, folded as they are now; the ones of tabs opened since stay.
+        // Restore groups as saved but with current fold state; groups of newer tabs stay.
         var restored = target.groups
         for (id, group) in groups { if restored[id] != nil { restored[id]?.isOpen = group.isOpen } else { restored[id] = group } }
         groups = restored
@@ -2146,12 +2206,12 @@ final class TabManager {
 
     // MARK: Groups of tabs
 
-    /// Tabs were added, removed or moved: each group is put right (one run of its space's list, see `TabGroups`), a
-    /// group left with no tabs goes, and then everything watching hears it.
+    /// Tabs were added, removed or moved: normalize each group to one run (`TabGroups`), drop empty groups, then
+    /// notify.
     func structureChanged() {
         settleGroups()
         changed.send(.structure)
-        // Windows sharing these tabs (#162) draw them again too.
+        // Sharing windows (#162) redraw too.
         guard !isBatching, !isRelaying, store.isShared else { return }
         for other in store.managers where other !== self { other.listChanged() }
     }
@@ -2162,9 +2222,10 @@ final class TabManager {
         var claimed: [UUID: UUID] = [:]
         let pinnedPages = Set(bookmarkTabs.values.map(\.id))
         for (space, list) in tabsBySpace {
-            // A group lives in one space: anywhere else its tabs are in none.
+            // A group belongs to one space; its tabs elsewhere are ungrouped.
             let known = Set(groups.keys).filter { claimed[$0] == nil || claimed[$0] == space }
-            // The pages riding in another's row: a split's, in its first tab's, or in a pinned page's, in no group.
+            // Pages drawn in another tab's row: split partners (in the first tab's row) and pinned-page partners (no
+            // group).
             var riders: [UUID: UUID?] = [:]
             let ids = Set(list.map(\.id))
             for pair in splits where !ids.isDisjoint(with: pair.ids) {
@@ -2182,38 +2243,37 @@ final class TabManager {
         }
     }
 
-    /// Which group each tab of a space is in, those in one.
+    /// Group per grouped tab in a space.
     func groupIDs(in spaceID: UUID) -> [UUID: UUID] {
         Dictionary(tabs(in: spaceID).compactMap { tab in tab.groupID.map { (tab.id, $0) } }, uniquingKeysWith: { a, _ in a })
     }
 
     func group(_ id: UUID) -> TabGroup? { groups[id] }
 
-    /// A group's tabs, in list order: the pages riding in its split rows too.
+    /// A group's tabs in list order, including split partners.
     func tabs(inGroup id: UUID) -> [Tab] {
         tabsBySpace.values.lazy.map { $0.filter { $0.groupID == id } }.first { !$0.isEmpty } ?? []
     }
 
-    /// The groups in a space, top to bottom.
+    /// A space's groups, top to bottom.
     func groups(in spaceID: UUID) -> [TabGroup] {
         var seen: Set<UUID> = []
         return tabs(in: spaceID).compactMap { tab in tab.groupID.flatMap { seen.insert($0).inserted ? groups[$0] : nil } }
     }
 
-    /// A group a tab coming back was in: the group, back if it went when its last tab closed; nil if it's gone
-    /// for good (ungrouped).
+    /// The group for a reopened tab, restoring it if removed; nil if gone for good.
     private func regroup(_ id: UUID) -> UUID? {
         if groups[id] == nil, let group = emptiedGroups.removeValue(forKey: id) { groups[id] = group }
         return groups[id] != nil ? id : nil
     }
 
-    /// The groups of a session coming back, before its tabs are adopted.
+    /// Restores a session's groups before its tabs are adopted.
     func restoreGroups(_ restored: [TabGroup]) {
         for group in restored { groups[group.id] = group }
     }
 
-    /// A new group of these tabs (rows of the list: a split's row brings its other pages, a tab the ones nested under
-    /// it), named `name`, where the first of them is. Tabs from another group leave it. Returns the group's id.
+    /// Creates a group named `name` from these rows (split partners and nested tabs included) at the first one's
+    /// position. Tabs leave other groups. Returns its id.
     @discardableResult
     func makeGroup(with picked: [Tab], name: String) -> UUID? {
         guard let space = picked.first(where: { $0.bookmarkID == nil })?.spaceID else { return nil }
@@ -2222,7 +2282,7 @@ final class TabManager {
         var chosen = picked.filter { $0.bookmarkID == nil && $0.spaceID == space && index[$0.id] != nil }
         chosen.sort { index[$0.id]! < index[$1.id]! }
         guard let first = chosen.first else { return nil }
-        // Each with what's nested under it, once.
+        // Each tab with its nested tabs, once.
         var blockIDs: [UUID] = []
         var taken: Set<UUID> = []
         for tab in chosen where !taken.contains(tab.id) {
@@ -2232,7 +2292,7 @@ final class TabManager {
         var block = nodes.filter { taken.contains($0.id) }
         for i in block.indices where !taken.contains(block[i].parent ?? UUID()) { block[i].parent = nil }
         let rest = nodes.filter { !taken.contains($0.id) }
-        // Where the first one is: in its place at the top level, or nested, just after the tab it was nested in.
+        // At the first tab's position: top level, or right after its parent if nested.
         var root = first.id
         let parents = Dictionary(nodes.map { ($0.id, $0.parent) }, uniquingKeysWith: { a, _ in a })
         while let up = parents[root] ?? nil { root = up }
@@ -2242,19 +2302,19 @@ final class TabManager {
         } else {
             at = rest.firstIndex { $0.id == root }.map { TabTree.subtreeEnd(at: $0, in: rest) } ?? 0
         }
-        // Never inside another group: after its tabs.
+        // Never inside another group: place it after.
         let current = groupIDs(in: space)
         while at > 0, at < rest.count, let other = current[rest[at].id], current[rest[at - 1].id] == other { at += 1 }
         let group = TabGroup(name: name)
         groups[group.id] = group
         applyTree(Array(rest[..<at]) + block + Array(rest[at...]), in: space)
         for tab in tabs(in: space) where taken.contains(tab.id) { tab.groupID = group.id }
-        // A split's other pages come along into the group (see `settleGroups`).
+        // Split partners join via `settleGroups`.
         structureChanged()
         return group.id
     }
 
-    /// The group goes; its tabs stay where they are, in no group.
+    /// Removes the group; its tabs stay in place, ungrouped.
     func ungroup(_ id: UUID) {
         guard groups[id] != nil else { return }
         for tab in tabs(inGroup: id) { tab.groupID = nil }
@@ -2270,22 +2330,21 @@ final class TabManager {
         structureChanged()
     }
 
-    /// Folds a group's tabs away in the sidebar, or shows them again.
+    /// Folds or unfolds a group in the sidebar.
     func setGroupOpen(_ id: UUID, _ open: Bool) {
         guard groups[id] != nil, groups[id]?.isOpen != open else { return }
         groups[id]?.isOpen = open
         structureChanged()
     }
 
-    /// A tab (with the tabs nested under it) into a group, after its last tab; nil takes it out of its group, just
-    /// after the group's tabs.
+    /// Moves a tab (with its nested tabs) to the end of a group; nil ungroups it, placing it after the group.
     func setGroup(of tab: Tab, to id: UUID?) {
         guard tab.bookmarkID == nil, tab.groupID != id else { return }
         let space = tab.spaceID
         let anchor = id ?? tab.groupID
         let nodes = treeNodes(in: space)
         guard let anchor, let start = nodes.firstIndex(where: { $0.id == tab.id }) else { return }
-        // Its own run left out, the place just after the group's last tab.
+        // Excluding its own run, the spot right after the group's last tab.
         let run = Set([tab.id] + TabTree.descendants(of: tab.id, in: nodes))
         let rest = nodes.filter { !run.contains($0.id) }
         let current = groupIDs(in: space)
@@ -2295,9 +2354,8 @@ final class TabManager {
         structureChanged()
     }
 
-    /// A whole group moved to `index` in the list without its tabs, in its own space or another, its tabs in their
-    /// order and still nested as they were. Never in the middle of another group or of a tab's nested tabs: just
-    /// after them.
+    /// Moves a group to `index` (counted without its tabs), in its space or another, keeping order and nesting. Never
+    /// inside another group or a nest: just after it.
     func moveGroup(_ id: UUID, to index: Int, in spaceID: UUID? = nil) {
         let members = tabs(inGroup: id)
         guard let from = members.first?.spaceID else { return }
@@ -2310,7 +2368,7 @@ final class TabManager {
         let wasSelected = members.contains { selectedTab === $0 }
         let oldIndex = tabs(in: from).firstIndex { $0 === members[0] } ?? 0
         let ids = Set(members.map(\.id))
-        // A split with a page outside the group can't span two spaces: it ends.
+        // A split partly outside the group can't span spaces: unsplit it.
         splits.removeAll { pair in pair.ids.contains(where: ids.contains) && !pair.ids.allSatisfy(ids.contains) }
         tabsBySpace[from]?.removeAll { ids.contains($0.id) }
         for tab in members {
@@ -2328,10 +2386,9 @@ final class TabManager {
     /// Background tabs nobody has looked at in a while give their memory back (TabSleep says when): every minute,
     /// and at once when macOS says memory is short.
     func sleepIdleTabs() {
-        // Kept awake: what's on screen (both halves of a split), anything in a call or floating, and sites that notify.
-        // Favorites and sites kept awake too, unless memory is critically short (TabSleep). Other spaces' pages sleep
-        // like any tab once idle; their snapshots still show while you swipe to them.
-        // Windows sharing their tabs (#162): the oldest looks for all of them, keeping what each has on screen.
+        // Kept awake: what's on screen (both halves of a split), calls, floating pages and notifying sites. Favorites
+        // and keep-awake sites too, unless memory is critical (TabSleep). Other spaces sleep normally; snapshots cover
+        // swipes. With shared tabs (#162) the oldest window checks for all, keeping each one's visible pages.
         let windows = store.managers.isEmpty ? [self] : store.managers
         guard windows.first === self else { return }
         var selectedIDs = Set<UUID>()

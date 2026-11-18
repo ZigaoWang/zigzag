@@ -181,8 +181,7 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
         didSet { if twoUp != oldValue { autoScales = true; relayout(keeping: topAnchor()) } }
     }
 
-    /// Two pages side by side only when there are two to show: a one-page document stays in the middle, rather than
-    /// alone on the right as a book's first page.
+    /// Two-up only with two or more pages, so a one-page document stays centered.
     private var spread: Bool { twoUp && pageSizes.count > 1 }
 
     var isDark = false {
@@ -900,8 +899,8 @@ final class ZigzagPDFView: NSView, NSMenuItemValidation {
                         length: text.string.length)
     }
 
-    /// The part of a page's text from `from` up to `to`, within its `length`: nil when none of it is there, as when
-    /// the text came back shorter than when it was selected.
+    /// The range from `from` to `to` clamped to `length`; nil when nothing remains (the text came back shorter than
+    /// when selected).
     nonisolated static func run(from: Int, to: Int, length: Int) -> Range<Int>? {
         let from = max(0, min(from, length)), to = max(0, min(to, length))
         return from < to ? from..<to : nil

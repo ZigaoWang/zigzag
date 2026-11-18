@@ -27,20 +27,18 @@ enum OwnScripts {
     }
 }
 
-/// Zigzag's own scripts that it runs in a page by itself (to read its icons, to ask whether it's a PDF, to tell it of
-/// a changed setting). WebKit runs a script it's asked to as if you had just clicked: whatever the page's code does
-/// then (a getter or function it redefined that Zigzag happens to call) could open a window, start a download or
-/// launch an app with no click of yours. So these run without that, where WebKit allows it, and in an isolated world
-/// (`.defaultClient`) unless they must reach the page's own code, where the page can't redefine what they call.
+/// Zigzag's own page scripts (reading icons, PDF checks, setting changes). WebKit runs evaluated scripts with a user
+/// gesture, so page code they touch (a redefined getter or function) could open a window, start a download or launch
+/// an app without a click. These run without the gesture where WebKit allows it, and in an isolated world
+/// (`.defaultClient`) unless they must reach page code, so the page can't redefine what they call.
 extension WKWebView {
     private static let evaluateQuietly = NSSelectorFromString("_evaluateJavaScript:asAsyncFunction:withSourceURL:withArguments:forceUserGesture:inFrame:inWorld:completionHandler:")
 
     /// Whether this WebKit can run a script without the user gesture.
     static var runsScriptsWithoutGesture: Bool { instancesRespond(to: evaluateQuietly) }
 
-    /// Runs `source` as Zigzag's own, with no user gesture. `asFunction`: the source is an async function's body, with
-    /// `arguments` as its variables, as `callAsyncJavaScript` takes it; otherwise an expression, as
-    /// `evaluateJavaScript` takes it.
+    /// Runs `source` with no user gesture. `asFunction`: `source` is an async function body with `arguments` as
+    /// variables (`callAsyncJavaScript`); otherwise an expression (`evaluateJavaScript`).
     func runOwnScript(_ source: String, asFunction: Bool = false, arguments: [String: Any] = [:], in frame: WKFrameInfo? = nil,
                       world: WKContentWorld = .defaultClient, completion: ((Result<Any?, Error>) -> Void)? = nil) {
         if Self.runsScriptsWithoutGesture, let method = method(for: Self.evaluateQuietly) {
@@ -55,7 +53,7 @@ extension WKWebView {
                                                        asFunction ? arguments as NSDictionary : nil, false, frame, world, done)
             return
         }
-        // An older WebKit without it: the isolated world still keeps the page's code out of the way.
+        // Older WebKit without it: the isolated world still shields from page code.
         if asFunction {
             callAsyncJavaScript(source, arguments: arguments, in: frame, in: world) { result in completion?(result.map { $0 is NSNull ? nil : $0 }) }
         } else {
@@ -63,7 +61,7 @@ extension WKWebView {
         }
     }
 
-    /// The same, awaited.
+    /// Async version.
     func runOwnScript(_ source: String, asFunction: Bool = false, arguments: [String: Any] = [:], in frame: WKFrameInfo? = nil,
                       world: WKContentWorld = .defaultClient) async throws -> Any? {
         try await withCheckedThrowingContinuation { (done: CheckedContinuation<ScriptValue, Error>) in
@@ -71,10 +69,10 @@ extension WKWebView {
         }.value
     }
 
-    /// What a script answered (plain values WebKit made from JavaScript's), carried back to the awaiting caller.
+    /// A script's result (plain values converted by WebKit), carried back to the caller.
     struct ScriptValue: @unchecked Sendable { let value: Any? }
 
-    /// The user agent the page is loaded with, as WebKit sends it: never asked of the page, which could answer anything.
+    /// The user agent WebKit actually sends; never asked of the page, which could lie.
     var sentUserAgent: String? {
         if let custom = customUserAgent, !custom.isEmpty { return custom }
         guard responds(to: NSSelectorFromString("_userAgent")) else { return nil }

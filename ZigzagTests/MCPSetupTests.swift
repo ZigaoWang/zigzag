@@ -68,7 +68,7 @@ extension MCPSetupTests {
         #expect(board.types?.contains(Clipboard.transientType) == false)
     }
 
-    /// Only a key as Zigzag makes them counts: one written into the key file by hand is replaced.
+    /// Only keys in Zigzag's format count; a hand-written key is replaced.
     @Test func onlyZigzagsOwnKeysAreUsed() throws {
         for _ in 0..<200 { #expect(MCPAccess.isZigzagKey(MCPAccess.newToken())) }
         let good = MCPAccess.newToken()
@@ -87,7 +87,7 @@ extension MCPSetupTests {
 }
 
 extension MCPSetupTests {
-    /// A copied password carries its markers in the same write, and goes when Zigzag quits if nothing was copied since.
+    /// Copied passwords get concealed markers in the same write and are cleared on quit if nothing was copied since.
     @MainActor @Test func copiedPasswordsAreMarkedAndCleared() {
         let board = NSPasteboard(name: NSPasteboard.Name("zigzag-test-\(UUID().uuidString)"))
         defer { board.releaseGlobally() }

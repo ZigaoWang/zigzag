@@ -2,9 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// The note to add Zigzag in 1Password shows only when the 1Password app really turns Zigzag away: not when one
-/// connection is turned away while another works, not when a later one gets through, and after one has, only when
-/// nothing gets through again. A reply Zigzag doesn't know proves nothing.
+/// The "add Zigzag in 1Password" note shows only when every connection is refused; one succeeding cancels it, and unknown replies prove nothing.
 struct OnePasswordTrustTests {
     private static func message(_ type: String) -> [String: Any] {
         ["callbackId": 1, "content": ["content": ["type": type, "content": [String: Any]()]]]
@@ -24,13 +22,13 @@ struct OnePasswordTrustTests {
         for type in ["Success", "ClientCreated", "LockStateChanged", "AutofillChangeEvent", "AutofillItemUpdated", "SecurityReviewEligibility"] {
             #expect(OnePasswordTrust.reply(type) == .connected)
         }
-        // Said whether or not the app trusts Zigzag: neither proves it.
+        // These come whether or not the app trusts Zigzag.
         for type in ["Offline", "AppQuit", "MainAppNotRunning", "MainAppOpenTimeout", "LostConnectionToApp", "Error"] {
             #expect(OnePasswordTrust.reply(type) == .other)
         }
     }
 
-    /// Turned away and nothing else: Zigzag needs adding, said once.
+    /// Refused with nothing through: ask, once.
     @Test func turnedAwayWithNothingThroughAsks() {
         var trust = OnePasswordTrust()
         trust.heard(.turnedAway, at: start)
@@ -39,13 +37,13 @@ struct OnePasswordTrustTests {
         let later = start.addingTimeInterval(OnePasswordTrust.grace)
         #expect(trust.needsAdding(at: later))
         do { let told = trust.tell(at: later); #expect(told) }
-        // Turned away again: the note stays, the toast isn't said twice.
+        // Refused again: the note stays, no second toast.
         trust.heard(.turnedAway, at: later.addingTimeInterval(30))
         #expect(trust.needsAdding(at: later.addingTimeInterval(60)))
         do { let told = trust.tell(at: later.addingTimeInterval(60)); #expect(!told) }
     }
 
-    /// One connection turned away while another starts and gets through: the app was slow, not untrusting.
+    /// One refused while another succeeds: slow app, not untrusted.
     @Test func laterSuccessCancelsATurnAway() {
         var trust = OnePasswordTrust()
         trust.heard(.turnedAway, at: start)
@@ -54,8 +52,7 @@ struct OnePasswordTrustTests {
         do { let told = trust.tell(at: start.addingTimeInterval(60)); #expect(!told) }
     }
 
-    /// Once something trusted got through, a turn-away never asks this session: a working 1Password turns one-off
-    /// messages away too, and that showed the note to people whose 1Password worked.
+    /// After a trusted connection, a refusal never asks this session; a working 1Password refuses one-off messages too, which showed the note wrongly.
     @Test func aTurnAwayAfterAConnectionNeverAsks() {
         var trust = OnePasswordTrust()
         trust.heard(.connected, at: start)
@@ -65,7 +62,7 @@ struct OnePasswordTrustTests {
         do { let told = trust.tell(at: start.addingTimeInterval(7200)); #expect(!told) }
     }
 
-    /// A reply type Zigzag doesn't know, heard before a turn-away (a handshake), proves nothing: the note still shows.
+    /// An unknown reply before a refusal (a handshake) proves nothing; the note still shows.
     @Test func anUnknownReplyIsntTrust() {
         #expect(OnePasswordTrust.reply("HelloThere") == .other)
         var trust = OnePasswordTrust()
@@ -73,12 +70,12 @@ struct OnePasswordTrustTests {
         #expect(!trust.connected)
         trust.heard(.turnedAway, at: start.addingTimeInterval(1))
         #expect(trust.needsAdding(at: start.addingTimeInterval(1 + OnePasswordTrust.grace)))
-        // Logged once a session, and never for a type that's known.
+        // Unknown types logged once a session; known ones never.
         let logged = ["Handshake", "Handshake", "LockStateChanged", "Offline", "BrowserVerificationFailed"].map { trust.isNewUnknown($0) }
         #expect(logged == [true, false, false, false, false])
     }
 
-    /// Added in 1Password after being turned away: the next connection clears the note.
+    /// Added in 1Password after a refusal: the next connection clears the note.
     @Test func addingZigzagClearsTheNote() {
         var trust = OnePasswordTrust()
         trust.heard(.turnedAway, at: start)
@@ -87,7 +84,7 @@ struct OnePasswordTrustTests {
         #expect(!trust.needsAdding(at: start.addingTimeInterval(130)))
     }
 
-    /// The app offline or not running doesn't count either way.
+    /// Offline or not running counts either way.
     @Test func offlineNeitherAsksNorClears() {
         var trust = OnePasswordTrust()
         trust.heard(.other, at: start)

@@ -9,7 +9,7 @@ nonisolated struct MCPBrowserRunner: MCPToolRunner {
     func call(_ name: String, arguments: [String: JSON], client: MCPClient) async -> MCPToolResult {
         switch MCPCommand.parse(name, arguments) {
         case .failure(let error): return .error(error.message)
-        // Everything a tool gives back carries what pages wrote: titles, text, links, fields.
+        // Tool results contain page-written content: titles, text, links, fields.
         case .success(let command): return await MCPBrowser.run(command, client: client).markedAsPageContent()
         }
     }
@@ -22,7 +22,7 @@ enum MCPBrowser {
     static func run(_ command: MCPCommand, client: MCPClient) async -> MCPToolResult {
         // Turned off while the request was on its way: nothing happens.
         guard MCPService.isOn else { return .error("Zigzag's MCP server was turned off in Settings.") }
-        // Stop, or the setting turned off and on again, while this waits: it never goes on after that.
+        // Never continue after Stop or an off/on toggle while waiting.
         let generation = AgentControl.shared.generation
         switch command {
         case .listTabs:
@@ -213,7 +213,7 @@ enum MCPBrowser {
         return .failure(.init("No open tab has id \(id). Use list_tabs for the tabs there are now."))
     }
 
-    /// list_tabs shows on the bar like any other tool: over the tab in front, unless no tool may use that one.
+    /// list_tabs shows on the bar like other tools, over the front tab unless tools can't use it.
     static func noteListing(_ front: Tab, by client: MCPClient, control: AgentControl = .shared) {
         guard MCPSafety.refusal(url: front.url, isPrivate: front.isPrivate, stopped: control.isStopped(front.id), needsPage: false) == nil else { return }
         control.touch(front, by: client)

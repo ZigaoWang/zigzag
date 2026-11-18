@@ -5,15 +5,34 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- An extension's popup lays its icons out as it does in Chrome. Zigzag was making every icon with no width of its own as wide as its row, so an icon beside a heading squeezed the heading to one letter a line, as in Dashlane's menu. Icons now keep the size their page gives them. ([#340](https://github.com/ZigaoWang/zigzag/issues/340))
+
+## [0.9.3] - 2026-11-18
+
+Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, and fixes for Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
+
 ### New
 - A download rule that runs a script shows it on the page: Running script while it works, then Ran script or Script failed with the script's last line, so a rule never runs out of sight. A rule that hands a link to an app, a download manager or your default browser says so once per session, after it worked. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 - A site can have an icon of its own. Change Site Icon… in Site Controls' ⋯ menu opens the same icon choices as a tab's, with symbols, emoji and Choose Image…, and every tab, pinned tab, favorite and history row on the site shows it. A tab's own icon still wins, and Use Site Icon puts the site's icon back. Settings › Privacy › Sites lists it to forget, and in a private window it lasts until the window closes. Thanks to [bkonia](https://github.com/bkonia). ([#310](https://github.com/ZigaoWang/zigzag/issues/310))
 - Settings › Privacy › Sites shows each choice made for a site on a row of its own, with the same control as in Site Controls and a × that forgets just that one, instead of one sentence and a single Forget. JavaScript and Extensions now sit on Site Controls' Permissions page beside the camera and the rest, and turning extensions off for a site is kept per profile. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#311](https://github.com/ZigaoWang/zigzag/issues/311), [#312](https://github.com/ZigaoWang/zigzag/issues/312), [#313](https://github.com/ZigaoWang/zigzag/issues/313), [#314](https://github.com/ZigaoWang/zigzag/issues/314))
+- The space editor is simpler. One row of swatches holds Default (the colors the space was made with), six presets, the space's background picture and Custom, which opens the color wheel and Shade below it when you want a color of your own. Effects sits under the row, and Profile moves to the bottom as one row, with what profiles do in its tooltip. Background is a swatch now: click it to choose a picture, and the × on its corner takes the picture off.
 
 ### Fixed
+- Pinning a group of tabs keeps the group whole: one pinned folder named after it, with its tabs in their order, instead of one pinned page per tab. Unpinning any of its pages brings the group back. ([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 - ⌘-clicking a video on YouTube always opens it in a new tab. Some ⌘-clicks went to the video in the tab you were on, because YouTube's own script followed the link there. Now a ⌘-click on a link opens it in a new tab whatever the page does with clicks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#317](https://github.com/ZigaoWang/zigzag/issues/317))
-- An extension's popup lays its icons out as it does in Chrome. Zigzag was making every icon with no width of its own as wide as its row, so an icon beside a heading squeezed the heading to one letter a line, as in Dashlane's menu. Icons now keep the size their page gives them. ([#340](https://github.com/ZigaoWang/zigzag/issues/340))
 - Each PDF opens in a helper of its own, as 0.9.2 meant: the build that shipped had all PDFs share one, so a PDF couldn't be kept apart from the others open at the same time.
+- An extension's right-click menu shows its emoji and symbols, like 📋 and ⌘, instead of garbled letters like "ðŸ“‹". An extension with background scripts, as most Firefox add-ons have, had its text read in the wrong encoding. Thanks to [mrfragger](https://github.com/mrfragger). ([#277](https://github.com/ZigaoWang/zigzag/issues/277))
+- An extension that turns its side panel on only for the tab you click it on, like ChatGPT's, opens the panel when you click its button, instead of the click doing nothing.
+- Links from other apps open in Zigzag Mini by default, like Arc's Little Arc. ⌘O moves the page into a tab, and Settings › Zigzag Mini turns it off. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Site Controls has a width of its own instead of the sidebar's, so its rows no longer get cut short or wrap in a narrow sidebar. From the sidebar it reaches past a narrow one over the page, and with the address bar above the page it opens under the address at its usual width. Thanks to [Tuszy42](https://github.com/Tuszy42). ([#335](https://github.com/ZigaoWang/zigzag/issues/335))
+- Extensions that need a recent Chrome, like Heylogin, install from the Chrome Web Store instead of being called no longer available: Zigzag told the store it was Chrome 140. Thanks to [datarip](https://github.com/datarip). ([#336](https://github.com/ZigaoWang/zigzag/issues/336))
+- Import from a file takes the bookmarks.html every browser exports, from Firefox, LibreWolf, Safari, Chrome and Edge. Its pages come over in a space of their own with their folders, as from a browser on this Mac. Thanks to [mrfragger](https://github.com/mrfragger). ([#330](https://github.com/ZigaoWang/zigzag/issues/330))
+- The mini player's arrow back to its tab always does something: it finds the tab in whichever window has it now and brings that window forward, ends the card when the tab is already on screen, and closes the card when the tab is gone. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#333](https://github.com/ZigaoWang/zigzag/issues/333))
+- An extension's popup takes focus when it opens, as in Chrome, so its buttons' tooltips and hover effects show right away. Before, they showed only after you clicked in it. When it closes, the keys go back to the page or field you were in. Thanks to [mrfragger](https://github.com/mrfragger). ([#277](https://github.com/ZigaoWang/zigzag/issues/277))
+- Find on page marks every match, also text right in a button, a row laid out as a flex box or beside a block, like an author's name in GitHub's issue list. WebKit draws no highlight there, so the match showed for a moment and went; such matches now get a mark of their own. A match the page draws again is marked again within a second. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#329](https://github.com/ZigaoWang/zigzag/issues/329))
+- Proton Pass's popup opens at its full size, with your items listed, instead of cut off below its search bar. In a popup, Zigzag answered Proton's check for whether it was open in a tab with the tab you were on, so it sized itself to fit a tab that wasn't there. Thanks to [JonasNowak](https://github.com/JonasNowak). ([#287](https://github.com/ZigaoWang/zigzag/issues/287))
+- Proton Pass puts its icon in sign-in fields and offers your logins when you click one. Its script on the page stopped before finding any fields, on a browser function WebKit doesn't have (requestIdleCallback), which Zigzag now gives extensions as Chrome does. Thanks to [JonasNowak](https://github.com/JonasNowak). ([#287](https://github.com/ZigaoWang/zigzag/issues/287))
 
 ## [0.9.2] - 2026-11-18
 
@@ -1330,6 +1349,7 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 - The first public release: signed and notarized, with updates that install themselves.
 
 [Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...HEAD
+[0.9.3]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...HEAD
 [0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0

@@ -46,7 +46,7 @@ final class PlainTextField: NSTextField {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Placed by `centeredY` on its screen's pixels: on a screen of another scale, placed again (as `Label` is).
+    /// `centeredY` depends on backing scale; re-place on scale change (as `Label` does).
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         superview?.needsLayout = true
@@ -77,19 +77,19 @@ private final class PaddedTextFieldCell: NSTextFieldCell {
 
 }
 
-/// A window the find bar searches in: a browser window, or Zigzag Mini (#246).
+/// A window the find bar can search: a browser window or Zigzag Mini (#246).
 protocol FindBarHost: AnyObject {
     var window: NSWindow? { get }
-    /// The page it searches, where the bar sits at the top right.
+    /// The searched page's frame; the bar sits at its top right.
     var focusedPaneFrame: NSRect { get }
-    /// A split pane's header at the top of that page, which the bar sits below.
+    /// Height of a split pane header above the page; the bar sits below it.
     var findBarHeaderHeight: CGFloat { get }
-    /// Where the bar goes, over the page.
+    /// View the bar is added to.
     var findBarOverlay: NSView { get }
-    /// Something in front of the page (the command bar, peek) takes Esc first.
+    /// Something over the page (command bar, peek) gets Esc first.
     var findBarIsCovered: Bool { get }
     var findableWebView: WKWebView? { get }
-    /// Zigzag's own PDF viewer showing the page, which searches the PDF itself.
+    /// Zigzag's PDF viewer, which searches the PDF itself.
     var findablePDF: PDFViewerView? { get }
 }
 
@@ -140,14 +140,14 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(keyChanged(_:)), name: NSWindow.didResignKeyNotification, object: nil)
     }
 
-    /// The page's marks aren't kept up with while you're in another window: busy pages change all the time.
+    /// Stop updating match marks while another window is key: busy pages change constantly.
     @objc private func keyChanged(_ note: Notification) {
         guard let changed = note.object as? NSWindow, changed === window?.window, isVisible, let searched, searchedPDF == nil,
               FindMarks.isAvailable else { return }
         FindMarks.pause(!changed.isKeyWindow, in: searched)
     }
 
-    /// A tick for each match along the page's right edge (`FindMarks`).
+    /// Match ticks along the page's right edge (`FindMarks`).
     private let ticks = FindMarksView()
 
     /// The page the last search ran in, so its highlight goes when you move to the other pane.
@@ -301,7 +301,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
     }
 
-    /// `toMatch`: a tick clicked, the match to go to.
+    /// `toMatch`: the match of a clicked tick.
     private func search(backwards: Bool, fromStart: Bool = false, toMatch: Int? = nil) {
         // A PDF is searched in its own viewer, which knows its pages and counts the matches itself.
         if let pdf = window?.findablePDF {
@@ -340,7 +340,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             return
         }
         let asked = query
-        // Every match marked by Zigzag, and the one you're on in the stronger color in place of WebKit's own mark.
+        // Zigzag marks every match and the current one in a stronger color instead of WebKit's highlight.
         let marks = FindMarks.isAvailable
         Task { @MainActor [weak self, weak webView] in
             guard let webView else { return }
@@ -354,31 +354,30 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             guard let self, self.query == asked, self.searched === webView else { return }
             self.show(result)
             guard marks else { return }
-            // WebKit's own yellow over the match would cover the stronger color.
+            // WebKit's yellow highlight would cover the current match color.
             if webView.responds(to: Self.hideFindUI) { webView.perform(Self.hideFindUI) }
             await self.refreshMarks(in: webView, found: result.count)
         }
     }
 
-    /// Marks every match on the page and puts a tick for each along its edge. `found`: WebKit's count; with none,
-    /// nothing is marked either, whatever Zigzag's own search would make of the page.
+    /// Marks all matches and adds edge ticks. `found`: WebKit's count; zero means nothing is marked.
     private func refreshMarks(in webView: WKWebView, found: Int) async {
         guard found > 0 else { clearMarks(in: webView); return }
         let asked = query
-        // Marked again while you're in another window (a page that finished loading): left alone till you're back.
+        // Refresh requested while another window is key (a page finished loading): wait until it's key again.
         let away = window?.window?.isKeyWindow == false
         guard let snapshot = await FindMarks.mark(asked, in: webView, paused: away), isVisible, query == asked, searched === webView else { return }
         ticks.attach(to: webView)
         ticks.snapshot = snapshot
-        // WebKit counts its place on from the last match it found, so after a tick, or a click on the page, it can say
-        // the wrong one. The marks know where the match is among them all: when both counted the same, theirs is said.
+        // WebKit counts from its last found match, so after a tick or page click its index can be wrong. When both
+        // counts agree, use the marks' index.
         if let current = snapshot.current, snapshot.count == found, found <= PageFind.maxCount, current != place {
             show(PageFind.Result(count: found, index: current))
         }
         FindMarks.listen(to: webView) { [weak self, weak webView] snapshot in
             guard let self, let webView, self.isVisible, self.searched === webView, self.query == asked else { return }
             self.ticks.snapshot = snapshot
-            // The page changed under the count: counted again.
+            // The page changed: recount.
             self.recount(in: webView, marking: false)
         }
     }
@@ -400,14 +399,14 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         place = nil
         loadingWatch = webView.observe(\.isLoading, options: [.new]) { [weak self] webView, change in
             MainActor.assumeIsolated {
-                // Off to another page: the ticks were the last one's.
+                // Navigating away: clear the old page's ticks.
                 if change.newValue == true { self?.ticks.snapshot = .empty } else { self?.recount(in: webView) }
             }
         }
     }
     private var loadingWatch: NSKeyValueObservation?
 
-    /// `marking`: the matches are marked again too, as on a page that just loaded.
+    /// `marking`: re-mark the matches too, as after a load.
     private func recount(in webView: WKWebView, marking: Bool = true) {
         guard isVisible, searched === webView, !query.isEmpty, PageFind.isAvailable else { return }
         let asked = query
@@ -474,7 +473,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     private static let hideFindUI = NSSelectorFromString("_hideFindUI")
 
     #if DEBUG
-    /// The bar, its ticks and what the page's script keeps, as JSON at `path` (`findstate`).
+    /// Writes the bar, ticks and page script state as JSON to `path` (`findstate`).
     func debugState(to path: String) {
         let webView = searched ?? window?.findableWebView
         var state: [String: Any] = [
@@ -494,7 +493,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
         }
     }
 
-    /// As a click on a tick (`findtick`).
+    /// Same as clicking a tick (`findtick`).
     func debugPickTick(_ index: Int) { search(backwards: false, toMatch: index) }
     #endif
 }
@@ -560,7 +559,7 @@ class FloatingPanelView: NSView {
     /// responder or has a mouseDown of its own. Words that are only words (a label) are surface.
     static func isBareSurface(_ hit: NSView?) -> Bool { bareSurfacePanel(hit) != nil }
 
-    /// The panel whose own surface a press landed on, or nil when it landed on one of its controls (`isBareSurface`).
+    /// The panel whose bare surface was hit, or nil for a hit on its controls (`isBareSurface`).
     static func bareSurfacePanel(_ hit: NSView?) -> FloatingPanelView? {
         var view = hit
         while let current = view {
@@ -571,12 +570,10 @@ class FloatingPanelView: NSView {
         return nil
     }
 
-    /// Hears a left press on the panel's own surface, which the window otherwise keeps from everything (the command
-    /// bar is moved this way).
+    /// Left presses on the panel's bare surface, which the window otherwise swallows (used to drag the command bar).
     var onBarePress: ((NSEvent) -> Void)?
 
-    /// A panel that is a button itself (the new tab note): the window hands it the left press on its surface and the
-    /// release, instead of keeping them from it.
+    /// For panels that act as buttons (the new tab note): the window delivers surface press and release to it.
     var takesPress: Bool { false }
 
     private static func handlesPress(_ view: NSView) -> Bool {
@@ -692,9 +689,8 @@ class FloatingPanelView: NSView {
     /// middle. Set it to the side nearest what opened it.
     var growsFrom = CGPoint(x: 0.5, y: 0)
 
-    /// Grows out of `anchor` (in its superview's coordinates, once its frame is set): from its side facing it, the
-    /// top when it opened below (a field's menu) and the bottom when it opened above, across from where the anchor
-    /// starts.
+    /// Grows out of `anchor` (superview coordinates, after its frame is set): from the top when opened below (a field's
+    /// menu), from the bottom when opened above, starting at the anchor's edge.
     func grow(from anchor: NSRect) {
         guard frame.width > 0, frame.height > 0 else { return }
         let flipped = superview?.isFlipped ?? true
@@ -735,8 +731,8 @@ class FloatingPanelView: NSView {
     /// Above the window's top edge: where a top-edge panel comes from and goes back to.
     private var offstage: CGFloat { frame.maxY + 12 }
 
-    /// For a note that belongs to the sidebar's side of the window (a link opened in a new tab while it's hidden): it
-    /// slides in from beyond that edge, `.minX` or `.maxX`, and leaves back out the same way.
+    /// For notes on the sidebar's side (a background tab opened while hidden): slides in and out past that edge,
+    /// `.minX` or `.maxX`.
     var slidesFromSide: NSRectEdge?
 
     /// Where it comes from and goes back to.
@@ -781,7 +777,7 @@ class FloatingPanelView: NSView {
         layer.add(grow, forKey: "presence.transform")
     }
 
-    /// On its way out: it takes no more clicks, which reach what's under it at once (`MenuPanel` sets it as it leaves).
+    /// Dismissing: ignores clicks so they reach what's below (`MenuPanel` sets it).
     var dismissing = false
     override func hitTest(_ point: NSPoint) -> NSView? { dismissing ? nil : super.hitTest(point) }
     /// Counts the times it's been sent off, so only the latest going takes it away.
@@ -859,22 +855,69 @@ class ToastView: FloatingPanelView {
     /// The space around the text: the icon on the left, the action (or padding) on the right.
     private var chromeWidth: CGFloat { fittingWidth - label.inkWidth }
 
-    /// Fits `maxWidth`: one line when it can, two wrapped lines when it can't, never past the page.
+    /// Max wrapped lines before truncating. Above two, the action moves below the text when it doesn't fit beside it.
+    var maxLines = 2
+    /// Action below the text at the right, for long notes in narrow windows.
+    private var actionBelow = false
+
+    /// Text start x: after the icon, or padding.
+    private var textStart: CGFloat { icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2 }
+
+    /// Text height wrapped to `width`.
+    private func wrappedHeight(_ width: CGFloat) -> CGFloat {
+        ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width + Label.inset * 2, height: 1000)).height ?? label.lineHeight * 2)
+    }
+
+    /// One line if it fits, else wrapped up to `maxLines`, never wider than the page.
     func size(maxWidth: CGFloat) -> NSSize {
         let width = min(ceil(fittingWidth), maxWidth)
-        let textWidth = width - chromeWidth
+        var textWidth = width - chromeWidth
         let wraps = label.inkWidth > textWidth + 0.5
         label.usesSingleLineMode = !wraps
-        label.maximumNumberOfLines = wraps ? 2 : 1
+        label.maximumNumberOfLines = wraps ? maxLines : 1
         label.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
         label.cell?.wraps = wraps
         label.cell?.truncatesLastVisibleLine = true
-        let textHeight = wraps ? ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth + Label.inset * 2, height: 200)).height ?? label.lineHeight * 2) : label.lineHeight
+        actionBelow = wraps && maxLines > 2 && !actionButton.isHidden && wrappedHeight(textWidth) > label.lineHeight * 2 + 1
         radius = wraps ? Tokens.Radius.panel : Self.height / 2
+        if actionBelow {
+            textWidth = width - textStart - belowTrailing
+            let h = Tokens.Metric.toastButtonHeight
+            return NSSize(width: width, height: belowTextTop + wrappedHeight(textWidth) + Tokens.Space.x2 + h + (Self.height - h) / 2)
+        }
+        let textHeight = wraps ? wrappedHeight(textWidth) : label.lineHeight
         return NSSize(width: width, height: max(Self.height, textHeight + Tokens.Space.x4))
     }
 
+    /// With the action below, the first line aligns with the close button, as in a one-line toast.
+    private var belowTextTop: CGFloat { round((Self.height - label.lineHeight) / 2) }
+    /// With the action below: trailing space after the text (close button or padding).
+    private var belowTrailing: CGFloat {
+        guard !closeButton.isHidden else { return Tokens.Space.x4 }
+        let side = closeButton.frame.width
+        return (Self.height - side) / 2 + side + Tokens.Space.x1
+    }
+
+    private func layoutBelow() {
+        let top = belowTextTop
+        if icon.image != nil {
+            icon.frame = NSRect(x: Tokens.Space.x3, y: top + (label.lineHeight - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
+            spinner.frame = icon.frame
+        }
+        if !closeButton.isHidden {
+            let side = closeButton.frame.width
+            closeButton.frame.origin = NSPoint(x: bounds.width - (Self.height - side) / 2 - side, y: (Self.height - side) / 2)
+        }
+        // Inset the pill from the bottom right like a one-line toast's from its right end.
+        let h = Tokens.Metric.toastButtonHeight, inset = (Self.height - h) / 2
+        let actionWidth = actionButton.fittingWidth
+        actionButton.frame = NSRect(x: bounds.width - inset - actionWidth, y: bounds.height - inset - h, width: actionWidth, height: h)
+        let textWidth = bounds.width - textStart - belowTrailing
+        label.frame = NSRect(x: textStart - Label.inset, y: top, width: textWidth + Label.inset * 2, height: actionButton.frame.minY - Tokens.Space.x2 - top)
+    }
+
     private func layoutContent() {
+        if actionBelow { layoutBelow(); return }
         var x = icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3
         if icon.image != nil {
             icon.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
@@ -909,16 +952,14 @@ enum Toast {
     private final class Showing {
         weak var toast: ToastView?
         var hideWork: DispatchWorkItem?
-        /// What the toast showing is about, when it's about something that can go away (an offer for a tab's page).
+        /// The object the toast is about, for toasts that should go with it (an offer for a tab's page).
         weak var owner: AnyObject?
     }
     private static var showing: [ObjectIdentifier: Showing] = [:]
 
-    /// How long a toast with Undo stays, for something taken away (tabs closed, pins removed, History cleared): long
-    /// enough to read it and reach Undo. It waits longer while the pointer is on it.
+    /// Duration for Undo toasts (tabs closed, pins removed, History cleared); longer while hovered.
     static let undoDuration: TimeInterval = 7
-    /// How long a confirmation of something a prompt just did stays ("Password saved"): it comes up as the prompt
-    /// slides away, so it stays long enough to be seen after that.
+    /// Duration for prompt confirmations ("Password saved"), which appear as the prompt slides away.
     static let confirmationDuration: TimeInterval = 3
 
     /// Whether an action shown at `shownAt` takes a click yet.
@@ -941,30 +982,22 @@ enum Toast {
         state.toast = nil
     }
 
-    /// Takes down the toast showing in this window if it's still the one shown for `owner`: another toast that took
-    /// its place since is left be.
+    /// Hides this window's toast only if it's still the one for `owner`.
     static func hide(for owner: AnyObject, in controller: BrowserWindowController) {
         let state = state(for: controller.root.overlay)
         guard state.owner === owner, state.toast?.dismissing == false else { return }
         hide(in: controller)
     }
 
-    /// Whether a toast is up in this window, one not already on its way out.
-    static func isShowing(in controller: BrowserWindowController) -> Bool {
-        let state = state(for: controller.root.overlay)
-        guard let toast = state.toast, toast.superview === controller.root.overlay else { return false }
-        return !toast.dismissing
-    }
-
-    /// What the toast showing in this window was shown for, if anything.
+    /// The owner of this window's current toast, if any.
     static func owner(in controller: BrowserWindowController) -> AnyObject? {
         let state = state(for: controller.root.overlay)
         guard let toast = state.toast, toast.superview === controller.root.overlay, !toast.dismissing else { return nil }
         return state.owner
     }
 
-    /// `closes` adds a close button, for an offer you may want gone before it goes on its own. `owner`: what it's
-    /// about, for `hide(for:in:)`. `onClose`: run when it's put away with its close button.
+    /// `closes` adds a close button, for offers. `owner`: for `hide(for:in:)`. `onClose`: runs when closed by its
+    /// button.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, owner: AnyObject? = nil, onClose: (() -> Void)? = nil,
                      in controller: BrowserWindowController) {
@@ -980,7 +1013,7 @@ enum Toast {
         let reserved = AgentControl.shared.reservedHeight(in: controller)
         page.origin.y += reserved
         page.size.height -= reserved
-        // Under a page's question or the update note at the top of the page, never over it.
+        // Below any page question or top update note, never over them.
         return PageQuestions.area(page, below: PageQuestions.occupied(in: controller.root.overlay))
     }
 
@@ -1017,8 +1050,8 @@ enum Toast {
         layer.add(move, forKey: "follow")
     }
 
-    /// Puts a notice back under a question that just came up in a window with no browser chrome (Zigzag Mini, an
-    /// installed app), using that window's own toast area.
+    /// Moves a notice below a question that just appeared in a window without browser chrome (Zigzag Mini, an installed
+    /// app), using its toast area.
     static func reposition(in host: PromptHost) {
         let spot = host.promptToastPlace
         guard let state = showing[ObjectIdentifier(spot.over)], let toast = state.toast,
@@ -1026,10 +1059,11 @@ enum Toast {
         place(toast, in: spot.area)
     }
 
-    /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
+    /// Shows a toast at the top center of `area` in any flipped view (also used by Passwords). `lines`: max wrap, for
+    /// notes that must be read in full.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
-                     onClose: (() -> Void)? = nil) {
+                     lines: Int = 2, onClose: (() -> Void)? = nil) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1043,6 +1077,7 @@ enum Toast {
             isNew = true
         }
         toast.label.stringValue = text
+        toast.maxLines = lines
         Announcement.post(text, priority: action == nil ? .medium : .high)
         // Busy: an empty picture keeps the icon's place for the spinner.
         toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }

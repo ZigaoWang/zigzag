@@ -70,16 +70,15 @@ import WebKit
         #expect(!BrowserWindow.browserActions.contains("selectAll:"))
     }
 
-    /// WKWebView goes Back on ⌫ (Forward on ⇧⌫) when no field has the focus, as Safari did years ago; every page's
-    /// preferences have that turned off.
+    /// WKWebView goes Back on ⌫ (Forward on ⇧⌫) with no focused field; it's disabled in every page's preferences.
     @Test func backspaceNeverGoesBack() {
         let key = "backspaceKeyNavigationEnabled"
         let preferences = WKPreferences()
-        // WebKit's own default, so this checks the key WebKit reads.
+        // WebKit's default is on, which confirms the key name.
         #expect(preferences.value(forKey: key) as? Bool == true)
         WebKitSetup.turnOffBackspaceNavigation(preferences)
         #expect(preferences.value(forKey: key) as? Bool == false)
-        // A page's new window gets a copy of its opener's preferences.
+        // Popups copy their opener's preferences.
         #expect((preferences.copy() as? WKPreferences)?.value(forKey: key) as? Bool == false)
     }
 }

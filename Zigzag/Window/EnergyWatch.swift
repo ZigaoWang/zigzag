@@ -1,12 +1,10 @@
 import AppKit
 import WebKit
 
-/// Notices a tab you're not looking at that keeps a CPU core busy and says so, with two minutes to keep it awake
-/// before it sleeps (it wakes where it was when you go back to it). Nothing sleeps without that warning. The page
-/// in front isn't flagged: you can see what it's doing, and a busy one is usually busy on purpose (an animation, a
-/// game). Nor is an extension blamed just for being on the page: password managers are on every page, so naming one
-/// would mostly be wrong. One is named only when it was caught in a loop there (ExtensionStorms). Nothing about the
-/// page is recorded; only how busy its process is.
+/// Flags a background tab that keeps a CPU core busy, with two minutes to keep it awake before it sleeps (it resumes
+/// when revisited). Nothing sleeps without that warning. The front page isn't flagged: it's visible, and usually busy
+/// on purpose (animation, game). Extensions aren't blamed just for being present (password managers are everywhere),
+/// only when caught looping (ExtensionStorms). Only process CPU is recorded, nothing about the page.
 @MainActor
 final class EnergyWatch {
     static let shared = EnergyWatch()
@@ -42,7 +40,7 @@ final class EnergyWatch {
     private var pending: [Int32: Date] = [:]
     /// Tabs you chose to keep awake from the warning: left alone for as long as Zigzag is open.
     private var spared: Set<UUID> = []
-    /// Extensions already named, by profile and ID: each is pointed out once for as long as Zigzag is open.
+    /// Extensions already named, by profile and ID; each is named once per launch.
     private var toldExtensions: Set<String> = []
 
     func start() {
@@ -96,7 +94,7 @@ final class EnergyWatch {
                 case .calm: pending[pid] = nil
                 case .warn:
                     streak[pid] = 0
-                    // An extension caught looping in one of its tabs is the one named, not the site.
+                    // Name an extension caught looping there instead of the site.
                     if #available(macOS 15.4, *), let held = Self.heldBack(in: pid) {
                         extensionIsBusy(held.id, name: held.host.displayName(for: held.id), in: held.tab, host: held.host)
                         continue
@@ -123,7 +121,7 @@ final class EnergyWatch {
         return manager.panes(of: front).contains { $0 === tab }
     }
 
-    /// A tab of this process where an extension was held back for reconnecting in a loop, and which extension.
+    /// A tab in this process where a looping extension was held back, and which extension.
     @available(macOS 15.4, *)
     private static func heldBack(in pid: Int32) -> (tab: Tab, id: String, host: ExtensionHost)? {
         for controller in WindowManager.shared.controllers {
@@ -135,8 +133,8 @@ final class EnergyWatch {
         return nil
     }
 
-    /// An extension kept a tab busy, caught reconnecting in a loop there (ExtensionStorms): named once, with a way to
-    /// turn it off on that site or everywhere. It's already held back, so nothing sleeps for it.
+    /// An extension caught reconnecting in a loop (ExtensionStorms): named once, with options to turn it off for the
+    /// site or everywhere. Already held back, so nothing sleeps.
     @available(macOS 15.4, *)
     func extensionIsBusy(_ id: String, name: String, in tab: Tab, host: ExtensionHost) {
         guard Self.sleepsBusyTabs, let controller = Self.window(holding: tab), !controller.tabManager.isPrivate,
@@ -153,7 +151,7 @@ final class EnergyWatch {
                        if let site {
                            menu.addItem(SidebarMenus.Item(String(localized: "Turn Off on \(site)", comment: "Menu item from the toast saying an extension is using a lot of energy: turns the extension off on this site only. The site is a domain.")) {
                                installs.setOff(id, on: site, true)
-                               // Its scripts leave the site's open pages as they load again.
+                               // Its scripts leave the site's open pages as they reload.
                                for owner in WindowManager.shared.controllers {
                                    for tab in owner.tabManager.allTabs where tab.webView != nil && tab.profile === profile && ContentBlocker.site(of: tab.url) == site { tab.reload() }
                                }
@@ -187,9 +185,8 @@ final class EnergyWatch {
     private func tabs(of pid: Int32, url: URL) -> (sleepers: [Tab], awake: [Tab], soon: Bool) {
         let now = Date()
         var sleepers: [Tab] = [], awake: [Tab] = [], soon = false
-        // Each window's own page (and its split partner) never sleeps here, even in a covered or minimized window:
-        // it would only load again at once, losing what it was doing. Windows sharing their tabs (#162) list the same
-        // ones: each tab is looked at once, and one any window has chosen stays.
+        // Each window's selected page (and split partner) never sleeps, even when covered or minimized: it would just
+        // reload. Sharing windows (#162) list the same tabs; each is checked once and any window's selection is kept.
         let kept = WindowManager.shared.controllers.flatMap { owner in owner.tabManager.selectedTab.map { owner.tabManager.panes(of: $0) } ?? [] }
         do {
             for tab in WindowManager.shared.openTabs where tab.webView.flatMap(Self.processID) == pid && !kept.contains(where: { $0 === tab }) {

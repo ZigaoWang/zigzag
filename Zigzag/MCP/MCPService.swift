@@ -20,8 +20,8 @@ enum MCPService {
 
     /// What Settings shows under the address: nil while all is well.
     private(set) static var problem: String?
-    /// The port was taken, so the key was replaced: whatever holds the port may have been handed the old one by an
-    /// app connecting to it. Settings says so.
+    /// The key was replaced because the port was taken; whatever holds the port may have the old one. Shown in
+    /// Settings.
     private(set) static var replacedKeyForBusyPort = false
     /// Told when the server starts, stops or fails.
     static let changed = Signal<Void>()
@@ -72,11 +72,9 @@ enum MCPService {
         server.start()
     }
 
-    /// Something else listens where apps send the key: an app connecting there hands it the key, so the key
-    /// changes and one sent there opens nothing here. Only when that key may have reached an app, though: one made
-    /// for a taken port and not yet copied from Settings can't have been sent anywhere, so a port that stays taken
-    /// launch after launch doesn't make a new key every time (and leave apps given the last one locked out for
-    /// nothing). Returns whether the key changed.
+    /// Replaces the key when another process listens on the port, since apps connecting there hand it the key. Only if
+    /// the key may have reached an app: one made for a taken port and never copied from Settings can't have, so a
+    /// persistently taken port doesn't rotate the key every launch and lock out apps. Returns whether it changed.
     @discardableResult
     static func replaceKeyForBusyPort(_ endpoint: MCPEndpoint, keyFile: URL = MCPKeyFile.url, defaults: UserDefaults = .standard) -> Bool {
         replacedKeyForBusyPort = true
@@ -87,18 +85,18 @@ enum MCPService {
         return true
     }
 
-    /// The fingerprint of the key made for a taken port, until it's copied from Settings. Only a fingerprint: the
-    /// key itself stays in its file.
+    /// Fingerprint of a key made for a taken port, until copied from Settings. Only a fingerprint; the key stays in its
+    /// file.
     private static let unsharedKey = "MCPKeyNotHandedOut"
 
-    /// Whether apps may have the key: unless it's the one made for a taken port and never copied since. A key
-    /// Zigzag knows nothing about (made before, or reset by hand) may have been handed out.
+    /// Whether apps may have the key: unless it's the taken-port key never copied since. Keys Zigzag didn't track
+    /// (older, reset by hand) count as handed out.
     static func keyMayHaveReachedApps(_ token: String?, defaults: UserDefaults = .standard) -> Bool {
         guard let token, !token.isEmpty else { return false }
         return defaults.string(forKey: unsharedKey) != fingerprint(token)
     }
 
-    /// The key is copied from Settings for an app: from now on it may be anywhere that app sends it.
+    /// Copied from Settings, so it may now be anywhere.
     static func noteKeyHandedOut(defaults: UserDefaults = .standard) { defaults.removeObject(forKey: unsharedKey) }
 
     private static func fingerprint(_ token: String) -> String {
@@ -129,8 +127,7 @@ enum MCPService {
         }
     }
 
-    /// The key apps send, made the first time it's needed. Read only to copy it for an app (Settings), so reading
-    /// it counts as handing it out.
+    /// Created on first use. Read only to copy for an app (Settings), so reading counts as handing out.
     static var token: String {
         noteKeyHandedOut()
         return MCPKeyFile.token(creating: true) ?? ""
@@ -160,7 +157,7 @@ nonisolated enum MCPKeyFile {
     static var url: URL { Paths.file("MCP Key") }
 
     static func token(at url: URL = url, creating: Bool) -> String? {
-        // Only a key as Zigzag makes them: one written there by hand, or by something else, is replaced.
+        // Replace a key not in Zigzag's format (written by hand or by something else).
         if let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
            MCPAccess.isZigzagKey(text) {
             // Kept to you alone, even if something loosened it.

@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// An update that's ready: when the sidebar's card shows, putting it away, a newer version taking the place of a
-/// staged one, the menu's title, and how often Zigzag looks.
+/// Ready updates: when the sidebar card shows, dismissing it, newer versions replacing a staged one, the menu title, and check frequency.
 struct UpdateReadyTests {
     @Test func nothingStagedShowsNothing() {
         let readiness = UpdateReadiness()
@@ -25,9 +24,9 @@ struct UpdateReadyTests {
         readiness.stage(version: "0.9.2", build: "117")
         readiness.dismiss()
         #expect(!readiness.showsCard)
-        // Still staged: it installs on quit, and Zigzag › Restart to Update is still there.
+        // Still staged: installs on quit, and Restart to Update stays in the menu.
         #expect(readiness.canRestart)
-        // The same update found again by a later check stays put away.
+        // The same update found again stays dismissed.
         readiness.stage(version: "0.9.2", build: "117")
         #expect(!readiness.showsCard)
     }
@@ -63,7 +62,7 @@ struct UpdateReadyTests {
         #expect(readiness.isStale(feedNewest: "118"))
         #expect(!readiness.isStale(feedNewest: "117"))
         #expect(!readiness.isStale(feedNewest: "116"))
-        // A feed that couldn't be read leaves the staged one alone.
+        // An unreadable feed leaves the staged update alone.
         #expect(!readiness.isStale(feedNewest: nil))
     }
 
@@ -82,10 +81,10 @@ struct UpdateReadyTests {
         let sized = UpdateCardState.downloading(version: "0.9.2", received: 0, total: 1000)
         #expect(sized.share == 0)
         #expect(sized.differsVisibly(from: start))
-        // Less than a percent more: not worth drawing again.
+        // Under 1%: not redrawn.
         #expect(!UpdateCardState.downloading(version: "0.9.2", received: 5, total: 1000).differsVisibly(from: sized))
         #expect(UpdateCardState.downloading(version: "0.9.2", received: 10, total: 1000).differsVisibly(from: sized))
-        // Every step is.
+        // Every stage change is.
         #expect(UpdateCardState.preparing(version: "0.9.2").differsVisibly(from: sized))
         #expect(UpdateCardState.ready(version: "0.9.2").isReady)
         #expect(UpdateCardState.preparing(version: "0.9.2-beta.1").version == "0.9.2-beta.1")
@@ -115,7 +114,7 @@ struct UpdateReadyTests {
         #expect(VersionName.display("0.9.2") == "0.9.2")
         #expect(VersionName.display("1.10") == "1.10")
         #expect(VersionName.display("") == "")
-        // Anything else after the dash still loses its dash and dots.
+        // Other suffixes lose the dash and dots too.
         #expect(VersionName.display("1.0-rc.2") == "1.0 rc 2")
         #expect(VersionName.display("1.0-beta") == "1.0 beta")
     }
@@ -127,7 +126,7 @@ struct UpdateReadyTests {
         #expect(updater.menuTitle == String(localized: "Check for Updates…", comment: "Zigzag menu item."))
         updater.debugStage("0.9.2")
         #expect(updater.menuTitle == String(localized: "Restart to Update", comment: "Zigzag menu item in place of Check for Updates… while an update is ready: restarts Zigzag into it."))
-        // Put away from the sidebar: the menu still offers it.
+        // Dismissed from the sidebar: still in the menu.
         updater.dismissCard()
         #expect(updater.menuTitle == String(localized: "Restart to Update", comment: "Zigzag menu item in place of Check for Updates… while an update is ready: restarts Zigzag into it."))
         #expect(!updater.readiness.showsCard)
@@ -141,10 +140,10 @@ struct UpdateReadyTests {
         #expect(UpdateSchedule.shouldCheck(lastCheck: nil, now: now, onWake: false))
         #expect(!UpdateSchedule.shouldCheck(lastCheck: now.addingTimeInterval(-3 * 3600), now: now, onWake: false))
         #expect(UpdateSchedule.shouldCheck(lastCheck: now.addingTimeInterval(-4 * 3600), now: now, onWake: false))
-        // Waking: once an hour has gone by.
+        // On wake: once an hour has passed.
         #expect(!UpdateSchedule.shouldCheck(lastCheck: now.addingTimeInterval(-30 * 60), now: now, onWake: true))
         #expect(UpdateSchedule.shouldCheck(lastCheck: now.addingTimeInterval(-61 * 60), now: now, onWake: true))
-        // A clock set back.
+        // Clock set back.
         #expect(UpdateSchedule.shouldCheck(lastCheck: now.addingTimeInterval(3600), now: now, onWake: false))
     }
 
@@ -178,7 +177,7 @@ struct UpdateReadyTests {
     }
 
     @Test func theFeedSkipsWhatThisMacCantInstall() {
-        // For a newer macOS, for another channel, or with nothing to download.
+        // Requires newer macOS, another channel, or no download.
         let data = feed(item("116", "0.9.1") + item("119", "1.0", minimum: "27.0") + item("118", "0.9.3-x", channel: "nightly")
                         + item("117", "0.9.2-info", enclosure: false))
         #expect(UpdateFeed.newest(in: data, host: mac) == .init(build: "116", version: "0.9.1"))
@@ -196,13 +195,13 @@ struct UpdateReadyTests {
         #expect(UpdateFeed.newest(in: feed(""), host: mac) == nil)
     }
 
-    /// `item` with more elements before its description.
+    /// `item` with extra elements before its description.
     private func item(_ build: String, _ version: String, with extra: String) -> String {
         item(build, version).replacingOccurrences(of: "<description>", with: extra + "<description>")
     }
 
     @Test func theFeedSkipsWhatSparkleWouldntFetchInTheBackground() {
-        // Only a delta, another OS, informational only, a major upgrade, and one that can't update build 115.
+        // Delta-only, other OS, informational, major upgrade, and one that can't update build 115.
         let delta = """
         <item><sparkle:version>120</sparkle:version><sparkle:shortVersionString>0.9.6</sparkle:shortVersionString>
         <sparkle:deltas><enclosure url="https://example.com/d.delta" sparkle:version="120" sparkle:deltaFrom="115" length="1"/></sparkle:deltas></item>
@@ -218,13 +217,13 @@ struct UpdateReadyTests {
         let notFromHere = item("124", "1.1", with: "<sparkle:minimumUpdateVersion>116</sparkle:minimumUpdateVersion>")
         let data = feed(item("116", "0.9.1") + delta + windows + informational + major + notFromHere)
         #expect(UpdateFeed.newest(in: data, host: mac) == .init(build: "116", version: "0.9.1"))
-        // A full enclosure beside the deltas counts, and its version isn't the delta's.
+        // A full enclosure beside deltas counts, with its own version.
         let both = delta.replacingOccurrences(of: "</item>", with: "<enclosure url=\"https://example.com/z.zip\" length=\"1\"/></item>")
         #expect(UpdateFeed.newest(in: feed(item("116", "0.9.1") + both), host: mac) == .init(build: "120", version: "0.9.6"))
     }
 
     @Test func aPhasedRolloutCountsOnceItReachesThisMacsGroup() {
-        // Group 3 of a daily rollout: from three days after its date.
+        // Group 3 of a daily phased rollout: eligible three days after its date.
         func newest(daysAgo: Double, group: Int?) -> String? {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: "en_US")
@@ -237,10 +236,10 @@ struct UpdateReadyTests {
         }
         #expect(newest(daysAgo: 2, group: 3) == "116")
         #expect(newest(daysAgo: 3.1, group: 3) == "118")
-        // No group picked yet: taken as the last, so the newer item waits longest.
+        // No group yet: treated as last, so newer items wait longest.
         #expect(newest(daysAgo: 3.1, group: nil) == "116")
         #expect(newest(daysAgo: 6.1, group: nil) == "118")
-        // A rollout without a date it can read doesn't count.
+        // A rollout without a readable date doesn't count.
         let undated = item("118", "0.9.3", with: "<sparkle:phasedRolloutInterval>86400</sparkle:phasedRolloutInterval>")
         #expect(UpdateFeed.newest(in: feed(item("116", "0.9.1") + undated), host: mac)?.build == "116")
     }

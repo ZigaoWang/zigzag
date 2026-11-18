@@ -29,34 +29,31 @@ protocol PromptHost: AnyObject {
     var promptIsCovered: Bool { get }
     /// The address the question hangs from: a click there doesn't put it off.
     var promptAnchor: NSView? { get }
-    /// Where a short notice over the page goes: the flipped layer over the pages, and the room in it. A window with
-    /// something else over its page (the desk, an AI app's bar) says so by answering this; everything else about a
-    /// notice comes from `promptToast` below, so every window says one the same way.
+    /// Where page toasts go: the flipped overlay and the area in it. Windows with something over the page (the desk, an
+    /// AI app's bar) override this; everything else comes from `promptToast`, so all windows show toasts the same way.
     var promptToastPlace: (over: NSView, area: NSRect) { get }
 }
 
 extension PromptHost {
-    /// Where a notice goes by default: over the pages, edge to edge, under a question that is already there.
+    /// Default: over the pages, full width, below any question.
     var promptToastPlace: (over: NSView, area: NSRect) {
         (promptOverlay, PageQuestions.area(promptOverlay.bounds, below: PageQuestions.occupied(in: promptOverlay)))
     }
 
-    /// A short notice over the page. `action` adds a button — a title and what pressing it does — for a notice with
-    /// something to offer (Allow Once, Try Again); one of those stays long enough to read and act on, and a `closes`
-    /// × for an offer you may want gone before it goes on its own. The button takes no click for its first half
-    /// second, so a click meant for the page can't land on it.
+    /// A toast over the page. `action` adds a button (title and handler) for offers (Allow Once, Try Again), which stay
+    /// longer; `closes` adds a ×. The button ignores clicks for its first half second so a click meant for the page
+    /// can't hit it. `lines`: max wrap (`Toast.show`).
     func promptToast(_ text: String, symbol: String, duration: TimeInterval,
-                     action: (title: String, run: () -> Void)? = nil, closes: Bool = false) {
+                     action: (title: String, run: () -> Void)? = nil, closes: Bool = false, lines: Int = 2) {
         let place = promptToastPlace
         Toast.show(text, symbol: symbol, action: action, duration: duration, closes: closes,
-                   over: place.over, area: place.area)
+                   over: place.over, area: place.area, lines: lines)
     }
 }
 
 extension WindowManager {
-    /// The window a page in `window` asks its questions in: a browser window, Zigzag Mini, or an installed app's own
-    /// window. Without the last, a web app's camera, location or notification request would be answered no without
-    /// being asked.
+    /// The window that asks questions for a page in `window`: a browser window, Zigzag Mini, or an installed app's
+    /// window. Without the last, a web app's camera, location or notification request was denied without asking.
     func promptHost(for window: NSWindow?) -> PromptHost? {
         guard let window else { return nil }
         if let controller = controller(for: window) { return controller }
@@ -64,9 +61,8 @@ extension WindowManager {
         return WebAppWindowController.all.first { $0.window === window }
     }
 
-    /// The window `tab` lives in, wherever it's showing: the same three `promptHost(for:)` answers, found by the page
-    /// instead of by the window. An installed app's window was missing here, so a login captured in one offered to be
-    /// saved in a window that was never looked for, and the offer never came up.
+    /// The window holding `tab`, found by page rather than window, with the same three cases as `promptHost(for:)`.
+    /// Installed app windows were missing here, so their Save password offers never appeared.
     func promptHost(holding tab: Tab) -> PromptHost? {
         if let controller = window(of: tab) { return controller }
         if let mini = MiniWindowController.all.first(where: { $0.tab === tab }) { return mini }
@@ -97,16 +93,15 @@ extension BrowserWindowController: PromptHost {
     }
     var promptIsCovered: Bool { commandBar.isVisible }
     var promptAnchor: NSView? { sidebar.address }
-    /// A notice in a browser window keeps clear of the desk when it's open, and of an AI app's bar over the page.
+    /// Browser window toasts avoid the open desk and an AI app's bar over the page.
     var promptToastPlace: (over: NSView, area: NSRect) { (root.overlay, Toast.area(in: self)) }
 }
 
-/// The top of a page holds one thing at a time. A page's questions (a site's permission, Save password?) take turns
-/// there: one shows, the next waits hidden until it's answered or set aside. A toast that comes while a question is
-/// up shows under it, and moves up once the question goes.
+/// The top of a page shows one question at a time (a site permission, Save password?); the next waits hidden until it's
+/// answered or dismissed. Toasts that arrive meanwhile show below it and move up once it goes.
 @MainActor enum PageQuestions {
-    /// The question showing at the top of a page in `overlay`, other than `except`; with `over`, only one where it
-    /// would cover that frame.
+    /// The question shown at the top of a page in `overlay`, other than `except`; with `over`, only one covering that
+    /// frame.
     static func showing(in overlay: NSView, except: NSView? = nil, over frame: NSRect? = nil) -> FloatingPanelView? {
         overlay.subviews.lazy.compactMap { $0 as? FloatingPanelView }.first { view in
             view !== except && (view is PermissionPrompt || view is SavePasswordPrompt) && !view.isHidden && !view.dismissing
@@ -114,19 +109,19 @@ extension BrowserWindowController: PromptHost {
         }
     }
 
-    /// Whether `question`, placed where it would show, may come up now: no other question is showing there. Questions
-    /// on different panes of a split show together.
+    /// Whether `question` may show now: no other question is shown there. Questions in different split panes show
+    /// together.
     static func mayShow(_ question: NSView, in overlay: NSView) -> Bool {
         showing(in: overlay, except: question, over: question.frame) == nil
     }
 
-    /// What a toast at the top of `area` keeps clear of: a question or the update note showing there.
+    /// What a top toast avoids in `area`: a shown question or the update note.
     static func occupied(in overlay: NSView) -> NSRect? {
         if let question = showing(in: overlay) { return question.frame }
         return overlay.subviews.lazy.compactMap { $0 as? WhatsNewOffer }.first { !$0.isHidden && !$0.dismissing }?.frame
     }
 
-    /// `area` with the top cut off down to the bottom of `taken`, for a toast to sit under what's there.
+    /// `area` trimmed from the top to below `taken`.
     static func area(_ area: NSRect, below taken: NSRect?) -> NSRect {
         guard let taken, taken.intersects(area), taken.maxY > area.minY else { return area }
         var below = area
@@ -135,23 +130,22 @@ extension BrowserWindowController: PromptHost {
         return below
     }
 
-    /// A question came up: the update note, which only informs, makes way for it, and a toast showing moves under it.
+    /// A question appeared: the update note gives way, and a toast moves below it.
     static func cameUp(in host: PromptHost) {
         if let controller = host as? BrowserWindowController {
             WhatsNewOffer.close(in: controller)
             Toast.reposition(in: controller)
         } else {
-            // Zigzag Mini and an installed app's window have no desk or agent bar, but their notice still moves under
-            // the question rather than sitting over it.
+            // Mini and app windows have no desk or agent bar, but their toast still moves below the question.
             Toast.reposition(in: host)
         }
     }
 
-    /// A question went, or stepped aside for another tab: the oldest one waiting for this page comes up, and a toast
-    /// under it moves back up.
+    /// A question closed or yielded to another tab: show the oldest waiting one for this page, and move a toast back
+    /// up.
     static func turnFreed(in host: PromptHost) {
         for view in host.promptOverlay.subviews {
-            // One already sliding out has had its answer.
+            // Skip one already dismissing.
             if (view as? FloatingPanelView)?.dismissing == true { continue }
             (view as? PermissionPrompt)?.followTab()
             (view as? SavePasswordPrompt)?.followTab()

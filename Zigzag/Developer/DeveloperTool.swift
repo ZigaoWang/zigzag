@@ -131,12 +131,10 @@ enum DeveloperTool: String, CaseIterable {
     /// or something to do.
     var isChoice: Bool { appearance != nil || userAgent != nil || self == .sizeFill }
 
-    /// The choice of its kind that leaves the page as any page: following the Mac, Zigzag's own user agent, filling
-    /// the window.
+    /// The default choice of its kind: follow the Mac, Zigzag's user agent, fill the window.
     var isDefaultChoice: Bool { self == .appearanceFollowsMac || self == .userAgentZigzag || self == .sizeFill }
 
-    /// Whether something among `tools` is in effect for a page with these choices: a choice other than the one any
-    /// page has, or something turned on.
+    /// Whether any of `tools` is active: a non-default choice or a toggle turned on.
     static func hasChoiceInEffect(among tools: [DeveloperTool], in state: DeveloperState) -> Bool {
         tools.contains { $0.isDefaultChoice ? !$0.isChecked(in: state) : !$0.isChoice && $0.isChecked(in: state) }
     }
@@ -156,8 +154,8 @@ enum DeveloperTool: String, CaseIterable {
         }
     }
 
-    /// Whether the tool has something to do with the choices as they are: only a page with a size of its own turns,
-    /// and a page drawn without its styles has none for print and keeps none of the outlines' style.
+    /// Whether the tool does anything with the current choices: rotation needs a custom size, and an unstyled page has
+    /// no print styles or outline style.
     func applies(in state: DeveloperState) -> Bool {
         switch self {
         case .rotate: state.size != nil
@@ -166,8 +164,7 @@ enum DeveloperTool: String, CaseIterable {
         }
     }
 
-    /// Whether this Mac's WebKit has what the tool needs: one that goes through WebKit's own unpublished preferences is
-    /// left out wherever it no longer does, rather than offered and doing nothing.
+    /// Whether this WebKit supports the tool; tools using private preferences are hidden where they're gone.
     var isAvailable: Bool {
         switch self {
         case .styles: PageStyles.isAvailable
@@ -331,8 +328,7 @@ enum DeveloperTool: String, CaseIterable {
     /// The tools with a tile of their own in Site Controls, where a development page doesn't have them above it.
     static let tiles: [DeveloperTool] = [.console, .inspect, .reloadIgnoringCache]
 
-    /// The tools Developer tools adds to View › Developer, those this Mac's WebKit has. The others have had their
-    /// items there all along.
+    /// Developer tools' additions to View › Developer that this WebKit supports; the others were always there.
     static let menuItems: [DeveloperTool] = [.site, .clearCache, .clearCookies, .appearanceFollowsMac, .appearanceLight, .appearanceDark, .printStyles,
                                            .sizeFill, .sizeCustom, .rotate, .sizeToggle,
                                            .userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox,
@@ -346,11 +342,9 @@ enum DeveloperTool: String, CaseIterable {
         self.init(rawValue: String(commandID.dropFirst(Self.commandPrefix.count)))
     }
 
-    /// Whether the tool is offered for the page you're on. Developer Mode for the site: with the main switch on, for
-    /// any web page, and not in a private window. Every other tool: on a development tab; clearing has nothing to clear in a
-    /// private window, which keeps nothing.
-    /// A page's own size is for a page shown on its own: not in a split, whose panes share the window as they are.
-    /// Nothing this Mac's WebKit doesn't have is offered (`isAvailable`).
+    /// Whether the tool is offered for the current page. Developer Mode for the site: main switch on, any web page, not
+    /// private. Others: development tabs only; clearing isn't offered in private windows. Custom page size isn't
+    /// offered in a split. Never anything unsupported (`isAvailable`).
     static func isOffered(_ tool: DeveloperTool, isOn: Bool, isDevelopment: Bool, url: URL?, isPrivate: Bool, inSplit: Bool = false) -> Bool {
         guard tool.isAvailable else { return false }
         return switch tool {

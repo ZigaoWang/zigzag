@@ -23,7 +23,7 @@ final class CertificatePage: NSView {
     private let chainLabel = Label.section(String(localized: "Chain", comment: "Section label over the certificates from the site's up to the root, on the certificate page of the site panel."))
     private var chainRows: [ChainRow] = []
     private var fields: [(name: Label, value: Label)] = []
-    /// The SHA-256 field's label and the fingerprint in it, broken into lines to fit the width it's laid out at.
+    /// The SHA-256 label and its fingerprint, wrapped to the layout width.
     private var fingerprint: (label: Label, value: String)?
 
     override init(frame: NSRect) {
@@ -117,8 +117,8 @@ final class CertificatePage: NSView {
             let valueLabel = Self.wrapping(Tokens.Font.body(), color: Tokens.Color.textPrimary)
             valueLabel.stringValue = value
             if name == "SHA-256" {
-                // A block of pairs, the same number on each line, broken only after a colon (`fingerprintLines`, as
-                // many as fit, set in `arrange`), its figures all as wide.
+                // Equal pairs per line, wrapped only after a colon (`fingerprintLines`, set in `arrange`), in tabular
+                // figures.
                 valueLabel.font = Tokens.Font.figures(Tokens.TypeSize.small)
                 fingerprint = (valueLabel, value)
             }
@@ -175,8 +175,8 @@ final class CertificatePage: NSView {
             }
         }
         if let fingerprint {
-            // As many pairs to a line as fit, halving from 16 (two lines) down, so the lines come out even.
-            // A pair at its widest: the figures are all as wide, the letters A to F not quite.
+            // Pairs per line: halve from 16 (two lines) until they fit, so lines are even. Measured at the widest pair,
+            // since tabular figures are fixed width but A-F aren't.
             let font = fingerprint.label.font ?? Tokens.Font.small()
             let widest = "0123456789ABCDEF".map { (String($0) as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
             let pair = widest * 2 + (":" as NSString).size(withAttributes: [.font: font]).width

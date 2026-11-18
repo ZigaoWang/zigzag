@@ -223,6 +223,7 @@
 		683F5B85A025D428AE54D386 /* MiniWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AEE03EBEB4A7817E6E100A /* MiniWindowController.swift */; };
 		686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18895E549507CE748D20047 /* TabDropIndexTests.swift */; };
 		691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDF5DDEF3F10D52662345203 /* ArcImporter.swift */; };
+		F11646D2DC7B598E9DCEEC7C /* BookmarksHTML.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCDAB660DAB0A020A7AC6B2A /* BookmarksHTML.swift */; };
 		694A0100C79943F9F99EAFD1 /* NetworkChanges.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0124D0F7C86C266C5E8A6AC7 /* NetworkChanges.swift */; };
 		696A9156848EC86706D34804 /* PageDialogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0CD79C0A1D2CDBE8C34B91 /* PageDialogs.swift */; };
 		6A33BB5CABADE7C1D292DE54 /* SaveFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = E95FE283163E55EA089497AE /* SaveFailure.swift */; };
@@ -251,6 +252,8 @@
 		CE5046E6187D607731AAB70F /* HistoryMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D70DDEBAE2B1AEFF28A65CC /* HistoryMenu.swift */; };
 		769E7489108DDC7DB699DC36 /* page-fullscreen.js in Resources */ = {isa = PBXBuildFile; fileRef = B6B4DC12DA4D88C56E886156 /* page-fullscreen.js */; };
 		789E734404BE475A5AA09EE2 /* find-count.html in Resources */ = {isa = PBXBuildFile; fileRef = 8BC5CFBDE21CD4D0E29009EB /* find-count.html */; };
+		0BEF7F50D05E7C726E2DCE7D /* safari-bookmarks.html in Resources */ = {isa = PBXBuildFile; fileRef = C9AEE84C5A07C6213FA3E8BA /* safari-bookmarks.html */; };
+		1E799F0AC6F2145D48B5661E /* firefox-bookmarks.html in Resources */ = {isa = PBXBuildFile; fileRef = 0024A62D1721F84806CE1C9E /* firefox-bookmarks.html */; };
 		78A01D8F531F6B66F95A8267 /* PermissionPromptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEE0E83603E1E4C9E7473B59 /* PermissionPromptTests.swift */; };
 		793B9026E6B038B286D30A34 /* SidebarListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15522DF5DF7479D8C9FB11A3 /* SidebarListView.swift */; };
 		79B109D184AEBA99124E805F /* ExtensionSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F25B6A15B8EF24B0520F26F /* ExtensionSearchTests.swift */; };
@@ -861,6 +864,8 @@
 		89A07EB62BF2057B04CDC41A /* autoconsent.info.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = autoconsent.info.json; sourceTree = "<group>"; };
 		8A7E9A550FE7FAD6F8CA7697 /* HistoryLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryLookup.swift; sourceTree = "<group>"; };
 		8BC5CFBDE21CD4D0E29009EB /* find-count.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "find-count.html"; sourceTree = "<group>"; };
+		C9AEE84C5A07C6213FA3E8BA /* safari-bookmarks.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "safari-bookmarks.html"; sourceTree = "<group>"; };
+		0024A62D1721F84806CE1C9E /* firefox-bookmarks.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "firefox-bookmarks.html"; sourceTree = "<group>"; };
 		8C69310459FA2C067D241416 /* MCPPageScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPPageScript.swift; sourceTree = "<group>"; };
 		8C71865A2409825CF2E77AF7 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		8C75446E0910274E17EE4DA1 /* SiteExtensionsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteExtensionsTests.swift; sourceTree = "<group>"; };
@@ -1080,6 +1085,7 @@
 		ECFB222D7082B8C1D2724708 /* tab-capture.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "tab-capture.js"; sourceTree = "<group>"; };
 		ED6BBDD8A2A81F07A7506CB3 /* EnergyWatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyWatch.swift; sourceTree = "<group>"; };
 		EDF5DDEF3F10D52662345203 /* ArcImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArcImporter.swift; sourceTree = "<group>"; };
+		DCDAB660DAB0A020A7AC6B2A /* BookmarksHTML.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksHTML.swift; sourceTree = "<group>"; };
 		EE1EE7853A66CE1029968DA5 /* Scripting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Scripting.swift; sourceTree = "<group>"; };
 		EE467D41C2D9D9428EE46A32 /* avoidxray.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = avoidxray.png; sourceTree = "<group>"; };
 		EEE9BA12566291B727684678 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
@@ -1527,6 +1533,7 @@
 			isa = PBXGroup;
 			children = (
 				EDF5DDEF3F10D52662345203 /* ArcImporter.swift */,
+				DCDAB660DAB0A020A7AC6B2A /* BookmarksHTML.swift */,
 				D2EA6931C96DF7709CF8A2B6 /* ChromiumExtensions.swift */,
 				59824EC63CB9D39A3EFC97CC /* ChromiumImporter.swift */,
 				E314E1B3C6242087C5B2B7E3 /* CSVImporter.swift */,
@@ -1634,6 +1641,8 @@
 				BD3E507FE9CD5CD3025750FE /* chrome-bookmarks-work.json */,
 				DDA8091D12FF865D4C6F3952 /* chrome-local-state.json */,
 				8BC5CFBDE21CD4D0E29009EB /* find-count.html */,
+				C9AEE84C5A07C6213FA3E8BA /* safari-bookmarks.html */,
+				0024A62D1721F84806CE1C9E /* firefox-bookmarks.html */,
 				9DF2A2D01D8BD422F0F2323B /* firefox-profile */,
 				4DB46F7EBC33B0D2A4962BF7 /* orion */,
 			);
@@ -2138,6 +2147,8 @@
 				FB2AE7D5BF0E44C75BDAEBBB /* chrome-local-state.json in Resources */,
 				F33B0673811E66F305F2EC55 /* favourites.plist in Resources */,
 				789E734404BE475A5AA09EE2 /* find-count.html in Resources */,
+				0BEF7F50D05E7C726E2DCE7D /* safari-bookmarks.html in Resources */,
+				1E799F0AC6F2145D48B5661E /* firefox-bookmarks.html in Resources */,
 				3CC1FECBB9087F53BF03AD3F /* key4.db in Resources */,
 				CE83F1D6BC2CD7361C5F4599 /* logins.json in Resources */,
 				93F7D9887CC5E8E2800B8E67 /* orion-extensions.plist in Resources */,
@@ -2211,6 +2222,7 @@
 				49171D1B593738C5F5041F13 /* AppBundledExtensions.swift in Sources */,
 				3690704E0C2C6021A3E511D7 /* AppDelegate.swift in Sources */,
 				691243202E89456F9FB1A3C5 /* ArcImporter.swift in Sources */,
+				F11646D2DC7B598E9DCEEC7C /* BookmarksHTML.swift in Sources */,
 				A51ADDC4218AC8285461C618 /* Atmosphere.swift in Sources */,
 				DE46862A25C7BB10CA9A1C57 /* AutoPictureInPicture.swift in Sources */,
 				087468A86D6129B66892F5D9 /* Autofill.swift in Sources */,
@@ -2815,7 +2827,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 122;
+				CURRENT_PROJECT_VERSION = 123;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -2832,7 +2844,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.4;
-				MARKETING_VERSION = 0.9.2;
+				MARKETING_VERSION = 0.9.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				OTHER_CODE_SIGN_FLAGS = "--timestamp";
@@ -2934,7 +2946,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 122;
+				CURRENT_PROJECT_VERSION = 123;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -2957,7 +2969,7 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.4;
-				MARKETING_VERSION = 0.9.2;
+				MARKETING_VERSION = 0.9.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

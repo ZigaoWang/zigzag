@@ -1,36 +1,35 @@
 import AppKit
 
-/// With the sidebar hidden, a link opened in a new tab behind the page (⌘-click, a middle click, Open Link in New
-/// Tab) went without a sign that anything happened (#272). A note slides in from the sidebar's edge for a moment, with
-/// the new tab's icon and title, in a toast's look. A click on it goes to the tab; the pointer on it keeps it there.
-/// Links opened one after another update the one note, the latest tab's, rather than stacking.
+/// With the sidebar hidden, a link opened in a background tab (⌘-click, middle click, Open Link in New Tab) gave no
+/// feedback (#272). A toast-style note slides in from the sidebar's edge with the tab's icon and title. Clicking it
+/// selects the tab; hovering keeps it. Further links update the same note instead of stacking.
 @MainActor
 final class NewTabNote {
-    /// How long it stays once the pointer isn't on it.
+    /// How long it stays without hover.
     static let duration: TimeInterval = 2.5
 
     private weak var controller: BrowserWindowController?
     private var view: NewTabNoteView?
     private weak var tab: Tab?
-    /// The site the tab is about to load, for a tab WebKit made empty: named until its page says what it is.
+    /// The site for a tab WebKit created empty; shown until the page has a title.
     private var site: URL?
     private var tabToken: SignalToken?
     private var hideWork: DispatchWorkItem?
-    /// When it goes, while the pointer isn't on it.
+    /// When it hides, without hover.
     private var deadline = Date()
-    /// What was left of its time when the pointer came onto it.
+    /// Time left when hover began.
     private var remaining: TimeInterval?
 
     init(controller: BrowserWindowController) {
         self.controller = controller
     }
 
-    /// Only with the sidebar out of sight: docked or slid out, the new row in it already says so.
+    /// Only with the sidebar hidden; docked or floating, the new row shows it already.
     static func shows(sidebarVisible: Bool, sidebarFloating: Bool, deskVisible: Bool) -> Bool {
         !sidebarVisible && !sidebarFloating && !deskVisible
     }
 
-    /// What it calls the tab: its title once the page has one, the site's name until then.
+    /// The tab's title once it has one, the site's name until then.
     static func title(of tab: Tab, site: URL?) -> String {
         if tab.isBlank, let host = site?.host(), !host.isEmpty { return host.withoutWWW }
         let title = tab.displayTitle
@@ -45,7 +44,7 @@ final class NewTabNote {
     var isShowing: Bool { view?.superview != nil && view?.dismissing == false }
 
     #if DEBUG
-    /// Where it is in the window, from the window's top left, while it's up.
+    /// Its frame from the window's top left while shown.
     var debugFrame: NSRect? {
         guard isShowing, let view, let window = view.window else { return nil }
         let r = view.convert(view.bounds, to: nil)
@@ -53,7 +52,7 @@ final class NewTabNote {
     }
     #endif
 
-    /// A tab you opened in the background in this window, from a link.
+    /// A background tab opened from a link in this window.
     func show(_ tab: Tab, site: URL? = nil) {
         guard let controller, Self.shows(sidebarVisible: controller.root.sidebarVisible, sidebarFloating: controller.root.isSidebarFloatingVisible,
                                          deskVisible: controller.desk.isVisible) else { return }
@@ -85,17 +84,17 @@ final class NewTabNote {
             controller.root.overlay.addSubview(note)
             note.present()
         } else if note.dismissing {
-            // Caught on its way out: it turns around from where it is.
+            // Caught while hiding: reverse from where it is.
             note.present()
         }
-        // Another one: the same note, with the new tab in it, and its time starts over. Nothing moves.
+        // Already showing: update it with the new tab and restart its timer, without moving.
         Announcement.post(Self.announcement(for: note.label.stringValue))
         remaining = note.isHovered ? Self.duration : nil
         if !note.isHovered { schedule(Self.duration) }
         else { hideWork?.cancel(); hideWork = nil }
     }
 
-    /// Takes it down, if it's up.
+    /// Hides it if shown.
     func hide() {
         hideWork?.cancel()
         hideWork = nil
@@ -105,8 +104,7 @@ final class NewTabNote {
         view.dismiss()
     }
 
-    /// The window's layout changed: the sidebar came back (or slid out), and the note steps away, or the page moved,
-    /// and it stays at its corner.
+    /// Layout changed: hide if the sidebar came back or slid out, else keep it at its corner.
     func reposition() {
         guard let controller, let view, view.superview != nil, !view.dismissing else { return }
         guard Self.shows(sidebarVisible: controller.root.sidebarVisible, sidebarFloating: controller.root.isSidebarFloatingVisible,
@@ -122,15 +120,15 @@ final class NewTabNote {
         note.setAccessibilityLabel(Self.announcement(for: note.label.stringValue))
     }
 
-    /// Its page said its title or sent its icon: the note shows it, keeping its corner.
+    /// The page sent its title or icon: update, keeping position.
     private func refresh() {
         guard let view, view.superview != nil, !view.dismissing else { return }
         fill(view)
         place(view)
     }
 
-    /// At the top of the page, on the sidebar's side: under a page's question, as a toast is, and clear of where a
-    /// link's address shows at the bottom.
+    /// At the top of the page on the sidebar's side, below any page question (like a toast), away from the bottom link
+    /// status.
     private func place(_ note: NewTabNoteView) {
         guard let controller else { return }
         let area = Toast.area(in: controller)
@@ -140,7 +138,7 @@ final class NewTabNote {
         note.needsLayout = true
     }
 
-    /// Long titles are cut short: it's a glance at what opened, not the page's whole name.
+    /// Long titles are truncated.
     static let maxWidth: CGFloat = 320
 
     private func schedule(_ delay: TimeInterval) {
@@ -156,7 +154,7 @@ final class NewTabNote {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
-    /// The pointer on it holds it; off it, the rest of its time runs, never less than a moment to move away.
+    /// Hover holds it; leaving resumes the remaining time, with a short minimum.
     private func hovered(_ inside: Bool) {
         guard let view, view.superview != nil, !view.dismissing else { return }
         if inside {
@@ -176,7 +174,7 @@ final class NewTabNote {
     }
 }
 
-/// A toast that's also a button: a click anywhere on it, and the pointer coming onto it and leaving.
+/// A toast that's a button: handles clicks anywhere and hover.
 final class NewTabNoteView: ToastView {
     var onClick: (() -> Void)?
     var onHover: ((Bool) -> Void)?
@@ -185,7 +183,7 @@ final class NewTabNoteView: ToastView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        // A site's icon comes at whatever size the site gave it.
+        // Site icons come in any size.
         icon.imageScaling = .scaleProportionallyUpOrDown
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
@@ -193,7 +191,7 @@ final class NewTabNoteView: ToastView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// One line, cut short at the end: a title never wraps under its icon.
+    /// Single line, truncated at the end.
     override func size(maxWidth: CGFloat) -> NSSize {
         label.usesSingleLineMode = true
         label.maximumNumberOfLines = 1
@@ -203,14 +201,14 @@ final class NewTabNoteView: ToastView {
         return NSSize(width: min(ceil(fittingWidth), maxWidth), height: Self.height)
     }
 
-    /// The whole note takes the press, its words and icon included.
+    /// The whole note takes the press, label and icon included.
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard !dismissing, frame.contains(point) else { return nil }
         return self
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    /// The window keeps presses on a panel's surface from it; this one is a button.
+    /// The window swallows panel surface presses; this one is a button.
     override var takesPress: Bool { true }
 
     override func mouseDown(with event: NSEvent) { pressed = true }

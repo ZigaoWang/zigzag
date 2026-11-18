@@ -20,8 +20,7 @@ struct MiniPlayerTests {
         #expect(MiniPlayerLayout.choose([paused, playing], viewport: viewport)?.index == 1)
     }
 
-    /// A feed of short videos plays the next one in another element: the card moves to it once its own has stopped,
-    /// and stays on a video you paused when nothing else plays.
+    /// In a short-video feed the card follows the next video once its own stops, and stays on a paused one when nothing else plays.
     @Test func theCardMovesOnToAFeedsNextVideo() {
         let r = CGRect(x: 0, y: 0, width: 640, height: 360)
         let shown = video(0, r, playing: false), next = video(1, r, playing: true)
@@ -551,5 +550,27 @@ struct MiniPlayerTests {
         button.isPressed = false
         button.isHovered = false
         #expect(button.layer?.shadowOpacity == 0.6)
+    }
+}
+
+/// The back arrow's tab lookup (#333).
+@MainActor struct MiniPlayerReturnTests {
+    private var space: UUID { Library.shared.spaces[0].id }
+
+    @Test func findsTheTabInWhicheverWindowHoldsIt() {
+        let here = TabManager(spaceID: space), there = TabManager(spaceID: space)
+        defer { here.invalidate(); there.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/video"), title: "Video", spaceID: space)
+        here.adopt([tab], in: space)
+        let holds: (TabManager, Tab) -> Bool = { $0.tab(with: $1.id) === $1 }
+        #expect(MiniPlayer.home(of: tab, here: here, in: [here, there], holds: holds) === here)
+        // Moved to the other window: found there.
+        _ = there.take(tab, from: here, at: 0)
+        #expect(here.tab(with: tab.id) == nil)
+        #expect(MiniPlayer.home(of: tab, here: here, in: [here, there], holds: holds) === there)
+        // Closed or no tab: not found.
+        there.close(tab)
+        #expect(MiniPlayer.home(of: tab, here: here, in: [here, there], holds: holds) == nil)
+        #expect(MiniPlayer.home(of: nil, here: here, in: [here, there], holds: holds) == nil)
     }
 }
