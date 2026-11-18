@@ -1698,7 +1698,9 @@ final class PanelRow: NSView {
     override func layout() {
         super.layout()
         let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
-        let size = NSSize(width: min(wanted.width, max(0, bounds.width - Self.minimumTitle - Tokens.Space.x4)), height: wanted.height)
+        // A name shorter than that keeps only its own width, so a short name never cuts its control short.
+        let named = ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0))
+        let size = NSSize(width: min(wanted.width, max(0, bounds.width - min(named, Self.minimumTitle) - Tokens.Space.x2)), height: wanted.height)
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
         let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
