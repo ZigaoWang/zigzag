@@ -7,6 +7,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - A download rule that runs a script shows it on the page: Running script while it works, then Ran script or Script failed with the script's last line, so a rule never runs out of sight. A rule that hands a link to an app, a download manager or your default browser says so once per session, after it worked. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#307](https://github.com/ZigaoWang/zigzag/pull/307))
+- A site can have an icon of its own. Change Site Icon… in Site Controls' ⋯ menu opens the same icon choices as a tab's, with symbols, emoji and Choose Image…, and every tab, pinned tab, favorite and history row on the site shows it. A tab's own icon still wins, and Use Site Icon puts the site's icon back. Settings › Privacy › Sites lists it to forget, and in a private window it lasts until the window closes. Thanks to [bkonia](https://github.com/bkonia). ([#310](https://github.com/ZigaoWang/zigzag/issues/310))
+### Fixed
+- ⌘-clicking a video on YouTube always opens it in a new tab. Some ⌘-clicks went to the video in the tab you were on, because YouTube's own script followed the link there. Now a ⌘-click on a link opens it in a new tab whatever the page does with clicks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#317](https://github.com/ZigaoWang/zigzag/issues/317))
 
 ## [0.9.2] - 2026-11-18
 

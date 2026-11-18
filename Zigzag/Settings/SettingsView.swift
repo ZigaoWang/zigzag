@@ -3730,11 +3730,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
             && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
+            && SiteIcons.sites.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements and site styles are removed.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements, site styles and site icons are removed.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -3750,6 +3751,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetAll()
                 ClientCertificates.forgetAllSessions()
                 SiteBoosts.forgetAll()
+                SiteIcons.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -3772,6 +3774,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
             .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
+            .union(SiteIcons.sites)
         var listed = 0, more = 0
         for site in sites.sorted() {
             let origin = origins[site]
@@ -3958,7 +3961,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     SiteBoosts.set(boost, forSite: site)
                 })
             }
-
+            if SiteIcons.all[site] != nil {
+                rows.append(makeRow(String(localized: "Site icon", comment: "Row in Settings › Privacy › Sites: an icon you set for this site in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites."),
+                                    control: NSView()) { SiteIcons.forget(site: site) })
+            }
             if let certificate = ClientCertificates.kept(host: site) {
                 rows.append(makeRow(String(localized: "Certificate", comment: "Row in Settings › Privacy › Sites: the certificate from your Keychain this site is always sent."),
                                     detail: certificate.name, control: NSView()) {
@@ -3996,11 +4002,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forget(site: site)
                 ClientCertificates.forgetSessions(site: site)
                 SiteBoosts.forget(site: site)
+                SiteIcons.forget(site: site)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
             let siteURL = URL(string: origin ?? "https://\(site)")
-            let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            let favicon = SiteIcons.all[site].map(IconChoice.pageIcon) ?? siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             sitesGroup.add(FormRow(title: site, icon: favicon, control: forget))
             for row in rows { sitesGroup.add(row) }
         }

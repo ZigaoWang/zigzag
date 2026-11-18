@@ -857,6 +857,8 @@ enum DebugBridge {
         case "iconsearch": IconPickerPanel.current?.grid.type(arg)
         case "iconreturn": IconPickerPanel.current?.grid.pickFirstResult()
         case "iconesc": IconPickerPanel.current?.grid.endSearch()
+        // iconclose: the open icon grid closed, as a click outside it does.
+        case "iconclose": IconPickerPanel.current?.close()
         // pageicon <index> <icon|none>: gives the tab at that sidebar position an icon of its own, as Change Icon… does.
         case "pageicon":
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
@@ -875,6 +877,17 @@ enum DebugBridge {
                     if let id = tab.bookmarkID { controller.setIconWithUndo(icon, forBookmark: id) } else { controller.setIconWithUndo(icon, for: tab) }
                 }
             }
+        // siteicon <icon|none>: the site of the tab in front gets that icon, as Change Site Icon… in Site Controls
+        // gives it (#310); a private window's only for it. siteiconfile <path>: its Choose Image…, with the file picked.
+        case "siteicon", "siteiconfile":
+            guard let tab = controller.tabManager.selectedTab, let site = SiteIcons.site(of: tab.url) else { break }
+            let store = controller.tabManager.privateStore
+            if name == "siteiconfile" {
+                controller.usePageImage(URL(fileURLWithPath: arg)) { SiteIcons.set($0, forSite: site, privateStore: store) }
+            } else {
+                SiteIcons.set(arg == "none" ? nil : arg, forSite: site, privateStore: store)
+            }
+            debugLog("siteicon \(site) => \(SiteIcons.icon(forSite: site, privateStore: store) ?? "-") kept=\(SiteIcons.all)")
         case "killpage":
             // killpage <url prefix>: ends that tab's page process, as macOS does when it takes memory back.
             if let webView = controller.tabManager.allTabs.first(where: { $0.url?.absoluteString.hasPrefix(arg) == true })?.webView,

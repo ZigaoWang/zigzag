@@ -178,7 +178,7 @@ final class SitePanel: FloatingPanelView {
             MainActor.assumeIsolated { self?.refreshHeaderEdge() }
         }
         radius = Tokens.Radius.panel
-        icon.image = tab.favicon
+        icon.image = SiteIcons.icon(for: url, privateStore: tab.privateStore).map(IconChoice.pageIcon) ?? tab.favicon
         // In the app's voice, as a page names itself; a site's name keeps its own spelling. Plain http or a port of
         // its own is named in full, as its answers are its own: localhost:3000 never reads like localhost:3001.
         let web = ["http", "https"].contains(self.url.scheme?.lowercased() ?? "")
@@ -217,7 +217,7 @@ final class SitePanel: FloatingPanelView {
             if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite || SiteOrigin.of(now) != origin { self.close() }
         }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
-        moreButton.isHidden = !canClear && !canBoost
+        moreButton.isHidden = !canClear && !canBoost && !canSetIcon
         // No page: only your extensions, one click away, the whole panel.
         if isBlank { [icon, siteName, siteNameHover, moreButton].forEach { $0.isHidden = true } }
         buildExtensions()
@@ -477,11 +477,26 @@ final class SitePanel: FloatingPanelView {
         controller != nil && !isBlank && ZapPicker.canZap(tab) && controller?.isShowingReader != true
     }
 
+    /// A web page's site in a browser window, a private one's too (kept for that window only), can have an icon of
+    /// its own: never in Zigzag Mini, which has no sidebar to show it.
+    private var canSetIcon: Bool { controller != nil && SiteIcons.site(of: url) != nil }
+
+    static let siteIconTitle = String(localized: "Change Site Icon…", comment: "Item in the … menu of the site panel: opens the icon choices for the whole site, used by every tab, pinned tab and favorite on it.")
+
+    /// The icon grid for the site, where the panel was: beside the sidebar when it hung from the sidebar's address,
+    /// so the tabs it changes stay in sight.
+    private func chooseSiteIcon() {
+        guard let controller else { return }
+        let tab = tab, top = frame.origin, beside = isAlongAddress
+        close()
+        controller.chooseSiteIcon(for: tab, at: top, besideSidebar: beside)
+    }
+
     static let zapTitle = String(localized: "Zap Element", comment: "Item in the … menu of the site panel: pick elements on the page to hide on this site, like Arc's Zap.")
 
     /// Clearing this site's cache or cookies, and its boosts: there when you need them, out of the way when you don't.
     private func showMoreMenu() {
-        guard canClear || canBoost else { return }
+        guard canClear || canBoost || canSetIcon else { return }
         var entries: [MenuPanel.Entry] = []
         if let controller, WebAppInstallSheet.canInstall(tab, isPrivate: controller.tabManager.isPrivate) {
             entries.append(.item(.init(title: WebAppInstallSheet.title) { [weak self, weak controller] in
@@ -507,8 +522,12 @@ final class SitePanel: FloatingPanelView {
         if canBoost {
             entries.append(.item(.init(title: Self.zapTitle, symbol: "scope") { [weak self] in self?.startZapping() }))
             entries.append(.item(.init(title: SiteStyleSheet.title, symbol: "paintbrush") { [weak self] in self?.editStyle() }))
-            if canClear { entries.append(.separator) }
         }
+        // An icon for the whole site (#310).
+        if canSetIcon {
+            entries.append(.item(.init(title: Self.siteIconTitle, symbol: "face.smiling") { [weak self] in self?.chooseSiteIcon() }))
+        }
+        if canClear, canBoost || canSetIcon { entries.append(.separator) }
         guard canClear else { MenuPanel.show(entries, from: moreButton); return }
         // Clearing asks first: cookies sign you out of the site, and neither can be taken back.
         MenuPanel.show(entries + [
@@ -661,6 +680,7 @@ final class SitePanel: FloatingPanelView {
         if arg == "zap" { startZapping(); return }
         if arg == "restore" { restoreZaps(); return }
         if arg == "style" { editStyle(); return }
+        if arg == "icon" { MenuPanel.current?.close(animated: false); chooseSiteIcon(); return }
         if arg == "more" { showMoreMenu(); return }
         guard let next = Page(rawValue: arg) else { return }
         if next == .connection { showCertificate() } else { show(next) }

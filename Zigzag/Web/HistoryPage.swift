@@ -73,12 +73,14 @@ enum HistoryPage {
     }
 
     /// A site's icon as the page gets it. Every row asks, and most rows are on sites already shown, so each one's PNG
-    /// is kept while the store hands back the same icon: a new or cleared icon is never served from here.
+    /// is kept while the store hands back the same icon: a new or cleared icon is never served from here. An icon set
+    /// for the site in Site Controls (`SiteIcons`) comes first; a symbol takes the page's text color.
     private static func icon(for target: URL, dark: Bool) -> Data? {
-        guard let icon = FaviconStore.shared.cachedIcon(for: target) else { return nil }
-        let key = (FaviconStore.shared.iconKey(for: target) ?? target.absoluteString) + (dark ? " dark" : "")
+        let chosen = SiteIcons.icon(for: target)
+        guard let icon = chosen.map(IconChoice.pageIcon) ?? FaviconStore.shared.cachedIcon(for: target) else { return nil }
+        let key = (chosen.map { "site " + $0 } ?? FaviconStore.shared.iconKey(for: target) ?? target.absoluteString) + (dark ? " dark" : "")
         if let kept = icons[key], kept.image === icon { return kept.png }
-        guard let png = png(FaviconView.isMonochrome(icon) ? inked(icon, dark: dark) : icon) else { return nil }
+        guard let png = png(icon.isTemplate || FaviconView.isMonochrome(icon) ? inked(icon, dark: dark) : icon) else { return nil }
         if icons.count >= 500 { icons.removeAll(keepingCapacity: true) }
         icons[key] = (icon, png)
         return png

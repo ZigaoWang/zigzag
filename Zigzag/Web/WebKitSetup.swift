@@ -166,8 +166,32 @@ enum PageScripts {
     static var all: [WKUserScript] {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
-        [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark]
+        [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark,
+         commandClickedLinks]
     }
+
+    /// A ⌘-click on a link to the web opens it in a new tab, whatever the page's own script does with clicks (#317).
+    /// YouTube's video links are real links its script follows in the page instead, and a ⌘-click it took for a
+    /// plain one moved this tab. The page doesn't hear that click at all: it runs before any of the page's own
+    /// listeners and stops there, and WebKit follows the link as usual, which `Tab` opens in a new tab. A link in
+    /// text being edited, one to this page's own heading or one to download is left to the page, as is any other
+    /// click.
+    static let commandClickedLinks = WKUserScript(source: """
+    (() => {
+      if (!/^https?:$/.test(location.protocol)) return;
+      addEventListener('click', (e) => {
+        if (!e.isTrusted || e.button !== 0 || !e.metaKey || e.ctrlKey) return;
+        const link = e.composedPath().find((n) => n instanceof Element && (n.localName === 'a' || n.localName === 'area') &&
+                                              (n.hasAttribute('href') || n.hasAttribute('xlink:href')));
+        if (!link || link.hasAttribute('download') || link.isContentEditable) return;
+        let url;
+        try { url = new URL(link.getAttribute('href') ?? link.getAttribute('xlink:href'), document.baseURI); } catch (error) { return; }
+        if (!/^https?:$/.test(url.protocol)) return;
+        if (url.hash && url.href.split('#')[0] === location.href.split('#')[0]) return;
+        e.stopImmediatePropagation();
+      }, true);
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
 
     /// The Apple Store's checkout draws one Apple Pay mark (#235). WebKit gives Apple Pay only to Safari, so the
     /// store uses Apple's Apple Pay script for other browsers, marks the page `supports-applepay-ac` and writes the
