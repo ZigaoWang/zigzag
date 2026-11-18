@@ -726,7 +726,7 @@ struct SitePanelSizingTests {
         #expect(SitePanelSizing.x(1_250, alongAddress: true, inset: inset, width: 240, overlayWidth: 1_200) == 1_200 - inset - 240)
     }
 
-    /// Its own width, whatever the sidebar's (#335): narrower only in a window too small for it.
+    /// Fixed width regardless of the sidebar (#335), narrower only in a small window.
     @Test func itKeepsItsOwnWidth() {
         #expect(SitePanel.fittingWidth(in: 1_280) == SitePanel.width)
         #expect(SitePanel.fittingWidth(in: 300) == 300 - Tokens.Metric.cardInset * 2)

@@ -40,9 +40,9 @@ final class SitePanel: FloatingPanelView {
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
     /// Opened from a split pane's strip, under its address: it belongs to where that strip is.
     private(set) var isFromPane = false
-    /// Under the sidebar's address, lined up with its edge: a window growing or shrinking leaves it there.
+    /// Opened from the sidebar's address: aligned with the field's edge.
     private var isAlongAddress = false
-    /// Under a sidebar on the right: lined up with the address's right edge, reaching left over the page.
+    /// Sidebar on the right: aligned with the address's trailing edge.
     private var alignsTrailing = false
 
     private let icon = FaviconView()
@@ -138,7 +138,7 @@ final class SitePanel: FloatingPanelView {
     static let unpinTitle = String(localized: "Unpin from Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.")
     static var pinLimitTip: String { String(localized: "At most \(ExtensionPins.limit) pins. Unpin one first.", comment: "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.") }
     static let minimumWidth: CGFloat = 256
-    /// Its own width, in from the window's edges, narrower only in a window too small for it.
+    /// The panel's width, narrower only in a window too small for it.
     static func fittingWidth(in overlayWidth: CGFloat) -> CGFloat {
         max(minimumWidth, min(width, overlayWidth - Tokens.Metric.cardInset * 2))
     }
@@ -257,9 +257,7 @@ final class SitePanel: FloatingPanelView {
         panel.isFromPane = Self.paneStrip(of: anchor) != nil
         let overlay = controller.root.overlay
         let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
-        // Its own width wherever it opens, never the sidebar's (#335). From the sidebar's address, lined up with the
-        // field's outer edge, reaching past a narrower sidebar over the page. From the address above the page or a
-        // split pane's strip, under the address's end where its button is. Always kept in the window.
+        // Fixed width, independent of the sidebar (#335).
         let pane = Self.paneStrip(of: anchor) != nil
         let aboveThePage = anchor.isDescendant(of: controller.root.topBar)
         let inset = Tokens.Metric.cardInset
@@ -268,8 +266,7 @@ final class SitePanel: FloatingPanelView {
             // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.recedes = [controller.sidebar.list]
         }
-        // Under the sidebar's address, edge to edge with its outer side: the window's inset put it a little in from
-        // the field, with the favorite under it peeking out at its corner.
+        // Aligned with the address field's outer edge.
         let alongAddress = !aboveThePage && !pane && anchorFrame.minX >= 0
         panel.isAlongAddress = alongAddress
         panel.alignsTrailing = alongAddress && controller.root.sidebarOnRight
@@ -588,8 +585,7 @@ final class SitePanel: FloatingPanelView {
         let inset = Tokens.Metric.cardInset
         width = Self.fittingWidth(in: superview.bounds.width)
         if isAlongAddress, let anchor, anchor.window === window {
-            // Under the sidebar's address: still lined up with it, wherever the window's edge took it (a sidebar on
-            // the right moves with that edge), and kept inside the window.
+            // Keep it aligned with the address after a resize.
             let along = anchor.convert(anchor.bounds, to: superview)
             frame.origin.x = SitePanelSizing.x(alignsTrailing ? along.maxX - width : along.minX, alongAddress: true, inset: inset,
                                                width: width, overlayWidth: superview.bounds.width)
@@ -696,7 +692,7 @@ final class SitePanel: FloatingPanelView {
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
          "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY],
-         // The width its widest row needs to say it all on one line: the panel's width for it.
+         // Width the widest row needs on one line.
          "fit": (rows + permissionsGroup.rows).map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "linksFit": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "place": ["x": frame.minX, "width": frame.width, "window": superview?.bounds.width ?? 0,
@@ -1729,7 +1725,7 @@ final class PanelRow: NSView {
         return title.stringValue
     }
 
-    /// The width it needs for its name, and the line under it, on one line each beside its whole control.
+    /// Width needed for the title, subtitle and control without wrapping.
     var debugWants: CGFloat {
         let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
         return ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0)) + Tokens.Space.x2 + wanted.width
@@ -1825,7 +1821,7 @@ final class PanelLinkRow: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
 
     var debugTitle: String { value.isEmpty ? title.stringValue : "\(title.stringValue): \(value)" }
-    /// The width it needs for its name and its whole value, past its hover wash's outsets.
+    /// Width needed for the name and value, including the hover outsets.
     var debugWants: CGFloat {
         let valueWidth = value.isEmpty ? 0 : ceil((value as NSString).size(withAttributes: [.font: valueLabel.font ?? Tokens.Font.body()]).width) + Tokens.Space.x2
         return ceil(title.textWidth) + valueWidth + (chevron.isHidden ? 0 : Tokens.Space.x4 + Tokens.Space.x1)
