@@ -1500,6 +1500,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         if let popup = (action.associatedTab as? PopupTab)?.popup ?? PopupWindowController.key, popup.window?.isVisible == true {
             endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: popup.window, fromPin: false)
             popup.showExtensionPopover(popover)
+            popover.contentViewController?.view.window?.makeKey()
             popupsChanged.send()
             completionHandler(nil)
             return
@@ -1520,6 +1521,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         closeOtherPopups(than: popover, in: place.view.window)
         endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: place.view.window, fromPin: fromPin)
         show(popover, from: place.rect, of: place.view)
+        // Key, as in Chrome: WebKit sends the pointer's moves only to a key window's page, so tooltips and hover need it (#277).
+        popover.contentViewController?.view.window?.makeKey()
         popupsChanged.send()
         completionHandler(nil)
     }
@@ -1535,13 +1538,28 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         openPopups[key] = OpenPopup(extensionID: extensionID, action: action, popover: popover, page: page, webView: view, window: window, fromPin: fromPin)
         let opening = bridge.tabCapture.currentOpening(extensionID)
         let place = PopupPlace(extensionID, window)
-        let closing = NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.popupClosedAt[place] = ProcessInfo.processInfo.systemUptime }
+        // What had the keys: a field being edited is its field, not the editor AppKit lends it.
+        let responder = window?.firstResponder
+        let focused = ((responder as? NSText)?.isFieldEditor == true ? (responder as? NSText)?.delegate as? NSView : responder as? NSView)
+            .flatMap { $0.window === window ? $0 : nil }
+        let closing = NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self, weak popover, weak window] _ in
+            MainActor.assumeIsolated {
+                self?.popupClosedAt[place] = ProcessInfo.processInfo.systemUptime
+                // Key goes back to the window it opened from, unless you moved on to another.
+                let popupWindow = popover?.contentViewController?.view.window
+                if let window, window.isVisible, NSApp.keyWindow == nil || NSApp.keyWindow === popupWindow {
+                    window.makeKey()
+                }
+            }
         }
-        let closed = NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self, weak popover] _ in
+        let closed = NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self, weak popover, weak window, weak focused] _ in
             MainActor.assumeIsolated {
                 // WebKit shows the same popover again for a new opening; a late notice for the last one is passed over.
                 guard popover?.isShown != true else { return }
+                // The page or field you were in has the keys again, unless something else in the window took them.
+                if let window, let focused, focused.window === window, (window.firstResponder as? NSView)?.window !== window {
+                    window.makeFirstResponder(focused)
+                }
                 self?.popupCloseObservers.removeValue(forKey: key)?.forEach(NotificationCenter.default.removeObserver)
                 self?.popupSizeWatches[key] = nil
                 self?.popupPlaces[key] = nil

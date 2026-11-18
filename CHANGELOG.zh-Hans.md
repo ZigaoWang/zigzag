@@ -29,6 +29,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 需要较新 Chrome 的扩展（比如 Heylogin）可以从 Chrome 应用商店安装了，不再显示已下架：Zigzag 之前告诉商店自己是 Chrome 140。感谢 [datarip](https://github.com/datarip)。([#336](https://github.com/ZigaoWang/zigzag/issues/336))
 - 从文件导入现在支持各个浏览器导出的 bookmarks.html，Firefox、LibreWolf、Safari、Chrome 和 Edge 都可以。网页会连同文件夹一起放进单独的空间，和从这台 Mac 上的浏览器导入一样。感谢 [mrfragger](https://github.com/mrfragger)。([#330](https://github.com/ZigaoWang/zigzag/issues/330))
 - 迷你播放器回到标签页的箭头不会再没反应了：它会在标签页现在所在的窗口里找到它，并把那个窗口带到前面；标签页已经在屏幕上时卡片会收起；标签页已经关掉时卡片会直接关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#333](https://github.com/ZigaoWang/zigzag/issues/333))
+- 扩展的弹出窗口打开时就会获得焦点，和 Chrome 一样，所以按钮的提示文字和悬停效果马上就会显示。以前要先在弹出窗口里点一下才会出现。弹出窗口关闭后，焦点回到你之前所在的网页或输入框。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 
 ## [0.9.2] - 2026-11-18
 

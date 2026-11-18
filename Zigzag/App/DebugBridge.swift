@@ -337,7 +337,8 @@ enum DebugBridge {
     /// The extension popup showing, without bringing the browser window forward (that would close it):
     /// popupwinstate <path> (its window: key, first responder; JSON), popupwinclick <x> <y> (a click there, in the
     /// popup's points from its top left), popupwintype <text> (keys pressed one by one, to whichever window is key,
-    /// as typing goes), popupwinjs <path> <script> (the script's result in the popup page).
+    /// as typing goes), popupwinjs <path> <script> (the script's result in the popup page), popupwinesc (Esc, handed
+    /// to the popup's window).
     private static func popupWindow(_ name: String, _ arg: String) {
         guard #available(macOS 15.4, *) else { return }
         let popovers = Profiles.shared.all.compactMap { $0.isDefault ? $0.extensions : $0.startedExtensions }.flatMap(\.debugShownPopovers)
@@ -354,7 +355,8 @@ enum DebugBridge {
                                         "appKey": NSApp.keyWindow.map { "\(type(of: $0))" } ?? "none",
                                         "firstResponder": window?.firstResponder.map { "\(type(of: $0))" } ?? "none",
                                         "responderInWebView": webView != nil,
-                                        "page": popupPage?.url?.absoluteString ?? "-"]
+                                        "page": popupPage?.url?.absoluteString ?? "-",
+                                        "windows": NSApp.windows.filter(\.isVisible).map { "\(type(of: $0)) key=\($0.isKeyWindow) firstResponder=\($0.firstResponder.map { "\(type(of: $0))" } ?? "none")" }]
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         case "popupwinclick":
             let n = arg.split(separator: " ").compactMap { Double($0) }
@@ -376,6 +378,14 @@ enum DebugBridge {
                                                                 isARepeat: false, keyCode: codes[ch] ?? 0) {
                         NSApp.postEvent(event, atStart: false)
                     }
+                }
+            }
+        case "popupwinesc":
+            for type in [NSEvent.EventType.keyDown, .keyUp] {
+                if let window, let event = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                            windowNumber: window.windowNumber, context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+                                                            isARepeat: false, keyCode: 53) {
+                    window.sendEvent(event)
                 }
             }
         case "popupwinjs":

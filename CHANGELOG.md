@@ -22,6 +22,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Extensions that need a recent Chrome, like Heylogin, install from the Chrome Web Store instead of being called no longer available: Zigzag told the store it was Chrome 140. Thanks to [datarip](https://github.com/datarip). ([#336](https://github.com/ZigaoWang/zigzag/issues/336))
 - Import from a file takes the bookmarks.html every browser exports, from Firefox, LibreWolf, Safari, Chrome and Edge. Its pages come over in a space of their own with their folders, as from a browser on this Mac. Thanks to [mrfragger](https://github.com/mrfragger). ([#330](https://github.com/ZigaoWang/zigzag/issues/330))
 - The mini player's arrow back to its tab always does something: it finds the tab in whichever window has it now and brings that window forward, ends the card when the tab is already on screen, and closes the card when the tab is gone. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#333](https://github.com/ZigaoWang/zigzag/issues/333))
+- An extension's popup takes focus when it opens, as in Chrome, so its buttons' tooltips and hover effects show right away. Before, they showed only after you clicked in it. When it closes, the keys go back to the page or field you were in. Thanks to [mrfragger](https://github.com/mrfragger). ([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 
 ## [0.9.2] - 2026-11-18
 
