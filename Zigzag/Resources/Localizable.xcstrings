@@ -4532,7 +4532,7 @@
       }
     },
     "Choose Image…" : {
-      "comment" : "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.\nItem in the context menu of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.",
+      "comment" : "Button at the foot of the icon choices of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.\nButton in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20934,7 +20934,7 @@
       }
     },
     "Use Site Icon" : {
-      "comment" : "Item in the context menu of a tab, a pinned tab or a favorite that has an icon you chose: puts the site's own icon back. Also the tooltip of that choice among the icons.",
+      "comment" : "Button at the foot of the icon choices of a tab, a pinned tab or a favorite that has an icon you chose: puts the site's own icon back. Also the tooltip of that choice among the icons.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -24362,7 +24362,7 @@
       }
     },
     "Choose an image to use as this page’s icon." : {
-      "comment" : "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.",
+      "comment" : "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

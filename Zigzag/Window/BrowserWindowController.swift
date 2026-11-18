@@ -3028,7 +3028,8 @@ extension BrowserWindowController: SidebarDelegate {
         let id = tab.id
         // The plain choice is the site's own icon, shown as it is.
         let siteIcon = tab.favicon ?? tab.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
-        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: tab.customIcon) { [weak self] icon in
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: tab.customIcon,
+                                    onChooseImage: { [weak self] in if let self, let tab = self.tabManager.tab(with: id) { self.chooseImageIcon(for: tab) } }) { [weak self] icon in
             guard let self, let tab = self.tabManager.tab(with: id) else { return }
             self.setIconWithUndo(icon, for: tab)
         }
@@ -3043,13 +3044,14 @@ extension BrowserWindowController: SidebarDelegate {
         guard let anchor else { return }
         closeFloatingPanels()
         let siteIcon = tabManager.bookmarkTab(for: id)?.favicon ?? FaviconStore.shared.cachedIcon(for: bookmark.url)
-        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon) { [weak self] icon in
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon,
+                                    onChooseImage: { [weak self] in self?.chooseImageIcon(forBookmark: id) }) { [weak self] icon in
             self?.setIconWithUndo(icon, forBookmark: id)
         }
         panel.show(beside: anchor, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
     }
 
-    /// Choose Image…: an image file as the tab's icon (#303), copied into Zigzag's folder.
+    /// Choose Image… in the icon grid: an image file as the tab's icon (#303), copied into Zigzag's folder.
     func chooseImageIcon(for tab: Tab) {
         let id = tab.id
         pickPageImage { [weak self] icon in
@@ -3072,7 +3074,7 @@ extension BrowserWindowController: SidebarDelegate {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.")
-        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.")
+        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.")
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.usePageImage(url, done)
