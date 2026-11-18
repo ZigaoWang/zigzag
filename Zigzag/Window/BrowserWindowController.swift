@@ -2644,7 +2644,7 @@ extension BrowserWindowController: SidebarDelegate {
         }), duration: Toast.undoDuration, in: self)
     }
 
-    /// Turns a tab into a bookmark, undoably. Half of a split pins the pair; a tab of a group, the group unless `keepingGroup` is off.
+    /// Turns a tab into a bookmark, undoably. A tab of a group pins the group unless `keepingGroup` is off.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID, keepingGroup: Bool = true) {
         Tutorial.complete("pin")
         pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: keepingGroup) }

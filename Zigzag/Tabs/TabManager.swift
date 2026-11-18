@@ -1331,8 +1331,7 @@ final class TabManager {
         return halves.first { $0.id == bookmarkID }?.tab
     }
 
-    /// Any page of a pinned group of tabs unpins all of it, back as the group of tabs (#209) it was, named and
-    /// folded as its folder was. Open pages come along as they are; one that isn't open opens fresh with the rest.
+    /// Unpins a whole pinned group (#209) back into a group of tabs, named and folded as its folder was.
     private func unpin(_ folder: BookmarkFolder, returning bookmarkID: UUID, toIndex index: Int?, in space: UUID) -> Tab? {
         let ids = Library.shared.allBookmarkIDs(inFolder: folder.id)
         var pages: [(id: UUID, tab: Tab)] = []

@@ -26,8 +26,7 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     /// The pages that were open when it was shut: shut on purpose, it hides them too (#154), though pages opened
     /// after still show under it (#94). Nil while it's open.
     var tucked: [UUID]? = nil
-    /// The group of tabs (#209) this folder was pinned from; nil for a folder made by hand. Unpinning any of its
-    /// pages brings the group back.
+    /// The group of tabs (#209) this folder was pinned from; nil for a folder made by hand.
     var groupID: UUID? = nil
 }
 
@@ -1465,8 +1464,7 @@ final class Library {
         commit()
     }
 
-    /// Pins the tabs of a group of tabs (#209) together as one folder, named and folded as the group was, in one
-    /// change. Its pages stay in the list in the group's order, all in the folder.
+    /// Pins a group of tabs (#209) as one folder, named and folded as the group was, in one change.
     func addPinnedGroup(_ marks: [Bookmark], splits: [PinnedSplit] = [], named name: String, group: UUID, isOpen: Bool, to spaceID: UUID, at index: Int? = nil) {
         guard let s = self.index(of: spaceID), !marks.isEmpty else { return }
         let at = Self.place(index, among: spaces[s].bookmarks.count)

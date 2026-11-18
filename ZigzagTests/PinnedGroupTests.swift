@@ -148,8 +148,7 @@ import Testing
         try body(manager, tabs, space)
     }
 
-    /// Pinning any tab of a group of tabs keeps the group one thing: a folder named as the group was, holding its
-    /// tabs in their order. Unpinning any page of it brings the group back, named, ordered and folded as it was.
+    /// Pinning a tab of a group pins the group as one folder; unpinning brings the group back.
     @Test func pinningAGroupOfTabsKeepsItWholeAsOneFolder() throws {
         try withTabs(["0", "1", "2", "3"]) { manager, tabs, space in
             let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
