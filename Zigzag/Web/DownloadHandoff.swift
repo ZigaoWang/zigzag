@@ -317,8 +317,7 @@ enum DownloadHandoff {
             // download is never cancelled for it — so there is nothing to do here but let it be saved.
             outcome = .noMatch
         }
-        // Said once it has worked, so a handoff that failed is never announced as one that didn't: the toast for the
-        // failure says what happened instead.
+        // Only once it worked: a failed handoff shows its failure instead.
         if outcome == .handedOff { announce(rule, request: request, values: values, secret: secret) }
         return outcome
     }
@@ -358,13 +357,11 @@ enum DownloadHandoff {
         case .jsonRPC:
             return .service(action.summary)
         case .openURL:
-            // A web address that isn't the web's belongs to its own app; a web address goes to the Mac's browser when
-            // that's where the rule says, and nowhere near Zigzag's own places, which show themselves.
+            // A non-web address opens in its own app. A web address is only announced when it goes to another browser.
             guard let url = URL(string: DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)),
                   let scheme = url.scheme else { return nil }
             if !OpenInZigzag.handles(url) { return .app(ExternalLinks.appName(forScheme: scheme)) }
-            // A rule that still asks (or was answered in the question) shows the answer as it opens the link, and
-            // Zigzag as the default browser gets its own handoff straight back and opens it in a tab, which shows.
+            // When Zigzag is the default browser, the link comes back here and opens in a tab.
             guard choice == .defaultBrowser, !DefaultBrowser.isDefault else { return nil }
             return .app(ExternalLinks.appName(forScheme: "https"))
         case .runScript, .saveToFolder, .openFile:

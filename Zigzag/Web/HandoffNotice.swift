@@ -1,13 +1,7 @@
 import Foundation
 
-/// What an automation says for itself when it hands something somewhere you can't see: one line over the page it
-/// fired on, naming the rule and where it went. **Only the handoffs that would otherwise be silent are announced** —
-/// an app, a service, the Mac's own browser. A link opened in a tab or in Mini, a script's card and a question all
-/// show themselves, so a line beside them would say the same thing twice. A rule says its line once a session, so a
-/// rule that fires all afternoon doesn't bury the page in notices.
-///
-/// What the notice is for is exact. It is what makes a rule you didn't make **detectable** — it does not make one
-/// impossible; signing or allow-listing scripts is a separate, larger thing.
+/// One line over the page when a rule hands a link somewhere you can't see: an app, a service, or another browser.
+/// A tab, Mini, a script's card or a question show themselves, so they get no line. Each rule says it once a session.
 @MainActor
 enum HandoffNotice {
     /// Where a handoff went that you can't see from the page: an app on this Mac (or the Mac's own browser), or a
@@ -43,7 +37,6 @@ enum HandoffNotice {
         case .service(let name):
             String(localized: "sent this link to \(name)", comment: "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.")
         }
-        // The rule's own name comes first: a notice you can't put a name to is the one thing it can't be.
         let named = rule.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return named.isEmpty ? did
             : String(localized: "\(named): \(did)", comment: "An automation's notice over the page: the rule's name, then what it did. The placeholders are the rule's name and one of the “handed this link to …” lines.")
