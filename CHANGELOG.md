@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- A site you allow can reach a program listening on this Mac, like the local agent an editor, a download helper or a companion app runs. Chrome and Firefox allow `http://localhost` and `ws://localhost` from a secure page; WebKit refuses it as mixed content, so Zigzag makes the request itself, as the site, and hands the answer back. It is off until you turn on Settings › Privacy › Allow websites to reach apps on this Mac and then the site's own Apps on This Mac switch in its Site Controls; nothing on the web can ask for either. An extension gets the same door through its own Apps on This Mac switch in Settings › Extensions, off by default. **Extensions that already opened `ws://localhost` with nothing asked now need that switch turned on**, so a companion app that relied on it should be allowed once there. Loopback only: not the local network, not another machine, and not images, scripts or stylesheets.
+
 ## [0.9.2] - 2026-11-18
 
 Sites that always open in the space you choose, Zap Element and Edit Style to hide parts of a site or restyle it, an Archive list, download rules that hand links and files to other apps, tabs shared between windows, JavaScript off per site, a History menu like Safari's, and smooth scrolling on high refresh rate displays.

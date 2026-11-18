@@ -230,6 +230,10 @@
 		6CA8173B28E0BD8CD7796BFE /* SettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */; };
 		6DB21398E0868F1B0DE29D05 /* MiniQuickOpen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67AF95E0EFA8B1BC26E4F70F /* MiniQuickOpen.swift */; };
 		6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */; };
+		C4A1F0B2D3E4456789AB0C13 /* ExtensionLocalReceiversTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A1F0B2D3E4456789AB0C14 /* ExtensionLocalReceiversTests.swift */; };
+		C4A1F0B2D3E4456789AB0C11 /* LocalReceiversTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A1F0B2D3E4456789AB0C12 /* LocalReceiversTests.swift */; };
+		C4A1F0B2D3E4456789AB0C03 /* LocalReceiverShim.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A1F0B2D3E4456789AB0C04 /* LocalReceiverShim.swift */; };
+		C4A1F0B2D3E4456789AB0C01 /* LocalReceivers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4A1F0B2D3E4456789AB0C02 /* LocalReceivers.swift */; };
 		6F00D32C32387168F17DADDA /* Passkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BA1C91E3BBFB79F23D274B4 /* Passkeys.swift */; };
 		6FAA00CCE4CED77788B5D1C3 /* DownloadRuleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDE5F88B8769F540831A7940 /* DownloadRuleSheet.swift */; };
 		2860A1B0C0DE4E5F286A0003 /* SiteRouteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2860A1B0C0DE4E5F286A0004 /* SiteRouteSheet.swift */; };
@@ -1000,6 +1004,10 @@
 		CDE5F88B8769F540831A7940 /* DownloadRuleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadRuleSheet.swift; sourceTree = "<group>"; };
 		2860A1B0C0DE4E5F286A0004 /* SiteRouteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRouteSheet.swift; sourceTree = "<group>"; };
 		CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissions.swift; sourceTree = "<group>"; };
+		C4A1F0B2D3E4456789AB0C14 /* ExtensionLocalReceiversTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionLocalReceiversTests.swift; sourceTree = "<group>"; };
+		C4A1F0B2D3E4456789AB0C12 /* LocalReceiversTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalReceiversTests.swift; sourceTree = "<group>"; };
+		C4A1F0B2D3E4456789AB0C04 /* LocalReceiverShim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalReceiverShim.swift; sourceTree = "<group>"; };
+		C4A1F0B2D3E4456789AB0C02 /* LocalReceivers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalReceivers.swift; sourceTree = "<group>"; };
 		CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarHistoryTests.swift; sourceTree = "<group>"; };
 		CF7284017D3B3ADB15E236C1 /* HistoryClustersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryClustersTests.swift; sourceTree = "<group>"; };
 		2568EC51DD9F3FAAE5DBFDF5 /* HistoryMenuTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryMenuTests.swift; sourceTree = "<group>"; };
@@ -1499,6 +1507,8 @@
 				6549370C4EBE20CEA25CD102 /* SafePDF.swift */,
 				84EF39EB77F65E6AB08E2E52 /* SafePictures.swift */,
 				CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */,
+				C4A1F0B2D3E4456789AB0C04 /* LocalReceiverShim.swift */,
+				C4A1F0B2D3E4456789AB0C02 /* LocalReceivers.swift */,
 				BBBD3598C3CAC25C5334760E /* StrictTransport.swift */,
 				5B92A13A0C322891D0B40426 /* SwipeNavigation.swift */,
 				1C39431B8AEC6A4334D9A32E /* WebKitSetup.swift */,
@@ -1723,6 +1733,8 @@
 				027487FE51DBB648D6C491C0 /* KeepOnTopTests.swift */,
 				05050957C75B37B4AFFACEDD /* LinkSiteTests.swift */,
 				6B89CCE006086C641D713AAB /* LocalizationTests.swift */,
+				C4A1F0B2D3E4456789AB0C14 /* ExtensionLocalReceiversTests.swift */,
+				C4A1F0B2D3E4456789AB0C12 /* LocalReceiversTests.swift */,
 				41C76DAA9705D717D9D98902 /* LocalServerTrustTests.swift */,
 				683CCE47B510EA40E8885D53 /* MainThreadStallTests.swift */,
 				A415AA1C66517812829F10FF /* MCPHTTPTests.swift */,
@@ -2408,6 +2420,8 @@
 				57456DF0F211F4F978E29567 /* SitePanel.swift in Sources */,
 				D91D69798D1EB25324AF6620 /* SiteStyleSheet.swift in Sources */,
 				6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */,
+				C4A1F0B2D3E4456789AB0C03 /* LocalReceiverShim.swift in Sources */,
+				C4A1F0B2D3E4456789AB0C01 /* LocalReceivers.swift in Sources */,
 				DFB7FFE90CE40670E90BB664 /* SiteSearch.swift in Sources */,
 				275FD1B2166497C8B9D7AFC6 /* CommandBarPlacement.swift in Sources */,
 				D35C9F0D071FD702CE802ECF /* SpaceColor.swift in Sources */,
@@ -2559,6 +2573,8 @@
 				3699D6B6A7F9E5448CD76ABA /* LinkSiteTests.swift in Sources */,
 				F93332479C4E8E444308AC31 /* LocalServerTrustTests.swift in Sources */,
 				3BEF15777F24915D05FC1681 /* LocalizationTests.swift in Sources */,
+				C4A1F0B2D3E4456789AB0C13 /* ExtensionLocalReceiversTests.swift in Sources */,
+				C4A1F0B2D3E4456789AB0C11 /* LocalReceiversTests.swift in Sources */,
 				591D0F32133D82363A1359F9 /* MCPHTTPTests.swift in Sources */,
 				8FFF17FE67210434B930B549 /* MCPServerTests.swift in Sources */,
 				F44995777C048CCAB085C8AA /* MCPSetupTests.swift in Sources */,
