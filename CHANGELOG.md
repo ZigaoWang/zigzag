@@ -5,6 +5,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-18
+
+Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, and fixes for Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
+
 ### New
 - A download rule that runs a script shows it on the page: Running script while it works, then Ran script or Script failed with the script's last line, so a rule never runs out of sight. A rule that hands a link to an app, a download manager or your default browser says so once per session, after it worked. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 - A site can have an icon of its own. Change Site Icon… in Site Controls' ⋯ menu opens the same icon choices as a tab's, with symbols, emoji and Choose Image…, and every tab, pinned tab, favorite and history row on the site shows it. A tab's own icon still wins, and Use Site Icon puts the site's icon back. Settings › Privacy › Sites lists it to forget, and in a private window it lasts until the window closes. Thanks to [bkonia](https://github.com/bkonia). ([#310](https://github.com/ZigaoWang/zigzag/issues/310))
@@ -1342,6 +1346,7 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 - The first public release: signed and notarized, with updates that install themselves.
 
 [Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...HEAD
+[0.9.3]: https://github.com/ZigaoWang/zigzag/compare/v0.9.2...HEAD
 [0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0
