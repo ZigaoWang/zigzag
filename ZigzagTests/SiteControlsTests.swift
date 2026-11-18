@@ -596,8 +596,8 @@ struct SitePanelRowsTests {
     }
 
     /// The first page is the page's own switches: zoom, ads, cookie banners, dark page, keeping it awake, full
-    /// screen and translating. Permissions, JavaScript and extensions are the Permissions page's (#311, #313), and
-    /// the space a site opens in is Settings › Spaces' (#286), so an ordinary web page has none of them here.
+    /// screen, translating and the space it opens in. Permissions, JavaScript and extensions are the Permissions
+    /// page's (#311, #313), so an ordinary web page has none of them here.
     @Test func theFirstPageIsOnlyPageSwitches() {
         var c = Context()
         #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake])

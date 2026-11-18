@@ -2303,7 +2303,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let routes = Library.shared.siteRoutes.sorted { $0.site < $1.site }
         if routes.isEmpty {
             routesGroup.add(FormRow(title: String(localized: "None yet", comment: "A row under Sites in Spaces in Settings › Spaces, shown when no site always opens in a space."),
-                                    detail: String(localized: "Add a site to have it always open in a space, wherever its link comes from.", comment: "Explanation under “None yet” in Settings › Spaces › Sites in Spaces."),
+                                    detail: String(localized: "To always open a site in a space, choose it under Open in, in the site’s controls.", comment: "Explanation under “None yet” in Settings › Spaces › Sites in Spaces. Open in is the row in the site panel."),
                                     control: NSView()))
         }
         let spaces = Library.shared.spaces

@@ -2433,17 +2433,6 @@
         }
       }
     },
-    "Add a site to have it always open in a space, wherever its link comes from." : {
-      "comment" : "Explanation under “None yet” in Settings › Spaces › Sites in Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加网站后，无论链接来自哪里，它都会在选定的空间中打开。"
-          }
-        }
-      }
-    },
     "Add this extension?" : {
       "comment" : "Title of the sheet that asks before adding an extension that has no name.",
       "localizations" : {
