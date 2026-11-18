@@ -3809,7 +3809,21 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                         self?.reloadPrivacy()
                         self?.layoutDocument()
                     }
-                    rows.append(makeRow(permission.title, control: dropdown) { [weak self] in
+                    // Open apps says which app the site was told to always open, by name, as one sentence.
+                    var detail: String?
+                    if permission == .apps {
+                        let apps = SitePermissions.choices(origin: origin).sorted { $0.key < $1.key }
+                            .filter { $0.value && $0.key.hasPrefix("app:") }
+                            .map { String(localized: "opens \(ExternalLinks.appName(forScheme: String($0.key.dropFirst(4))))", comment: "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name.") }
+                        if !apps.isEmpty {
+                            let line = apps.joined(separator: String(localized: "site-choices.separator", defaultValue: ", ",
+                                                                     comment: "Between the choices made for a site in Settings › Privacy › Sites, like “camera allowed, zoom 125%”."))
+                            let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
+                            detail = String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
+                                            comment: "Under a site in Settings › Privacy › Sites: the choices made for it, as one sentence.")
+                        }
+                    }
+                    rows.append(makeRow(permission.title, detail: detail, control: dropdown) { [weak self] in
                         SitePermissions.setChoice(.ask, for: permission, origin: origin)
                         self?.permissionsChangedHere.remove("\(origin)|\(permission.rawValue)")
                     })
