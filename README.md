@@ -86,6 +86,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **WebRTC** | Turn on Protect IP address from WebRTC, and sites can't learn your real IP address through WebRTC while you use a proxy or VPN. Calls work on the sites you allow, and a site that tries WebRTC while it's blocked says so, with Allow for This Site. |
 | **Cookie pop-ups** | Turned down for you, never accepted, with DuckDuckGo's Autoconsent rules. Leave them alone everywhere or for one site if you'd rather answer yourself. |
 | **Site Controls** | One panel per site: zoom, permissions (camera, microphone, location, notifications, pop-ups, opening apps, screen sharing, WebRTC), each set to Ask, Allow or Block, JavaScript on or off, the certificate, extensions, and switches for dark pages, ad blocking and cookie pop-ups. When a site asks for one of these, it asks on one card over the page, for this time or always, and a site you said no to stops asking. |
+| **Boosts** | Zap Element hides the parts of a site you don't want, like a banner or a sidebar, and Edit Style gives a site CSS of your own. Both are in Site Controls' ⋯ menu and stay with the site. |
 | **Developer Mode** | For the sites you build, `localhost` to begin with: the console with an error count, Inspect Element, device sizes, light and dark, print styles, JavaScript, images or styles off, another user agent, and a QR code to open the page on your phone. |
 | **Extensions** | From the Chrome Web Store, where the store's own button reads Add to Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
 | **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen and Orion. |
@@ -101,7 +102,7 @@ It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc u
 
 - No sync between Macs or to iPhone. Passwords sync through iCloud Keychain; spaces and tabs don't.
 - Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
-- No Boosts, Easels or Notes, and no AI built into the browser: AI apps can use Zigzag over MCP only if you turn it on.
+- No Easels or Notes, and Boosts are CSS only (Zap Element and Edit Style, no per-site scripts). No AI built into the browser: AI apps can use Zigzag over MCP only if you turn it on.
 - A few Chrome extension APIs aren't there yet: the tab groups API, debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work.
 - EasyList and the other built-in blocking lists update with Zigzag, not on their own; only uBlock Origin's lists do.
 - macOS 15.4 or later only.
