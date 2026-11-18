@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- An update now has one home, the card at the bottom of the sidebar. After Check for Updates…, the card shows the download filling with how much has come, then the update being prepared, then Restart once it's ready, instead of a toast and the card saying the same thing at once. The card shows the whole version, read as 0.9.2 beta 1 rather than 0.9.2-beta.1, and with the sidebar hidden it sits in the same corner of the window.
+
 ## [0.9.2] - 2026-11-18
 
 Sites that always open in the space you choose, Zap Element and Edit Style to hide parts of a site or restyle it, an Archive list, download rules that hand links and files to other apps, tabs shared between windows, JavaScript off per site, a History menu like Safari's, and smooth scrolling on high refresh rate displays.
