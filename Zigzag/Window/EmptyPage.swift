@@ -163,6 +163,8 @@ final class EmptyPageBackdrop: NSView {
                 fade.duration = Tokens.Motion.large
                 fade.timingFunction = Tokens.Motion.easeOut
                 layer.add(fade, forKey: "ground")
+            } else {
+                layer?.removeAnimation(forKey: "ground")
             }
             paint()
         }

@@ -1867,6 +1867,8 @@ final class SidebarView: NSView {
     // MARK: Two-finger swipe between spaces
 
     var onSwipeSpace: ((Int) -> Bool)?
+    /// Mid-swipe: the space coming in and how far, 0 to 1; nil and 0 once the list springs home.
+    var onSwipeLook: ((UUID?, CGFloat) -> Void)?
 
     /// Where a gesture over the sidebar is: not yet known to be sideways or up and down, following the fingers
     /// sideways, scrolling the list, or let go (its momentum still to swallow).
@@ -2049,6 +2051,8 @@ final class SidebarView: NSView {
         for dot in dots {
             dot.swipeShare = dot.spaceID == currentSpaceID ? 1 - share : dot.spaceID == incoming ? share : nil
         }
+        // And the window's color, from this space's toward the one coming in.
+        onSwipeLook?(incoming, share)
     }
 
     /// The dots go back to showing only the space you're in.
@@ -2116,6 +2120,7 @@ final class SidebarView: NSView {
         swipeOffset = 0
         swipeTarget = 0
         clearSwipeDots()
+        onSwipeLook?(nil, 0)
         let out = [panes.left, panes.right].filter { !$0.scroll.isHidden }
         guard offset != 0 else { out.forEach(hidePane); return }
         Tokens.Motion.withoutAnimation {

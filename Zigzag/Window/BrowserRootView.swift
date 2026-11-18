@@ -312,6 +312,13 @@ final class BrowserRootView: SpaceFrameView {
                            picture: EmptyPage.picture(for: kept, isPrivate: isPrivate), animated: animated && window?.isVisible == true)
     }
 
+    /// Partway through a swipe: the empty page's wash `share` of the way to `next`'s. Its picture changes on landing.
+    func showEmptyPage(of space: SpaceInfo, toward next: SpaceInfo, share: CGFloat) {
+        let kept = Library.shared.space(space.id) ?? space
+        let ground = SpaceInfo.mix(EmptyPage.ground(for: space, isPrivate: false), EmptyPage.ground(for: next, isPrivate: false), by: share)
+        emptyBackdrop.show(ground: ground, picture: EmptyPage.picture(for: kept, isPrivate: false), animated: false)
+    }
+
     /// Desk view hides the pages while their picture flies into or out of a card, so the two never show at once.
     /// They stay in the window and keep drawing, so they're ready the moment they show again.
     var pagesHidden = false {

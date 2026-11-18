@@ -14,6 +14,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - An extension's popup lays its icons out as it does in Chrome. Zigzag was making every icon with no width of its own as wide as its row, so an icon beside a heading squeezed the heading to one letter a line, as in Dashlane's menu. Icons now keep the size their page gives them. ([#340](https://github.com/ZigaoWang/zigzag/issues/340))
+- Swiping between spaces changes the window's color as you swipe, blending from one space's to the next with your fingers, and it goes back if you call the swipe off. Before, the color stayed the old space's until your fingers let go.
 
 ## [0.9.3] - 2026-11-18
 

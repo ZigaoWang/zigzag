@@ -298,6 +298,25 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
         }
     }
 
+    /// `a` moved `share` of the way to `b`, alpha included, light and dark alike: a look partway through a swipe.
+    static func mix(_ a: NSColor, _ b: NSColor, by share: CGFloat) -> NSColor {
+        let t = min(max(share, 0), 1)
+        if t == 0 { return a }
+        if t == 1 { return b }
+        return NSColor(name: nil) { appearance in
+            var x: NSColor?, y: NSColor?
+            appearance.performAsCurrentDrawingAppearance {
+                x = a.usingColorSpace(.sRGB)
+                y = b.usingColorSpace(.sRGB)
+            }
+            guard let x, let y else { return t < 0.5 ? a : b }
+            return NSColor(srgbRed: x.redComponent + (y.redComponent - x.redComponent) * t,
+                           green: x.greenComponent + (y.greenComponent - x.greenComponent) * t,
+                           blue: x.blueComponent + (y.blueComponent - x.blueComponent) * t,
+                           alpha: x.alphaComponent + (y.alphaComponent - x.alphaComponent) * t)
+        }
+    }
+
     /// `color` at `alpha`, still following light and dark when it does.
     private static func covering(_ color: NSColor, by alpha: CGFloat) -> NSColor {
         guard alpha < 1 else { return color }

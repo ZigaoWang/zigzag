@@ -128,6 +128,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.tabManager.switchSpace(by: offset)
             return before != self.tabManager.currentSpaceID
         }
+        sidebar.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         // Right-click Back or Forward: the pages that way, to jump several at once.
         sidebar.backButton.onRightClick = { [weak self] _ in self?.historyMenu(back: true) }
@@ -610,7 +611,29 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if window?.isKeyWindow == true { handoff?.becomeCurrent() }
     }
 
+    /// Whether the window shows a look partway to another space, mid-swipe.
+    private var showsSwipeLook = false
+
+    /// Mid-swipe: the window's look `share` of the way to `id`'s, as far as the fingers have pulled that space in. Nil
+    /// or none of the way: the current space's own again, as when a swipe is called off.
+    private func swipeLook(toward id: UUID?, share: CGFloat) {
+        guard !tabManager.isPrivate else { return }
+        let space = tabManager.currentSpace
+        guard let id, id != space.id, share > 0, let next = Library.shared.space(id) else {
+            if showsSwipeLook { applySpaceColor(animated: true, crossFadesMode: false) }
+            return
+        }
+        showsSwipeLook = true
+        let (color, end) = root.paint(space, toward: next, share: share)
+        root.sidebarContainer.tint = color
+        root.sidebarContainer.gradient = end.map { ($0, share < 0.5 ? space.gradientAngle : next.gradientAngle) }
+        let t = Double(min(share, 1))
+        root.sidebarContainer.grain = (space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t
+        root.showEmptyPage(of: space, toward: next, share: share)
+    }
+
     private func applySpaceColor(animated: Bool, crossFadesMode: Bool = true) {
+        showsSwipeLook = false
         lastSpaceID = tabManager.currentSpaceID
         render(tabManager.currentSpace, animated: animated, crossFadesMode: crossFadesMode)
     }
