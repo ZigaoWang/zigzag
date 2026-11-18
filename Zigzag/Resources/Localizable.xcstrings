@@ -14316,6 +14316,17 @@
         }
       }
     },
+    "Pin Group" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定分组"
+          }
+        }
+      }
+    },
     "Pin Split View" : {
       "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
       "localizations" : {
@@ -20742,6 +20753,17 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "Unpin Group" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar. The tab is in a pinned group; the whole group goes back to the tabs.\nMenu bar item: unpins the whole pinned group the tab is in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定分组"
           }
         }
       }

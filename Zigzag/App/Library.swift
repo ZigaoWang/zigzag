@@ -26,6 +26,8 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     /// The pages that were open when it was shut: shut on purpose, it hides them too (#154), though pages opened
     /// after still show under it (#94). Nil while it's open.
     var tucked: [UUID]? = nil
+    /// The group of tabs (#209) this folder was pinned from; nil for a folder made by hand.
+    var groupID: UUID? = nil
 }
 
 extension Array where Element == BookmarkFolder {
@@ -1443,6 +1445,14 @@ final class Library {
         return nil
     }
 
+    /// The folder a group of tabs (#209) was pinned as, if the page is in one.
+    func pinnedGroup(containing bookmarkID: UUID) -> BookmarkFolder? {
+        for space in spaces {
+            if let folder = space.folders?.first(where: { $0.groupID != nil && $0.bookmarkIDs.contains(bookmarkID) }) { return folder }
+        }
+        return nil
+    }
+
     /// Pins the pages of a split view or tile group together at a place in a space's list, laid out as `layout`
     /// (whose pages are `marks`, in order), in one change.
     func addPinnedSplit(_ marks: [Bookmark], as layout: PinnedSplit, to spaceID: UUID, at index: Int? = nil) {
@@ -1450,6 +1460,22 @@ final class Library {
         let at = Self.place(index, among: spaces[s].bookmarks.count)
         spaces[s].bookmarks.insert(contentsOf: marks, at: at)
         spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [layout]
+        tidyFolders(s)
+        commit()
+    }
+
+    /// Pins a group of tabs (#209) as one folder, named and folded as the group was, in one change.
+    func addPinnedGroup(_ marks: [Bookmark], splits: [PinnedSplit] = [], named name: String, group: UUID, isOpen: Bool, to spaceID: UUID, at index: Int? = nil) {
+        guard let s = self.index(of: spaceID), !marks.isEmpty else { return }
+        let at = Self.place(index, among: spaces[s].bookmarks.count)
+        spaces[s].bookmarks.insert(contentsOf: marks, at: at)
+        var folder = BookmarkFolder(name: name, bookmarkIDs: marks.map(\.id))
+        folder.groupID = group
+        folder.isOpen = isOpen
+        // Folded, it hides its pages though they're open, as the group did.
+        if !isOpen { folder.tucked = marks.map(\.id).sorted { $0.uuidString < $1.uuidString } }
+        spaces[s].folders = (spaces[s].folders ?? []) + [folder]
+        if !splits.isEmpty { spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + splits }
         tidyFolders(s)
         commit()
     }

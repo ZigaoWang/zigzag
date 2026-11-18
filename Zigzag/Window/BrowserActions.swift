@@ -673,10 +673,12 @@ extension BrowserWindowController: NSMenuItemValidation {
                 : String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge.")
             return true
         case #selector(toggleBookmark(_:)):
-            // As the sidebar names them: a favorite moves back to the tabs, and half of a split pins with its other half.
+            // Named as in the sidebar's menus.
             let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
             item.title = tab?.isFavorite == true ? String(localized: "Move to Tabs", comment: "Menu bar item: moves the favorite back to the tabs.")
+                : tab?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil ? String(localized: "Unpin Group", comment: "Menu bar item: unpins the whole pinned group the tab is in.")
                 : tab?.bookmarkID != nil ? String(localized: "Unpin Tab", comment: "Menu bar item: unpins the tab.")
+                : tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
                 : String(localized: "Pin Tab", comment: "Menu bar item: pins the tab.")
             return tab?.url != nil && !tabManager.isPrivate

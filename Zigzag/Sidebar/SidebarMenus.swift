@@ -130,6 +130,10 @@ enum SidebarMenus {
         String(localized: "Choose Image…", comment: "Button at the foot of the icon choices of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.")
     }
 
+    static var unpinGroupTitle: String {
+        String(localized: "Unpin Group", comment: "Item in a pinned tab's context menu in the sidebar. The tab is in a pinned group; the whole group goes back to the tabs.")
+    }
+
     /// "Remove Pinned Page", or for several, how many.
     static func removePinsTitle(_ count: Int) -> String {
         count == 1 ? String(localized: "Remove Pinned Page", comment: "Menu item: takes a pinned page out of the sidebar")
@@ -149,7 +153,10 @@ enum SidebarMenus {
         let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
         // Pins and favorites are shared by every window: a private one's tabs stay out of them.
         if !manager.isPrivate {
-            menu.addItem(Item(pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.") : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
+            let pinTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.")
+                : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.")
+                : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar.")
+            menu.addItem(Item(pinTitle, enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
             menu.addItem(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
         }
         if manager.split(for: tab) != nil {
@@ -275,7 +282,7 @@ enum SidebarMenus {
                 menu.addItem(Item(String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")) { manager.close(pages) })
             }
             if !manager.isPrivate {
-                menu.addItem(Item(String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+                menu.addItem(Item(Library.shared.pinnedGroup(containing: bookmark.id) != nil ? Self.unpinGroupTitle : String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
                 menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
             }
             return menu
@@ -286,7 +293,7 @@ enum SidebarMenus {
         }
         // Pins are shared by every window: a private one doesn't take them away.
         if !manager.isPrivate {
-            menu.addItem(Item(String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+            menu.addItem(Item(Library.shared.pinnedGroup(containing: bookmark.id) != nil ? Self.unpinGroupTitle : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
             menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
         }
         return menu
