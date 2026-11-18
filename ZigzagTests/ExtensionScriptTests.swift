@@ -615,6 +615,36 @@ struct ExtensionScriptTests {
         #expect(ExtensionStore.contentScriptsFirst.hasPrefix(ExtensionBridgeScript.keepsBrowser))
     }
 
+    @Test func idleCallbacksRunInExtensionPagesAndContentScripts() {
+        // Proton Pass's content script stopped on requestIdleCallback, which WebKit doesn't have (#287).
+        #expect(ExtensionStore.contentScriptsFirst.contains(ExtensionBridgeScript.idleCallbacks))
+        #expect(ExtensionBridgeScript.differences.contains(ExtensionBridgeScript.idleCallbacks))
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = new Map(), __last = 0, document = {};
+        var setTimeout = (f) => { __timers.set(++__last, f); return __last; };
+        var clearTimeout = (id) => { __timers.delete(id); };
+        var __flush = () => { const t = [...__timers.values()]; __timers.clear(); t.forEach((f) => f()); };
+        """)
+        context.evaluateScript(ExtensionBridgeScript.idleCallbacks)
+        context.evaluateScript("""
+        var __ran = [];
+        requestIdleCallback((deadline) => __ran.push(['a', deadline.didTimeout, deadline.timeRemaining() > 0]));
+        cancelIdleCallback(requestIdleCallback(() => __ran.push(['b'])));
+        __flush();
+        """)
+        #expect(context.evaluateScript("JSON.stringify(__ran)")?.toString() == "[[\"a\",false,true]]")
+        // A worker has none in Chrome either, and one WebKit has is left as it is.
+        let worker = JSContext()!
+        worker.evaluateScript(ExtensionBridgeScript.idleCallbacks)
+        #expect(worker.evaluateScript("typeof requestIdleCallback")?.toString() == "undefined")
+        let own = JSContext()!
+        own.evaluateScript("var document = {}; var mine = () => 7; var requestIdleCallback = mine;")
+        own.evaluateScript(ExtensionBridgeScript.idleCallbacks)
+        #expect(own.evaluateScript("requestIdleCallback === mine")?.toBool() == true)
+    }
+
     @Test func browserIsKeptOnceAnExtensionPageGetsIt() {
         // Extension pages may get the API after Zigzag's scripts run; it's kept before the page's timers fire.
         let context = JSContext()!

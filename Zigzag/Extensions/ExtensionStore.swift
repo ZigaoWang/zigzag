@@ -1437,9 +1437,9 @@ extension ExtensionStore {
         return SHA256.hash(data: digest).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Runs before content scripts in their world (ConnectGuard.file): keeps WebKit's `browser`, as in backgrounds and pages
-    /// (ExtensionBridgeScript.keepsBrowser), then the reconnect guard.
-    nonisolated static let contentScriptsFirst = ExtensionBridgeScript.keepsBrowser + "\n" + ConnectGuard.source
+    /// Runs before content scripts in their world (ConnectGuard.file): keeps WebKit's `browser` (ExtensionBridgeScript.keepsBrowser),
+    /// adds requestIdleCallback, then the reconnect guard.
+    nonisolated static let contentScriptsFirst = ExtensionBridgeScript.keepsBrowser + "\n" + ExtensionBridgeScript.idleCallbacks + "\n" + ConnectGuard.source
 
     /// One of a shim's patches, as plain text for making an overlay off the main thread.
     nonisolated struct OverlayPatch: Sendable {

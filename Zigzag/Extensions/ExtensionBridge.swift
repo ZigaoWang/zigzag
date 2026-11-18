@@ -205,7 +205,7 @@ enum ExtensionBridgeScript {
     }()
 
     /// Where WebKit answers differently from Chrome, made to answer as Chrome does (webkit-differences.js).
-    static let differences: String = keepsBrowser + "\n" + webLocks + "\n" + differencesSource
+    static let differences: String = keepsBrowser + "\n" + idleCallbacks + "\n" + webLocks + "\n" + differencesSource
 
     /// Keeps the global `browser` as WebKit's API in backgrounds, pages and content scripts. WebKit looks up listeners
     /// through that global on every delivery (message, port, event); Chrome doesn't. Proton Pass replaces `chrome` and
@@ -229,6 +229,30 @@ enum ExtensionBridgeScript {
       let tries = 0;
       const again = () => { if (!keep() && ++tries < 100) setTimeout(again, 20); };
       setTimeout(again, 0);
+    })();
+    """
+
+    /// requestIdleCallback where WebKit has none, in the extension's pages and content scripts: Chrome has it, and
+    /// Proton Pass's content script stopped on it before putting its icon in sign-in fields (#287).
+    nonisolated static let idleCallbacks = """
+    (() => {
+      if (typeof document === 'undefined' || typeof globalThis.requestIdleCallback === 'function') return;
+      const timers = new Map();
+      let last = 0;
+      globalThis.requestIdleCallback = function requestIdleCallback(callback) {
+        if (typeof callback !== 'function') throw new TypeError("Failed to execute 'requestIdleCallback' on 'Window': parameter 1 is not of type 'Function'.");
+        const id = ++last;
+        timers.set(id, setTimeout(() => {
+          timers.delete(id);
+          const began = Date.now();
+          callback({ didTimeout: false, timeRemaining: () => Math.max(0, 50 - (Date.now() - began)) });
+        }, 1));
+        return id;
+      };
+      globalThis.cancelIdleCallback = function cancelIdleCallback(id) {
+        clearTimeout(timers.get(id));
+        timers.delete(id);
+      };
     })();
     """
 
