@@ -1908,6 +1908,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLeavingPage = true
+        // Ended while the page is still in its process: the next page may get a new one (#348).
+        if Passkeys.available { Passkeys.endRequests(in: webView) {} }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
