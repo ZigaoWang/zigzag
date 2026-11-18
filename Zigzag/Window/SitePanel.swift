@@ -1004,8 +1004,10 @@ final class SitePanel: FloatingPanelView {
         }
         // Whether extensions run here at all; off, every tile above dims and says so (#215). It is a permission the
         // site is given or not, not a switch for the page, so it belongs here with the rest.
-        if #available(macOS 15.4, *), controller != nil, !isPrivate, !isBlank,
-           ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+        // Only once there are extensions to run here, or they were turned off here before.
+        if #available(macOS 15.4, *), controller != nil, !isPrivate, !isBlank, tab.extensionHost != nil,
+           ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+           !(extensionsSection?.items.isEmpty ?? true) || ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) {
             let profile = tab.profile
             let enabled = !ExtensionStore.extensionsOffSites(in: profile).contains(site)
             let row = PanelRow.toggle(String(localized: "Extensions", comment: "Row in the site panel's Permissions page: whether extensions run on this site."),
