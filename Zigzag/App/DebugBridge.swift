@@ -200,6 +200,7 @@ enum DebugBridge {
         case "minisetting": MiniWindowController.opensExternalLinks = arg == "on"
         case "minitype": mini?.debugEnter(arg)
         case "minimove": mini?.openInZigzag()
+        case "mininote": mini?.debugLinksNote(arg)
         case "minispace": mini?.debugSpace(arg)
         case "minicopy": mini?.copyPageURL(nil)
         case "minisite": mini?.showSiteControls()

@@ -9346,6 +9346,17 @@
         }
       }
     },
+    "Glance, then get back to what you were doing. To keep the page, use this button or press ⌘O." : {
+      "comment" : "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like ⌘O) moves the page into a tab of a browser window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "看完就能回去。\n想留下这个网页，点这个按钮或按 ⌘O。"
+          }
+        }
+      }
+    },
     "Go Back" : {
       "comment" : "Button on the page Zigzag shows when a page can't load: back to the page before.",
       "localizations" : {
@@ -9397,6 +9408,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "前往标签页 1 至 8 或最后一个标签页"
+          }
+        }
+      }
+    },
+    "Got It" : {
+      "comment" : "Button on the note shown the first time a link from another app opens in Zigzag Mini: puts the note away and keeps using Zigzag Mini.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "知道了"
           }
         }
       }
@@ -10792,6 +10814,17 @@
         }
       }
     },
+    "Links from other apps open here" : {
+      "comment" : "Title of the note shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. The note points at the Open in button.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其他 App 的链接会在这里打开"
+          }
+        }
+      }
+    },
     "Links from other apps open here." : {
       "comment" : "Explanation under “Default browser” in Settings › General.",
       "localizations" : {
@@ -10803,13 +10836,13 @@
         }
       }
     },
-    "Links from other apps open in Zigzag Mini. Turn this off in Settings." : {
-      "comment" : "Toast shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. Settings means Settings › Zigzag Mini, where this can be turned off. Zigzag Mini is a name, kept in Latin letters.",
+    "Links from other apps will open as tabs." : {
+      "comment" : "Toast in the browser window after Use Tabs Instead on the note shown the first time a link from another app opened in Zigzag Mini. The page has moved into a tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "来自其他 App 的链接会在 Zigzag Mini 中打开。可在“设置”中关闭。"
+            "value" : "来自其他 App 的链接将以标签页打开。"
           }
         }
       }
@@ -13225,7 +13258,7 @@
       }
     },
     "Open in Zigzag" : {
-      "comment" : "Button in the toast shown the first time a link from another app opens in Zigzag Mini: moves the page into a tab, as ⌘O does.\nFile menu item of an installed app's window: opens the page it shows in a tab of a Zigzag window.",
+      "comment" : "File menu item of an installed app's window: opens the page it shows in a tab of a Zigzag window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20742,6 +20775,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用强密码"
+          }
+        }
+      }
+    },
+    "Use Tabs Instead" : {
+      "comment" : "Button on the note shown the first time a link from another app opens in Zigzag Mini: links from other apps open as tabs from now on, and this page moves into a tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改用标签页"
           }
         }
       }

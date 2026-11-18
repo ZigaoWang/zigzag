@@ -601,13 +601,67 @@ class FloatingPanelView: NSView {
         if view === surface { super.addSubview(view) } else { surface.addSubview(view) }
     }
 
+    /// An arrow on the top edge pointing up at what the panel is about, at this x; the panel's top `arrowHeight` is
+    /// the arrow's.
+    var arrowX: CGFloat? { didSet { needsLayout = true } }
+    static let arrowHeight: CGFloat = 8
+    private static let arrowWidth: CGFloat = 20
+    /// The arrow's outline: the edge drawn along it, since a layer border can't follow it.
+    private let outline = CAShapeLayer()
+
+    /// The rounded body with the arrow on top, in the panel's own (flipped) coordinates.
+    private func arrowPath(at x: CGFloat) -> CGPath {
+        let h = Self.arrowHeight, half = Self.arrowWidth / 2, r = radius
+        let body = NSRect(x: 0, y: h, width: bounds.width, height: bounds.height - h)
+        let tipX = min(max(x, r + half), body.maxX - r - half)
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: body.minX + r, y: body.minY))
+        path.addLine(to: CGPoint(x: tipX - half, y: body.minY))
+        path.addArc(tangent1End: CGPoint(x: tipX, y: 0), tangent2End: CGPoint(x: tipX + half, y: body.minY), radius: 3)
+        path.addLine(to: CGPoint(x: tipX + half, y: body.minY))
+        path.addArc(tangent1End: CGPoint(x: body.maxX, y: body.minY), tangent2End: CGPoint(x: body.maxX, y: body.maxY), radius: r)
+        path.addArc(tangent1End: CGPoint(x: body.maxX, y: body.maxY), tangent2End: CGPoint(x: body.minX, y: body.maxY), radius: r)
+        path.addArc(tangent1End: CGPoint(x: body.minX, y: body.maxY), tangent2End: CGPoint(x: body.minX, y: body.minY), radius: r)
+        path.addArc(tangent1End: CGPoint(x: body.minX, y: body.minY), tangent2End: CGPoint(x: body.maxX, y: body.minY), radius: r)
+        path.closeSubpath()
+        return path
+    }
+
     override func layout() {
         super.layout()
         surface.frame = bounds
-        surface.layer?.cornerRadius = radius
         material.frame = bounds
-        material.layer?.cornerRadius = radius
-        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        if let arrowX {
+            let path = arrowPath(at: arrowX)
+            surface.layer?.cornerRadius = 0
+            let mask = (surface.layer?.mask as? CAShapeLayer) ?? CAShapeLayer()
+            mask.frame = surface.bounds
+            mask.path = path
+            surface.layer?.mask = mask
+            // The material takes a mask image, not a layer mask.
+            material.layer?.cornerRadius = 0
+            material.maskImage = NSImage(size: bounds.size, flipped: true) { _ in
+                guard let context = NSGraphicsContext.current?.cgContext else { return false }
+                context.addPath(path)
+                context.setFillColor(NSColor.black.cgColor)
+                context.fillPath()
+                return true
+            }
+            surface.layer?.borderWidth = 0
+            Tokens.Motion.withoutAnimation {
+                outline.frame = bounds
+                outline.path = path
+                outline.fillColor = nil
+                outline.lineWidth = Tokens.Metric.hairline
+                outline.zPosition = 2
+                if outline.superlayer == nil { layer?.addSublayer(outline) }
+            }
+            layer?.shadowPath = path
+        } else {
+            surface.layer?.cornerRadius = radius
+            material.layer?.cornerRadius = radius
+            layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
+        }
         onLayout?()
         matchCorners()
     }
@@ -666,7 +720,8 @@ class FloatingPanelView: NSView {
                 surface.color = Brand.Theme.for(self).panel.withAlphaComponent(Tokens.Contrast.isOpaque ? 1 : 0.88)
             }
             surface.layer?.borderColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
-            surface.layer?.borderWidth = edgeColor == nil ? Tokens.Metric.hairline : 1.5
+            surface.layer?.borderWidth = arrowX != nil ? 0 : edgeColor == nil ? Tokens.Metric.hairline : 1.5
+            outline.strokeColor = cgColor(edgeColor ?? Tokens.Color.panelEdge)
             layer?.shadowColor = cgColor(Tokens.Color.panelShadow)
             layer?.shadowOpacity = isElevated ? 1 : 0
             layer?.shadowRadius = Tokens.Shadow.panelRadius / 2
@@ -855,69 +910,22 @@ class ToastView: FloatingPanelView {
     /// The space around the text: the icon on the left, the action (or padding) on the right.
     private var chromeWidth: CGFloat { fittingWidth - label.inkWidth }
 
-    /// Max wrapped lines before truncating. Above two, the action moves below the text when it doesn't fit beside it.
-    var maxLines = 2
-    /// Action below the text at the right, for long notes in narrow windows.
-    private var actionBelow = false
-
-    /// Text start x: after the icon, or padding.
-    private var textStart: CGFloat { icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2 }
-
-    /// Text height wrapped to `width`.
-    private func wrappedHeight(_ width: CGFloat) -> CGFloat {
-        ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width + Label.inset * 2, height: 1000)).height ?? label.lineHeight * 2)
-    }
-
-    /// One line if it fits, else wrapped up to `maxLines`, never wider than the page.
+    /// One line if it fits, else two wrapped lines, never wider than the page.
     func size(maxWidth: CGFloat) -> NSSize {
         let width = min(ceil(fittingWidth), maxWidth)
-        var textWidth = width - chromeWidth
+        let textWidth = width - chromeWidth
         let wraps = label.inkWidth > textWidth + 0.5
         label.usesSingleLineMode = !wraps
-        label.maximumNumberOfLines = wraps ? maxLines : 1
+        label.maximumNumberOfLines = wraps ? 2 : 1
         label.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
         label.cell?.wraps = wraps
         label.cell?.truncatesLastVisibleLine = true
-        actionBelow = wraps && maxLines > 2 && !actionButton.isHidden && wrappedHeight(textWidth) > label.lineHeight * 2 + 1
+        let textHeight = wraps ? ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth + Label.inset * 2, height: 200)).height ?? label.lineHeight * 2) : label.lineHeight
         radius = wraps ? Tokens.Radius.panel : Self.height / 2
-        if actionBelow {
-            textWidth = width - textStart - belowTrailing
-            let h = Tokens.Metric.toastButtonHeight
-            return NSSize(width: width, height: belowTextTop + wrappedHeight(textWidth) + Tokens.Space.x2 + h + (Self.height - h) / 2)
-        }
-        let textHeight = wraps ? wrappedHeight(textWidth) : label.lineHeight
         return NSSize(width: width, height: max(Self.height, textHeight + Tokens.Space.x4))
     }
 
-    /// With the action below, the first line aligns with the close button, as in a one-line toast.
-    private var belowTextTop: CGFloat { round((Self.height - label.lineHeight) / 2) }
-    /// With the action below: trailing space after the text (close button or padding).
-    private var belowTrailing: CGFloat {
-        guard !closeButton.isHidden else { return Tokens.Space.x4 }
-        let side = closeButton.frame.width
-        return (Self.height - side) / 2 + side + Tokens.Space.x1
-    }
-
-    private func layoutBelow() {
-        let top = belowTextTop
-        if icon.image != nil {
-            icon.frame = NSRect(x: Tokens.Space.x3, y: top + (label.lineHeight - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
-            spinner.frame = icon.frame
-        }
-        if !closeButton.isHidden {
-            let side = closeButton.frame.width
-            closeButton.frame.origin = NSPoint(x: bounds.width - (Self.height - side) / 2 - side, y: (Self.height - side) / 2)
-        }
-        // Inset the pill from the bottom right like a one-line toast's from its right end.
-        let h = Tokens.Metric.toastButtonHeight, inset = (Self.height - h) / 2
-        let actionWidth = actionButton.fittingWidth
-        actionButton.frame = NSRect(x: bounds.width - inset - actionWidth, y: bounds.height - inset - h, width: actionWidth, height: h)
-        let textWidth = bounds.width - textStart - belowTrailing
-        label.frame = NSRect(x: textStart - Label.inset, y: top, width: textWidth + Label.inset * 2, height: actionButton.frame.minY - Tokens.Space.x2 - top)
-    }
-
     private func layoutContent() {
-        if actionBelow { layoutBelow(); return }
         var x = icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3
         if icon.image != nil {
             icon.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
@@ -1059,11 +1067,10 @@ enum Toast {
         place(toast, in: spot.area)
     }
 
-    /// Shows a toast at the top center of `area` in any flipped view (also used by Passwords). `lines`: max wrap, for
-    /// notes that must be read in full.
+    /// Shows a toast at the top center of `area` in any flipped view (also used by Passwords).
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
-                     lines: Int = 2, onClose: (() -> Void)? = nil) {
+                     onClose: (() -> Void)? = nil) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1077,7 +1084,6 @@ enum Toast {
             isNew = true
         }
         toast.label.stringValue = text
-        toast.maxLines = lines
         Announcement.post(text, priority: action == nil ? .medium : .high)
         // Busy: an empty picture keeps the icon's place for the spinner.
         toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }
