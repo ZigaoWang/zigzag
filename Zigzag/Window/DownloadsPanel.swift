@@ -187,8 +187,7 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     /// The progress line under a download that's under way.
     private static let barHeight: CGFloat = 3
 
-    /// The file icons' column, from the row's edge: the folder row under the list centers its glyph in it, so the
-    /// names and its title start at one x.
+    /// File icon column from the row edge; the folder row centers its glyph in it so names and title align.
     static let iconColumn: (x: CGFloat, width: CGFloat) = (CardRow.inset - 2, Tokens.Space.x8)
 
     override func layout() {
@@ -201,14 +200,14 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
         actionButton.frame.origin = NSPoint(x: bounds.width - pad - b.width, y: (bounds.height - b.height) / 2)
         pauseButton.frame.origin = NSPoint(x: actionButton.frame.minX - pauseButton.frame.width, y: actionButton.frame.minY)
         let x = icon.frame.maxX + CardRow.inset - Label.inset
-        // A finished file's button waits for the pointer, but its room is kept: the name never cuts shorter on hover.
+        // A finished file's button shows on hover, but its space is reserved so the name doesn't shorten.
         let right = !pauseButton.isHidden ? pauseButton.frame.minX : actionButton.frame.minX
         let width = max(0, right - Tokens.Space.x2 - x)
         let nameH = name.lineHeight, statusH = status.lineHeight
         let top = (bounds.height - nameH - statusH - 2) / 2
         name.frame = NSRect(x: x, y: top, width: width, height: nameH)
         status.frame = NSRect(x: x, y: name.frame.maxY + 2, width: width, height: statusH)
-        // A name cut in the middle shows whole under the pointer.
+        // Tooltip with the full name when truncated.
         toolTip = name.inkWidth > width - Label.inset * 2 ? name.stringValue : nil
         if !bar.isHidden {
             // Under the text, lined up with it, as long as the name may run.
@@ -509,7 +508,7 @@ final class DownloadsPanelView: FloatingPanelView {
         let h = title.lineHeight
         let x = inset + CardRow.inset - 2 - Label.inset
         let end = clearButton.isHidden ? more.frame.minX : clearButton.frame.minX
-        // Its capitals level with More's dots.
+        // Caps aligned with More's dots.
         title.frame = NSRect(x: x, y: more.frame.minY + title.centeredY(in: more.frame.height), width: max(0, end - x - Tokens.Space.x2), height: h)
         var y = header
         if rows.isEmpty {

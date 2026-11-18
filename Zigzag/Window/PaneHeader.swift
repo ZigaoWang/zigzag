@@ -213,10 +213,9 @@ final class PaneHeaderView: NSView {
         return .noReload
     }
 
-    /// The address pill in a row of buttons: centered on `center` (its page's middle), as wide as its address
-    /// (`fitting`), within the `room` the buttons leave and nudged clear of them where centering would cut it. Over
-    /// its card, the field takes the room up to a comfortable width (`addressMaxWidth`), as an address field does,
-    /// rather than a small pill adrift in it. A split pane's strip and the bar above the page (#275) place theirs alike.
+    /// The address pill in a button row: centered on `center` (the page's middle), as wide as its address (`fitting`),
+    /// within the `room` the buttons leave and shifted to avoid clipping. Over the card it widens to a comfortable
+    /// width (`addressMaxWidth`), like an address field. Used by split pane strips and the top bar (#275).
     static func pillFrame(center: CGFloat, room: ClosedRange<CGFloat>, fitting: CGFloat, overCard: Bool, midY: CGFloat) -> NSRect {
         let h = Tokens.Pane.addressHeight
         let width = max(0, min(room.upperBound - room.lowerBound, overCard ? addressMaxWidth : fitting))
@@ -224,7 +223,7 @@ final class PaneHeaderView: NSView {
         return NSRect(x: round(x), y: midY - h / 2, width: width, height: h)
     }
 
-    /// Too narrow a pill shows nothing readable: it steps aside.
+    /// Hidden when too narrow to read.
     static func pillFits(_ frame: NSRect) -> Bool { frame.width >= PaneAddressView.padding * 3 }
 
     private var currentFit = Fit.all
@@ -319,8 +318,8 @@ final class TitleBandGuard: NSControl {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// A pane's address: the page's address in a small field, a faint fill and a 1px edge. A click edits it. The bar
-/// above the page holds one too (`TopBarView.pill`), for the page alone in the window (#275).
+/// A pane's address: a small field with a faint fill and 1px border; clicking edits it. The top bar has one too
+/// (`TopBarView.pill`) for a single page (#275).
 final class PaneAddressView: InteractiveView {
 
     // MARK: Dropping a link or words (#182)
@@ -348,12 +347,12 @@ final class PaneAddressView: InteractiveView {
         hasText && (width >= fitting - 0.5 || width >= padding * 2 + buttonRoom + minTextWithButton)
     }
     var showsSiteControls: Bool { !isHidden && !siteControls.isHidden }
-    /// Whether the field has its own Site Controls at its end. The bar above the page keeps the address's own buttons
-    /// beside the field instead (`TopBarView.pill`), so its field has none.
+    /// Whether the field has its own Site Controls. The top bar keeps the address buttons beside it instead
+    /// (`TopBarView.pill`), so its field has none.
     var hasSiteControls = true { didSet { if hasSiteControls != oldValue { needsLayout = true } } }
 
-    /// The page isn't secure (plain http, or a certificate let through on the warning page): the not-secure mark
-    /// before the address, as the sidebar's address has it.
+    /// Not secure (http, or a certificate allowed from the warning page): shows the not-secure mark before the address,
+    /// as in the sidebar.
     var notSecure = false {
         didSet {
             guard notSecure != oldValue else { return }
@@ -364,7 +363,7 @@ final class PaneAddressView: InteractiveView {
         }
     }
     private let mark = NSImageView()
-    /// What the mark takes before the address: its width and the gap after it.
+    /// Width of the mark plus its gap.
     private static var markRoom: CGFloat { Tokens.Space.x3 + Tokens.Space.x1 }
 
     var text: String = "" {
@@ -440,8 +439,8 @@ final class PaneAddressView: InteractiveView {
         label.lineBreakMode = shown == text && fits ? .byTruncatingMiddle : AddressView.lineBreak(forName: shown)
         toolTip = shown == text && fits ? nil : text
         guard notSecure else { return }
-        // The mark goes just before the address's first letter. In a field wider than the address (centered in it),
-        // the address moves over by half the mark, so the two together sit in the field's middle.
+        // The mark sits just before the first letter. In a field wider than the address (centered), the address shifts
+        // by half the mark so both stay centered.
         let ink = min(ceil((shown as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.body()]).width), label.frame.width - Label.inset * 2)
         if label.frame.width - Label.inset * 2 - ink >= markRoom { label.frame.origin.x -= markRoom / 2 }
         mark.frame = NSRect(x: round(label.frame.midX - ink / 2 - markRoom), y: 0, width: Tokens.Space.x3, height: bounds.height)

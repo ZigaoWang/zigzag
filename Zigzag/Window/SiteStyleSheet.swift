@@ -1,13 +1,13 @@
 import AppKit
 
-/// Edit Style…, from Site Controls: a site's own CSS, in a sheet over the window. The page shows it as you type;
-/// Save keeps it for the site (a private window's for that window only), Cancel puts back what was there. Empty is
-/// off. Only plain CSS: no scripts, and nothing loaded from elsewhere (`SiteBoosts.styleProblem`).
+/// Edit Style… from Site Controls: a site's custom CSS in a sheet. The page previews it while typing; Save keeps it
+/// (private windows: for the window only), Cancel reverts. Empty turns it off. Plain CSS only: no scripts or external
+/// loads (`SiteBoosts.styleProblem`).
 enum SiteStyleSheet {
     static let title = String(localized: "Edit Style…", comment: "Item in the … menu of the site panel: opens a sheet to write CSS of your own for the site's pages.")
     static let rules = String(localized: "Plain CSS only: no @import, scripts or web addresses.", comment: "Under the code field of the Edit Style sheet: what a site's style may hold.")
 
-    /// The sheet open now, for debugging.
+    /// The open sheet, for debugging.
     private(set) static weak var shown: FormSheet?
     private(set) static weak var shownField: MultilineField?
 
@@ -27,7 +27,7 @@ enum SiteStyleSheet {
             note?.textColor = problem == nil ? Tokens.Color.textSecondary : Tokens.Color.destructive
             sheetRef?.revalidate()
             sheetRef?.needsLayout = true
-            // As you type, the page shows it; CSS that can't be used leaves the page as it last could.
+            // Live preview; invalid CSS leaves the last valid style.
             guard let tab, problem == nil else { return }
             var preview = SiteBoosts.boost(forSite: site, privateStore: privateStore)
             preview.style = text
@@ -40,7 +40,7 @@ enum SiteStyleSheet {
                                    rows: rows, confirmTitle: String(localized: "Save", comment: "Button of the Edit Style sheet: keeps the CSS for the site."),
                                    canConfirm: { [weak field] in SiteBoosts.styleProblem(field?.text ?? "") == nil }) { [weak tab, weak field] confirmed in
             if confirmed, let field { SiteBoosts.setStyle(field.text, forSite: site, privateStore: privateStore) }
-            // Saved, or put back as it was.
+            // Saved or reverted.
             if let tab { PageBoosts.refresh(tab) }
         }
         sheet.heldUpNote = { [weak field] in SiteBoosts.styleProblem(field?.text ?? "")?.message }
@@ -52,7 +52,7 @@ enum SiteStyleSheet {
     }
 
     #if DEBUG
-    /// boostcss <css> | save | cancel: types the CSS into the open sheet (as a paste would), or answers it.
+    /// boostcss <css> | save | cancel: pastes the CSS into the open sheet, or saves or cancels it.
     static func debug(_ arg: String) {
         switch arg {
         case "save": shown?.debugAnswer(true)

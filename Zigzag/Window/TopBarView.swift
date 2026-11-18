@@ -1,15 +1,13 @@
 import AppKit
 
-/// The bar above the page (Settings › Appearance › Address bar above the page), as in Arc's and Chrome's top-bar
-/// layout: back, forward and reload at the leading end, the site in a quiet pill over the page's middle (the one a
-/// split pane's strip has, `pill`), and the address's own buttons at the trailing end (#275). The buttons are the
-/// sidebar's own views, moved here rather than made again, so their actions, the panels and popups that come out of
-/// them, the command bar and their tooltips work as they do in the sidebar. It lies on the window's frame as the
-/// sidebar does, its middle on the traffic lights' line, and like the sidebar it moves the window and zooms it on a
-/// double-click.
+/// The bar above the page (Settings › Appearance › Address bar above the page), like Arc's and Chrome's top bar: back,
+/// forward and reload at the leading end, the site in a pill over the page's middle (`pill`, as in split panes), and
+/// the address buttons at the trailing end (#275). The buttons are the sidebar's own views moved here, so actions,
+/// panels, popups, the command bar and tooltips work the same. It sits on the window frame like the sidebar, centered
+/// on the traffic lights' line, and drags the window and zooms on double-click.
 ///
-/// A page can bring tools of its own to the bar's trailing end (`accessory`), after the address. With the address
-/// kept in the sidebar, the bar is there for them alone, and they sit at its trailing end all the same.
+/// Pages can add tools at the trailing end (`accessory`), after the address. With the address in the sidebar, the bar
+/// holds only those.
 final class TopBarView: NSView {
     /// Twice the traffic lights' center line: the lights, the sidebar's toggle and everything here sit on one line.
     static let height: CGFloat = Tokens.Sidebar.lightsCenter * 2
@@ -84,20 +82,20 @@ final class TopBarView: NSView {
     /// The address is here (Settings › Appearance › Address bar above the page), not in the sidebar.
     var holdsAddress: Bool { address?.superview === self }
 
-    /// The page's site, in the pill a split pane's strip has (#275): centered over the page, as wide as the site,
-    /// quiet. A click opens the command bar right over it, as a pane's does, and ⌘L does the same. The address's
-    /// own buttons (`AddressView.buttonsOnly`) stay at the bar's trailing end, so the pill has no Site Controls.
+    /// The site pill, as in split pane strips (#275): centered over the page, as wide as the site. Click or ⌘L opens
+    /// the command bar over it. The address buttons (`AddressView.buttonsOnly`) stay at the trailing end, so no Site
+    /// Controls.
     let pill: PaneAddressView = {
         let pill = PaneAddressView()
         pill.hasSiteControls = false
         pill.isHidden = true
         return pill
     }()
-    /// Where the pill centers, from the bar's leading edge: the page's middle. Nil centers it in its room.
+    /// Pill center from the bar's leading edge (the page's middle); nil centers it in its room.
     var addressCenter: CGFloat? { didSet { if addressCenter != oldValue { needsLayout = true } } }
 
-    /// Shows the page's site in the pill: its name as the sidebar's address has it (History, a file's name), or the
-    /// prompt on a new tab, and the not-secure mark when it isn't secure.
+    /// Shows the site in the pill, named as in the sidebar address (History, a file name) or the new tab prompt, with
+    /// the not-secure mark when needed.
     func showPage(url: URL?, notSecure: Bool) {
         let name = AddressView.name(of: url)
         pill.text = name.isEmpty ? String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab.") : name
@@ -124,8 +122,8 @@ final class TopBarView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
 
-    /// Takes the sidebar's buttons and address, in order: the address keeps only its buttons here, the pill showing
-    /// the site (the sidebar gives it back its field when it takes it back).
+    /// Takes the sidebar's buttons and address, in order; here the address shows only its buttons and the pill shows
+    /// the site (the sidebar restores its field when it takes it back).
     func hold(buttons: [NSView], address: NSView) {
         self.buttons = buttons
         self.address = address
@@ -138,23 +136,21 @@ final class TopBarView: NSView {
     struct Frames: Equatable {
         var sidebarButton: NSRect?
         var buttons: [NSRect]
-        /// The address: its buttons alone at the room's trailing end when `addressWidth` is given, else the room.
+        /// The address: its buttons at the room's trailing end when `addressWidth` is given, else the whole room.
         var address: NSRect
-        /// The pill with the site, centered over the page in the room left before the address's buttons.
+        /// The site pill, centered over the page in the room before the address buttons.
         var pill: NSRect?
         /// The page's tools, when they take any room: the bar's whole height, ending where the address would.
         var accessory: NSRect?
     }
 
-    /// The sidebar's toggle when it's here, then the buttons, a button apart, then the address to the trailing inset,
-    /// all centered on the lights' line. After the traffic lights the first glyph sits `Sidebar.lightsGap` after them,
-    /// as the toggle's does in the sidebar's own top row; without them the first button starts `leadingInset` in.
-    /// `onRight`: the sidebar is on the right, so its toggle is at the bar's trailing end, where the sidebar's own
-    /// lands (`trailingToggle`), with the address ending as far before it as it starts after the buttons.
-    /// `accessory`: the width the page's tools take at the trailing end; the address ends a gap before them.
-    /// `addressWidth`: the address's buttons' width, at the room's end; `pill`: the pill's own width (its site's),
-    /// centered on `pillCenter` (the page's middle) in the room before them, as a pane's strip places its own
-    /// (`PaneHeaderView.pillFrame`); `onCard`, the bar on the page's card: the pill takes up to a field's width.
+    /// The sidebar toggle when here, then the buttons a button apart, then the address to the trailing inset, all
+    /// centered on the lights' line. After the traffic lights the first glyph sits `Sidebar.lightsGap` after them, as
+    /// in the sidebar's top row; without them it starts at `leadingInset`. `onRight`: the toggle goes at the trailing
+    /// end (`trailingToggle`), the address ending as far before it as it starts after the buttons. `accessory`: width
+    /// of page tools at the trailing end. `addressWidth`: width of the address buttons; `pill`: the pill's width,
+    /// centered on `pillCenter` in the room before them (`PaneHeaderView.pillFrame`); `onCard`: the pill widens to a
+    /// field's width.
     static func frames(width: CGFloat, buttons: Int, sidebarButton: Bool = false, onRight: Bool = false, trafficLightsWidth: CGFloat,
                        leadingInset: CGFloat = Tokens.Sidebar.edge, trailingInset: CGFloat, accessory: CGFloat = 0,
                        addressWidth: CGFloat? = nil, pill: CGFloat? = nil, pillCenter: CGFloat? = nil, onCard: Bool = false) -> Frames {
@@ -319,11 +315,11 @@ final class TopBarView: NSView {
         centerStripAddresses()
     }
 
-    /// The pill shows while the address is here and it has the room to read; while the panes' strips are in the row,
-    /// the window fades it with the bar's other controls (`ownControls`).
+    /// The pill shows while the address is here and it fits; with pane strips in the row, it fades with the bar's other
+    /// controls (`ownControls`).
     override func willRemoveSubview(_ subview: NSView) {
         super.willRemoveSubview(subview)
-        // The sidebar takes the address back: the site goes back with it.
+        // The sidebar took the address back: hide the pill.
         if subview === address { pill.isHidden = true }
     }
 

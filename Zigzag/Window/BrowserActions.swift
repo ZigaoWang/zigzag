@@ -4,8 +4,7 @@ import WebKit
 /// Menu actions. Every one of these is reachable from the menu bar with its shortcut shown.
 extension BrowserWindowController: NSMenuItemValidation {
     var selectedTab: Tab? { tabManager.selectedTab }
-    /// The page on screen here: none while another window sharing the tabs has it (#162), so what acts on a page waits
-    /// for Show Here.
+    /// The page on screen; nil while another sharing window shows it (#162).
     var selectedWebView: WKWebView? { selectedTab.flatMap { tabManager.isShownElsewhere($0) ? nil : $0.webView } }
 
     // MARK: File
@@ -24,7 +23,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         if commandBar.isVisible && commandBar.mode == .editCurrent { commandBar.dismiss(); return }
         commandBar.show(mode: .editCurrent)
     }
-    /// Edit › Select All with no page or field to take it, after a click in the sidebar: its tabs (#302).
+    /// Select All after a sidebar click with no field or page to take it: select its tabs (#302).
     override func selectAll(_ sender: Any?) {
         if (window as? BrowserWindow)?.selectAllInSidebar() != true { NSSound.beep() }
     }
@@ -45,8 +44,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         closeWithUndo(tab)
     }
 
-    /// Copies a link, without its tracking parameters and titled where rich text is taken, and says so, wherever the
-    /// copy came from.
+    /// Copies a link without tracking parameters, with its title as rich text, and shows a toast.
     func copyLink(_ url: URL, title: String?) {
         CleanLink.write(url, title: title)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", in: self)
@@ -227,7 +225,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func toggleBrowserSidebar(_ sender: Any?) {
         root.setSidebarVisible(!root.sidebarVisible, animated: true)
-        // Back in the sidebar, the update card lives there rather than floating.
+        // With the sidebar back, the update card returns there.
         if root.sidebarVisible { Updater.shared.stopFloating() }
         onStateChange?()
     }
@@ -592,7 +590,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             created = Library.shared.addSpace(profile: tabManager.profile.id, ownProfile: own)
         }
         guard let space = created else { return }
-        // Its own profile, when Settings › Spaces gives new spaces one (#291).
+        // Its own profile when Settings › Spaces gives new spaces one (#291).
         let madeProfile = own ? Library.shared.profileID(ofSpace: space.id) : nil
         let previous = tabManager.currentSpaceID
         // Into the new space first: that move isn't the guide's "go back" step, which only starts once this one counts.
@@ -607,7 +605,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             if Library.shared.space(previous) != nil { tabManager.switchToSpace(previous) }
             // Nothing was in it yet, so there's nothing for ⌘Z to bring back.
             Library.shared.removeSpace(space.id)
-            // Nor in the profile made for it, unless a space was put on it since.
+            // Remove the profile made for it too, unless another space uses it.
             if let madeProfile, madeProfile != Profile.defaultID, Library.shared.spaces(in: madeProfile).isEmpty {
                 Task { await Profiles.shared.remove(madeProfile) }
             }
@@ -673,7 +671,7 @@ extension BrowserWindowController: NSMenuItemValidation {
                 : String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge.")
             return true
         case #selector(toggleBookmark(_:)):
-            // Named as in the sidebar's menus.
+            // Same names as the sidebar menus.
             let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
             item.title = tab?.isFavorite == true ? String(localized: "Move to Tabs", comment: "Menu bar item: moves the favorite back to the tabs.")
                 : tab?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil ? String(localized: "Unpin Group", comment: "Menu bar item: unpins the whole pinned group the tab is in.")
@@ -752,8 +750,8 @@ enum ZoomLevels {
     /// A zoom as people read it: "125%".
     static func percent(_ zoom: CGFloat) -> String { "\(Int((zoom * 100).rounded()))%" }
 
-    /// The zoom of every site that has none of its own: Settings › Appearance › Page zoom, 100% unless changed.
-    /// Actual Size goes back to it, as Chrome's and Safari's reset do.
+    /// Zoom for sites without their own: Settings › Appearance › Page zoom (100% by default). Actual Size resets to it,
+    /// as in Chrome and Safari.
     static var defaultZoom: CGFloat {
         get {
             let zoom = UserDefaults.standard.double(forKey: defaultKey)
@@ -762,8 +760,7 @@ enum ZoomLevels {
         set {
             let old = defaultZoom
             if abs(newValue - 1) < 0.001 { UserDefaults.standard.removeObject(forKey: defaultKey) } else { UserDefaults.standard.set(Double(newValue), forKey: defaultKey) }
-            // Open pages that were at the old default follow the new one now, not on their next load. One zoomed by
-            // hand, saved for its site or only for now in a private window, stays as it is.
+            // Open pages at the old default switch now. Manually zoomed pages keep their zoom.
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) {
                 guard let webView = tab.webView, let url = tab.url, !hasOwnZoom(url),
                       abs(webView.pageZoom - old) < 0.001 else { continue }
@@ -777,7 +774,7 @@ enum ZoomLevels {
         CGFloat(all[HistoryStore.normalizedHost(url)] ?? Double(defaultZoom))
     }
 
-    /// Whether the site has a zoom of its own, rather than the default.
+    /// Whether the site has its own zoom.
     static func hasOwnZoom(_ url: URL) -> Bool { all[HistoryStore.normalizedHost(url)] != nil }
 
     /// How many sites have their own zoom.
@@ -797,7 +794,7 @@ enum ZoomLevels {
     static func set(_ zoom: CGFloat, for url: URL) {
         var levels = UserDefaults.standard.dictionary(forKey: key) as? [String: Double] ?? [:]
         let host = HistoryStore.normalizedHost(url)
-        // The default needs no entry; anything else, 100% included when the default isn't, is the site's own.
+        // The default isn't stored; anything else (100% too, if not default) is the site's.
         if abs(zoom - defaultZoom) < 0.001 { levels[host] = nil } else { levels[host] = Double(zoom) }
         UserDefaults.standard.set(levels, forKey: key)
     }
