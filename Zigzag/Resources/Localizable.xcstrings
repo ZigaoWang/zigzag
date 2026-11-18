@@ -571,7 +571,7 @@
       }
     },
     "%@ of %@" : {
-      "comment" : "Under a download's name in the downloads panel: how much has come of how much, like 3.7 MB of 9 MB.\nUnder a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.\nOn the sidebar's update card while an update downloads: how much has come of how much, like 12 of 40 MB.",
+      "comment" : "Under a download's name in the downloads panel: how much has come of how much, like 3.7 MB of 9 MB.\nUnder a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.\nOn the sidebar's update card while an update downloads: how much has come of how much, like 9.4 of 18.2 MB.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
