@@ -49,8 +49,35 @@ struct ExtensionOverlayTests {
         defer { try? FileManager.default.removeItem(at: fixture.work) }
 
         #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
-        #expect(try Self.background(in: fixture.overlay)["scripts"] as? [String] == ["zigzag-prelude.js", "js/one.js", "js/two.js"])
+        let background = try Self.background(in: fixture.overlay)
+        #expect(background["scripts"] == nil)
+        #expect(background["page"] as? String == ExtensionStore.backgroundPageFile)
+        let page = try Self.text(ExtensionStore.backgroundPageFile, in: fixture.overlay)
+        #expect(page.contains(#"<script src="/zigzag-prelude.js"></script>"# + "\n" + #"<script src="/js/one.js"></script>"# + "\n" + #"<script src="/js/two.js"></script>"#))
         #expect(try Self.text("zigzag-prelude.js", in: fixture.overlay) == Self.prelude)
+    }
+
+    /// Background scripts are read as UTF-8, as in Chrome and Firefox: their page says so, so a menu item titled "📋 Clip
+    /// ⌘⇧X" isn't shown as "ðŸ“‹ Clip âŒ˜â‡§X" (#277).
+    @Test func backgroundScriptsAreReadAsUTF8() throws {
+        let fixture = try Self.fixture(
+            ["manifest_version": 3, "name": "Menu glyphs", "version": "1.0", "background": ["scripts": ["bg.js"], "type": "module"]],
+            files: ["bg.js": "browser.contextMenus.create({ id: 'clip', title: '📋 Clip ⌘⇧X' });"])
+        defer { try? FileManager.default.removeItem(at: fixture.work) }
+
+        #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
+        let page = try Self.text(ExtensionStore.backgroundPageFile, in: fixture.overlay)
+        #expect(page.hasPrefix("<!DOCTYPE html>\n<meta charset=\"utf-8\">"))
+        #expect(page.contains(#"<script type="module" src="/bg.js"></script>"#))
+        // A path is only ever an attribute's value.
+        #expect(ExtensionStore.backgroundPage(scripts: [#"a"><b.js"#], modules: false).contains(#"src="/a&quot;&gt;&lt;b.js""#))
+        // Scripts meant for a worker as well stay as they were.
+        let worker = try Self.fixture(
+            ["manifest_version": 3, "name": "Either", "version": "1.0", "background": ["scripts": ["bg.js"], "preferred_environment": ["service_worker"]]],
+            files: ["bg.js": "x();"])
+        defer { try? FileManager.default.removeItem(at: worker.work) }
+        #expect(ExtensionStore.writeOverlayManifest(in: worker.overlay, from: worker.package, prelude: Self.prelude))
+        #expect(try Self.background(in: worker.overlay)["scripts"] as? [String] == ["zigzag-prelude.js", "bg.js"])
     }
 
     @Test func mv2BackgroundPageGetsThePreludeAheadOfItsScripts() throws {

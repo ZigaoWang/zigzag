@@ -74,39 +74,28 @@ struct MiniWindowTests {
         #expect(viaDocument(URL(string: "zigzag://history")!) == nil)
     }
 
-    // MARK: The one-time offer (#246)
+    // MARK: On by default
 
-    @Test func theOfferIsMadeOnlyOnceAndOnlyWhileOff() {
-        let web = URL(string: "https://accounts.example.com/sign-in")!
-        #expect(MiniWindowController.offersMini(for: web, settingOn: false, asked: false, needsOnboarding: false))
-        // Asked before, whatever the answer, it never comes back.
-        #expect(!MiniWindowController.offersMini(for: web, settingOn: false, asked: true, needsOnboarding: false))
-        // Already on: the link went to Zigzag Mini, nothing to offer.
-        #expect(!MiniWindowController.offersMini(for: web, settingOn: true, asked: false, needsOnboarding: false))
-        // The first window after onboarding is where you start: no offer over it.
-        #expect(!MiniWindowController.offersMini(for: web, settingOn: false, asked: false, needsOnboarding: true))
-        // Files opened from Finder stay tabs even with the setting on, so they don't offer it.
-        #expect(!MiniWindowController.offersMini(for: URL(fileURLWithPath: "/tmp/plot.html"), settingOn: false, asked: false, needsOnboarding: false))
+    @Test func takesLinksFromOtherAppsUnlessTurnedOff() throws {
+        let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        // Never set: on, as in Little Arc.
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
+        // Turned off in Settings: stays off.
+        defaults.set(false, forKey: "OpensExternalLinksInMini")
+        #expect(!MiniWindowController.opensExternalLinks(in: defaults))
+        defaults.set(true, forKey: "OpensExternalLinksInMini")
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
     }
 
-    /// It never takes the place of another toast, nor gets its place taken by the offer to translate that comes as
-    /// the page loads: two quiet checks in a row first.
-    @Test func theOfferWaitsItsTurn() {
-        #expect(MiniWindowController.offerTurn(quiet: true, quietBefore: true, inFront: true) == .now)
-        #expect(MiniWindowController.offerTurn(quiet: true, quietBefore: false, inFront: true) == .wait)
-        #expect(MiniWindowController.offerTurn(quiet: false, quietBefore: true, inFront: true) == .wait)
-        // Gone to another tab: not over a page it isn't about (and not counted as asked, so the next link asks).
-        #expect(MiniWindowController.offerTurn(quiet: true, quietBefore: true, inFront: false) == .never)
-    }
-
-    @Test func theOfferIsRememberedOnceShown() {
-        let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: "MiniOfferShown")
-        defer { defaults.set(before, forKey: "MiniOfferShown") }
-        defaults.removeObject(forKey: "MiniOfferShown")
-        #expect(!MiniWindowController.miniOffered)
-        MiniWindowController.miniOffered = true
-        #expect(defaults.bool(forKey: "MiniOfferShown"))
+    @Test func theFirstLinkSaysSoOnlyOnce() throws {
+        let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(MiniWindowController.takeLinksNote(in: defaults))
+        #expect(!MiniWindowController.takeLinksNote(in: defaults))
+        #expect(!MiniWindowController.takeLinksNote(in: defaults))
     }
 
     // MARK: Its size

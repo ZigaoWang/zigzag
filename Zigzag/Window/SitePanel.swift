@@ -40,8 +40,10 @@ final class SitePanel: FloatingPanelView {
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
     /// Opened from a split pane's strip, under its address: it belongs to where that strip is.
     private(set) var isFromPane = false
-    /// Under the sidebar's address, as wide as it and edge to edge with it: a window growing or shrinking leaves it there.
+    /// Opened from the sidebar's address: aligned with the field's edge.
     private var isAlongAddress = false
+    /// Sidebar on the right: aligned with the address's trailing edge.
+    private var alignsTrailing = false
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
@@ -136,6 +138,10 @@ final class SitePanel: FloatingPanelView {
     static let unpinTitle = String(localized: "Unpin from Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.")
     static var pinLimitTip: String { String(localized: "At most \(ExtensionPins.limit) pins. Unpin one first.", comment: "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.") }
     static let minimumWidth: CGFloat = 256
+    /// The panel's width, narrower only in a window too small for it.
+    static func fittingWidth(in overlayWidth: CGFloat) -> CGFloat {
+        max(minimumWidth, min(width, overlayWidth - Tokens.Metric.cardInset * 2))
+    }
     private var width: CGFloat = SitePanel.width
     private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
 
@@ -251,30 +257,20 @@ final class SitePanel: FloatingPanelView {
         panel.isFromPane = Self.paneStrip(of: anchor) != nil
         let overlay = controller.root.overlay
         let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
-        // From the address bar in the sidebar: its width and left edge, just below it. With the sidebar slid out or
-        // hidden it's the same width (the address keeps its width off screen), so it never grows past the sidebar.
-        // From the address above the page, the sidebar's width, under the address's end where its button is.
-        // From a split pane's strip (on its card or up in the bar), its own width, under that pane's address's end,
-        // where its button is, and kept in the window.
+        // Fixed width, independent of the sidebar (#335).
         let pane = Self.paneStrip(of: anchor) != nil
         let aboveThePage = anchor.isDescendant(of: controller.root.topBar)
-        let sidebarLane = controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
         let inset = Tokens.Metric.cardInset
-        if pane {
-            panel.width = max(Self.minimumWidth, min(Self.width, overlay.bounds.width - inset * 2))
-        } else {
-            panel.width = anchorFrame.width > 0 && !aboveThePage ? anchorFrame.width : sidebarLane
-        }
+        panel.width = Self.fittingWidth(in: overlay.bounds.width)
         if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible, !aboveThePage, !pane {
             // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.recedes = [controller.sidebar.list]
         }
-        var x = aboveThePage || pane ? anchorFrame.maxX - panel.width : anchorFrame.minX
-        if pane { x = min(x, overlay.bounds.width - inset - panel.width) }
-        // Under the sidebar's address, edge to edge with it, both sides: the window's inset put it a little right of
-        // the field, with the favorite under it peeking out at its corner.
+        // Aligned with the address field's outer edge.
         let alongAddress = !aboveThePage && !pane && anchorFrame.minX >= 0
         panel.isAlongAddress = alongAddress
+        panel.alignsTrailing = alongAddress && controller.root.sidebarOnRight
+        let x = aboveThePage || pane || panel.alignsTrailing ? anchorFrame.maxX - panel.width : anchorFrame.minX
         panel.frame.origin = NSPoint(x: SitePanelSizing.x(x, alongAddress: alongAddress, inset: inset, width: panel.width, overlayWidth: overlay.bounds.width),
                                      y: anchorFrame.maxY + 4)
         // Never past the window's bottom: what doesn't fit scrolls.
@@ -314,7 +310,7 @@ final class SitePanel: FloatingPanelView {
         // Over the page, under the button's end, as from the address above a browser window's page; kept in the window.
         let overlay = mini.overlay
         let inset = Tokens.Metric.cardInset
-        panel.width = max(Self.minimumWidth, min(Self.width, overlay.bounds.width - inset * 2))
+        panel.width = Self.fittingWidth(in: overlay.bounds.width)
         let b = button.convert(button.bounds, to: overlay)
         let x = min(b.maxX - panel.width, overlay.bounds.width - inset - panel.width)
         panel.frame.origin = NSPoint(x: max(inset, x), y: max(b.maxY, 0) + 4)
@@ -587,18 +583,16 @@ final class SitePanel: FloatingPanelView {
         guard let superview, maxHeight < .greatestFiniteMagnitude else { return }
         // Narrower now: as narrow as it must be, and back inside the window's right edge, as it opened.
         let inset = Tokens.Metric.cardInset
-        if !isAlongAddress {
-            width = max(Self.minimumWidth, min(Self.width, superview.bounds.width - inset * 2))
-            frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
-            frame.size.width = width
-        } else if let anchor, anchor.window === window {
-            // Under the sidebar's address: still edge to edge with it, wherever the window's edge took it (a sidebar
-            // on the right moves with that edge), and kept inside the window.
+        width = Self.fittingWidth(in: superview.bounds.width)
+        if isAlongAddress, let anchor, anchor.window === window {
+            // Keep it aligned with the address after a resize.
             let along = anchor.convert(anchor.bounds, to: superview)
-            if along.width > 0 { width = along.width }
-            frame.origin.x = SitePanelSizing.x(along.minX, alongAddress: true, inset: inset, width: width, overlayWidth: superview.bounds.width)
-            frame.size.width = width
+            frame.origin.x = SitePanelSizing.x(alignsTrailing ? along.maxX - width : along.minX, alongAddress: true, inset: inset,
+                                               width: width, overlayWidth: superview.bounds.width)
+        } else {
+            frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
         }
+        frame.size.width = width
         maxHeight = SitePanelSizing.maxHeight(overlayHeight: superview.bounds.height, top: frame.minY)
         resize()
     }
@@ -698,6 +692,9 @@ final class SitePanel: FloatingPanelView {
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
          "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY],
+         // Width the widest row needs on one line.
+         "fit": (rows + permissionsGroup.rows).map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
+         "linksFit": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "place": ["x": frame.minX, "width": frame.width, "window": superview?.bounds.width ?? 0,
                    "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? -1]]
     }
@@ -1728,6 +1725,12 @@ final class PanelRow: NSView {
         return title.stringValue
     }
 
+    /// Width needed for the title, subtitle and control without wrapping.
+    var debugWants: CGFloat {
+        let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
+        return ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0)) + Tokens.Space.x2 + wanted.width
+    }
+
     /// choose <index>: picks that choice in the row's dropdown, as its menu would.
     func debugChoose(_ index: Int) {
         guard let dropdown = control as? DropdownButton, dropdown.options.indices.contains(index) else { return }
@@ -1818,6 +1821,11 @@ final class PanelLinkRow: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
 
     var debugTitle: String { value.isEmpty ? title.stringValue : "\(title.stringValue): \(value)" }
+    /// Width needed for the name and value, including the hover outsets.
+    var debugWants: CGFloat {
+        let valueWidth = value.isEmpty ? 0 : ceil((value as NSString).size(withAttributes: [.font: valueLabel.font ?? Tokens.Font.body()]).width) + Tokens.Space.x2
+        return ceil(title.textWidth) + valueWidth + (chevron.isHidden ? 0 : Tokens.Space.x4 + Tokens.Space.x1)
+    }
 
     /// Its name, for a row that says something else after a click (Show All, Show Less).
     var titleText: String {

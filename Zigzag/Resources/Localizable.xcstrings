@@ -10935,6 +10935,17 @@
         }
       }
     },
+    "Links from other apps open in Zigzag Mini. Turn this off in Settings." : {
+      "comment" : "Toast shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. Settings means Settings › Zigzag Mini, where this can be turned off. Zigzag Mini is a name, kept in Latin letters.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来自其他 App 的链接会在 Zigzag Mini 中打开。可在“设置”中关闭。"
+          }
+        }
+      }
+    },
     "Loading…" : {
       "comment" : "In Settings › Privacy › Stored by Websites while the list of sites is read.",
       "localizations" : {
@@ -13357,7 +13368,7 @@
       }
     },
     "Open in Zigzag" : {
-      "comment" : "File menu item of an installed app's window: opens the page it shows in a tab of a Zigzag window.",
+      "comment" : "Button in the toast shown the first time a link from another app opens in Zigzag Mini: moves the page into a tab, as ⌘O does.\nFile menu item of an installed app's window: opens the page it shows in a tab of a Zigzag window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13385,17 +13396,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 Zigzag Mini 中打开来自其他 App 的链接"
-          }
-        }
-      }
-    },
-    "Open links from other apps in Zigzag Mini?" : {
-      "comment" : "Toast shown once, the first time a link from another app opens as a new tab: offers to open such links in Zigzag Mini (the small window for one page) from now on. Zigzag Mini is a name, kept in Latin letters.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Zigzag Mini 中打开来自其他 App 的链接？"
           }
         }
       }
@@ -21028,17 +21028,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许使用 WebRTC 通话"
-          }
-        }
-      }
-    },
-    "Use Zigzag Mini" : {
-      "comment" : "Button in the toast offering to open links from other apps in Zigzag Mini: turns that on and moves this page into a Zigzag Mini window. Zigzag Mini is a name, kept in Latin letters.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用 Zigzag Mini"
           }
         }
       }

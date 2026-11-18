@@ -338,8 +338,6 @@ final class WindowManager {
             MiniWindowController.open(url: url, fromAnotherApp: true)
             return
         }
-        // Asked before the link opens, which ends onboarding.
-        let mayOffer = fromAnotherApp && offersMini(url)
         // A link opened before onboarding was finished: you're browsing now, so the next launch restores this window
         // instead of starting over with the welcome (and then saving over what you opened).
         if Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
@@ -350,69 +348,11 @@ final class WindowManager {
                 controller.window?.makeKeyAndOrderFront(nil)
                 return
             }
-            // Only a new tab is offered Zigzag Mini: a tab already open on the page is simply gone to.
-            let isNew = controller.tabManager.existingTab(for: url) == nil
             controller.open(url, disposition: .foregroundTab)
             controller.window?.makeKeyAndOrderFront(nil)
-            if mayOffer, isNew { offerMini(in: controller) }
         } else {
-            let controller = newWindow(url: url)
-            if mayOffer { offerMini(in: controller) }
+            newWindow(url: url)
         }
-    }
-
-    /// Whether a link from another app that opens as a tab offers Zigzag Mini instead (`offerMini`).
-    func offersMini(_ url: URL) -> Bool {
-        MiniWindowController.offersMini(for: url, settingOn: MiniWindowController.opensExternalLinks,
-                                        asked: MiniWindowController.miniOffered, needsOnboarding: Self.needsOnboarding)
-    }
-
-    /// The first link from another app that opens as a new tab, while such links still go to tabs: one offer, in that
-    /// window, to send them to Zigzag Mini from now on, this page first. Asked once, whatever the answer (#246).
-    /// It waits its turn: until the page has loaded and no other toast is up (the offer to translate a page in another
-    /// language comes as it loads, and would take its place), while the page is still the one in front. A page that
-    /// never gives it room leaves it for the next link.
-    func offerMini(in controller: BrowserWindowController) {
-        guard let tab = controller.tabManager.selectedTab else { return }
-        func attempt(_ left: Int, quietBefore: Bool) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self, weak controller, weak tab] in
-                guard let self, let controller, let tab, !MiniWindowController.miniOffered, !MiniWindowController.opensExternalLinks else { return }
-                let quiet = !tab.isLoading && !Toast.isShowing(in: controller)
-                switch MiniWindowController.offerTurn(quiet: quiet, quietBefore: quietBefore,
-                                                      inFront: controller.tabManager.selectedTab === tab && controller.window?.isVisible == true) {
-                case .now: self.showMiniOffer(for: tab, in: controller)
-                case .wait: if left > 0 { attempt(left - 1, quietBefore: quiet) }
-                case .never: break
-                }
-            }
-        }
-        attempt(30, quietBefore: false)
-    }
-
-    private func showMiniOffer(for tab: Tab, in controller: BrowserWindowController) {
-        MiniWindowController.miniOffered = true
-        Toast.show(String(localized: "Open links from other apps in Zigzag Mini?", comment: "Toast shown once, the first time a link from another app opens as a new tab: offers to open such links in Zigzag Mini (the small window for one page) from now on. Zigzag Mini is a name, kept in Latin letters."),
-                   symbol: "macwindow",
-                   action: (String(localized: "Use Zigzag Mini", comment: "Button in the toast offering to open links from other apps in Zigzag Mini: turns that on and moves this page into a Zigzag Mini window. Zigzag Mini is a name, kept in Latin letters."),
-                            { [weak controller, weak tab] in
-                                guard let controller, let tab, controller.canOpenInMini(tab) else {
-                                    MiniWindowController.opensExternalLinks = true
-                                    return
-                                }
-                                // One ⌘Z takes the whole choice back: the page to its tab, and links to tabs again.
-                                let undo = controller.sidebarUndo
-                                undo.beginUndoGrouping()
-                                Self.setOpensLinksInMini(true, in: controller)
-                                controller.openInMini(tab)
-                                undo.endUndoGrouping()
-                            }),
-                   duration: 10, closes: true, in: controller)
-    }
-
-    /// Turns links from other apps in Zigzag Mini on or off, as a step ⌘Z in `controller` takes back.
-    private static func setOpensLinksInMini(_ on: Bool, in controller: BrowserWindowController) {
-        MiniWindowController.opensExternalLinks = on
-        controller.sidebarUndo.registerUndo(withTarget: controller) { setOpensLinksInMini(!on, in: $0) }
     }
 
     /// A page from another app goes to Zigzag Mini rather than a tab here.

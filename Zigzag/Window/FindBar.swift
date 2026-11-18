@@ -859,22 +859,70 @@ class ToastView: FloatingPanelView {
     /// The space around the text: the icon on the left, the action (or padding) on the right.
     private var chromeWidth: CGFloat { fittingWidth - label.inkWidth }
 
-    /// Fits `maxWidth`: one line when it can, two wrapped lines when it can't, never past the page.
+    /// How many lines the text may wrap to before it's cut short. Past two, the action goes under the text when it
+    /// doesn't fit beside it in two lines.
+    var maxLines = 2
+    /// The action sits under the text, at the right: a long note in a narrow window.
+    private var actionBelow = false
+
+    /// Where the text starts: after the icon, or the padding.
+    private var textStart: CGFloat { icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3 + Tokens.Metric.favicon + Tokens.Space.x2 }
+
+    /// The text's height wrapped to `width`.
+    private func wrappedHeight(_ width: CGFloat) -> CGFloat {
+        ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width + Label.inset * 2, height: 1000)).height ?? label.lineHeight * 2)
+    }
+
+    /// Fits `maxWidth`: one line when it can, wrapped lines (up to `maxLines`) when it can't, never past the page.
     func size(maxWidth: CGFloat) -> NSSize {
         let width = min(ceil(fittingWidth), maxWidth)
-        let textWidth = width - chromeWidth
+        var textWidth = width - chromeWidth
         let wraps = label.inkWidth > textWidth + 0.5
         label.usesSingleLineMode = !wraps
-        label.maximumNumberOfLines = wraps ? 2 : 1
+        label.maximumNumberOfLines = wraps ? maxLines : 1
         label.lineBreakMode = wraps ? .byWordWrapping : .byTruncatingTail
         label.cell?.wraps = wraps
         label.cell?.truncatesLastVisibleLine = true
-        let textHeight = wraps ? ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth + Label.inset * 2, height: 200)).height ?? label.lineHeight * 2) : label.lineHeight
+        actionBelow = wraps && maxLines > 2 && !actionButton.isHidden && wrappedHeight(textWidth) > label.lineHeight * 2 + 1
         radius = wraps ? Tokens.Radius.panel : Self.height / 2
+        if actionBelow {
+            textWidth = width - textStart - belowTrailing
+            let h = Tokens.Metric.toastButtonHeight
+            return NSSize(width: width, height: belowTextTop + wrappedHeight(textWidth) + Tokens.Space.x2 + h + (Self.height - h) / 2)
+        }
+        let textHeight = wraps ? wrappedHeight(textWidth) : label.lineHeight
         return NSSize(width: width, height: max(Self.height, textHeight + Tokens.Space.x4))
     }
 
+    /// With the action below: the text's first line sits level with the close button, as on a one-line toast.
+    private var belowTextTop: CGFloat { round((Self.height - label.lineHeight) / 2) }
+    /// With the action below: the room right of the text, the close button's, or padding.
+    private var belowTrailing: CGFloat {
+        guard !closeButton.isHidden else { return Tokens.Space.x4 }
+        let side = closeButton.frame.width
+        return (Self.height - side) / 2 + side + Tokens.Space.x1
+    }
+
+    private func layoutBelow() {
+        let top = belowTextTop
+        if icon.image != nil {
+            icon.frame = NSRect(x: Tokens.Space.x3, y: top + (label.lineHeight - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
+            spinner.frame = icon.frame
+        }
+        if !closeButton.isHidden {
+            let side = closeButton.frame.width
+            closeButton.frame.origin = NSPoint(x: bounds.width - (Self.height - side) / 2 - side, y: (Self.height - side) / 2)
+        }
+        // The pill inset from the bottom right corner as a one-line toast's is from its right end.
+        let h = Tokens.Metric.toastButtonHeight, inset = (Self.height - h) / 2
+        let actionWidth = actionButton.fittingWidth
+        actionButton.frame = NSRect(x: bounds.width - inset - actionWidth, y: bounds.height - inset - h, width: actionWidth, height: h)
+        let textWidth = bounds.width - textStart - belowTrailing
+        label.frame = NSRect(x: textStart - Label.inset, y: top, width: textWidth + Label.inset * 2, height: actionButton.frame.minY - Tokens.Space.x2 - top)
+    }
+
     private func layoutContent() {
+        if actionBelow { layoutBelow(); return }
         var x = icon.image == nil ? Tokens.Space.x4 : Tokens.Space.x3
         if icon.image != nil {
             icon.frame = NSRect(x: x, y: (bounds.height - Tokens.Metric.favicon) / 2, width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)
@@ -949,13 +997,6 @@ enum Toast {
         hide(in: controller)
     }
 
-    /// Whether a toast is up in this window, one not already on its way out.
-    static func isShowing(in controller: BrowserWindowController) -> Bool {
-        let state = state(for: controller.root.overlay)
-        guard let toast = state.toast, toast.superview === controller.root.overlay else { return false }
-        return !toast.dismissing
-    }
-
     /// What the toast showing in this window was shown for, if anything.
     static func owner(in controller: BrowserWindowController) -> AnyObject? {
         let state = state(for: controller.root.overlay)
@@ -1027,9 +1068,10 @@ enum Toast {
     }
 
     /// Shows a toast at the top center of `area` in any flipped host view (the Passwords window uses it too).
+    /// `lines`: how far the text may wrap in a narrow window, for a note that must be read whole.
     static func show(_ text: String, symbol: String? = nil, action: (title: String, run: () -> Void)? = nil,
                      duration: TimeInterval = 1.3, closes: Bool = false, over host: NSView, area: NSRect, busy: Bool = false,
-                     onClose: (() -> Void)? = nil) {
+                     lines: Int = 2, onClose: (() -> Void)? = nil) {
         let state = state(for: host)
         let toast: ToastView
         let isNew: Bool
@@ -1043,6 +1085,7 @@ enum Toast {
             isNew = true
         }
         toast.label.stringValue = text
+        toast.maxLines = lines
         Announcement.post(text, priority: action == nil ? .medium : .high)
         // Busy: an empty picture keeps the icon's place for the spinner.
         toast.icon.image = busy ? NSImage(size: NSSize(width: Tokens.Metric.favicon, height: Tokens.Metric.favicon)) : symbol.map { Tokens.Symbol.image($0) }

@@ -1564,6 +1564,9 @@ final class BridgeSidePanel: BridgeNamespace {
     /// Pages set for one tab, by the extension's id for the tab.
     private var tabPaths: [String: [Int: String]] = [:]
     private var disabled: Set<String> = []
+    /// On or off for one tab, which wins over the extension's answer for every tab, as in Chrome. ChatGPT turns its
+    /// panel off everywhere and on for the tab you click it on, then opens it there.
+    private var tabEnabled: [String: [Int: Bool]] = [:]
     private var opensOnClick: Set<String> = []
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
@@ -1572,6 +1575,7 @@ final class BridgeSidePanel: BridgeNamespace {
             let options = args.object(0)
             if let tab = options["tabId"] as? Int {
                 if let path = options.string("path") { tabPaths[extensionID, default: [:]][tab] = path }
+                if let enabled = options["enabled"] as? Bool { tabEnabled[extensionID, default: [:]][tab] = enabled }
                 // Off for that tab: its page goes, and its panel with it.
                 if options["enabled"] as? Bool == false {
                     tabPaths[extensionID]?[tab] = nil
@@ -1587,7 +1591,7 @@ final class BridgeSidePanel: BridgeNamespace {
             return nil
         case "getOptions":
             let tab = args.object(0)["tabId"] as? Int
-            var options: [String: Any] = ["enabled": !disabled.contains(extensionID)]
+            var options: [String: Any] = ["enabled": isEnabled(extensionID, tab: tab)]
             if let path = path(for: extensionID, tab: tab) { options["path"] = path }
             if let tab { options["tabId"] = tab }
             return options
@@ -1622,6 +1626,13 @@ final class BridgeSidePanel: BridgeNamespace {
         }
     }
 
+    /// Whether the panel may show for the tab: what the extension said for that tab, else for every tab.
+    private func isEnabled(_ extensionID: String, tab: Int?) -> Bool {
+        Self.isEnabled(everywhere: !disabled.contains(extensionID), forTab: tab.flatMap { tabEnabled[extensionID]?[$0] })
+    }
+
+    nonisolated static func isEnabled(everywhere: Bool, forTab: Bool?) -> Bool { forTab ?? everywhere }
+
     /// The page to show: what the extension set for the tab, else for every tab, else its manifest's.
     private func path(for extensionID: String, tab: Int? = nil) -> String? {
         if let tab, let set = tabPaths[extensionID]?[tab] { return set }
@@ -1644,7 +1655,7 @@ final class BridgeSidePanel: BridgeNamespace {
 
     @discardableResult
     func open(_ extensionID: String, in controller: BrowserWindowController?, tab: Int? = nil) -> Bool {
-        guard let controller, !disabled.contains(extensionID), let path = path(for: extensionID, tab: tab),
+        guard let controller, isEnabled(extensionID, tab: tab), let path = path(for: extensionID, tab: tab),
               let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
               let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
         let root = controller.root
@@ -1682,6 +1693,7 @@ final class BridgeSidePanel: BridgeNamespace {
         close(extensionID)
         paths[extensionID] = nil
         tabPaths[extensionID] = nil
+        tabEnabled[extensionID] = nil
         opensOnClick.remove(extensionID)
         disabled.remove(extensionID)
     }
