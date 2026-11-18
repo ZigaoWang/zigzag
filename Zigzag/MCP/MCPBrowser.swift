@@ -82,14 +82,14 @@ enum MCPBrowser {
         case .read(_, let maxChars):
             return await page(tab, since: generation) { webView in
                 switch await MCPPageScript.run("read", ["maxChars": maxChars], in: webView) {
-                case .failure(let error): return .error(error.message)
+                case .failure(let error): return .pageError(error.message)
                 case .success(let object): return .data(json(object))
                 }
             }
         case .links(_, let max):
             return await page(tab, since: generation) { webView in
                 switch await MCPPageScript.run("links", ["max": max], in: webView) {
-                case .failure(let error): return .error(error.message)
+                case .failure(let error): return .pageError(error.message)
                 case .success(let object): return .data(json(object))
                 }
             }
@@ -98,7 +98,7 @@ enum MCPBrowser {
                 var args: [String: Any] = [:]
                 if let ref { args["ref"] = ref }
                 switch await MCPPageScript.run("snapshot", args, in: webView) {
-                case .failure(let error): return .error(error.message)
+                case .failure(let error): return .pageError(error.message)
                 case .success(let object):
                     guard let answer = JSON(foundation: object), let snapshot = MCPSnapshot(answer) else { return .error("The page gave no snapshot.") }
                     let written = snapshot.text(filter: filter, depth: depth, maxChars: maxChars)
@@ -114,7 +114,7 @@ enum MCPBrowser {
             return await page(tab, since: generation) { webView in
                 let before = webView.backForwardList.currentItem
                 switch await MCPPageScript.run("click", target.args, in: webView) {
-                case .failure(let error): return .error(error.message)
+                case .failure(let error): return .pageError(error.message)
                 case .success(let object):
                     // A click often starts a page load: given a moment to begin, then waited for.
                     await waitForLoad(tab, from: before, grace: 0.6)
@@ -129,7 +129,8 @@ enum MCPBrowser {
                 let args = target.args.merging(["text": text, "clear": clear, "submit": submit]) { $1 }
                 switch await MCPPageScript.run("type", args, in: webView) {
                 case .failure(let error):
-                    return .error(error.message == "password" ? "That's a password field. Zigzag never lets AI apps type passwords; ask the person to type it." : error.message)
+                    if error.message == "password" { return .error("That's a password field. Zigzag never lets AI apps type passwords; ask the person to type it.") }
+                    return .pageError(error.message)
                 case .success(let object):
                     if submit { await waitForLoad(tab, from: before, grace: 0.6) }
                     return .data(json(object))
@@ -139,7 +140,7 @@ enum MCPBrowser {
             return await page(tab, since: generation) { webView in
                 let args = (target?.args ?? [:]).merging(["dy": dy]) { $1 }
                 switch await MCPPageScript.run("scroll", args, in: webView) {
-                case .failure(let error): return .error(error.message)
+                case .failure(let error): return .pageError(error.message)
                 case .success(let object): return .data(json(object))
                 }
             }
@@ -150,7 +151,7 @@ enum MCPBrowser {
                 let before = webView.backForwardList.currentItem
                 let target: [String: Any]
                 switch await MCPPageScript.run("keyTarget", element?.args ?? [:], in: webView) {
-                case .failure(let error): return .error(error.message)
+                case .failure(let error): return .pageError(error.message)
                 case .success(let object): target = object
                 }
                 if press.editsText, target["secret"] as? Bool == true {

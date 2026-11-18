@@ -49,7 +49,7 @@ nonisolated struct MCPToolResult: Sendable, Equatable {
     var structured: JSON?
     var isError = false
     /// Contains page-written content (titles, addresses, text, fields), fenced by `markedAsPageContent`. Zigzag's own
-    /// text (`text`, `error`) isn't.
+    /// text (`text`, `error`) isn't; an error that quotes the page (`pageError`) is.
     var fromPages = true
 
     /// Zigzag's own text, never fenced.
@@ -63,11 +63,17 @@ nonisolated struct MCPToolResult: Sendable, Equatable {
         MCPToolResult(content: [["type": "text", "text": .string(message)]], isError: true, fromPages: false)
     }
 
+    /// An error from the page script, which can quote the page (what covers an element, what a ref stood for, a list's
+    /// options): fenced like the rest of what pages wrote.
+    static func pageError(_ message: String) -> MCPToolResult {
+        MCPToolResult(content: [["type": "text", "text": .string(message)]], isError: true)
+    }
+
     /// Fences page-written text as untrusted, since pages can phrase it as instructions to the model. Each text goes
     /// between lines with a fresh random tag the page can't predict, so it can't close the fence early. Zigzag's own
     /// results (`fromPages` false) are unchanged.
     func markedAsPageContent(tag: String = UUID().uuidString.lowercased()) -> MCPToolResult {
-        guard !isError, fromPages else { return self }
+        guard fromPages else { return self }
         var marked = self
         marked.content = content.map { item in
             guard item["type"] == "text", let text = item["text"]?.string, var object = item.object else { return item }
