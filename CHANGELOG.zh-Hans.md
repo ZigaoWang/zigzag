@@ -12,6 +12,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 修复
+- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
+- 鼠标侧键的后退和前进在 Zigzag Mini 和已安装的网页 App 里也能用了，不再只在浏览器窗口里有效。感谢 [Tuszy42](https://github.com/Tuszy42)。([#345](https://github.com/ZigaoWang/zigzag/issues/345))
 ### 新功能
 - “设置 › 扩展”里每个扩展的下面都有“网站访问权限”：在所有网站上、在你点按它时或在特定网站上，特定网站会列出来，可以添加和移除。它和地址栏旁扩展菜单里的“网站访问权限”是同一个选项。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
 - Raindrop.io 等只在需要时才申请网站权限的扩展，在“网站访问权限”里选“在所有网站上”后就能正常使用。之前这个选项实际上没给它们任何网站的权限，它们访问自己服务器的请求都会被拦下，Raindrop 看起来像坏了或没登录。没选之前，菜单也不再显示它已选中。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))

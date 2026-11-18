@@ -2361,14 +2361,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
         if spaceSwitcher.handle(event) { return true }
-        // A mouse's side buttons go back and forward, as in Chrome and Arc (Safari leaves them to the page, which rarely
-        // uses them). On release, and the press is taken too, so the page never sees half of it.
-        // In a split, the page under the pointer is the one that goes, made the one you're in first as a click
-        // would, not whichever pane you were last in (#170).
-        if event.type == .otherMouseDown || event.type == .otherMouseUp, event.buttonNumber == 3 || event.buttonNumber == 4 {
-            if event.type == .otherMouseDown, root.tiles != nil { focusPane(at: event.locationInWindow) }
-            if event.type == .otherMouseUp { event.buttonNumber == 3 ? goBack(nil) : goForward(nil) }
-            return true
+        // A mouse's side buttons go back and forward (`BrowserWindow.SideButton`). In a split, the page under the
+        // pointer is the one that goes, made the one you're in first as a click would, not whichever pane you were
+        // last in (#170).
+        if BrowserWindow.SideButton(event.type, button: event.buttonNumber) == .press, root.tiles != nil {
+            focusPane(at: event.locationInWindow)
         }
         if event.type == .leftMouseDown, root.tiles != nil { focusPane(at: event.locationInWindow) }
         // A click anywhere else finishes a name being typed into a sidebar row, as in Finder: rows don't take focus,

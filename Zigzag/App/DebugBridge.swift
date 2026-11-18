@@ -96,7 +96,7 @@ enum DebugBridge {
     /// webapp open|close <id> (as the app's small app asks), webapp remove <id>, webapp closeall, webapp removeall, webapp state <path> (JSON: the list,
     /// the open windows), webapp settings (Settings › General), webapp toolbar on|off (the first app's), webapp front |
     /// browserfront (the menu bar for that window in front), webapp menukey <char> (⌘<char>'s item, run), webapp menu
-    /// <path> (the menu bar's items).
+    /// <path> (the menu bar's items), webapp sidebutton <back|forward> x y (in the first app's window).
     private static func runWebApp(_ arg: String) {
         let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
         let rest = f.count > 1 ? f[1] : ""
@@ -109,6 +109,7 @@ enum DebugBridge {
         case "close": WebAppStore.handle(WebAppLink.make(.close, id: rest))
         case "remove": WebAppStore.shared.remove(rest)
         case "closeall": WebAppWindowController.all.forEach { $0.window?.close() }
+        case "sidebutton": if let window = WebAppWindowController.all.first?.window { sendSideButton(rest, to: window) }
         case "removeall": WebAppStore.shared.apps.forEach { WebAppStore.shared.remove($0.id) }
         case "toolbar":
             // toolbar on|off: the first app's toolbar, as Settings' switch sets it.
@@ -159,6 +160,23 @@ enum DebugBridge {
         }
     }
 
+    /// `<back|forward> x y`: a mouse's side button pressed and let go at a point (window points, top left origin),
+    /// handed to the window as the press and release would arrive.
+    private static func sendSideButton(_ arg: String, to window: NSWindow) {
+        let f = arg.split(separator: " ").map(String.init)
+        guard f.count >= 3, let x = Double(f[1]), let y = Double(f[2]) else { return }
+        let screen = window.convertPoint(toScreen: NSPoint(x: x, y: window.frame.height - y))
+        let location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
+        let button = CGMouseButton(rawValue: f[0] == "forward" ? 4 : 3) ?? .center
+        for type in [CGEventType.otherMouseDown, .otherMouseUp] {
+            guard let cg = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: location, mouseButton: button),
+                  let event = NSEvent(cgEvent: cg) else { continue }
+            let start = CACurrentMediaTime()
+            window.sendEvent(event)
+            debugLog("sidebutton \(f[0]) \(type == .otherMouseDown ? "down" : "up") button \(event.buttonNumber) took \(Int((CACurrentMediaTime() - start) * 1000)) ms")
+        }
+    }
+
     private static func runMini(_ name: String, _ arg: String) {
         let mini = MiniWindowController.all.last
         switch name {
@@ -201,6 +219,7 @@ enum DebugBridge {
         case "miniborderless": BrowserRootView.isBorderless = arg == "on"
         case "miniclose": mini?.window?.performClose(nil)
         case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
+        case "minisidebutton": if let window = mini?.window { sendSideButton(arg, to: window) }
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
         case "miniesc": mini?.debugEscape()
         case "miniquit": NSApp.terminate(nil)
@@ -1496,21 +1515,9 @@ enum DebugBridge {
             default: break
             }
         case "sidebutton":
-            // sidebutton <back|forward> x y: a mouse's side button pressed and let go at a point (window points, top
-            // left origin), handed to the window as the press and release would arrive, inside the app only, never
-            // posted to the system. How long each took goes to the debug log (#170).
-            let f = arg.split(separator: " ").map(String.init)
-            guard f.count >= 3, let x = Double(f[1]), let y = Double(f[2]), let window = controller.window else { break }
-            let screen = window.convertPoint(toScreen: NSPoint(x: x, y: window.frame.height - y))
-            let location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
-            let button = CGMouseButton(rawValue: f[0] == "forward" ? 4 : 3) ?? .center
-            for type in [CGEventType.otherMouseDown, .otherMouseUp] {
-                guard let cg = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: location, mouseButton: button),
-                      let event = NSEvent(cgEvent: cg) else { continue }
-                let start = CACurrentMediaTime()
-                window.sendEvent(event)
-                debugLog("sidebutton \(f[0]) \(type == .otherMouseDown ? "down" : "up") button \(event.buttonNumber) took \(Int((CACurrentMediaTime() - start) * 1000)) ms")
-            }
+            // sidebutton <back|forward> x y (`sendSideButton`): inside the app only, never posted to the system. How
+            // long each took goes to the debug log (#170). minisidebutton and webapp sidebutton do the same there.
+            if let window = controller.window { sendSideButton(arg, to: window) }
         case "downloads": controller.showDownloads(nil)
         case "dl":
             // dl pause|resume|state: acts on the newest download.
