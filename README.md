@@ -1,3 +1,11 @@
+# Zigzag
+> Feels great. Weighs Nothing. The new Arc browser.
+
+[![MIT License](https://img.shields.io/badge/License-Apache-green.svg)](https://opensource.org/license/apache/)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/ZigaoWang/zigzag?sort=semver&display_name=tag)
+![Platform](https://img.shields.io/badge/Platform-macOS-black)
+
+ 
 <p align="center">
   <a href="https://zigzagbrowser.com"><img src="docs/brand/readme-hero.jpg" width="960" alt="Zigzag: Feels great. Weighs nothing. The lightweight browser for Mac, free and open source. A Zigzag window in split view, Fonts In Use beside Grilli Type, with the sidebar of spaces and pinned tabs."></a>
 </p>
@@ -9,26 +17,67 @@
 </p>
 
 <p align="center">
-  Your tabs in a sidebar, grouped into spaces. A native Mac app in Swift on WebKit,<br>
-  about 35 MB installed, with no account and no telemetry.
+  Your tabs in a sidebar, grouped into spaces. Native Mac app in Swift on WebKit.<br>
+  35 MB installed. No account, no telemetry.
 </p>
 
-## Why I built it
+## 🤔 Features
 
-Hi, I'm Zigao, a high school student in Shanghai. I used Arc every day. When The Browser Company said it's shutting
-Arc down on December 22, I really didn't want to go back to tabs along the top, and the alternatives I tried were
-either Chromium forks or browsers built around AI. So I made my own, and I've used it as my main browser ever since.
+| | |
+|---|---|
+| **Spaces** | Each with its own color, icon, pinned tabs and folders. Switch between them easily with trackpad or mouse. |
+| **Favorites** | Your most used sites as tiles above every space. Any tab can wear its own symbol. |
+| **Profiles** | Keep work and personal apart. Each profile has its own extensions, sign-ins, history and favorites. |
+| **Sites in spaces** | Choose a space for a site, in Site Controls or Settings, and its links open wherever they come from: another app, ⌘T or another space, as with Arc's Air Traffic Control. *A space on its own profile works like a Firefox container.* |
+| **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. *Type `you`, press Tab, and you're searching YouTube.* |
+| **Import** | Import everything you had from most other browsers, including Arc, Chrome, Safari, Edge... *(see below for full list)* |
+| **Extensions** | From the Chrome Web Store. Most popular extensions work for Zigzag. |
+| **Tab groups** | Pick some tabs and choose Group Tabs, and they become a folder in the sidebar that moves as one. |
+| **Split view** | Up to four tabs in one page. Drag a page by its strip to move it, and pin a split to keep it. |
+| **Windows** | Rearrange tabs easily without it reloading. *Customization settings for sidebar and tabs included.* |
+| **Web apps** | Make a site an app on its own for easy access. *Just like Safari.* |
+| **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, plus auto-updating uBlock Origin filter lists. |
+| **Peek** | Shift-click a link to read it over the page you're on. |
+| **Mini player** | Leave a tab while its video plays, and the video follows you in a small player. Resize it, move it, switch it freely. |
+| **Now Playing** | Every tab playing sound in the background gets a card at the foot of the sidebar, up to three. Pause or mute it instantly. |
+| **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
+| **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Undo brings them back. |
+| **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps can open in it, like Little Arc, and Open in Zigzag Mini moves a tab into one. |
+| **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
+| **Dark pages** | Light any site drawn dark by DarkReader's engine. Photos stay true. Sites with a dark look of their own keep it. Pure black if you like it darker. |
+| **Cookie pop-ups** | Turned down for you, never accepted, with DuckDuckGo's Autoconsent rules. Leave them alone everywhere or for one site if you'd rather answer yourself. |
+| **Site Controls** | One panel per site: zoom, permissions (Ask/Allow/Block, JavaScript on/off), certificate, extensions, switches for dark pages, ad blocking and cookie pop-ups. |
+| **Developer Mode** | For sites you build, get access to the console, inspect elements, device sizes, JavaScript, and more features for devs.|
+| **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
+| **Downloads** | Send files of a type to a folder of their own. Rules hand a download link to a download manager script, asking you first. See [docs/download-rules.md](docs/download-rules.md). |
+| **Automation** | AppleScript, Shortcuts and osascript can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
+| **WebRTC** | Turn on Protect IP address from WebRTC, and sites can't learn your real IP address through WebRTC while you use a proxy or VPN. Calls work on the sites you allow, and a site that tries WebRTC while it's blocked says so, with Allow for This Site. |
+| **Languages** | English and Simplified Chinese. |
+| **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), on-device translation, find on page, History menu with Recently Closed, default page zoom, address bar above the page (optional), Picture in Picture, private windows, Web Inspector. |
 
-**Why WebKit and not Chromium?** I actually started by forking Helium. The source was about 100 GB and every build
-took 3 to 4 hours on my Mac, which isn't something I can keep up by myself. WebKit already comes with macOS, it's
-lighter on battery and memory, and Apple ships its security fixes with macOS updates. You still get Chrome
-extensions, installed straight from the Chrome Web Store.
+**Supported browsers for data import.** Bookmarks, history, passwords, and more from: 
 
-**Why not Zen or Orion?** I tried both before starting this, and they're good. Zen runs on Firefox, so it uses Firefox
-extensions and doesn't feel like a Mac app to me. Orion is closer, but it isn't open source. I wanted something
-that works like Arc, feels native, is open source, and runs my Chrome extensions.
+- Arc
+- Brave
+- Chrome
+- Chromium
+- Comet
+- Dia
+- Edge
+- Firefox
+- Helium
+- Opera
+- Orion
+- Safari
+- Thorium
+- Vivaldi
+- Whale
+- Yandex
+- Zen
 
-## Coming from Arc
+**Popular extensions supported:** 1Password, Bitwarden, Dark Reader, Tampermonkey, and more!
+
+## 🛬 Coming from Arc
 
 **Your Arc comes with you.** File › Import from Another Browser…, pick Arc, and your spaces, pinned tabs, pinned folders, Favorites,
 history, passwords, sign-ins and extensions come over. Your open tabs can come too, split views and all, and wait to
@@ -38,11 +87,11 @@ each Arc profile comes over as a Zigzag profile of its own.
 **1Password works.** Install it from the Chrome Web Store inside Zigzag, like you would in Arc. It talks to the
 1Password app. The first time, add Zigzag in 1Password › Settings › Browser. Bitwarden works too.
 
-**It can't be switched off.** There's no account, and Zigzag doesn't depend on a server of mine. The only things I
+**Zigzag stays. Arc is gone.** There's no account, and Zigzag doesn't depend on a server of mine. The only things I
 host are the update feed and a short list of ad blocking fixes, and if they went away, Zigzag would keep working.
 [Privacy](#privacy) lists everything Zigzag connects to on its own.
 
-## See it
+## 👀 See it
 
 <p align="center">
   <img src="docs/spaces.gif" width="960" alt="Switching between three spaces in Zigzag, each with its own color and tabs">
@@ -61,39 +110,25 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 
 <p align="center"><sub>More, in motion, at <a href="https://zigzagbrowser.com">zigzagbrowser.com</a>.</sub></p>
 
-## What it does
 
-| | |
-|---|---|
-| **Spaces** | Each with its own color, icon, pinned tabs and folders. Swipe on the sidebar, or nudge the mouse wheel sideways, to switch. |
-| **Favorites** | Your most used sites as tiles, above every space. Any tab, pinned tab or favorite can wear its own emoji or symbol. |
-| **Profiles** | Keep work and personal apart. Each profile has its own extensions, sign-ins, history and favorites, and every space is on one. |
-| **Sites in spaces** | Choose a space for a site, in Site Controls or Settings › Spaces, and its links open there wherever they come from: another app, ⌘T or another space, as with Arc's Air Traffic Control. A space on its own profile works like a Firefox container. |
-| **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. Type `you`, press Tab, and you're searching YouTube. Drag the bar anywhere in the window and it opens there from then on. |
-| **Tab groups** | Pick some tabs and choose Group Tabs, and they become a folder in the sidebar that opens and closes, renames, and moves as one. |
-| **Split view** | Up to four tabs: drag a tab onto the page's edges for a half, or its corners for a quarter. Drag a page by its strip to move it, and pin a split to keep it. |
-| **Windows** | Drag a tab to another window and it moves as it is, without loading again. Turn on Settings › Tabs › Windows share a space's tabs and every window on a space lists the same tabs, as in Arc. The sidebar sits on the left or the right. |
-| **Web apps** | Install as App makes a site an app of its own, in your Applications folder, the Dock and ⌘Tab, with a toolbar in the site's color. |
-| **Peek** | Shift-click a link to read it over the page you're on. |
-| **Mini player** | Leave a tab while its video plays and the video follows you in a small player. Resize it from any edge and put it anywhere, even outside the window over other apps. Turn it off from its menu if you'd rather not have it. Switch to another app and the video floats over it in Picture in Picture. |
-| **Now Playing** | Every tab playing sound in the background gets a card at the foot of the sidebar, up to three, to pause or mute it. |
-| **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
-| **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Point at it to see which it would close. A split view stays or goes whole. Undo brings them back. |
-| **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps can open in it, like Little Arc, and Open in Zigzag Mini moves a tab into one. |
-| **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
-| **Dark pages** | Light sites drawn dark by Dark Reader's engine, with its fixes for thousands of sites, so photos stay true. Sites with a dark look of their own keep it. Pure black if you like it darker. On everywhere or per site. |
-| **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, compiled into WebKit content rule lists, plus uBlock Origin's filter lists, which update on their own. |
-| **WebRTC** | Turn on Protect IP address from WebRTC, and sites can't learn your real IP address through WebRTC while you use a proxy or VPN. Calls work on the sites you allow, and a site that tries WebRTC while it's blocked says so, with Allow for This Site. |
-| **Cookie pop-ups** | Turned down for you, never accepted, with DuckDuckGo's Autoconsent rules. Leave them alone everywhere or for one site if you'd rather answer yourself. |
-| **Site Controls** | One panel per site: zoom, permissions (camera, microphone, location, notifications, pop-ups, opening apps, screen sharing, WebRTC), each set to Ask, Allow or Block, JavaScript on or off, the certificate, extensions, and switches for dark pages, ad blocking and cookie pop-ups. When a site asks for one of these, it asks on one card over the page, for this time or always, and a site you said no to stops asking. |
-| **Developer Mode** | For the sites you build, `localhost` to begin with: the console with an error count, Inspect Element, device sizes, light and dark, print styles, JavaScript, images or styles off, another user agent, and a QR code to open the page on your phone. |
-| **Extensions** | From the Chrome Web Store, where the store's own button reads Add to Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
-| **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen and Orion. |
-| **Downloads** | Send files of a type to a folder of their own, or open safe ones like PDFs once they're saved. Rules hand a link or a download to an app, a script or a download manager like aria2, asking you first. See [docs/download-rules.md](docs/download-rules.md). |
-| **Automation** | AppleScript, Shortcuts and `osascript` can list and open tabs and read pages, written the way Safari and Chrome take them. See [docs/automation.md](docs/automation.md). |
-| **AI apps** | Off until you turn it on: AI apps on your Mac can use your tabs over MCP, never private windows or passwords. See [docs/automation.md](docs/automation.md#ai-apps-mcp). |
-| **Languages** | English and Simplified Chinese. |
-| **And** | Reader, PDF viewer, full-page screenshots (⇧⌘2), on-device translation, find on page that marks every match, a History menu with Recently Closed and the last seven days, a default page zoom, an address bar above the page if you'd rather have one, Picture in Picture, private windows, Web Inspector. |
+## Why I built it
+
+I used Arc every day. When The Browser Company said it's shutting
+Arc down on December 22, I really didn't want to go back to tabs along the top, and the alternatives I tried were
+either Chromium forks or browsers built around AI. So I made my own, and I've used it as my main browser ever since.
+
+**Why WebKit and not Chromium?** I actually started by forking Helium. The source was about 100 GB and every build
+took 3 to 4 hours on my Mac, which isn't something I can keep up by myself. WebKit already comes with macOS, it's
+lighter on battery and memory, and Apple ships its security fixes with macOS updates. You still get Chrome
+extensions, installed straight from the Chrome Web Store.
+
+**Why not Zen or Orion?** I tried both before starting this, and they're good. Zen runs on Firefox, so it uses Firefox
+extensions and doesn't feel like a Mac app to me. Orion is closer, but it isn't open source. I wanted something
+that works like Arc, feels native, is open source, and runs my Chrome extensions.
+
+
+
+
 
 ## What's missing
 
@@ -106,7 +141,7 @@ It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc u
 - EasyList and the other built-in blocking lists update with Zigzag, not on their own; only uBlock Origin's lists do.
 - macOS 15.4 or later only.
 
-## How it's built
+## 🔨 How it's built
 
 Zigzag is about 120,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
 engine is the WebKit that ships with macOS, which is why the app is small and why engine security fixes arrive
@@ -158,7 +193,7 @@ Translation runs on your Mac, with Apple's on-device Translation. Fraudulent web
 the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
 Help › Report a Problem writes a report you can read first, and nothing is sent unless you send it.
 
-## Install
+## 🛠️ Install
 
 Download the DMG from [zigzagbrowser.com](https://zigzagbrowser.com/download), open it, and drag Zigzag to
 Applications. Or, with Homebrew:
@@ -168,7 +203,7 @@ Applications. Or, with Homebrew:
 Updates install by themselves. What changed in each version is in the
 [release notes](https://zigzagbrowser.com/release-notes) and [CHANGELOG.md](CHANGELOG.md).
 
-## Feedback
+## 💬 Feedback
 
 - **Bugs and ideas:** [open an issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), or Help › Send Feedback… in the app. For a bug, Help › Report a Problem… writes a report you can read before you send it.
 - **Email:** a@zigao.wang
@@ -216,9 +251,11 @@ The name "Zigzag", the app icon and the logo are not covered by the license: the
 reserved. A fork needs its own name and icon. See [TRADEMARKS.md](TRADEMARKS.md) and [NOTICE](NOTICE).
 Third-party work Zigzag uses is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Acknowledgments
+## ❤️Acknowledgments
 
 Thanks to the [LINUX DO](https://linux.do) community for trying Zigzag early and sharing their feedback.
+
+And most of all, thanks to you for using Zigzag. Welcome to the new Arc.
 
 <p align="center">
   <a href="https://linux.do"><img src="https://shorturl.at/ggSqS" alt="LINUX DO" /></a>
