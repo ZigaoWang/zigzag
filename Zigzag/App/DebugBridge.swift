@@ -2412,6 +2412,15 @@ enum DebugBridge {
             if f.count == 2 { Task { await WebsiteData.clear(f[0] == "cache" ? .cache : .cookies, site: f[1], in: controller.tabManager.profile.store); debugLog("cleared \(f[0]) for \(f[1])") } }
         case "cmd": controller.commandBar.runAction(arg)
         case "settingsfind": controller.tabManager.selectedTab?.settingsView?.debugFind(arg)
+        // quitfromloop: quits from the run loop, as ⌘Q does, not from inside a main-queue block: what quitting waits
+        // for (downloads pausing, cookies clearing) comes back on the main queue.
+        case "quitfromloop": NSApp.perform(#selector(NSApplication.terminate(_:)), with: nil, afterDelay: 0)
+        // keptcookies clear | add | quit on|off | top: Settings › Privacy's kept cookies (#334). keptcookiesstate <path>:
+        // each profile's kept sites and quit choice, as JSON.
+        case "keptcookies": controller.tabManager.selectedTab?.settingsView?.debugKeptCookies(arg)
+        case "keptcookiesstate":
+            let state = Profiles.shared.all.map { ["profile": $0.id.uuidString, "sites": KeptCookies.sites(in: $0.id).sorted(), "clearsOnQuit": KeptCookies.clearsOnQuit(in: $0.id)] as [String: Any] }
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
         // passwordfiller zigzag|iCloud: Settings › Passwords › Password manager (#248).
         case "passwordfiller": controller.tabManager.selectedTab?.settingsView?.debugChoosePasswordFiller(arg)
         // sitedata seed <count> | bench <path>: made-up sites in the profile of the space in front, or Settings'
