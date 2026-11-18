@@ -80,6 +80,15 @@ nonisolated enum SpaceBackground {
         return CGImageSourceCreateImageAtIndex(input, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary)
     }
 
+    /// The kept picture made small, `side` pixels on its longest side, for its swatch in the space editor.
+    static func thumbnail(_ name: String, side: Int, in folder: URL = folder) -> CGImage? {
+        guard let input = CGImageSourceCreateWithURL(folder.appendingPathComponent(name) as CFURL, nil) else { return nil }
+        let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                        kCGImageSourceCreateThumbnailWithTransform: true,
+                                        kCGImageSourceThumbnailMaxPixelSize: side]
+        return CGImageSourceCreateThumbnailAtIndex(input, 0, options as CFDictionary)
+    }
+
     /// Whether the picture is still in the folder (⌘Z can bring back a name whose copy Remove deleted).
     static func isKept(_ name: String, in folder: URL = folder) -> Bool {
         isOwnName(name) && FileManager.default.fileExists(atPath: folder.appendingPathComponent(name).path)

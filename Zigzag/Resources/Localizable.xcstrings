@@ -3639,7 +3639,7 @@
       }
     },
     "Background" : {
-      "comment" : "Label in a space's editor, before the buttons that choose or remove the picture its empty page shows.",
+      "comment" : "Tooltip and accessibility label of the swatch in a space's editor that chooses the picture its empty page shows.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4058,17 +4058,6 @@
         }
       }
     },
-    "Butter" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale yellow.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "奶油黄"
-          }
-        }
-      }
-    },
     "Cache" : {
       "comment" : "Under a site in Settings › Privacy › Site Data: what it keeps on this Mac. A label, no full stop.",
       "localizations" : {
@@ -4388,17 +4377,6 @@
         }
       }
     },
-    "Charcoal" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "炭灰"
-          }
-        }
-      }
-    },
     "Check Again" : {
       "comment" : "Button by a browser in the welcome window: check again whether macOS allows reading it.",
       "localizations" : {
@@ -4576,7 +4554,7 @@
       }
     },
     "Choose Image…" : {
-      "comment" : "Button at the foot of the icon choices of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.\nButton in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.",
+      "comment" : "Button at the foot of the icon choices of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4736,17 +4714,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择…"
-          }
-        }
-      }
-    },
-    "Clay" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale warm brown.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "陶土"
           }
         }
       }
@@ -6263,7 +6230,7 @@
       }
     },
     "Custom" : {
-      "comment" : "A search engine choice in Settings: one you give an address for.",
+      "comment" : "A search engine choice in Settings: one you give an address for.\nTooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9318,17 +9285,6 @@
         }
       }
     },
-    "Frost" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale, see-through icy blue.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "霜蓝"
-          }
-        }
-      }
-    },
     "Frosted" : {
       "comment" : "In the space editor, for a see-through space: frosted glass, the desktop blurred behind it.",
       "localizations" : {
@@ -9479,7 +9435,7 @@
       }
     },
     "Glass" : {
-      "comment" : "A row in the space editor's Effects, for a see-through space: clear or frosted glass.\nTooltip and accessibility label of a preset look in the space editor. Clear, see-through glass.",
+      "comment" : "A row in the space editor's Effects, for a see-through space: clear or frosted glass.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11122,17 +11078,6 @@
         }
       }
     },
-    "Matcha" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale green, after the tea.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "抹茶"
-          }
-        }
-      }
-    },
     "Mature" : {
       "comment" : "A heading in Settings › Developer › Feature Flags: WebKit features on by default and in use for more than a year.",
       "localizations" : {
@@ -11200,7 +11145,7 @@
       }
     },
     "Mint" : {
-      "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale green.",
+      "comment" : "Name of a curated space color, in the space editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12740,17 +12685,6 @@
         }
       }
     },
-    "Oat" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A warm pale beige.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "燕麦"
-          }
-        }
-      }
-    },
     "Off" : {
       "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
       "localizations" : {
@@ -13653,17 +13587,6 @@
         }
       }
     },
-    "Oxblood" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep red.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "牛血红"
-          }
-        }
-      }
-    },
     "Page zoom" : {
       "comment" : "A setting in Settings › Appearance: the zoom websites open at, like 110%.",
       "localizations" : {
@@ -14411,17 +14334,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "固定到地址栏"
-          }
-        }
-      }
-    },
-    "Pine" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. A deep green.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "松绿"
           }
         }
       }
@@ -15384,7 +15296,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Button in a space's editor, on the Background row: takes the picture off the space's empty page and deletes Zigzag's copy of it.\nButton of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nButton on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again.\nTooltip of a download's button in the downloads panel: takes the download off the list.",
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nButton on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again.\nTooltip of a download's button in the downloads panel: takes the download off the list.\nVoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16176,7 +16088,7 @@
       }
     },
     "Rose" : {
-      "comment" : "Name of a curated space color, in the space editor.\nTooltip and accessibility label of a preset look in the space editor. A pale pink.",
+      "comment" : "Name of a curated space color, in the space editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18029,17 +17941,6 @@
         }
       }
     },
-    "Smoke" : {
-      "comment" : "Tooltip and accessibility label of a preset look in the space editor. Dark, smoky see-through glass.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "烟灰"
-          }
-        }
-      }
-    },
     "Smooth" : {
       "comment" : "VoiceOver, the Grain slider's value with no grain.",
       "localizations" : {
@@ -18228,7 +18129,7 @@
       }
     },
     "Spaces on the same profile share sign-ins, history and extensions. Use another profile to keep them apart." : {
-      "comment" : "Note under the Profile row in a space's editor, which also opens for a new space: what being on the same profile means.",
+      "comment" : "Tooltip of the Profile row in a space's editor, which also opens for a new space: what being on the same profile means.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -21011,7 +20912,7 @@
       }
     },
     "Use Default Colors" : {
-      "comment" : "Button in the space editor, and item in a space's context menu: puts back the colors the space had when it was made.",
+      "comment" : "Item in a space's context menu, and tooltip of the first swatch in the space editor: puts back the colors the space had when it was made.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
