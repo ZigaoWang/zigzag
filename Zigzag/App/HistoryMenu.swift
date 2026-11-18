@@ -186,7 +186,7 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
     }
 
     private static func icon(for url: URL) -> NSImage {
-        guard let icon = FaviconStore.shared.cachedIcon(for: url)?.copy() as? NSImage else { return Tokens.Symbol.image("globe", size: 13) }
+        guard let icon = SiteIcons.shownIcon(for: url)?.copy() as? NSImage else { return Tokens.Symbol.image("globe", size: 13) }
         icon.size = NSSize(width: 16, height: 16)
         return icon
     }

@@ -676,14 +676,14 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                     guard entry.url.host()?.hasSuffix(domain) == true, entry.url.path.count > 1, !SearchFolding.isSearchResultsPage(entry.url),
                           seen.insert(key).inserted else { continue }
                     results.append(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? CommandRanker.displayURL(entry.url) : entry.title,
-                                                 detail: CommandRanker.displayURL(entry.url), icon: FaviconStore.shared.cachedIcon(for: entry.url)))
+                                                 detail: CommandRanker.displayURL(entry.url), icon: SiteIcons.shownIcon(for: entry.url, privateStore: host.commandBarTabs?.privateStore)))
                 }
             }
         }
         // An inline completion becomes the first result.
         if let completionURL, !typed.isEmpty {
             let top = CommandResult(kind: .open(completionURL), title: CommandRanker.displayURL(completionURL), detail: "",
-                                    icon: FaviconStore.shared.cachedIcon(for: completionURL), symbol: "globe")
+                                    icon: SiteIcons.shownIcon(for: completionURL, privateStore: host.commandBarTabs?.privateStore), symbol: "globe")
             results.removeAll { $0.kind == .open(completionURL) || $0.title == top.title }
             results.insert(top, at: 0)
             // Already open in another tab? Enter still opens what you typed; switching to that tab is the row under it,
