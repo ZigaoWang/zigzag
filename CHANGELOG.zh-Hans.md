@@ -20,8 +20,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 在 YouTube 上按住 ⌘ 点视频，现在总会在新标签页打开。以前有时会在当前标签页打开，因为 YouTube 自己的脚本把链接接了过去。现在按住 ⌘ 点链接，不管网页怎么处理点按，都会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#317](https://github.com/ZigaoWang/zigzag/issues/317))
 - 每个 PDF 都在自己单独的辅助进程里打开，这本来是 0.9.2 要做到的：发布的版本里所有 PDF 共用一个，同时打开的 PDF 没能彼此隔开。
-
-### 修复
 - 扩展的右键菜单能正常显示表情和符号了，比如 📋 和 ⌘，不会再变成“ðŸ“‹”这样的乱码。用后台脚本的扩展（大多数 Firefox 附加组件都是这样）之前文字的编码读错了。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - 只在你点按它的那个标签页打开侧边栏的扩展，比如 ChatGPT 的扩展，现在点它的按钮就会打开侧边栏，不会再点了没反应。
 
