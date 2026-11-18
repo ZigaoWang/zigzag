@@ -215,6 +215,8 @@ targets:
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         XPCService:
           ServiceType: Application
+          # A helper of its own for each document (PDFService's _setUUID); without it every PDF shares one.
+          _MultipleInstances: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: wang.zigao.zigzag.pdfrenderer
