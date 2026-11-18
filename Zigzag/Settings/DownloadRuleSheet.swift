@@ -1,22 +1,20 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// The sheet that makes or changes one rule: what it's called, what it catches, and where the address goes. The
-/// action kind is chosen before the sheet opens (from Add Rule or a preset), so the fields shown are exactly the ones
-/// that action uses. Tokens are listed under the pattern: an Open URL template, a script's arguments and a service's
-/// parameters take them; a path, an endpoint and a method are literal.
+/// Edits one download rule: name, match, and action. The action kind is chosen before opening (Add Rule or a preset),
+/// so only its fields show. Tokens apply to Open URL templates, script arguments and service parameters; paths,
+/// endpoints and methods are literal.
 enum DownloadRuleSheet {
-    /// Opens the editor for a new rule of `kind`, or for `rule` if one is given.
+    /// Edits a new rule of `kind`, or `rule` if given.
     static func show(in host: NSView, kind: DownloadRuleAction.Kind, preset: DownloadPreset? = nil, rule existing: DownloadRule? = nil) {
         let source = existing ?? preset?.rule ?? DownloadRule(name: "", action: DownloadRuleAction(kind: kind))
         // A preset's action may differ from the requested kind (the downloader presets are RPC): the action wins.
         let action = existing?.action ?? preset?.rule.action ?? DownloadRuleAction(kind: kind)
-        // Declared before the fields, which hear the sheet and ask it to check them again.
-        /// Opening this sheet for a destination (Open, Save) is the panel under Save downloads to asking for one file
-        /// type: the sheet then asks *which type* (its extensions, not an address) and what happens to it, instead of
-        /// the address matches and the four handoff actions.
+        // Declared before the fields, which call back to revalidate.
+        /// Opened for a destination (Open, Save) from Save downloads to: asks for file extensions and what to do,
+        /// instead of address matches and the four handoff actions.
         let isDestination = action.kind.isDestination
-        /// The two destinations, in the order the choice offers them; the action's own kind is the one chosen.
+        /// Both destinations in menu order; the action's kind is selected.
         let destinationKinds: [DownloadRuleAction.Kind] = [.openFile, .saveToFolder]
         var sheetRef: FormSheet?
 
@@ -26,15 +24,14 @@ enum DownloadRuleSheet {
             ? String(localized: "pdf, epub", comment: "Placeholder of the file-extension field in the sheet that makes a per-extension destination: the extensions to list, like pdf, epub.")
             : String(localized: "example.com/files/", comment: "Placeholder of the pattern field in the sheet that makes a download rule."))
         pattern.stringValue = source.pattern
-        /// Whether the pointer is over the main button, which asks for the whole answer to "why can't I add this?".
+        /// Pointer over the main button, which shows every field blocking Add.
         var addHovered = false
 
         let applies = DropdownButton()
         applies.options = DownloadRule.Applies.allCases.map { DropdownButton.Option(title: $0.title) }
         applies.selectedIndex = DownloadRule.Applies.allCases.firstIndex(of: source.applies) ?? 0
-        // The Match dropdown offers the address matches: a file-type rule is a per-extension destination, made and
-        // edited in the panel under Save downloads to, not here. One that arrives anyway keeps what it had. A sheet
-        // opened *for* a destination is that panel's own editor, so there the one match it can have is the choice.
+        // Address matches only: file-type rules are edited from Save downloads to. An existing one keeps its match. For
+        // a destination, file type is the only match.
         let matchChoices = isDestination ? [.fileType] : DownloadRule.Match.allCases.filter { $0 != .fileType }
         let match = DropdownButton()
         match.options = matchChoices.map { DropdownButton.Option(title: $0.title) }
@@ -44,14 +41,13 @@ enum DownloadRuleSheet {
         let runsInPrivate = Toggle(isOn: source.runsInPrivateWindows)
         runsInPrivate.setAccessibilityLabel(String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."))
 
-        // The action's own fields, one set per kind.
+        // Fields per action kind.
         var actionRows: [FormSheet.Row] = []
         var appField: FilledField?
         var urlField: FilledField?
-        /// Open URL: where a web address opens, as the dropdown shows it. Ask is the rule that will ask the first time
-        /// it fires; Default Browser is what these rules did before Zigzag had places of its own.
+        /// Open URL: where a web address opens. Ask asks on first use; Default Browser is the pre-places behavior.
         var openInField: DropdownButton?
-        /// Every choice the Open in dropdown offers, in order: Ask, the Mac's browser, then Zigzag's three places.
+        /// Ask, the Mac's browser, then Zigzag's three places.
         let openInChoices = OpenInZigzag.Choice.allCases
         var scriptField: FilledField?
         var argumentView: MultilineField?
@@ -60,10 +56,10 @@ enum DownloadRuleSheet {
         var parametersView: MultilineField?
         var secretField: FilledField?
         var stylePicker: DropdownButton?
-        /// A destination's two fields: which of the two it is, and the folder one of them saves into.
+        /// A destination's kind and save folder.
         var destinationField: DropdownButton?
         var folderField: FilledField?
-        /// Where the folder row sits in `actionRows`, so it can be taken out while the other destination is chosen.
+        /// The folder row's index in `actionRows`, hidden for the other destination.
         var folderActionRow: Int?
 
         switch action.kind {
@@ -71,9 +67,8 @@ enum DownloadRuleSheet {
             let field = FilledField(placeholder: String(localized: "Choose an app…", comment: "Placeholder of the app field in a download rule's sheet."))
             field.stringValue = action.appPath
             appField = field
-            // The same shape as the script field's below: what lives in one place is one click away, which is what
-            // makes the list worth having. An app kept anywhere else stays reachable through Choose an App…, and
-            // what's picked from the list is stored as its full path.
+            // Like the script field below: apps in the listed folders are one click away, others via Choose an App…;
+            // stored as a full path.
             let chooseAnApp = {
                 let panel = NSOpenPanel()
                 panel.canChooseFiles = true
@@ -111,8 +106,8 @@ enum DownloadRuleSheet {
             field.stringValue = action.urlTemplate
             urlField = field
             actionRows.append(FormSheet.Row(label: String(localized: "URL", comment: "Label of the URL field in a download rule's sheet."), view: field))
-            // Where a *web* address opens: the Mac's browser, or one of Zigzag's three places. An address that isn't
-            // the web's (mpv://, a magnet) belongs to its own app, which the note says.
+            // Where a web address opens: the Mac's browser or one of Zigzag's places. Non-web addresses (mpv://,
+            // magnet) go to their own app, as the note says.
             let place = DropdownButton()
             place.options = OpenInZigzag.Choice.allCases.map { DropdownButton.Option(title: $0.title) }
             place.selectedIndex = openInChoices.firstIndex(of: action.openIn) ?? 0
@@ -126,9 +121,8 @@ enum DownloadRuleSheet {
             let field = FilledField(placeholder: String(localized: "Choose a script…", comment: "Placeholder of the script field in a download rule's sheet."))
             field.stringValue = action.scriptPath
             scriptField = field
-            // The folder is the list: every script in it is one click away, which is what makes one place mean
-            // something. A script kept elsewhere stays reachable through Choose a Script…, and what's picked from the
-            // folder is stored as its own name, so the rule reads `yt-dlp.sh` and goes on working.
+            // Scripts in the folder are listed; others via Choose a Script…. Folder scripts are stored by name, so the
+            // rule reads `yt-dlp.sh` and keeps working.
             let pickAScript = {
                 let panel = NSOpenPanel()
                 panel.canChooseFiles = true
@@ -197,9 +191,8 @@ enum DownloadRuleSheet {
             actionRows.append(.note(String(localized: "A JSON array. Tokens are filled in.",
                                            comment: "Under the parameters of a JSON-RPC download rule.")))
         case .saveToFolder, .openFile:
-            // A destination's own two things: what happens to a file of this type, and, when it is saved, where.
-            // The row that picks the kind is the one the panel's "Add File Type…" opens on; the folder row is
-            // taken out of the form for Open, where the file goes to the ordinary place instead.
+            // A destination's kind and, when saving, its folder. The kind row is where "Add File Type…" opens; the
+            // folder row is hidden for Open.
             let whereTo = DropdownButton()
             whereTo.options = destinationKinds.map { DropdownButton.Option(title: $0.title) }
             whereTo.selectedIndex = destinationKinds.firstIndex(of: action.kind) ?? 0
@@ -207,7 +200,7 @@ enum DownloadRuleSheet {
             actionRows.append(FormSheet.Row(label: String(localized: "Destination", comment: "Label of the choice in a per-extension destination's sheet: a folder of its own, or Zigzag showing the file itself."),
                                             view: whereTo))
             let folder = FilledField(placeholder: String(localized: "Choose a folder…", comment: "Placeholder of the folder field in a per-extension destination's sheet."))
-            // A new type starts in the folder downloads already go to: "Save" means save there unless it is changed.
+            // New types default to the downloads folder.
             folder.stringValue = action.folderPath.isEmpty && existing == nil ? DownloadManager.folder.path : action.folderPath
             folderField = folder
             let chooseFolder = PillButton(title: String(localized: "Choose…", comment: "Button beside a path in a download rule's sheet: opens the open panel."))
@@ -216,8 +209,7 @@ enum DownloadRuleSheet {
                 panel.canChooseFiles = false
                 panel.canChooseDirectories = true
                 panel.prompt = String(localized: "Choose", comment: "Button of the open panel that picks a folder for a download rule.")
-                // It opens where the field already points — the folder downloads go to, for a new type — so the
-                // ordinary answer is one click, not a walk back from wherever the panel was last.
+                // The panel opens at the field's folder, so the default is one click.
                 let typed = (folder.stringValue as NSString).expandingTildeInPath
                 var isFolder: ObjCBool = false
                 if !typed.isEmpty, FileManager.default.fileExists(atPath: typed, isDirectory: &isFolder), isFolder.boolValue {
@@ -236,9 +228,8 @@ enum DownloadRuleSheet {
 
         let tokens = FormSheet.Row.note(String(localized: "Tokens: {link}, {encoded_link}, {host}, {path}, {query}, {referrer}, {cookies}, {cookie_header}, {filename}, {mime}, {space}.",
                                              comment: "The tokens a download rule's fields may use, listed in its sheet."))
-        /// A destination is asked one thing of its own — which types of file — so it drops what only an address rule
-        /// has any use for: what the rule applies to (a type is always a download), how it matches (the type is the
-        /// match), whether case matters and whether the page goes on. An address rule keeps all of them.
+        /// Destinations only ask for file types; they drop the address rule rows (applies to, match, case, page
+        /// continues).
         let matchRows: [FormSheet.Row] = isDestination ? [
             FormSheet.Row(label: String(localized: "Name", comment: "Label of the name field in a download rule's sheet."), view: name),
             FormSheet.Row(label: String(localized: "File Extensions", comment: "Label of the extensions field in a per-extension destination's sheet, where the types of file are listed."), view: pattern),
@@ -251,7 +242,7 @@ enum DownloadRuleSheet {
             FormSheet.Row(label: String(localized: "Match case", comment: "Label of the case choice in a download rule's sheet."), view: matchCase),
             FormSheet.Row(label: String(localized: "Run in private windows", comment: "Label of the switch in a download rule's sheet that lets the rule run in private windows."), view: runsInPrivate),
         ]
-        // A destination adds what it does; an address rule lists its tokens, unless its path is literal (Open App).
+        // Destinations add their action; address rules list tokens unless the path is literal (Open App).
         let rows = matchRows + actionRows + (isDestination ? [
             FormSheet.Row.note(String(localized: "Save writes files of this type to the folder; Open saves them where downloads go and opens them in your Mac’s app. The first file type that matches wins.",
                                                  comment: "Under the fields of a per-extension destination's sheet: what each destination does, and that the first one that matches decides.")),
@@ -278,8 +269,8 @@ enum DownloadRuleSheet {
                 action.rpcParameters = parametersView?.text ?? "[]"
                 action.rpcStyle = DownloadRuleAction.RPCStyle.allCases[stylePicker?.selectedIndex ?? 0]
             case .saveToFolder, .openFile:
-                // Which of the two it is, as the choice says, and the folder one of them saves into (kept even while
-                // the other is chosen, so switching back finds it again).
+                // The selected kind, and the folder (kept while the other kind is selected, so switching back restores
+                // it).
                 if let index = destinationField?.selectedIndex, destinationKinds.indices.contains(index) {
                     action.kind = destinationKinds[index]
                 }
@@ -296,14 +287,12 @@ enum DownloadRuleSheet {
             return rule
         }
 
-        /// Mark the fields holding Add back: the pattern, and the action's own field. `all` also marks the two you
-        /// may simply not have reached yet — a name and a pattern that is still empty — which is what the pointer over
-        /// the dead button asks for. One list serves the markers, the tooltips and the button's own answer, so the
-        /// three can never disagree.
+        /// Marks fields blocking Add: the pattern and the action's field. `all` also marks an empty name and pattern,
+        /// for hover on the disabled button. One list drives markers, tooltips and the note so they agree.
         func markHeldUp(_ rule: DownloadRule?) {
             let held = rule.map { Self.heldUp($0, all: addHovered) } ?? []
             let notes = Dictionary(held.map { ($0.field, $0.note) }, uniquingKeysWith: { first, _ in first })
-            // The fields this sheet holds. Every one this sheet can show is marked.
+            // Every field this sheet can show.
             let fields: [HeldField: FilledField?] = [.name: name, .pattern: pattern, .action(.app): appField,
                                                      .action(.url): urlField, .action(.script): scriptField,
                                                      .action(.endpoint): endpointField, .action(.method): methodField,
@@ -315,12 +304,12 @@ enum DownloadRuleSheet {
             }
         }
 
-        /// What the dead Add button says for itself: the first thing to fix, in the order the form is filled in.
+        /// The disabled Add button's tooltip: the first problem, in form order.
         func heldUpNote() -> String? {
             ruleFromFields().flatMap { Self.heldUp($0, all: true).first?.note }
         }
 
-        /// A rule is ready when nothing is holding it up: the same list the fields and the button are told from.
+        /// Valid when nothing blocks it, from the same list as the markers.
         func isValid(_ rule: DownloadRule) -> Bool { Self.heldUp(rule, all: true).isEmpty }
 
         let valid = {
@@ -333,7 +322,7 @@ enum DownloadRuleSheet {
         }
         matchCase.onChange = { _ in sheetRef?.revalidate() }
 
-        // A destination is its own kind of form: a title of its own, and a line saying what it is for.
+        // Destinations get their own title and description.
         let sheetTitle: String
         let sheetMessage: String
         if isDestination {
@@ -357,7 +346,7 @@ enum DownloadRuleSheet {
                                    confirmTitle: existing == nil ? String(localized: "Add", comment: "Button of the sheet that makes a download rule.")
                                                                  : String(localized: "Save", comment: "Button of the sheet that changes a download rule."),
                                    canConfirm: valid) { confirmed in
-            // The sheet is done either way; the fields are read below, not from it.
+            // Done either way; fields are read below.
             sheetRef = nil
             guard confirmed, let rule = ruleFromFields(), isValid(rule) else { return }
             let save = {
@@ -372,15 +361,14 @@ enum DownloadRuleSheet {
             save()
         }
         sheetRef = sheet
-        // Hovering the dead Add button marks every field holding it up, and the button says the first of them for
-        // itself; leaving it takes the markers back.
+        // Hovering the disabled Add button marks every blocking field and the tooltip names the first; leaving clears
+        // them.
         sheet.onConfirmHover = { over in
             addHovered = over
             sheetRef?.revalidate()
         }
         sheet.heldUpNote = { heldUpNote() }
-        // The folder belongs to one of the two destinations. Choosing the other takes the row out of the form
-        // rather than leaving a field there that would be ignored — and puts it back, with the folder it had.
+        // The folder only applies to Save: hide the row for Open, and restore it with its value.
         if let whereTo = destinationField, let folderActionRow {
             let row = matchRows.count + folderActionRow
             whereTo.onSelect = { [weak sheet, weak whereTo] _ in
@@ -392,10 +380,9 @@ enum DownloadRuleSheet {
         }
     }
 
-    /// A field with a button beside it (a path and Choose…). The sheet lays its rows out by frame, and
-    /// `NSStackView(views:)` turns autoresizing off, so without this the stack would size to its content — the field's
-    /// own width plus the button — and the button would be drawn past the row's end, unseen. The field is what gives
-    /// way when the row is narrower than the two together; the button keeps its own width.
+    /// A field with a button beside it (a path and Choose…). Rows are laid out by frame and `NSStackView(views:)`
+    /// disables autoresizing, so without this the stack sizes to its content and the button overflows the row unseen.
+    /// The field shrinks; the button keeps its width.
     static func stack(_ field: NSView, _ button: NSView) -> NSStackView {
         let stack = NSStackView(views: [field, button])
         stack.orientation = .horizontal
@@ -405,25 +392,22 @@ enum DownloadRuleSheet {
         stack.translatesAutoresizingMaskIntoConstraints = true
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         button.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        // Shrinking is the other half of it: with both at the default resistance, a row narrower than field + button
-        // can't be resolved and the stack lays the button out past the end rather than drawing it inside.
+        // With equal compression resistance, a narrow row can't be resolved and the button overflows.
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         button.setContentCompressionResistancePriority(.required, for: .horizontal)
         return stack
     }
 
-    /// Everything holding a rule's Add button back, in the order the form is filled in: the name, what it matches,
-    /// then the action's own field. `all` adds the two you may simply not have reached yet — an empty name and an
-    /// empty pattern — which is what the pointer over the dead button asks for; a broken expression is always worth
-    /// saying. Empty means Add can be pressed, so this is also what a rule's readiness means.
+    /// What blocks Add, in form order: name, match, then the action's field. `all` adds an empty name and pattern, for
+    /// hover on the disabled button; a bad regex always counts. Empty means valid.
     static func heldUp(_ rule: DownloadRule, all: Bool) -> [(field: HeldField, note: String)] {
         var held: [(field: HeldField, note: String)] = []
-        // A name is for the list's own reading; a per-extension destination is named by its extensions.
+        // Destinations are named by their extensions.
         if all, rule.name.isEmpty, !rule.action.kind.isDestination {
             held.append((.name, String(localized: "Give the rule a name.", comment: "Tooltip on the name field of a download rule being added without one, so its Add button can't be pressed.")))
         }
         if rule.match == .fileType {
-            // An extension list is what a type rule reads: a comma with nothing between is not one.
+            // Commas with nothing between aren't extensions.
             if DownloadRule.Match.extensions(in: rule.pattern).isEmpty {
                 if all || !rule.pattern.isEmpty {
                     held.append((.pattern, String(localized: "List the file extensions this rule catches, like pdf, epub.", comment: "Tooltip on the extensions field of a per-extension destination that names none, so its Add button can't be pressed.")))
@@ -442,20 +426,19 @@ enum DownloadRuleSheet {
         return held
     }
 
-    /// Which of the sheet's fields something can be said about.
+    /// Sheet fields that can carry a note.
     enum HeldField: Hashable {
         case name
         case pattern
         case action(ActionField)
     }
 
-    /// Which of a rule action's own fields is holding its Add button back, if one is.
+    /// An action field that blocks Add.
     enum ActionField: Hashable { case app, url, script, endpoint, method, folder }
 
-    /// The field a rule's action still needs something in, and what to say about it: nil when the action can run.
-    /// Kept out of the sheet so the one thing that decides it — `isComplete` — is tested against every kind, and so a
-    /// greyed Add button never leaves the person guessing which field to fill. An address with no scheme (`bing.com`)
-    /// is complete's own case, and its own words.
+    /// The action field still missing input and its note; nil when runnable. Outside the sheet so `isComplete` is
+    /// tested for every kind, and a disabled Add always names the field. A scheme-less address (`bing.com`) has its own
+    /// note.
     static func actionHoldUp(_ action: DownloadRuleAction) -> (field: ActionField, note: String)? {
         switch action.kind {
         case .openApp:
@@ -483,8 +466,8 @@ enum DownloadRuleSheet {
             if action.folderPath.isEmpty {
                 return (.folder, String(localized: "Choose the folder this type is saved into.", comment: "Tooltip on the folder field of a per-extension destination that saves files with no folder chosen, so its Add button is greyed."))
             }
-            // A folder that has gone, or is a file, would silently fall back to the ordinary downloads folder. A path
-            // with tokens is checked when it is expanded for the download, since it names no one folder yet.
+            // A missing folder, or a file, would silently fall back to the downloads folder. Paths with tokens are
+            // checked at download time.
             guard action.folderPath.contains("{") else {
                 let path = (action.folderPath as NSString).expandingTildeInPath
                 var isDirectory: ObjCBool = false
@@ -499,16 +482,15 @@ enum DownloadRuleSheet {
     }
 }
 
-/// The apps an Open App rule can hand a link to, by name: the ones in the Mac's Applications folder, its System
-/// Applications (and Utilities), and yours — one level deep, never inside a bundle. A menu rather than a scan of
-/// everything installed, with the open panel one item away for anything else.
+/// Apps an Open App rule can use, by name: /Applications, /System/Applications (and Utilities), and ~/Applications, one
+/// level deep, never inside bundles. Choose an App… covers the rest.
 enum Applications {
     static func named() -> [(name: String, path: String)] {
         named(in: ["/Applications", "/System/Applications", "/System/Applications/Utilities",
                    FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path])
     }
 
-    /// The same, for a given set of folders: what a test can point at a folder of its own.
+    /// For explicit folders, for tests.
     static func named(in folders: [String]) -> [(name: String, path: String)] {
         var seen = Set<String>()
         var found: [(name: String, path: String)] = []
@@ -516,14 +498,14 @@ enum Applications {
             for item in (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? [] where item.hasSuffix(".app") {
                 let path = (folder as NSString).appendingPathComponent(item)
                 guard seen.insert(path).inserted else { continue }
-                // The name Finder shows: localized ("计算器" for Calculator.app) and without .app.
+                // Finder's localized name ("计算器" for Calculator.app), without .app.
                 found.append((name: FileManager.default.displayName(atPath: path).replacingOccurrences(of: ".app", with: "", options: [.anchored, .backwards]), path: path))
             }
         }
         return found.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    /// The app's own icon at menu size, as Finder draws it.
+    /// The app icon at menu size.
     static func icon(_ path: String) -> NSImage {
         let image = NSWorkspace.shared.icon(forFile: path)
         image.size = NSSize(width: 16, height: 16)

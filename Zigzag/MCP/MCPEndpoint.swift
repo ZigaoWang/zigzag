@@ -48,11 +48,11 @@ nonisolated struct MCPToolResult: Sendable, Equatable {
     var content: [JSON]
     var structured: JSON?
     var isError = false
-    /// Carries what pages wrote (a title, an address, text, fields), so `markedAsPageContent` sets it apart. Zigzag's
-    /// own words (`text`, `error`) don't.
+    /// Contains page-written content (titles, addresses, text, fields), fenced by `markedAsPageContent`. Zigzag's own
+    /// text (`text`, `error`) isn't.
     var fromPages = true
 
-    /// Zigzag's own words, never set apart as a page's.
+    /// Zigzag's own text, never fenced.
     static func text(_ text: String) -> MCPToolResult { MCPToolResult(content: [["type": "text", "text": .string(text)]], fromPages: false) }
 
     static func data(_ value: JSON) -> MCPToolResult {
@@ -63,10 +63,9 @@ nonisolated struct MCPToolResult: Sendable, Equatable {
         MCPToolResult(content: [["type": "text", "text": .string(message)]], isError: true, fromPages: false)
     }
 
-    /// The same result with its text set apart as the website's: titles, page text, links and fields are written
-    /// by whoever made the page, and a page can word them as orders to the model. Each text goes between two lines
-    /// with a fresh random tag the page can't know in advance, so it can't close the block early. Errors and other
-    /// results in Zigzag's own words (`fromPages` false) stay as they are.
+    /// Fences page-written text as untrusted, since pages can phrase it as instructions to the model. Each text goes
+    /// between lines with a fresh random tag the page can't predict, so it can't close the fence early. Zigzag's own
+    /// results (`fromPages` false) are unchanged.
     func markedAsPageContent(tag: String = UUID().uuidString.lowercased()) -> MCPToolResult {
         guard !isError, fromPages else { return self }
         var marked = self
@@ -154,14 +153,14 @@ nonisolated enum MCPAccess {
             .replacingOccurrences(of: "=", with: "")
     }
 
-    /// A key as `newToken` makes them: 43 characters of URL-safe base64 that are 32 bytes, with nothing over.
+    /// A key as `newToken` makes it: 43 URL-safe base64 characters encoding exactly 32 bytes.
     static func isZigzagKey(_ text: String) -> Bool {
         guard text.utf8.count == 43,
               text.utf8.allSatisfy({ (0x41...0x5A).contains($0) || (0x61...0x7A).contains($0) || (0x30...0x39).contains($0) || $0 == 0x2D || $0 == 0x5F })
         else { return false }
         let standard = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/") + "="
         guard let bytes = Data(base64Encoded: standard), bytes.count == 32 else { return false }
-        // The last character carries two bits past the 32 bytes; Zigzag's keys have them clear.
+        // The last character has two spare bits; Zigzag's keys keep them zero.
         return Data(bytes).base64EncodedString() == standard
     }
 
@@ -259,8 +258,8 @@ nonisolated final class MCPEndpoint: @unchecked Sendable {
 
     // MARK: Requests
 
-    /// `authorized` is called the moment the key is accepted, before the request is worked on: the connection
-    /// counts as an app's from then on, however long a tool takes.
+    /// `authorized` runs as soon as the key is accepted, before handling, so the connection counts as an app's however
+    /// long the tool takes.
     func handle(_ request: HTTPRequest, authorized: () -> Void = {}) async -> HTTPResponse {
         // From a web page (DNS rebinding) or sent to an address other than this Mac's: refused before anything else.
         guard MCPAccess.originAllowed(request.header("origin")), MCPAccess.hostAllowed(request.header("host")) else {

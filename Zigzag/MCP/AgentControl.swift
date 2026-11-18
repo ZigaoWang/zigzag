@@ -18,7 +18,7 @@ final class AgentControl {
 
     private(set) var inUse: [UUID: Use] = [:]
     private(set) var stopped: Set<UUID> = []
-    /// Goes up at every Stop and every time the setting goes off: a tool that began before it never acts after.
+    /// Bumped on every Stop and when the setting turns off, so earlier tool calls never act after.
     private(set) var generation = 0
     /// Told when you press Stop: every AI app is cut off.
     var onStop: ((MCPClient) -> Void)?
@@ -34,7 +34,7 @@ final class AgentControl {
 
     func isStopped(_ id: UUID) -> Bool { stopped.contains(id) }
 
-    /// Stop was pressed, or the setting went off, since `generation` was read.
+    /// Stopped or turned off since `generation` was read.
     func stopped(since generation: Int) -> Bool { self.generation != generation }
 
     /// Stop on the bar: the tab is let go and kept out of reach, and every app is disconnected (`onStop`).

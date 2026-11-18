@@ -79,7 +79,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             // The page measures in CSS pixels; at a site's zoom, each is pageZoom points.
             let zoom = webView.pageZoom
             let field = NSRect(x: x * zoom, y: y * zoom, width: w * zoom, height: h * zoom)
-            // Only a field you can see on the page now: the menu never opens for one scrolled away or placed off it.
+            // Only visible fields; never open the menu for one scrolled away or offscreen.
             guard Self.isInView(field, viewport: webView.bounds.size) else { hide(); return }
             focusedByUser = body["byUser"] as? Bool == true
             let frame = message.frameInfo
@@ -137,8 +137,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         case "key":
             guard let menu, let key = body["key"] as? String else { return }
             if key == "Escape" { hide(); return }
-            // As with clicks, the first half second takes no Return: a page that just put the menu up can't have
-            // Down, Down, Return already on their way pick from it. The arrows only move the selection.
+            // Like clicks, Return is ignored for the first half second so a page can't pre-queue Down, Down, Return
+            // into a menu it just opened. Arrows only move the selection.
             guard menu.takesKey(key) else { return }
             switch key {
             case "ArrowDown": menu.move(1); markSelected(menu.selected != nil)
@@ -177,20 +177,18 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     /// Where the menu showing was put: picking "other parts of the site" lists them in the same place.
     private var field = NSRect.zero
-    /// The field the menu is for was clicked or tabbed to, not put in focus by the page.
+    /// Focused by click or Tab, not by the page.
     private var focusedByUser = false
 
-    /// Whether a field (in the web view's points, from its top left) is on the page you see: its middle inside the
-    /// view.
+    /// Whether the field's center (web view points, top left) is inside the view.
     static func isInView(_ field: NSRect, viewport: NSSize) -> Bool {
         field.width > 0 && field.height > 0 && field.midX >= 0 && field.midX <= viewport.width && field.midY >= 0 && field.midY <= viewport.height
     }
 
-    /// Return fills from the menu only for a field you clicked or tabbed to, or with the menu where you can see it.
+    /// Return fills only for a user-focused field or a visible menu.
     static func enterMayFill(focusedByUser: Bool, menuOnScreen: Bool) -> Bool { focusedByUser || menuOnScreen }
 
-    /// Where the menu goes for a field (both in the overlay's coordinates): under it, or over it when there's no
-    /// room below, and always wholly inside the window, across and down.
+    /// Menu frame below the field, or above when there's no room, clamped to the window (overlay coordinates).
     static func menuFrame(under field: NSRect, in bounds: NSRect, height: CGFloat) -> NSRect {
         let margin = Tokens.Space.x2
         let width = min(max(field.width, 260), 360)
@@ -393,7 +391,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         let origin = target.origin
         let webView = target.webView
         hide()
-        // Rules so tight that the password would be a short PIN: not strong, so not filled or saved as one.
+        // Rules so tight the password would be a short PIN: not strong, so not filled or saved.
         guard rules.allowsStrongPassword else { Self.tell(Self.rulesTooTight, about: webView); return }
         let candidates = PasswordGenerator.candidates(rules, count: 6)
         Task {
@@ -415,10 +413,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let password = candidates[index]
             let username = (result?["username"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             do {
-                // Kept at once, so a reload or a submit that goes unnoticed never loses it, but as a pending login of
-                // its own, never over the account's saved one: if the site turns the change down, the old password is
-                // still there. It takes the account's place once the site has taken the form, and another made for
-                // the same form on the same page replaces it (`PasswordCapture.filledGenerated`).
+                // Saved at once as a separate pending login, never over the account's, so a missed submit or a rejected
+                // change loses nothing. It replaces the saved one once the site accepts the form; another for the same
+                // form replaces it (`PasswordCapture.filledGenerated`).
                 try await PasswordCapture.shared.filledGenerated(password, origin: origin, username: username,
                                                                  sameForm: result?["sameForm"] as? Bool == true, in: webView.owner)
                 if let controller { Toast.show(String(localized: "Strong password saved for \(origin.displayName)", comment: "Toast after a strong password was filled and saved. The placeholder is a site, like github.com."), symbol: "key", duration: 2, in: controller) }
@@ -450,7 +447,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             guard stillThere() else { return }
             let arguments: [String: Any] = ["values": values, "expectedOrigin": target.origin.description]
             let filled = try? await target.webView.callAsyncJavaScript(Self.formFiller, arguments: arguments, in: target.frame, contentWorld: .defaultClient)
-            // Nothing it could see to fill (or the page moved on as it filled): said, rather than nothing happening.
+            // Nothing visible filled (or the page navigated): say so instead of failing silently.
             if (filled as? NSNumber)?.intValue ?? 0 == 0, stillThere() {
                 Self.tell(String(localized: "Zigzag couldn’t find fields for your card that it can see here.", comment: "Toast when Fill from My Card was picked but no visible name, email, phone or address field on the page could take it. My Card is the person's own card in Contacts, as macOS calls it."),
                           about: target.webView)
@@ -503,8 +500,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// panel can't open, the click on the field has brought Zigzag's menu as it always has.
     func keyIconClicked(in webView: BrowserWebView) {
         debugLog("autofill key icon clicked")
-        // Only where the key is Zigzag's to show (`AutofillKeyIcon.shows`): a field marked before Fill passwords was
-        // turned off does nothing.
+        // Only where Zigzag shows the key (`AutofillKeyIcon.shows`); fields marked before Fill passwords was turned off
+        // do nothing.
         guard #available(macOS 27, *), AutofillKeyIcon.shows(in: webView), Self.justClicked(webView.lastClickUp), Self.isInFront(webView),
               let origin = Origin(webView.url) else { return }
         // Zigzag's menu for the same click, shown or on its way, makes room for the panel.
@@ -611,10 +608,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const hint = (el.name || '') + ' ' + (el.id || '') + ' ' + (el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '');
         return /first.?name|last.?name|full.?name|your.?name|^name$|e-?mail|phone|mobile|address|street|city|zip|postal|postcode|company|organi[sz]ation/i.test(hint.trim());
       };
-      // `byUser`: you clicked or tabbed to the field, rather than the page putting the cursor in it.
+      // `byUser`: focused by click or Tab, not by the page.
       const report = (el, byUser) => {
         const r = el.getBoundingClientRect();
-        // Only a field on the page you see: never one scrolled away or placed off it.
+        // Only visible fields, never scrolled away or offscreen.
         const x = r.left + r.width / 2, y = r.top + r.height / 2;
         if (!(r.width > 0 && r.height > 0 && x >= 0 && x <= innerWidth && y >= 0 && y <= innerHeight)) return;
         // The field the menu is for, should Passwords… open the Mac's panel on it (SystemAutoFillPanel).
@@ -688,12 +685,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     """
 
-    /// What both login fillers (`filler`, `generatedFiller`) check a field with before filling it: `visible` and
-    /// `inView`. One copy, so the two can't drift apart.
+    /// Shared `visible` and `inView` checks for `filler` and `generatedFiller`, so they can't drift.
     static let loginFields = placeholderCheck + """
-    // Only fields a person can see: a real size, on the page, not transparent or hidden by an ancestor; on the page
-    // across and near where you are (half a screen above or below, as a form's other field can be), not clipped
-    // away inside a tiny box, and not covered by something else.
+    // Visible fields only: real size, on the page, not transparent or hidden by an ancestor, within half a screen of
+    // the viewport, not clipped in a tiny box, not covered.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
@@ -719,7 +714,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       }
       return true;
     };
-    // The field the menu was for is on the page you see, never one scrolled away or placed off it.
+    // The menu's field is in the viewport.
     const inView = (el) => {
       const r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
       return x >= 0 && x <= innerWidth && y >= 0 && y <= innerHeight;
@@ -727,11 +722,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
 
     """
 
-    /// Picks the first candidate the field accepts (its `pattern` and lengths), puts it in every new-password
-    /// field of the focused form (the password and its confirmation), and returns its index and the username
-    /// typed so far, if any.
+    /// Fills the first candidate the field accepts (`pattern`, lengths) into every new-password field of the focused
+    /// form (password and confirmation); returns its index and the username so far.
     static let generatedFiller = loginFields + """
-    // Checked here, at the moment of filling: only the site the menu was offered on gets it.
+    // Checked at fill time: only the origin the menu was offered on.
     if (location.origin !== expectedOrigin) return { index: -1, moved: true };
     const active = document.activeElement;
     const scope = (active && active.form) || document;
@@ -763,7 +757,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    // The same fields as the last strong password went into, on this page: another try for the same form.
+    // Same fields as the last generated password on this page: a retry for the same form.
     const sameForm = (window.__zigzagGenerated || []).some((el) => targets.includes(el));
     // The fields holding it, so a press that may send their form is noticed (the password watcher's script).
     window.__zigzagGenerated = targets;
@@ -781,15 +775,13 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     static let formFiller = """
     // Checked here, at the moment of filling: only the site the card was offered on gets it.
     if (location.origin !== expectedOrigin) return 0;
-    // The field you're in, inside any open shadow roots (where the page's activeElement is only their host).
+    // The focused element, through open shadow roots (activeElement is only their host).
     let active = document.activeElement;
     while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
-    // An element's box, across a shadow root's edge to its host.
+    // Parent, crossing a shadow root to its host.
     const up = (el) => el.parentElement || (el.parentNode && el.parentNode.host) || null;
-    // Your phone and address go only where you can see them land: the field you're in, and the others of its form
-    // (with no form, of the part of the page around it), at a size you'd see (not a sliver), on screen now (a field
-    // far down the page is one you'd never notice filled), not faded out, not clipped away inside a tiny box, and
-    // not covered by something else.
+    // Phone and address fill only visible fields: the focused one and its form's (or nearby section's without a form),
+    // at a real size, on screen now (not far down the page), not faded, not clipped in a tiny box, not covered.
     const visible = (el) => {
       if (el.disabled || el.readOnly || el.type === 'hidden') return false;
       const r = el.getBoundingClientRect();
@@ -799,7 +791,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
       const style = getComputedStyle(el);
       if (style.visibility !== 'visible') return false;
-      // Its own opacity and every box's around it: what you'd see of it.
+      // Combined opacity of the element and its ancestors.
       let opacity = 1;
       for (let box = el; box; box = up(box)) opacity *= parseFloat(getComputedStyle(box).opacity);
       if (opacity < 0.5) return false;
@@ -813,7 +805,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         const w = Math.min(r.right, b.right) - Math.max(r.left, b.left), h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
         if (w < 8 || h < 8) return false;
       }
-      // Asked of its own shadow root, if it's in one: the page itself would answer with the host.
+      // Hit-test in its own shadow root; the document would return the host.
       const root = el.getRootNode();
       const hit = (root && root.elementFromPoint ? root : document).elementFromPoint(Math.min(cx, innerWidth - 1), Math.min(cy, innerHeight - 1));
       if (hit && hit !== el && !el.contains(hit) && !(hit.control === el)) return false;
@@ -856,13 +848,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
       el.dispatchEvent(new Event('change', { bubbles: true }));
     };
     if (!active || !['INPUT', 'SELECT'].includes(active.tagName) || !visible(active)) return 0;
-    // With no form, the part of the page around the field: the nearest box (a few levels up at most, never the
-    // whole page) that holds other fields for your details, widened to the section it's in when that's close by.
-    // Fields of some form inside it are that form's, not this one's.
+    // Without a form, the nearest ancestor (a few levels up, never the whole page) holding other detail fields, widened
+    // to its section when close. Fields belonging to another form inside are excluded.
     const around = () => {
       const part = 'section, fieldset, dialog, [role="group"], [role="form"], [role="dialog"], [role="region"]';
       const outside = (box) => !box || box === document.body || box === document.documentElement;
-      // Its fields, inside open shadow roots too (a page's own components).
+      // Its fields, including inside open shadow roots.
       const loose = (box) => {
         const found = [];
         const walk = (node) => {
@@ -981,10 +972,8 @@ final class AutofillMenu: FloatingPanelView {
     /// The most rows the menu lists.
     static let maxRows = 8
 
-    /// When it came up. For the first half second it takes no clicks, so a page can't bring it up just as you click
-    /// (a "click here, fast" game) and catch that click on a login.
-    /// Return waits the same half second (`Autofill`'s key handling); the arrows only move the selection, so they
-    /// work at once.
+    /// Ignores clicks for the first half second so a page can't pop it up under a click aimed elsewhere (a "click here,
+    /// fast" game). Return waits the same (`Autofill`'s key handling); arrows work at once.
     private let shownAt = ProcessInfo.processInfo.systemUptime
     static let quietFor: TimeInterval = 0.5
 
@@ -993,7 +982,7 @@ final class AutofillMenu: FloatingPanelView {
     func takesKey(_ key: String) -> Bool { Self.takesKey(key, shownFor: ProcessInfo.processInfo.systemUptime - shownAt) }
     var takesInput: Bool { Self.takesInput(shownFor: ProcessInfo.processInfo.systemUptime - shownAt) }
 
-    /// In a window you can see, the one in front, and wholly inside the page it floats over.
+    /// In a visible, front window and fully inside the page.
     var isOnScreen: Bool {
         guard let window, window.isVisible, window.isKeyWindow, window.occlusionState.contains(.visible), let superview, !isHidden else { return false }
         return superview.visibleRect.contains(frame)

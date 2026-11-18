@@ -47,9 +47,8 @@ enum Brand {
         return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
     }
 
-    /// Text on a button filled with `fill`: white, or a deep ink of the fill's own hue, whichever reads better on it
-    /// in the appearance it's drawn in. A space's accent is deep by day and pale at night, so white text on it
-    /// would fail in dark mode; this picks as `Theme.onAccent` does, for any fill.
+    /// White or a deep ink of the fill's hue, whichever contrasts better in the current appearance. Accents are pale in
+    /// dark mode, so white would fail; same logic as `Theme.onAccent`.
     static func ink(on fill: NSColor) -> NSColor {
         NSColor(name: nil) { appearance in
             var ink = NSColor.white

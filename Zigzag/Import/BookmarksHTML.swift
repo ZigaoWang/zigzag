@@ -3,7 +3,7 @@ import Foundation
 /// The Netscape bookmarks HTML that Firefox, Safari, Chrome and Edge export: `<H3>` folders over `<DL>` lists,
 /// `<A HREF>` pages. A tolerant scanner, since the files are rarely well formed.
 nonisolated enum BookmarksHTML {
-    /// A chosen bookmarks file, or a problem saying it holds none.
+    /// A bookmarks file, or a problem if it has none.
     static func read(_ file: URL) -> ImportBatch {
         var batch = ImportBatch()
         if let data = try? Data(contentsOf: file) { batch.bookmarks = bookmarks(in: text(of: data)) }

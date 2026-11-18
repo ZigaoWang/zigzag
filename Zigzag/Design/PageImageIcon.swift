@@ -2,21 +2,18 @@ import AppKit
 import ImageIO
 import UniformTypeIdentifiers
 
-/// An image file you chose as a tab's, pinned page's or favorite's icon (#303), kept as a square PNG in Zigzag's data
-/// folder (`Page Icons`), so it stays when the original moves. The icon string is `image:<file name>`, kept where an
-/// SF Symbol's name or an emoji is (`IconChoice`).
-///
-/// SVG and the web's own bitmap kinds are read by the sandboxed picture helper (`SafePictures`), which has no network
-/// and no files, so an SVG's scripts never run and its links to other files are never followed. A PDF goes to the PDF
-/// helper. HEIC and ICNS, which neither takes, are read here, as a space's background is.
+/// A user-chosen image icon for a tab, pinned page or favorite (#303), stored as a square PNG in `Page Icons` so it
+/// survives the original moving. Icon string: `image:<file name>` (`IconChoice`). SVG and web bitmaps are decoded by
+/// the sandboxed `SafePictures` helper (no network or files, so SVG scripts and links never run); PDFs go to the PDF
+/// helper; HEIC and ICNS are read here.
 nonisolated enum PageImageIcon {
     static let prefix = "image:"
-    /// Larger files are turned away: an icon never needs more.
+    /// Icons never need more.
     static let maxBytes = 1024 * 1024
-    /// Pixels across the kept PNG: 3x the largest place an icon shows (a favorite's tile, 18 pt at the largest text).
+    /// 3x the largest icon size (an 18 pt favorite tile at the largest text).
     static let side = 128
 
-    /// What the open panel offers.
+    /// Allowed in the open panel.
     static let types: [UTType] = [.svg, .png, .jpeg, .heic, .pdf, .icns]
 
     enum Failure: Error, Equatable {
@@ -28,14 +25,14 @@ nonisolated enum PageImageIcon {
 
     static func isImage(_ icon: String) -> Bool { name(of: icon) != nil }
 
-    /// The kept file's name in an icon string, if it's one of these.
+    /// The stored file name from an icon string, if it is one.
     static func name(of icon: String) -> String? {
         guard icon.hasPrefix(prefix) else { return nil }
         let name = String(icon.dropFirst(prefix.count))
         return isOwnName(name) ? name : nil
     }
 
-    /// Copies the image at `source` into `folder` as a square PNG and gives its icon string.
+    /// Copies `source` into `folder` as a square PNG and returns its icon string.
     static func store(_ source: URL, in folder: URL = folder) async throws(Failure) -> String {
         let size = (try? source.resourceValues(forKeys: [.fileSizeKey]))?.fileSize
         if let size, size > maxBytes { throw .tooLarge }
@@ -53,14 +50,14 @@ nonisolated enum PageImageIcon {
         return prefix + name
     }
 
-    /// The picture in some bytes, at most `side` pixels across.
+    /// Decodes to at most `side` pixels.
     static func read(_ data: Data) async -> CGImage? {
         if PictureFormat.sniff(data) != nil { return await SafePictures.shared.decode(data, maxSide: side)?.image }
         if data.starts(with: Array("%PDF-".utf8)) { return await readPDF(data) }
         return readLocalBitmap(data)
     }
 
-    /// HEIC or ICNS, only as what the bytes say they are.
+    /// HEIC or ICNS, by content type only.
     private static func readLocalBitmap(_ data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               let type = CGImageSourceGetType(source) as String?,
@@ -70,11 +67,11 @@ nonisolated enum PageImageIcon {
                                         kCGImageSourceCreateThumbnailWithTransform: true,
                                         kCGImageSourceShouldCacheImmediately: true,
                                         kCGImageSourceThumbnailMaxPixelSize: side]
-        // An ICNS holds several sizes; ImageIO's first is its largest.
+        // ImageIO's first ICNS image is the largest.
         return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
-    /// A PDF's first page, drawn to fit `side` by the sandboxed PDF helper (`SafePDF`), as every PDF is.
+    /// First PDF page, rendered by the sandboxed `SafePDF` helper.
     @MainActor private static func readPDF(_ data: Data) async -> CGImage? {
         let pdf = SafePDF(data: data)
         defer { pdf.close() }
@@ -84,7 +81,7 @@ nonisolated enum PageImageIcon {
         return await pdf.render(page: 0, rect: CGRect(origin: .zero, size: page), scale: scale, dark: false)
     }
 
-    /// The picture centered on a transparent square as wide as its longer side, so it's never stretched.
+    /// Centers on a transparent square so it's never stretched.
     static func square(_ image: CGImage) -> CGImage? {
         let w = image.width, h = image.height
         guard w > 0, h > 0 else { return nil }
@@ -100,7 +97,7 @@ nonisolated enum PageImageIcon {
                   space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
     }
 
-    /// The kept image for an icon string, in a square of `points`; nil when it isn't one or its file is gone.
+    /// The stored image at `points`; nil if not an image icon or the file is gone.
     static func image(_ icon: String, points: CGFloat, in folder: URL = folder) -> NSImage? {
         guard let name = name(of: icon),
               let source = CGImageSourceCreateWithURL(folder.appendingPathComponent(name) as CFURL, nil),
@@ -112,9 +109,8 @@ nonisolated enum PageImageIcon {
         return image
     }
 
-    /// Deletes every kept image that none of `references` names (the saved library and session, read as text) and
-    /// that was made before `before`, so one chosen while this runs stays. Run as Zigzag starts: an icon taken away
-    /// is kept until then, so ⌘Z can bring it back.
+    /// At launch, deletes images not named in `references` (saved library and session text) and older than `before`.
+    /// Removed icons are kept until then for ⌘Z.
     static func prune(keepingNamesIn references: [Data], before: Date, in folder: URL = folder) {
         let files = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
         let text = references.map { String(decoding: $0, as: UTF8.self) }
@@ -125,7 +121,7 @@ nonisolated enum PageImageIcon {
         }
     }
 
-    /// Only a plain `<UUID>.png` in the folder: an icon string can never name a path anywhere else.
+    /// Only `<UUID>.png`, so an icon string can't point elsewhere.
     private static func isOwnName(_ name: String) -> Bool {
         guard name.hasSuffix(".png") else { return false }
         return UUID(uuidString: String(name.dropLast(4))) != nil

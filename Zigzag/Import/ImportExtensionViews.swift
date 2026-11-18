@@ -124,7 +124,7 @@ final class ImportExtensionsReview: NSView, ImportListItem {
             name.lineBreakMode = .byTruncatingTail
             var limits: NSTextField?
             if !prepared.report.limits.isEmpty {
-                // As the install sheet says it, one sentence with English names in lower case.
+                // Matches the install sheet: one sentence, English names lowercased.
                 let names = prepared.report.limits.map { Words.lowercasedForList($0.text) }
                 let list = Words.list(names)
                 let text = NSTextField(wrappingLabelWithString: String(localized: "Won’t work in Zigzag: \(list).",

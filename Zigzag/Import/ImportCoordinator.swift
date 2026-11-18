@@ -11,7 +11,7 @@ enum ImportCoordinator {
         case firefox(FirefoxImporter.Browser)
         case safari
         case orion(OrionImporter.Browser)
-        /// A CSV, a bookmarks HTML file or Safari's export zip the person chose.
+        /// A CSV, bookmarks HTML or Safari export zip.
         case file(URL)
     }
 
@@ -26,7 +26,7 @@ enum ImportCoordinator {
             if let bundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 return NSWorkspace.shared.icon(forFile: app.path)
             }
-            // A file's own kind: a bookmarks page, a zip, a CSV.
+            // Icon from the file's type.
             if case .file(let url) = kind, let type = UTType(filenameExtension: url.pathExtension) { return NSWorkspace.shared.icon(for: type) }
             return NSWorkspace.shared.icon(for: .commaSeparatedText)
         }
@@ -329,13 +329,10 @@ enum ImportCoordinator {
         }
     }
 
-    /// Imports from one source. Reading happens off the main thread; macOS may show its own prompts on the way
-    /// (allowing access to a browser's passwords).
-    ///
-    /// `into`: the profile that gets it all (left out, the first): its history and sign-ins, and the spaces
-    /// and favorites made for what came over. Passwords go into the one vault every profile shares. From Arc, with
-    /// its spaces on more than one of its profiles, `into` gets its default profile's, and each of its own profiles'
-    /// go to the profile here with its name (`ArcImporter.importSidebar`).
+    /// Imports from one source, reading off the main thread; macOS may prompt along the way (browser password access).
+    /// `into` (default: the first profile) gets history, sign-ins, and the new spaces and favorites. Passwords go into
+    /// the shared vault. From multi-profile Arc, `into` gets the default profile and the rest map by name
+    /// (`ArcImporter.importSidebar`).
     static func run(_ source: Source, _ choice: Choice, primaryPassword: String = "", into target: Profile? = nil) async -> Summary {
         let choice = choice.intersection(source.offers)
         let profile = target ?? Profiles.shared.default
@@ -354,8 +351,8 @@ enum ImportCoordinator {
         // Arc's spaces, pinned tabs, favorites, open tabs and history come through its own importer, which knows its
         // sidebar.
         var arcReading = reading
-        // Each of Arc's own profiles kept apart (by folder) and the profile here it went to: its history and
-        // sign-ins go there too. Each is held while this writes into it, as `profile` is.
+        // Arc profile folders mapped to local profiles; history and sign-ins go there too. Each is held while written,
+        // like `profile`.
         var arcProfiles: [String: UUID] = [:]
         var held: Set<UUID> = []
         defer { for id in held { Profiles.shared.done(id) } }
@@ -371,10 +368,10 @@ enum ImportCoordinator {
                 summary.problems += result.problems
                 arcProfiles = result.profiles
             } else if choice.contains(.history) || choice.contains(.signIns) {
-                // Without the sidebar, only to profiles an earlier import made for them; none is made now.
+                // Without the sidebar, only profiles an earlier import created; none are created now.
                 arcProfiles = ArcImporter.knownProfiles()
             }
-            // One that went to `profile` goes with the rest; one already deleted gets nothing of its own.
+            // Ones mapped to `profile` merge with the rest; deleted ones get nothing.
             arcProfiles = arcProfiles.filter { _, id in
                 guard id != profile.id else { return false }
                 guard !held.contains(id) else { return true }
@@ -461,8 +458,7 @@ enum ImportCoordinator {
         return summary
     }
 
-    /// The sign-ins brought, by the profile here each goes to: a browser profile's in `apart` (Arc's own, by
-    /// folder) to its own, the rest to `into`, first.
+    /// Imported sign-ins per target profile: folders in `apart` to their own, the rest to `into`, which comes first.
     static func cookieGroups(_ batch: ImportBatch, apart: [String: UUID], into: UUID) -> [(profile: UUID, cookies: [SignInImporter.Cookie])] {
         guard !batch.cookies.isEmpty else { return [] }
         var targets = [UUID](repeating: into, count: batch.cookies.count)

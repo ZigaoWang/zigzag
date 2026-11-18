@@ -44,7 +44,7 @@ final class ConfirmSheet: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
-    /// Answered and fading away: clicks go through to what's under it at once.
+    /// Clicks pass through while it fades out.
     private var isLeaving = false
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
     override var isFlipped: Bool { true }
@@ -59,7 +59,7 @@ final class ConfirmSheet: NSView {
     }
 
     private static func present(_ sheet: ConfirmSheet, in host: NSView) {
-        // One sheet at a time: What's New, which only informs, makes way.
+        // One sheet at a time: What's New gives way.
         WhatsNewSheet.makeRoom(in: host.window)
         sheet.frame = host.bounds
         sheet.autoresizingMask = [.width, .height]
