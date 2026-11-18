@@ -1425,7 +1425,7 @@ extension ExtensionStore {
 
     /// Marks overlays made by this version of the writer. It is in the signature so a marker written by an older
     /// format is rebuilt once, even when its text happens to match.
-    nonisolated static let overlayFormatVersion = 1
+    nonisolated static let overlayFormatVersion = 2
 
     /// The background part of the package's manifest and, for a background page, the page's own bytes. The package is
     /// never written to, so this stays stable until the extension's own files change.
@@ -1677,7 +1677,16 @@ extension ExtensionStore {
                     guard let path = packagePath(script) else { return false }
                     if seen.insert(path).inserted { ordered.append(path) }
                 }
-                background["scripts"] = ["zigzag-prelude.js"] + ordered.filter { $0 != "zigzag-prelude.js" }
+                let scripts = ["zigzag-prelude.js"] + ordered.filter { $0 != "zigzag-prelude.js" }
+                if background["preferred_environment"] == nil {
+                    // A page of Zigzag's own that says it's UTF-8: the one this WebKit makes for the scripts doesn't,
+                    // so their text read as Windows-1252, and a menu item's "📋" showed as "ðŸ“‹" (#277).
+                    page = (backgroundPageFile, backgroundPage(scripts: scripts, modules: background["type"] as? String == "module"))
+                    background["page"] = backgroundPageFile
+                    background["scripts"] = nil
+                } else {
+                    background["scripts"] = scripts
+                }
             } else {
                 return false
             }
@@ -1713,6 +1722,20 @@ extension ExtensionStore {
         } catch {
             return false
         }
+    }
+
+    /// The background page Zigzag writes for an extension's background scripts.
+    nonisolated static let backgroundPageFile = "zigzag-background.html"
+
+    /// The page WebKit would make for background scripts, with the charset newer WebKit gives it: Chrome and Firefox
+    /// read an extension's scripts as UTF-8.
+    nonisolated static func backgroundPage(scripts: [String], modules: Bool) -> String {
+        func escaped(_ text: String) -> String {
+            text.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "\"", with: "&quot;")
+                .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        }
+        let tags = scripts.map { "<script\(modules ? " type=\"module\"" : "") src=\"/\(escaped($0))\"></script>" }
+        return "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n<body>\n" + tags.joined(separator: "\n") + "\n</body>\n"
     }
 
     /// A background page with one prelude script before its first script. The page's own bytes, CSP and script order
