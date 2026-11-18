@@ -15,6 +15,8 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 更新现在只在一个地方显示：边栏底部的卡片。“检查更新…”之后，卡片会显示下载进度和已下载多少，接着是准备更新，准备好后出现“重新启动”，不再同时弹出提示和卡片说同一件事。卡片会显示完整的版本号，写成 0.9.2 Beta 1 而不是 0.9.2-beta.1；边栏隐藏时，它会出现在窗口的同一个角落。
 - 标签页、固定标签页和收藏的菜单里又只有一个“更改图标…”了，不再是三个图标选项：“选取图像…”和“使用网站图标”移到了它打开的图标选择下方。感谢 [bkonia](https://github.com/bkonia)。([#303](https://github.com/ZigaoWang/zigzag/issues/303))
+- 点击登录框下方 iCloud 密码的“启用密码自动填充”，现在会和点它的按钮一样打开输入验证码的地方，不再没有反应。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
+- Mac App 可装可不装的扩展（比如 Better Passwords）不装 App 也能正常用了：不再显示“Invalid call to runtime.connectNative()”，Zigzag 也不再提示它需要配套的 App。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
 
 ## [0.9.2] - 2026-11-18
 

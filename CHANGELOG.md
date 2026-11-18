@@ -8,6 +8,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - An update now has one home, the card at the bottom of the sidebar. After Check for Updates…, the card shows the download filling with how much has come, then the update being prepared, then Restart once it's ready, instead of a toast and the card saying the same thing at once. The card shows the whole version, read as 0.9.2 beta 1 rather than 0.9.2-beta.1, and with the sidebar hidden it sits in the same corner of the window.
 - The menu of a tab, pinned tab or favorite has just Change Icon… again, instead of three icon items: Choose Image… and Use Site Icon are now at the bottom of the icon choices it opens. Thanks to [bkonia](https://github.com/bkonia). ([#303](https://github.com/ZigaoWang/zigzag/issues/303))
+- Clicking iCloud Passwords' Enable Password AutoFill under a sign-in field opens the extension's code entry, as clicking its button does, instead of doing nothing. Thanks to [bkonia](https://github.com/bkonia). ([#248](https://github.com/ZigaoWang/zigzag/issues/248))
+- An extension whose Mac app is optional, like Better Passwords, works without it again: it no longer shows "Invalid call to runtime.connectNative()", and Zigzag no longer says it needs its app. Thanks to [bkonia](https://github.com/bkonia). ([#248](https://github.com/ZigaoWang/zigzag/issues/248))
 
 ## [0.9.2] - 2026-11-18
 
