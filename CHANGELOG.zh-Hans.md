@@ -13,6 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
+- Firefox 扩展和 Chrome 扩展走同一套层，现在可以安装和运行：在“设置 › 扩展 › 从文件安装…”里选择 **.xpi** 文件，或导入 Firefox、Zen 个人资料里的扩展。扩展的 `browser.*` API 会返回 Promise，它自己的后台、内容脚本和选项页都像在 Firefox 里一样工作；Zigzag 无法支持的部分会在安装前列在安装面板里，而不是之后无声失败。感谢 [Lakeland97](https://github.com/Lakeland97)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - 运行脚本的下载规则会在网页上显示进度：运行时显示“正在运行脚本”，结束后显示“脚本运行完成”或“脚本运行失败”，并附上脚本最后输出的一行，规则不会再悄悄运行。把链接交给 App、下载工具或默认浏览器的规则，成功后每次打开 Zigzag 会提示一次。感谢 [Lakeland97](https://github.com/Lakeland97)。([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 
 ## [0.9.2] - 2026-11-18

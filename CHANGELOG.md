@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- Firefox extensions install and run through the same layer as Chrome's: choose an **.xpi** file in Settings › Extensions › Install from File…, or import the extensions from a Firefox or Zen profile. An add-on's `browser.*` API gets promises, and its own background, content scripts and options page work as they do in Firefox; what Zigzag cannot answer is listed in the install sheet before you add it, rather than failing quietly later. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - A download rule that runs a script shows it on the page: Running script while it works, then Ran script or Script failed with the script's last line, so a rule never runs out of sight. A rule that hands a link to an app, a download manager or your default browser says so once per session, after it worked. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 
 ## [0.9.2] - 2026-11-18
