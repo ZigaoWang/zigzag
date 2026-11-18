@@ -185,6 +185,9 @@ struct ProfileChoiceTests {
         #expect(ProfileKey.fillsPasswords.name(in: Profile.defaultID) == "PasswordsAutofill")
         #expect(ProfileKey.extensionsPinned.name(in: Profile.defaultID) == "ExtensionsPinned")
         #expect(ProfileKey.extensionsPinned.name(in: work) == "ExtensionsPinned.\(work.uuidString)")
+        // What a profile decides about its extensions is its own too, and goes with it.
+        #expect(ProfileKey.extensionsOffSites.name(in: Profile.defaultID) == "ExtensionsOffSites")
+        #expect(ProfileKey.extensionsOffSites.name(in: work) == "ExtensionsOffSites.\(work.uuidString)")
     }
 
     @Test func aRemovedProfileLeavesNoChoiceBehindAndTheFirstKeepsIts() throws {

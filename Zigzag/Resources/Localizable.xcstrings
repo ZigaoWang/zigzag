@@ -8669,6 +8669,17 @@
         }
       }
     },
+    "Extensions come from Chrome and browsers built on it. Firefox and Safari get theirs from stores of their own." : {
+      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展只能从 Chrome 及基于它的浏览器导入。Firefox 和 Safari 的扩展来自它们各自的商店。"
+          }
+        }
+      }
+    },
     "Extensions, sign-ins and history kept on this Mac" : {
       "comment" : "Under the title of a row in Settings › Profiles, for data left by a profile that's in no list.",
       "localizations" : {
@@ -24506,24 +24517,6 @@
         }
       }
     },
-    "extension.limit.tabGroups" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: grouping tabs.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Tab groups"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "标签页组"
-          }
-        }
-      }
-    },
     "Extensions in Firefox" : {
       "comment" : "Heading over the extensions Firefox already downloaded, in the Import window.",
       "localizations" : {
@@ -24670,6 +24663,94 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "扩展来自 Chrome 及基于它的浏览器，经由 Chrome 网上应用店。Firefox 和 Safari 的扩展来自它们各自的商店。"
+          }
+        }
+      }
+    },
+    "%lld hidden" : {
+      "comment" : "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏 %lld 个"
+          }
+        }
+      }
+    },
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements, site styles and site icons are removed." : {
+      "comment" : "Message of the sheet that forgets the choices made for single sites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，隐藏的元素、网站样式和网站图标也会被移除。"
+          }
+        }
+      }
+    },
+    "Clear %@" : {
+      "comment" : "Tooltip of the × on a site's row in Settings › Privacy › Sites: forgets that one choice for the site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除“%@”"
+          }
+        }
+      }
+    },
+    "Follow Setting" : {
+      "comment" : "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随设置"
+          }
+        }
+      }
+    },
+    "Site icon" : {
+      "comment" : "Row in Settings › Privacy › Sites: an icon you set for this site in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站图标"
+          }
+        }
+      }
+    },
+    "Zapped elements" : {
+      "comment" : "Row in Settings › Privacy › Sites: elements hidden on this site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏的元素"
+          }
+        }
+      }
+    },
+    "Change Site Icon…" : {
+      "comment" : "Item in the … menu of the site panel: opens the icon choices for the whole site, used by every tab, pinned tab and favorite on it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改网站图标…"
+          }
+        }
+      }
+    },
+    "Choose an image to use as this site’s icon." : {
+      "comment" : "Message of the panel that picks an image file (SVG, PNG and others) as a whole site's icon, from Choose Image… under the icon choices Site Controls opens.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选取一张图像用作此网站的图标。"
           }
         }
       }

@@ -80,11 +80,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Empty pages' pictures no space has any more: a deleted space's, kept until now so ⌘Z could bring it back.
         let backgrounds = Set(Library.shared.spaces.compactMap(\.backgroundImage))
         DispatchQueue.global(qos: .utility).async { SpaceBackground.prune(keeping: backgrounds) }
-        // Image icons no saved tab, pinned page or favorite names any more (#303), kept until now for ⌘Z.
+        // Image icons no saved tab, pinned page, favorite or site names any more (#303), kept until now for ⌘Z.
         let started = Date()
+        // A site's icon (#310) is kept in the settings, not a file.
+        let siteIcons = Data(SiteIcons.all.values.joined(separator: "\n").utf8)
         DispatchQueue.global(qos: .utility).async {
             let saved = ((try? FileManager.default.contentsOfDirectory(at: Paths.support, includingPropertiesForKeys: nil)) ?? [])
-                .filter { $0.pathExtension == "json" }.compactMap { try? Data(contentsOf: $0) }
+                .filter { $0.pathExtension == "json" }.compactMap { try? Data(contentsOf: $0) } + [siteIcons]
             PageImageIcon.prune(keepingNamesIn: saved, before: started)
         }
         // Icons clearing history set aside, if Zigzag didn't get to remove them when it quit.

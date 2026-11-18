@@ -403,7 +403,7 @@ enum CommandRanker {
                 for entry in profile.history.recent(limit: 8) {
                     let title = entry.title.isEmpty ? HistoryStore.fileName(of: entry.url) ?? displayURL(entry.url) : entry.title
                     add(CommandResult(kind: .history(entry.url), title: title,
-                                      detail: detail(displayURL(entry.url), under: title), icon: FaviconStore.shared.cachedIcon(for: entry.url)),
+                                      detail: detail(displayURL(entry.url), under: title), icon: SiteIcons.shownIcon(for: entry.url, privateStore: manager?.privateStore)),
                         key: TabManager.normalize(entry.url))
                 }
                 // No history yet: say what this is for rather than showing nothing.
@@ -445,7 +445,7 @@ enum CommandRanker {
             if let destination = destination(from: query) {
                 let url = destination.url
                 add(CommandResult(kind: .open(url, httpFallback: destination.httpFallback), title: displayURL(url), detail: "",
-                                  icon: FaviconStore.shared.cachedIcon(for: url), symbol: "globe"),
+                                  icon: SiteIcons.shownIcon(for: url, privateStore: manager?.privateStore), symbol: "globe"),
                     key: TabManager.normalize(url))
             } else {
                 add(CommandResult(kind: .search(query), title: query, detail: engine.name, symbol: "magnifyingglass"), key: "search:\(query)")
@@ -490,7 +490,7 @@ enum CommandRanker {
                 add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
                                   detail: space.map { String(localized: "Archived from \($0)", comment: "Under a command bar result for a tab that tidied itself away. The name is the space it was in.") }
                                       ?? String(localized: "Archived", comment: "Under a command bar result for a tab that tidied itself away."),
-                                  icon: FaviconStore.shared.cachedIcon(for: entry.url), symbol: "archivebox"), key: key)
+                                  icon: SiteIcons.shownIcon(for: entry.url, privateStore: manager?.privateStore), symbol: "archivebox"), key: key)
             }
         }
 
@@ -501,7 +501,7 @@ enum CommandRanker {
             guard !seen.contains(key), !SearchFolding.isSearchResultsPage(entry.url) else { continue }
             let title = entry.title.isEmpty ? displayURL(entry.url) : entry.title
             add(CommandResult(kind: .history(entry.url), title: title,
-                              detail: detail(displayURL(entry.url), under: title), icon: FaviconStore.shared.cachedIcon(for: entry.url)), key: key)
+                              detail: detail(displayURL(entry.url), under: title), icon: SiteIcons.shownIcon(for: entry.url, privateStore: manager?.privateStore)), key: key)
             historyCount += 1
         }
 
