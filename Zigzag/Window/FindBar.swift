@@ -997,13 +997,6 @@ enum Toast {
         hide(in: controller)
     }
 
-    /// Whether a toast is up in this window, one not already on its way out.
-    static func isShowing(in controller: BrowserWindowController) -> Bool {
-        let state = state(for: controller.root.overlay)
-        guard let toast = state.toast, toast.superview === controller.root.overlay else { return false }
-        return !toast.dismissing
-    }
-
     /// What the toast showing in this window was shown for, if anything.
     static func owner(in controller: BrowserWindowController) -> AnyObject? {
         let state = state(for: controller.root.overlay)

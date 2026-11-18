@@ -61,10 +61,16 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// Opened for a link from another app.
     private var fromAnotherApp = false
 
-    /// Settings › Zigzag Mini: links from other apps open here instead of in a tab. Off unless you turn it on.
+    /// Settings › Zigzag Mini: links from other apps open here instead of in a tab, as in Little Arc. On unless you
+    /// turned it off.
     static var opensExternalLinks: Bool {
-        get { UserDefaults.standard.bool(forKey: "OpensExternalLinksInMini") }
+        get { opensExternalLinks(in: .standard) }
         set { UserDefaults.standard.set(newValue, forKey: "OpensExternalLinksInMini") }
+    }
+
+    /// The setting as `defaults` has it: on when it was never set.
+    nonisolated static func opensExternalLinks(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: "OpensExternalLinksInMini") as? Bool ?? true
     }
 
     /// Whether a page another app hands over goes to Zigzag Mini: only web links, only with the setting on, and
@@ -73,25 +79,26 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         settingOn && !needsOnboarding && ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
-    /// The setting's offer has been made (`WindowManager.offerMini`): it's never made again, whatever the answer.
-    static var miniOffered: Bool {
-        get { UserDefaults.standard.bool(forKey: "MiniOfferShown") }
-        set { UserDefaults.standard.set(newValue, forKey: "MiniOfferShown") }
+    /// Whether this link from another app is the first to open here, which says so: true once, then never again.
+    nonisolated static func takeLinksNote(in defaults: UserDefaults) -> Bool {
+        guard !defaults.bool(forKey: "MiniLinksExplained") else { return false }
+        defaults.set(true, forKey: "MiniLinksExplained")
+        return true
     }
 
-    /// Whether a link from another app, opening as a new tab, offers Zigzag Mini: only one it would take with the
-    /// setting on, while the setting is off, and only if the offer hasn't been made before (#246).
-    nonisolated static func offersMini(for url: URL, settingOn: Bool, asked: Bool, needsOnboarding: Bool) -> Bool {
-        !settingOn && !asked && takes(url, settingOn: true, needsOnboarding: needsOnboarding)
-    }
-
-    enum OfferTurn: Equatable { case now, wait, never }
-
-    /// When the offer shows, checked each second: once the page has loaded and no other toast has been up for two
-    /// checks running (the offer to translate comes just after a page loads); never once you've gone to another tab.
-    nonisolated static func offerTurn(quiet: Bool, quietBefore: Bool, inFront: Bool) -> OfferTurn {
-        guard inFront else { return .never }
-        return quiet && quietBefore ? .now : .wait
+    /// The first link from another app that opens here says so, once, with ⌘O's move into a tab and where to turn
+    /// it off.
+    private func explainLinks() {
+        guard Self.takeLinksNote(in: .standard) else { return }
+        // Once the window has grown in.
+        DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.enter * Tokens.Motion.debugSlowdown + 0.3) { [weak self] in
+            guard let self, !self.movedOut, !self.isLeaving, !self.isClosing else { return }
+            self.promptToast(String(localized: "Links from other apps open in Zigzag Mini. Turn this off in Settings.", comment: "Toast shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. Settings means Settings › Zigzag Mini, where this can be turned off. Zigzag Mini is a name, kept in Latin letters."),
+                             symbol: "macwindow", duration: 10,
+                             action: (String(localized: "Open in Zigzag", comment: "Button in the toast shown the first time a link from another app opens in Zigzag Mini: moves the page into a tab, as ⌘O does."),
+                                      { [weak self] in self?.openInZigzag() }),
+                             lines: 3)
+        }
     }
 
     /// How big a new one opens: as big as you last made one, as Little Arc does, never smaller than it can be; the
@@ -139,6 +146,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             controller.returnTo = AppSwitching.lastOtherApp
             if !NSApp.isActive { NSRunningApplication.current.activate(options: []) }
             MiniLinkWake.linkOpenedInMini()
+            controller.explainLinks()
         }
         return controller
     }
