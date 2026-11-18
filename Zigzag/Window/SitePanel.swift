@@ -74,6 +74,8 @@ final class SitePanel: FloatingPanelView {
     private var permissionsRow: PanelLinkRow?
     /// How many elements on the site are zapped, and Restore All.
     private var zappedRow: PanelLinkRow?
+    /// The site's own CSS, while it has some: into Edit Style.
+    private var styleRow: PanelLinkRow?
     private let permissionsGroup = PanelGroup()
     private var resetPermissions: PanelLinkRow?
     /// The Permissions page of a site that hasn't asked for anything: says so, with no Reset (#232).
@@ -504,6 +506,7 @@ final class SitePanel: FloatingPanelView {
         // Boosts: hiding what you don't want on the site.
         if canBoost {
             entries.append(.item(.init(title: Self.zapTitle, symbol: "scope") { [weak self] in self?.startZapping() }))
+            entries.append(.item(.init(title: SiteStyleSheet.title, symbol: "paintbrush") { [weak self] in self?.editStyle() }))
             if canClear { entries.append(.separator) }
         }
         guard canClear else { MenuPanel.show(entries, from: moreButton); return }
@@ -657,6 +660,7 @@ final class SitePanel: FloatingPanelView {
         // sitepage zap | restore: Zap Element in ⋯, or the zapped row's Restore All.
         if arg == "zap" { startZapping(); return }
         if arg == "restore" { restoreZaps(); return }
+        if arg == "style" { editStyle(); return }
         if arg == "more" { showMoreMenu(); return }
         guard let next = Page(rawValue: arg) else { return }
         if next == .connection { showCertificate() } else { show(next) }
@@ -669,7 +673,7 @@ final class SitePanel: FloatingPanelView {
     var debugState: [String: Any] {
         ["site": site, "page": page.rawValue, "certificate": certificatePage?.debugState ?? [:],
          "connection": connectionLine?.debugText ?? "",
-         "links": [permissionsRow, zappedRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
+         "links": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugTitle),
          "rows": rows.map(\.debugTitle), "permissions": permissionsGroup.rows.map(\.debugTitle),
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
@@ -1104,13 +1108,26 @@ final class SitePanel: FloatingPanelView {
         ZapPicker.start(in: tab, controller: controller)
     }
 
-    /// "3 zapped", with Restore All: only once something on the site is.
+    private func editStyle() {
+        guard let controller else { return }
+        let tab = tab
+        close()
+        SiteStyleSheet.show(for: tab, in: controller)
+    }
+
+    /// "3 zapped", with Restore All, and Custom style: only once the site has them.
     private func buildBoostRows() {
         guard canBoost else { return }
         if zappedRow == nil {
             let row = PanelLinkRow("", value: Self.restoreAllTitle) { [weak self] in self?.restoreZaps() }
             addSubview(row)
             zappedRow = row
+        }
+        if styleRow == nil {
+            let row = PanelLinkRow(String(localized: "Custom style", comment: "Row in the site panel, there while the site has CSS of your own: opens Edit Style. Its value says Edit…."),
+                                   value: String(localized: "Edit…", comment: "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.")) { [weak self] in self?.editStyle() }
+            addSubview(row)
+            styleRow = row
         }
         refreshBoostRows()
     }
@@ -1121,6 +1138,7 @@ final class SitePanel: FloatingPanelView {
         let zaps = boost.zaps.count
         zappedRow?.titleText = SiteBoosts.zapped(zaps)
         zappedRow?.isHidden = zaps == 0
+        styleRow?.isHidden = !boost.hasStyle
         needsLayout = true
     }
 
@@ -1307,8 +1325,9 @@ final class SitePanel: FloatingPanelView {
         var c = SitePanelRows.Context()
         c.hasPermissions = permissionsRow?.isHidden == false
         c.zapped = zappedRow == nil ? 0 : boost.zaps.count
+        c.styled = styleRow != nil && boost.hasStyle
         let links = SitePanelRows.links(c)
-        let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.permissions, permissionsRow), (.zapped, zappedRow)]
+        let linkRows: [(SitePanelRows.Link, PanelLinkRow?)] = [(.permissions, permissionsRow), (.zapped, zappedRow), (.style, styleRow)]
         var placed = false
         for (kind, row) in linkRows {
             guard let row else { continue }
@@ -1992,7 +2011,7 @@ enum SitePanelRows {
     enum Row: Equatable { case zoom, adBlocking, cookieBanners, javaScript, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions, openIn }
     /// The rows into the panel's other pages. Extensions are on the first page itself (#215), and the connection is a
     /// small line under the site's name (#221).
-    enum Link: Equatable { case permissions, zapped }
+    enum Link: Equatable { case permissions, zapped, style }
 
     struct Context {
         /// An http or https page, not an extension's own page.
@@ -2020,6 +2039,8 @@ enum SitePanelRows {
         var manySpaces = false
         /// How many elements on the site are zapped.
         var zapped = 0
+        /// The site has CSS of your own.
+        var styled = false
     }
 
     static func rows(_ c: Context) -> [Row] {
@@ -2046,6 +2067,7 @@ enum SitePanelRows {
         var links: [Link] = []
         if c.hasPermissions { links.append(.permissions) }
         if c.zapped > 0 { links.append(.zapped) }
+        if c.styled { links.append(.style) }
         return links
     }
 }

@@ -2047,6 +2047,28 @@
         }
       }
     },
+    "A style can’t hold a tag like </style>." : {
+      "comment" : "Under the code field of the Edit Style sheet, while the CSS holds an HTML tag: why Save can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "样式里不能有 </style> 这样的标签。"
+          }
+        }
+      }
+    },
+    "A style can’t load anything from the web, with @import or a web address." : {
+      "comment" : "Under the code field of the Edit Style sheet, while the CSS imports or loads something from the web: why Save can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "样式不能通过 @import 或网址从网上载入任何内容。"
+          }
+        }
+      }
+    },
     "A tab needs your answer" : {
       "comment" : "Tooltip of the glow along the sidebar's edge when one page is waiting for an answer.",
       "localizations" : {
@@ -2642,13 +2664,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements show again." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements and site styles are removed." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，隐藏的元素也会重新显示。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，隐藏的元素和网站样式也会被移除。"
           }
         }
       }
@@ -3782,6 +3804,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "书签和历史记录，需要你的许可"
+          }
+        }
+      }
+    },
+    "boosted" : {
+      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: it has CSS of your own (Edit Style… in Site Controls).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已自定样式"
           }
         }
       }
@@ -6146,6 +6179,28 @@
         }
       }
     },
+    "CSS for %@" : {
+      "comment" : "VoiceOver name of the code field in the Edit Style sheet. The site is a domain, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的 CSS"
+          }
+        }
+      }
+    },
+    "CSS of your own for this site’s pages, shown as you type. Leave it empty to turn it off." : {
+      "comment" : "Under the title of the Edit Style sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为此网站的页面写你自己的 CSS，输入时就会显示。留空即可关闭。"
+          }
+        }
+      }
+    },
     "Custom" : {
       "comment" : "A search engine choice in Settings: one you give an address for.",
       "localizations" : {
@@ -6175,6 +6230,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自定网页尺寸…"
+          }
+        }
+      }
+    },
+    "Custom style" : {
+      "comment" : "Row in the site panel, there while the site has CSS of your own: opens Edit Style. Its value says Edit….",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自定样式"
           }
         }
       }
@@ -8081,6 +8147,17 @@
         }
       }
     },
+    "Edit Style…" : {
+      "comment" : "Item in the … menu of the site panel: opens a sheet to write CSS of your own for the site's pages.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑样式…"
+          }
+        }
+      }
+    },
     "Edit this page’s address" : {
       "comment" : "VoiceOver hint of the address in a split view page's strip.",
       "localizations" : {
@@ -8115,7 +8192,7 @@
       }
     },
     "Edit…" : {
-      "comment" : "Button on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color.\nButton on a space's row in Settings › Spaces: opens its editor.",
+      "comment" : "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.\nButton on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color.\nButton on a space's row in Settings › Spaces: opens its editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14288,6 +14365,17 @@
         }
       }
     },
+    "Plain CSS only: no @import, scripts or web addresses." : {
+      "comment" : "Under the code field of the Edit Style sheet: what a site's style may hold.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只能使用普通 CSS：不能有 @import、脚本或网址。"
+          }
+        }
+      }
+    },
     "Play" : {
       "comment" : "Tooltip of a button in the sidebar's Now Playing control, for a tab playing sound in the background.\nTooltip of the mini player's play button while the video is paused.",
       "localizations" : {
@@ -16170,7 +16258,7 @@
       }
     },
     "Save" : {
-      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.",
+      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton of the Edit Style sheet: keeps the CSS for the site.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18194,6 +18282,17 @@
         }
       }
     },
+    "Style for %@" : {
+      "comment" : "Title of the Edit Style sheet. The site is a domain, like example.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 的样式"
+          }
+        }
+      }
+    },
     "Substitutions" : {
       "comment" : "Submenu of the Edit menu.",
       "localizations" : {
@@ -18664,6 +18763,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这就是切换空间"
+          }
+        }
+      }
+    },
+    "That’s too long for a style. Keep it under 100 KB." : {
+      "comment" : "Under the code field of the Edit Style sheet, while the CSS is too long: why Save can't be pressed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "样式太长了，请控制在 100 KB 以内。"
           }
         }
       }

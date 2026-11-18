@@ -195,6 +195,11 @@ final class FormSheet: NSView, NSTextFieldDelegate {
         // A dropdown's menu, open over the form, has the keys while it's up.
         if MenuPanel.current != nil { return event }
         let composing = (window.firstResponder as? NSTextView)?.hasMarkedText() == true
+        // Return in a field of several lines (MultilineField) starts a new line there.
+        if [36, 76].contains(event.keyCode), let text = window.firstResponder as? NSTextView, !text.isFieldEditor, text.isEditable,
+           event.modifierFlags.intersection([.command, .option, .control]).isEmpty {
+            return event
+        }
         switch Self.keyAction(keyCode: event.keyCode, modifiers: event.modifierFlags, characters: event.charactersIgnoringModifiers,
                               destructive: isDestructive, canConfirm: canConfirm(), composing: composing) {
         case .confirm: finish(true)

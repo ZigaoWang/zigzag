@@ -1,12 +1,40 @@
 import AppKit
 import WebKit
 
-/// What you changed about one site's pages, as Arc's Boosts: elements you zapped, hidden on every visit.
+/// What you changed about one site's pages, as Arc's Boosts: elements you zapped, hidden on every visit, and CSS of
+/// your own. No scripts: user scripts are Tampermonkey's.
 nonisolated struct SiteBoost: Codable, Equatable, Sendable {
     /// CSS selectors, one for each element zapped, in the order they were.
     var zaps: [String] = []
+    /// The site's own CSS (Edit Style…); empty is off.
+    var style = ""
 
-    var isEmpty: Bool { zaps.isEmpty }
+    var hasStyle: Bool { !style.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    var isEmpty: Bool { zaps.isEmpty && !hasStyle }
+}
+
+nonisolated extension SiteBoost {
+    private enum Keys: String, CodingKey { case zaps, style }
+
+    /// Either part may be missing (boosts kept before styles were).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Keys.self)
+        zaps = try c.decodeIfPresent([String].self, forKey: .zaps) ?? []
+        style = try c.decodeIfPresent(String.self, forKey: .style) ?? ""
+    }
+}
+
+/// Why a site's CSS can't be used: plain CSS only, nothing that loads from elsewhere or reads as HTML.
+nonisolated enum StyleProblem: Equatable, Sendable {
+    case tooLong, tag, loads
+
+    var message: String {
+        switch self {
+        case .tooLong: String(localized: "That’s too long for a style. Keep it under 100 KB.", comment: "Under the code field of the Edit Style sheet, while the CSS is too long: why Save can't be pressed.")
+        case .tag: String(localized: "A style can’t hold a tag like </style>.", comment: "Under the code field of the Edit Style sheet, while the CSS holds an HTML tag: why Save can't be pressed.")
+        case .loads: String(localized: "A style can’t load anything from the web, with @import or a web address.", comment: "Under the code field of the Edit Style sheet, while the CSS imports or loads something from the web: why Save can't be pressed.")
+        }
+    }
 }
 
 /// Boosts for each site, kept under its host without "www.". Only web pages (http, https) have them: never Zigzag's
@@ -113,9 +141,81 @@ enum SiteBoosts {
         return !selector.contains { "{};@<\"'\n\r".contains($0) } && !selector.contains("/*") && !selector.contains("*/")
     }
 
-    /// The style sheet for a site's boosts: a rule for each zap, so one a browser can't read leaves the rest working.
+    /// The style sheet for a site's boosts: a rule for each zap, so one a browser can't read leaves the rest working,
+    /// then the site's own CSS, when it's plain CSS.
     nonisolated static func css(for boost: SiteBoost) -> String {
-        boost.zaps.filter(isPlainSelector).map { "\($0) { display: none !important; }" }.joined(separator: "\n")
+        var parts = boost.zaps.filter(isPlainSelector).map { "\($0) { display: none !important; }" }
+        if boost.hasStyle, styleProblem(boost.style) == nil { parts.append(boost.style) }
+        return parts.joined(separator: "\n")
+    }
+
+    /// Keeps a site's CSS (empty turns it off). Returns false for CSS that can't be used.
+    @discardableResult
+    static func setStyle(_ css: String, forSite site: String, privateStore: WKWebsiteDataStore? = nil) -> Bool {
+        guard styleProblem(css) == nil else { return false }
+        var boost = boost(forSite: site, privateStore: privateStore)
+        boost.style = css.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : css
+        set(boost, forSite: site, privateStore: privateStore)
+        return true
+    }
+
+    /// The longest CSS a site keeps, in bytes.
+    nonisolated static let maxStyle = 100_000
+
+    /// Why CSS can't be a site's style, or nil for plain CSS. It's read as a browser reads it, with its comments
+    /// gone and its escapes (`\75 rl(`) undone, so nothing written in a roundabout way gets past: no tags, no
+    /// @import, and no url(), src() or image-set() that reaches anything but data: or the page's own #fragment.
+    nonisolated static func styleProblem(_ css: String) -> StyleProblem? {
+        guard css.utf8.count <= maxStyle else { return .tooLong }
+        let plain = unescaped(withoutComments(css)).lowercased()
+        if plain.range(of: #"<\s*/?\s*[a-z!]"#, options: .regularExpression) != nil { return .tag }
+        if plain.contains("@import") { return .loads }
+        // Every function that takes an address: what it's handed must be inline.
+        var rest = plain[...]
+        while let call = rest.range(of: #"(url|src|image-set|-webkit-image-set|image|cross-fade|-webkit-cross-fade)\s*\("#, options: .regularExpression) {
+            let name = plain[call].prefix { $0.isLetter || $0 == "-" }
+            let argument = rest[call.upperBound...].drop { $0.isWhitespace || $0 == "\"" || $0 == "'" }
+            if name == "url" || name == "src" {
+                if !(argument.hasPrefix("data:") || argument.hasPrefix("#")) { return .loads }
+            } else {
+                // A list of addresses: strings in it are addresses too.
+                let inside = rest[call.upperBound...].prefix { $0 != ")" }
+                if inside.contains("\"") || inside.contains("'") { return .loads }
+            }
+            rest = rest[call.upperBound...]
+        }
+        return nil
+    }
+
+    /// CSS with each comment a space, as the browser sees it (`u/**/rl` is two words).
+    nonisolated static func withoutComments(_ css: String) -> String {
+        var out = "", rest = css[...]
+        while let start = rest.range(of: "/*") {
+            out += rest[..<start.lowerBound] + " "
+            guard let end = rest[start.upperBound...].range(of: "*/") else { return out }
+            rest = rest[end.upperBound...]
+        }
+        return out + rest
+    }
+
+    /// CSS with its escapes undone: a backslash and up to six hex digits (and one space after) is that character,
+    /// a backslash and anything else is that.
+    nonisolated static func unescaped(_ css: String) -> String {
+        var out = "", chars = Array(css.unicodeScalars), i = 0
+        while i < chars.count {
+            guard chars[i] == "\\", i + 1 < chars.count else { out.unicodeScalars.append(chars[i]); i += 1; continue }
+            var j = i + 1, hex = ""
+            while j < chars.count, hex.count < 6, chars[j].properties.isASCIIHexDigit { hex.unicodeScalars.append(chars[j]); j += 1 }
+            if hex.isEmpty {
+                out.unicodeScalars.append(chars[j])
+                i = j + 1
+            } else {
+                out.unicodeScalars.append(UInt32(hex, radix: 16).flatMap(Unicode.Scalar.init) ?? "\u{FFFD}")
+                if j < chars.count, chars[j] == " " || chars[j] == "\n" || chars[j] == "\t" { j += 1 }
+                i = j
+            }
+        }
+        return out
     }
 }
 
@@ -139,6 +239,12 @@ enum PageBoosts {
         let css = SiteBoosts.css(for: SiteBoosts.boost(forSite: site, privateStore: privateStore))
         guard !css.isEmpty else { return }
         controller.addUserScript(WKUserScript(source: source(css: css, site: site), injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
+    }
+
+    /// Shows `boost` on the page in `tab` now without keeping it (Edit Style's preview as you type).
+    static func show(_ boost: SiteBoost, site: String, in tab: Tab) {
+        guard let webView = tab.webView, !ErrorPage.pending.contains(webView), SiteBoosts.site(of: webView.url) == site else { return }
+        webView.runOwnScript(source(css: SiteBoosts.css(for: boost), site: site), world: world)
     }
 
     /// The boosts of the page in `tab` changed: the page shows it now, and its next load too.

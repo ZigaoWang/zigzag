@@ -2168,10 +2168,14 @@ enum DebugBridge {
         case "zapmode":
             if arg == "off" { ZapPicker.current?.stop() } else if let tab = controller.tabManager.selectedTab { ZapPicker.start(in: tab, controller: controller) }
         case "zaphover": ZapPicker.debugHover(arg)
+        // boostsheet: Edit Style… for the page in front. boostcss <css> | save | cancel: typed into its field ("\n" a
+        // new line), or answered.
+        case "boostsheet": if let tab = controller.tabManager.selectedTab { SiteStyleSheet.show(for: tab, in: controller) }
+        case "boostcss": SiteStyleSheet.debug(arg)
         case "zapstate":
             let tab = controller.tabManager.selectedTab
             let boost = SiteBoosts.boost(for: tab?.webView?.url, privateStore: tab?.privateStore)
-            debugLog("zapstate \(SiteBoosts.site(of: tab?.webView?.url) ?? "-") picking=\(ZapPicker.current != nil) zaps=\(boost.zaps)")
+            debugLog("zapstate \(SiteBoosts.site(of: tab?.webView?.url) ?? "-") picking=\(ZapPicker.current != nil) zaps=\(boost.zaps) style=\(boost.style.count)")
         case "sitecert": SitePanel.shown?.debugCertificate(Int(arg) ?? 0)
         case "sitext": SitePanel.shown?.extensionsSection?.debugCommand(arg)
         case "sitextcount": SitePanel.debugExtensionCount = Int(arg) ?? 0
