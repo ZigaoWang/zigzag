@@ -1121,13 +1121,10 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    /// An extension asked for its companion app, and that app isn't on this Mac.
+    /// An extension asked for its companion app, and that app isn't on this Mac. Noted only: as in Chrome, the extension
+    /// hears the host isn't there and says so itself. For many (Bitwarden, Better Passwords) the app is optional (#248).
     fileprivate func companionAppMissing(for context: WKWebExtensionContext) {
-        let name = context.webExtension.displayName ?? String(localized: "This extension", comment: "Stands in for an extension's name when it has none, at the start of a sentence.")
-        setAttention(Attention(
-            title: String(localized: "\(name) needs its app", comment: "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."),
-            message: String(localized: "\(name) works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag.", comment: "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."),
-            buttonTitle: String(localized: "OK", comment: "Button that closes the note about an extension's missing app."), appBundleID: nil), for: context.uniqueIdentifier)
+        ExtensionLog.write("\(context.webExtension.displayName ?? context.uniqueIdentifier) asked for a companion app that isn't installed")
     }
 
     // MARK: Event fan-out from our model
