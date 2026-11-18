@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
-- Passkeys keep working after a sign-in page offered one in its username field, as GitHub's does. Reloading such a page, or asking for a passkey a second time, could get the request refused, and then every passkey on every site failed with no prompt until you restarted your Mac. If yours are failing now, restart once after updating. ([#348](https://github.com/ZigaoWang/zigzag/issues/348))
+- Passkeys keep working after a sign-in page offered one in its username field, as GitHub's does. Reloading such a page, or asking for a passkey a second time, could get the request refused, and then every passkey on every site failed with no prompt until you restarted your Mac. If yours are failing now, restart once after updating. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean). ([#348](https://github.com/ZigaoWang/zigzag/issues/348))
 
 ## [0.9.3] - 2026-11-18
 
