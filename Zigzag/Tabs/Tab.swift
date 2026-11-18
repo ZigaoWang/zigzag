@@ -307,6 +307,8 @@ final class Tab: NSObject {
     var isNotSecure: Bool { url?.scheme?.lowercased() == "http" || usesCertificateException }
 
     private(set) var webView: BrowserWebView?
+    /// The handler a page's loopback calls come through, so its sockets can be ended when it leaves.
+    private weak var localReceivers: LocalReceiverMessages?
     /// Where the web view sits, with the Web Inspector when it's docked (`PageHolder`): what shows the tab borrows this,
     /// never the web view alone. Made with the first web view and kept, so the next one appears in its place.
     private(set) var pageHolder: PageHolder?
@@ -539,6 +541,11 @@ final class Tab: NSObject {
         if #available(macOS 15.4, *), extensionConfiguration == nil, privateStore == nil,
            configuration.webExtensionController === profile.extensions.controller {
             profile.extensions.bridge.userScripts.attach(configuration.userContentController)
+        }
+        // A page's own scripts may ask Zigzag to make a loopback call, when Settings and the site's switch both say
+        // yes. An extension's own page has its bridge instead, and a private window's page is refused by the handler.
+        if extensionConfiguration == nil {
+            localReceivers = LocalReceiverShim.attach(to: configuration, tab: self)
         }
         showsExtensionPage = extensionConfiguration != nil
         openedByPage = fromWebKit
@@ -1960,6 +1967,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLeavingPage = true
+        // The page is going: a socket it opened to this Mac goes with it.
+        localReceivers?.closeAllSockets()
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
