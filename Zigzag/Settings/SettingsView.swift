@@ -3874,44 +3874,37 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 })
             }
 
+            // The same switches as the site's own Site Controls, by the same names.
             if let url, PageFullScreen.pageSites.contains(site) || PageFullScreen.screenSites.contains(site) {
-                let options = [String(localized: "Fills the Page", comment: "A choice for full screen in Settings › Privacy › Sites: the video fills the page's area in the window."),
-                               String(localized: "Fills the Screen", comment: "A choice for full screen in Settings › Privacy › Sites: the video covers the whole screen.")]
-                let dropdown = DropdownButton()
-                dropdown.options = options.map { DropdownButton.Option(title: $0) }
-                dropdown.selectedIndex = PageFullScreen.choice(for: url) == .page ? 0 : 1
-                dropdown.onSelect = { [weak self] index in
-                    PageFullScreen.setChoice(index == 0 ? .page : .screen, for: url)
+                let toggle = Toggle(isOn: PageFullScreen.choice(for: url) == .page)
+                toggle.onChange = { [weak self] on in
+                    PageFullScreen.setChoice(on ? .page : .screen, for: url)
                     self?.reloadPrivacy()
                     self?.layoutDocument()
                 }
-                rows.append(makeRow(String(localized: "Full screen", comment: "Row in Settings › Privacy › Sites: where a video's full screen goes on this site."),
-                                    control: dropdown) { PageFullScreen.setChoice(nil, for: url) })
+                rows.append(makeRow(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
+                                    control: toggle) { PageFullScreen.setChoice(nil, for: url) })
             }
 
             if let url, CookieBanners.sitesHandled.contains(site) || CookieBanners.sitesLeft.contains(site) {
-                let options = [String(localized: "Reject", comment: "A choice for cookie banners in Settings › Privacy › Sites: say no to the site's cookie consent pop-up."),
-                               String(localized: "Leave Alone", comment: "A choice for cookie banners in Settings › Privacy › Sites: leave the site's cookie consent pop-up for you to answer.")]
-                let dropdown = DropdownButton()
-                dropdown.options = options.map { DropdownButton.Option(title: $0) }
-                dropdown.selectedIndex = CookieBanners.sitesHandled.contains(site) ? 0 : 1
-                dropdown.onSelect = { [weak self] index in
-                    CookieBanners.setChoice(index == 0, for: url)
+                let toggle = Toggle(isOn: CookieBanners.sitesHandled.contains(site))
+                toggle.onChange = { [weak self] on in
+                    CookieBanners.setChoice(on, for: url)
                     self?.reloadPrivacy()
                     self?.layoutDocument()
                 }
                 rows.append(makeRow(String(localized: "Cookie banners", comment: "Row in Settings › Privacy › Sites: what Zigzag does with the site's cookie consent pop-up."),
-                                    control: dropdown) { CookieBanners.setChoice(nil, for: url) })
+                                    control: toggle) { CookieBanners.setChoice(nil, for: url) })
             }
 
             if let url, ContentBlocker.allowedSites.contains(site) {
-                let toggle = Toggle(isOn: true)
+                let toggle = Toggle(isOn: false)
                 toggle.onChange = { [weak self] on in
-                    ContentBlocker.setAllowed(on, on: url)
+                    ContentBlocker.setAllowed(!on, on: url)
                     self?.reloadPrivacy()
                     self?.layoutDocument()
                 }
-                rows.append(makeRow(String(localized: "Allow ads", comment: "Row in Settings › Privacy › Sites: this site may show its ads."),
+                rows.append(makeRow(String(localized: "Ad blocking", comment: "Row in the site panel's This Site group."),
                                     control: toggle) {
                     var allowed = ContentBlocker.allowedSites
                     allowed.remove(site)
