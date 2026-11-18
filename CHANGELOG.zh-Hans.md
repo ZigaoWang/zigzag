@@ -14,6 +14,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ### 新功能
 - 可以为你选择的网站保留 Cookie。“清除 Cookie…”会让你在其他所有网站上退出登录，这些网站则不受影响；打开“设置 › 隐私”中的“退出 Zigzag 时清除 Cookie”后，每次退出都会清除其余网站的 Cookie。在网站设置中打开“保留 Cookie”，或在“设置 › 隐私”中添加网站；一个网站同时包括 http、https 和所有子域名。感谢 [mrfragger](https://github.com/mrfragger)。([#334](https://github.com/ZigaoWang/zigzag/issues/334))
+- 用到 Hyper 键（⌃⌥⇧⌘ 一起按）的快捷键，在“设置 › 快捷键”、命令栏和录制快捷键时只显示一个 ✦ 键帽，不再列出四个修饰键。在设置里搜“hyper”也能找到。感谢 [JonasNowak](https://github.com/JonasNowak)。([#352](https://github.com/ZigaoWang/zigzag/pull/352))
 
 ### 修复
 - 在扩展弹窗里改的设置不会再自己变回去了。Strongbox 的“填充”开关每次点完显示的都是点之前的状态，重新打开又反过来，因为 WebKit 有时会在扩展上一次保存还没完成时就先读了存储。现在每个扩展的保存和读取都按它调用的顺序完成，和 Chrome 一样。感谢 [bkonia](https://github.com/bkonia)。([#350](https://github.com/ZigaoWang/zigzag/issues/350))

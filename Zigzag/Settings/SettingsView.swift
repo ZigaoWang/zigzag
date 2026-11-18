@@ -4427,7 +4427,11 @@ final class KeyCaps: NSView {
 final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// By name, and by its keys whichever way you type them: "⌘L", "⌘ L", or "command L".
     var searchText: String {
-        let names = ["⌘": "command cmd", "⇧": "shift", "⌥": "option alt", "⌃": "control ctrl", Shortcuts.globe: "fn globe"]
+        let names = [
+            "⌘": "command cmd", "⇧": "shift", "⌥": "option alt", "⌃": "control ctrl",
+            Shortcuts.globe: "fn globe",
+            Shortcuts.hyper: "hyper hypr command cmd shift option alt control ctrl ⌃⌥⇧⌘",
+        ]
         let spoken = keys.map { names[$0] ?? $0 }.joined(separator: " ")
         let shortcut = String(localized: "shortcut", comment: "A word that finds keyboard shortcuts with Find a setting in Settings. Not shown.")
         return title.stringValue + " " + shortcut + " " + keys.joined() + " " + keys.joined(separator: " ") + " " + spoken
@@ -4642,10 +4646,14 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// While recording: the modifiers you're holding, so you can see the shortcut forming.
     private func showHeld(_ flags: NSEvent.ModifierFlags) {
         var held = ""
-        if flags.contains(.control) { held += "⌃" }
-        if flags.contains(.option) { held += "⌥" }
-        if flags.contains(.shift) { held += "⇧" }
-        if flags.contains(.command) { held += "⌘" }
+        if flags.isSuperset(of: Shortcuts.hyperFlags) {
+            held = Shortcuts.hyper
+        } else {
+            if flags.contains(.control) { held += "⌃" }
+            if flags.contains(.option) { held += "⌥" }
+            if flags.contains(.shift) { held += "⇧" }
+            if flags.contains(.command) { held += "⌘" }
+        }
         fieldLabel.stringValue = held.isEmpty ? String(localized: "Type a shortcut", comment: "In Settings › Shortcuts while recording a new shortcut.") : held + " …"
         fieldLabel.textColor = held.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
     }
