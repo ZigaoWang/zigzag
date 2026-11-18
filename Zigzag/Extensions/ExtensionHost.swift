@@ -1039,6 +1039,20 @@ final class ExtensionHost: NSObject {
         }
     }
 
+    /// action.openPopup() from the extension's page in a frame on a site (FramedExtensionPopups): its popup, from its
+    /// button when pinned, else the address. Nil when it opens; otherwise Chrome-style words for the extension.
+    func openPopup(_ extensionID: String, from tab: Tab) -> String? {
+        guard !tab.isPrivate, let context = context(for: extensionID), tab.isSeen(by: context),
+              let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.tab(with: tab.id) === tab }),
+              !controller.tabManager.isPrivate else { return "No active browser window." }
+        guard context.action(for: tab)?.presentsPopup == true else { return "Extension does not have a popup on the active tab." }
+        ExtensionLog.write("openPopup \(context.webExtension.displayName ?? "?") from its frame")
+        controller.closeFloatingPanels()
+        popupRequest = PopupRequest(extensionID: extensionID, fromPin: true, controller: controller)
+        context.performAction(for: tab)
+        return nil
+    }
+
     // MARK: Needing attention
 
     /// Something only the person can fix, shown as a "!" on the extension's button.
