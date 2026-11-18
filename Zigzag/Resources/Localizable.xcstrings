@@ -381,6 +381,28 @@
         }
       }
     },
+    "%@ is using the camera" : {
+      "comment" : "Menu item of the address bar's camera button: the page using the camera, by name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 正在使用摄像头"
+          }
+        }
+      }
+    },
+    "%@ is using the microphone" : {
+      "comment" : "Menu item of the address bar's camera button: the page using the microphone, by name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 正在使用麦克风"
+          }
+        }
+      }
+    },
     "%@ is using this tab" : {
       "comment" : "On the bar over a tab an AI app is using through MCP. The placeholder is the app's name, as it gives it.",
       "localizations" : {
@@ -1223,6 +1245,17 @@
         }
       }
     },
+    "%lld hidden" : {
+      "comment" : "Under Zapped elements in Settings › Privacy › Sites: how many elements are hidden. The number is that count.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏 %lld 个"
+          }
+        }
+      }
+    },
     "%lld matches" : {
       "comment" : "Find bar count: how many matches the page has.",
       "localizations" : {
@@ -1818,6 +1851,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已隐藏 %lld 个"
+          }
+        }
+      }
+    },
+    ", " : {
+      "comment" : "Between the camera's and the microphone's states in the address bar's capture button tooltip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "，"
           }
         }
       }
@@ -2418,6 +2462,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为网站开启开发者模式"
+          }
+        }
+      }
+    },
+    "Add a site to have it always open in a space, wherever its link comes from." : {
+      "comment" : "Explanation under “None yet” in Settings › Spaces › Sites in Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加网站后，无论链接来自哪里，它都会在选定的空间中打开。"
           }
         }
       }
@@ -3084,6 +3139,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "另一个 App 正在使用该文件"
+          }
+        }
+      }
+    },
+    "Another page" : {
+      "comment" : "Stands for a page with no title in the camera button's menu.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另一个页面"
           }
         }
       }
@@ -3799,6 +3865,127 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "书签和历史记录，需要你的许可"
+          }
+        }
+      }
+    },
+    "Camera off" : {
+      "comment" : "Part of the address bar's capture button tooltip: the page's camera is muted from it and can be turned back on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摄像头已关闭"
+          }
+        }
+      }
+    },
+    "Camera on" : {
+      "comment" : "Part of the address bar's capture button tooltip: the page has the camera on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "摄像头已打开"
+          }
+        }
+      }
+    },
+    "Clear %@" : {
+      "comment" : "Tooltip of the × on a site's row in Settings › Privacy › Sites: forgets that one choice for the site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除“%@”"
+          }
+        }
+      }
+    },
+    "Follow Setting" : {
+      "comment" : "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随设置"
+          }
+        }
+      }
+    },
+    "Microphone off" : {
+      "comment" : "Part of the address bar's capture button tooltip: the page's microphone is muted from it and can be turned back on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风已关闭"
+          }
+        }
+      }
+    },
+    "Microphone on" : {
+      "comment" : "Part of the address bar's capture button tooltip: the page has the microphone on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "麦克风已打开"
+          }
+        }
+      }
+    },
+    "Turn Camera Off" : {
+      "comment" : "Menu item of the address bar's camera button: mutes this page's camera, keeping its stream so it can be turned back on without a reload.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭摄像头"
+          }
+        }
+      }
+    },
+    "Turn Camera On" : {
+      "comment" : "Menu item of the address bar's camera button: turns this page's camera back on after muting it, without a reload.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开摄像头"
+          }
+        }
+      }
+    },
+    "Turn Microphone Off" : {
+      "comment" : "Menu item of the address bar's camera button: mutes this page's microphone, keeping its stream so it can be turned back on without a reload.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭麦克风"
+          }
+        }
+      }
+    },
+    "Turn Microphone On" : {
+      "comment" : "Menu item of the address bar's camera button: turns this page's microphone back on after muting it, without a reload.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开麦克风"
+          }
+        }
+      }
+    },
+    "Zapped elements" : {
+      "comment" : "Row in Settings › Privacy › Sites: elements hidden on this site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已隐藏的元素"
           }
         }
       }
