@@ -531,17 +531,6 @@
         }
       }
     },
-    "%@ needs its app" : {
-      "comment" : "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 需要配套的 App"
-          }
-        }
-      }
-    },
     "%@ night" : {
       "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
       "localizations" : {
@@ -749,17 +738,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 在 Zigzag 里用不了。"
-          }
-        }
-      }
-    },
-    "%@ works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag." : {
-      "comment" : "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 需要配合 Mac 上的一个 App 使用，但 Zigzag 找不到它。请安装该 App，然后重新打开 Zigzag。"
           }
         }
       }
@@ -12675,7 +12653,7 @@
       }
     },
     "OK" : {
-      "comment" : "Button of a sheet that says something didn't work.\nButton that answers a page's JavaScript dialog sheet.\nButton that closes the note about an extension's missing app.",
+      "comment" : "Button of a sheet that says something didn't work.\nButton that answers a page's JavaScript dialog sheet.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19566,7 +19544,7 @@
       }
     },
     "This extension" : {
-      "comment" : "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.\nStands in for an extension's name when it has none, at the start of a sentence.",
+      "comment" : "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

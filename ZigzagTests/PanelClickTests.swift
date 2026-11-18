@@ -113,3 +113,34 @@ struct PanelFieldPressTests {
         #expect(FloatingPanelView.isBareSurface(label))
     }
 }
+
+/// A click on the new tab note reaches it through the window: the window keeps presses on a panel's bare surface
+/// from everything, and kept them from the note too, so a click on it never went to the tab.
+@MainActor
+struct NewTabNoteClickTests {
+    @Test func aClickThroughTheWindowReachesTheNote() {
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { window.close() }
+        let content = FlippedView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        window.contentView = content
+        let overlay = PassthroughView(frame: content.bounds)
+        content.addSubview(overlay)
+        let note = NewTabNoteView()
+        note.label.stringValue = "Example Domain"
+        let size = note.size(maxWidth: 320)
+        note.frame = NSRect(x: 12, y: 56, width: size.width, height: size.height)
+        overlay.addSubview(note)
+        var clicks = 0
+        note.onClick = { clicks += 1 }
+
+        let center = note.convert(NSPoint(x: note.bounds.midX, y: note.bounds.midY), to: nil)
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = NSEvent.mouseEvent(with: type, location: center, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+            window.sendEvent(event!)
+        }
+        #expect(clicks == 1)
+        // Still a panel's surface: the press never moves the window or reaches what's behind.
+        #expect(FloatingPanelView.isBareSurface(note))
+    }
+}

@@ -1039,6 +1039,20 @@ final class ExtensionHost: NSObject {
         }
     }
 
+    /// action.openPopup() from the extension's page in a frame on a site (FramedExtensionPopups): its popup, from its
+    /// button when pinned, else the address. Nil when it opens; otherwise Chrome-style words for the extension.
+    func openPopup(_ extensionID: String, from tab: Tab) -> String? {
+        guard !tab.isPrivate, let context = context(for: extensionID), tab.isSeen(by: context),
+              let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.tab(with: tab.id) === tab }),
+              !controller.tabManager.isPrivate else { return "No active browser window." }
+        guard context.action(for: tab)?.presentsPopup == true else { return "Extension does not have a popup on the active tab." }
+        ExtensionLog.write("openPopup \(context.webExtension.displayName ?? "?") from its frame")
+        controller.closeFloatingPanels()
+        popupRequest = PopupRequest(extensionID: extensionID, fromPin: true, controller: controller)
+        context.performAction(for: tab)
+        return nil
+    }
+
     // MARK: Needing attention
 
     /// Something only the person can fix, shown as a "!" on the extension's button.
@@ -1107,13 +1121,10 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    /// An extension asked for its companion app, and that app isn't on this Mac.
+    /// An extension asked for its companion app, and that app isn't on this Mac. Noted only: as in Chrome, the extension
+    /// hears the host isn't there and says so itself. For many (Bitwarden, Better Passwords) the app is optional (#248).
     fileprivate func companionAppMissing(for context: WKWebExtensionContext) {
-        let name = context.webExtension.displayName ?? String(localized: "This extension", comment: "Stands in for an extension's name when it has none, at the start of a sentence.")
-        setAttention(Attention(
-            title: String(localized: "\(name) needs its app", comment: "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."),
-            message: String(localized: "\(name) works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag.", comment: "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name."),
-            buttonTitle: String(localized: "OK", comment: "Button that closes the note about an extension's missing app."), appBundleID: nil), for: context.uniqueIdentifier)
+        ExtensionLog.write("\(context.webExtension.displayName ?? context.uniqueIdentifier) asked for a companion app that isn't installed")
     }
 
     // MARK: Event fan-out from our model
@@ -1569,7 +1580,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
-            replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
+            replyHandler(nil, NativeMessagingHost.notFound)
             return
         }
         host.sendOnce(message, reply: replyHandler)
@@ -1611,7 +1622,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
-            completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
+            completionHandler(NativeMessagingHost.notFound)
             return
         }
         let key = ObjectIdentifier(port)
@@ -1800,6 +1811,10 @@ final class NativeMessagingHost {
         origin = host.origin
         extensionID = id
     }
+
+    /// Chrome's words for a host that isn't there. Extensions match them to tell "app not installed" from a failure
+    /// (Better Passwords then offers its setup instead of an error, #248).
+    static var notFound: NSError { NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "Specified native messaging host not found."]) }
 
     /// Chrome's rule for a host's name: lowercase words of letters, digits and underscores, joined by dots. Anything
     /// else (a slash, "..") could reach a file outside the hosts folder.

@@ -112,6 +112,7 @@ enum WebKitSetup {
             configuration.userContentController.addUserScript(WKUserScript(
                 source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.differences)\n}",
                 injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
+            configuration.userContentController.addScriptMessageHandler(FramedExtensionPopups.shared, contentWorld: .page, name: FramedExtensionPopups.messageName)
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
@@ -392,5 +393,27 @@ final class ExtensionPageErrors: NSObject, WKScriptMessageHandler {
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.securityOrigin.protocol == "webkit-extension", let text = message.body as? String else { return }
         ExtensionLog.write("page \(message.frameInfo.securityOrigin.host.prefix(8)) \(text)")
+    }
+}
+
+/// action.openPopup() from an extension's own page in a frame on a site (webkit-differences.js), which WebKit won't
+/// take from a site's process (#248). Only a frame of the extension itself asks: a site can't post as one.
+final class FramedExtensionPopups: NSObject, WKScriptMessageHandlerWithReply {
+    static let shared = FramedExtensionPopups()
+    static let messageName = "zigzagOpenPopup"
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage,
+                               replyHandler: @escaping @MainActor (Any?, String?) -> Void) {
+        let origin = message.frameInfo.securityOrigin
+        guard origin.protocol == "webkit-extension", !message.frameInfo.isMainFrame,
+              let tab = (message.webView as? BrowserWebView)?.owner else {
+            replyHandler(nil, "Not allowed")
+            return
+        }
+        guard #available(macOS 15.4, *), let host = tab.extensionHost else {
+            replyHandler("Extensions don't run here.", nil)
+            return
+        }
+        replyHandler(host.openPopup(origin.host, from: tab), nil)
     }
 }
