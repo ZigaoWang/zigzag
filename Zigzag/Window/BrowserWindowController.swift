@@ -719,7 +719,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.refreshRows()
         }
         reloadFavorites()
-        sidebar.address.setCapture(camera: tab?.captureState(forCamera: true) ?? .off, microphone: tab?.captureState(forCamera: false) ?? .off)
+        refreshCapture()
         updateWindowTitle()
         refreshExtensionActions()
         updateNowPlaying()
