@@ -11,7 +11,7 @@
   // What WebKit sends, for the requests Zigzag sends for the extension itself (extensionFetch below).
   const sentUserAgent = nav ? String(nav.userAgent) : '';
   if (nav && !/Chrome\//.test(nav.userAgent)) {
-    const asChrome = nav.userAgent.replace(/Version\/[\d.]+ Safari\/[\d.]+/, 'Chrome/140.0.0.0 Safari/537.36');
+    const asChrome = nav.userAgent.replace(/Version\/[\d.]+ Safari\/[\d.]+/, 'Chrome/157.0.0.0 Safari/537.36');
     const proto = Object.getPrototypeOf(nav);
     for (const [key, value] of [['userAgent', asChrome], ['appVersion', asChrome.replace(/^Mozilla\//, '')]]) {
       try { Object.defineProperty(proto, key, { get: () => value, configurable: true, enumerable: true }); } catch (e) {}

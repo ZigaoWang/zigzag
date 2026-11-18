@@ -218,7 +218,7 @@ enum ExtensionStore {
 
     /// The Chrome version Zigzag gives the store: packages are picked for it, and the store's own button checks an
     /// extension's minimum version against it.
-    static let chromeVersion = "140.0"
+    static let chromeVersion = "157.0"
 
     static let webStoreURL = URL(string: "https://chromewebstore.google.com/category/extensions")!
 
