@@ -5,6 +5,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-18
+
+Sites that always open in the space you choose, Zap Element and Edit Style to hide parts of a site or restyle it, an Archive list, download rules that hand links and files to other apps, tabs shared between windows, JavaScript off per site, a History menu like Safari's, and smooth scrolling on high refresh rate displays.
+
 ### New
 - Download rules, in Settings › Downloads, hand a download or a link to another app, a script or a download manager like aria2, Motrix or yt-dlp, by what its address matches. Add Rule starts with the ready-made rules, the App field lists your apps, and scripts can live in one Scripts folder. In Settings, each rule reads as a sentence, like "Files ending in .torrent go to aria2", and rules are dragged into order. A rule's handoff asks the first time, with This time, Always on this site or Always for the rule, and Settings › Downloads lists what each rule remembers. An Open URL rule with a web address can open it in Zigzag, in this tab, a new tab or Zigzag Mini, instead of your default browser. Zigzag asks before it hands anything off, and whatever no rule matches is saved as before. See [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md). Thanks to [Lakeland97](https://github.com/Lakeland97). ([#191](https://github.com/ZigaoWang/zigzag/issues/191))
 - Double-clicking the empty space below your tabs opens a new tab, as in Arc. The top of the sidebar still works like a title bar, and Settings › Appearance › Double-click the sidebar for a new tab turns it off. ([#262](https://github.com/ZigaoWang/zigzag/issues/262))
@@ -1313,6 +1317,7 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 - The first public release: signed and notarized, with updates that install themselves.
 
 [Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...HEAD
+[0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...HEAD
 [0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/ZigaoWang/zigzag/compare/v0.8.5...v0.8.6
