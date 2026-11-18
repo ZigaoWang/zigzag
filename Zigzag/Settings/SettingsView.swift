@@ -961,6 +961,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let localServersGroup = FormGroup()
     private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site."))
     private var developerToken: SignalToken?
+    /// Kept cookies' sites, changed in Site Controls or here (#334).
+    private var keptCookiesToken: SignalToken?
+    /// Clear Cookies…, Add Site… and the quit switch, for the debug bridge.
+    private weak var clearCookiesButton: PillButton?
+    private weak var addKeptButton: PillButton?
+    private weak var clearOnQuitToggle: Toggle?
     /// Settings › Developer › Feature Flags (#173): WebKit's flags, a group for each status, made the first time the
     /// group shows. There only while Developer Mode is on and WebKit lists them.
     private var flagGroups: [FeatureFlags.Status: FormGroup] = [:]
@@ -1384,6 +1390,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                       control: developerTrustToggle))
         addSiteButton.onClick = { [weak self] _ in if let self { DevelopmentSiteSheet.add(in: self) } }
         addSizeButton.onClick = { [weak self] _ in if let self { PageSizeSheet.add(in: self) } }
+        keptCookiesToken = KeptCookies.changed.observe { [weak self] in
+            guard let self, self.showsWebsiteData else { return }
+            self.reloadPrivacy()
+            self.layoutDocument()
+        }
         // Changed here or in another window's Settings: the switch and the list follow.
         developerToken = DeveloperTools.changed.observe { [weak self] in
             guard let self else { return }
@@ -2747,6 +2758,24 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// keptcookies clear | add | quit on|off | top: Clear Cookies… or Add Site… pressed, the quit switch flipped as a
+    /// click does, or the page scrolled to them.
+    func debugKeptCookies(_ arg: String) {
+        let click = NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
+        switch arg {
+        case "clear": if let click { clearCookiesButton?.onClick?(click) }
+        case "add": if let click { addKeptButton?.onClick?(click) }
+        case "quit on", "quit off":
+            guard let toggle = clearOnQuitToggle else { break }
+            toggle.isOn = arg == "quit on"
+            toggle.onChange?(toggle.isOn)
+        case "top":
+            guard let button = clearCookiesButton else { break }
+            documentView.scroll(NSPoint(x: 0, y: max(0, button.convert(button.bounds, to: documentView).minY - 160)))
+        default: break
+        }
+    }
+
     /// Chooses the password filler, as the menu does.
     func debugChoosePasswordFiller(_ name: String) {
         if let filler = PasswordFiller(rawValue: name) { choosePasswordFiller(filler) }
@@ -3781,11 +3810,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let cookies = PillButton(title: String(localized: "Clear Cookies…", comment: "Button in Settings › Privacy."))
         cookies.onClick = { [weak self, weak cookies] _ in
-            self?.confirm(title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that clears cookies."),
-                          message: Words.sentences(String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies."), only),
+            // The sites you keep cookies for are left alone, and the sheet says so.
+            let kept = KeptCookies.sites(in: profile.id)
+            self?.confirm(title: kept.isEmpty ? String(localized: "Clear cookies for every site?", comment: "Title of the sheet that clears cookies.") : KeptCookies.clearTitle,
+                          message: Words.sentences(kept.isEmpty ? String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies.")
+                                                                : KeptCookies.clearMessage(keeping: kept.count), only),
                           action: String(localized: "Clear Cookies", comment: "Button of the sheet that clears cookies.")) {
                 Task { @MainActor in
-                    await WebsiteData.clear(.cookies, in: store)
+                    await WebsiteData.clear(.cookies, keeping: kept, in: store)
                     cookies?.flash(Self.cleared)
                     self?.reloadSiteData()
                 }
@@ -3797,17 +3829,48 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  detail: String(localized: "The cache makes pages load faster. Cookies keep you signed in.", comment: "Explanation under “Website data” in Settings › Privacy."),
                                  control: data))
 
+        // Sites whose cookies clearing leaves alone (#334), each with ×, then whether the rest go at quit.
+        let kept = KeptCookies.sites(in: profile.id)
+        let addKept = PillButton(title: String(localized: "Add Site…", comment: "Button beside “Keep cookies for these sites” in Settings › Privacy: opens the sheet that adds a site whose cookies are kept."))
+        addKept.onClick = { [weak self] _ in if let self { KeptCookiesSheet.add(in: self, profile: profile.id) } }
+        let keptRow = FormRow(title: String(localized: "Keep cookies for these sites", comment: "A setting in Settings › Privacy: the sites whose cookies Clear Cookies… and quitting leave alone, listed under it."),
+                              detail: kept.isEmpty
+                                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
+                                : String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed."),
+                              control: addKept)
+        keptRow.keywords = String(localized: "cookies keep exceptions signed in sign-in allow sites", comment: "Words that find the Keep cookies for these sites setting. Not shown.")
+        privacyGroup.add(keptRow)
+        for site in kept.sorted() {
+            let x = IconButton(symbol: "xmark", size: .compact,
+                               toolTip: String(localized: "Stop Keeping Cookies for \(site)", comment: "Tooltip of the × on a site under “Keep cookies for these sites” in Settings › Privacy. The site is a domain, like github.com."))
+            x.onClick = { _ in KeptCookies.remove(site, in: profile.id) }
+            let favicon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            let row = FormRow(title: site, icon: favicon, control: x)
+            row.keywords = keptRow.keywords
+            privacyGroup.add(row)
+        }
+        let quitToggle = Toggle(isOn: KeptCookies.clearsOnQuit(in: profile.id))
+        quitToggle.onChange = { KeptCookies.setClearsOnQuit($0, in: profile.id) }
+        let quitRow = FormRow(title: String(localized: "Clear cookies when Zigzag quits", comment: "A setting in Settings › Privacy: every site's cookies and data are cleared as Zigzag quits, except the sites kept."),
+                              detail: String(localized: "Each time you quit, every other site’s cookies and data are cleared, so you start signed out of them next time.", comment: "Explanation under “Clear cookies when Zigzag quits” in Settings › Privacy: every site but the ones kept."),
+                              control: quitToggle)
+        quitRow.keywords = keptRow.keywords
+        privacyGroup.add(quitRow)
+        clearCookiesButton = cookies
+        addKeptButton = addKept
+        clearOnQuitToggle = quitToggle
+
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let nothingChosen = permissionsChangedHere.isEmpty && ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites(in: profile).isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
             && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
-            && SiteIcons.sites.isEmpty
+            && SiteIcons.sites.isEmpty && kept.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements, site styles and site icons are removed.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, no site keeps its cookies when they’re cleared, and zapped elements, site styles and site icons are removed.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -3824,6 +3887,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetAllSessions()
                 SiteBoosts.forgetAll()
                 SiteIcons.forgetAll()
+                KeptCookies.setSites([], in: profile.id)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -3843,7 +3907,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
             .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
-            .union(SiteIcons.sites)
+            .union(SiteIcons.sites).union(kept)
         var listed = 0, more = 0
         for site in sites.sorted() {
             let origin = origins[site]
@@ -3960,6 +4024,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
 
             // Same switches and names as Site Controls.
+            // Kept from Clear Cookies… and quitting (#334).
+            if kept.contains(site) {
+                let toggle = Toggle(isOn: true)
+                toggle.onChange = { on in on ? KeptCookies.add(site, in: profile.id) : KeptCookies.remove(site, in: profile.id) }
+                rows.append(makeRow(String(localized: "Keep cookies", comment: "Row in Settings › Privacy › Sites: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone."),
+                                    control: toggle) { KeptCookies.remove(site, in: profile.id) })
+            }
+
             if let url, PageFullScreen.pageSites.contains(site) || PageFullScreen.screenSites.contains(site) {
                 let toggle = Toggle(isOn: PageFullScreen.choice(for: url) == .page)
                 toggle.onChange = { [weak self] on in
@@ -4071,6 +4143,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetSessions(site: site)
                 SiteBoosts.forget(site: site)
                 SiteIcons.forget(site: site)
+                KeptCookies.remove(site, in: profile.id)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }

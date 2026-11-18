@@ -770,14 +770,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // The profile you're in when you ask; a private window's own store.
         let store = tabManager.privateStore ?? tabManager.profile.store
         let only = ProfileSheets.onlyNote(tabManager.isPrivate ? nil : tabManager.profile.id)
-        ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies."),
-                          message: Words.sentences(String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies."), only),
+        // Sites you keep cookies for are left alone; a private window keeps none.
+        let kept = tabManager.isPrivate ? [] : KeptCookies.sites(in: tabManager.profile.id)
+        ConfirmSheet.show(in: root.overlay, title: kept.isEmpty ? String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies.") : KeptCookies.clearTitle,
+                          message: Words.sentences(kept.isEmpty ? String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies.")
+                                                                : KeptCookies.clearMessage(keeping: kept.count), only),
                           confirmTitle: String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
-                await WebsiteData.clear(.cookies, in: store)
+                await WebsiteData.clear(.cookies, keeping: kept, in: store)
                 self?.tabManager.selectedTab?.reload()
-                if let self { Toast.show(String(localized: "Cookies cleared. You’re signed out everywhere.", comment: "Toast after every site's cookies are cleared."), symbol: "trash", duration: 2.4, in: self) }
+                let toast = kept.isEmpty ? String(localized: "Cookies cleared. You’re signed out everywhere.", comment: "Toast after every site's cookies are cleared.")
+                                         : String(localized: "Cookies cleared, except for the sites you keep", comment: "Toast after every site's cookies are cleared but those of the sites that keep theirs (Settings › Privacy).")
+                if let self { Toast.show(toast, symbol: "trash", duration: 2.4, in: self) }
             }
         }
     }

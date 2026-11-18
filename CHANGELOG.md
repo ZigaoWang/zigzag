@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- Keep cookies for the sites you choose. Clear Cookies… signs you out of every other site and leaves these alone, and Clear cookies when Zigzag quits in Settings › Privacy clears the rest each time you quit. Turn on Keep cookies in a site's controls, or add a site in Settings › Privacy; one entry covers http, https and every subdomain. Thanks to [mrfragger](https://github.com/mrfragger). ([#334](https://github.com/ZigaoWang/zigzag/issues/334))
+
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, and fixes for passkeys, Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.

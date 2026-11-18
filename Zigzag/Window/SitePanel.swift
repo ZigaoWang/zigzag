@@ -965,6 +965,13 @@ final class SitePanel: FloatingPanelView {
                     guard let self else { return }
                     KeepAwake.set(on, for: self.url)
                 })
+            case .keepCookies:
+                // Clear Cookies… and quitting leave the site's cookies alone (#334).
+                rows.append(.toggle(String(localized: "Keep cookies", comment: "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in."),
+                                    on: KeptCookies.keeps(url, in: tab.profile.id), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    KeptCookies.set(on, for: self.url, in: self.tab.profile.id, isPrivate: self.isPrivate || self.tab.isPrivate)
+                })
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
                 rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
@@ -1728,6 +1735,12 @@ final class PanelRow: NSView {
 
     /// choose <index>: picks that choice in the row's dropdown, as its menu would.
     func debugChoose(_ index: Int) {
+        // A switch: 1 is on, 0 off.
+        if let toggle = control as? Toggle {
+            toggle.isOn = index != 0
+            toggle.onChange?(toggle.isOn)
+            return
+        }
         guard let dropdown = control as? DropdownButton, dropdown.options.indices.contains(index) else { return }
         dropdown.selectedIndex = index
         dropdown.onSelect?(index)
@@ -2053,7 +2066,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, fullScreenFills, alwaysTranslate, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2092,6 +2105,7 @@ enum SitePanelRows {
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
+            rows.append(.keepCookies)
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }

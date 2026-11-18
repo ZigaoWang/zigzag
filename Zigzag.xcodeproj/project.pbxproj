@@ -68,6 +68,9 @@
 		1BDD9CF59E226E6A01A7786B /* PDFPagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E558E83E023FA9E27853542E /* PDFPagesView.swift */; };
 		1CB8BE33E2AB5808DEC21270 /* OwnScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADF6A2A22DF8C77C3C203284 /* OwnScripts.swift */; };
 		1CDB552BE051BEBF9C1496B7 /* CertificateDetails.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C054793F49E04AC36C79015 /* CertificateDetails.swift */; };
+		C0C1E3340000000000000001 /* KeptCookies.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000002 /* KeptCookies.swift */; };
+		C0C1E3340000000000000003 /* KeptCookiesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000004 /* KeptCookiesSheet.swift */; };
+		C0C1E3340000000000000005 /* KeptCookiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000006 /* KeptCookiesTests.swift */; };
 		C297C0DE0000000000000001 /* ClientCertificates.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000002 /* ClientCertificates.swift */; };
 		C297C0DE0000000000000003 /* ClientCertificatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000004 /* ClientCertificatesTests.swift */; };
 		C1EA411C0000000000000001 /* CleanLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EA411C0000000000000002 /* CleanLink.swift */; };
@@ -621,6 +624,9 @@
 		0A6D4409217ACDE22F8A28EA /* api-surface.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "api-surface.js"; sourceTree = "<group>"; };
 		0AF7047E5A8FD4E834836B5B /* ad-engine.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = "ad-engine.js"; sourceTree = "<group>"; };
 		0C054793F49E04AC36C79015 /* CertificateDetails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificateDetails.swift; sourceTree = "<group>"; };
+		C0C1E3340000000000000002 /* KeptCookies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookies.swift; sourceTree = "<group>"; };
+		C0C1E3340000000000000004 /* KeptCookiesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesSheet.swift; sourceTree = "<group>"; };
+		C0C1E3340000000000000006 /* KeptCookiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesTests.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000002 /* ClientCertificates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificates.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000004 /* ClientCertificatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificatesTests.swift; sourceTree = "<group>"; };
 		C1EA411C0000000000000002 /* CleanLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanLink.swift; sourceTree = "<group>"; };
@@ -1461,6 +1467,7 @@
 			children = (
 				CDE5F88B8769F540831A7940 /* DownloadRuleSheet.swift */,
 				2860A1B0C0DE4E5F286A0004 /* SiteRouteSheet.swift */,
+				C0C1E3340000000000000004 /* KeptCookiesSheet.swift */,
 				68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */,
 				67B6B0BECF34D62E3B175E0A /* SettingsView.swift */,
 				FF4C5952AA98F3E6F967D1C5 /* Shortcuts.swift */,
@@ -1536,6 +1543,7 @@
 				67F8A3E569D800FE5A83516D /* SiteBoosts.swift */,
 				C310C0DE0000000000000002 /* SiteIcons.swift */,
 				C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */,
+				C0C1E3340000000000000002 /* KeptCookies.swift */,
 			);
 			path = Web;
 			sourceTree = "<group>";
@@ -1694,6 +1702,7 @@
 				BF2F4BA4D4D31C1518CC7B9E /* CapitalizationTests.swift */,
 				501B90ADF75ED2EF79493586 /* CertificateTrustTests.swift */,
 				C297C0DE0000000000000004 /* ClientCertificatesTests.swift */,
+				C0C1E3340000000000000006 /* KeptCookiesTests.swift */,
 				C1EA411C0000000000000004 /* CleanLinkTests.swift */,
 				6B6C77CFE33BFCD7CC963266 /* ChromeProfilesImportTests.swift */,
 				481827B643635F1AC8578208 /* ChromeUniverseTests.swift */,
@@ -2496,6 +2505,8 @@
 				DA721E6FCFEF463D60EDC99A /* WebStoreButton.swift in Sources */,
 				E42A5504EE597C075414B18A /* WebStoreOffer.swift in Sources */,
 				F972A38781338935BAF22135 /* WebsiteData.swift in Sources */,
+				C0C1E3340000000000000001 /* KeptCookies.swift in Sources */,
+				C0C1E3340000000000000003 /* KeptCookiesSheet.swift in Sources */,
 				089B04904C4690F9A9C519AC /* WelcomeWindow.swift in Sources */,
 				7C42A54C2877285DE25719E2 /* WhatsNew.swift in Sources */,
 				2EB548A050B8877233F8E0C8 /* WindowManager.swift in Sources */,
@@ -2542,6 +2553,7 @@
 				1EA0745E8CAC4A123D48C269 /* CapitalizationTests.swift in Sources */,
 				CE33211DE5E98DCFE4811C4A /* CertificateTrustTests.swift in Sources */,
 				C297C0DE0000000000000003 /* ClientCertificatesTests.swift in Sources */,
+				C0C1E3340000000000000005 /* KeptCookiesTests.swift in Sources */,
 				C1EA411C0000000000000003 /* CleanLinkTests.swift in Sources */,
 				D7DA27736AE177FF489E42C3 /* ChromeProfilesImportTests.swift in Sources */,
 				E75ABF7DDA7F3B4D7CA155E3 /* ChromeUniverseTests.swift in Sources */,

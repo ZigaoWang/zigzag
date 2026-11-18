@@ -216,8 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let downloading = DownloadManager.shared.activeCount
         // Going for good: downloads still coming in pause first, so they go on from Downloads after the next launch.
         func quitNow() -> NSApplication.TerminateReply {
-            guard downloading > 0 else { return .terminateNow }
-            DownloadManager.shared.pauseAllForQuit { NSApp.reply(toApplicationShouldTerminate: true) }
+            guard downloading > 0 || !KeptCookies.profilesClearingOnQuit().isEmpty else { return .terminateNow }
+            Self.finishBeforeQuitting(downloading: downloading)
             return .terminateLater
         }
         // Asked already, or not asking: downloads are the one thing worth asking about anyway.
@@ -238,11 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let monitor { NSEvent.removeMonitor(monitor) }
             guard quit else { NSApp.reply(toApplicationShouldTerminate: false); return }
             Self.quitConfirmed = true
-            if downloading > 0 {
-                DownloadManager.shared.pauseAllForQuit { NSApp.reply(toApplicationShouldTerminate: true) }
-            } else {
-                NSApp.reply(toApplicationShouldTerminate: true)
-            }
+            Self.finishBeforeQuitting(downloading: downloading)
         }
         let message = downloading == 0
             ? String(localized: "Your tabs and spaces will be right here when you open it again.",
@@ -260,6 +256,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return nil
         }
         return .terminateLater
+    }
+
+    /// Pauses downloads and clears the cookies chosen to go at quit (#334) side by side, each bounded, then quits.
+    private static func finishBeforeQuitting(downloading: Int) {
+        let clearing = KeptCookies.profilesClearingOnQuit()
+        var left = (downloading > 0 ? 1 : 0) + (clearing.isEmpty ? 0 : 1)
+        guard left > 0 else { NSApp.reply(toApplicationShouldTerminate: true); return }
+        let finish = {
+            left -= 1
+            if left == 0 { NSApp.reply(toApplicationShouldTerminate: true) }
+        }
+        if downloading > 0 { DownloadManager.shared.pauseAllForQuit(then: finish) }
+        if !clearing.isEmpty { KeptCookies.clearForQuit(clearing, done: finish) }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

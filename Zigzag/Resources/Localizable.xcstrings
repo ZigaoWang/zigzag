@@ -2681,13 +2681,13 @@
         }
       }
     },
-    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements, site styles and site icons are removed." : {
+    "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, no site keeps its cookies when they’re cleared, and zapped elements, site styles and site icons are removed." : {
       "comment" : "Message of the sheet that forgets the choices made for single sites.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，隐藏的元素、网站样式和网站图标也会被移除。"
+            "value" : "广告会在所有网站上重新拦截，扩展会在每个网站上运行，网站会重新询问是否使用你的摄像头、麦克风、位置、通知和证书，缩放、JavaScript、深色网页、全屏幕和 Cookie 弹窗会重新跟随你的设置，所有网站的标签页也会在后台照常休眠，清除 Cookie 时也不再保留任何网站，隐藏的元素、网站样式和网站图标也会被移除。"
           }
         }
       }
@@ -3792,6 +3792,94 @@
         }
       }
     },
+    "Clear cookies for every site you don’t keep?" : {
+      "comment" : "Title of the sheet that clears every site's cookies, when some sites keep theirs (Settings › Privacy › Keep Cookies).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除未保留网站的 Cookie 吗？"
+          }
+        }
+      }
+    },
+    "Clear cookies when Zigzag quits" : {
+      "comment" : "A setting in Settings › Privacy: every site's cookies and data are cleared as Zigzag quits, except the sites kept.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 Zigzag 时清除 Cookie"
+          }
+        }
+      }
+    },
+    "Clear Cookies… and quitting leave its cookies alone, on http and https and every subdomain, so you stay signed in." : {
+      "comment" : "Under the title of the sheet that adds a site whose cookies are kept, from Settings › Privacy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“清除 Cookie…”和退出时都不会清除它的 Cookie，http、https 和所有子域名都包括在内，让你保持登录。"
+          }
+        }
+      }
+    },
+    "Clear Cookies… and quitting leave them alone, so you stay signed in." : {
+      "comment" : "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“清除 Cookie…”和退出时都不会清除它们，让你保持登录。"
+          }
+        }
+      }
+    },
+    "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls." : {
+      "comment" : "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“清除 Cookie…”和退出时都不会清除它们，让你保持登录。可以在这里添加网站，或在网站设置中打开“保留 Cookie”。"
+          }
+        }
+      }
+    },
+    "Cookies cleared, except for the sites you keep" : {
+      "comment" : "Toast after every site's cookies are cleared but those of the sites that keep theirs (Settings › Privacy).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已清除 Cookie，保留的网站除外"
+          }
+        }
+      }
+    },
+    "cookies keep exceptions signed in sign-in allow sites" : {
+      "comment" : "Words that find the Keep cookies for these sites setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 保留 例外 登录 允许 网站"
+          }
+        }
+      }
+    },
+    "Each time you quit, every other site’s cookies and data are cleared, so you start signed out of them next time." : {
+      "comment" : "Explanation under “Clear cookies when Zigzag quits” in Settings › Privacy: every site but the ones kept.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每次退出时，其他网站的 Cookie 和数据都会被清除，下次打开时需要重新登录。"
+          }
+        }
+      }
+    },
     "Follow Setting" : {
       "comment" : "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript.",
       "localizations" : {
@@ -3803,6 +3891,39 @@
         }
       }
     },
+    "Keep cookies" : {
+      "comment" : "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留 Cookie"
+          }
+        }
+      }
+    },
+    "Keep Cookies for a Site" : {
+      "comment" : "Title of the sheet that adds a site whose cookies are kept, from Settings › Privacy.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为网站保留 Cookie"
+          }
+        }
+      }
+    },
+    "Keep cookies for these sites" : {
+      "comment" : "A setting in Settings › Privacy: the sites whose cookies Clear Cookies… and quitting leave alone, listed under it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为这些网站保留 Cookie"
+          }
+        }
+      }
+    },
     "Site icon" : {
       "comment" : "Row in Settings › Privacy › Sites: an icon you set for this site in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites.",
       "localizations" : {
@@ -3810,6 +3931,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网站图标"
+          }
+        }
+      }
+    },
+    "Stop Keeping Cookies for %@" : {
+      "comment" : "Tooltip of the × on a site under “Keep cookies for these sites” in Settings › Privacy. The site is a domain, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不再保留 %@ 的 Cookie"
+          }
+        }
+      }
+    },
+    "You’ll be signed out of every site except the %lld sites you keep. Your passwords, pinned tabs and history stay." : {
+      "comment" : "Message of the sheet that clears every site's cookies, when some sites keep theirs. The number is how many, always more than one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "除了你保留的 %lld 个网站，你将在所有网站上退出登录。你的密码、已固定标签页和历史记录会保留。"
+          }
+        }
+      }
+    },
+    "You’ll be signed out of every site except the one you keep. Your passwords, pinned tabs and history stay." : {
+      "comment" : "Message of the sheet that clears every site's cookies, when one site keeps its cookies.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "除了你保留的那个网站，你将在所有网站上退出登录。你的密码、已固定标签页和历史记录会保留。"
           }
         }
       }
