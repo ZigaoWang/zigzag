@@ -12,13 +12,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-### 修复
-- 更新现在只在一个地方显示：边栏底部的卡片。“检查更新…”之后，卡片会显示下载进度和已下载多少，接着是准备更新，准备好后出现“重新启动”，不再同时弹出提示和卡片说同一件事。卡片会显示完整的版本号，写成 0.9.2 Beta 1 而不是 0.9.2-beta.1；边栏隐藏时，它会出现在窗口的同一个角落。
-- 标签页、固定标签页和收藏的菜单里又只有一个“更改图标…”了，不再是三个图标选项：“选取图像…”和“使用网站图标”移到了它打开的图标选择下方。感谢 [bkonia](https://github.com/bkonia)。([#303](https://github.com/ZigaoWang/zigzag/issues/303))
-- 点击登录框下方 iCloud 密码的“启用密码自动填充”，现在会和点它的按钮一样打开输入验证码的地方，不再没有反应。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
-- Mac App 可装可不装的扩展（比如 Better Passwords）不装 App 也能正常用了：不再显示“Invalid call to runtime.connectNative()”，Zigzag 也不再提示它需要配套的 App。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
-- 边栏隐藏时，链接在新标签页中打开后出现的提示，点一下又能切到那个标签页了。([#272](https://github.com/ZigaoWang/zigzag/issues/272))
-
 ## [0.9.2] - 2026-11-18
 
 网站可以始终在你选的空间中打开；“隐藏元素”和“编辑样式”可以藏起网站的一部分或改它的样子；归档有了自己的列表；下载规则能把链接和文件交给其他 App；窗口可以共享标签页；可以给单个网站关掉 JavaScript；“历史记录”菜单更像 Safari；高刷新率屏幕上滚动更流畅。
@@ -48,10 +41,10 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 网站要求提供证书来确认你的身份时（有些单位的 Outlook、Microsoft 登录和内网就是这样），Zigzag 会像 Safari 一样从你的钥匙串里提供证书。页面上会出现一个面板，列出网站能接受的证书，写明每个是谁颁发的、什么时候过期，还有“始终为此网站使用这个证书”，默认打开，下次就不用再选了。“设置 › 隐私 › 网站”会列出每个网站用的证书，可以忘掉。证书删掉或过期后会重新询问，点“取消”就不带证书继续；无痕浏览窗口每次都会问，选择只保留到窗口关闭。要添加证书，在“钥匙串访问”里打开它的 .p12 文件就行；macOS 可能会问一次是否允许 Zigzag 使用它的密钥。感谢 [ldhieu](https://github.com/ldhieu)。([#297](https://github.com/ZigaoWang/zigzag/issues/297))
 - 在边栏里点一下之后，按 ⌘A 会选中“标签页”部分的所有标签页，和 Arc、Finder 一样，可以一起关闭、移动、固定或分屏。收起的分组里和折叠起来的标签页下面的标签页不会被选中，按 Esc 取消选择。在网页、地址栏或重命名框里按 ⌘A，还是选中那里的文字。感谢 [Kevoin](https://github.com/Kevoin)。([#302](https://github.com/ZigaoWang/zigzag/issues/302))
 - 归档的标签页有了自己的列表，就像 Arc 的归档。在“历史记录 › 显示归档”或命令栏里的“显示归档”打开它：自动收起的标签页按归档的日期排好，每个都写着网站和它原来所在的空间。点按一个就会在那个空间里重新打开。列表可以搜索，也可以“清除归档”，之后用提示里的“撤销”可以恢复。“设置 › 标签页 › 归档闲置的标签页”关着时，列表会说明这一点，并给出打开它的按钮。无痕浏览窗口的标签页永远不会归档。
-- 标签页、固定标签页和收藏可以用你自己的图像当图标。在它的菜单里，“更改图标…”旁边的“选取图像…”可以选 1 MB 以内的 SVG、PNG、JPEG、HEIC、PDF 或 ICNS 文件，“使用网站图标”会换回网站自己的图标。Zigzag 会存一份自己的副本，原文件移走或删掉图标也还在；SVG 会安全地绘制，不运行脚本，也不从别处载入任何东西。感谢 [bkonia](https://github.com/bkonia)。([#303](https://github.com/ZigaoWang/zigzag/issues/303))
+- 标签页、固定标签页和收藏可以用你自己的图像当图标。在它的菜单里点“更改图标…”，下方的“选取图像…”可以选 1 MB 以内的 SVG、PNG、JPEG、HEIC、PDF 或 ICNS 文件，“使用网站图标”会换回网站自己的图标。Zigzag 会存一份自己的副本，原文件移走或删掉图标也还在；SVG 会安全地绘制，不运行脚本，也不从别处载入任何东西。感谢 [bkonia](https://github.com/bkonia)。([#303](https://github.com/ZigaoWang/zigzag/issues/303))
 - “拷贝链接”会去掉 utm_source 这类跟踪参数，粘贴到支持富文本的地方时会是带网页标题的链接。
 - 新增“隐藏元素”，类似 Arc 的 Boosts，可以把网站上你不想看到的部分藏起来。在“网站设置”的 ⋯ 菜单里选它，把指针移到横幅、侧栏或弹窗上点一下，它就不见了，以后每次打开这个网站也不会再出现。完成后按 Esc。“网站设置”会显示隐藏了几个，点“全部恢复”就能找回来，在“设置 › 隐私 › 网站”里也能忘掉。在无痕浏览窗口里隐藏的，只保留到窗口关闭。
-- “网站设置”的 ⋯ 菜单里新增“编辑样式…”，可以给网站写你自己的 CSS，类似 Arc 的 Boost：边输入页面边变，以后每次打开都在。留空就是关闭。只能写普通 CSS，不能有 @import、脚本或网址，所以粘贴来的样式不会载入或发送任何东西。网站有自定样式时，“网站设置”会多一行“自定样式”，“设置 › 隐私 › 网站”里会标成“已自定样式”，可以忘掉；无痕浏览窗口里的样式只保留到窗口关闭。
+- “网站设置”的 ⋯ 菜单里新增“编辑样式…”，可以给网站写你自己的 CSS，类似 Arc 的 Boost：边输入页面边变，以后每次打开都在。留空就是关闭。只能写普通 CSS，不能导入其他样式表，也不能有脚本或网址，所以粘贴来的样式不会载入或发送任何东西。网站有自定样式时，“网站设置”会多一行“自定样式”，“设置 › 隐私 › 网站”里会标成“已自定样式”，可以忘掉；无痕浏览窗口里的样式只保留到窗口关闭。
 
 ### 修复
 - 在 macOS 15 上，Bitwarden 能用了，不会再一打开就说不支持 WebAssembly。macOS 15 自带的 WebKit 会忽略扩展运行 WebAssembly 的许可，Bitwarden 的密码库代码离不开它，于是被拒绝了。现在 Zigzag 会用这个 WebKit 认得的写法给这类扩展这个许可，脚本能从哪里载入的限制不变。macOS 26 及以后的版本不受影响。感谢 [ldhieu](https://github.com/ldhieu)。([#298](https://github.com/ZigaoWang/zigzag/issues/298))
@@ -72,6 +65,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 导入窗口里选了 Chrome 后，“导入”按钮不再跑到窗口底下点不到。屏幕放得下时，窗口会跟着你选的内容变高；放不下时，浏览器列表和选项可以滚动，“导入”和“以后”一直留在底部。感谢 [tachebleue](https://github.com/tachebleue)。([#293](https://github.com/ZigaoWang/zigzag/issues/293))
 - 网站的请求卡片（摄像头、位置、通知、弹出窗口等）现在会跟着下面的网页变成浅色或深色，和网页上方的栏一样，“仅此一次”的菜单也一样。以前在浅色的空间里，网站是深色的或者 Mac 开着深色模式，它还是浅色的。卡片显示时网页变了，它也会跟着变。感谢 [Lakeland97](https://github.com/Lakeland97)。([#300](https://github.com/ZigaoWang/zigzag/issues/300))
 - 后台的标签页正要进入睡眠或被关掉时，如果它的网站刚好把它转到另一个网站，Zigzag 不会再意外退出了，之前就有一次是在 Mac 唤醒后一两分钟发生的。网页还在载入的标签页现在会等它载入完再睡眠，Zigzag 不再需要的网页也会稍等一下再关掉，不再和 WebKit 撞在一起。感谢 [rcoopr](https://github.com/rcoopr)。([#305](https://github.com/ZigaoWang/zigzag/issues/305))
+- 更新现在只在一个地方显示：边栏底部的卡片。“检查更新…”之后，卡片会显示下载进度和已下载多少，接着是准备更新，准备好后出现“重新启动”，不再同时弹出提示和卡片说同一件事。卡片会显示完整的版本号；边栏隐藏时，它会出现在窗口的同一个角落。
+- 点击登录框下方 iCloud 密码的“启用密码自动填充”，现在会和点它的按钮一样打开输入验证码的地方，不再没有反应。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
+- Mac App 可装可不装的扩展（比如 Better Passwords）不装 App 也能正常用了：不再显示“Invalid call to runtime.connectNative()”，Zigzag 也不再提示它需要配套的 App。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
 
 ## [0.9.1] - 2026-11-16
 
