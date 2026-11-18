@@ -5,6 +5,14 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- An update now has one home, the card at the bottom of the sidebar. After Check for Updates…, the card shows the download filling with how much has come, then the update being prepared, then Restart once it's ready, instead of a toast and the card saying the same thing at once. The card shows the whole version, read as 0.9.2 beta 1 rather than 0.9.2-beta.1, and with the sidebar hidden it sits in the same corner of the window.
+- The menu of a tab, pinned tab or favorite has just Change Icon… again, instead of three icon items: Choose Image… and Use Site Icon are now at the bottom of the icon choices it opens. Thanks to [bkonia](https://github.com/bkonia). ([#303](https://github.com/ZigaoWang/zigzag/issues/303))
+
+## [0.9.2] - 2026-11-18
+
+Sites that always open in the space you choose, Zap Element and Edit Style to hide parts of a site or restyle it, an Archive list, download rules that hand links and files to other apps, tabs shared between windows, JavaScript off per site, a History menu like Safari's, and smooth scrolling on high refresh rate displays.
+
 ### New
 - Download rules, in Settings › Downloads, hand a download or a link to another app, a script or a download manager like aria2, Motrix or yt-dlp, by what its address matches. Add Rule starts with the ready-made rules, the App field lists your apps, and scripts can live in one Scripts folder. In Settings, each rule reads as a sentence, like "Files ending in .torrent go to aria2", and rules are dragged into order. A rule's handoff asks the first time, with This time, Always on this site or Always for the rule, and Settings › Downloads lists what each rule remembers. An Open URL rule with a web address can open it in Zigzag, in this tab, a new tab or Zigzag Mini, instead of your default browser. Zigzag asks before it hands anything off, and whatever no rule matches is saved as before. See [docs/download-rules.md](https://github.com/ZigaoWang/zigzag/blob/main/docs/download-rules.md). Thanks to [Lakeland97](https://github.com/Lakeland97). ([#191](https://github.com/ZigaoWang/zigzag/issues/191))
 - Double-clicking the empty space below your tabs opens a new tab, as in Arc. The top of the sidebar still works like a title bar, and Settings › Appearance › Double-click the sidebar for a new tab turns it off. ([#262](https://github.com/ZigaoWang/zigzag/issues/262))
@@ -32,6 +40,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Archived tabs have a list of their own, like Arc's Archive. History › Show Archive, or Show Archive in the command bar, opens it: the tabs that tidied themselves away, by the day they went, each with its site and the space it came from. Click one to open it again in that space. It has a search field and Clear Archive, which the toast's Undo puts back. With Settings › Tabs › Archive tabs you haven’t used off, it says so, with a button to turn it on. Private windows' tabs are never archived.
 - A tab, pinned tab or favorite can use an image of your own as its icon. Choose Image… in its menu, beside Change Icon…, takes an SVG, PNG, JPEG, HEIC, PDF or ICNS file up to 1 MB, and Use Site Icon puts the site's icon back. Zigzag keeps its own copy, so the icon stays if you move or delete the file, and an SVG is drawn safely, with no scripts and nothing loaded from elsewhere. Thanks to [bkonia](https://github.com/bkonia). ([#303](https://github.com/ZigaoWang/zigzag/issues/303))
 - Copy Link leaves out tracking parameters like utm_source, and pastes as the page's title linked where rich text is accepted.
+- Zap Element, like Arc's Boosts, hides parts of a site you don't want to see. Choose it from the ⋯ menu in Site Controls, point at a banner, a sidebar or a pop-up, and click it: it's gone, and stays gone each time you visit the site. Press Esc when you're done. Site Controls shows how many are zapped, with Restore All to bring them back, and Settings › Privacy › Sites lists them to forget. In a private window, what you zap lasts until the window closes.
+- Edit Style…, in the ⋯ menu of Site Controls, gives a site CSS of your own, like an Arc Boost: the page shows it as you type, and it's there each time you visit. Leave it empty to turn it off. It's plain CSS only, with no @import, scripts or web addresses, so a style you paste can't load anything or send anything anywhere. Site Controls has a Custom style row while a site has one, Settings › Privacy › Sites lists the site as boosted to forget, and a private window's style lasts until the window closes.
 
 ### Fixed
 - Bitwarden works on macOS 15, instead of saying right away that WebAssembly isn't supported. The WebKit in macOS 15 ignores an extension's permission to run WebAssembly, so Bitwarden's vault code, which needs it, was refused. Zigzag now gives such extensions that permission in a form this WebKit keeps, with the same limits on where their scripts load from. macOS 26 and later weren't affected. Thanks to [ldhieu](https://github.com/ldhieu). ([#298](https://github.com/ZigaoWang/zigzag/issues/298))
@@ -1311,6 +1321,7 @@ Thanks to [@evannotfound](https://github.com/evannotfound) for reporting #1, #2,
 - The first public release: signed and notarized, with updates that install themselves.
 
 [Unreleased]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...HEAD
+[0.9.2]: https://github.com/ZigaoWang/zigzag/compare/v0.9.1...HEAD
 [0.9.1]: https://github.com/ZigaoWang/zigzag/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/ZigaoWang/zigzag/compare/v0.8.6...v0.9.0
 [0.8.6]: https://github.com/ZigaoWang/zigzag/compare/v0.8.5...v0.8.6

@@ -16,6 +16,14 @@ enum Words {
         locale.language.languageCode == .english ? Locale(identifier: "en_US") : locale
     }
 
+    /// A feature name that follows another in an English list reads lower case; every other language keeps its own
+    /// casing. Ideographs are an explicit guard because a short Chinese string with an English brand can look English.
+    static func lowercasedForList(_ text: String) -> String {
+        guard NSLinguisticTagger.dominantLanguage(for: text) == "en",
+              !text.unicodeScalars.contains(where: { $0.properties.isIdeographic }) else { return text }
+        return text.prefix(1).lowercased() + text.dropFirst()
+    }
+
     /// Two whole sentences, one after the other, spaced as this language spaces them (not at all after a
     /// full-width full stop). With no second sentence, the first as it is, and with no first, the second.
     static func sentences(_ first: String, _ second: String?) -> String {

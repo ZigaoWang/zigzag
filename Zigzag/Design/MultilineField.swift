@@ -3,7 +3,7 @@ import AppKit
 /// A field for several lines of plain text (a script's arguments, a JSON body): `FilledField`'s fill, corners and
 /// focus ring around a scrolling text view, in the body type, with the Mac's smart quotes and dashes off so what you
 /// type is what's kept.
-final class MultilineField: NSView {
+final class MultilineField: NSView, NSTextViewDelegate {
     private let scroll = NSScrollView()
     private let textView: NSTextView
     private var responderWatch: NSKeyValueObservation?
@@ -13,7 +13,11 @@ final class MultilineField: NSView {
         set { textView.string = newValue; needsLayout = true }
     }
 
-    init(text: String) {
+    /// Hears each change typed or pasted, with the text as it is now.
+    var onChange: ((String) -> Void)?
+
+    /// `font`: the body type unless given (code, in a monospaced face).
+    init(text: String, font: NSFont = Tokens.Font.body()) {
         let storage = NSTextStorage()
         let layout = NSLayoutManager()
         storage.addLayoutManager(layout)
@@ -23,7 +27,8 @@ final class MultilineField: NSView {
         textView = NSTextView(frame: .zero, textContainer: container)
         super.init(frame: .zero)
         textView.string = text
-        textView.font = Tokens.Font.body()
+        textView.font = font
+        textView.delegate = self
         textView.textColor = Tokens.Color.textPrimary
         textView.drawsBackground = false
         textView.isRichText = false
@@ -53,6 +58,19 @@ final class MultilineField: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     private var isEditing: Bool { window?.firstResponder === textView }
+
+    func textDidChange(_ notification: Notification) {
+        needsLayout = true
+        onChange?(textView.string)
+    }
+
+    /// Puts the keyboard in it, once it's in a window.
+    func focus() { window?.makeFirstResponder(textView) }
+
+    override func setAccessibilityLabel(_ label: String?) {
+        super.setAccessibilityLabel(label)
+        textView.setAccessibilityLabel(label)
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()

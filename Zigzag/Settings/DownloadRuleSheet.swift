@@ -118,7 +118,7 @@ enum DownloadRuleSheet {
             place.selectedIndex = openInChoices.firstIndex(of: action.openIn) ?? 0
             place.toolTip = String(localized: "A rule that hasn’t been told asks the first time it fires, and keeps your answer.", comment: "Tooltip on the Open in choice of an Open URL download rule.")
             openInField = place
-            actionRows.append(FormSheet.Row(label: String(localized: "Open in", comment: "Label of the choice of where a web address opens, in an Open URL download rule's sheet."),
+            actionRows.append(FormSheet.Row(label: String(localized: "Opens in", comment: "Label of the choice of where a web address opens, in an Open URL download rule's sheet."),
                                             view: place))
             actionRows.append(.note(String(localized: "A web address opens in Zigzag or your default browser. Anything else opens in its own app.",
                                            comment: "Under the Open in choice of an Open URL download rule: only the web's own addresses are Zigzag's to open.")))

@@ -2,11 +2,13 @@ import AppKit
 import Sparkle
 
 /// Automatic updates via Sparkle, which downloads, checks each update's signature and installs it. Zigzag looks every
-/// few hours and on waking from sleep, quietly; once an update is ready the sidebar says so, with a Restart that
-/// brings everything back in the new version, and an update you don't restart for installs when Zigzag quits.
+/// few hours and on waking from sleep, quietly; once an update is ready the sidebar's update card says so, with a
+/// Restart that brings everything back in the new version, and an update you don't restart for installs when Zigzag
+/// quits.
 ///
 /// Sparkle never shows a window of its own: `QuietUserDriver` stands in for its standard one, so an update found in
-/// the background stays out of the way, and Check for Updates… answers in a toast.
+/// the background stays out of the way. One you asked for comes in on the card, which shows it downloading and being
+/// prepared before it's ready; a toast only says a check is under way, or what it found when that's nothing.
 final class Updater {
     static let shared = Updater()
     private var updater: SPUUpdater?
@@ -44,6 +46,29 @@ final class Updater {
     }
     static let changed = Signal<Void>()
 
+    /// An update you asked for on its way in, for the card: downloading, then being prepared.
+    private(set) var activity: UpdateCardState? {
+        didSet { if activity?.differsVisibly(from: oldValue) ?? (oldValue != nil) { Self.changed.send() } }
+    }
+
+    /// What the update card shows, if anything: an update coming in that you asked for, or one that's ready.
+    var cardState: UpdateCardState? {
+        if let activity { return activity }
+        guard readiness.showsCard, let staged = readiness.staged else { return nil }
+        return .ready(version: staged.version)
+    }
+
+    /// With the sidebar hidden, the card floats in its corner: for an update you asked for, and once when one is
+    /// ready. It stops floating when you close it or restart, or once the sidebar's shown, where it stays.
+    private(set) var cardFloats = false {
+        didSet { if cardFloats != oldValue { Self.changed.send() } }
+    }
+    /// The build the card last floated for, so one that's ready floats only once.
+    private var floatedBuild: String?
+
+    /// The sidebar came back in a window: the card lives there now.
+    func stopFloating() { cardFloats = false }
+
     /// Zigzag › Check for Updates…, or Restart to Update while one is ready.
     var menuTitle: String {
         readiness.canRestart ? String(localized: "Restart to Update", comment: "Zigzag menu item in place of Check for Updates… while an update is ready: restarts Zigzag into it.")
@@ -55,7 +80,7 @@ final class Updater {
     private var restart = Restart.none
     /// Check for Updates… is under way: it answers in toasts, where a quiet check says nothing.
     private var manualCheck = false
-    /// The window whose toast says "Checking…" or "Downloading…", put away when the check ends without a word.
+    /// The window whose toast says "Checking…", put away when the check ends without a word.
     private weak var workingToast: BrowserWindowController?
     /// The staged update was let go for a newer one: Sparkle fetches that as soon as it's done.
     private var fetchesAfterCycle = false
@@ -105,6 +130,8 @@ final class Updater {
                        comment: "Toast after Check for Updates in a development build."), symbol: "arrow.down.circle")
             return
         }
+        // Coming in already: the card shows it, out where you can see it.
+        if activity != nil { cardFloats = true; return }
         let checking = String(localized: "Checking for updates…", comment: "Toast while Zigzag › Check for Updates… looks for a new version.")
         // Asked again while the first is under way: the same check goes on.
         if manualCheck { sayWorking(checking); return }
@@ -113,7 +140,7 @@ final class Updater {
         whenSparkleIsFree { [weak self] in
             guard let self, self.manualCheck else { return }
             // A quiet check that was under way may have staged one meanwhile.
-            if self.readiness.canRestart { self.sayReady(); self.manualCheck = false; return }
+            if self.readiness.canRestart { self.showReady(); self.manualCheck = false; return }
             // Sparkle still busy after the wait, or not taking checks: it would start nothing, and no answer would
             // ever come, so say so now.
             guard updater.canCheckForUpdates else { self.failed(); self.manualCheck = false; return }
@@ -124,9 +151,10 @@ final class Updater {
     /// The card's Restart, Zigzag › Restart to Update and Settings': Sparkle installs the staged update and opens
     /// Zigzag again, with every window and tab as it was (`UpdateRelaunch`, written as Sparkle asks to relaunch).
     func restartToUpdate() {
+        cardFloats = false
         #if DEBUG
         if stagedForDebug {
-            say(String(localized: "Zigzag would restart into \(readiness.staged?.version ?? "") now.",
+            say(String(localized: "Zigzag would restart into \(VersionName.display(readiness.staged?.version ?? "")) now.",
                        comment: "Debug builds only: toast after Restart on a pretend update. The placeholder is its version."), symbol: "arrow.clockwise")
             return
         }
@@ -144,7 +172,10 @@ final class Updater {
     }
 
     /// The card's ×: away for this version until Zigzag restarts. The update still installs when Zigzag quits.
-    func dismissCard() { readiness.dismiss() }
+    func dismissCard() {
+        cardFloats = false
+        readiness.dismiss()
+    }
 
     /// Runs `action` once Sparkle has no check of its own under way.
     private func whenSparkleIsFree(_ action: @escaping () -> Void, tries: Int = 120) {
@@ -165,9 +196,10 @@ final class Updater {
         found = update
         if item.isInformationOnlyUpdate { reply(.dismiss); return }
         guard state.stage == .installing else {
-            // Asked for, or Restart found its staged update gone and fetches it again.
+            // Asked for, or Restart found its staged update gone and fetches it again: the card shows it coming in,
+            // in place of the toast.
             if manualCheck || restart == .running {
-                sayWorking(String(localized: "Downloading Zigzag \(update.version)…", comment: "Toast while Check for Updates… downloads a new version. The placeholder is the version."))
+                downloadBegins(update.version)
             }
             reply(.install)
             return
@@ -207,12 +239,14 @@ final class Updater {
     /// both the user driver (`manual`) and the delegate; the toast is said once.
     fileprivate func noUpdate(manual: Bool) {
         readiness.clear()
+        activity = nil
         if manual {
             say(String(localized: "Zigzag is up to date.", comment: "Toast after Check for Updates… finds no newer version."), symbol: "checkmark.circle")
         }
     }
 
     fileprivate func failed() {
+        activity = nil
         guard manualCheck || restart != .none else { return }
         say(String(localized: "Couldn’t check for updates. Try again later.", comment: "Toast when Check for Updates… or Restart to Update can't reach the update feed."),
             symbol: "exclamationmark.triangle")
@@ -221,10 +255,10 @@ final class Updater {
     fileprivate func cycleFinished() {
         // A restart that's running and still here didn't happen; one waiting for this check to end goes on.
         if restart == .running { restart = .none }
-        workingTimeout?.cancel()
-        if let window = workingToast { Toast.hide(in: window) }
+        hideWorkingToast()
         manualCheck = false
-        workingToast = nil
+        // A download that stopped without coming to anything.
+        activity = nil
         if fetchesAfterCycle {
             fetchesAfterCycle = false
             whenSparkleIsFree { [weak self] in self?.updater?.checkForUpdatesInBackground() }
@@ -232,8 +266,48 @@ final class Updater {
     }
 
     private func stage(_ update: UpdateReadiness.Staged) {
+        let asked = manualCheck || activity != nil
+        activity = nil
         readiness.stage(version: update.version, build: update.build)
-        if manualCheck { sayReady() }
+        if asked { showReady() } else if floatedBuild != update.build {
+            // Ready from a quiet check: once, where you'll see it with the sidebar hidden.
+            floatedBuild = update.build
+            cardFloats = true
+        }
+    }
+
+    /// Ready, for a check you asked for: on the card, out where you can see it, never in a toast.
+    private func showReady() {
+        hideWorkingToast()
+        readiness.undismiss()
+        floatedBuild = readiness.staged?.build
+        cardFloats = true
+    }
+
+    // MARK: The download, for the card
+
+    /// An update you asked for starts coming in: the card shows it, in place of the toast.
+    private func downloadBegins(_ version: String) {
+        hideWorkingToast()
+        activity = .downloading(version: version, received: 0, total: 0)
+        cardFloats = true
+    }
+
+    /// Sparkle knows how big the download is.
+    fileprivate func downloadExpects(_ length: UInt64) {
+        guard case .downloading(let version, _, _) = activity else { return }
+        activity = .downloading(version: version, received: 0, total: length)
+    }
+
+    fileprivate func downloadReceived(_ length: UInt64) {
+        guard case .downloading(let version, let received, let total) = activity else { return }
+        activity = .downloading(version: version, received: received + length, total: total)
+    }
+
+    /// Downloaded: Sparkle unpacks it and checks its signature before it's ready.
+    fileprivate func extracting() {
+        guard let activity else { return }
+        self.activity = .preparing(version: activity.version)
     }
 
     /// One session for every look at the feed, with no cookies or cache kept: a session made per look is never
@@ -255,15 +329,21 @@ final class Updater {
 
     private var toastWindow: BrowserWindowController? { WindowManager.shared.keyController ?? WindowManager.shared.controllers.first }
 
-    private func say(_ text: String, symbol: String, action: (title: String, run: () -> Void)? = nil) {
-        guard let window = toastWindow else { return }
+    private func say(_ text: String, symbol: String) {
+        guard let window = workingToast ?? toastWindow else { return }
         workingToast = nil
         workingTimeout?.cancel()
-        Toast.show(text, symbol: symbol, action: action, duration: action == nil ? 3 : 6, in: window)
+        Toast.show(text, symbol: symbol, duration: 3, in: window)
     }
 
-    /// How long "Checking…" or "Downloading…" stays up when no word comes from Sparkle: then it goes, and the check
-    /// is no longer one you asked for (what it finds still shows in the sidebar).
+    private func hideWorkingToast() {
+        workingTimeout?.cancel()
+        if let window = workingToast { Toast.hide(in: window) }
+        workingToast = nil
+    }
+
+    /// How long "Checking…" stays up when no word comes from Sparkle: then it goes, and the check is no longer one
+    /// you asked for (what it finds still shows on the card).
     static let workingLimit: TimeInterval = 90
     private var workingTimeout: DispatchWorkItem?
 
@@ -284,21 +364,58 @@ final class Updater {
         Toast.working(text, in: window)
     }
 
-    private func sayReady() {
-        guard let version = readiness.staged?.version else { return }
-        say(String(localized: "Zigzag \(version) is ready.", comment: "Toast after Check for Updates… has downloaded a new version. The placeholder is the version."),
-            symbol: "arrow.clockwise.circle",
-            action: (String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General."),
-                     { Updater.shared.restartToUpdate() }))
-    }
-
     #if DEBUG
     /// `updateready <version>`: the card, menu item and Settings row for a pretend update; `off` takes it away.
     func debugStage(_ version: String?) {
         stagedForDebug = version != nil
         var shown = UpdateReadiness()
         if let version { shown.stage(version: version, build: version) }
+        activity = nil
         readiness = shown
+        if version == nil { cardFloats = false; floatedBuild = nil }
+    }
+
+    /// Counts `updatesim` runs, so a new one stops the last.
+    private var simulation = 0
+
+    /// `updatesim <version> [share|preparing]`: Check for Updates… finding a pretend update, then downloading,
+    /// preparing and staging it through the same steps Sparkle's answers take; held at that share of the download
+    /// (0.3), or while preparing, when one is given.
+    func debugSimulate(_ version: String, holdAt hold: String?) {
+        simulation += 1
+        let run = simulation
+        debugStage(nil)
+        manualCheck = true
+        sayWorking(String(localized: "Checking for updates…", comment: "Toast while Zigzag › Check for Updates… looks for a new version."))
+        let size: UInt64 = 40_000_000, chunk: UInt64 = 400_000
+        let holdShare = hold.flatMap(Double.init)
+        func after(_ seconds: TimeInterval, _ step: @escaping () -> Void) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
+                MainActor.assumeIsolated { if self?.simulation == run { step() } }
+            }
+        }
+        func receive() {
+            if let holdShare, let share = activity?.share, share >= holdShare { return }
+            guard (activity?.share ?? 0) < 1 else {
+                extracting()
+                if hold == "preparing" { return }
+                after(2) {
+                    self.stagedForDebug = true
+                    self.stage(.init(version: version, build: version))
+                    self.cycleFinished()
+                }
+                return
+            }
+            downloadReceived(chunk)
+            after(0.05) { receive() }
+        }
+        after(1.2) {
+            self.downloadBegins(version)
+            after(0.6) {
+                self.downloadExpects(size)
+                after(0.2) { receive() }
+            }
+        }
     }
     #endif
 }
@@ -359,9 +476,19 @@ private final class QuietUserDriver: NSObject, SPUUserDriver {
     }
 
     func showDownloadInitiated(cancellation: @escaping () -> Void) {}
-    func showDownloadDidReceiveExpectedContentLength(_ expectedContentLength: UInt64) {}
-    func showDownloadDidReceiveData(ofLength length: UInt64) {}
-    func showDownloadDidStartExtractingUpdate() {}
+
+    func showDownloadDidReceiveExpectedContentLength(_ expectedContentLength: UInt64) {
+        Updater.shared.downloadExpects(expectedContentLength)
+    }
+
+    func showDownloadDidReceiveData(ofLength length: UInt64) {
+        Updater.shared.downloadReceived(length)
+    }
+
+    func showDownloadDidStartExtractingUpdate() {
+        Updater.shared.extracting()
+    }
+
     func showExtractionReceivedProgress(_ progress: Double) {}
 
     func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {

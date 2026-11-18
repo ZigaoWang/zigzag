@@ -71,6 +71,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Archive (old tabs put away) | 归档 | 存档 | Arc's Chinese users say 归档. |
 | Getting Started (the guide) | 入门 | 新手指南 | Short, Apple-like. |
 | What's New | 新功能 | 更新内容 | Apple uses 新功能. |
+| Beta (a version: 0.9.2 beta 1) | Beta | 测试版, 公测版 | As Settings' Beta 版更新: a version reads 0.9.2 Beta 1, the word in Latin with a capital, as Apple writes its own betas. |
 | Chrome Web Store | Chrome 网上应用店 | Chrome 应用商店 | Google's own Chinese name for it. |
 | Automation (the Settings section) | 自动化 | | macOS's Privacy & Security › Automation is 自动化. |
 | AI apps | AI 应用 | AI 程序, 人工智能应用 | Short, and what people say. MCP stays as it is. |
@@ -85,6 +86,8 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | English | 简体中文 | Not used | Why |
 |---|---|---|---|
 | Clear (history, cache, cookies) | 清除 | 清空 | Safari: 清除历史记录. |
+| Zap Element (hide part of a site, as Arc's Zap) | 隐藏元素 | 抹除元素, 消除元素 | Says what happens to it; counted 已隐藏 3 个, and Restore All is 全部恢复. |
+| Edit Style… (a site's own CSS) | 编辑样式… | 自定义 CSS, 修改样式… | 样式 as Safari's 停用样式; a site with one is 已自定样式, its row 自定样式. |
 | Ask / Allow / Block (a site's permission) | 询问 / 允许 / 阻止 | | The same three words wherever a permission is set: Site Controls and Settings › Privacy › Sites. |
 | Close Tab | 关闭标签页 | | Safari. |
 | Reopen Closed Tab | 重新打开已关闭的标签页 | | Safari's 重新打开最近关闭的标签页, shortened. |

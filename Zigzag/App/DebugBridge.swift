@@ -539,9 +539,16 @@ enum DebugBridge {
         // the menu item's title and what's staged (JSON).
         if name == "updateready" { Updater.shared.debugStage(arg == "off" || arg.isEmpty ? nil : arg); return }
         if name == "updatedismiss" { Updater.shared.dismissCard(); return }
+        // updatesim <version> [share|preparing]: Check for Updates… with a pretend download on the card, held there
+        // when given.
+        if name == "updatesim" {
+            let f = arg.split(separator: " ").map(String.init)
+            Updater.shared.debugSimulate(f.first ?? "0.9.2-beta.1", holdAt: f.count > 1 ? f[1] : nil)
+            return
+        }
         if name == "updatestate" {
             let readiness = Updater.shared.readiness
-            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard,
+            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats,
                                         "shown": !controller.sidebar.updateCard.isHidden, "frame": NSStringFromRect(controller.sidebar.updateCard.frame)]
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
             return
@@ -2161,6 +2168,21 @@ enum DebugBridge {
         // dropdown, or Reset Permissions. sitepanelstate <path>: what it shows (JSON). sitext open|fold: its
         // Extensions header. sitextcount <n>: panels opened from now on show n extensions (0: as they are).
         case "sitepage": SitePanel.shown?.debugPage(arg)
+        // zap <css selector>: Zap Element's click on the first element that matches, in the page in front. zapmode
+        // on|off: the picker on that page, or off. zaphover <css selector>: its outline on that element. zapstate:
+        // the site's boosts, in the debug log.
+        case "zap": if let tab = controller.tabManager.selectedTab { ZapPicker.debugZap(arg, in: tab) }
+        case "zapmode":
+            if arg == "off" { ZapPicker.current?.stop() } else if let tab = controller.tabManager.selectedTab { ZapPicker.start(in: tab, controller: controller) }
+        case "zaphover": ZapPicker.debugHover(arg)
+        // boostsheet: Edit Style… for the page in front. boostcss <css> | save | cancel: typed into its field ("\n" a
+        // new line), or answered.
+        case "boostsheet": if let tab = controller.tabManager.selectedTab { SiteStyleSheet.show(for: tab, in: controller) }
+        case "boostcss": SiteStyleSheet.debug(arg)
+        case "zapstate":
+            let tab = controller.tabManager.selectedTab
+            let boost = SiteBoosts.boost(for: tab?.webView?.url, privateStore: tab?.privateStore)
+            debugLog("zapstate \(SiteBoosts.site(of: tab?.webView?.url) ?? "-") picking=\(ZapPicker.current != nil) zaps=\(boost.zaps) style=\(boost.style.count)")
         case "sitecert": SitePanel.shown?.debugCertificate(Int(arg) ?? 0)
         case "sitext": SitePanel.shown?.extensionsSection?.debugCommand(arg)
         case "sitextcount": SitePanel.debugExtensionCount = Int(arg) ?? 0

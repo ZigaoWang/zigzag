@@ -1,0 +1,1051 @@
+{
+  "schemaVersion": 1,
+  "chromeTypes": "0.1.464",
+  "groups": {
+    "tabGroups": {
+      "catalog": "extension.limit.tabGroups",
+      "order": 10
+    },
+    "tabActions": {
+      "catalog": "extension.limit.tabActions",
+      "order": 20
+    },
+    "tabHousekeeping": {
+      "catalog": "extension.limit.tabHousekeeping",
+      "order": 21
+    },
+    "windowsPopup": {
+      "catalog": "extension.limit.windowsPopup",
+      "order": 30
+    },
+    "runtime": {
+      "catalog": "extension.limit.runtime",
+      "order": 40
+    },
+    "runtimeContexts": {
+      "catalog": "extension.limit.runtimeContexts",
+      "order": 45
+    },
+    "runtimeBackgroundPage": {
+      "catalog": "extension.limit.backgroundPage",
+      "order": 46
+    },
+    "action": {
+      "catalog": "extension.limit.action",
+      "order": 50
+    },
+    "notifications": {
+      "catalog": "extension.limit.notifications",
+      "order": 60
+    },
+    "sidePanel": {
+      "catalog": "extension.limit.sidePanel",
+      "order": 70
+    },
+    "systemDisplay": {
+      "catalog": "extension.limit.systemDisplay",
+      "order": 80
+    },
+    "power": {
+      "catalog": "extension.limit.power",
+      "order": 90
+    },
+    "identity": {
+      "catalog": "extension.limit.signIn",
+      "order": 100
+    },
+    "bookmarks": {
+      "catalog": "extension.limit.bookmarks",
+      "order": 110
+    },
+    "downloads": {
+      "catalog": "extension.limit.downloads",
+      "order": 120
+    },
+    "tabCapture": {
+      "catalog": "extension.limit.tabCapture",
+      "order": 130
+    },
+    "tabVideoCapture": {
+      "catalog": "extension.limit.tabVideoCapture",
+      "order": 135
+    },
+    "cookies": {
+      "catalog": "extension.limit.cookies",
+      "order": 140
+    },
+    "cookiePartitions": {
+      "catalog": "extension.limit.cookiePartitions",
+      "order": 141
+    },
+    "permissions": {
+      "catalog": "extension.limit.hostAccessRequests",
+      "order": 150
+    },
+    "storage": {
+      "catalog": "extension.limit.storage",
+      "order": 160
+    },
+    "storageSync": {
+      "catalog": "extension.limit.storageSync",
+      "order": 170
+    },
+    "scripting": {
+      "catalog": "extension.limit.localScripts",
+      "order": 180
+    },
+    "dnr": {
+      "catalog": "extension.limit.blockingRules",
+      "order": 190
+    },
+    "dnrStaticRules": {
+      "catalog": "extension.limit.staticRuleChanges",
+      "order": 191
+    },
+    "dnrFeedback": {
+      "catalog": "extension.limit.matchedRuleDebugging",
+      "order": 192
+    },
+    "webRequestBlocking": {
+      "catalog": "extension.limit.webRequestBlocking",
+      "order": 200
+    },
+    "language": {
+      "catalog": "extension.limit.languageDetection",
+      "order": 210
+    },
+    "legacyExtension": {
+      "catalog": "extension.limit.legacyExtension",
+      "order": 220
+    },
+    "sessions": {
+      "catalog": "extension.limit.sessions",
+      "order": 230
+    },
+    "search": {
+      "catalog": "extension.limit.search",
+      "order": 240
+    },
+    "debugger": {
+      "catalog": "extension.limit.debugger",
+      "order": 250
+    },
+    "fontSettings": {
+      "catalog": "extension.limit.fontSettings",
+      "order": 260
+    },
+    "privacy": {
+      "catalog": "extension.limit.privacySettings",
+      "order": 270
+    },
+    "management": {
+      "catalog": "extension.limit.management",
+      "order": 280
+    },
+    "pageCapture": {
+      "catalog": "extension.limit.pageCapture",
+      "order": 290
+    },
+    "desktopCapture": {
+      "catalog": "extension.limit.desktopCapture",
+      "order": 300
+    },
+    "omnibox": {
+      "catalog": "extension.limit.addressBarKeyword",
+      "order": 310
+    },
+    "publicSuffix": {
+      "catalog": "extension.limit.publicSuffix",
+      "order": 320
+    },
+    "devtools": {
+      "catalog": "extension.limit.devtools",
+      "order": 330
+    },
+    "contentSettings": {
+      "catalog": "extension.limit.contentSettings",
+      "order": 340
+    },
+    "readingList": {
+      "catalog": "extension.limit.readingList",
+      "order": 350
+    },
+    "tts": {
+      "catalog": "extension.limit.tts",
+      "order": 360
+    },
+    "geolocation": {
+      "catalog": "extension.limit.geolocation",
+      "order": 370
+    },
+    "clipboardRead": {
+      "catalog": "extension.limit.clipboardRead",
+      "order": 380
+    },
+    "proxy": {
+      "catalog": "extension.limit.proxyScripts",
+      "order": 390
+    },
+    "deprecatedChannel": {
+      "catalog": "extension.limit.deprecatedChannel",
+      "order": 400
+    }
+  },
+  "claims": {
+    "alarms": {
+      "status": "native"
+    },
+    "commands": {
+      "status": "native"
+    },
+    "i18n": {
+      "status": "native",
+      "members": {
+        "detectLanguage": {
+          "status": "emulated",
+          "implementation": "js:detectLanguage",
+          "group": "language"
+        }
+      }
+    },
+    "storage": {
+      "status": "native",
+      "members": {
+        "managed": {
+          "status": "emulated",
+          "implementation": "js:managed",
+          "group": "storage"
+        }
+      }
+    },
+    "webNavigation": {
+      "status": "native"
+    },
+    "tabs": {
+      "status": "patched",
+      "implementation": "js:setMember",
+      "group": "tabActions",
+      "members": {
+        "group": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "tabGroups"
+        },
+        "ungroup": {
+          "status": "emulated",
+          "implementation": "js:ungroup",
+          "group": "tabGroups"
+        },
+        "createSplit": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "tabActions"
+        },
+        "unsplit": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "tabActions"
+        },
+        "discard": {
+          "status": "emulated",
+          "implementation": "js:discard",
+          "group": "tabHousekeeping"
+        },
+        "highlight": {
+          "status": "emulated",
+          "implementation": "js:highlight",
+          "group": "tabHousekeeping"
+        }
+      }
+    },
+    "windows": {
+      "status": "patched",
+      "implementation": "js:setMember",
+      "group": "windowsPopup",
+      "members": {
+        "create": {
+          "status": "patched",
+          "implementation": "js:setMember",
+          "group": "windowsPopup"
+        }
+      }
+    },
+    "runtime": {
+      "status": "patched",
+      "implementation": "js:setMember",
+      "group": "runtime",
+      "members": {
+        "restart": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "runtime"
+        },
+        "restartAfterDelay": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "runtime"
+        },
+        "getPackageDirectoryEntry": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "runtime"
+        },
+        "getContexts": {
+          "status": "bridged",
+          "implementation": "swift:BridgeContexts",
+          "group": "runtimeContexts"
+        },
+        "getBackgroundPage": {
+          "status": "patched",
+          "implementation": "js:correctGetBackgroundPage",
+          "group": "runtimeBackgroundPage"
+        }
+      }
+    },
+    "action": {
+      "status": "patched",
+      "implementation": "js:setMember",
+      "group": "action",
+      "members": {
+        "setBadgeTextColor": {
+          "status": "emulated",
+          "implementation": "js:setBadgeTextColor",
+          "group": "action"
+        },
+        "getBadgeTextColor": {
+          "status": "emulated",
+          "implementation": "js:getBadgeTextColor",
+          "group": "action"
+        },
+        "getUserSettings": {
+          "status": "emulated",
+          "implementation": "js:getUserSettings",
+          "group": "action"
+        },
+        "onUserSettingsChanged": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "action"
+        }
+      }
+    },
+    "contextMenus": {
+      "status": "patched",
+      "implementation": "js:keptMenus"
+    },
+    "cookies": {
+      "status": "patched",
+      "implementation": "js:cookies",
+      "group": "cookies",
+      "members": {
+        "getPartitionKey": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "cookiePartitions"
+        }
+      }
+    },
+    "permissions": {
+      "status": "patched",
+      "implementation": "js:permissions",
+      "group": "permissions",
+      "members": {
+        "addHostAccessRequest": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "permissions"
+        },
+        "removeHostAccessRequest": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "permissions"
+        }
+      }
+    },
+    "scripting": {
+      "status": "patched",
+      "implementation": "js:scripting",
+      "group": "scripting",
+      "members": {
+        "registerContentScripts": {
+          "status": "patched",
+          "implementation": "js:scripting",
+          "group": "scripting"
+        },
+        "updateContentScripts": {
+          "status": "patched",
+          "implementation": "js:scripting",
+          "group": "scripting"
+        }
+      }
+    },
+    "declarativeNetRequest": {
+      "status": "patched",
+      "implementation": "js:dnr",
+      "group": "dnr",
+      "members": {
+        "updateStaticRules": {
+          "status": "emulated",
+          "implementation": "js:dnr",
+          "group": "dnrStaticRules"
+        },
+        "getDisabledRuleIds": {
+          "status": "emulated",
+          "implementation": "js:dnr",
+          "group": "dnr"
+        },
+        "isRegexSupported": {
+          "status": "emulated",
+          "implementation": "js:dnr",
+          "group": "dnr"
+        },
+        "getAvailableStaticRuleCount": {
+          "status": "emulated",
+          "implementation": "js:dnr",
+          "group": "dnr"
+        },
+        "getMatchedRules": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnr"
+        },
+        "setExtensionActionOptions": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnr"
+        },
+        "testMatchOutcome": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnr"
+        },
+        "onRuleMatchedDebug": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "dnr"
+        }
+      }
+    },
+    "webRequest": {
+      "status": "patched",
+      "implementation": "js:webRequest"
+    },
+    "history": {
+      "status": "bridged",
+      "implementation": "swift:history"
+    },
+    "topSites": {
+      "status": "bridged",
+      "implementation": "swift:topSites"
+    },
+    "bookmarks": {
+      "status": "bridged",
+      "implementation": "swift:bookmarks",
+      "group": "bookmarks",
+      "members": {
+        "onImportBegan": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "bookmarks"
+        },
+        "onImportEnded": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "bookmarks"
+        },
+        "onChildrenReordered": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "bookmarks"
+        }
+      }
+    },
+    "downloads": {
+      "status": "bridged",
+      "implementation": "swift:downloads",
+      "group": "downloads",
+      "members": {
+        "setShelfEnabled": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "downloads"
+        },
+        "setUiOptions": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "downloads"
+        },
+        "acceptDanger": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "downloads"
+        },
+        "onDeterminingFilename": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "downloads"
+        }
+      }
+    },
+    "notifications": {
+      "status": "bridged",
+      "implementation": "swift:notifications",
+      "group": "notifications",
+      "members": {
+        "onButtonClicked": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "notifications"
+        },
+        "onShowSettings": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "notifications"
+        },
+        "onPermissionLevelChanged": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "notifications"
+        },
+        "getPermissionLevel": {
+          "status": "bridged",
+          "implementation": "swift:notifications",
+          "group": "notifications"
+        }
+      }
+    },
+    "idle": {
+      "status": "bridged",
+      "implementation": "swift:idle",
+      "members": {
+        "setDetectionInterval": {
+          "status": "bridged",
+          "implementation": "swift:idle"
+        }
+      }
+    },
+    "tts": {
+      "status": "bridged",
+      "implementation": "swift:tts"
+    },
+    "offscreen": {
+      "status": "bridged",
+      "implementation": "swift:offscreen"
+    },
+    "identity": {
+      "status": "bridged",
+      "implementation": "swift:identity",
+      "group": "identity",
+      "members": {
+        "getAuthToken": {
+          "status": "unsupported",
+          "reason": "chromeService",
+          "group": "identity"
+        },
+        "getProfileUserInfo": {
+          "status": "bridged",
+          "implementation": "swift:identity",
+          "group": "identity"
+        },
+        "getAccounts": {
+          "status": "bridged",
+          "implementation": "swift:identity",
+          "group": "identity"
+        },
+        "removeCachedAuthToken": {
+          "status": "bridged",
+          "implementation": "swift:identity",
+          "group": "identity"
+        },
+        "onSignInChanged": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "identity"
+        }
+      }
+    },
+    "sidePanel": {
+      "status": "bridged",
+      "implementation": "swift:sidePanel",
+      "group": "sidePanel",
+      "members": {
+        "getLayout": {
+          "status": "unsupported",
+          "reason": "notImplemented",
+          "group": "sidePanel"
+        },
+        "onOpened": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "sidePanel"
+        },
+        "onClosed": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "sidePanel"
+        }
+      }
+    },
+    "proxy": {
+      "status": "bridged",
+      "implementation": "swift:proxy",
+      "group": "proxy",
+      "members": {
+        "settings": {
+          "status": "bridged",
+          "implementation": "swift:proxy",
+          "group": "proxy"
+        }
+      }
+    },
+    "tabCapture": {
+      "status": "bridged",
+      "implementation": "swift:tabCapture",
+      "group": "tabCapture",
+      "members": {
+        "capture": {
+          "status": "bridged",
+          "implementation": "swift:tabCapture",
+          "group": "tabVideoCapture"
+        }
+      }
+    },
+    "userScripts": {
+      "status": "bridged",
+      "implementation": "swift:userScripts"
+    },
+    "system.display": {
+      "status": "bridged",
+      "implementation": "swift:system.display",
+      "group": "systemDisplay",
+      "members": {
+        "setDisplayProperties": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "setDisplayLayout": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "enableUnifiedDesktop": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "overscanCalibrationStart": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "overscanCalibrationAdjust": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "overscanCalibrationReset": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "overscanCalibrationComplete": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "showNativeTouchCalibration": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "startCustomTouchCalibration": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "completeCustomTouchCalibration": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "clearTouchCalibration": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "setMirrorMode": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        },
+        "onDisplayChanged": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "systemDisplay"
+        }
+      }
+    },
+    "power": {
+      "status": "bridged",
+      "implementation": "swift:power",
+      "group": "power",
+      "members": {
+        "reportActivity": {
+          "status": "unsupported",
+          "reason": "platform",
+          "group": "power"
+        }
+      }
+    },
+    "extension": {
+      "status": "deprecated",
+      "reason": "removed",
+      "group": "legacyExtension"
+    },
+    "omnibox": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "omnibox"
+    },
+    "privacy": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "privacy"
+    },
+    "sessions": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "sessions",
+      "members": {
+        "getRecentlyClosed": {
+          "status": "emulated",
+          "implementation": "js:getRecentlyClosed",
+          "group": "sessions"
+        },
+        "getDevices": {
+          "status": "emulated",
+          "implementation": "js:getDevices",
+          "group": "sessions"
+        }
+      }
+    },
+    "search": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "search"
+    },
+    "debugger": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "debugger",
+      "members": {
+        "detach": {
+          "status": "emulated",
+          "implementation": "js:detach",
+          "group": "debugger"
+        },
+        "getTargets": {
+          "status": "emulated",
+          "implementation": "js:getTargets",
+          "group": "debugger"
+        }
+      }
+    },
+    "tabGroups": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "tabGroups",
+      "members": {
+        "query": {
+          "status": "emulated",
+          "implementation": "js:query",
+          "group": "tabGroups"
+        }
+      }
+    },
+    "fontSettings": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "fontSettings",
+      "members": {
+        "getFontList": {
+          "status": "emulated",
+          "implementation": "js:getFontList",
+          "group": "fontSettings"
+        },
+        "getFont": {
+          "status": "emulated",
+          "implementation": "js:getFont",
+          "group": "fontSettings"
+        },
+        "setFont": {
+          "status": "emulated",
+          "implementation": "js:setFont",
+          "group": "fontSettings"
+        },
+        "clearFont": {
+          "status": "emulated",
+          "implementation": "js:clearFont",
+          "group": "fontSettings"
+        }
+      }
+    },
+    "publicSuffix": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "publicSuffix"
+    },
+    "management": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "management",
+      "members": {
+        "getSelf": {
+          "status": "emulated",
+          "implementation": "js:getSelf",
+          "group": "management"
+        },
+        "getAll": {
+          "status": "emulated",
+          "implementation": "js:getAll",
+          "group": "management"
+        }
+      }
+    },
+    "pageCapture": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "pageCapture"
+    },
+    "desktopCapture": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "desktopCapture"
+    },
+    "devtools.inspectedWindow": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "devtools"
+    },
+    "devtools.network": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "devtools"
+    },
+    "devtools.panels": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "devtools"
+    },
+    "devtools.performance": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "devtools"
+    },
+    "devtools.recorder": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "devtools"
+    },
+    "gcm": {
+      "status": "unsupported",
+      "reason": "deprecatedChannel",
+      "group": "deprecatedChannel"
+    },
+    "instanceID": {
+      "status": "unsupported",
+      "reason": "deprecatedChannel",
+      "group": "deprecatedChannel"
+    }
+  },
+  "permissions": {
+    "bookmarks": {
+      "status": "supported"
+    },
+    "clipboardRead": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "clipboardRead"
+    },
+    "contentSettings": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "contentSettings"
+    },
+    "cookies": {
+      "status": "partial",
+      "claims": [
+        "cookies.getPartitionKey"
+      ]
+    },
+    "debugger": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "debugger"
+    },
+    "declarativeNetRequest": {
+      "status": "partial",
+      "claims": [
+        "declarativeNetRequest.updateStaticRules"
+      ]
+    },
+    "declarativeNetRequestFeedback": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "dnrFeedback"
+    },
+    "declarativeNetRequestWithHostAccess": {
+      "status": "partial",
+      "claims": [
+        "declarativeNetRequest.updateStaticRules"
+      ]
+    },
+    "desktopCapture": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "desktopCapture"
+    },
+    "downloads": {
+      "status": "supported"
+    },
+    "downloads.open": {
+      "status": "supported"
+    },
+    "fontSettings": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "fontSettings"
+    },
+    "geolocation": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "geolocation"
+    },
+    "history": {
+      "status": "supported"
+    },
+    "identity": {
+      "status": "supported"
+    },
+    "identity.email": {
+      "status": "partial",
+      "claims": [
+        "identity.getProfileUserInfo"
+      ]
+    },
+    "idle": {
+      "status": "supported"
+    },
+    "management": {
+      "status": "partial",
+      "claims": [
+        "management.getSelf"
+      ]
+    },
+    "nativeMessaging": {
+      "status": "supported"
+    },
+    "notifications": {
+      "status": "supported"
+    },
+    "offscreen": {
+      "status": "supported"
+    },
+    "pageCapture": {
+      "status": "unsupported",
+      "reason": "webkitMissing",
+      "group": "pageCapture"
+    },
+    "power": {
+      "status": "supported"
+    },
+    "privacy": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "privacy"
+    },
+    "proxy": {
+      "status": "partial",
+      "claims": [
+        "proxy.settings"
+      ]
+    },
+    "readingList": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "readingList"
+    },
+    "sessions": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "sessions"
+    },
+    "sidePanel": {
+      "status": "supported"
+    },
+    "storage": {
+      "status": "partial",
+      "catalog": "extension.limit.storageSync",
+      "group": "storageSync"
+    },
+    "system.display": {
+      "status": "supported"
+    },
+    "tabCapture": {
+      "status": "partial",
+      "catalog": "extension.limit.tabVideoCapture",
+      "group": "tabVideoCapture",
+      "claims": [
+        "tabCapture.capture"
+      ]
+    },
+    "tabGroups": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "tabGroups"
+    },
+    "tabs": {
+      "status": "partial",
+      "claims": [
+        "tabs.discard",
+        "tabs.highlight"
+      ]
+    },
+    "topSites": {
+      "status": "supported"
+    },
+    "tts": {
+      "status": "supported"
+    },
+    "ttsEngine": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "tts"
+    },
+    "userScripts": {
+      "status": "supported"
+    },
+    "webNavigation": {
+      "status": "supported"
+    },
+    "webRequest": {
+      "status": "supported"
+    },
+    "webRequestAuthProvider": {
+      "status": "supported"
+    },
+    "webRequestBlocking": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "webRequestBlocking"
+    }
+  },
+  "manifest": {
+    "omnibox": {
+      "status": "unsupported",
+      "reason": "notImplemented",
+      "group": "omnibox"
+    }
+  }
+}

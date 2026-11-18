@@ -344,7 +344,7 @@ enum SettingsVersionRow {
         let refresh = { [weak row, weak update] in
             guard let row, let update else { return }
             let ready = Updater.shared.readiness.staged?.version
-            row.detailText = detail(ready: ready)
+            row.detailText = detail(ready: ready, coming: Updater.shared.activity)
             update.title = ready == nil ? checkTitle
                 : String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General.")
         }
@@ -354,10 +354,20 @@ enum SettingsVersionRow {
         return row
     }
 
-    /// What's under Zigzag's name: its version, and the one that's ready when there is one.
-    static func detail(ready: String?) -> String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
-        guard let ready else { return String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General.") }
+    /// What's under Zigzag's name: its version, and the one that's ready when there is one, or coming in, as the
+    /// sidebar's update card says it.
+    static func detail(ready: String?, coming: UpdateCardState? = nil) -> String {
+        let version = VersionName.display(VersionName.running)
+        switch coming {
+        case .downloading(let new, _, _):
+            return String(localized: "Downloading version \(VersionName.display(new))…",
+                          comment: "Under Zigzag's name in Settings › General while an update you asked for downloads. The placeholder is the new version.")
+        case .preparing(let new):
+            return String(localized: "Preparing version \(VersionName.display(new))…",
+                          comment: "Under Zigzag's name in Settings › General once an update has downloaded, while it's unpacked and checked. The placeholder is the new version.")
+        default: break
+        }
+        guard let ready = ready.map(VersionName.display) else { return String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General.") }
         return String(localized: "Version \(ready) is ready to install. You have \(version).",
                       comment: "Under Zigzag's name in Settings › General while an update is ready, beside Restart. The placeholders are the new version and the one running.")
     }
@@ -2171,9 +2181,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // says something is missing without saying what.
         var summary = detail.isEmpty ? "" : Words.list(detail)
         if let manifest = ExtensionStore.manifest(for: id) {
-            let limits = ExtensionReport(extension: ext, manifest: manifest, id: id).limits
+            // The lines only: the overlay is decoded once, behind ExtensionCompatibility.shared, and each row does
+            // not build a whole report for them.
+            let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id)
             if let first = limits.first {
-                let names = Words.list([first] + limits.dropFirst().map { $0.prefix(1).lowercased() + $0.dropFirst() })
+                let names = Words.list([first.text] + limits.dropFirst().map { Words.lowercasedForList($0.text) })
                 let note = String(localized: "\(names) won’t work in Zigzag.",
                                   comment: "Under an extension's name in Settings › Extensions, after its version: the features it uses that Zigzag lacks, like “Side panel and notifications won’t work in Zigzag.”")
                 summary = summary.isEmpty ? note : summary + "\n" + note
@@ -3709,12 +3721,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let nothingChosen = ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites.isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
-            && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty
+            && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, and every site’s tabs can sleep in the background.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements and site styles are removed.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -3728,6 +3740,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 SiteJavaScript.forgetAll()
                 ClientCertificates.forgetAll()
                 ClientCertificates.forgetAllSessions()
+                SiteBoosts.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -3745,7 +3758,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let sites = Set(origins.keys).union(ContentBlocker.allowedSites).union(ExtensionStore.extensionsOffSites).union(ZoomLevels.all.keys)
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
-            .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites)
+            .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -3793,6 +3806,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else if CookieBanners.sitesLeft.contains(site) {
                 said.append(String(localized: "cookie banners left alone", comment: "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer."))
             }
+            if let zaps = SiteBoosts.all[site]?.zaps.count, zaps > 0 {
+                said.append(SiteBoosts.zapped(zaps))
+            }
+            if SiteBoosts.all[site]?.hasStyle == true {
+                said.append(String(localized: "boosted", comment: "A choice made for a site in Settings › Privacy, in a list of them: it has CSS of your own (Edit Style… in Site Controls)."))
+            }
             if let certificate = ClientCertificates.kept(host: site) {
                 said.append(String(localized: "certificate: \(certificate.name)", comment: "A choice made for a site in Settings › Privacy, in a list of them: the certificate from your Keychain it's always sent, by name."))
             }
@@ -3823,6 +3842,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 SiteJavaScript.forget(site: site)
                 ClientCertificates.forget(site: site)
                 ClientCertificates.forgetSessions(site: site)
+                SiteBoosts.forget(site: site)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
