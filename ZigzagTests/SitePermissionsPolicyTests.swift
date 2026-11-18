@@ -699,6 +699,36 @@ import WebKit
         #expect(PopupNotice.mayAsk(origin: origin, now: now.addingTimeInterval(PopupNotice.putOffGap)))
         PopupNotice.forgetAnswers(origin: origin)
     }
+
+    /// Settings › Downloads groups a rule's answered sites by what was answered, so a refused site does not read like
+    /// a handed-off one; the groups come in the question's own order and only when they have sites.
+    @Test func theDownloadsListGroupsSitesByTheirAnswer() throws {
+        try withDefaults { _ in
+            let rule = UUID()
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://a.com")
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule), origin: "https://b.com")
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule), origin: "https://c.com")
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule), origin: "https://d.com")
+            let decided = SitePermissions.decisions(prefix: PermissionSubject.handoff(rule))
+            #expect(decided.map(\.origin) == ["https://a.com", "https://b.com", "https://c.com", "https://d.com"])
+            let groups = SettingsView.handoffAnswerGroups(decided)
+            #expect(groups.map(\.sites) == [["https://a.com", "https://c.com"], ["https://d.com"], ["https://b.com"]])
+            // The row's title is the very word the question's button used.
+            #expect(groups.map(\.title) == ["Hand Off", "Open in Browser", "Don’t Allow"])
+            #expect(SettingsView.handoffAnswerGroups([]).isEmpty)
+        }
+    }
+
+    /// A kept answer's row takes the rule as its subject, as the rule's own row does, and keeps the answer and the site
+    /// it was given on in the detail beneath it.
+    @Test func aKeptAnswersRowNamesItsRuleAndSite() {
+        let row = SettingsView.handoffAnswerRow(ruleNamed: "YouTube", answer: "Hand Off", sites: "youtube.com")
+        #expect(row.title == "YouTube")
+        #expect(row.detail.contains("Hand Off"))
+        #expect(row.detail.contains("youtube.com"))
+        // A rule with no name still reads as a rule, never as an empty row.
+        #expect(SettingsView.handoffAnswerRow(ruleNamed: "  ", answer: "Hand Off", sites: "youtube.com").title == "Untitled Rule")
+    }
 }
 
 /// The tab that asked a pop-up's question, recording what its host was told to open.
