@@ -529,8 +529,8 @@ extension DownloadRuleAction {
     /// new tab unless the answer itself names a place. **One rule, two callers**: `DownloadHandoff.openURL` opens it
     /// here, and `HandoffNotice` says what it is about to do from the same answer, so what a rule says can never
     /// drift from what it does. Only an Open URL has anywhere to decide; every other kind ignores this.
-    func place(askingOn rule: DownloadRule?) -> OpenInZigzag.Place? {
-        openIn ?? (rule == nil ? .newTab : nil)
+    func place(askingOn rule: DownloadRule?) -> OpenInZigzag.Choice? {
+        openIn == .ask ? (rule == nil ? .newTab : nil) : openIn
     }
 }
 

@@ -53,6 +53,13 @@ enum HandoffNotice {
             case .thisTab: return String(localized: "opened this link in this tab", comment: "An automation's notice over the page: the rule opened the link where you already are.")
             case .newTab: return String(localized: "opened this link in a new tab", comment: "An automation's notice over the page: the rule opened the link in a tab of its own.")
             case .mini: return String(localized: "opened this link in Mini", comment: "An automation's notice over the page: the rule opened the link in Zigzag Mini.")
+            case .defaultBrowser:
+                // Handed to the Mac's own browser: a firing like any other, and the one state that would otherwise
+                // say nothing at all. Named by the app that takes it, as a scheme no Zigzag place handles is.
+                return String(localized: "handed this link to \(ExternalLinks.appName(forScheme: "https"))", comment: "An automation's notice over the page: what a rule did with the link. The placeholder is the app that opens the address's scheme, like mpv for mpv://.")
+            case .ask:
+                // Never reached: `place(askingOn:)` maps Ask to nil (a rule to ask) or New Tab (no rule to ask).
+                return nil
             }
         case .saveToFolder, .openFile:
             // A destination never runs as an action: it is read where WebKit makes the download, and a file landing in

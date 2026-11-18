@@ -1040,10 +1040,14 @@ struct DownloadRuleTests {
         web.openIn = .mini
         #expect(line(web) == "Videos: opened this link in Mini")
 
-        // No place yet, and a rule to ask: opening it asks where, and the question is the sighting itself. Once an
-        // answer is kept on the rule the question stops, and the line above is what says so in its place.
-        web.openIn = nil
+        // A rule that would ask: the question is the sighting itself, so no line. (With no rule to ask on — a
+        // script's own answer — it opens in a new tab instead, which is the line above.)
+        web.openIn = .ask
         #expect(line(web) == nil)
+
+        // Handed to the Mac's own browser: an ordinary firing, and the one state that would otherwise say nothing.
+        web.openIn = .defaultBrowser
+        #expect(line(web)?.hasPrefix("Videos: handed this link to ") == true)
 
         // A script's card says it is running, and a destination is read where WebKit makes the download, never run as
         // an action: neither is announced here.
@@ -1072,10 +1076,17 @@ struct DownloadRuleTests {
         let rule = DownloadRule(name: "Videos", match: .any, action: web)
 
         // A rule that hasn't been told: nowhere yet — it will ask.
+        web.openIn = .ask
         #expect(web.place(askingOn: rule) == nil)
         // Told, and it keeps that.
         web.openIn = .mini
         #expect(web.place(askingOn: rule) == .mini)
+        // The Mac's own browser is a place of its own, not "Ask".
+        web.openIn = .defaultBrowser
+        #expect(web.place(askingOn: rule) == .defaultBrowser)
+        // With no rule to ask on, Ask means a new tab rather than a question.
+        web.openIn = .ask
+        #expect(web.place(askingOn: nil) == .newTab)
     }
 
     /// A notice said twice while it is still up is one notice with a count, in the diagnostics' own shape — and only
