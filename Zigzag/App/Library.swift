@@ -7,8 +7,9 @@ struct Bookmark: Codable, Identifiable, Equatable {
     /// Drawn instead of its site's icon: an SF Symbol's name, or an emoji. Nil: its site's (and older libraries).
     var icon: String? = nil
 
-    /// What stands for it wherever it's drawn: the icon you chose, else its site's, once that's been fetched.
-    var displayIcon: NSImage? { icon.map(IconChoice.pageIcon) ?? FaviconStore.shared.cachedIcon(for: url) }
+    /// What stands for it wherever it's drawn: the icon you chose, else the one set for its site (`SiteIcons`), else
+    /// its site's own, once that's been fetched.
+    var displayIcon: NSImage? { (icon ?? SiteIcons.icon(for: url)).map(IconChoice.pageIcon) ?? FaviconStore.shared.cachedIcon(for: url) }
 }
 
 /// A named group of a space's pinned pages, folded open or shut in the sidebar. Its pages stay in the space's own list
