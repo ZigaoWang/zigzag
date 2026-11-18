@@ -2356,6 +2356,19 @@ extension Tab: WKUIDelegate {
         completion(PageWindowFrame.frame(of: webView, hostWindow: host?.hostWindow))
     }
 
+    /// The page's Web Inspector opened (WKUIDelegatePrivate, unpublished): in Chrome's look when that's chosen
+    /// (`ChromeInspector`).
+    @objc(_webView:didAttachLocalInspector:)
+    func webView(_ webView: WKWebView, didAttachLocalInspector inspector: NSObject) {
+        ChromeInspector.inspectorOpened(inspector)
+    }
+
+    /// Where the page's Web Inspector gets Chrome's DevTools from (`ChromeDevTools`). WKUIDelegatePrivate, unpublished.
+    @objc(_webView:configurationForLocalInspector:)
+    func webView(_ webView: WKWebView, configurationForLocalInspector inspector: NSObject) -> NSObject? {
+        ChromeDevTools.inspectorConfiguration()
+    }
+
     /// The key icon macOS 27 shows in sign-in fields (AutofillKeyIcon), clicked. WebKit reports it through this
     /// (WKUIDelegatePrivate, unpublished); without it the click is only a click on the field.
     @objc(_webView:didClickAutoFillButtonWithUserInfo:)

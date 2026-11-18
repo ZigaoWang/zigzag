@@ -1954,6 +1954,15 @@ enum DebugBridge {
                 }
                 debugLog("inspector \(arg) => visible=\(flag("isVisible")) picking=\(flag("isElementSelectionActive"))")
             }
+        case "inspectorjs":
+            // inspectorjs <expression>: evaluates it in the Web Inspector's own page and logs the result as JSON. Not with eval,
+            // which that page's content security policy refuses.
+            guard let webView = controller.selectedWebView,
+                  let inspector = webView.perform(NSSelectorFromString("_inspector"))?.takeUnretainedValue() as? NSObject,
+                  let page = inspector.perform(NSSelectorFromString("inspectorWebView"))?.takeUnretainedValue() as? WKWebView else { break }
+            page.evaluateJavaScript("JSON.stringify((() => { try { return (\(arg)); } catch (e) { return 'error: ' + e; } })())") { result, error in
+                debugLog("inspectorjs => \(result ?? error.map { "\($0)" } ?? "nil")")
+            }
         case "altsvc":
             // altsvc [forget]: the sites WebKit keeps HTTP/3 for, and the other data they have, before and after forgetting.
             Task { @MainActor in

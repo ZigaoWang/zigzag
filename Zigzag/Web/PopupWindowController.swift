@@ -338,6 +338,17 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         Self.open.remove(self)
     }
 
+    /// The popup's Web Inspector opened: in Chrome's look when that's chosen (`ChromeInspector`).
+    @objc(_webView:didAttachLocalInspector:)
+    func webView(_ webView: WKWebView, didAttachLocalInspector inspector: NSObject) {
+        ChromeInspector.inspectorOpened(inspector)
+    }
+
+    @objc(_webView:configurationForLocalInspector:)
+    func webView(_ webView: WKWebView, configurationForLocalInspector inspector: NSObject) -> NSObject? {
+        ChromeDevTools.inspectorConfiguration()
+    }
+
     func webViewDidClose(_ webView: WKWebView) {
         Diagnostics.note("Pop-up closed itself", site: webView.url?.host(), isPrivate: isPrivate)
         noteClosed()

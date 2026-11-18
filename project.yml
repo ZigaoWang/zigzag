@@ -63,6 +63,10 @@ targets:
         excludes: [Design/DESIGN.md]
       # The release notes the app shows after an update: this version's section of the changelog, in Chinese
       # from the Chinese changelog when the app speaks Chinese.
+      # Chrome's DevTools frontend, kept as a folder: its files are found by their paths (ChromeDevTools.swift).
+      - path: DevToolsFrontend
+        type: folder
+        buildPhase: resources
       - path: CHANGELOG.md
         buildPhase: resources
       - path: CHANGELOG.zh-Hans.md

@@ -1,0 +1,166 @@
+/* Chrome DevTools' colors on WebKit's Web Inspector (inspector-chrome.js). Scoped to .zz-chrome so the
+   setting can take it off again. The !important rules win over WebKit's own selection rules, which repaint
+   everything in a selected row white. */
+
+:root.zz-chrome {
+    --zz-accent: #1a73e8;
+    --zz-toolbar: #f1f3f4;
+    --zz-tab-hover: #e3e5e8;
+    --zz-line: #cacdd1;
+    --zz-dom-selected: #cfe8fc;
+    --zz-dom-selected-unfocused: #e8eaed;
+    --zz-dom-hover: #f0f6fe;
+    --zz-tag: #881280;
+    --zz-attr-name: #994500;
+    --zz-attr-value: #1a1aa6;
+    --zz-comment: #236e25;
+    --zz-doctype: #8c8c8c;
+    --zz-css-name: #c80000;
+    --zz-error-bg: #fff0f0;
+    --zz-error-line: #ffd6d6;
+    --zz-error-text: #e41b1b;
+    --zz-warning-bg: #fffbe5;
+    --zz-warning-line: #fff5c2;
+    --zz-warning-text: #5c3c00;
+
+    --text-color: #1f1f1f;
+    --text-color-active: #1f1f1f;
+    --text-color-secondary: #5f6368;
+    --background-color: #ffffff;
+    --background-color-content: #ffffff;
+    --background-color-intermediate: #f8f9fa;
+    --panel-background-color: var(--zz-toolbar);
+    --panel-background-color-light: #f8f9fa;
+    --border-color: var(--zz-line);
+    --border-color-secondary: #e0e0e0;
+    --selected-background-color: var(--zz-accent);
+    --selected-background-color-active: #1765cc;
+    --selected-background-color-hover: rgba(26, 115, 232, 0.12);
+    --selected-background-color-unfocused: #dadce0;
+    --selected-text-background-color: #cfe8fc;
+    --glyph-color: #5f6368;
+    --glyph-color-active: var(--zz-accent);
+    --breakpoint-color: var(--zz-accent);
+    --syntax-highlight-number-color: #1c00cf;
+    --syntax-highlight-boolean-color: #0d22aa;
+    --syntax-highlight-string-color: #c41a16;
+    --syntax-highlight-link-color: #1a1aa6;
+    --syntax-highlight-regexp-color: #c41a16;
+    --syntax-highlight-comment-color: #236e25;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root.zz-chrome {
+        --zz-accent: #8ab4f8;
+        --zz-toolbar: #292a2d;
+        --zz-tab-hover: #35363a;
+        --zz-line: #494c50;
+        --zz-dom-selected: #2b4b70;
+        --zz-dom-selected-unfocused: #3c4043;
+        --zz-dom-hover: #2a3442;
+        --zz-tag: #5db0d7;
+        --zz-attr-name: #9bbbdc;
+        --zz-attr-value: #f29766;
+        --zz-comment: #898989;
+        --zz-doctype: #7f7f7f;
+        --zz-css-name: #35d4c7;
+        --zz-error-bg: #290000;
+        --zz-error-line: #5c0000;
+        --zz-error-text: #ff8080;
+        --zz-warning-bg: #332a00;
+        --zz-warning-line: #665500;
+        --zz-warning-text: #ffdd9e;
+
+        --text-color: #e8eaed;
+        --text-color-active: #ffffff;
+        --text-color-secondary: #9aa0a6;
+        --background-color: #202124;
+        --background-color-content: #202124;
+        --background-color-intermediate: #242528;
+        --background-color-secondary: #292a2d;
+        --background-color-tertiary: #35363a;
+        --panel-background-color: var(--zz-toolbar);
+        --panel-background-color-light: #2f3033;
+        --border-color: var(--zz-line);
+        --border-color-secondary: #3c4043;
+        --selected-background-color: #1a73e8;
+        --selected-background-color-active: #1765cc;
+        --selected-background-color-hover: rgba(138, 180, 248, 0.16);
+        --selected-background-color-unfocused: #3c4043;
+        --selected-text-background-color: #2b4b70;
+        --glyph-color: #9aa0a6;
+        --glyph-color-active: var(--zz-accent);
+        --breakpoint-color: #1a73e8;
+        --syntax-highlight-number-color: #9980ff;
+        --syntax-highlight-boolean-color: #9980ff;
+        --syntax-highlight-string-color: #f29766;
+        --syntax-highlight-link-color: #9bbbdc;
+        --syntax-highlight-regexp-color: #f29766;
+        --syntax-highlight-comment-color: #747474;
+    }
+}
+
+/* Tabs: flat, with Chrome's colored line under the one in front. */
+:root.zz-chrome .tab-bar,
+:root.zz-chrome body.window-inactive .tab-bar {
+    --tab-bar-background: var(--zz-toolbar);
+    border-bottom: 1px solid var(--zz-line);
+}
+:root.zz-chrome .tab-bar > .tabs > .item {
+    border: none !important;
+    --tab-item-background: var(--zz-toolbar) !important;
+    color: var(--text-color-secondary);
+}
+:root.zz-chrome .tab-bar > .tabs:not(.animating) > .item:not(.selected, .disabled):hover {
+    --tab-item-background: var(--zz-tab-hover) !important;
+    color: var(--text-color);
+}
+:root.zz-chrome .tab-bar > .tabs > .item:not(.disabled).selected {
+    color: var(--text-color);
+    box-shadow: inset 0 -2px 0 var(--zz-accent);
+}
+:root.zz-chrome .navigation-bar {
+    background-color: var(--zz-toolbar);
+}
+
+/* Elements: Chrome's colors for the DOM tree, kept in a selected row, which is light blue rather than solid. */
+:root.zz-chrome .tree-outline.dom .html-tag,
+:root.zz-chrome .tree-outline.dom .html-tag-name,
+:root.zz-chrome .tree-outline.dom .html-pseudo-element { color: var(--zz-tag) !important; }
+:root.zz-chrome .tree-outline.dom .html-attribute-name { color: var(--zz-attr-name) !important; }
+:root.zz-chrome .tree-outline.dom .html-attribute-value { color: var(--zz-attr-value) !important; }
+:root.zz-chrome .tree-outline.dom .html-comment { color: var(--zz-comment) !important; }
+:root.zz-chrome .tree-outline.dom .html-doctype { color: var(--zz-doctype) !important; }
+:root.zz-chrome .tree-outline.dom .html-text-node,
+:root.zz-chrome .tree-outline.dom li.selected { color: var(--text-color) !important; }
+
+:root.zz-chrome .tree-outline.dom li.selected .selection-area {
+    background-color: var(--zz-dom-selected-unfocused) !important;
+}
+:root.zz-chrome .tree-outline.dom:not(.non-selectable):focus-within li.selected .selection-area {
+    background-color: var(--zz-dom-selected) !important;
+}
+:root.zz-chrome .tree-outline.dom:not(.non-selectable) li.hovered:not(.selected) .selection-area {
+    background-color: var(--zz-dom-hover) !important;
+    opacity: 1 !important;
+}
+
+/* Styles: property names in Chrome's red (teal in dark), values in the text color. */
+:root.zz-chrome .spreadsheet-css-declaration .property:not(.disabled, .invalid-name) .name {
+    color: var(--zz-css-name) !important;
+}
+:root.zz-chrome .spreadsheet-css-declaration .property:not(.disabled, .invalid-value) .value {
+    color: var(--text-color);
+}
+
+/* Console: Chrome's error and warning rows. */
+:root.zz-chrome .console-error-level {
+    background-color: var(--zz-error-bg);
+    border-color: var(--zz-error-line);
+}
+:root.zz-chrome .console-error-level .console-message-body { color: var(--zz-error-text); }
+:root.zz-chrome .console-warning-level {
+    background-color: var(--zz-warning-bg);
+    border-color: var(--zz-warning-line);
+}
+:root.zz-chrome .console-warning-level .console-message-body { color: var(--zz-warning-text); }

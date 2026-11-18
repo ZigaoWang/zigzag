@@ -4674,6 +4674,61 @@
         }
       }
     },
+    "Chrome DevTools’ colors and Network columns, docked on the right until you pick another side. On every site, not only those in Developer Mode." : {
+      "comment" : "Explanation under “Web Inspector like Chrome” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 Chrome 开发者工具的配色和“网络”栏目，停靠在右侧，直到你选择其他位置。适用于所有网站，不只是开启了开发者模式的网站。"
+          }
+        }
+      }
+    },
+    "chrome devtools inspect element inspector dock elements network" : {
+      "comment" : "Words that find the Web Inspector like Chrome setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chrome devtools inspect element inspector dock elements network 检查器 网页检查器 检查元素 开发者工具 停靠 元素 网络"
+          }
+        }
+      }
+    },
+    "Chrome DevTools (Preview)" : {
+      "comment" : "A setting in Settings › Developer: Chrome's own DevTools in place of the Web Inspector. A preview: not everything works yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chrome 开发者工具（预览）"
+          }
+        }
+      }
+    },
+    "Chrome’s own DevTools in place of the Web Inspector, for Elements, Console, Network and Sources. Performance, Memory and Lighthouse don’t work. Takes effect the next time you open it." : {
+      "comment" : "Explanation under “Chrome DevTools (Preview)” in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用 Chrome 自己的开发者工具代替网页检查器，支持元素、控制台、网络和源代码。性能、内存和 Lighthouse 无法使用。下次打开时生效。"
+          }
+        }
+      }
+    },
+    "chrome devtools preview elements console network sources" : {
+      "comment" : "Words that find the Chrome DevTools (Preview) setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "chrome devtools preview elements console network sources 开发者工具 预览 元素 控制台 网络 源代码"
+          }
+        }
+      }
+    },
     "Clay" : {
       "comment" : "Tooltip and accessibility label of a preset look in the space editor. A pale warm brown.",
       "localizations" : {
@@ -7500,6 +7555,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今天"
+          }
+        }
+      }
+    },
+    "Web Inspector like Chrome" : {
+      "comment" : "A setting in Settings › Developer: the Web Inspector takes Chrome DevTools' colors and opens docked on the right.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chrome 风格的网页检查器"
           }
         }
       }

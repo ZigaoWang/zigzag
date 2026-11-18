@@ -885,6 +885,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let addSizeButton = PillButton(title: String(localized: "Add Size…", comment: "Button beside Page Sizes in Settings › Developer: opens the sheet that adds a size to the list."))
     private let developerToolsToggle = Toggle()
     private let developerBarToggle = Toggle()
+    private let developerInspectorToggle = Toggle()
+    private let chromeDevToolsToggle = Toggle()
     private let developerTrustToggle = Toggle()
     private let localServersGroup = FormGroup()
     private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site."))
@@ -1305,6 +1307,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                         detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
                                                        comment: "Explanation under “Tools above the page” in Settings › Developer."),
                                         control: developerBarToggle))
+        developerInspectorToggle.onChange = { on in ChromeInspector.isOn = on }
+        let inspectorRow = FormRow(title: String(localized: "Web Inspector like Chrome", comment: "A setting in Settings › Developer: the Web Inspector takes Chrome DevTools' colors and opens docked on the right."),
+                                   detail: String(localized: "Chrome DevTools’ colors and Network columns, docked on the right until you pick another side. On every site, not only those in Developer Mode.",
+                                                  comment: "Explanation under “Web Inspector like Chrome” in Settings › Developer."),
+                                   control: developerInspectorToggle)
+        inspectorRow.keywords = String(localized: "chrome devtools inspect element inspector dock elements network", comment: "Words that find the Web Inspector like Chrome setting with Find a setting in Settings. Not shown.")
+        developerToolsGroup.add(inspectorRow)
+        chromeDevToolsToggle.onChange = { on in ChromeDevTools.isOn = on }
+        let devToolsRow = FormRow(title: String(localized: "Chrome DevTools (Preview)", comment: "A setting in Settings › Developer: Chrome's own DevTools in place of the Web Inspector. A preview: not everything works yet."),
+                                  detail: String(localized: "Chrome’s own DevTools in place of the Web Inspector, for Elements, Console, Network and Sources. Performance, Memory and Lighthouse don’t work. Takes effect the next time you open it.",
+                                                 comment: "Explanation under “Chrome DevTools (Preview)” in Settings › Developer."),
+                                  control: chromeDevToolsToggle)
+        devToolsRow.keywords = String(localized: "chrome devtools preview elements console network sources", comment: "Words that find the Chrome DevTools (Preview) setting with Find a setting in Settings. Not shown.")
+        developerToolsGroup.add(devToolsRow)
         developerTrustToggle.onChange = { on in DeveloperTools.trustsLocalServers = on }
         localServersGroup.add(FormRow(title: String(localized: "Trust certificates of servers on this Mac", comment: "A setting in Settings › Developer, under Local Servers: a development site served from this Mac over https with a certificate of its own opens without the warning."),
                                       detail: String(localized: "A development site at localhost or 127.0.0.1 that uses its own certificate for https opens without the warning. Only for servers on this Mac, and only the certificate first shown.",
@@ -1317,6 +1333,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             guard let self else { return }
             if self.developerToolsToggle.isOn != DeveloperTools.isOn { self.developerToolsToggle.isOn = DeveloperTools.isOn }
             if self.developerBarToggle.isOn != DeveloperTools.showsInBar { self.developerBarToggle.isOn = DeveloperTools.showsInBar }
+            if self.developerInspectorToggle.isOn != ChromeInspector.isOn { self.developerInspectorToggle.isOn = ChromeInspector.isOn }
+            if self.chromeDevToolsToggle.isOn != ChromeDevTools.isOn { self.chromeDevToolsToggle.isOn = ChromeDevTools.isOn }
             if self.developerTrustToggle.isOn != DeveloperTools.trustsLocalServers { self.developerTrustToggle.isOn = DeveloperTools.trustsLocalServers }
             self.reloadDevelopmentSites()
             self.reloadPageSizes()
@@ -3475,6 +3493,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         aiAppsToggle.isOn = MCPService.isOn
         developerToolsToggle.isOn = DeveloperTools.isOn
         developerBarToggle.isOn = DeveloperTools.showsInBar
+        developerInspectorToggle.isOn = ChromeInspector.isOn
+        chromeDevToolsToggle.isOn = ChromeDevTools.isOn
         developerTrustToggle.isOn = DeveloperTools.trustsLocalServers
         refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
