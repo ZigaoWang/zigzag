@@ -237,7 +237,7 @@ enum AdBlockers {
     static func active(in profile: Profile) -> String? {
         guard #available(macOS 15.4, *) else { return nil }
         let installs = profile.installs
-        let offSites = ExtensionStore.extensionsOffSites
+        let offSites = ExtensionStore.extensionsOffSites(in: profile)
         return active(among: known.keys.filter { id in
             guard installs.isEnabled(id), installs.isInstalled(id) else { return false }
             return reachesYouTube(access: installs.siteAccess(id), approved: installs.state(id)?.grantedMatchPatterns,

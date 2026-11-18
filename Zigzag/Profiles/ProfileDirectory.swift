@@ -207,6 +207,8 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
 /// profile's is the plain name Zigzag has always used, so what was chosen before there were profiles is its.
 nonisolated enum ProfileKey: String, CaseIterable {
     case extensionsPinned = "ExtensionsPinned"
+    /// Sites where every extension is off, which a profile chooses for itself.
+    case extensionsOffSites = "ExtensionsOffSites"
     case offersToSavePasswords = "PasswordsOfferToSave"
     case fillsPasswords = "PasswordsAutofill"
     /// Who fills passwords there: Zigzag or the iCloud Passwords extension (PasswordFiller). Unset until chosen.

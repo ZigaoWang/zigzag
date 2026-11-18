@@ -302,6 +302,7 @@
 		8FE22A2F18661ACD22105921 /* SplitRowAlignmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */; };
 		8FFF17FE67210434B930B549 /* MCPServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521AE408AF88148280EB7303 /* MCPServerTests.swift */; };
 		900908465AF9EC502A7E417D /* ApplePayMarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45FC278A744522036D5BB671 /* ApplePayMarkTests.swift */; };
+		A1B317C0FFEE000000000317 /* CommandClickedLinksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B317C0FFEE000000000318 /* CommandClickedLinksTests.swift */; };
 		902CD60C9DC21A528D47701B /* CrashReports.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8551A279CC24B357CC11755E /* CrashReports.swift */; };
 		91501632F628CC18660775E6 /* SecurityFixesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7890881D589D032D70E5DC20 /* SecurityFixesTests.swift */; };
 		915210234137A2CB955111A1 /* SiteData.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECEDC8885535F130965981A /* SiteData.swift */; };
@@ -493,6 +494,7 @@
 		ED98E29840EB4D47CE0DB5DE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B6B0BECF34D62E3B175E0A /* SettingsView.swift */; };
 		4C61E68005B832B99BDBAD7D /* SiteJavaScript.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF340C37DBA4804CD5D1B996 /* SiteJavaScript.swift */; };
 		C9285AA2BEAE163949E8C387 /* SiteBoosts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67F8A3E569D800FE5A83516D /* SiteBoosts.swift */; };
+		C310C0DE0000000000000001 /* SiteIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = C310C0DE0000000000000002 /* SiteIcons.swift */; };
 		EE50A8806A3BCABE6BF1D616 /* WebRTCProtection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72B87B15434806BCC150750E /* WebRTCProtection.swift */; };
 		EE9A7B05AB9BDA9E496233F5 /* PendingQuestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A274EC7489E7F31FF1125EDC /* PendingQuestions.swift */; };
 		EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */; };
@@ -722,6 +724,7 @@
 		4363A8C97194CFB82618511C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		445BFF7EFE1744F510AC8334 /* BridgeWebRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeWebRequest.swift; sourceTree = "<group>"; };
 		45FC278A744522036D5BB671 /* ApplePayMarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplePayMarkTests.swift; sourceTree = "<group>"; };
+		A1B317C0FFEE000000000318 /* CommandClickedLinksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandClickedLinksTests.swift; sourceTree = "<group>"; };
 		46D2E0F2330CC776A71AC19D /* PageStatePrivacyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageStatePrivacyTests.swift; sourceTree = "<group>"; };
 		47104C74FDC45A440611D21F /* ReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTests.swift; sourceTree = "<group>"; };
 		4747A7F3F3BF04066B45CFDA /* ExtensionCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionCompatibility.swift; sourceTree = "<group>"; };
@@ -808,6 +811,7 @@
 		71C449E3F3ECA4A28D2BCAA7 /* bridge.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = bridge.js; sourceTree = "<group>"; };
 		DF340C37DBA4804CD5D1B996 /* SiteJavaScript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteJavaScript.swift; sourceTree = "<group>"; };
 		67F8A3E569D800FE5A83516D /* SiteBoosts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteBoosts.swift; sourceTree = "<group>"; };
+		C310C0DE0000000000000002 /* SiteIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteIcons.swift; sourceTree = "<group>"; };
 		72B87B15434806BCC150750E /* WebRTCProtection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebRTCProtection.swift; sourceTree = "<group>"; };
 		734C513712E93C242D199929 /* SiteDataListTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteDataListTests.swift; sourceTree = "<group>"; };
 		7520635385AA4E5E5C5AC9FB /* OrionImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrionImporter.swift; sourceTree = "<group>"; };
@@ -1523,6 +1527,7 @@
 				72B87B15434806BCC150750E /* WebRTCProtection.swift */,
 				DF340C37DBA4804CD5D1B996 /* SiteJavaScript.swift */,
 				67F8A3E569D800FE5A83516D /* SiteBoosts.swift */,
+				C310C0DE0000000000000002 /* SiteIcons.swift */,
 				C4B5A4CDA29A214770AB79A6 /* WebsiteData.swift */,
 			);
 			path = Web;
@@ -1670,6 +1675,7 @@
 				8D4C44C0E24339E50B51709A /* AdFiltersTests.swift */,
 				BD42A0A68E58665548147DC9 /* AppBundledExtensionsTests.swift */,
 				45FC278A744522036D5BB671 /* ApplePayMarkTests.swift */,
+				A1B317C0FFEE000000000318 /* CommandClickedLinksTests.swift */,
 				3793F63D79DA937BC749EE1B /* ArcOpenTabsTests.swift */,
 				0E012EDE5594146129BF106F /* AsleepMarkTests.swift */,
 				FD0F5740003190746ACD4D73 /* AutoPictureInPictureTests.swift */,
@@ -2471,6 +2477,7 @@
 				EE50A8806A3BCABE6BF1D616 /* WebRTCProtection.swift in Sources */,
 				4C61E68005B832B99BDBAD7D /* SiteJavaScript.swift in Sources */,
 				C9285AA2BEAE163949E8C387 /* SiteBoosts.swift in Sources */,
+				C310C0DE0000000000000001 /* SiteIcons.swift in Sources */,
 				B7FC60AE25ED52099E5FDF43 /* WebSocketBridge.swift in Sources */,
 				DA721E6FCFEF463D60EDC99A /* WebStoreButton.swift in Sources */,
 				E42A5504EE597C075414B18A /* WebStoreOffer.swift in Sources */,
@@ -2511,6 +2518,7 @@
 				1482F4A584F73FF91CA61BE4 /* AddressTests.swift in Sources */,
 				C81F9C4850E8A068FF99DE78 /* AppBundledExtensionsTests.swift in Sources */,
 				900908465AF9EC502A7E417D /* ApplePayMarkTests.swift in Sources */,
+				A1B317C0FFEE000000000317 /* CommandClickedLinksTests.swift in Sources */,
 				2730AFB9F9F959653E83DA33 /* ArcOpenTabsTests.swift in Sources */,
 				51C6E5A688AD4C767333719C /* AsleepMarkTests.swift in Sources */,
 				9D02F7D07BA7EFB165D985AE /* AutoPictureInPictureTests.swift in Sources */,

@@ -80,7 +80,13 @@ final class Tab: NSObject {
     /// right (see TabGroups).
     var groupID: UUID?
 
-    private(set) var url: URL? { didSet { refreshDevelopment() } }
+    private(set) var url: URL? {
+        didSet {
+            refreshDevelopment()
+            // Another site can have an icon of its own (`SiteIcons`).
+            if SiteIcons.site(of: url) != SiteIcons.site(of: oldValue) { refreshChosenIcon() }
+        }
+    }
     private(set) var title: String
     private(set) var favicon: NSImage?
     private(set) var themeColor: NSColor?
@@ -160,7 +166,7 @@ final class Tab: NSObject {
         didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
     }
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
-    var privateStore: WKWebsiteDataStore?
+    var privateStore: WKWebsiteDataStore? { didSet { if privateStore !== oldValue { refreshChosenIcon() } } }
     var isPrivate: Bool { privateStore != nil }
 
     /// Moves it to another space. On another profile, its page moves with it.
@@ -334,6 +340,7 @@ final class Tab: NSObject {
         self.createdAt = createdAt
         super.init()
         if let url = self.url { favicon = FaviconStore.shared.cachedIcon(for: url) }
+        chosenIcon = SiteIcons.icon(for: self.url)
         isDevelopment = DeveloperTools.applies(to: self.url)
         snapshot = SnapshotStore.load(id)
         if #available(macOS 15.4, *) {
@@ -392,8 +399,8 @@ final class Tab: NSObject {
     /// An icon you gave the tab (an SF Symbol's name, or an emoji), drawn instead of its site's. The page of a pinned
     /// tab or a favorite shows that one's icon instead (`chosenIcon`).
     var customIcon: String? { didSet { if oldValue != customIcon { refreshChosenIcon() } } }
-    /// The icon you chose that stands for it, or nil for its site's. Kept up to date (`refreshChosenIcon`), and
-    /// says `.favicon` when it changes, as a new site icon does.
+    /// The icon you chose that stands for it, or the one set for its site (`SiteIcons`), or nil for the site's own.
+    /// Kept up to date (`refreshChosenIcon`), and says `.favicon` when it changes, as a new site icon does.
     private(set) var chosenIcon: String?
 
     /// A development tab (#141): Developer tools is on and the page it shows is on a site you develop
@@ -473,17 +480,18 @@ final class Tab: NSObject {
     /// Looks again at which chosen icon shows: after its own changes, it becomes or stops being a pinned page's or a
     /// favorite's, or the library changes (that page given an icon, or ⌘Z taking one back).
     func refreshChosenIcon() {
-        let icon = Self.chosenIcon(own: customIcon, bookmarkID: bookmarkID) { Library.shared.bookmark($0) }
+        let site = SiteIcons.icon(for: url ?? bookmarkID.flatMap { Library.shared.bookmark($0)?.url }, privateStore: privateStore)
+        let icon = Self.chosenIcon(own: customIcon, bookmarkID: bookmarkID, site: site) { Library.shared.bookmark($0) }
         guard icon != chosenIcon else { return }
         chosenIcon = icon
         changed.send(.favicon)
     }
 
-    /// A pinned page's or favorite's page shows the icon given to that page, or its site's if it has none, whatever
-    /// the tab had of its own; any other tab shows its own.
-    static func chosenIcon(own: String?, bookmarkID: UUID?, bookmark: (UUID) -> Bookmark?) -> String? {
-        guard let bookmarkID else { return own }
-        return bookmark(bookmarkID)?.icon
+    /// A pinned page's or favorite's page shows the icon given to that page, whatever the tab had of its own; any
+    /// other tab shows its own. Without one, the icon set for its site (`site`), if any.
+    static func chosenIcon(own: String?, bookmarkID: UUID?, site: String? = nil, bookmark: (UUID) -> Bookmark?) -> String? {
+        guard let bookmarkID else { return own ?? site }
+        return bookmark(bookmarkID)?.icon ?? site
     }
 
     /// What stands for the tab wherever it's drawn (its row, a favorite's tile, the switcher, the command bar): the

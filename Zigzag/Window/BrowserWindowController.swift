@@ -535,7 +535,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let entry = SidebarMenus.Item(String(title.prefix(60))) { [weak webView] in
                 if let owner = (webView as? BrowserWebView)?.owner { owner.go(to: item) } else { webView?.go(to: item) }
             }
-            if let icon = FaviconStore.shared.cachedIcon(for: item.url) {
+            if let icon = SiteIcons.shownIcon(for: item.url, privateStore: (webView as? BrowserWebView)?.owner?.privateStore) {
                 let small = icon.copy() as! NSImage
                 small.size = NSSize(width: 16, height: 16)
                 entry.image = small
@@ -3068,7 +3068,27 @@ extension BrowserWindowController: SidebarDelegate {
         pickPageImage { [weak self] icon in self?.setIconWithUndo(icon, forBookmark: id) }
     }
 
-    private func pickPageImage(_ done: @escaping (String) -> Void) {
+    /// The same icon grid for a whole site, from Site Controls (#310), level with that panel: every tab, pinned page
+    /// and favorite on the site shows it, unless it has one of its own. Use Site Icon goes back to the site's own. A
+    /// private window's lasts as long as the window.
+    func chooseSiteIcon(for tab: Tab, at point: NSPoint, besideSidebar: Bool) {
+        guard let site = SiteIcons.site(of: tab.url) else { return }
+        closeFloatingPanels()
+        let store = tabManager.privateStore
+        let siteIcon = tab.favicon ?? tab.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
+        let set: (String?) -> Void = { icon in SiteIcons.set(icon, forSite: site, privateStore: store) }
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle,
+                                    selected: SiteIcons.icon(forSite: site, privateStore: store),
+                                    onChooseImage: { [weak self] in self?.pickPageImage(forSite: true, set) }, onPick: set)
+        if besideSidebar {
+            let x = root.besideSidebar(width: panel.preferredWidth)
+            panel.show(at: NSPoint(x: x, y: point.y), in: root.overlay, growsFrom: CGPoint(x: root.sidebarOnRight ? 1 : 0, y: 0.1))
+        } else {
+            panel.show(at: point, in: root.overlay, growsFrom: CGPoint(x: 0.5, y: 0))
+        }
+    }
+
+    private func pickPageImage(forSite: Bool = false, _ done: @escaping (String) -> Void) {
         guard let window else { return }
         closeFloatingPanels()
         let panel = NSOpenPanel()
@@ -3076,7 +3096,9 @@ extension BrowserWindowController: SidebarDelegate {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.")
-        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.")
+        panel.message = forSite
+            ? String(localized: "Choose an image to use as this site’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a whole site's icon, from Choose Image… under the icon choices Site Controls opens.")
+            : String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.")
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.usePageImage(url, done)
