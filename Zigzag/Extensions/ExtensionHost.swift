@@ -690,21 +690,34 @@ final class ExtensionHost: NSObject {
     /// clicked the extension on, or only sites they listed. Sites where extensions are off are denied to all.
     private func applySiteAccess(to context: WKWebExtensionContext) {
         let id = context.uniqueIdentifier
-        let approved = (profile.installs.state(id)?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
-        let access = profile.installs.siteAccess(id)
+        let state = profile.installs.state(id)
+        let approved = (state?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
         // Forget earlier decisions first (clearing one pattern can clear an overlapping one), then make the current ones.
         for pattern in context.grantedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
         for pattern in context.deniedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
-        if access == .all {
-            for pattern in approved { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
-        } else {
-            for site in profile.installs.accessSites(id) {
-                for pattern in Self.patterns(for: site) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
-            }
+        for pattern in Self.siteAccessPatterns(state?.siteAccess, approved: approved, optional: context.webExtension.optionalPermissionMatchPatterns,
+                                               sites: profile.installs.accessSites(id)) {
+            context.setPermissionStatus(.grantedExplicitly, for: pattern)
         }
         for site in ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)) {
             for pattern in Self.patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
+    }
+
+    /// The sites a site access choice grants (nil: never chosen). Chosen, "On All Sites" adds the optional host permissions too.
+    static func siteAccessPatterns(_ access: ExtensionInstalls.SiteAccess?, approved: [WKWebExtension.MatchPattern],
+                                   optional: Set<WKWebExtension.MatchPattern>, sites: [String]) -> [WKWebExtension.MatchPattern] {
+        switch access {
+        case nil: approved
+        case .all: approved + optional.filter { !approved.contains($0) }
+        case .click, .sites: sites.flatMap(patterns(for:))
+        }
+    }
+
+    /// Asks for sites only as optional and has none yet, so "On All Sites" isn't its state until chosen.
+    func asksForSitesOnlyOptionally(_ id: String) -> Bool {
+        guard let context = context(for: id), profile.installs.state(id)?.siteAccess == nil else { return false }
+        return (profile.installs.state(id)?.grantedMatchPatterns ?? []).isEmpty && !context.webExtension.optionalPermissionMatchPatterns.isEmpty
     }
 
     /// A site and its subdomains, over http and https, with a trailing dot too (bank.com. is bank.com).

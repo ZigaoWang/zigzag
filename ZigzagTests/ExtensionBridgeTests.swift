@@ -498,6 +498,53 @@ extension ExtensionBridgeTests {
         #expect(response["url"] as? String == localURL.appendingPathComponent("unexpected").absoluteString)
     }
 
+    /// An extension asking for sites only as optional (Raindrop) reaches a server without CORS headers once "On All
+    /// Sites" is chosen, as Chrome does with host access; by default, or for another site listed, it's blocked (#324).
+    @Test func chosenAllSitesGivesOptionalHostAccessPastCORS() async throws {
+        let server = try SessionTestServer()
+        let target = try await server.start()
+        defer { server.listener.cancel() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":[],"optional_host_permissions":["*://*/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("<!doctype html><title>page</title>".utf8).write(to: folder.appendingPathComponent("page.html"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+
+        func fetched(_ access: ExtensionInstalls.SiteAccess?, sites: [String] = []) async throws -> String {
+            let controller = WKWebExtensionController(configuration: .nonPersistent())
+            let context = WKWebExtensionContext(for: ext)
+            try controller.load(context)
+            defer { try? controller.unload(context) }
+            for pattern in ExtensionHost.siteAccessPatterns(access, approved: [], optional: ext.optionalPermissionMatchPatterns, sites: sites) {
+                context.setPermissionStatus(.grantedExplicitly, for: pattern)
+            }
+            #expect(BridgeExtensionFetch.allows(target, context: context) == (access == .all))
+            let page = WKWebView(frame: .zero, configuration: try #require(context.webViewConfiguration))
+            page.load(URLRequest(url: context.baseURL.appendingPathComponent("page.html")))
+            for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(100)) }
+            #expect(page.title == "page")
+            return try await page.callAsyncJavaScript("""
+                try { const response = await fetch(target, { credentials: 'omit' }); return String(response.status) + ' ' + await response.text(); }
+                catch (error) { return error.name; }
+                """, arguments: ["target": target.absoluteString], in: nil, contentWorld: .page) as? String ?? ""
+        }
+        #expect(try await fetched(nil) == "TypeError")
+        #expect(try await fetched(.sites, sites: ["example.com"]) == "TypeError")
+        #expect(try await fetched(.all) == #"200 {"signedIn":false}"#)
+    }
+
+    @Test func siteAccessChoicesGrantWhatTheySay() throws {
+        let required = try WKWebExtension.MatchPattern(string: "https://api.example/*")
+        let optional: Set = [try WKWebExtension.MatchPattern(string: "*://*/*")]
+        #expect(ExtensionHost.siteAccessPatterns(nil, approved: [required], optional: optional, sites: []) == [required])
+        #expect(Set(ExtensionHost.siteAccessPatterns(.all, approved: [required], optional: optional, sites: [])) == optional.union([required]))
+        #expect(ExtensionHost.siteAccessPatterns(.click, approved: [required], optional: optional, sites: []).isEmpty)
+        #expect(Set(ExtensionHost.siteAccessPatterns(.sites, approved: [], optional: optional, sites: ["raindrop.io"]))
+            == Set(ExtensionHost.patterns(for: "raindrop.io")))
+    }
+
     /// A name an extension gives a download stays a plain file name inside Downloads.
     @Test func downloadNamesCantClimbOut() {
         #expect(BridgeDownloads.safeName("../../evil/report.pdf") == "report.pdf")
