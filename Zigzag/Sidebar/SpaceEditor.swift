@@ -431,8 +431,7 @@ struct SpaceLook {
         return true
     }
 
-    /// Looks taken from real materials, muted, in light and deep pairs: neutral, warm, cool. Every one is a spot on the
-    /// wheel, a Shade and the effects, so whatever a preset gives, Custom can reach.
+    /// Preset looks in light and deep pairs. Each is reachable from Custom too.
     static let presets: [SpaceLook] = [
         SpaceLook(name: String(localized: "White", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 0),
         SpaceLook(name: String(localized: "Black", comment: "Tooltip and accessibility label of a preset look in the space editor."), tint: 0, depth: 1),
@@ -442,7 +441,7 @@ struct SpaceLook {
         fade(String(localized: "Slate", comment: "Tooltip and accessibility label of a preset look in the space editor. A deep blue gray."), 0.62, 0.76, 0.62, 0.9, tint: 0.35),
     ]
 
-    /// A quiet fade, top to bottom, from one color to a shade of it.
+    /// A top-to-bottom gradient from a color to a shade of it.
     private static func fade(_ name: String, _ hue: Double, _ depth: Double, _ hue2: Double, _ depth2: Double, tint: Double) -> SpaceLook {
         SpaceLook(name: name, hue: hue, tint: tint, depth: depth, hue2: hue2, depth2: depth2, angle: 90)
     }
@@ -976,8 +975,7 @@ final class ColorChip: InteractiveView {
     }
 }
 
-/// A dark dot with a white ×, edged in white so it lifts off any color, in either mode: on a chip's corner, it takes
-/// what the chip holds away.
+/// The × on a chip's corner that removes what the chip holds.
 final class RemoveBadge {
     let layer = CALayer()
     private static let side: CGFloat = 14
@@ -1016,8 +1014,7 @@ final class RemoveBadge {
     func hits(_ point: CGPoint) -> Bool { !layer.isHidden && layer.frame.insetBy(dx: -2, dy: -2).contains(point) }
 }
 
-/// The space's picture among the swatches: an empty slot until it has one, then the picture, with the × on hover that
-/// takes it off.
+/// The background picture swatch: an empty slot, or the picture with a remove button on hover.
 final class BackgroundSwatch: InteractiveView {
     var image: CGImage? {
         didSet {
@@ -1079,7 +1076,6 @@ final class BackgroundSwatch: InteractiveView {
     override func stateDidChange(animated: Bool) {
         Tokens.Motion.withoutAnimation {
             effectiveAppearance.performAsCurrentDrawingAppearance {
-                // The same circle a swatch fills, swelling the same way under the pointer.
                 let inset: CGFloat = isHovered ? 0 : 2
                 let circle = bounds.insetBy(dx: inset, dy: inset)
                 outline.frame = bounds
@@ -1199,10 +1195,8 @@ final class DisclosureRow: InteractiveView {
     }
 }
 
-/// How a space looks, in one piece: one row of swatches (Default, the presets, the space's picture, Custom), the
-/// wheel (around for the hue, out from the middle for how much of it) and Shade under Custom when it's open, then
-/// Effects, folded until wanted: Gradient (a slot to add a second color, and the direction once there are two),
-/// See-through and Grain. `onPreview` fires while you drag, `onCommit` when you let go or pick something.
+/// The space's look: swatches (Default, presets, picture, Custom), the wheel and Shade under Custom, and Effects.
+/// `onPreview` fires while dragging, `onCommit` on release or pick.
 final class SpaceLookEditor: NSView {
     private let wheel = ColorWheel()
     private let colorsLabel = SpaceLookEditor.rowLabel(String(localized: "Gradient", comment: "A row's label in the space editor's Effects: the space's one or two colors."))
@@ -1573,7 +1567,6 @@ final class SpaceLookEditor: NSView {
         super.layout()
         let width = bounds.width
         var y: CGFloat = 0
-        // Spread across the column, the first at its start and the last at its end.
         let tiles = self.tiles
         let gap = (width - CGFloat(tiles.count) * swatchSize) / CGFloat(tiles.count - 1)
         for (i, tile) in tiles.enumerated() {
@@ -1584,7 +1577,6 @@ final class SpaceLookEditor: NSView {
         wheel.frame = NSRect(x: 0, y: y + Tokens.Space.x3, width: width, height: wheelHeight)
         row(shadeLabel, shadeSlider, y: wheel.frame.maxY + Tokens.Space.x3, height: sliderHeight)
         if showsCustom { y += customHeight }
-        // Effects' words as far under the swatches as the swatches are under the name.
         y += Tokens.Space.x1
         effects.frame = NSRect(x: 0, y: y, width: width, height: disclosureHeight)
         y += disclosureHeight + Tokens.Space.x2
@@ -1633,7 +1625,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     /// The space's icon, at the start of its name; click it to choose one in place of the colors.
     private let iconButton = IconButton(symbol: "circle.dashed", size: .compact, toolTip: String(localized: "Choose Icon", comment: "Tooltip of the icon button before the space's name, in the space editor."))
     private var iconGrid: IconGrid?
-    /// The profile the space is on: its sign-ins, extensions and website data. Last, under a line: it's seldom changed.
+    /// The profile the space uses.
     private let profileLabel = SpaceLookEditor.rowLabel(String(localized: "Profile", comment: "Label in a space's editor, before the choice of the profile the space is on."))
     private let profileButton = DropdownButton()
     private let profileLine = ColorView(color: Tokens.Color.separator)
@@ -1769,7 +1761,6 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         let below = pad + nameHeight + Tokens.Space.x3
         editor.frame = NSRect(x: pad, y: below, width: width, height: editor.preferredHeight)
         iconGrid?.frame = NSRect(x: pad, y: below, width: width, height: IconGrid.height)
-        // Profile last, under a line: its label, and its menu at the column's end.
         let lineY = below + (iconGrid != nil ? IconGrid.height : editor.preferredHeight - editor.trailingAir) + Tokens.Space.x3
         profileLine.frame = NSRect(x: pad, y: lineY, width: width, height: Tokens.Metric.hairline)
         let rowY = lineY + Tokens.Metric.hairline + Tokens.Space.x3, rowH = Tokens.Page.controlHeight
