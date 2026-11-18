@@ -421,14 +421,20 @@ final class IconPickerPanel: FloatingPanelView {
 
     /// Beside the sidebar, level with the row it's for.
     func show(beside row: NSView, in overlay: NSView, x: CGFloat) {
-        IconPickerPanel.current?.close()
         let rowFrame = row.convert(row.bounds, to: overlay)
+        // Out of the sidebar's side: its left edge, or its right one beside a sidebar on the right.
+        show(at: NSPoint(x: x, y: rowFrame.minY - Tokens.Space.x2), in: overlay, growsFrom: CGPoint(x: x < rowFrame.minX ? 1 : 0, y: 0.1))
+    }
+
+    /// With its top left corner at `point`, kept inside the overlay: where Site Controls was, for a site's icon (#310).
+    func show(at point: NSPoint, in overlay: NSView, growsFrom: CGPoint) {
+        IconPickerPanel.current?.close()
         let size = NSSize(width: preferredWidth, height: preferredHeight)
-        let top = max(Tokens.Space.x2, min(rowFrame.minY - Tokens.Space.x2, overlay.bounds.height - size.height - Tokens.Space.x2))
+        let top = max(Tokens.Space.x2, min(point.y, overlay.bounds.height - size.height - Tokens.Space.x2))
+        let x = max(Tokens.Space.x2, min(point.x, overlay.bounds.width - size.width - Tokens.Space.x2))
         frame = NSRect(origin: NSPoint(x: x, y: top), size: size)
         overlay.addSubview(self)
-        // Out of the sidebar's side: its left edge, or its right one beside a sidebar on the right.
-        growsFrom = CGPoint(x: x < rowFrame.minX ? 1 : 0, y: 0.1)
+        self.growsFrom = growsFrom
         present(arrival: .pop)
         IconPickerPanel.current = self
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
