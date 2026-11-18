@@ -523,7 +523,6 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     }
 }
 
-
 // MARK: - Presets
 
 /// The arrangements most people want, so a rule for aria2 or mpv is a menu choice and a look at the fields rather
