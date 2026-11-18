@@ -2869,24 +2869,24 @@ enum DebugBridge {
     static func logMotion(in root: NSView, for milliseconds: Double, to path: String) {
         let start = CACurrentMediaTime()
         var lines: [String] = []
-        func watched(_ view: NSView) -> [NSView] {
-            let mine = view is FloatingPanelView || view is ScrimView || view is ConfirmSheet || view is FormSheet
-                || view is PageDialogSheet || view is WhatsNewSheet || view is TabPreviewView || view is EmptySpaceMark
-            return (mine ? [view] : []) + view.subviews.flatMap(watched)
-        }
-        func shownOpacity(_ view: NSView) -> Float {
-            var opacity: Float = 1
-            var current: NSView? = view
-            while let v = current, v !== root {
-                let layer = v.layer?.presentation() ?? v.layer
-                opacity *= (layer?.opacity ?? 1) * (v.isHidden ? 0 : 1)
-                current = v.superview
-            }
-            return opacity
-        }
         motionTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { _ in
             MainActor.assumeIsolated {
+            @MainActor func watched(_ view: NSView) -> [NSView] {
+                let mine = view is FloatingPanelView || view is ScrimView || view is ConfirmSheet || view is FormSheet
+                    || view is PageDialogSheet || view is WhatsNewSheet || view is TabPreviewView || view is EmptySpaceMark
+                return (mine ? [view] : []) + view.subviews.flatMap(watched)
+            }
+            @MainActor func shownOpacity(_ view: NSView) -> Float {
+                var opacity: Float = 1
+                var current: NSView? = view
+                while let v = current, v !== root {
+                    let layer = v.layer?.presentation() ?? v.layer
+                    opacity *= (layer?.opacity ?? 1) * (v.isHidden ? 0 : 1)
+                    current = v.superview
+                }
+                return opacity
+            }
                 let ms = (CACurrentMediaTime() - start) * 1000
                 // Not committed to the render server yet.
                 for view in watched(root) where view.layer?.presentation() != nil {

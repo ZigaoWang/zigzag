@@ -585,7 +585,7 @@ extension DownloadManager: WKDownloadDelegate {
                 if outcome == .handedOff {
                     items.removeAll { $0.download === download }
                     changed.send(nil)
-                    download.cancel { _ in }
+                    Task { _ = await download.cancel() }
                     return nil
                 }
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
@@ -596,7 +596,7 @@ extension DownloadManager: WKDownloadDelegate {
                 // Don't Allow: nothing saved, row removed.
                 items.removeAll { $0.download === download }
                 changed.send(nil)
-                download.cancel { _ in }
+                Task { _ = await download.cancel() }
                 return nil
             }
         }

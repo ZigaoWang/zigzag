@@ -3997,7 +3997,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 })
             }
 
-            if let url, ExtensionStore.extensionsOffSites(in: profile).contains(site) {
+            if url != nil, ExtensionStore.extensionsOffSites(in: profile).contains(site) {
                 let toggle = Toggle(isOn: false)
                 toggle.onChange = { [weak self] on in
                     guard let self else { return }

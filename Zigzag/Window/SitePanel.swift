@@ -695,7 +695,7 @@ final class SitePanel: FloatingPanelView {
          "fit": (rows + permissionsGroup.rows).map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "linksFit": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "place": ["x": frame.minX, "width": frame.width, "window": superview?.bounds.width ?? 0,
-                   "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? -1]]
+                   "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? CGFloat(-1)]]
     }
 
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.

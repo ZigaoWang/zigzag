@@ -1149,8 +1149,6 @@ final class MiniPlayerView: NSView {
         isGrowing = false
         guard let window, let superview, autoresizingMask.isEmpty else { return }
         let now = frame.offsetBy(dx: MiniPlayer.global(window.frame).minX, dy: MiniPlayer.global(window.frame).minY)
-        // The panel shrinking to the card and the card filling it show together, never one a frame before the other.
-        window.disableScreenUpdatesUntilFlush()
         Tokens.Motion.withoutAnimation {
             globalFrame = isDragging ? now : target
             frame = superview.bounds
