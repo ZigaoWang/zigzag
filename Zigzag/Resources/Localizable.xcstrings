@@ -297,6 +297,17 @@
         }
       }
     },
+    "%@ has no bookmarks Zigzag can read. Export your bookmarks as an HTML file from your browser, then choose it." : {
+      "comment" : "Problem in the Import window. The placeholder is the chosen file's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”里没有 Zigzag 能读取的书签。从你的浏览器把书签导出为 HTML 文件，然后选择它。"
+          }
+        }
+      }
+    },
     "%@ is blocking ads on YouTube." : {
       "comment" : "After the explanation under “Block ads and trackers” in Settings › Privacy, while an ad blocker extension (its name, like uBlock Origin Lite) handles YouTube instead of Zigzag.",
       "localizations" : {
@@ -4597,24 +4608,24 @@
         }
       }
     },
-    "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file)." : {
+    "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s browsing data export (a .zip file)." : {
       "comment" : "Message of the open panel from the Import window's Choose File… button.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选取一个密码导出文件（.csv 文件）或 Safari 的浏览数据导出文件（.zip 文件）。"
+            "value" : "选取一个密码导出文件（.csv 文件）、书签导出文件（.html 文件）或 Safari 的浏览数据导出文件（.zip 文件）。"
           }
         }
       }
     },
-    "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file)." : {
+    "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s exported browsing data (a .zip file)." : {
       "comment" : "Message of the open panel from the welcome window’s Import a password file… link.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选取一个密码导出文件（.csv 文件）或 Safari 导出的浏览数据（.zip 文件）。"
+            "value" : "选取一个密码导出文件（.csv 文件）、书签导出文件（.html 文件）或 Safari 导出的浏览数据（.zip 文件）。"
           }
         }
       }
@@ -21943,13 +21954,13 @@
         }
       }
     },
-    "You can still bring passwords from an exported .csv file, or bookmarks and history from Safari’s export (a .zip file)." : {
+    "You can still bring passwords from an exported .csv file, bookmarks from an exported .html file, or bookmarks and history from Safari’s export (a .zip file)." : {
       "comment" : "Import window, under “No other browsers found on this Mac”: what can still come over from a file.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你仍然可以从导出的 .csv 文件导入密码，或从 Safari 导出的 .zip 文件导入书签和历史记录。"
+            "value" : "你仍然可以从导出的 .csv 文件导入密码，从导出的 .html 文件导入书签，或从 Safari 导出的 .zip 文件导入书签和历史记录。"
           }
         }
       }

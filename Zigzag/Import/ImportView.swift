@@ -529,11 +529,11 @@ final class ImportView: NSView {
         }
     }
 
-    /// A password CSV, or Safari's browsing data zip.
+    /// A password CSV, a bookmarks HTML file, or Safari's browsing data zip.
     private func pickFile() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = String(localized: "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file).", comment: "Message of the open panel from the Import window's Choose File… button.")
+        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html]
+        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s browsing data export (a .zip file).", comment: "Message of the open panel from the Import window's Choose File… button.")
         panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
@@ -1113,7 +1113,7 @@ private final class ImportHero: NSView {
 /// come over from a file.
 final class ImportEmptyState: NSView {
     private let heading = NSTextField(wrappingLabelWithString: String(localized: "No other browsers found on this Mac", comment: "Import window, when no other browser was found."))
-    private let note = NSTextField(wrappingLabelWithString: String(localized: "You can still bring passwords from an exported .csv file, or bookmarks and history from Safari’s export (a .zip file).",
+    private let note = NSTextField(wrappingLabelWithString: String(localized: "You can still bring passwords from an exported .csv file, bookmarks from an exported .html file, or bookmarks and history from Safari’s export (a .zip file).",
                                                                    comment: "Import window, under “No other browsers found on this Mac”: what can still come over from a file."))
 
     override init(frame: NSRect) {

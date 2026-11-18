@@ -213,9 +213,76 @@ private final class FixtureMarker {}
 
 struct SafariExportTests {
     @Test func decodesEntitiesInBookmarks() {
-        #expect(SafariImporter.decodeEntities("Tom &amp; Jerry&#39;s &#x263A; &lt;b&gt;") == "Tom & Jerry's ☺ <b>")
-        #expect(SafariImporter.decodeEntities("a?x=1&amp;y=2") == "a?x=1&y=2")
-        #expect(SafariImporter.decodeEntities("R&D & more &bogus;") == "R&D & more &bogus;")
+        #expect(BookmarksHTML.decodeEntities("Tom &amp; Jerry&#39;s &#x263A; &lt;b&gt;") == "Tom & Jerry's ☺ <b>")
+        #expect(BookmarksHTML.decodeEntities("a?x=1&amp;y=2") == "a?x=1&y=2")
+        #expect(BookmarksHTML.decodeEntities("R&D & more &bogus;") == "R&D & more &bogus;")
+    }
+}
+
+/// A bookmarks.html chosen in the Import window (#330): pages with their folders, as Firefox and Safari write them.
+struct BookmarksHTMLTests {
+    static func fixture(_ name: String) throws -> URL {
+        try #require(Bundle(for: FixtureMarker.self).url(forResource: name, withExtension: "html"))
+    }
+
+    static func summary(_ bookmarks: [ImportBatch.Bookmark]) -> [String] {
+        bookmarks.map { ($0.folders + [$0.title]).joined(separator: " / ") }
+    }
+
+    /// Firefox/LibreWolf: roots flattened, nesting and entities kept, feeds and non-web links skipped.
+    @Test func readsAFirefoxExport() throws {
+        let batch = BookmarksHTML.read(try Self.fixture("firefox-bookmarks"))
+        #expect(batch.problems.isEmpty)
+        #expect(Self.summary(batch.bookmarks) == ["Get Help", "LibreWolf / LibreWolf", "GitHub", "Work / Docs & Notes / Tom & Jerry's — docs",
+                                                  "Work / Plan", "untitled.example.net", "中文页面"])
+        #expect(batch.bookmarks[3].url.absoluteString == "https://example.com/a?x=1&y=2")
+        #expect(batch.bookmarks[6].url.host() == "example.com")
+    }
+
+    /// Safari: no outer list, roots flattened, Reading List skipped.
+    @Test func readsASafariExport() throws {
+        let batch = BookmarksHTML.read(try Self.fixture("safari-bookmarks"))
+        #expect(Self.summary(batch.bookmarks) == ["Apple", "Reading / Example Net", "In the menu", "Travel / Maps",
+                                                  "Travel / \(String(localized: "Folder", comment: "Name of an imported folder that had none.")) / Trains"])
+    }
+
+    /// Chrome/Edge style, with lower-case tags and missing closing tags.
+    @Test func readsAChromeExport() {
+        let html = """
+        <!DOCTYPE NETSCAPE-Bookmark-file-1>
+        <TITLE>Bookmarks</TITLE><H1>Bookmarks</H1>
+        <DL><p>
+            <DT><H3 ADD_DATE="1" LAST_MODIFIED="2" PERSONAL_TOOLBAR_FOLDER="true">Bookmarks bar</H3>
+            <DL><p>
+                <dt><a href='https://a.example/' add_date=1>A
+                <DT><H3>Empty</H3>
+                <DT><H3>Full</H3>
+                <DL><p><DT><A HREF="https://b.example/">B</A></DL><p>
+            </DL><p>
+            <DT><A HREF="https://c.example/">C</A>
+        </DL><p>
+        """
+        #expect(Self.summary(BookmarksHTML.bookmarks(in: html)) == ["A", "Full / B", "C"])
+    }
+
+    @Test func aFileWithoutBookmarksIsAProblem() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("page-\(UUID().uuidString).html")
+        try Data("<html><body><p>Hello</p></body></html>".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let batch = BookmarksHTML.read(file)
+        #expect(batch.bookmarks.isEmpty)
+        #expect(batch.problems.count == 1)
+    }
+
+    /// One new space, as for a browser.
+    @Test func goesIntoASpaceOfItsOwn() throws {
+        let bookmarks = BookmarksHTML.read(try Self.fixture("firefox-bookmarks")).bookmarks
+        let plan = ImportCoordinator.plan(bookmarks, source: "bookmarks.html", in: [SpaceInfo(name: "Personal", color: .sky)],
+                                          on: Profile.defaultID, profileOf: { _ in Profile.defaultID })
+        #expect(plan.count == 1)
+        #expect(plan.first?.space == nil)
+        #expect(plan.first?.name.contains("bookmarks.html") == true)
+        #expect(plan.first?.new.count == bookmarks.count)
     }
 }
 

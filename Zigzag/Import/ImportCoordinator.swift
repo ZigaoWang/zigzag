@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import WebKit
 
 /// "Bring your stuff from another browser": finds the browsers on this Mac, imports what the person picks,
@@ -10,7 +11,7 @@ enum ImportCoordinator {
         case firefox(FirefoxImporter.Browser)
         case safari
         case orion(OrionImporter.Browser)
-        /// A CSV or Safari export zip the person chose.
+        /// A CSV, a bookmarks HTML file or Safari's export zip the person chose.
         case file(URL)
     }
 
@@ -25,6 +26,8 @@ enum ImportCoordinator {
             if let bundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
                 return NSWorkspace.shared.icon(forFile: app.path)
             }
+            // A file's own kind: a bookmarks page, a zip, a CSV.
+            if case .file(let url) = kind, let type = UTType(filenameExtension: url.pathExtension) { return NSWorkspace.shared.icon(for: type) }
             return NSWorkspace.shared.icon(for: .commaSeparatedText)
         }
 
@@ -418,6 +421,7 @@ enum ImportCoordinator {
             case .orion(let browser): return OrionImporter.read(browser, reading)
             case .file(let url):
                 if url.pathExtension.lowercased() == "zip" { return SafariImporter.readExport(url) }
+                if ["html", "htm"].contains(url.pathExtension.lowercased()) { return BookmarksHTML.read(url) }
                 switch CSVImporter.read(url) {
                 case .success(let (_, batch)): return batch
                 case .failure: return ImportBatch(problems: [ImportProblem(message: String(localized: "\(url.lastPathComponent) isn’t a password export Zigzag recognizes. Export a CSV from your password manager or browser and choose it.",
