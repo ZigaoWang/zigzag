@@ -161,6 +161,9 @@ enum Shortcuts {
 
     /// The Globe (fn) key as macOS writes it; keycaps draw it as the globe symbol.
     static let globe = "\u{1F310}\u{FE0E}"
+    /// The Hyper key (⌃⌥⇧⌘ held together); keycaps draw it as the sparkle symbol.
+    static let hyper = "✦"
+    static let hyperFlags: NSEvent.ModifierFlags = [.control, .option, .shift, .command]
 
     /// The keys to draw for a combo, modifiers first in the order macOS shows them.
     static func caps(_ combo: Combo) -> [String] {
@@ -170,10 +173,14 @@ enum Shortcuts {
         let shiftedLetter = combo.key.uppercased() == combo.key && combo.key.lowercased() != combo.key
         // Globe first, as the menu bar shows (Enter Full Screen is 🌐F).
         if m.contains(.function) { keys.append(globe) }
-        if m.contains(.control) { keys.append("⌃") }
-        if m.contains(.option) { keys.append("⌥") }
-        if m.contains(.shift) || shiftedLetter { keys.append("⇧") }
-        if m.contains(.command) { keys.append("⌘") }
+        if m.isSuperset(of: hyperFlags) {
+            keys.append(hyper)
+        } else {
+            if m.contains(.control) { keys.append("⌃") }
+            if m.contains(.option) { keys.append("⌥") }
+            if m.contains(.shift) || shiftedLetter { keys.append("⇧") }
+            if m.contains(.command) { keys.append("⌘") }
+        }
         keys.append(name(of: combo.key))
         return keys
     }
