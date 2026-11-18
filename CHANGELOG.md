@@ -19,6 +19,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Site Controls has a width of its own instead of the sidebar's, so its rows no longer get cut short or wrap in a narrow sidebar. From the sidebar it reaches past a narrow one over the page, and with the address bar above the page it opens under the address at its usual width. Thanks to [Tuszy42](https://github.com/Tuszy42). ([#335](https://github.com/ZigaoWang/zigzag/issues/335))
 - Extensions that need a recent Chrome, like Heylogin, install from the Chrome Web Store instead of being called no longer available: Zigzag told the store it was Chrome 140. Thanks to [datarip](https://github.com/datarip). ([#336](https://github.com/ZigaoWang/zigzag/issues/336))
 - Import from a file takes the bookmarks.html every browser exports, from Firefox, LibreWolf, Safari, Chrome and Edge. Its pages come over in a space of their own with their folders, as from a browser on this Mac. Thanks to [mrfragger](https://github.com/mrfragger). ([#330](https://github.com/ZigaoWang/zigzag/issues/330))
+- The mini player's arrow back to its tab always does something: it finds the tab in whichever window has it now and brings that window forward, ends the card when the tab is already on screen, and closes the card when the tab is gone. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#333](https://github.com/ZigaoWang/zigzag/issues/333))
 
 ## [0.9.2] - 2026-11-18
 

@@ -553,3 +553,25 @@ struct MiniPlayerTests {
         #expect(button.layer?.shadowOpacity == 0.6)
     }
 }
+
+/// The back arrow's tab lookup (#333).
+@MainActor struct MiniPlayerReturnTests {
+    private var space: UUID { Library.shared.spaces[0].id }
+
+    @Test func findsTheTabInWhicheverWindowHoldsIt() {
+        let here = TabManager(spaceID: space), there = TabManager(spaceID: space)
+        defer { here.invalidate(); there.invalidate() }
+        let tab = Tab(url: URL(string: "https://example.com/video"), title: "Video", spaceID: space)
+        here.adopt([tab], in: space)
+        let holds: (TabManager, Tab) -> Bool = { $0.tab(with: $1.id) === $1 }
+        #expect(MiniPlayer.home(of: tab, here: here, in: [here, there], holds: holds) === here)
+        // Moved to the other window: found there.
+        _ = there.take(tab, from: here, at: 0)
+        #expect(here.tab(with: tab.id) == nil)
+        #expect(MiniPlayer.home(of: tab, here: here, in: [here, there], holds: holds) === there)
+        // Closed, or no tab at all: nowhere.
+        there.close(tab)
+        #expect(MiniPlayer.home(of: tab, here: here, in: [here, there], holds: holds) == nil)
+        #expect(MiniPlayer.home(of: nil, here: here, in: [here, there], holds: holds) == nil)
+    }
+}
