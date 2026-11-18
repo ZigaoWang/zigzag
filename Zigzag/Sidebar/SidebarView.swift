@@ -1407,7 +1407,7 @@ final class SidebarView: NSView {
     private func bottomFrames() -> (nowPlaying: [NSRect], update: NSRect, listBottom: CGFloat) {
         let pad = Tokens.Sidebar.edge
         var bottom = bottomBar.frame.minY
-        let updateHeight = Tokens.Sidebar.nowPlayingHeight
+        let updateHeight = Tokens.Sidebar.updateCardHeight
         let update = NSRect(x: pad, y: bottom - (updateCard.isHidden ? 0 : updateHeight), width: bounds.width - pad * 2, height: updateHeight)
         if !updateCard.isHidden { bottom = update.minY - Tokens.Space.x1 }
         let playingHeight = Tokens.Sidebar.nowPlayingHeight
@@ -1431,8 +1431,9 @@ final class SidebarView: NSView {
             Tokens.Motion.settle(updateCard)
             updateCard.isHidden = false
             needsLayout = true
-            updateCard.alphaValue = 0
-            Tokens.Motion.animate(Tokens.Motion.change) { self.updateCard.animator().alphaValue = 1 }
+            layoutSubtreeIfNeeded()
+            // In from a touch smaller as it fades in, as a closed one goes out (only the fade with Reduce Motion).
+            Tokens.Motion.present(updateCard, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: true)
             return
         }
         updateCardFadingOut = true

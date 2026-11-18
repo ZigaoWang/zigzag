@@ -1,14 +1,16 @@
 import AppKit
 
-/// An update that's ready, at the foot of the sidebar: Zigzag's icon, "Update ready" and the version, a Restart that
+/// An update that's ready, at the foot of the sidebar: Zigzag's icon, "Update ready" over the version, a Restart that
 /// restarts into it with everything back, and a close button that puts it away until Zigzag restarts (the update
-/// still installs when Zigzag quits). Laid out as the Now Playing card is, a row's height with a row's columns; a
-/// click anywhere on it restarts, as Restart does.
+/// still installs when Zigzag quits). Two lines, so the version is always whole, on a row's columns; a click
+/// anywhere on it restarts, as Restart does.
 final class UpdateCard: InteractiveView {
     private let icon = NSImageView()
     private let title = Label(String(localized: "Update ready", comment: "The sidebar's card for an update that's downloaded and ready: Restart installs it."),
                               font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
-    private let version = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textSecondary)
+    private let version = Label("", font: UpdateCard.versionFont, color: Tokens.Color.textSecondary)
+    /// The version under the title: a section label's size, regular, in quiet ink.
+    private static var versionFont: NSFont { .systemFont(ofSize: Tokens.Sidebar.labelText) }
     let restartButton = RestartPill(title: String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General."))
     /// Last, where a tab row's close is.
     let hideButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Not Now", comment: "Tooltip and VoiceOver action of the close button on the sidebar's update card: puts the card away; the update installs when Zigzag quits."))
@@ -22,6 +24,7 @@ final class UpdateCard: InteractiveView {
         layer?.cornerCurve = .continuous
         icon.image = NSApp.applicationIconImage
         icon.imageScaling = .scaleProportionallyUpOrDown
+        title.fadesTail = true
         version.fadesTail = true
         [icon, title, version, restartButton, hideButton].forEach { addSubview($0) }
         onClick = { [weak self] _ in self?.onRestart?() }
@@ -31,7 +34,7 @@ final class UpdateCard: InteractiveView {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.title.font = Tokens.Font.sidebarRow()
-                self.version.font = Tokens.Font.sidebarRow()
+                self.version.font = UpdateCard.versionFont
                 self.hideButton.symbolSize = Tokens.Sidebar.rowGlyph
                 self.restartButton.sizeChanged()
                 self.needsLayout = true
@@ -79,24 +82,31 @@ final class UpdateCard: InteractiveView {
         let restart = NSRect(x: hide.minX - Self.buttonGap - pill, y: y, width: pill, height: b)
         hideButton.frame = hide
         restartButton.frame = restart
-        // "Update ready" whole while it fits, then the version after it, fading out at its end when it runs short.
+        // The two lines on the text column, up to Restart, whose own room either side of its word is the gap before
+        // it. Set by their capitals: the title's tops to the version's baseline sit in the middle, as much room above
+        // as below.
         let x = icon.frame.maxX + SidebarRowView.titleOffset
-        // Restart's own room either side of its word is the gap before it.
-        let end = restart.minX
-        let h = ceil(title.intrinsicContentSize.height)
-        let titleWidth = min(ceil(title.inkWidth + Label.inset * 2), max(0, end - x))
-        title.frame = NSRect(x: x, y: title.centeredY(in: bounds.height), width: titleWidth, height: h)
-        // A word space from the title's last letter to the version's first, the labels' insets set aside.
-        let versionX = title.frame.maxX - Label.inset * 2 + Self.versionGap
-        version.frame = NSRect(x: versionX, y: version.centeredY(in: bounds.height), width: max(0, end - versionX), height: h)
-        version.isHidden = version.frame.width < Tokens.Space.x4
+        let width = max(0, restart.minX - x)
+        let titleFont = title.font ?? Tokens.Font.sidebarRow(), versionFont = version.font ?? Self.versionFont
+        let block = titleFont.capHeight + Self.lineGap + versionFont.capHeight
+        let top = (bounds.height - block) / 2
+        title.frame = NSRect(x: x, y: lineY(title, capsMiddle: top + titleFont.capHeight / 2), width: width, height: title.lineHeight)
+        version.frame = NSRect(x: x, y: lineY(version, capsMiddle: top + block - versionFont.capHeight / 2), width: width, height: version.lineHeight)
+        title.fadeTail()
         version.fadeTail()
+    }
+
+    /// Where a line goes for its capitals' middle to land at `capsMiddle`, on the screen's pixels.
+    private func lineY(_ label: Label, capsMiddle: CGFloat) -> CGFloat {
+        let scale = window?.backingScaleFactor ?? 2
+        let below = Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarRow(), lineHeight: label.lineHeight)
+        return ((capsMiddle - label.lineHeight / 2 - below) * scale).rounded() / scale
     }
 
     /// Between Restart and the close button, as between a row's buttons.
     private static let buttonGap: CGFloat = 2
-    /// Between "Update ready" and the version: a word space.
-    private static let versionGap: CGFloat = 4
+    /// From the title's baseline to the tops of the version's capitals.
+    private static let lineGap: CGFloat = 5
 
     override func stateDidChange(animated: Bool) {
         let theme = Brand.Theme.for(self)
