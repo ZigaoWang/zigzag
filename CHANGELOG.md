@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - ⌘-clicking a video on YouTube always opens it in a new tab. Some ⌘-clicks went to the video in the tab you were on, because YouTube's own script followed the link there. Now a ⌘-click on a link opens it in a new tab whatever the page does with clicks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#317](https://github.com/ZigaoWang/zigzag/issues/317))
 
+- Settings › Privacy › Sites shows each choice made for a site on a row of its own, with the same control as in Site Controls and a × that forgets just that one, instead of one sentence and a single Forget. JavaScript and Extensions now sit on Site Controls' Permissions page beside the camera and the rest, and turning extensions off for a site is kept per profile. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#311](https://github.com/ZigaoWang/zigzag/issues/311), [#312](https://github.com/ZigaoWang/zigzag/issues/312), [#313](https://github.com/ZigaoWang/zigzag/issues/313), [#314](https://github.com/ZigaoWang/zigzag/issues/314))
 ## [0.9.2] - 2026-11-18
 
 Sites that always open in the space you choose, Zap Element and Edit Style to hide parts of a site or restyle it, an Archive list, download rules that hand links and files to other apps, tabs shared between windows, JavaScript off per site, a History menu like Safari's, and smooth scrolling on high refresh rate displays.

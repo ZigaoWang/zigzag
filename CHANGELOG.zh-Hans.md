@@ -18,6 +18,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 在 YouTube 上按住 ⌘ 点视频，现在总会在新标签页打开。以前有时会在当前标签页打开，因为 YouTube 自己的脚本把链接接了过去。现在按住 ⌘ 点链接，不管网页怎么处理点按，都会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#317](https://github.com/ZigaoWang/zigzag/issues/317))
 
+- “设置 › 隐私 › 网站”里，给一个网站做的每个选择各占一行，用的是和网站设置里一样的控件，每行都有一个 ×，只忘记那一项，不再是一句话加一个“忘记”。JavaScript 和扩展现在放在网站设置的“权限”页，和摄像头等放在一起；给某个网站关掉扩展会按个人资料分别记住。感谢 [Lakeland97](https://github.com/Lakeland97)。([#311](https://github.com/ZigaoWang/zigzag/issues/311)、[#312](https://github.com/ZigaoWang/zigzag/issues/312)、[#313](https://github.com/ZigaoWang/zigzag/issues/313)、[#314](https://github.com/ZigaoWang/zigzag/issues/314))
 ## [0.9.2] - 2026-11-18
 
 网站可以始终在你选的空间中打开；“隐藏元素”和“编辑样式”可以藏起网站的一部分或改它的样子；归档有了自己的列表；下载规则能把链接和文件交给其他 App；窗口可以共享标签页；可以给单个网站关掉 JavaScript；“历史记录”菜单更像 Safari；高刷新率屏幕上滚动更流畅。
