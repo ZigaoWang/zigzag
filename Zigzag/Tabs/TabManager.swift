@@ -1154,11 +1154,11 @@ final class TabManager {
     /// Turns a tab into a bookmark at the given position. Its page stays open behind the bookmark. Half of a split
     /// pins the pair, and a page of a tile group the whole group (#203): every page, side by side as it is, still
     /// open together.
-    func bookmarkTab(_ tab: Tab, at index: Int? = nil, in spaceID: UUID? = nil) {
+    func bookmarkTab(_ tab: Tab, at index: Int? = nil, in spaceID: UUID? = nil, keepingGroup: Bool = true) {
         guard tab.bookmarkID == nil, let url = tab.url else { return }
         let space = spaceID ?? tab.spaceID
         // A group of tabs (#209) pins whole, as one folder named after it, its splits still side by side.
-        if let groupID = tab.groupID, let group = group(groupID) {
+        if keepingGroup, let groupID = tab.groupID, let group = group(groupID) {
             let members = tabs(inGroup: groupID)
             if !members.isEmpty, members.allSatisfy({ $0.url != nil }) {
                 let memberIDs = Set(members.map(\.id))

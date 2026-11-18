@@ -219,6 +219,17 @@ import Testing
         }
     }
 
+    /// Dragging one tab of a group to the pinned pages pins just that tab; the group keeps the rest.
+    @Test func aTabPinnedOutOfItsGroupLeavesTheRest() throws {
+        try withTabs(["0", "1"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Two"))
+            manager.bookmarkTab(tabs[0], in: space, keepingGroup: false)
+            let page = try #require(tabs[0].bookmarkID)
+            #expect(Library.shared.pinnedGroup(containing: page) == nil)
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == [tabs[1].id])
+        }
+    }
+
     /// A tab in no group still pins on its own: one page, in no folder.
     @Test func aTabOutsideAGroupStillPinsOnItsOwn() throws {
         try withTabs(["0"]) { manager, tabs, space in

@@ -2644,10 +2644,10 @@ extension BrowserWindowController: SidebarDelegate {
         }), duration: Toast.undoDuration, in: self)
     }
 
-    /// Turns a tab into a bookmark, undoably. Half of a split pins the pair.
-    func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID) {
+    /// Turns a tab into a bookmark, undoably. Half of a split pins the pair; a tab of a group, the group unless `keepingGroup` is off.
+    func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID, keepingGroup: Bool = true) {
         Tutorial.complete("pin")
-        pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID) }
+        pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: keepingGroup) }
     }
 
     /// Turns a bookmark back into a tab, undoably. Half of a pinned split unpins the pair.
@@ -2803,7 +2803,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {
         // Pins are shared by every window: a private one's tabs stay out of them.
         guard !tabManager.isPrivate else { return }
-        confirmProfileCrossing([tab], to: spaceID) { [weak self] in self?.bookmarkWithUndo(tab, at: index, in: spaceID) }
+        confirmProfileCrossing([tab], to: spaceID) { [weak self] in self?.bookmarkWithUndo(tab, at: index, in: spaceID, keepingGroup: false) }
     }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?, group: UUID?) {
         // Pins are shared by every window: a private one doesn't take them away.
@@ -3235,7 +3235,7 @@ extension BrowserWindowController: SidebarDelegate {
             case .bookmark(let id): return id
             case .tab(let id):
                 guard let tab = tabManager.tab(with: id), tab.url != nil else { return nil }
-                if tab.bookmarkID == nil { bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
+                if tab.bookmarkID == nil { bookmarkWithUndo(tab, at: nil, in: tab.spaceID, keepingGroup: false) }
                 return tab.bookmarkID
             default: return nil
             }
