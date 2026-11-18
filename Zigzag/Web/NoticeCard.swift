@@ -240,8 +240,8 @@ final class NoticeCard: FloatingPanelView {
         needsLayout = true
     }
 
-    /// The colour of the icon: the ink of the text while it runs, green when it worked, and the app's own
-    /// something-to-fix colour when it didn't (its red is kept for what can't be undone).
+    /// The color of the icon: the ink of the text while it runs, green when it worked, and the app's own
+    /// something-to-fix color when it didn't (its red is kept for what can't be undone).
     private func ink(for tone: NoticeTone) -> NSColor {
         switch tone {
         case .plain: Tokens.Color.textPrimary
@@ -273,7 +273,7 @@ final class NoticeCard: FloatingPanelView {
         return CardOverThePage.pad + max(CardOverThePage.iconSide, textHeight(for: textWidth)) + CardOverThePage.pad
     }
 
-    /// At the top of the pane the page is in, centred: the same place a site's question comes up, so the two are read
+    /// At the top of the pane the page is in, centered: the same place a site's question comes up, so the two are read
     /// from the same spot.
     private func place(in controller: PromptHost) {
         surfaceTint = nil

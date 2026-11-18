@@ -1124,7 +1124,7 @@ struct DownloadRuleTests {
         // Dropped where it already is, nothing moves: it is already just before that rule.
         #expect(moved([a, b, c], a.id, before: b.id) == order([a, b, c]))
         #expect(moved([a, b, c], b.id, before: c.id) == order([a, b, c]))
-        // A file type sitting between them stays where it is: the handoff is placed before its neighbour, not last.
+        // A file type sitting between them stays where it is: the handoff is placed before its neighbor, not last.
         #expect(moved([a, type, b], b.id, before: a.id) == order([b, a, type]))
         // A rule that isn't in the list it was dropped into leaves the order alone.
         #expect(moved([a, b], c.id, before: a.id) == order([a, b]))
