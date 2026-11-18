@@ -1071,9 +1071,13 @@ final class SitePanel: FloatingPanelView {
         row.isHidden = shown.isEmpty && !web
         // Only the site's own answers count: WebRTC blocked by the setting alone says nothing about this site.
         let own = shown.filter { isOwn($0) }
-        let choices = own.map { choice($0, origin: origin) }
-        row.value = own.isEmpty ? "" : PermissionChoice.summary(choices)
-        row.shortValue = own.isEmpty ? "" : PermissionChoice.shortSummary(choices)
+        var choices = own.map { choice($0, origin: origin) }
+        // JavaScript and extensions are on this page too, so a site's own choice for them counts: JavaScript off
+        // here never reads as Ask.
+        if web, SiteJavaScript.isOwn(url, in: tab) { choices.append(SiteJavaScript.allows(url, in: tab) ? .allow : .block) }
+        if web, !isPrivate, ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) { choices.append(.block) }
+        row.value = choices.isEmpty ? "" : PermissionChoice.summary(choices)
+        row.shortValue = choices.isEmpty ? "" : PermissionChoice.shortSummary(choices)
         needsLayout = true
     }
 
