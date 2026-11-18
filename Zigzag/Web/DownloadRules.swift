@@ -135,6 +135,11 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     /// or its cookies, to another app or script is exactly what could break that promise. A private window runs no
     /// rule that hasn't been let in, and the link or download carries on as if no rule had matched.
     var runsInPrivateWindows = false
+    /// What this rule was told about handing off, for **every site**: "handOff", "browser" or "deny". Nil is a rule
+    /// that has only been answered per site (kept under `handoff:<id>` in `SitePermissions`) or not at all. It is the
+    /// third scope a question about a rule offers, and it belongs here because it is the rule's own answer: it travels
+    /// with the rule and goes when the rule does.
+    var handoffAnswer: String?
     var action: DownloadRuleAction
 
     /// A regex that doesn't compile is kept as typed but never matches, so a half-written rule can't catch anything.
@@ -264,7 +269,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, action
+        case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, handoffAnswer, action
     }
 
     /// Older files may lack a key a newer Zigzag added, and a kind this build doesn't know (a file-type rule from
@@ -290,6 +295,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         pattern = value(String.self, .pattern) ?? ""
         isCaseSensitive = value(Bool.self, .isCaseSensitive) ?? false
         runsInPrivateWindows = value(Bool.self, .runsInPrivateWindows) ?? false
+        handoffAnswer = value(String.self, .handoffAnswer)
         action = value(DownloadRuleAction.self, .action) ?? DownloadRuleAction(kind: .openURL)
         // A rule that isn't an object, has no action, or names a kind this build doesn't know is kept, but not run:
         // it could not do what it says, and a prompt for it would be a question with no true answer. A `.contains`
@@ -400,6 +406,12 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     var appPath = ""
     /// Open URL: the URL to open, with tokens such as `{encoded_link}`.
     var urlTemplate = ""
+    /// Open URL: where a *web* address opens. Ask is a rule that has not been told yet: the hand-off card picks a place
+    /// for that one hand-off only, and the separate "Where should this open" question's Always is what keeps a place
+    /// here. Default Browser is what these rules did before Zigzag had places of its own, and is what a rule from an
+    /// older file keeps. An address that isn't the web's (mpv://, a magnet) belongs to the app that handles it and
+    /// ignores this.
+    var openIn: OpenInZigzag.Choice = .ask
     /// Run Script: the executable, or a `.sh` file run by `/bin/sh`.
     var scriptPath = ""
     /// Run Script: one argv value each. A token is substituted into its own argument, never joined into a shell line.
@@ -482,7 +494,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     init(kind: Kind) { self.kind = kind }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, appPath, urlTemplate, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle, folderPath
+        case kind, appPath, urlTemplate, openIn, scriptPath, arguments, rpcEndpoint, rpcMethod, rpcParameters, rpcStyle, folderPath
     }
 
     init(from decoder: Decoder) throws {
@@ -491,7 +503,6 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             guard let container else { return nil }
             return try? container.decodeIfPresent(type, forKey: key)
         }
-        func wasSet(_ key: CodingKeys) -> Bool { container?.contains(key) ?? false }
         if let rawKind = value(String.self, .kind) {
             if let known = Kind(rawValue: rawKind) { kind = known } else { kind = .openURL; wasDecodedFromUnknownKind = true }
         } else {
@@ -501,6 +512,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
         appPath = value(String.self, .appPath) ?? ""
         urlTemplate = value(String.self, .urlTemplate) ?? ""
+        openIn = value(OpenInZigzag.Choice.self, .openIn) ?? .defaultBrowser
         scriptPath = value(String.self, .scriptPath) ?? ""
         arguments = value([String].self, .arguments) ?? []
         rpcEndpoint = value(String.self, .rpcEndpoint) ?? ""
@@ -820,9 +832,12 @@ final class DownloadRulesStore {
 
     private(set) var rules: [DownloadRule]
     let changed = Signal<Void>()
+    /// The file the list is kept in. A test passes one of its own, so it never reads or writes the Mac's list.
+    private let file: URL
 
-    init() {
-        rules = JSONStore.load([DownloadRule].self, from: Paths.downloadRules) ?? []
+    init(file: URL = Paths.downloadRules) {
+        self.file = file
+        rules = JSONStore.load([DownloadRule].self, from: file) ?? []
     }
 
     /// The first rule that catches `url`, or none. `appliesToLinks` is false for a download. `filename` is the
@@ -899,7 +914,16 @@ final class DownloadRulesStore {
 
     func update(_ rule: DownloadRule) {
         guard let index = rules.firstIndex(where: { $0.id == rule.id }) else { return }
-        rules[index] = rule
+        let old = rules[index]
+        // An answer was given to the behaviour the rule had then. A different script or URL is a different thing to
+        // hand a link or download to, so the answers must not silently rule the new one; its name or another field
+        // doesn't change what runs, and leaves them alone.
+        var saved = rule
+        if old.action.scriptPath != rule.action.scriptPath || old.action.urlTemplate != rule.action.urlTemplate {
+            saved.handoffAnswer = nil
+            Self.forgetHandoffAnswers(for: rule.id)
+        }
+        rules[index] = saved
         save()
     }
 
@@ -919,7 +943,16 @@ final class DownloadRulesStore {
     func remove(id: UUID) {
         rules.removeAll { $0.id == id }
         HandoffSecrets.removeSecret(for: id)
+        // The answers sites gave this rule go with it: kept under its id, nothing else could ever read them again.
+        Self.forgetHandoffAnswers(for: id)
         save()
+    }
+
+    /// Forgets the answers sites gave the rule with `id`: kept under `handoff:<id>`, only that rule could read them,
+    /// and they were given to the behavior it had when they were kept.
+    private static func forgetHandoffAnswers(for id: UUID) {
+        let subject = PermissionSubject.handoff(id)
+        for site in SitePermissions.sites(prefix: subject) { SitePermissions.remember(nil, subject: subject, origin: site) }
     }
 
     /// The rules with the one whose `id` this is moved to just before `before` (`nil` puts it last). Kept apart from
@@ -958,7 +991,7 @@ final class DownloadRulesStore {
     }
 
     private func save() {
-        JSONStore.save(rules, to: Paths.downloadRules)
+        JSONStore.save(rules, to: file)
         changed.send()
     }
 }

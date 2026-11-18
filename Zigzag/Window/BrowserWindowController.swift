@@ -66,6 +66,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         window.contentView = root
+        window.sidebar = sidebar
         window.setFrame(rect, display: false)
         root.sidebarVisible = sidebarVisible
         // A width saved before the toolbar's buttons grew can be narrower than they now need.
@@ -2258,7 +2259,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         switch disposition {
         case .currentTab:
-            if let tab = tabManager.selectedTab {
+            // The tab that asked, never the selected one: in a split they are different panes.
+            if let tab = opener ?? tabManager.selectedTab {
                 tab.load(url, by: sender, httpFallback: httpFallback)
             } else {
                 tabManager.newTab(url: url, by: sender, httpFallback: httpFallback)
@@ -2350,19 +2352,19 @@ extension BrowserWindowController: SwipeArrowHost {
 extension BrowserWindowController: TabHost {
     var hostWindow: NSWindow? { window }
 
-    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // Inside peek, another peek just navigates the card.
         // A page's link: the page's doing wherever it opens, never yours (Tab sends only links to the web here).
-        if tab.isPeek, disposition == .peek { tab.load(url, by: .page); return }
+        if tab.isPeek, disposition == .peek { tab.load(url, by: sender); return }
         // A result opened from a search page keeps the search one Back away.
         if disposition == .backgroundTab || disposition == .foregroundTab, let current = tab.url, SearchFolding.isSearchResultsPage(current),
            let history = tab.interactionStateForSaving {
             let newTab = tabManager.newTab(url: nil, select: disposition == .foregroundTab, opener: tab, title: url.host(), site: url)
-            newTab.restoreHistory(history, thenLoad: url, by: .page)
+            newTab.restoreHistory(history, thenLoad: url, by: sender)
             if disposition == .backgroundTab { newTabNote.show(newTab, site: url) }
             return
         }
-        open(url, disposition: disposition, opener: tab, allowSwitch: false, by: .page)
+        open(url, disposition: disposition, opener: tab, allowSwitch: false, by: sender)
     }
 
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool {
@@ -2991,6 +2993,58 @@ extension BrowserWindowController: SidebarDelegate {
             self?.setIconWithUndo(icon, forBookmark: id)
         }
         panel.show(beside: anchor, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
+    }
+
+    /// Choose Image…: an image file as the tab's icon (#303), copied into Zigzag's folder.
+    func chooseImageIcon(for tab: Tab) {
+        let id = tab.id
+        pickPageImage { [weak self] icon in
+            guard let self, let tab = self.tabManager.tab(with: id) else { return }
+            self.setIconWithUndo(icon, for: tab)
+        }
+    }
+
+    /// Choose Image… for a pinned page or a favorite.
+    func chooseImageIcon(forBookmark id: UUID) {
+        guard !tabManager.isPrivate, Library.shared.bookmark(id) != nil else { return }
+        pickPageImage { [weak self] icon in self?.setIconWithUndo(icon, forBookmark: id) }
+    }
+
+    private func pickPageImage(_ done: @escaping (String) -> Void) {
+        guard let window else { return }
+        closeFloatingPanels()
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = PageImageIcon.types
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.")
+        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.")
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            self?.usePageImage(url, done)
+        }
+    }
+
+    /// Reads the file into an icon, or says why it can't be one.
+    func usePageImage(_ url: URL, _ done: @escaping (String) -> Void) {
+        Task { [weak self] in
+            do throws(PageImageIcon.Failure) {
+                done(try await PageImageIcon.store(url))
+            } catch {
+                guard let host = self?.window?.contentView else { return }
+                ConfirmSheet.notice(in: host, title: String(localized: "Couldn’t use this picture", comment: "Title of the notice when an image file chosen as a page's icon can't be used."),
+                                    message: Self.pageImageFailure(error))
+            }
+        }
+    }
+
+    static func pageImageFailure(_ failure: PageImageIcon.Failure) -> String {
+        switch failure {
+        case .tooLarge:
+            String(localized: "That file is larger than 1 MB. Choose a smaller image.", comment: "Message of the notice when an image file chosen as a page's icon is too big.")
+        case .unreadable:
+            String(localized: "Zigzag can’t read that file as an image. Choose an SVG, PNG, JPEG, HEIC, PDF or ICNS file.", comment: "Message of the notice when an image file chosen as a page's icon can't be read.")
+        }
     }
 
     func listSplit(_ tab: Tab, with other: Tab, otherOnRight: Bool) { splitWithUndo(tab, with: other, otherOnRight: otherOnRight) }

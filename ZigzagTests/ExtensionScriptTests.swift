@@ -997,6 +997,27 @@ struct ExtensionScriptTests {
         #expect(ExtensionStore.filled(worker) == nil)
     }
 
+    @Test func wasmPolicySurvivesWebKitDroppingItsKeyword() throws {
+        // Bitwarden's: script loading keeps its limits under script-src-elem, attributes and workers under their own.
+        let bitwarden = "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+        #expect(ExtensionStore.wasmCompatiblePolicy(bitwarden)
+                == "script-src-elem 'self'; script-src-attr 'none'; worker-src 'self'; object-src 'self'")
+        // Directives the extension set itself stay as they are.
+        #expect(ExtensionStore.wasmCompatiblePolicy("script-src 'self' 'WASM-UNSAFE-EVAL'; worker-src blob:;")
+                == "script-src-elem 'self'; script-src-attr 'none'; worker-src blob:")
+        // No WebAssembly asked for, or a default-src it would fall back to: left alone.
+        #expect(ExtensionStore.wasmCompatiblePolicy("script-src 'self'; object-src 'self'") == nil)
+        #expect(ExtensionStore.wasmCompatiblePolicy("default-src 'self'; script-src 'self' 'wasm-unsafe-eval'") == nil)
+
+        let manifest: [String: Any] = ["manifest_version": 3, "content_security_policy": ["extension_pages": bitwarden, "sandbox": "sandbox allow-scripts; script-src 'self'"]]
+        let policies = try #require(ExtensionStore.allowingWasm(manifest)["content_security_policy"] as? [String: String])
+        #expect(policies["extension_pages"]?.hasPrefix("script-src-elem 'self';") == true)
+        #expect(policies["sandbox"] == "sandbox allow-scripts; script-src 'self'")
+        // Manifest V2 isn't parsed with the restriction.
+        let v2: [String: Any] = ["manifest_version": 2, "content_security_policy": ["extension_pages": bitwarden]]
+        #expect((ExtensionStore.allowingWasm(v2)["content_security_policy"] as? [String: String])?["extension_pages"] == bitwarden)
+    }
+
     @Test func theLockStandInStaysOffWebsitesAndInstallsOnce() {
         let run = { (origin: String) -> JSContext in
             let context = JSContext()!

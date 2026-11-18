@@ -662,8 +662,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     /// The strip's Copy Link, and ⇧⌘C: the page's address, with the toast a browser window shows.
     @objc func copyPageURL(_ sender: Any?) {
         guard let url = tab.url, !isLeaving else { return }
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        CleanLink.write(url, title: tab.displayTitle)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
     }
 
@@ -920,16 +919,16 @@ extension MiniWindowController: TabHost {
     var hostWindow: NSWindow? { window }
 
     /// One page lives here: a link that asks for a tab of its own goes to a browser window, as a sign-in popup's does.
-    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
+    func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition, by sender: Tab.LoadSender = .page) {
         // A page's link (Tab sends only links to the web here): the page's doing wherever it opens.
         switch disposition {
         case .currentTab, .peek:
-            tab.load(url, by: .page)
+            tab.load(url, by: sender)
         case .newWindow, .privateWindow:
-            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: .page)
+            WindowManager.shared.newWindow(url: url, showCommandBar: false, isPrivate: disposition == .privateWindow, by: sender)
         case .foregroundTab, .backgroundTab:
             let target = Self.browserWindow()
-            target.open(url, disposition: disposition, allowSwitch: false, by: .page)
+            target.open(url, disposition: disposition, allowSwitch: false, by: sender)
             if disposition == .foregroundTab { target.window?.makeKeyAndOrderFront(nil) }
         }
     }

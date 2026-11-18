@@ -385,12 +385,12 @@ final class SitePanel: FloatingPanelView {
             self.close()
             if let controller = self.controller { controller.sharePage(nil); return }
             guard let opener else { return }
-            NSSharingServicePicker(items: [url as NSURL]).show(relativeTo: opener.bounds, of: opener, preferredEdge: .minY)
+            NSSharingServicePicker(items: [CleanLink.clean(url) as NSURL]).show(relativeTo: opener.bounds, of: opener, preferredEdge: .minY)
         }))
         let copyLink = String(localized: "Copy Link", comment: "Action in the site panel: copies the page's address.")
         specs.append(("link", copyLink, copyLink, false, { [weak self] in
             guard let self else { return }
-            if let controller = self.controller { controller.copyLink(self.url) } else { self.mini?.copyPageURL(nil) }
+            if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.mini?.copyPageURL(nil) }
             self.close()
         }))
         if controller != nil, PageScreenshot.canTake(tab), !readerOn {

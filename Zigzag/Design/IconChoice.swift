@@ -1,6 +1,7 @@
 import AppKit
 
-/// An icon you can give a folder or a space: one of a short list of SF Symbols, or any emoji.
+/// An icon you can give a folder or a space: one of a short list of SF Symbols, or any emoji. A page's can also be an
+/// image file you chose (`PageImageIcon`).
 enum IconChoice {
     /// Enough to tell work, study, money, making things and the rest apart at a glance.
     static let symbols: [String] = [
@@ -14,9 +15,14 @@ enum IconChoice {
 
     static func isSymbol(_ icon: String) -> Bool { NSImage(systemSymbolName: icon, accessibilityDescription: nil) != nil }
 
-    /// The icon at `size`: a symbol as a template, so it takes the color of the text around it; an emoji in its own.
+    /// An emoji: neither a symbol nor an image file.
+    static func isEmoji(_ icon: String) -> Bool { !PageImageIcon.isImage(icon) && !isSymbol(icon) }
+
+    /// The icon at `size`: a symbol as a template, so it takes the color of the text around it; an emoji or an image
+    /// file in its own.
     static func image(_ icon: String, size: CGFloat) -> NSImage {
         if isSymbol(icon) { return Tokens.Symbol.image(icon, size: size) }
+        if PageImageIcon.isImage(icon) { return PageImageIcon.image(icon, points: size) ?? Tokens.Symbol.image("globe", size: size) }
         return emoji(icon, size: size)
     }
 
@@ -26,12 +32,16 @@ enum IconChoice {
     private static var pageIconIDs: Set<ObjectIdentifier> = []
 
     /// An icon you gave a tab, a pinned page or a favorite, in a favicon's square: a symbol as a template, so whatever
-    /// draws it gives it the ink around it; an emoji in its own colors.
+    /// draws it gives it the ink around it; an emoji or an image file in its own colors. An image file that's gone
+    /// shows the globe, as a site with no icon does.
     static func pageIcon(_ icon: String) -> NSImage {
         if let made = pageIcons[icon] { return made }
         let side: CGFloat = 16
         let image: NSImage
-        if isSymbol(icon) {
+        if PageImageIcon.isImage(icon) {
+            guard let kept = PageImageIcon.image(icon, points: side) else { return pageIcon("globe") }
+            image = kept
+        } else if isSymbol(icon) {
             let symbol = Tokens.Symbol.image(icon, size: Tokens.Symbol.row)
             // A wide symbol shrinks to fit the square rather than spilling out of it.
             image = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
@@ -152,7 +162,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
         noResults.isHidden = true
         addSubview(noResults)
         emojiField.field.delegate = self
-        if let selected, !IconChoice.isSymbol(selected) { emojiField.stringValue = selected; shownEmoji = selected }
+        if let selected, IconChoice.isEmoji(selected) { emojiField.stringValue = selected; shownEmoji = selected }
         addSubview(emojiField)
         refresh()
         // Made now, while the grid is looked at, so it's there by the time a name is typed.
@@ -264,7 +274,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     /// no search, so Esc closes what the grid is in, as before.
     @discardableResult func endSearch() -> Bool {
         guard query != nil else { return false }
-        if let selected, !IconChoice.isSymbol(selected) {
+        if let selected, IconChoice.isEmoji(selected) {
             emojiField.stringValue = selected
             shownEmoji = selected
         } else {

@@ -20,8 +20,12 @@ enum DownloadHandoff {
         var dataStore: WKWebsiteDataStore?
         var isPrivate = false
         var window: NSWindow?
-        /// The tab that asked, where one did: its page keeps the answer for as long as it is on the page.
+        /// The tab that asked, where one did: its page keeps the answer for as long as it is on the page, and an Open
+        /// URL rule opening a web address in Zigzag opens it in relation to this tab ("This Tab" is this one).
         var tab: Tab?
+        /// Where the handoff question was told to open a web address, when it offered that choice in the same card:
+        /// this hand-off's place, never the rule's. Only the separate question's Always writes one on the rule.
+        var place: OpenInZigzag.Choice?
         /// Whether you clicked the link that led here. A click may send this page's cookies to the target; a page
         /// that starts a download or a navigation on its own may not.
         var wasClicked = false
@@ -34,7 +38,8 @@ enum DownloadHandoff {
     enum Outcome: Equatable {
         /// A rule ran. The navigation is cancelled, and any download WebKit made for it is.
         case handedOff
-        /// No rule wanted it: carry on as if there were none.
+        /// No rule wanted it: carry on as if there were none. Also what an Open URL rule answers when its question was
+        /// put off, so the link loads or the file saves as if the rule had never matched.
         case noMatch
         /// Refused at the handoff question: cancel it without running the rule. A link goes nowhere, and a download
         /// is not saved either.
@@ -70,6 +75,19 @@ enum DownloadHandoff {
     /// Where a handoff stands: run the rule, leave it in the browser, or cancel the link.
     enum HandoffGate: Equatable { case handOff, browser, cancel }
 
+    /// What a handoff question answered: the gate, and, where the same card offered a place to open a web address,
+    /// the place it picked. The place travels with this handoff only: a card's answer is never written on the rule. A
+    /// rule's own place comes from its sheet, or from the separate question's Always.
+    struct Decision {
+        let gate: HandoffGate
+        var place: OpenInZigzag.Choice? = nil
+        /// True when the question was put off rather than answered like "Open in Browser": the link or download
+        /// carries on, but the same download must not be offered to the rule a second time.
+        var declined = false
+    }
+
+    /// A stored answer as a gate. Nil and anything that isn't one of the three answers read as the browser, which is
+    /// what a caller that only has an answer to pass has always meant.
     static func gate(stored: String?) -> HandoffGate {
         switch stored {
         case "handOff": .handOff
@@ -79,37 +97,92 @@ enum DownloadHandoff {
         }
     }
 
+    /// A kept answer as a gate, or nil when there is no answer yet. Unlike `gate`, an unknown or missing answer is not
+    /// the browser: it is the caller's sign that the question still has to be asked.
+    private static func keptGate(_ stored: String?) -> HandoffGate? {
+        switch stored {
+        case "handOff": .handOff
+        case "browser": .browser
+        case "deny": .cancel
+        default: nil
+        }
+    }
+
     /// The key a page answer is kept under: per rule, so two rules on one page keep their own answers.
     static func handoffKind(_ rule: DownloadRule) -> String { "handoff:\(rule.id.uuidString)" }
 
-    /// Asks where a handoff should go, unless this page already answered for this rule. The question asks in the
-    /// page's own window; with no window to ask in, nothing is handed off and the link or download stays as it is.
-    /// The answer holds for the page: a link that starts a download is one question, not two.
-    static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil, forDownload: Bool = false) async -> HandoffGate {
+    /// The places the hand-off card's dropdown offers, This Tab first. The card's buttons answer the question and the
+    /// dropdown only says where, so its first entry is the place Hand Off sends without the dropdown being looked at:
+    /// This Tab keeps the link inside Zigzag. The rule's own question, and the sheet, keep `Choice.destinations`'
+    /// order, where the Mac's browser is first — they are about the rule, not about one hurried hand-off.
+    static let cardPlaces: [OpenInZigzag.Choice] = [.thisTab] + OpenInZigzag.Choice.destinations.filter { $0 != .thisTab }
+
+    /// The site that produced the handoff, never the destination when a page or referrer can name it instead.
+    static func questionOrigin(for request: Request) -> String? {
+        request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
+    }
+
+    /// The third duration a handoff question offers: the rule by name, or "this rule" where it has none. Kept on the
+    /// rule itself, the answer travels with it, is exported with it, and goes when it does.
+    static func alwaysFor(_ rule: DownloadRule) -> String {
+        let name = rule.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty
+            ? String(localized: "Always for this rule", comment: "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The rule has no name.")
+            : String(localized: "Always for “\(name)”", comment: "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.")
+    }
+
+    /// Asks where a handoff should go, unless this page, this site or the rule itself already answered. The question
+    /// asks in the page's own window; with no window to ask in, nothing is handed off and the link or download stays as
+    /// it is. A link that starts a download is one question, not two.
+    static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil, forDownload: Bool = false) async -> Decision {
         // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
-        guard !request.isPrivate || rule.runsInPrivateWindows else { return .browser }
-        guard isHandoffable(request.url) else { return .browser }
+        guard !request.isPrivate || rule.runsInPrivateWindows else { return Decision(gate: .browser) }
+        guard isHandoffable(request.url) else { return Decision(gate: .browser) }
         // The page's own site keys its answer: a page with no site (a file, a data URL) is asked every time, so the
         // target's site is not used in its place. The target is still what a prompt names when there is no page.
         let pageOrigin = request.pageOrigin ?? SiteOrigin.of(request.referrer)
         let origin = pageOrigin ?? SiteOrigin.of(request.url)
         let kind = handoffKind(rule)
+        let subject = PermissionSubject.handoff(rule.id)
         // What this page already answered holds wherever the page is: it was given for this question, and asking again
         // from a background tab would only lose the answer.
-        if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind) {
-            return gate(stored: kept)
+        if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind),
+           let answered = keptGate(kept) {
+            return Decision(gate: answered)
         }
+        // Then the site's standing answer. A private window is not the site the answer was given to, so the answer
+        // kept for it doesn't reach into one.
+        if !request.isPrivate, let pageOrigin, let kept = SitePermissions.action(subject, origin: pageOrigin),
+           let answered = keptGate(kept) {
+            return Decision(gate: answered)
+        }
+        // The rule's own answer belongs to the rule, as its configured fields do, so a private window that has let the
+        // rule in still reads it.
+        if let kept = rule.handoffAnswer, let answered = keptGate(kept) { return Decision(gate: answered) }
         // Nothing new is asked for a pop-up: its links and downloads stay in Zigzag.
-        guard request.mayAsk else { return .browser }
+        guard request.mayAsk else { return Decision(gate: .browser) }
         guard let controller = tab.flatMap({ WindowManager.shared.promptHost(holding: $0) })
+                ?? (request.window?.windowController as? PromptHost)
                 ?? WindowManager.shared.promptHost(for: request.window)
-                ?? WindowManager.shared.promptHost(for: NSApp?.keyWindow) else { return .browser }
+                ?? WindowManager.shared.promptHost(for: NSApp?.keyWindow) else { return Decision(gate: .browser) }
         // A new question has to be able to show: a background tab, a window behind another, a pop-up's own window (not
         // a prompt host yet) or Zigzag in the background would hold it with nothing to see. The download or link
         // carries on as if no rule had matched.
         let inFront = tab.map { controller.promptShows($0) }
         guard questionCanShow(tabIsInFront: inFront, windowIsVisible: controller.window?.isVisible == true,
-                              windowIsKey: controller.window?.isKeyWindow == true) else { return .browser }
+                              windowIsKey: controller.window?.isKeyWindow == true) else { return Decision(gate: .browser) }
+        // An Open URL rule that hasn't been told where to open asks in this same card: the place is the one thing its
+        // question has to add, and a second card for it would be a second interruption.
+        let asksPlace = asksWhereToOpen(rule, request: request)
+        // This time, then the site where there is one, then the rule's own answer for every site. A private window
+        // keeps nothing for the site, so that choice is not offered there; the rule's own is.
+        let siteMayKeep = !request.isPrivate && !controller.promptIsPrivate && pageOrigin != nil
+        var durations = [String(localized: "This time", comment: "Duration choice on a site's permission question: the answer holds for this page only.")]
+        if siteMayKeep {
+            durations.append(String(localized: "Always on this site", comment: "Duration choice on a site's permission question: the answer is remembered for this site."))
+        }
+        durations.append(alwaysFor(rule))
+        let ruleScope = durations.count - 1
         let answer = await PermissionPrompt.ask(
             host: SitePermissions.askerName(origin), origin: origin, answerKey: pageOrigin, what: rule.name, symbol: "arrow.up.forward.app",
             in: controller, tab: tab,
@@ -121,26 +194,54 @@ enum DownloadHandoff {
                     : String(localized: "Open in Browser", comment: "Button that lets a link stay in the browser instead of running a download rule.")),
                 PermissionAction(id: "handOff", title: String(localized: "Hand Off", comment: "Button that runs the named download rule for a link or download."), isDeny: false, isProminent: true)
             ],
+            chooser: asksPlace ? cardPlaces.map { .alternate($0.rawValue, $0.title) } : [],
+            durations: durations,
             canRemember: false,
             answered: {
-                // Asked while another question was up: the page may have answered this one in the meantime.
-                guard let pageOrigin, let tab else { return nil }
-                switch tab.permissionAnswers.action(key: pageOrigin, kind: kind) {
-                case "handOff": return PermissionAnswer(action: "handOff", remember: false)
-                case "browser": return PermissionAnswer(action: "browser", remember: false)
-                case "deny": return PermissionAnswer(action: "deny", remember: false)
-                default: return nil
+                // Asked while another question was up: the page, the site or the rule may have answered this one in the
+                // meantime.
+                if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind),
+                   keptGate(kept) != nil {
+                    return PermissionAnswer(action: kept, remember: false)
                 }
+                if siteMayKeep, let pageOrigin, let kept = SitePermissions.action(subject, origin: pageOrigin),
+                   keptGate(kept) != nil {
+                    return PermissionAnswer(action: kept, remember: true, scopeIndex: 1)
+                }
+                if let kept = rule.handoffAnswer, keptGate(kept) != nil {
+                    return PermissionAnswer(action: kept, remember: true, scopeIndex: ruleScope)
+                }
+                return nil
             })
-        guard let answer else { return .browser }
+        guard let answer else { return Decision(gate: .browser, declined: true) }
         let action: String
         switch answer.action {
         case "handOff": action = "handOff"
         case "browser": action = "browser"
         default: action = "deny"
         }
-        if let pageOrigin, let tab { tab.permissionAnswers.note(action, key: pageOrigin, kind: kind) }
-        return gate(stored: action)
+        if answer.scopeIndex == ruleScope {
+            var remembered = DownloadRulesStore.shared.rules.first { $0.id == rule.id } ?? rule
+            remembered.handoffAnswer = action
+            DownloadRulesStore.shared.update(remembered)
+        } else if answer.scopeIndex == 1, siteMayKeep, let pageOrigin, !request.isPrivate {
+            SitePermissions.remember(action, subject: subject, origin: pageOrigin)
+        } else if let pageOrigin, let tab {
+            tab.permissionAnswers.note(action, key: pageOrigin, kind: kind)
+        }
+        let place = action == "handOff" && asksPlace ? answer.choice.flatMap(OpenInZigzag.Choice.init(rawValue:)) : nil
+        return Decision(gate: gate(stored: action), place: place)
+    }
+
+    /// Whether this rule's question has to add where a web address opens: an Open URL rule that hasn't been told, and
+    /// a target that is the web's own. Anything else (mpv://, a magnet) belongs to its app and has no place to pick.
+    private static func asksWhereToOpen(_ rule: DownloadRule, request: Request) -> Bool {
+        guard rule.action.kind == .openURL, rule.action.openIn == .ask else { return false }
+        let values = HandoffValues(link: request.url, referrer: request.referrer, filename: request.filename,
+                                   mime: request.mime, space: request.space)
+        let text = DownloadTokens.expand(rule.action.urlTemplate, with: values, secret: "", query: true)
+        guard let url = URL(string: text) else { return false }
+        return OpenInZigzag.handles(url)
     }
 
     /// Whether a rule may read this page's cookies for its target: only when the target is the page's own site, or
@@ -206,7 +307,7 @@ enum DownloadHandoff {
             outcome = await openApp(rule.action, values: values, secret: secret)
             if let cookieFile { removeWhenTheOtherAppHasRead(cookieFile) }
         case .openURL:
-            outcome = openURL(rule.action, values: values, secret: secret)
+            outcome = await openURL(rule.action, values: values, secret: secret, request: request, rule: rule)
             if let cookieFile { removeWhenTheOtherAppHasRead(cookieFile) }
         case .jsonRPC:
             outcome = await callService(rule.action, values: values, secret: secret)
@@ -274,13 +375,82 @@ enum DownloadHandoff {
         return .handedOff
     }
 
-    private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String) -> Outcome {
+    /// An Open URL action. A web address is Zigzag's own: it opens where the rule says, and a rule that hasn't been
+    /// told yet asks — in the hand-off card, or in the separate question when there was no card. The card's place is
+    /// that one hand-off's alone and is never written on the rule; only the separate question's Always keeps one
+    /// there. Any other address (mpv://, a magnet, a mail link) belongs to the app that handles it and is handed on
+    /// exactly as it always was.
+    private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
+                                request: Request, rule: DownloadRule) async -> Outcome {
         let text = DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)
         guard let url = URL(string: text), url.scheme != nil else {
             return .failed(String(localized: "The URL isn’t valid.", comment: "Why a download rule failed: the URL it was told to open can't be made."))
         }
-        return NSWorkspace.shared.open(url) ? .handedOff
+        guard OpenInZigzag.handles(url) else { return openWithTheSystem(url) }
+        // The card's place is this hand-off's own (see `opening`), so nothing here writes the rule: a rule that asked
+        // is still asking afterwards, and asks again the next time it fires.
+        var choice = opening(rule, at: request.place)
+        if choice == .ask { choice = await askWhereToOpen(rule: rule, request: request) ?? .ask }
+        switch choice {
+        case .defaultBrowser:
+            return openWithTheSystem(url)
+        case .thisTab, .newTab, .mini:
+            // Put off, or nowhere to show it: the link or the file is left as if no rule had it.
+            guard let place = choice.place, let host = WindowManager.shared.promptHost(for: request.window) else { return .noMatch }
+            OpenInZigzag.open(url, at: place, from: request.tab, in: host)
+            return .handedOff
+        case .ask:
+            return .noMatch
+        }
+    }
+
+    /// Where one hand-off opens: the place its card picked for this time, or the rule's own answer. The card's place is
+    /// never written on the rule, whichever it is: the card is answered in a hurry, and its dropdown says what happens
+    /// to this link or file, not what the rule should do. A rule's own place comes from its sheet, or from the separate
+    /// question's Always.
+    static func opening(_ rule: DownloadRule, at cardPlace: OpenInZigzag.Choice?) -> OpenInZigzag.Choice {
+        cardPlace ?? rule.action.openIn
+    }
+
+    /// The rule the separate question's answer leaves behind: Always writes the picked place down, Once leaves the rule
+    /// asking. Nil is "the rule stays exactly as it is", so a caller saves only what it is given.
+    static func ruleToKeep(_ rule: DownloadRule, choice: OpenInZigzag.Choice, always: Bool) -> DownloadRule? {
+        guard always else { return nil }
+        var kept = rule
+        kept.action.openIn = choice
+        return kept
+    }
+
+    /// An address Zigzag doesn't own, handed to whatever on this Mac does.
+    private static func openWithTheSystem(_ url: URL) -> Outcome {
+        NSWorkspace.shared.open(url) ? .handedOff
             : .failed(String(localized: "No app opens that URL.", comment: "Why a download rule failed: nothing on this Mac handles the URL's scheme."))
+    }
+
+    /// Asks, once, where this rule's web addresses should open, and writes the answer down on the rule. The dropdown
+    /// picks one of the places; the two buttons say whether it lasts — Once, or Always, which keeps it on the rule.
+    private static func askWhereToOpen(rule: DownloadRule, request: Request) async -> OpenInZigzag.Choice? {
+        guard let host = WindowManager.shared.promptHost(for: request.window) else { return nil }
+        // The site it's for, not the rule's name: the card names a site the way every other question does, and the
+        // question goes when that site is left behind (never because the *rule's* name isn't the page's host).
+        let origin = SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
+        let answer = await PermissionPrompt.ask(
+            host: SitePermissions.askerName(origin), origin: origin,
+            what: "", // `title` words the question; `what` is only ever its fallback's wording.
+            symbol: "macwindow.badge.plus", in: host, tab: request.tab,
+            title: String(localized: "Where should this open", comment: "A download rule's question the first time an Open URL rule fires on a web address: which place to open it in. The card adds the question mark."),
+            actions: [.alternate("once", String(localized: "Once", comment: "Button on a download rule's question: open it where the dropdown says this one time, and ask again next time.")),
+                      .alternate("always", String(localized: "Always", comment: "Button on a download rule's question: open it where the dropdown says, and keep that on the rule, which never asks again."))],
+            chooser: OpenInZigzag.Choice.destinations.map { .alternate($0.rawValue, $0.title) },
+            canRemember: false)
+        guard let answer, let choice = OpenInZigzag.Choice(rawValue: answer.choice ?? "") else { return nil }
+        // "Once" opens it where it was asked for and asks again next time; "Always" writes it on the rule.
+        // The rule as it is now: its own question may have just written down its kept answer.
+        let current = DownloadRulesStore.shared.rules.first { $0.id == rule.id } ?? rule
+        if let kept = ruleToKeep(current, choice: choice, always: answer.action != "once") {
+            DownloadRulesStore.shared.update(kept)
+        }
+        return choice
     }
 
     /// Runs the script with every token as its own argument or environment value. A `.sh` file is run by `/bin/sh`;

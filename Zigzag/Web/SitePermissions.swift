@@ -186,6 +186,21 @@ enum SitePermissions {
         return found
     }
 
+    /// The origins that hold an answer under a subject's own id (`"handoff:<rule UUID>"`), for listing, per rule, the
+    /// sites a handoff rule was decided on. Sorted, so a list built from it doesn't shuffle.
+    static func sites(prefix: String) -> [String] { decisions(prefix: prefix).map(\.origin) }
+
+    /// The same sites, each with what it answered (`"handOff"`, `"browser"`, `"deny"`), so a list can show a rule's
+    /// sites by their decision rather than in one undifferentiated run where a refused site reads like a handed-off
+    /// one. Sorted by origin. The one place the key is split, so a caller can't drift from it.
+    static func decisions(prefix: String) -> [(origin: String, action: String)] {
+        stored.compactMap { key, action in
+            let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[1].hasPrefix(prefix) else { return nil }
+            return (String(parts[0]), action)
+        }.sorted { $0.origin < $1.origin }
+    }
+
     private static func allowed(_ action: String?) -> Bool? { action.map { $0 != "deny" } }
     static func kind(_ type: WKMediaCaptureType) -> String {
         switch type {
@@ -887,6 +902,8 @@ final class PermissionPrompt: FloatingPanelView {
     /// one answers the question, so the card stays a line.
     private let answerMenu = DropdownButton()
     private var menuChoices: [PermissionAction] = []
+    /// Whether `menuChoices` is a pick-only dropdown (where a web address opens) rather than answers of their own.
+    private var hasChooser = false
     /// The site that asked: when the tab goes elsewhere, the question no longer applies.
     private var askingHost = ""
     /// The origin that asked, when there is one: the question goes once the tab is on another origin, even one
@@ -992,11 +1009,16 @@ final class PermissionPrompt: FloatingPanelView {
     /// two frames on one page are two askers.
     /// `menu` is answers of one kind offered as a single dropdown after the buttons (where a pop-up opens); choosing
     /// one answers the question, and it stands in as the question's own filled answer.
+    /// `chooser` is the other way round: contents of one kind (where a web address opens) that the dropdown only
+    /// *picks*, while the buttons answer. The answer carries the chosen entry as `choice`, and the duration is left
+    /// out — the buttons are what say whether it happens at all.
     /// The duration choice is This time unless `canRemember` offers Always on this site. A disabled choice keeps
     /// `rememberNote` as its explanation. Nil means Not Now.
     static func ask(host: String, origin: String? = nil, answerKey: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
+                    chooser: [PermissionAction] = [],
+                    durations: [String]? = nil,
                     canRemember: Bool = true, rememberNote: String? = nil,
                     cancellation: QuestionCancellation? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
@@ -1004,7 +1026,7 @@ final class PermissionPrompt: FloatingPanelView {
         let remembers = canRemember && !controller.promptIsPrivate
         // Answered already: nothing to show, and nothing to mark.
         if let known = answered() {
-            return PermissionAnswer(action: known.action, remember: known.remember && remembers)
+            return PermissionAnswer(action: known.action, remember: known.remember && remembers, scopeIndex: known.scopeIndex, choice: known.choice)
         }
         let request = title ?? String(localized: "Use \(what)", comment: "A site's permission question, without its question mark. Only for a request no caller words itself; the placeholder is in English.")
         let asking = tab ?? controller.promptFrontTab
@@ -1017,7 +1039,7 @@ final class PermissionPrompt: FloatingPanelView {
         if let before = inFlight[sharedKey] {
             let known = await before.task.value
             guard cancellation?.isCancelled != true else { return nil }
-            return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers) }
+            return known.map { PermissionAnswer(action: $0.action, remember: $0.remember && remembers, scopeIndex: $0.scopeIndex, choice: $0.choice) }
         }
         // One of the window's waiting questions from the moment it is asked, even if it cannot be shown yet: the tab
         // wears the marker, the card that is up counts it, and another tab's question is not held behind this one.
@@ -1030,7 +1052,9 @@ final class PermissionPrompt: FloatingPanelView {
             }
             setWaiting(questionsWaiting(in: controller) + 1, in: controller)
             let answer = await show(host: host, request: request,
-                                  symbol: symbol, icon: icon, actions: actions, menu: menu, canRemember: remembers, rememberNote: rememberNote,
+                                  symbol: symbol, icon: icon, actions: actions, menu: menu, chooser: chooser,
+                                  canRemember: remembers, rememberNote: rememberNote,
+                                  durations: durations,
                                   origin: origin, in: controller, tab: tab, cancellation: cancellation, answered: answered)
             // Answered or put off: it is no longer one of the window's waiting questions.
             PendingQuestions.answer(questionID)
@@ -1056,7 +1080,9 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], canRemember: Bool, rememberNote: String?, origin: String?, in controller: PromptHost, tab: Tab?,
+                             menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool, rememberNote: String?,
+                             durations: [String]? = nil,
+                             origin: String?, in controller: PromptHost, tab: Tab?,
                              cancellation: QuestionCancellation? = nil,
                              answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         // The held pop-up it was for is gone: there is nothing to ask about any more.
@@ -1094,8 +1120,11 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.contentTintColor = Tokens.Color.textPrimary
                 prompt.badge.color = .clear
             }
-            prompt.duration.isEnabled = canRemember
-            if !canRemember {
+            prompt.duration.isEnabled = canRemember || durations != nil
+            if let durations {
+                prompt.duration.options = durations.map { DropdownButton.Option(title: $0) }
+                prompt.duration.selectedIndex = 0
+            } else if !canRemember {
                 prompt.duration.toolTip = rememberNote ?? (controller.promptIsPrivate
                     ? String(localized: "Private windows don’t remember answers.", comment: "Tooltip of the disabled duration dropdown on a permission question in a private window.")
                     : String(localized: "This site can’t remember this answer.", comment: "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept."))
@@ -1105,7 +1134,10 @@ final class PermissionPrompt: FloatingPanelView {
                 if action.isProminent { button.tint = accent }
                 button.onClick = { [weak prompt] _ in
                     guard let prompt, action.isDeny || prompt.acceptsAllow else { return }
-                    prompt.finish(PermissionAnswer(action: action.id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
+                    prompt.finish(PermissionAnswer(action: action.id,
+                                                   remember: canRemember && prompt.duration.selectedIndex == 1,
+                                                   scopeIndex: scope, choice: prompt.chosenChoice))
                 }
                 return button
             }
@@ -1123,9 +1155,23 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.answerMenu.tint = accent
                 prompt.answerMenu.onSelect = { [weak prompt] index in
                     guard let prompt, prompt.acceptsAllow, menu.indices.contains(index) else { return }
-                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: canRemember && prompt.duration.selectedIndex == 1))
+                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
+                    prompt.finish(PermissionAnswer(action: menu[index].id,
+                                                   remember: canRemember && prompt.duration.selectedIndex == 1,
+                                                   scopeIndex: scope))
                 }
                 prompt.addSubview(prompt.answerMenu)
+            }
+            // Contents of one kind (where a web address opens), which the dropdown only picks: the buttons answer,
+            // and the duration goes, since there is nothing to run out. Nothing is answered here — the dropdown keeps
+            // the chosen index itself, and `chosenChoice` is read when a button is pressed.
+            if !chooser.isEmpty {
+                prompt.hasChooser = true
+                prompt.menuChoices = chooser
+                prompt.answerMenu.options = chooser.map { DropdownButton.Option(title: $0.title) }
+                prompt.addSubview(prompt.answerMenu)
+                // A question with durations of its own still offers them beside the place.
+                if durations == nil { prompt.duration.isHidden = true }
             }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { response in
@@ -1283,9 +1329,17 @@ final class PermissionPrompt: FloatingPanelView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// The entry a pick-only dropdown had chosen, read when a button answers. Nil for a question with no such
+    /// dropdown, and for the ones whose dropdown answers itself.
+    private var chosenChoice: String? {
+        guard hasChooser, !menuChoices.isEmpty else { return nil }
+        return menuChoices[min(max(0, answerMenu.selectedIndex), menuChoices.count - 1)].id
+    }
+
     private func finish(_ choice: PermissionAnswer?) {
         // The disabled duration control also guards debug answers: a private or one-time question never returns Always.
-        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled) }
+        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled,
+                                                   scopeIndex: $0.scopeIndex, choice: $0.choice) }
         stopListening()
         let answer = self.answer
         self.answer = nil
@@ -1364,9 +1418,10 @@ final class PermissionPrompt: FloatingPanelView {
 
     private func height(for width: CGFloat) -> CGFloat {
         let header = Self.pad + max(Self.iconSide, textHeight(for: width))
-        // One line of answers, or, where they don't fit, the duration on a row of its own above them.
-        let answers = answersFit(in: width) ? Self.buttonHeight
-                                             : Tokens.Page.controlHeight + Tokens.Space.x2 + Self.buttonHeight
+        // One line of answers, or, where they don't fit, the duration on a row of its own above them. A question
+        // with no duration (a pick-only dropdown) keeps its answers on one line however narrow it gets.
+        let answers = duration.isHidden || answersFit(in: width) ? Self.buttonHeight
+                                                               : Tokens.Page.controlHeight + Tokens.Space.x2 + Self.buttonHeight
         // A line under them while other questions wait their turn in this window.
         let waiting = Self.waitingLine(questionsWaiting: questionsWaiting) == nil ? 0
                                                                                  : moreWaiting.lineHeight + Tokens.Space.x2
@@ -1417,7 +1472,7 @@ final class PermissionPrompt: FloatingPanelView {
         let each = max(Tokens.Dialog.minButtonWidth,
                        (available - menuWidth - Self.buttonGap * CGFloat(max(0, buttons.count - 1))) / CGFloat(max(1, buttons.count)))
         var x = w - pad
-        if oneLine {
+        if oneLine, !duration.isHidden {
             let size = duration.intrinsicContentSize
             x -= size.width
             duration.frame = NSRect(x: x, y: y, width: size.width, height: Tokens.Page.controlHeight)

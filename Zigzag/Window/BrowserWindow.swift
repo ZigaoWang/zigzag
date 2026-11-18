@@ -7,6 +7,11 @@ final class BrowserWindow: NSWindow {
     var trafficLightOrigin: NSPoint? { didSet { layoutTrafficLights() } }
     /// Intercepts events before the web view sees them (Control+Tab, the back and forward mouse buttons).
     var eventInterceptor: ((NSEvent) -> Bool)?
+    /// The sidebar, for Edit › Select All after a click in it (#302).
+    weak var sidebar: SidebarView?
+    /// The last click in the window was in the sidebar, and nothing has been typed since: Edit › Select All picks
+    /// every tab there, as in Arc and Finder, instead of the page's text (#302).
+    private(set) var sidebarHasTheClick = false
 
     init(contentRect: NSRect) {
         super.init(contentRect: contentRect,
@@ -144,6 +149,20 @@ final class BrowserWindow: NSWindow {
         return browserActions.contains(NSStringFromSelector(action))
     }
 
+    /// A text field or editor taking the keys takes ⌘A back from the sidebar.
+    override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
+        if responder is NSText || responder is NSTextField { sidebarHasTheClick = false }
+        return super.makeFirstResponder(responder)
+    }
+
+    /// Edit › Select All reaching the page (or nothing) after a click in the sidebar: the sidebar's tabs are picked
+    /// instead. False when the sidebar doesn't have it.
+    func selectAllInSidebar() -> Bool {
+        guard sidebarHasTheClick, let sidebar, !sidebar.isHiddenOrHasHiddenAncestor else { return false }
+        sidebar.list.selectAll(nil)
+        return true
+    }
+
     private static func isInPage(_ view: NSView) -> Bool {
         var view: NSView? = view
         while let current = view {
@@ -165,6 +184,11 @@ final class BrowserWindow: NSWindow {
         if event.type == .keyDown, !event.modifierFlags.contains(.command), firstResponder is WKWebView {
             UndoClock.lastPageEdit = Date()
             UndoClock.lastPageInput = Date()
+            sidebarHasTheClick = false
+        }
+        if event.type == .leftMouseDown {
+            let hit = contentView?.hitTest(event.locationInWindow)
+            sidebarHasTheClick = sidebar.map { hit?.isDescendant(of: $0) == true } ?? false
         }
         // A click in a page counts too: a web app (Figma, Docs) keeps its own undo, which a click can change.
         if event.type == .leftMouseDown, contentView?.hitTest(event.locationInWindow).map(Self.isInPage) == true {

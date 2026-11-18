@@ -141,6 +141,7 @@ enum CommandRanker {
     /// the command goes there too, so the row would only say the same thing twice.
     static func repeatsCommand(_ url: URL?, offered actionIDs: Set<String>) -> Bool {
         (SettingsPage.isSettings(url) && actionIDs.contains("settings")) || (HistoryPage.isHistory(url) && actionIDs.contains("history"))
+            || (ArchivePage.isArchive(url) && actionIDs.contains("archive"))
     }
 
     /// The open tabs offered before anything is typed: the latest six but the one you're on, and, with
@@ -200,6 +201,8 @@ enum CommandRanker {
                keywords: ["clear", "cookies", "sign", "out", "logout", "reset", "data"], symbol: "trash"),
         Action(id: "settings", title: String(localized: "Settings", comment: "A command in the command bar, named as in the menu bar."),
                keywords: ["settings", "preferences", "options", "engine", "privacy", "extensions", "shortcuts"], symbol: "gearshape"),
+        Action(id: "archive", title: String(localized: "Show Archive", comment: "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs."),
+               keywords: ["archive", "archived", "tabs", "old", "tidy", "restore"], symbol: "archivebox"),
         Action(id: "passwords", title: String(localized: "Passwords", comment: "A command in the command bar, named as in the menu bar."),
                keywords: ["passwords", "logins", "keychain", "accounts"], symbol: "key"),
         Action(id: "import", title: String(localized: "Import from Another Browser…", comment: "A command in the command bar, named as in the menu bar."),

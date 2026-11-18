@@ -638,6 +638,146 @@ struct DownloadRuleTests {
         #expect(decoded.first?.action.destination == .folder("/Users/me/Downloads/PDFs"))
     }
 
+    // MARK: Where an Open URL rule opens
+
+    /// Which addresses are Zigzag's own to open, and which belong to the app that handles them. Only the web's own
+    /// are Zigzag's: what you build a rule for to reach mpv or IINA must still reach mpv or IINA.
+    @Test func aWebAddressIsZigzagsAndAnythingElseItsAppsOwn() {
+        #expect(OpenInZigzag.handles(URL(string: "https://example.com/a?b=c")!))
+        #expect(OpenInZigzag.handles(URL(string: "http://example.com/a")!))
+        #expect(OpenInZigzag.handles(URL(string: "HTTPS://example.com/a")!))
+        #expect(!OpenInZigzag.handles(URL(string: "mpv://example.com/a")!))
+        #expect(!OpenInZigzag.handles(URL(string: "iina://weblink?url=x")!))
+        #expect(!OpenInZigzag.handles(URL(string: "magnet:?xt=urn:btih:abc")!))
+        #expect(!OpenInZigzag.handles(URL(string: "mailto:someone@example.com")!))
+        #expect(!OpenInZigzag.handles(URL(string: "file:///Users/me/a.pdf")!))
+    }
+
+    /// A new rule asks where to open; a rule from before the choice existed keeps opening in the Mac's default
+    /// browser, which is what every Open URL rule did before Zigzag had places of its own.
+    @Test func aRuleRemembersWhereItsWebAddressOpens() throws {
+        var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.action.urlTemplate = "https://mirror.example.com/{filename}"
+        #expect(rule.action.openIn == .ask)
+
+        let plain = try JSONEncoder().encode([rule])
+        #expect(String(decoding: plain, as: UTF8.self).contains("\"openIn\":\"ask\""))
+        let told = try JSONDecoder().decode([DownloadRule].self, from: plain)
+        #expect(told == [rule])
+        #expect(told.first?.action.openIn == .ask)
+
+        rule.action.openIn = .mini
+        let data = try JSONEncoder().encode([rule])
+        let again = try JSONDecoder().decode([DownloadRule].self, from: data)
+        #expect(again == [rule])
+        #expect(again.first?.action.openIn == .mini)
+
+        // An older file has no openIn at all: those rules went to the default browser, and still do.
+        // Taken out of the object itself: JSONEncoder's key order isn't fixed, so the text may not have a comma before it.
+        var objects = try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        var action = try #require(objects[0]["action"] as? [String: Any])
+        #expect(action.removeValue(forKey: "openIn") != nil)
+        objects[0]["action"] = action
+        let older = try JSONSerialization.data(withJSONObject: objects)
+        let fromOlder = try JSONDecoder().decode([DownloadRule].self, from: older)
+        #expect(fromOlder.first?.action.openIn == .defaultBrowser)
+    }
+
+    @Test func everyPlaceIsOneTheQuestionKnows() {
+        #expect(OpenInZigzag.Place.allCases.map(\.rawValue) == ["thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Place(rawValue: "thisTab") == .thisTab)
+        #expect(OpenInZigzag.Place(rawValue: "mini") == .mini)
+        // The pop-up question's "deny", and the viewer it keeps under that name, are not places to open in, so an
+        // answer of those leaves the rule asking rather than taking a value it doesn't know.
+        #expect(OpenInZigzag.Place(rawValue: "deny") == nil)
+        #expect(OpenInZigzag.Place(rawValue: "viewer") == nil)
+        #expect(OpenInZigzag.Place(rawValue: "") == nil)
+        #expect(OpenInZigzag.Place.allCases.allSatisfy { !$0.title.isEmpty })
+
+        // A rule's own choice adds Ask and the Mac's default browser, but the question only offers destinations.
+        #expect(OpenInZigzag.Choice.allCases.map(\.rawValue) == ["ask", "defaultBrowser", "thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Choice.destinations.map(\.rawValue) == ["defaultBrowser", "thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Choice.ask.place == nil)
+        #expect(OpenInZigzag.Choice.defaultBrowser.place == nil)
+        #expect(OpenInZigzag.Choice.mini.place == .mini)
+        #expect(OpenInZigzag.Choice.allCases.allSatisfy { !$0.title.isEmpty })
+    }
+
+    /// An Open URL rule that opens the web's own address still needs nothing but that address: where it opens has an
+    /// answer from the moment the rule exists (Zigzag asks), so it can never hold Add back.
+    @Test func whereAWebAddressOpensNeverHoldsTheRuleBack() {
+        var action = DownloadRuleAction(kind: .openURL)
+        #expect(!action.isComplete)
+        action.urlTemplate = "https://example.com/{filename}"
+        #expect(action.isComplete)
+        #expect(DownloadRuleSheet.actionHoldUp(action) == nil)
+        #expect(action.openIn == .ask)
+        // Nothing to answer about where it opens, so the only thing a rule could be held up by is what it catches.
+        var mine = DownloadRule(name: "Mirror", match: .any, action: action)
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
+        mine.action.openIn = .newTab
+        #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
+    }
+
+    // MARK: The place the hand-off card asks for
+
+    /// The hand-off card asks where its web address opens only when the rule hasn't been told, and it is answered in a
+    /// hurry: the dropdown's first entry is the answer a press of Hand Off sends without the dropdown being touched.
+    /// That entry is This Tab, which keeps the link inside Zigzag; the Mac's browser is still offered. The separate
+    /// "Where should this open" question and the rule sheet keep their order — the browser first — because they are
+    /// about a rule, not about this one hand-off.
+    @Test func theHandOffCardStartsWithThisTabInZigzag() {
+        #expect(DownloadHandoff.cardPlaces.map(\.rawValue) == ["thisTab", "defaultBrowser", "newTab", "mini"])
+        #expect(DownloadHandoff.cardPlaces.first == .thisTab)
+        // The first entry is what the card's dropdown starts on: `DropdownButton` selects index 0 until it is touched,
+        // and the card reads the selected entry when Hand Off is pressed.
+        let dropdown = DropdownButton()
+        dropdown.options = DownloadHandoff.cardPlaces.map { DropdownButton.Option(title: $0.title) }
+        #expect(dropdown.selectedIndex == 0)
+        #expect(dropdown.options.first?.title == OpenInZigzag.Choice.thisTab.title)
+        // The question the rule itself asks, and the sheet, are unchanged: the browser is the first destination
+        // offered, and Ask is still the sheet's first choice.
+        #expect(OpenInZigzag.Choice.destinations.map(\.rawValue) == ["defaultBrowser", "thisTab", "newTab", "mini"])
+        #expect(OpenInZigzag.Choice.allCases.map(\.rawValue) == ["ask", "defaultBrowser", "thisTab", "newTab", "mini"])
+    }
+
+    /// A place picked in the hand-off card opens that hand-off and nothing else: the rule is left exactly as it was,
+    /// so a rule that hadn't been told (`.ask`) is still asking next time.
+    @Test func aCardsPlaceOpensOneHandOffAndNeverBecomesTheRules() {
+        var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.action.urlTemplate = "https://mirror.example.com/{filename}"
+        #expect(rule.action.openIn == .ask)
+
+        let request = DownloadHandoff.Request(url: URL(string: "https://example.com/a.zip")!, place: .thisTab)
+        #expect(DownloadHandoff.opening(rule, at: request.place) == .thisTab, "this hand-off opens where the card says")
+        #expect(DownloadHandoff.ruleToKeep(rule, choice: .thisTab, always: false) == nil, "nothing is written on the rule")
+        #expect(rule.action.openIn == .ask, "and the rule is still asking")
+
+        // Told in its sheet, the rule opens there without a card, and a card's place still overrides this one only.
+        var told = rule
+        told.action.openIn = .mini
+        #expect(DownloadHandoff.opening(told, at: nil) == .mini)
+        #expect(DownloadHandoff.opening(told, at: .newTab) == .newTab)
+        #expect(told.action.openIn == .mini)
+    }
+
+    /// The separate question's two answers: Always keeps the place on the rule, Once opens it there and leaves the rule
+    /// asking. The answer is a rule to save, never a rule changed in place — the caller writes it.
+    @Test func onlyAlwaysKeepsThePlaceOnTheRule() {
+        var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.action.urlTemplate = "https://mirror.example.com/{filename}"
+        #expect(rule.action.openIn == .ask)
+
+        #expect(DownloadHandoff.ruleToKeep(rule, choice: .mini, always: false) == nil)
+        let kept = DownloadHandoff.ruleToKeep(rule, choice: .mini, always: true)
+        #expect(kept?.id == rule.id)
+        #expect(kept?.action.openIn == .mini)
+        #expect(rule.action.openIn == .ask, "the rule the question asked about is not changed in place")
+    }
+
     /// Everything holding a rule's Add button back, in the order the form is filled in: the button's own words and the
     /// fields it marks come from this one list, so the two can never disagree.
     @Test func aRuleSaysEverythingHoldingAddBack() {
@@ -750,11 +890,11 @@ struct DownloadRuleTests {
         let request = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!, pageOrigin: origin)
 
         tab.permissionAnswers.note("deny", key: origin, kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .cancel)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .cancel)
         tab.permissionAnswers.note("handOff", key: origin, kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .handOff)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .handOff)
         tab.permissionAnswers.note("browser", key: origin, kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .browser)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .browser)
     }
 
     /// A page with no site of its own (a file, a data URL) is asked every time: an answer kept against the target's
@@ -766,7 +906,7 @@ struct DownloadRuleTests {
         let kind = DownloadHandoff.handoffKind(rule)
         tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
         let request = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!)
-        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true) == .browser)
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .browser)
     }
 
     /// A pop-up may not ask (its window can sit behind the browser's), but a page's kept answer still holds there.
@@ -778,9 +918,9 @@ struct DownloadRuleTests {
         var quiet = DownloadHandoff.Request(url: URL(string: "https://example.com/file.zip")!,
                                             pageOrigin: "https://example.com")
         quiet.mayAsk = false
-        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .browser)
+        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true).gate == .browser)
         tab.permissionAnswers.note("deny", key: "https://example.com", kind: kind)
-        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true) == .cancel)
+        #expect(await DownloadHandoff.decide(rule, request: quiet, tab: tab, forDownload: true).gate == .cancel)
     }
 
     // MARK: The App field's menu
@@ -836,5 +976,253 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc)?.field == .method)
         rpc.rpcMethod = "aria2.addUri"
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
+    }
+}
+
+extension DownloadRuleTests {
+    @Test func storedHandoffAnswersMapToGates() {
+        #expect(DownloadHandoff.gate(stored: "handOff") == .handOff)
+        #expect(DownloadHandoff.gate(stored: "browser") == .browser)
+        #expect(DownloadHandoff.gate(stored: "deny") == .cancel)
+        #expect(DownloadHandoff.gate(stored: nil) == .browser)
+    }
+
+    /// A handoff answered "Always on this site" is kept for the site and read back without asking again, in any page
+    /// of that site. The rule's own answer travels with the rule, so a private window still reads it.
+    @MainActor @Test func aSitesHandoffAnswerStandsForEveryPageOfIt() async throws {
+        let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        let rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule.id), origin: "https://site.example")
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/other")!,
+                                              pageOrigin: "https://site.example")
+        #expect(await DownloadHandoff.decide(rule, request: request).gate == .cancel)
+
+        var privateRequest = request
+        privateRequest.isPrivate = true
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest).gate == .browser,
+                "a private window is not the site the answer was given to")
+    }
+
+    /// The third scope: a rule answered for itself stands for every site. A private window still refuses a rule that
+    /// was not let in there, and once it is, reads the rule's own answer, which belongs to the rule rather than to the
+    /// site the session is on.
+    @MainActor @Test func aRulesOwnAnswerStandsForEverySite() async {
+        var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        // Never told: with no window to ask in, the rule simply doesn't run.
+        #expect(await DownloadHandoff.decide(rule, request: request).gate == .browser)
+
+        rule.handoffAnswer = "handOff"
+        #expect(await DownloadHandoff.decide(rule, request: request).gate == .handOff)
+        rule.handoffAnswer = "deny"
+        #expect(await DownloadHandoff.decide(rule, request: request).gate == .cancel)
+
+        var privateRequest = request
+        privateRequest.isPrivate = true
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest).gate == .browser,
+                "a private window runs no rule that hasn't been let in")
+        rule.runsInPrivateWindows = true
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest).gate == .cancel)
+        rule.handoffAnswer = "handOff"
+        #expect(await DownloadHandoff.decide(rule, request: privateRequest).gate == .handOff)
+    }
+
+    /// The site's answer is the more specific one, so it outranks the rule's own; the rule's is still saved with the
+    /// rule, so it travels with it.
+    @MainActor @Test func aSitesAnswerOutranksTheRulesOwn() async throws {
+        let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        rule.handoffAnswer = "handOff"
+        SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule.id), origin: "https://site.example")
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(await DownloadHandoff.decide(rule, request: request).gate == .cancel)
+    }
+
+    /// The rule's own answer is saved with the rule, so it travels with it; a rule with none reads as none.
+    @Test func aRulesOwnAnswerSurvivesItsJSON() throws {
+        var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        #expect(try JSONDecoder().decode(DownloadRule.self, from: JSONEncoder().encode(rule)).handoffAnswer == nil)
+        rule.handoffAnswer = "handOff"
+        let read = try JSONDecoder().decode(DownloadRule.self, from: JSONEncoder().encode(rule))
+        #expect(read.handoffAnswer == "handOff")
+    }
+
+    /// The third duration choice names the rule, and says "this rule" where the rule has no name rather than "".
+    @Test func theThirdDurationChoiceNamesTheRule() {
+        let named = DownloadRule(name: "YouTube", applies: .downloads, match: .contains, pattern: "youtube",
+                                 action: DownloadRuleAction(kind: .openURL))
+        #expect(DownloadHandoff.alwaysFor(named).contains("YouTube"))
+        let unnamed = DownloadRule(name: "   ", applies: .downloads, match: .contains, pattern: "youtube",
+                                   action: DownloadRuleAction(kind: .openURL))
+        #expect(!DownloadHandoff.alwaysFor(unnamed).contains("“”"))
+        #expect(DownloadHandoff.alwaysFor(unnamed) != DownloadHandoff.alwaysFor(named))
+    }
+
+    @Test func aHandoffQuestionUsesThePageOrigin() {
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(DownloadHandoff.questionOrigin(for: request) == "https://site.example")
+    }
+
+    @Test func aHandoffQuestionFallsBackToTheReferrerThenTheTarget() {
+        let referred = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                               referrer: URL(string: "https://site.example/page")!)
+        #expect(DownloadHandoff.questionOrigin(for: referred) == "https://site.example")
+        let bare = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!)
+        #expect(DownloadHandoff.questionOrigin(for: bare) == "https://cdn.example")
+    }
+}
+
+extension DownloadRuleTests {
+    /// A handoff answered "Open in Browser" this time holds for the page, so the download the same page starts is not
+    /// asked the same question again.
+    @MainActor @Test func aHandoffAnsweredThisTimeIsNotAskedAgain() async {
+        let rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                action: DownloadRuleAction(kind: .openURL))
+        let tab = Tab(url: URL(string: "https://site.example/page"), spaceID: UUID())
+        tab.permissionAnswers.note("browser", key: "https://site.example", kind: DownloadHandoff.handoffKind(rule))
+        let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
+                                              referrer: URL(string: "https://site.example/page")!,
+                                              pageOrigin: "https://site.example")
+        #expect(await DownloadHandoff.decide(rule, request: request, tab: tab).gate == .browser)
+        #expect(DownloadHandoff.handoffKind(rule) == "handoff:\(rule.id.uuidString)")
+    }
+}
+
+/// What saving a rule does to the answers it kept: a different script or URL is a different rule's behaviour, while
+/// its name or another field leaves the answers where they are.
+extension DownloadRuleTests {
+    private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
+        let suite = "DownloadRuleKeptAnswerTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try body(defaults)
+    }
+
+    /// A rules file of its own, so a test never reads or writes the Mac's own list.
+    private func rulesFile() -> URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-download-rules-\(UUID().uuidString).json")
+    }
+
+    @MainActor @Test func changingAScriptsPathForgetsOnlyThatRulesAnswers() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                    action: DownloadRuleAction(kind: .runScript))
+            rule.action.scriptPath = "/usr/bin/true"
+            rule.handoffAnswer = "handOff"
+            var other = DownloadRule(name: "Other", applies: .downloads, match: .contains, pattern: "other.zip",
+                                     action: DownloadRuleAction(kind: .runScript))
+            other.action.scriptPath = "/usr/bin/true"
+            other.handoffAnswer = "browser"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            store.add(other)
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule.id), origin: "https://a.example")
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(other.id), origin: "https://b.example")
+
+            var edited = rule
+            edited.action.scriptPath = "/usr/bin/false"
+            store.update(edited)
+
+            #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == nil)
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
+            // Another rule's answers, and this rule's own row, are not touched.
+            #expect(store.rules.first { $0.id == other.id }?.handoffAnswer == "browser")
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(other.id)).count == 1)
+        }
+    }
+
+    @MainActor @Test func changingAURLTemplateForgetsThatRulesAnswers() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Video", applies: .linksAndDownloads, match: .contains, pattern: "video",
+                                    action: DownloadRuleAction(kind: .openURL))
+            rule.action.urlTemplate = "mpv://{encoded_link}"
+            rule.handoffAnswer = "deny"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            SitePermissions.remember("handOff", subject: PermissionSubject.handoff(rule.id), origin: "https://video.example")
+
+            var edited = rule
+            edited.action.urlTemplate = "iina://{encoded_link}"
+            store.update(edited)
+
+            #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == nil)
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
+        }
+    }
+
+    @MainActor @Test func renamingARuleOrChangingAnUnrelatedFieldKeepsItsAnswers() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Video", applies: .linksAndDownloads, match: .contains, pattern: "video",
+                                    action: DownloadRuleAction(kind: .openURL))
+            rule.action.urlTemplate = "mpv://{encoded_link}"
+            rule.handoffAnswer = "handOff"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            SitePermissions.remember("browser", subject: PermissionSubject.handoff(rule.id), origin: "https://video.example")
+
+            var edited = rule
+            edited.name = "Renamed"
+            // A field of the action that isn't the script or the URL — `openIn`'s place in a later build — is not a
+            // change of what runs.
+            edited.action.arguments = ["--unrelated"]
+            store.update(edited)
+
+            #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == "handOff")
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).count == 1)
+        }
+    }
+
+    @MainActor @Test func removingARuleForgetsTheAnswersKeptForIt() throws {
+        try withDefaults { _ in
+            let file = rulesFile()
+            defer { try? FileManager.default.removeItem(at: file) }
+            var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
+                                    action: DownloadRuleAction(kind: .openURL))
+            rule.handoffAnswer = "handOff"
+            let store = DownloadRulesStore(file: file)
+            store.add(rule)
+            SitePermissions.remember("deny", subject: PermissionSubject.handoff(rule.id), origin: "https://a.example")
+
+            store.remove(id: rule.id)
+
+            #expect(store.rules.isEmpty)
+            #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
+        }
     }
 }

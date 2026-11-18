@@ -1981,6 +1981,17 @@
         }
       }
     },
+    "A rule that hasn’t been told asks the first time it fires, and keeps your answer." : {
+      "comment" : "Tooltip on the Open in choice of an Open URL download rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没指定位置的规则会在第一次触发时询问，并记住你的选择。"
+          }
+        }
+      }
+    },
     "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too." : {
       "comment" : "Under the list in Settings › Developer.",
       "localizations" : {
@@ -2104,6 +2115,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你正在看的视频会在其他 App 和桌面上方的小播放器里继续播放；回到它的页面时，再回到页面里。"
+          }
+        }
+      }
+    },
+    "A web address opens in Zigzag or your default browser. Anything else opens in its own app." : {
+      "comment" : "Under the Open in choice of an Open URL download rule: only the web's own addresses are Zigzag's to open.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网页地址在 Zigzag 或默认浏览器中打开，其他地址在各自的 App 中打开。"
           }
         }
       }
@@ -2939,6 +2961,28 @@
         }
       }
     },
+    "Always for this rule" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The rule has no name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此规则始终如此"
+          }
+        }
+      }
+    },
+    "Always for “%@”" : {
+      "comment" : "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”始终如此"
+          }
+        }
+      }
+    },
     "Always on this site" : {
       "comment" : "Duration choice on a site's permission question: the answer is remembered for this site.",
       "localizations" : {
@@ -3137,6 +3181,28 @@
         }
       }
     },
+    "Archive" : {
+      "comment" : "Title of the Archive page, the list of tabs that were archived; also its tab's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "归档"
+          }
+        }
+      }
+    },
+    "Archive cleared" : {
+      "comment" : "Toast after the Archive page is cleared.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已清除归档"
+          }
+        }
+      }
+    },
     "Archive tabs you haven’t used" : {
       "comment" : "A setting in Settings › Tabs.",
       "localizations" : {
@@ -3166,6 +3232,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已从“%@”归档"
+          }
+        }
+      }
+    },
+    "Archived tabs are forgotten. History keeps the pages you visited." : {
+      "comment" : "Message of the sheet that asks before clearing the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已归档的标签页会被忘掉。历史记录仍会保留你访问过的页面。"
+          }
+        }
+      }
+    },
+    "Archived tabs show up here when Settings › Tabs › Archive tabs you haven’t used is on." : {
+      "comment" : "On the Archive page while archiving is off. Name the setting as it reads in Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开“设置 › 标签页 › 归档闲置的标签页”后，归档的标签页会出现在这里。"
           }
         }
       }
@@ -3204,7 +3292,7 @@
       }
     },
     "Ask" : {
-      "comment" : "A choice in a permission's dropdown in Site Controls: the site asks each time.",
+      "comment" : "A choice in a permission's dropdown in Site Controls: the site asks each time.\nChoice in an Open URL download rule's Open in dropdown: the rule asks where to open the first time it fires, and keeps the answer.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4328,7 +4416,7 @@
       }
     },
     "Choose" : {
-      "comment" : "Button of the panel that picks a picture for a space's empty page.\nButton of the panel that picks the downloads folder.",
+      "comment" : "Button of the panel that picks a picture for a space's empty page.\nButton of the panel that picks the downloads folder.\nButton of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4383,7 +4471,7 @@
       }
     },
     "Choose Image…" : {
-      "comment" : "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.",
+      "comment" : "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.\nItem in the context menu of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4565,6 +4653,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "清除"
+          }
+        }
+      }
+    },
+    "Clear Archive" : {
+      "comment" : "Button on the Archive page, and the button of the sheet that asks before clearing it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "清除归档"
           }
         }
       }
@@ -4763,6 +4862,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要清除今天的历史记录吗？"
+          }
+        }
+      }
+    },
+    "Clear the archive?" : {
+      "comment" : "Title of the sheet that asks before clearing the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要清除归档吗？"
           }
         }
       }
@@ -5971,7 +6081,7 @@
       }
     },
     "Couldn’t use this picture" : {
-      "comment" : "Title of the notice when a picture chosen for a space's empty page can't be read.",
+      "comment" : "Title of the notice when a picture chosen for a space's empty page can't be read.\nTitle of the notice when an image file chosen as a page's icon can't be used.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6179,6 +6289,17 @@
         }
       }
     },
+    "Default Browser" : {
+      "comment" : "Choice in an Open URL download rule's Open in dropdown: opens the web address in the Mac's default browser, as these rules did before Zigzag had its own places.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认浏览器"
+          }
+        }
+      }
+    },
     "Default browser" : {
       "comment" : "A setting in Settings › General.",
       "localizations" : {
@@ -6197,6 +6318,852 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同一空间的每个窗口列出相同的标签页，各自显示自己的那一个。一个网页同一时间只能显示在一个窗口中。"
+          }
+        }
+      }
+    },
+    "extension.limit.action" : {
+      "comment" : "A Chrome extension feature Zigzag limits: badge text color and toolbar button settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Toolbar button settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具栏按钮设置"
+          }
+        }
+      }
+    },
+    "extension.limit.addressBarKeyword" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: an omnibox keyword.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Address bar keyword"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址栏关键词"
+          }
+        }
+      }
+    },
+    "extension.limit.backgroundPage" : {
+      "comment" : "A Chrome extension feature Zigzag limits: runtime.getBackgroundPage answers Manifest V2 only; a Manifest V3 page gets “You do not have a background page.” A Manifest V3 worker keeps WebKit's member, visible rather than absent.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The background page (Manifest V2 only; Manifest V3 pages get “You do not have a background page.”)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后台页面（仅 Manifest V2；Manifest V3 页面会收到“You do not have a background page.”）"
+          }
+        }
+      }
+    },
+    "extension.limit.blockingRules" : {
+      "comment" : "A Chrome extension feature Zigzag limits: switching individual network rules on and off.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blocking rules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拦截规则"
+          }
+        }
+      }
+    },
+    "extension.limit.bookmarks" : {
+      "comment" : "A Chrome extension feature Zigzag limits: bookmark import and reorder events.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your bookmarks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的书签"
+          }
+        }
+      }
+    },
+    "extension.limit.clipboardRead" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: reading the clipboard.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reading what you copy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取你拷贝的内容"
+          }
+        }
+      }
+    },
+    "extension.limit.contentSettings" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the contentSettings API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Content settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容设置"
+          }
+        }
+      }
+    },
+    "extension.limit.cookiePartitions" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: reading a cookie's partition key.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cookie partition details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 分区详情"
+          }
+        }
+      }
+    },
+    "extension.limit.cookies" : {
+      "comment" : "A Chrome extension feature Zigzag limits: cookie partition keys.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Cookie details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie 详情"
+          }
+        }
+      }
+    },
+    "extension.limit.debugger" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the debugger API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Debugging pages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调试页面"
+          }
+        }
+      }
+    },
+    "extension.limit.deprecatedChannel" : {
+      "comment" : "A Chrome extension feature Chrome removed: its old Google messaging channels.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Deprecated Google APIs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已弃用的 Google API"
+          }
+        }
+      }
+    },
+    "extension.limit.desktopCapture" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the desktopCapture API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recording your screen"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制你的屏幕"
+          }
+        }
+      }
+    },
+    "extension.limit.devtools" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: extension DevTools panels.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Developer tools"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开发者工具"
+          }
+        }
+      }
+    },
+    "extension.limit.downloads" : {
+      "comment" : "A Chrome extension feature Zigzag limits: the download shelf, danger prompts and filename events.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Downloads"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载"
+          }
+        }
+      }
+    },
+    "extension.limit.fontSettings" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the fontSettings API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Font settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字体设置"
+          }
+        }
+      }
+    },
+    "extension.limit.geolocation" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the geolocation permission.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Your location"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的位置"
+          }
+        }
+      }
+    },
+    "extension.limit.hostAccessRequests" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Site access requests"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站访问请求"
+          }
+        }
+      }
+    },
+    "extension.limit.languageDetection" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: i18n.detectLanguage.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Language detection"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语言检测"
+          }
+        }
+      }
+    },
+    "extension.limit.legacyExtension" : {
+      "comment" : "A Chrome extension feature Chrome removed: the old chrome.extension namespace.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Legacy extension APIs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "旧版扩展 API"
+          }
+        }
+      }
+    },
+    "extension.limit.localScripts" : {
+      "comment" : "A Chrome extension feature Zigzag limits: registered content scripts that name file: pages.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Scripts on local files"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地文件上的脚本"
+          }
+        }
+      }
+    },
+    "extension.limit.management" : {
+      "comment" : "A Chrome extension feature Zigzag limits: listing and changing other extensions.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Managing other extensions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理其他扩展"
+          }
+        }
+      }
+    },
+    "extension.limit.matchedRuleDebugging" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: seeing which blocking rules matched a request.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Matched-rule debugging"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配规则调试"
+          }
+        }
+      }
+    },
+    "extension.limit.notifications" : {
+      "comment" : "A Chrome extension feature Zigzag limits: notification buttons and settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Notifications"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
+          }
+        }
+      }
+    },
+    "extension.limit.pageCapture" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: saving a page as MHTML.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saving pages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储页面"
+          }
+        }
+      }
+    },
+    "extension.limit.power" : {
+      "comment" : "A Chrome extension feature Zigzag limits: reporting activity to keep the Mac awake.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Keeping your Mac awake"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 Mac 保持唤醒"
+          }
+        }
+      }
+    },
+    "extension.limit.privacySettings" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: changing the browser's privacy settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Privacy settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私设置"
+          }
+        }
+      }
+    },
+    "extension.limit.proxyScripts" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: proxy auto-config scripts, which choose a proxy for each site.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Proxy scripts (PAC)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理脚本（PAC）"
+          }
+        }
+      }
+    },
+    "extension.limit.publicSuffix" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the publicSuffix API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Domain names"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "域名"
+          }
+        }
+      }
+    },
+    "extension.limit.readingList" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the readingList API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reading list"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阅读列表"
+          }
+        }
+      }
+    },
+    "extension.limit.runtime" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: restarting the browser or reading its package folder.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Restarting Zigzag"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动 Zigzag"
+          }
+        }
+      }
+    },
+    "extension.limit.runtimeContexts" : {
+      "comment" : "A Chrome extension feature Zigzag limits: runtime.getContexts reports background, popup, side panel and offscreen contexts only; tabs, subframes, developer tools and real document IDs are not reported.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Open pages (background, popup, side panel and offscreen only; no tabs, subframes, developer tools or document IDs)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开的页面（仅后台、弹出式窗口、边栏面板和离屏页面；不含标签页、子框架、开发者工具或文档 ID）"
+          }
+        }
+      }
+    },
+    "extension.limit.search" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the search API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Search settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索设置"
+          }
+        }
+      }
+    },
+    "extension.limit.sessions" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: the sessions API.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Closed tabs and sessions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭的标签页和会话"
+          }
+        }
+      }
+    },
+    "extension.limit.sidePanel" : {
+      "comment" : "A Chrome extension feature Zigzag limits: the side panel's layout and open/close events.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Side panel"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏面板"
+          }
+        }
+      }
+    },
+    "extension.limit.signIn" : {
+      "comment" : "A Chrome extension feature Zigzag limits: Chrome's own Google account sign-in.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Signing in with your account"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用你的账户登录"
+          }
+        }
+      }
+    },
+    "extension.limit.staticRuleChanges" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: switching individual static rules on and off with declarativeNetRequest.updateStaticRules.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Changes to static blocking rules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对静态拦截规则的更改"
+          }
+        }
+      }
+    },
+    "extension.limit.storage" : {
+      "comment" : "A Chrome extension feature Zigzag emulates: managed extension storage.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Stored extension settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展存储的设置"
+          }
+        }
+      }
+    },
+    "extension.limit.storageSync" : {
+      "comment" : "A Chrome extension feature Zigzag limits: storage.sync keeps its settings on this Mac instead of syncing them.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Settings synced between Macs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Mac 之间同步的设置"
+          }
+        }
+      }
+    },
+    "extension.limit.systemDisplay" : {
+      "comment" : "A Chrome extension feature Zigzag limits: changing display settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Display information"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示器信息"
+          }
+        }
+      }
+    },
+    "extension.limit.tabActions" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: splitting tabs and other tab actions beyond opening and switching.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Some tab actions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分标签页操作"
+          }
+        }
+      }
+    },
+    "extension.limit.tabCapture" : {
+      "comment" : "A Chrome extension feature Zigzag limits: tab video capture; audio is captured.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Recording tabs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制标签页"
+          }
+        }
+      }
+    },
+    "extension.limit.tabGroups" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: grouping tabs.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tab groups"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签页组"
+          }
+        }
+      }
+    },
+    "extension.limit.tabHousekeeping" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: discarding tabs to save memory and highlighting a set of tabs.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Discarding and highlighting tabs"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "丢弃和高亮标签页"
+          }
+        }
+      }
+    },
+    "extension.limit.tabVideoCapture" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: recording a tab's video; audio capture works.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Tab video capture"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "录制标签页视频"
+          }
+        }
+      }
+    },
+    "extension.limit.tts" : {
+      "comment" : "A Chrome extension feature Zigzag limits: extensions that are themselves a text-to-speech engine.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Reading aloud"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "朗读"
+          }
+        }
+      }
+    },
+    "extension.limit.webRequestBlocking" : {
+      "comment" : "A Chrome extension feature Zigzag cannot provide: blocking web requests with webRequest.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Blocking requests the old way"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用旧方式拦截请求"
+          }
+        }
+      }
+    },
+    "extension.limit.windowsPopup" : {
+      "comment" : "A Chrome extension feature Zigzag limits: extension windows opened as popups.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Popup windows"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "弹出式窗口"
           }
         }
       }
@@ -6256,6 +7223,17 @@
         }
       }
     },
+    "No archived tab matches “%@”." : {
+      "comment" : "On the Archive page when a search finds nothing. The placeholder is what was typed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有与“%@”匹配的已归档标签页。"
+          }
+        }
+      }
+    },
     "Open in" : {
       "comment" : "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from.",
       "localizations" : {
@@ -6267,6 +7245,17 @@
         }
       }
     },
+    "Open Settings" : {
+      "comment" : "Button on the Archive page while archiving is off: opens Settings › Tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
+          }
+        }
+      }
+    },
     "Opened in %@" : {
       "comment" : "Toast after a link to a site that always opens in a space (Settings › Spaces) opened there instead of where it was clicked or typed. The name is the space's.",
       "localizations" : {
@@ -6274,6 +7263,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已在“%@”中打开"
+          }
+        }
+      }
+    },
+    "Search archive" : {
+      "comment" : "Placeholder of the search field on the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索归档"
+          }
+        }
+      }
+    },
+    "Show Archive" : {
+      "comment" : "History menu item, and a command in the command bar: opens the Archive page, the list of archived tabs.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示归档"
           }
         }
       }
@@ -6333,6 +7344,17 @@
         }
       }
     },
+    "Tabs you haven’t used in a while show up here." : {
+      "comment" : "On the Archive page while it's empty and archiving is on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "闲置一段时间的标签页会归档到这里。"
+          }
+        }
+      }
+    },
     "That folder isn’t there. Choose one that is." : {
       "comment" : "Tooltip on the folder field of a per-extension destination whose folder has gone or is a file, so its Add button is greyed.",
       "localizations" : {
@@ -6373,6 +7395,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要让网站始终在某个空间中打开，请在它的网站设置中的“打开于”里选择空间。"
+          }
+        }
+      }
+    },
+    "Today" : {
+      "comment" : "Heading of the tabs archived today, on the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今天"
           }
         }
       }
@@ -7912,6 +8945,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "忘记"
+          }
+        }
+      }
+    },
+    "Forget %@" : {
+      "comment" : "Tooltip of the button that forgets one site's answer about a download rule. The placeholder is the site's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忘记 %@"
+          }
+        }
+      }
+    },
+    "Forget the Answer for Every Site" : {
+      "comment" : "Tooltip of the button that forgets a download rule's standing answer about handing off, which it was given for every site.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "忘记对所有网站的选择"
           }
         }
       }
@@ -11635,6 +12690,17 @@
         }
       }
     },
+    "Once" : {
+      "comment" : "Button on a download rule's question: open it where the dropdown says this one time, and ask again next time.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此一次"
+          }
+        }
+      }
+    },
     "Only %@’s history is cleared; other profiles keep theirs." : {
       "comment" : "Added to the message of a sheet that asks before clearing History, when there's more than one profile. The placeholder is the profile's name.",
       "localizations" : {
@@ -12064,8 +13130,19 @@
         }
       }
     },
+    "Open in" : {
+      "comment" : "Label of the choice of where a web address opens, in an Open URL download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开位置"
+          }
+        }
+      }
+    },
     "Open in %@" : {
-      "comment" : "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.",
+      "comment" : "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.\nTooltip of a row on the Archive page: the tab opens again in the space it came from. The placeholder is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19220,7 +20297,7 @@
       }
     },
     "Undo" : {
-      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nEdit menu item.\nToast button",
+      "comment" : "Button in a toast: takes back what was just done.\nButton in a toast: undoes what the toast says happened.\nButton in the toast after History is cleared.\nButton in the toast after a login is deleted.\nButton in the toast after the Archive page is cleared.\nEdit menu item.\nToast button",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20341,6 +21418,17 @@
         }
       }
     },
+    "Where should this open" : {
+      "comment" : "A download rule's question the first time an Open URL rule fires on a web address: which of Zigzag's own places to open it in. The card adds the question mark.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要在哪里打开"
+          }
+        }
+      }
+    },
     "Where ⌘T and links put a new tab in the sidebar." : {
       "comment" : "Explanation under “New tabs open” in Settings › Tabs.",
       "localizations" : {
@@ -20515,6 +21603,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "黄色"
+          }
+        }
+      }
+    },
+    "Yesterday" : {
+      "comment" : "Heading of the tabs archived yesterday, on the Archive page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天"
           }
         }
       }
@@ -23036,848 +24135,35 @@
         }
       }
     },
-    "extension.limit.tabGroups" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: grouping tabs.",
-      "extractionState" : "extracted_with_value",
+    "Choose an image to use as this page’s icon." : {
+      "comment" : "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.",
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Tab groups"
-          }
-        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "标签页组"
+            "value" : "选取一张图像用作此页面的图标。"
           }
         }
       }
     },
-    "extension.limit.tabActions" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: splitting tabs and other tab actions beyond opening and switching.",
-      "extractionState" : "extracted_with_value",
+    "That file is larger than 1 MB. Choose a smaller image." : {
+      "comment" : "Message of the notice when an image file chosen as a page's icon is too big.",
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Some tab actions"
-          }
-        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "部分标签页操作"
+            "value" : "此文件大于 1 MB。请选取一张较小的图像。"
           }
         }
       }
     },
-    "extension.limit.tabHousekeeping" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: discarding tabs to save memory and highlighting a set of tabs.",
-      "extractionState" : "extracted_with_value",
+    "Zigzag can’t read that file as an image. Choose an SVG, PNG, JPEG, HEIC, PDF or ICNS file." : {
+      "comment" : "Message of the notice when an image file chosen as a page's icon can't be read.",
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Discarding and highlighting tabs"
-          }
-        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "丢弃和高亮标签页"
-          }
-        }
-      }
-    },
-    "extension.limit.windowsPopup" : {
-      "comment" : "A Chrome extension feature Zigzag limits: extension windows opened as popups.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Popup windows"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "弹出式窗口"
-          }
-        }
-      }
-    },
-    "extension.limit.runtime" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: restarting the browser or reading its package folder.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Restarting Zigzag"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新启动 Zigzag"
-          }
-        }
-      }
-    },
-    "extension.limit.runtimeContexts" : {
-      "comment" : "A Chrome extension feature Zigzag limits: runtime.getContexts reports background, popup, side panel and offscreen contexts only; tabs, subframes, developer tools and real document IDs are not reported.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Open pages (background, popup, side panel and offscreen only; no tabs, subframes, developer tools or document IDs)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开的页面（仅后台、弹出式窗口、边栏面板和离屏页面；不含标签页、子框架、开发者工具或文档 ID）"
-          }
-        }
-      }
-    },
-    "extension.limit.backgroundPage" : {
-      "comment" : "A Chrome extension feature Zigzag limits: runtime.getBackgroundPage answers Manifest V2 only; a Manifest V3 page gets “You do not have a background page.” A Manifest V3 worker keeps WebKit's member, visible rather than absent.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The background page (Manifest V2 only; Manifest V3 pages get “You do not have a background page.”)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后台页面（仅 Manifest V2；Manifest V3 页面会收到“You do not have a background page.”）"
-          }
-        }
-      }
-    },
-    "extension.limit.action" : {
-      "comment" : "A Chrome extension feature Zigzag limits: badge text color and toolbar button settings.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Toolbar button settings"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "工具栏按钮设置"
-          }
-        }
-      }
-    },
-    "extension.limit.notifications" : {
-      "comment" : "A Chrome extension feature Zigzag limits: notification buttons and settings.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Notifications"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通知"
-          }
-        }
-      }
-    },
-    "extension.limit.sidePanel" : {
-      "comment" : "A Chrome extension feature Zigzag limits: the side panel's layout and open/close events.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Side panel"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏面板"
-          }
-        }
-      }
-    },
-    "extension.limit.systemDisplay" : {
-      "comment" : "A Chrome extension feature Zigzag limits: changing display settings.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Display information"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示器信息"
-          }
-        }
-      }
-    },
-    "extension.limit.power" : {
-      "comment" : "A Chrome extension feature Zigzag limits: reporting activity to keep the Mac awake.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Keeping your Mac awake"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "让 Mac 保持唤醒"
-          }
-        }
-      }
-    },
-    "extension.limit.signIn" : {
-      "comment" : "A Chrome extension feature Zigzag limits: Chrome's own Google account sign-in.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Signing in with your account"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用你的账户登录"
-          }
-        }
-      }
-    },
-    "extension.limit.bookmarks" : {
-      "comment" : "A Chrome extension feature Zigzag limits: bookmark import and reorder events.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Your bookmarks"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的书签"
-          }
-        }
-      }
-    },
-    "extension.limit.downloads" : {
-      "comment" : "A Chrome extension feature Zigzag limits: the download shelf, danger prompts and filename events.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Downloads"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下载"
-          }
-        }
-      }
-    },
-    "extension.limit.tabCapture" : {
-      "comment" : "A Chrome extension feature Zigzag limits: tab video capture; audio is captured.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Recording tabs"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "录制标签页"
-          }
-        }
-      }
-    },
-    "extension.limit.tabVideoCapture" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: recording a tab's video; audio capture works.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Tab video capture"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "录制标签页视频"
-          }
-        }
-      }
-    },
-    "extension.limit.cookies" : {
-      "comment" : "A Chrome extension feature Zigzag limits: cookie partition keys.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Cookie details"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookie 详情"
-          }
-        }
-      }
-    },
-    "extension.limit.cookiePartitions" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: reading a cookie's partition key.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Cookie partition details"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cookie 分区详情"
-          }
-        }
-      }
-    },
-    "extension.limit.hostAccessRequests" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: asking for host access at runtime.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Site access requests"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "网站访问请求"
-          }
-        }
-      }
-    },
-    "extension.limit.storage" : {
-      "comment" : "A Chrome extension feature Zigzag emulates: managed extension storage.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Stored extension settings"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "扩展存储的设置"
-          }
-        }
-      }
-    },
-    "extension.limit.storageSync" : {
-      "comment" : "A Chrome extension feature Zigzag limits: storage.sync keeps its settings on this Mac instead of syncing them.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Settings synced between Macs"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Mac 之间同步的设置"
-          }
-        }
-      }
-    },
-    "extension.limit.localScripts" : {
-      "comment" : "A Chrome extension feature Zigzag limits: registered content scripts that name file: pages.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Scripts on local files"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本地文件上的脚本"
-          }
-        }
-      }
-    },
-    "extension.limit.blockingRules" : {
-      "comment" : "A Chrome extension feature Zigzag limits: switching individual network rules on and off.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Blocking rules"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拦截规则"
-          }
-        }
-      }
-    },
-    "extension.limit.staticRuleChanges" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: switching individual static rules on and off with declarativeNetRequest.updateStaticRules.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Changes to static blocking rules"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "对静态拦截规则的更改"
-          }
-        }
-      }
-    },
-    "extension.limit.matchedRuleDebugging" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: seeing which blocking rules matched a request.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Matched-rule debugging"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匹配规则调试"
-          }
-        }
-      }
-    },
-    "extension.limit.webRequestBlocking" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: blocking web requests with webRequest.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Blocking requests the old way"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用旧方式拦截请求"
-          }
-        }
-      }
-    },
-    "extension.limit.languageDetection" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: i18n.detectLanguage.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Language detection"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "语言检测"
-          }
-        }
-      }
-    },
-    "extension.limit.legacyExtension" : {
-      "comment" : "A Chrome extension feature Chrome removed: the old chrome.extension namespace.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Legacy extension APIs"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "旧版扩展 API"
-          }
-        }
-      }
-    },
-    "extension.limit.sessions" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the sessions API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Closed tabs and sessions"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已关闭的标签页和会话"
-          }
-        }
-      }
-    },
-    "extension.limit.search" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the search API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Search settings"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜索设置"
-          }
-        }
-      }
-    },
-    "extension.limit.debugger" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the debugger API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Debugging pages"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "调试页面"
-          }
-        }
-      }
-    },
-    "extension.limit.fontSettings" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the fontSettings API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Font settings"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "字体设置"
-          }
-        }
-      }
-    },
-    "extension.limit.privacySettings" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: changing the browser's privacy settings.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Privacy settings"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "隐私设置"
-          }
-        }
-      }
-    },
-    "extension.limit.management" : {
-      "comment" : "A Chrome extension feature Zigzag limits: listing and changing other extensions.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Managing other extensions"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "管理其他扩展"
-          }
-        }
-      }
-    },
-    "extension.limit.pageCapture" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: saving a page as MHTML.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Saving pages"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储页面"
-          }
-        }
-      }
-    },
-    "extension.limit.desktopCapture" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the desktopCapture API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Recording your screen"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "录制你的屏幕"
-          }
-        }
-      }
-    },
-    "extension.limit.addressBarKeyword" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: an omnibox keyword.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Address bar keyword"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地址栏关键词"
-          }
-        }
-      }
-    },
-    "extension.limit.publicSuffix" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the publicSuffix API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Domain names"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "域名"
-          }
-        }
-      }
-    },
-    "extension.limit.devtools" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: extension DevTools panels.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Developer tools"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开发者工具"
-          }
-        }
-      }
-    },
-    "extension.limit.contentSettings" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the contentSettings API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Content settings"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "内容设置"
-          }
-        }
-      }
-    },
-    "extension.limit.readingList" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the readingList API.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Reading list"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "阅读列表"
-          }
-        }
-      }
-    },
-    "extension.limit.tts" : {
-      "comment" : "A Chrome extension feature Zigzag limits: extensions that are themselves a text-to-speech engine.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Reading aloud"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "朗读"
-          }
-        }
-      }
-    },
-    "extension.limit.geolocation" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: the geolocation permission.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Your location"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的位置"
-          }
-        }
-      }
-    },
-    "extension.limit.clipboardRead" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: reading the clipboard.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Reading what you copy"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "读取你拷贝的内容"
-          }
-        }
-      }
-    },
-    "extension.limit.proxyScripts" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: proxy auto-config scripts, which choose a proxy for each site.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Proxy scripts (PAC)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "代理脚本（PAC）"
-          }
-        }
-      }
-    },
-    "extension.limit.deprecatedChannel" : {
-      "comment" : "A Chrome extension feature Chrome removed: its old Google messaging channels.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Deprecated Google APIs"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已弃用的 Google API"
+            "value" : "Zigzag 无法将此文件读取为图像。请选取 SVG、PNG、JPEG、HEIC、PDF 或 ICNS 文件。"
           }
         }
       }

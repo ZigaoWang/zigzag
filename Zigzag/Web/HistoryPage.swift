@@ -17,6 +17,7 @@ enum HistoryPage {
         guard configuration.urlSchemeHandler(forURLScheme: scheme) == nil else { return }
         configuration.setURLSchemeHandler(SchemeHandler.shared, forURLScheme: scheme)
         configuration.userContentController.addScriptMessageHandler(Bridge.shared, contentWorld: .page, name: "zigzagHistory")
+        configuration.userContentController.addScriptMessageHandler(ArchivePage.Bridge.shared, contentWorld: .page, name: "zigzagArchive")
     }
 
     /// ⌘Y: the History tab you already have in this space, or a new one.
@@ -52,6 +53,9 @@ enum HistoryPage {
                 type = "image/png"
             } else if url.host() == "history" {
                 data = Data(HistoryPage.html(for: webView).utf8)
+                type = "text/html"
+            } else if url.host() == ArchivePage.host {
+                data = Data(ArchivePage.html(for: webView).utf8)
                 type = "text/html"
             } else if url.host() == SettingsPage.host {
                 data = Data(SettingsPage.html.utf8)
@@ -266,7 +270,7 @@ enum HistoryPage {
         }), duration: Toast.undoDuration, in: controller)
     }
 
-    private static func controller(for webView: WKWebView?) -> BrowserWindowController? {
+    static func controller(for webView: WKWebView?) -> BrowserWindowController? {
         WindowManager.shared.controllers.first { $0.window != nil && $0.window === webView?.window }
     }
 
@@ -285,7 +289,7 @@ enum HistoryPage {
     // MARK: The page
 
     /// The space this page is in, for its accent and the wordmark's color.
-    private static func theme(for webView: WKWebView) -> Brand.Theme {
+    static func theme(for webView: WKWebView) -> Brand.Theme {
         let controller = WindowManager.shared.controller(for: webView.window) ?? WindowManager.shared.keyController
         return controller.map { Brand.Theme.of($0.tabManager.currentSpace) } ?? .brand
     }
@@ -340,7 +344,7 @@ enum HistoryPage {
         return json.replacingOccurrences(of: "</", with: "<\\/")
     }
 
-    private static func escape(_ s: String) -> String {
+    static func escape(_ s: String) -> String {
         s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
             .replacingOccurrences(of: "\"", with: "&quot;")
     }

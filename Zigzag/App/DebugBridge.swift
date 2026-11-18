@@ -854,6 +854,16 @@ enum DebugBridge {
                 let icon = f.count > 1 && f[1] != "none" ? f[1] : nil
                 if let id = list[n].bookmarkID { Library.shared.setIcon(icon, forBookmark: id) } else { list[n].customIcon = icon }
             }
+        // pageiconfile <index> <path>: Choose Image… for the tab at that sidebar position, with the file already picked.
+        case "pageiconfile":
+            let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+            let list = controller.tabManager.navigableTabs
+            if f.count == 2, let n = Int(f[0]), list.indices.contains(n) {
+                let tab = list[n]
+                controller.usePageImage(URL(fileURLWithPath: f[1])) { icon in
+                    if let id = tab.bookmarkID { controller.setIconWithUndo(icon, forBookmark: id) } else { controller.setIconWithUndo(icon, for: tab) }
+                }
+            }
         case "killpage":
             // killpage <url prefix>: ends that tab's page process, as macOS does when it takes memory back.
             if let webView = controller.tabManager.allTabs.first(where: { $0.url?.absoluteString.hasPrefix(arg) == true })?.webView,
@@ -1761,6 +1771,20 @@ enum DebugBridge {
             NSApp.terminate(nil)
         case "materials": MaterialsShowcase.debug(arg)
         case "history": HistoryPage.open(in: controller)
+        case "archive": ArchivePage.open(in: controller)
+        case "seedarchive":
+            // seedarchive [n]: n archived tabs (6 by default) spread over the spaces and the last few days, as if
+            // they'd tidied themselves away; no tab is opened for them.
+            let spaces = Library.shared.spaces.filter { Library.shared.profileID(ofSpace: $0.id) == controller.tabManager.profile.id }
+            let sites = [("https://www.apple.com/", "Apple"), ("https://github.com/", "GitHub"), ("https://en.wikipedia.org/wiki/Zigzag", "Zigzag - Wikipedia"),
+                         ("https://news.ycombinator.com/", "Hacker News"), ("https://developer.apple.com/documentation/webkit", "WebKit | Apple Developer Documentation"),
+                         ("https://www.example.com/", "Example Domain")]
+            let n = Int(arg) ?? 6
+            TabArchive.shared.add(contentsOf: (0..<n).reversed().compactMap { i in
+                let site = sites[i % sites.count]
+                guard let url = URL(string: site.0 + (i < sites.count ? "" : "?\(i)")), let space = spaces.isEmpty ? nil : spaces[i % spaces.count] else { return nil }
+                return ArchivedTab(url: url, title: site.1, spaceID: space.id, archivedAt: Date().addingTimeInterval(-Double(i) * 16 * 3600 - 600))
+            })
         case "clearhistory":
             // Clears the history of the profile you're in, undoably, as the menu's Clear History does once confirmed.
             controller.historyChange(HistoryPage.clearHistory) { [tabManager = controller.tabManager] in tabManager.profile.history.remove() }

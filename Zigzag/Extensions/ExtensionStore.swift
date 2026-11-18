@@ -1399,6 +1399,7 @@ extension ExtensionStore {
         let overlay = overlayFolder(in: folder, version: state.version)
         let fill = fills
         let signature = overlaySignature(prelude: prelude, patches: patches, fill: fill, package: package)
+            + (webKitDropsWasmKeyword ? "wasm-policy" : "")
         // Asked for twice at once (a profile's extensions starting as one is added): made once.
         if let making = overlaysMaking[overlay.path] { return await making.value }
         let making = Task.detached(priority: .userInitiated) {
@@ -1539,6 +1540,50 @@ extension ExtensionStore {
     }
 
 
+    /// WebKit before macOS 26 drops 'wasm-unsafe-eval' from a Manifest V3 extension's script-src (WebKit bug
+    /// 290153), so the WebAssembly the extension asked for is refused. Bitwarden then says WebAssembly isn't
+    /// supported (#298). Fixed in WebKit 293854@main.
+    nonisolated static var webKitDropsWasmKeyword: Bool {
+        #if DEBUG
+        // Testing builds on a newer macOS: ZIGZAG_WASM_POLICY=1 writes the policy as the older one gets it.
+        if ProcessInfo.processInfo.environment["ZIGZAG_WASM_POLICY"] == "1" { return true }
+        #endif
+        if #available(macOS 26, *) { return false }
+        return true
+    }
+
+    /// An extension_pages policy that still allows WebAssembly in that WebKit, or nil if it doesn't ask for it.
+    /// script-src becomes script-src-elem with the same sources, so scripts load as before; script-src-attr and
+    /// worker-src get the same limits too. Only string eval is no longer refused. With a default-src, eval and
+    /// WebAssembly fall back to it and stay refused, so that policy is left alone.
+    nonisolated static func wasmCompatiblePolicy(_ policy: String) -> String? {
+        let directives = policy.split(separator: ";").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let name = { (directive: String) in directive.split(separator: " ").first.map { $0.lowercased() } ?? "" }
+        let names = Set(directives.map(name))
+        guard !names.contains("default-src"), let script = directives.first(where: { name($0) == "script-src" }) else { return nil }
+        let sources = script.split(separator: " ").dropFirst().map(String.init)
+        guard sources.contains(where: { $0.lowercased() == "'wasm-unsafe-eval'" }) else { return nil }
+        let kept = sources.filter { $0.lowercased() != "'wasm-unsafe-eval'" }.joined(separator: " ")
+        var result: [String] = []
+        for directive in directives {
+            guard name(directive) == "script-src" else { result.append(directive); continue }
+            for (added, value) in [("script-src-elem", kept), ("script-src-attr", "'none'"), ("worker-src", kept)] where !names.contains(added) {
+                result.append(value.isEmpty ? added : added + " " + value)
+            }
+        }
+        return result.joined(separator: "; ")
+    }
+
+    /// The manifest with its extension_pages policy made `wasmCompatiblePolicy`, for a Manifest V3 extension.
+    nonisolated static func allowingWasm(_ manifest: [String: Any]) -> [String: Any] {
+        guard manifest["manifest_version"] as? Int == 3, var policies = manifest["content_security_policy"] as? [String: Any],
+              let pages = policies["extension_pages"] as? String, let fixed = wasmCompatiblePolicy(pages) else { return manifest }
+        var manifest = manifest
+        policies["extension_pages"] = fixed
+        manifest["content_security_policy"] = policies
+        return manifest
+    }
+
     /// A patched file is a real copy (the package's stays as it was); its link in the overlay is replaced.
     nonisolated private static func apply(_ patches: [OverlayPatch], to file: String, in overlay: URL, from package: URL, id: String) {
         let source = package.appendingPathComponent(file), target = overlay.appendingPathComponent(file)
@@ -1651,6 +1696,7 @@ extension ExtensionStore {
         // Chrome's userScripts doesn't, so an extension that asked for userScripts may not have asked for it.
         if permissions.contains("userScripts"), !permissions.contains("scripting") { permissions.append("scripting") }
         manifest["permissions"] = permissions
+        if webKitDropsWasmKeyword { manifest = allowingWasm(manifest) }
         guard let out = try? JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted]) else { return false }
         do {
             try out.write(to: overlay.appendingPathComponent("manifest.json"))
