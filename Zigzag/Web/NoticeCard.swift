@@ -150,9 +150,13 @@ final class NoticeCard: FloatingPanelView {
         self.notice = notice
         render()
         appearWork?.cancel()
+        // Over its own tab only, as while it ran: an ending in a background tab waits there for you, and its time
+        // to go starts once it has been seen.
         if notice.isOver {
-            showNow()
-            hideAfterWhile()
+            // Up already, it grows to its new words where it is: a failure has a line under its title.
+            if isUp { rePlace { place(in: controller) } }
+            followTab()
+            if isUp, hideWork == nil { hideAfterWhile() }
         }
         return true
     }
@@ -175,6 +179,7 @@ final class NoticeCard: FloatingPanelView {
         isUp = true
         slidesFromTop = true
         present()
+        if notice.isOver, hideWork == nil { hideAfterWhile() }
     }
 
     private func hideAfterWhile() {
