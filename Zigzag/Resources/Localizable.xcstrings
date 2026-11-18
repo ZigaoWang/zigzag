@@ -23833,39 +23833,6 @@
         }
       }
     },
-    "opened this link in Mini" : {
-      "comment" : "An automation's notice over the page: the rule opened the link in Zigzag Mini.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在 Mini 中打开这个链接"
-          }
-        }
-      }
-    },
-    "opened this link in a new tab" : {
-      "comment" : "An automation's notice over the page: the rule opened the link in a tab of its own.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在新标签页中打开这个链接"
-          }
-        }
-      }
-    },
-    "opened this link in this tab" : {
-      "comment" : "An automation's notice over the page: the rule opened the link where you already are.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已在此标签页中打开这个链接"
-          }
-        }
-      }
-    },
     "opens %@" : {
       "comment" : "A choice made for a site in Settings › Privacy: its links of this kind open in an app, by name.",
       "localizations" : {

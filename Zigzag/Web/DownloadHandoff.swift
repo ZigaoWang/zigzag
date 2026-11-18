@@ -297,7 +297,6 @@ enum DownloadHandoff {
                 cookieFile = file
             }
         }
-        announce(rule, askingOn: rule, action: rule.action, values: values, secret: secret, request: request)
         let outcome: Outcome
         switch rule.action.kind {
         case .runScript:
@@ -318,21 +317,20 @@ enum DownloadHandoff {
             // download is never cancelled for it — so there is nothing to do here but let it be saved.
             outcome = .noMatch
         }
+        // Said once it has worked, so a handoff that failed is never announced as one that didn't: the toast for the
+        // failure says what happened instead.
+        if outcome == .handedOff { announce(rule, request: request, values: values, secret: secret) }
         return outcome
     }
 
-    /// Says what a rule is about to do, where its tab is — in the window holding it, so a rule that fires in a
-    /// background tab says so there rather than in the one you are looking at. Before the action runs, because what
-    /// the notice needs to know is what is *about* to happen, and because a slow action shouldn't hold the notice back.
-    /// Nothing is said where the firing shows something of its own (see `HandoffNotice.line`).
-    ///
-    /// `named` is the rule the notice puts a name to; `askingOn` is the rule an Open URL would keep a chosen place on.
-    /// They are the same rule for a rule's own firing, and only an Open URL can tell them apart.
-    private static func announce(_ named: DownloadRule?, askingOn rule: DownloadRule?, action: DownloadRuleAction,
-                                values: HandoffValues, secret: String, request: Request) {
-        guard let line = HandoffNotice.line(for: named, askingOn: rule, action: action, values: values, secret: secret),
+    /// Says what a rule did, where its tab is — in the window holding it, so a rule that fires in a background tab
+    /// says so there rather than in the one you are looking at. Only for a handoff that leaves Zigzag and only once a
+    /// session: everything else shows itself (see `HandoffNotice.takeLine`).
+    private static func announce(_ rule: DownloadRule, request: Request, values: HandoffValues, secret: String) {
+        let choice = opening(rule, at: request.place)
+        guard let line = HandoffNotice.takeLine(for: rule, elsewhere: elsewhere(of: rule.action, at: choice, values: values, secret: secret)),
               let host = handoffHost(for: request) else { return }
-        host.promptAutomation(line, symbol: action.kind.symbol)
+        host.promptAutomation(line, symbol: rule.action.kind.symbol)
     }
 
     /// A rule that ran, but not: said over the page, and noted without the link, the cookies or the secret.
@@ -347,6 +345,30 @@ enum DownloadHandoff {
         guard let controller = WindowManager.shared.controller(for: window) ?? WindowManager.shared.keyController else { return }
         Toast.show(String(localized: "Couldn’t hand off: \(reason)", comment: "Toast when a download rule's action fails for a link or a download. The placeholder is the reason, a few words."),
                    symbol: "exclamationmark.triangle", duration: 4, in: controller)
+    }
+
+    /// Where a handoff went, when there's nowhere in Zigzag that shows it: an app on this Mac, or a service. Nil for
+    /// everything else — a link opened in a tab or in Mini, a script's card, a download's file — which shows itself.
+    private static func elsewhere(of action: DownloadRuleAction, at choice: OpenInZigzag.Choice,
+                                  values: HandoffValues, secret: String) -> HandoffNotice.Elsewhere? {
+        switch action.kind {
+        case .openApp:
+            return .app(action.summary)
+        case .jsonRPC:
+            return .service(action.summary)
+        case .openURL:
+            // A web address that isn't the web's belongs to its own app; a web address goes to the Mac's browser when
+            // that's where the rule says, and nowhere near Zigzag's own places, which show themselves.
+            guard let url = URL(string: DownloadTokens.expand(action.urlTemplate, with: values, secret: secret)),
+                  let scheme = url.scheme else { return nil }
+            if !OpenInZigzag.handles(url) { return .app(ExternalLinks.appName(forScheme: scheme)) }
+            // A rule that still asks (or was answered in the question) shows the answer as it opens the link, and
+            // Zigzag as the default browser gets its own handoff straight back and opens it in a tab, which shows.
+            guard choice == .defaultBrowser, !DefaultBrowser.isDefault else { return nil }
+            return .app(ExternalLinks.appName(forScheme: "https"))
+        case .runScript, .saveToFolder, .openFile:
+            return nil
+        }
     }
 
     /// An app handed a `{cookies}` path may read it a moment later than the open call returns. The file waits a few

@@ -1008,85 +1008,70 @@ struct DownloadRuleTests {
 
     // MARK: What an automation says for itself
 
-    /// Every firing that would otherwise be **silent** is announced — that is the user's rule, and the only thing
-    /// that makes a rule planted by something else detectable — and the firings that say so themselves are not, so
-    /// nothing is said twice.
-    @Test func everyFiringThatWouldBeSilentIsAnnounced() {
-        let values = HandoffValues(link: URL(string: "https://example.com/video.mp4")!)
+    /// Only the handoffs that would otherwise be **silent** are announced — an app, a service, the Mac's own browser,
+    /// and an address of some other app's — and a rule says its line once, so the tab it opened isn't covered by a
+    /// line saying it opened it.
+    @Test func onlyTheHandoffsYouCantSeeAreAnnounced() {
+        func action(_ kind: DownloadRuleAction.Kind) -> DownloadRuleAction { DownloadRuleAction(kind: kind) }
 
-        /// A rule's own firing: the rule is both the one the notice names and the one a place would be kept on.
-        func line(_ action: DownloadRuleAction, named: String = "Videos") -> String? {
-            let rule = DownloadRule(name: named, match: .any, action: action)
-            return HandoffNotice.line(for: rule, askingOn: rule, action: action, values: values, secret: "")
-        }
-
-        // An app, and a service: what it did, and the rule it did it.
-        var app = DownloadRuleAction(kind: .openApp)
+        var app = action(.openApp)
         app.appPath = "/Applications/mpv.app"
-        #expect(line(app) == "Videos: handed this link to mpv")
-
-        var service = DownloadRuleAction(kind: .jsonRPC)
+        var service = action(.jsonRPC)
         service.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc"
         service.rpcMethod = "aria2.addUri"
-        #expect(line(service) == "Videos: sent this link to aria2.addUri · 127.0.0.1")
-
-        // A web address with a place already decided says which place.
-        var web = DownloadRuleAction(kind: .openURL)
-        web.urlTemplate = "{link}"
-        web.openIn = .newTab
-        #expect(line(web) == "Videos: opened this link in a new tab")
-        web.openIn = .thisTab
-        #expect(line(web) == "Videos: opened this link in this tab")
-        web.openIn = .mini
-        #expect(line(web) == "Videos: opened this link in Mini")
-
-        // A rule that would ask: the question is the sighting itself, so no line. (With no rule to ask on — a
-        // script's own answer — it opens in a new tab instead, which is the line above.)
-        web.openIn = .ask
-        #expect(line(web) == nil)
-
-        // Handed to the Mac's own browser: an ordinary firing, and the one state that would otherwise say nothing.
-        web.openIn = .defaultBrowser
-        #expect(line(web)?.hasPrefix("Videos: handed this link to ") == true)
-
-        // A script's card says it is running, and a destination is read where WebKit makes the download, never run as
-        // an action: neither is announced here.
-        var script = DownloadRuleAction(kind: .runScript)
+        var script = action(.runScript)
         script.scriptPath = "yt-dlp.sh"
-        #expect(line(script) == nil)
-        #expect(line(DownloadRuleAction(kind: .saveToFolder)) == nil)
-        #expect(line(DownloadRuleAction(kind: .openFile)) == nil)
+        var web = action(.openURL)
+        web.urlTemplate = "{link}"
 
-        // An address that isn't the web's belongs to its own app: named if this Mac has one for the scheme, the
-        // scheme itself if it hasn't. The rule is still what the line starts with.
-        var own = DownloadRuleAction(kind: .openURL)
-        own.urlTemplate = "mpv://{encoded_link}"
-        let ownLine = line(own)
-        #expect(ownLine?.hasPrefix("Videos: handed this link to ") == true)
-        #expect(ownLine?.contains("mpv") == true)
-
+        // An app and a service leave Zigzag with nothing on screen saying so: a line each.
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: app), elsewhere: .app("mpv")) == "Videos: handed this link to mpv")
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: service), elsewhere: .service("aria2.addUri · 127.0.0.1")) == "Videos: sent this link to aria2.addUri · 127.0.0.1")
         // A rule that was never named says what happened without inventing a name for it.
-        #expect(line(app, named: "") == "handed this link to mpv")
+        #expect(HandoffNotice.line(for: DownloadRule(name: "", action: app), elsewhere: .app("mpv")) == "handed this link to mpv")
+        // Nothing that shows itself: a script's card, a tab, Mini, a question, a download's file.
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: script), elsewhere: nil) == nil)
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: web), elsewhere: nil) == nil)
+        // And nothing without a rule to name.
+        #expect(HandoffNotice.line(for: nil, elsewhere: .app("mpv")) == nil)
+    }
+
+    /// A rule says its line once a session: the first handoff announces, and the ones after it don't, so a rule that
+    /// fires all afternoon doesn't bury the page in notices.
+    @Test func aRuleSaysItsLineOnceASession() {
+        HandoffNotice.forgetSaid()
+        defer { HandoffNotice.forgetSaid() }
+        let rule = DownloadRule(name: "Videos", match: .any, action: DownloadRuleAction(kind: .openApp))
+        #expect(HandoffNotice.takeLine(for: rule, elsewhere: .app("mpv")) == "Videos: handed this link to mpv")
+        #expect(HandoffNotice.takeLine(for: rule, elsewhere: .app("mpv")) == nil)
+        // A different rule has its own line.
+        let other = DownloadRule(name: "Music", match: .any, action: DownloadRuleAction(kind: .openApp))
+        #expect(HandoffNotice.takeLine(for: other, elsewhere: .app("mpv")) == "Music: handed this link to mpv")
+        // One that has nothing to say doesn't use up its turn: it says so if it ever hands off for real.
+        let quiet = DownloadRule(name: "Quiet", match: .any, action: DownloadRuleAction(kind: .runScript))
+        #expect(HandoffNotice.takeLine(for: quiet, elsewhere: nil) == nil)
+        #expect(HandoffNotice.takeLine(for: quiet, elsewhere: .app("mpv")) == "Quiet: handed this link to mpv")
     }
 
     /// Where an Open URL will open is decided in **one** place, so what a notice says and what the action does can
-    /// never drift apart: a rule asks and keeps the answer.
-    @Test func aWebAddressOpensWhereTheNoticeSaysItDoes() {
+    /// never drift apart: the card's answer for this handoff, else the rule's own.
+    @Test func aWebAddressOpensWhereTheRuleSaysItDoes() {
         var web = DownloadRuleAction(kind: .openURL)
         let rule = DownloadRule(name: "Videos", match: .any, action: web)
 
-        // A rule that hasn't been told: nowhere yet — it will ask.
+        // The rule's own answer, until the card answers for this hand-off alone.
+        for choice in OpenInZigzag.Choice.allCases {
+            web.openIn = choice
+            let told = DownloadRule(name: "Videos", match: .any, action: web)
+            #expect(DownloadHandoff.opening(told, at: nil) == choice)
+            #expect(DownloadHandoff.opening(told, at: .mini) == .mini)
+        }
+
+        // Ask is a place only the question can answer: nothing to open until it does.
         web.openIn = .ask
-        #expect(web.place(askingOn: rule) == nil)
-        // Told, and it keeps that.
-        web.openIn = .mini
-        #expect(web.place(askingOn: rule) == .mini)
-        // The Mac's own browser is a place of its own, not "Ask".
-        web.openIn = .defaultBrowser
-        #expect(web.place(askingOn: rule) == .defaultBrowser)
-        // With no rule to ask on, Ask means a new tab rather than a question.
-        web.openIn = .ask
-        #expect(web.place(askingOn: nil) == .newTab)
+        #expect(DownloadHandoff.opening(rule, at: nil) == .ask)
+        #expect(DownloadHandoff.opening(rule, at: nil).place == nil)
+        #expect(DownloadHandoff.opening(rule, at: .defaultBrowser).place == nil)
     }
 
     /// A notice said twice while it is still up is one notice with a count, in the diagnostics' own shape — and only
