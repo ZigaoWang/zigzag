@@ -16,6 +16,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - An extension's right-click menu shows its emoji and symbols, like 📋 and ⌘, instead of garbled letters like "ðŸ“‹". An extension with background scripts, as most Firefox add-ons have, had its text read in the wrong encoding. Thanks to [mrfragger](https://github.com/mrfragger). ([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - An extension that turns its side panel on only for the tab you click it on, like ChatGPT's, opens the panel when you click its button, instead of the click doing nothing.
 - Links from other apps open in Zigzag Mini by default, like Arc's Little Arc. ⌘O moves the page into a tab, and Settings › Zigzag Mini turns it off. ([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- Site Controls has a width of its own instead of the sidebar's, so its rows no longer get cut short or wrap in a narrow sidebar. From the sidebar it reaches past a narrow one over the page, and with the address bar above the page it opens under the address at its usual width. Thanks to [Tuszy42](https://github.com/Tuszy42). ([#335](https://github.com/ZigaoWang/zigzag/issues/335))
 
 ## [0.9.2] - 2026-11-18
 

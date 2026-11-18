@@ -23,6 +23,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 扩展的右键菜单能正常显示表情和符号了，比如 📋 和 ⌘，不会再变成“ðŸ“‹”这样的乱码。用后台脚本的扩展（大多数 Firefox 附加组件都是这样）之前文字的编码读错了。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - 只在你点按它的那个标签页打开侧边栏的扩展，比如 ChatGPT 的扩展，现在点它的按钮就会打开侧边栏，不会再点了没反应。
 - 来自其他 App 的链接现在默认在 Zigzag Mini 中打开，就像 Arc 的 Little Arc。按 ⌘O 可以把网页移到标签页里，不想要的话可以在“设置 › Zigzag Mini”中关闭。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- 网站设置有了自己的宽度，不再跟着边栏走，边栏很窄时里面的文字不会再被截断或换行。从边栏打开时，边栏太窄它会延伸到网页上；地址栏在网页上方时，它在地址下方以平常的宽度打开。感谢 [Tuszy42](https://github.com/Tuszy42)。([#335](https://github.com/ZigaoWang/zigzag/issues/335))
 
 ## [0.9.2] - 2026-11-18
 
