@@ -525,11 +525,17 @@ enum DownloadHandoff {
                 // The card says how it went, where there is one and it hasn't been put away. Anything else falls back
                 // to the notice below, so a script that fails is never silent.
                 let ended: ScriptNotice.State = status == 0 ? .ran : .failed(said)
-                if card?.say(ScriptNotice(script: script.script, state: ended)) == true || status == 0 { return }
+                let onCard = card?.say(ScriptNotice(script: script.script, state: ended)) == true
+                guard status != 0 else { return }
                 let reason = said.isEmpty
                     ? String(localized: "The script exited with status \(status).", comment: "Why a download rule failed: the script finished with an error code. The placeholder is a number, like 1.")
                     : String(localized: "The script failed: \(said)", comment: "Why a download rule failed: the script exited with an error code and printed this. The placeholder is the script's own last line of error text.")
-                report(.failed(reason), rule: rule, url: link, isPrivate: isPrivate)
+                // The card said it over the page; the diagnostics still note it, as they note every failed handoff.
+                if onCard {
+                    Diagnostics.note("Handoff failed", site: link.host(), "\(rule?.name ?? "Rule"): \(reason)", isPrivate: isPrivate)
+                } else {
+                    report(.failed(reason), rule: rule, url: link, isPrivate: isPrivate)
+                }
             }
         }
         do {
