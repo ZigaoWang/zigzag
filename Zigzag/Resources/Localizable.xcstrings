@@ -8456,17 +8456,6 @@
         }
       }
     },
-    "Every site" : {
-      "comment" : "Under a download rule in Settings › Downloads: the answer beside it was given for every site, not just one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有站点"
-          }
-        }
-      }
-    },
     "Every tab, at a glance" : {
       "comment" : "Said once a step is done in the getting-started guide, a card in the window.",
       "localizations" : {
@@ -24304,7 +24293,7 @@
       }
     },
     "Every site" : {
-      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.",
+      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.\nUnder a download rule in Settings › Downloads: the answer beside it was given for every site, not just one.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
