@@ -30,4 +30,44 @@ struct ExtensionLocalReceiversTests {
         let old = try JSONDecoder().decode(ExtensionInstalls.State.self, from: Data(#"{"enabled":true}"#.utf8))
         #expect(old.localReceivers == nil)
     }
+
+    @Test func aLoopbackExtensionRequestKeepsItsMethodHeadersBodyAndCredentials() throws {
+        let url = URL(string: "http://localhost:9990/save")!
+        let request = try BridgeExtensionFetch.localReceiverRequest(
+            ["method": "post", "headers": [["Content-Type", "application/json"], ["X-Token", "abc"]],
+             "body": #"{"ok":true}"#, "credentials": "include"], url: url)
+        #expect(request.method == "POST")
+        #expect(request.headers["Content-Type"] == "application/json")
+        #expect(request.headers["X-Token"] == "abc")
+        #expect(request.body == Data(#"{"ok":true}"#.utf8))
+        #expect(request.credentials == .include)
+    }
+
+    @Test func aLoopbackExtensionRequestDefaultsToNoCookies() throws {
+        let request = try BridgeExtensionFetch.localReceiverRequest([:], url: URL(string: "http://127.0.0.1:1/")!)
+        #expect(request.method == "GET")
+        #expect(request.credentials == .sameOrigin)
+    }
+
+    @Test func aLoopbackExtensionRequestRefusesWhatTheDoorDoesNotCarry() {
+        let url = URL(string: "http://localhost:9990/")!
+        #expect(throws: (any Error).self) {
+            try BridgeExtensionFetch.localReceiverRequest(["method": "TRACE"], url: url)
+        }
+        #expect(throws: (any Error).self) {
+            try BridgeExtensionFetch.localReceiverRequest(
+                ["body": String(repeating: "x", count: LocalReceivers.responseLimit + 1)], url: url)
+        }
+    }
+
+    @Test func aLoopbackAnswerIsWhatTheBridgeExpects() {
+        let response = LocalReceivers.Response(url: URL(string: "http://localhost:9990/")!, status: 200,
+                                               headers: ["content-type": "application/json"],
+                                               body: Data("{}".utf8))
+        let answer = BridgeExtensionFetch.localReceiverAnswer(response)
+        #expect(answer["status"] as? Int == 200)
+        #expect((answer["headers"] as? [[String]]) == [["content-type", "application/json"]])
+        #expect((answer["body"] as? String).flatMap { Data(base64Encoded: $0) } == Data("{}".utf8))
+        #expect(answer["redirected"] as? Bool == false)
+    }
 }

@@ -85,6 +85,19 @@
   // here as the original fetch; a write that would do either fails, as it may not be sent twice.
   if (typeof globalThis.fetch === 'function') {
     const nativeFetch = globalThis.fetch.bind(globalThis);
+    // This Mac by the names loopback is reached by; http only, because that is what WebKit blocks. An extension
+    // reaches it through the person's own switch for it, not through host access (a loopback address has none).
+    const localLoopback = (url) => {
+      if (url.protocol !== 'http:') return false;
+      let host = url.hostname.toLowerCase();
+      if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+      if (host.endsWith('.')) host = host.slice(0, -1);
+      if (host === 'localhost' || host.endsWith('.localhost')
+          || host === '::1' || host === '0:0:0:0:0:0:0:1') return true;
+      const parts = host.split('.');
+      return parts.length === 4 && parts.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255)
+        && parts[0] === '127';
+    };
     const metadata = (response, answer) => {
       const clone = response.clone.bind(response);
       Object.defineProperties(response, {
@@ -97,9 +110,13 @@
       const isRequest = input instanceof Request;
       const option = (name, fallback) => init && init[name] !== undefined ? init[name] : isRequest ? input[name] : fallback;
       const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
+      const loopback = localLoopback(url);
       const method = String(option('method', 'GET')).toUpperCase();
       const body = init && init.body != null ? init.body : isRequest ? input.body : null;
-      if (!['http:', 'https:'].includes(url.protocol) || option('credentials', 'same-origin') !== 'include'
+      // A loopback call is the exception to "only include sends cookies": it is another origin on this Mac, and the
+      // helper is a plain server with no CORS reply of its own to read, so the switch alone decides and the default
+      // credentials stand. Everything else here is unchanged.
+      if (!['http:', 'https:'].includes(url.protocol) || (!loopback && option('credentials', 'same-origin') !== 'include')
           || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
@@ -120,7 +137,8 @@
       signal.addEventListener('abort', abort, { once: true });
       try {
         const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method,
-          headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect, userAgent: sentUserAgent }]), aborted]);
+          headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect, userAgent: sentUserAgent,
+          credentials: request.credentials }]), aborted]);
         signal.throwIfAborted();
         if (answer.fallback) return nativeFetch(input, init);
         const binary = atob(answer.body), bytes = new Uint8Array(binary.length);
