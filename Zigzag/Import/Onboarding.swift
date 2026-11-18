@@ -1296,8 +1296,8 @@ private final class BringPicker: StepContent {
     private func pickFile() {
         guard let window, !isImporting else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = String(localized: "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file).",
+        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html]
+        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s exported browsing data (a .zip file).",
                                comment: "Message of the open panel from the welcome window’s Import a password file… link.")
         panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         panel.beginSheetModal(for: window) { [weak self] response in

@@ -7,6 +7,12 @@ import Testing
 struct WebStoreButtonTests {
     private let id = "bcjindcccaagfpapjjmafapmmgkkhgoa"
 
+    @Test func extensionsSeeTheSameChromeVersionAsTheStore() throws {
+        let url = try #require(Bundle.main.url(forResource: "bridge", withExtension: "js"))
+        let bridge = try String(contentsOf: url, encoding: .utf8)
+        #expect(bridge.contains("Chrome/\(ExtensionStore.chromeVersion).0.0"))
+    }
+
     // MARK: Who's heard
 
     @Test func onlyTheStoresOwnPageIsHeard() {

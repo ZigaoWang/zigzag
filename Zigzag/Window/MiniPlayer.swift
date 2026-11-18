@@ -195,15 +195,36 @@ final class MiniPlayer {
 
     /// Back to the tab (its arrow, its site's name, a double-click on the card), in its own space if it's in another:
     /// its page, video still playing, goes back into the page card.
+    /// Finds the tab in whichever window holds it (#333); closes the card when it's gone.
     func returnToTab() {
-        guard let tab, let controller, !tab.isClosed, controller.tabManager.tab(with: tab.id) === tab else { return }
-        controller.tabManager.select(tab)
+        guard let controller else { return }
+        let home = Self.home(of: tab, here: controller, in: WindowManager.shared.controllers) { window, tab in
+            !window.tabManager.isInvalidated && window.tabManager.tab(with: tab.id) === tab
+        }
+        guard let home, let tab else {
+            close()
+            return
+        }
+        // Moved to another window: give the page back first.
+        if home !== controller { apply(model.lost(tab.id)) }
+        home.tabManager.select(tab)
+        // Already selected: select() changes nothing, so end the card here.
+        if home === controller, model.tab == tab.id, isOnScreen(tab), let front = controller.tabManager.selectedTab {
+            apply(model.switched(shown: Set(controller.tabManager.panes(of: front).map(\.id)), playing: nil))
+        }
         // From over another app, or a window put away in the Dock: the window comes forward with its tab.
-        if let window = controller.window {
+        if let window = home.window {
             if window.isMiniaturized { window.deminiaturize(nil) }
             NSApp.activate()
             window.makeKeyAndOrderFront(nil)
         }
+    }
+
+    /// The window holding the tab, this one first; nil when it's closed or in none.
+    static func home<Window: AnyObject>(of tab: Tab?, here: Window, in windows: [Window], holds: (Window, Tab) -> Bool) -> Window? {
+        guard let tab, !tab.isClosed else { return nil }
+        if holds(here, tab) { return here }
+        return windows.first { $0 !== here && holds($0, tab) }
     }
 
     /// Its window is closing: the card goes with it, and minimized videos' pages too.

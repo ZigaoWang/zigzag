@@ -25,6 +25,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 只在你点按它的那个标签页打开侧边栏的扩展，比如 ChatGPT 的扩展，现在点它的按钮就会打开侧边栏，不会再点了没反应。
 - 来自其他 App 的链接现在默认在 Zigzag Mini 中打开，就像 Arc 的 Little Arc。按 ⌘O 可以把网页移到标签页里，不想要的话可以在“设置 › Zigzag Mini”中关闭。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
 - 网站设置有了自己的宽度，不再跟着边栏走，边栏很窄时里面的文字不会再被截断或换行。从边栏打开时，边栏太窄它会延伸到网页上；地址栏在网页上方时，它在地址下方以平常的宽度打开。感谢 [Tuszy42](https://github.com/Tuszy42)。([#335](https://github.com/ZigaoWang/zigzag/issues/335))
+- 需要较新 Chrome 的扩展（比如 Heylogin）可以从 Chrome 应用商店安装了，不再显示已下架：Zigzag 之前告诉商店自己是 Chrome 140。感谢 [datarip](https://github.com/datarip)。([#336](https://github.com/ZigaoWang/zigzag/issues/336))
+- 从文件导入现在支持各个浏览器导出的 bookmarks.html，Firefox、LibreWolf、Safari、Chrome 和 Edge 都可以。网页会连同文件夹一起放进单独的空间，和从这台 Mac 上的浏览器导入一样。感谢 [mrfragger](https://github.com/mrfragger)。([#330](https://github.com/ZigaoWang/zigzag/issues/330))
+- 迷你播放器回到标签页的箭头不会再没反应了：它会在标签页现在所在的窗口里找到它，并把那个窗口带到前面；标签页已经在屏幕上时卡片会收起；标签页已经关掉时卡片会直接关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#333](https://github.com/ZigaoWang/zigzag/issues/333))
 
 ## [0.9.2] - 2026-11-18
 
