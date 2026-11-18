@@ -806,7 +806,7 @@ final class PageCardView: NSView {
     /// Shows that this tab's page is in another window (nil: show pages again). `showHere` moves it here.
     func showElsewhere(_ tab: Tab?, showHere: (() -> Void)? = nil) {
         shownElsewhere = tab
-        guard let tab else {
+        guard tab != nil else {
             elsewhere?.removeFromSuperview()
             elsewhere = nil
             return

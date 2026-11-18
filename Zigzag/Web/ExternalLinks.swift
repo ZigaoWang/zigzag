@@ -233,7 +233,7 @@ enum ExternalLinks {
 
     /// The kept Allow, Block, or Always Open app; nil asks. A foreign frame (`foreign`) only gets Block.
     static func decision(page: String?, foreign: Bool, stored: String?) -> String? {
-        guard let page, let stored else { return nil }
+        guard page != nil, let stored else { return nil }
         if stored == "deny" { return "deny" }
         return foreign ? nil : stored
     }

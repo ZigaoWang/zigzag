@@ -70,7 +70,7 @@ nonisolated enum OpenInZigzag {
         case .mini:
             // Mini, on the same data store when there is one.
             guard let configuration = configuration ?? tab?.webView?.configuration else { return }
-            PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window, by: sender)
+            _ = PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window, by: sender)
         }
     }
 
