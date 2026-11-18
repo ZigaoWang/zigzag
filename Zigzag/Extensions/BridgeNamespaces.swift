@@ -1907,7 +1907,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     private func ensureReachable(_ tab: Tab, in controller: BrowserWindowController, by extensionID: String) throws {
         guard !controller.tabManager.isPrivate, !tab.isPrivate, let webView = tab.webView, let url = webView.url ?? tab.url,
               let context = host.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
-        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites,
+        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites(in: host.profile),
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: host.profile.installs.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
         }

@@ -181,7 +181,7 @@ final class SitePanel: FloatingPanelView {
         icon.image = tab.favicon
         // In the app's voice, as a page names itself; a site's name keeps its own spelling. Plain http or a port of
         // its own is named in full, as its answers are its own: localhost:3000 never reads like localhost:3001.
-        let web = ["http", "https"].contains(url?.scheme?.lowercased() ?? "")
+        let web = ["http", "https"].contains(self.url.scheme?.lowercased() ?? "")
         let full = origin.map(SiteOrigin.label).flatMap { $0.contains(":") ? $0 : nil }
         let named = web ? full ?? site : site
         shownName = named
@@ -733,7 +733,7 @@ final class SitePanel: FloatingPanelView {
         guard #available(macOS 15.4, *), controller != nil, let host = tab.extensionHost else { return }
         let actions = host.actions(for: tab)
         let installs = tab.profile.installs
-        let offHere = !isBlank && ExtensionStore.extensionsOffSites.contains(site)
+        let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
         let web = ["http", "https"].contains(url.scheme ?? "")
         let tab = tab, url = url
         var items: [SiteExtensionsSection.Item] = actions.map { action in
@@ -868,9 +868,9 @@ final class SitePanel: FloatingPanelView {
         // Once a consent pop-up was found on the page, or a choice was made for the site (#175).
         context.cookieBanners = CookieBanners.applies(to: url)
             && (CookieBanners.outcome(in: tab.webView, site: site) != nil || CookieBanners.choice(for: url) != nil)
-        if #available(macOS 15.4, *) { context.extensionHost = controller != nil && tab.extensionHost != nil && !isBlank }
-        context.hasExtensions = !(extensionsSection?.items.isEmpty ?? true)
-        context.hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
+        // JavaScript has its row on every web page, so Permissions is always a page with something on it.
+        let hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
+        context.hasPermissions = hasPermissions || context.isWeb
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
@@ -878,7 +878,6 @@ final class SitePanel: FloatingPanelView {
         // Translating is a browser window's (`translatePage`).
         context.foreignLanguage = controller != nil && tab.foreignLanguage != nil
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
-        context.manySpaces = Library.shared.spaces.count > 1 && SiteRoutes.site(of: url) != nil
         return context
     }
 
@@ -929,18 +928,6 @@ final class SitePanel: FloatingPanelView {
                     if let webView = self.tab.webView { CookieBanners.forget(in: webView) }
                     self.tab.reload()
                 })
-            case .javaScript:
-                // The page's own scripts here (#282): Allowed or Not Allowed, over Settings › Privacy › JavaScript.
-                // It's for the page as it loads, so choosing reloads it; in a private window it's this tab's alone.
-                let tab = tab, url = url
-                let allowed = SiteJavaScript.allows(url, in: tab)
-                let row = PanelRow.choice(String(localized: "JavaScript", comment: "Row in the site panel's This Site group: whether the site's pages may run their scripts. A name: keep it as it is."),
-                                          options: [Self.javaScriptAllowed, Self.javaScriptNotAllowed], selected: allowed ? 0 : 1,
-                                          status: { _ in Self.javaScriptStatus(url: url, tab: tab) }) { index in
-                    SiteJavaScript.choose(index == 0, for: url, in: tab)
-                }
-                javaScriptRow = row
-                rows.append(row)
             case .darkPage:
                 // Dark pages for this site alone (#134): Automatic follows Settings, On and Off hold whatever it says,
                 // Force darkens it even where it looks dark on its own. Under the name, what that means here now.
@@ -968,18 +955,6 @@ final class SitePanel: FloatingPanelView {
                     guard let self else { return }
                     PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
                 })
-            case .extensions:
-                // Whether extensions run here at all; off, every tile above dims and says so (#215).
-                rows.append(.toggle(String(localized: "Extensions", comment: "Row in the site panel's This Site group."), on: !ExtensionStore.extensionsOffSites.contains(site),
-                                    status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
-                    guard let self else { return }
-                    var sites = ExtensionStore.extensionsOffSites
-                    if on { sites.remove(self.site) } else { sites.insert(self.site) }
-                    ExtensionStore.extensionsOffSites = sites
-                    self.tab.reload()
-                })
-            case .openIn:
-                rows.append(openInRow())
             case .alwaysTranslate:
                 guard let language = tab.foreignLanguage else { break }
                 let name = PageTranslator.name(of: language)
@@ -1008,6 +983,7 @@ final class SitePanel: FloatingPanelView {
     private func buildPermissions() {
         var permissionRows: [PanelRow] = []
         permissionKinds = []
+        javaScriptRow = nil
         if let origin {
             let tab = tab
             for permission in SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate) {
@@ -1026,13 +1002,43 @@ final class SitePanel: FloatingPanelView {
                 permissionKinds.append(permission)
             }
         }
+        // Whether extensions run here at all; off, every tile above dims and says so (#215). It is a permission the
+        // site is given or not, not a switch for the page, so it belongs here with the rest.
+        if #available(macOS 15.4, *), controller != nil, !isPrivate, !isBlank,
+           ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            let profile = tab.profile
+            let enabled = !ExtensionStore.extensionsOffSites(in: profile).contains(site)
+            let row = PanelRow.toggle(String(localized: "Extensions", comment: "Row in the site panel's Permissions page: whether extensions run on this site."),
+                                      on: enabled, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                guard let self else { return }
+                var sites = ExtensionStore.extensionsOffSites(in: profile)
+                if on { sites.remove(self.site) } else { sites.insert(self.site) }
+                ExtensionStore.setExtensionsOffSites(sites, in: profile)
+                self.tab.reload()
+            }
+            permissionRows.append(row)
+        }
+        // JavaScript is a site choice of its own, not one of WebKit's permissions, but it belongs on this page with
+        // them: Allowed or Not Allowed, over Settings › Privacy › JavaScript. It's for the page as it loads, so
+        // choosing reloads it; in a private window it's this tab's alone.
+        if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            let tab = tab, url = url
+            let allowed = SiteJavaScript.allows(url, in: tab)
+            let row = PanelRow.choice(String(localized: "JavaScript", comment: "Row in the site panel's Permissions page: whether the site's pages may run their scripts. A name: keep it as it is."),
+                                      options: [Self.javaScriptAllowed, Self.javaScriptNotAllowed], selected: allowed ? 0 : 1,
+                                      status: { _ in Self.javaScriptStatus(url: url, tab: tab) }) { index in
+                SiteJavaScript.choose(index == 0, for: url, in: tab)
+            }
+            permissionRows.append(row)
+            javaScriptRow = row
+        }
         if permissionsGroup.superview == nil { permissionsBox.addSubview(permissionsGroup) }
         permissionsGroup.rows = permissionRows
         // WebRTC's row with the protection on is the setting's, not the site's: under the line saying it hasn't
         // asked for anything, and with no Reset.
         let own = permissionKinds.filter { isOwn($0) }
         if permissionsEmpty.superview == nil { permissionsBox.addSubview(permissionsEmpty) }
-        permissionsEmpty.isHidden = !own.isEmpty
+        permissionsEmpty.isHidden = !own.isEmpty || javaScriptRow != nil
         if resetPermissions == nil, let origin {
             let row = PanelLinkRow(String(localized: "Reset Permissions", comment: "Row under a site's permissions in the site panel: forgets every answer given to the site, so it asks again.")) { [weak self] in
                 SitePermissions.reset(origin: origin)
@@ -1059,36 +1065,14 @@ final class SitePanel: FloatingPanelView {
     private func refreshPermissionsRow() {
         guard let origin, let row = permissionsRow else { return }
         let shown = SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate)
-        row.isHidden = shown.isEmpty
+        let web = ["http", "https"].contains(url.scheme?.lowercased() ?? "")
+        row.isHidden = shown.isEmpty && !web
         // Only the site's own answers count: WebRTC blocked by the setting alone says nothing about this site.
         let own = shown.filter { isOwn($0) }
         let choices = own.map { choice($0, origin: origin) }
         row.value = own.isEmpty ? "" : PermissionChoice.summary(choices)
         row.shortValue = own.isEmpty ? "" : PermissionChoice.shortSummary(choices)
         needsLayout = true
-    }
-
-    /// Open in (#286): the space this site always opens in, or Any space. A page on a subdomain of a listed site shows
-    /// that site's choice, and changes it; otherwise the page's own site is listed.
-    private func openInRow() -> PanelRow {
-        let spaces = Library.shared.spaces
-        let route = Library.shared.siteRoute(for: url)
-        let site = route?.site ?? SiteRoutes.site(of: url) ?? self.site
-        let selected = route.flatMap { route in spaces.firstIndex { $0.id == route.spaceID }.map { $0 + 1 } } ?? 0
-        let pageSite = SiteRoutes.site(of: url)
-        return .choice(String(localized: "Open in", comment: "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from."),
-                       options: [Self.anySpace] + spaces.map(\.name), selected: selected,
-                       status: { index in
-                           // Said only when the choice is a parent site's: what else it covers.
-                           guard index > 0, site != pageSite else { return nil }
-                           return String(localized: "All of \(site)", comment: "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).")
-                       }) { index in
-            Library.shared.setSiteRoute(site, to: index > 0 && spaces.indices.contains(index - 1) ? spaces[index - 1].id : nil)
-        }
-    }
-
-    static var anySpace: String {
-        String(localized: "Any Space", comment: "The first choice of Open in, in the site panel and in Settings › Spaces: the site opens in whatever space the link is in, as usual.")
     }
 
     private func rebuildRows() {
@@ -1323,7 +1307,8 @@ final class SitePanel: FloatingPanelView {
 
         // One line into each of the other pages, each saying what's there; only those that apply.
         var c = SitePanelRows.Context()
-        c.hasPermissions = permissionsRow?.isHidden == false
+        // JavaScript gives every web page a Permissions page, whether or not anything else was asked.
+        c.hasPermissions = permissionsRow?.isHidden == false || (["http", "https"].contains(url.scheme?.lowercased() ?? "") && permissionsRow != nil)
         c.zapped = zappedRow == nil ? 0 : boost.zaps.count
         c.styled = styleRow != nil && boost.hasStyle
         let links = SitePanelRows.links(c)
@@ -1699,9 +1684,15 @@ final class PanelRow: NSView {
     }
     #endif
 
+    /// The least room a row's name keeps beside its control: enough for a short one ("Microphone", "JavaScript").
+    /// A control that wants more than the rest of the row (a menu of long space names) takes what's left and says the
+    /// whole of its choice in its tooltip, and its menu opens as wide as that choice needs (#314).
+    private static let minimumTitle: CGFloat = 96
+
     override func layout() {
         super.layout()
-        let size = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
+        let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
+        let size = NSSize(width: min(wanted.width, max(0, bounds.width - Self.minimumTitle - Tokens.Space.x4)), height: wanted.height)
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
         let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
@@ -2008,9 +1999,9 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, javaScript, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions, openIn }
-    /// The rows into the panel's other pages. Extensions are on the first page itself (#215), and the connection is a
-    /// small line under the site's name (#221).
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, fullScreenFills, alwaysTranslate }
+    /// The rows into the panel's other pages. A page's permissions, JavaScript and extensions are their own page
+    /// (#311, #313), and the connection is a small line under the site's name (#221).
     enum Link: Equatable { case permissions, zapped, style }
 
     struct Context {
@@ -2031,12 +2022,6 @@ enum SitePanelRows {
         var coveredPage = false
         /// The site asked for something, or has an answer kept.
         var hasPermissions = false
-        /// Extensions run in this window (never a private one).
-        var extensionHost = true
-        /// There are extensions to run, or not, on this site.
-        var hasExtensions = false
-        /// There's more than one space for the site to always open in (#286).
-        var manySpaces = false
         /// How many elements on the site are zapped.
         var zapped = 0
         /// The site has CSS of your own.
@@ -2048,18 +2033,12 @@ enum SitePanelRows {
         if c.isWeb, !c.coveredPage { rows.append(.zoom) }
         if c.isWeb, c.adBlocking, !c.isPrivate { rows.append(.adBlocking) }
         if c.isWeb, c.cookieBanners, !c.isPrivate { rows.append(.cookieBanners) }
-        // JavaScript on every web site, a private window's too (chosen for its tab alone).
-        if c.isWeb { rows.append(.javaScript) }
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
-        // Whether extensions run here: on a web site, once there are extensions to run.
-        if c.isWeb, !c.isPrivate, c.extensionHost, c.hasExtensions { rows.append(.extensions) }
-        // The space the site always opens in: never chosen from a private window, which keeps nothing of its sites.
-        if c.isWeb, !c.isPrivate, c.manySpaces { rows.append(.openIn) }
         return rows
     }
 

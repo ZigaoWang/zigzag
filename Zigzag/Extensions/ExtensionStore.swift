@@ -194,19 +194,18 @@ enum ExtensionStore {
     /// The profiles that have this extension.
     static func profiles(with id: String) -> [Profile] { Profiles.shared.all.filter { $0.installs.hasRecord(id) } }
 
-    /// Sites where every extension is off, whatever its own access says.
-    private static let offSitesKey = "ExtensionsOffSites"
-    static var extensionsOffSites: Set<String> {
-        get { Set(UserDefaults.standard.stringArray(forKey: offSitesKey) ?? []) }
-        set {
-            UserDefaults.standard.set(Array(newValue).sorted(), forKey: offSitesKey)
-            guard #available(macOS 15.4, *) else { return }
-            // Only profiles whose extensions are running: one that isn't started reads the sites when it starts.
-            for profile in Profiles.shared.all {
-                guard let host = profile.startedExtensions else { continue }
-                for id in profile.installs.installedIDs { host.applySiteAccess(id) }
-            }
-        }
+    /// Sites where every extension is off, whatever its own access says. Each profile has its own: the first
+    /// profile keeps the key it always had, so nothing already chosen changes; another profile's is its own, so
+    /// turning extensions off on a site there leaves them on for the others, and removing it forgets its list.
+    static func extensionsOffSites(in profile: Profile) -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: ProfileKey.extensionsOffSites.name(in: profile.id)) ?? [])
+    }
+
+    static func setExtensionsOffSites(_ sites: Set<String>, in profile: Profile) {
+        UserDefaults.standard.set(Array(sites).sorted(), forKey: ProfileKey.extensionsOffSites.name(in: profile.id))
+        guard #available(macOS 15.4, *), let host = profile.startedExtensions else { return }
+        // Only whose extensions are running: one that isn't started reads the sites when it starts.
+        for id in profile.installs.installedIDs { host.applySiteAccess(id) }
     }
 
     /// Removing an extension is remembered, so 1Password's automatic setup doesn't bring it back.

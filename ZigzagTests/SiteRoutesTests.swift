@@ -138,15 +138,11 @@ struct SiteRoutesTests {
 
     // MARK: Site Controls
 
-    @Test func openInIsOfferedWithMoreThanOneSpace() {
+    /// A site's space is chosen from the space it's in (Settings › Spaces), not from Site Controls: the page's
+    /// switches never list the spaces any more.
+    @Test func openInIsNotAFirstPageRow() {
         var c = SitePanelRows.Context()
-        #expect(!SitePanelRows.rows(c).contains(.openIn))
-        c.manySpaces = true
-        #expect(SitePanelRows.rows(c).last == .openIn)
-        c.isPrivate = true
-        #expect(!SitePanelRows.rows(c).contains(.openIn))
-        c.isPrivate = false
-        c.isWeb = false
-        #expect(!SitePanelRows.rows(c).contains(.openIn))
+        c.isWeb = true
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake])
     }
 }

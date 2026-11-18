@@ -2424,7 +2424,7 @@ enum DebugBridge {
         case "extoffsite":
             // extoffsite <site> on|off
             let f = arg.split(separator: " ").map(String.init)
-            if f.count == 2 { var sites = ExtensionStore.extensionsOffSites; if f[1] == "on" { sites.insert(f[0]) } else { sites.remove(f[0]) }; ExtensionStore.extensionsOffSites = sites }
+            if f.count == 2 { var sites = ExtensionStore.extensionsOffSites(in: controller.tabManager.profile); if f[1] == "on" { sites.insert(f[0]) } else { sites.remove(f[0]) }; ExtensionStore.setExtensionsOffSites(sites, in: controller.tabManager.profile) }
         case "extpopupstate":
             // extpopupstate <id> [script]: where its popup page is, even before WebKit asks to show it.
             if #available(macOS 15.4, *), let item = extensions(in: controller).actions(for: controller.tabManager.selectedTab).first(where: { $0.id == String(arg.prefix { $0 != " " }) }),
