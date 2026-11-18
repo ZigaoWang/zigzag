@@ -162,6 +162,112 @@ final class BridgeNotifications: BridgeNamespace {
 
 // MARK: - runtime.getContexts
 
+/// Chrome's `ContextType`: the kinds of context `runtime.getContexts` reports.
+nonisolated enum ContextType: String {
+    case tab = "TAB"
+    case popup = "POPUP"
+    case background = "BACKGROUND"
+    case offscreenDocument = "OFFSCREEN_DOCUMENT"
+    case sidePanel = "SIDE_PANEL"
+    case developerTools = "DEVELOPER_TOOLS"
+}
+
+/// One of an extension's contexts, as `runtime.getContexts` describes it. Only what Zigzag can name truthfully is set:
+/// WebKit gives no Chrome tab or document identity, so `tabID` is -1 except for a side panel opened for a tab, and
+/// `documentID` stays empty rather than being made up.
+nonisolated struct Context {
+    var type: ContextType
+    var contextID: String
+    var documentID: String? = nil
+    var documentURL: URL?
+    var tabID = -1
+    var windowID = -1
+    var frameID = 0
+    var incognito = false
+
+    /// The document's origin as Chrome reports it: the extension's actual scheme (`webkit-extension://` until the
+    /// scheme is decided), never a translated one.
+    var documentOrigin: String? {
+        guard let documentURL, let scheme = documentURL.scheme, let host = documentURL.host() else { return nil }
+        return "\(scheme)://\(host)"
+    }
+
+    /// Chrome's ExtensionContext, with the fields Zigzag has no truthful value for left out.
+    var dictionary: [String: Any] {
+        var answer: [String: Any] = ["contextType": type.rawValue, "contextId": contextID, "tabId": tabID,
+                                     "windowId": windowID, "frameId": frameID, "incognito": incognito]
+        if let documentID { answer["documentId"] = documentID }
+        if let documentURL { answer["documentUrl"] = documentURL.absoluteString }
+        if let documentOrigin { answer["documentOrigin"] = documentOrigin }
+        return answer
+    }
+}
+
+/// The fields of Chrome's `ContextFilter`: every field given narrows the answer at once, and within one list any value
+/// matches. An explicit empty list matches nothing, and a document field leaves out a context with no document.
+nonisolated struct ContextFilter {
+    private let contextIDs: [String]?
+    private let documentIDs: [String]?
+    private let documentOrigins: [String]?
+    private let documentURLs: [String]?
+    private let frameIDs: [Int]?
+    private let incognito: Bool?
+    private let tabIDs: [Int]?
+    private let windowIDs: [Int]?
+    private let types: [String]?
+
+    init(_ object: [String: Any]) {
+        contextIDs = object["contextIds"] as? [String]
+        documentIDs = object["documentIds"] as? [String]
+        documentOrigins = object["documentOrigins"] as? [String]
+        documentURLs = object["documentUrls"] as? [String]
+        frameIDs = object["frameIds"] as? [Int]
+        incognito = object["incognito"] as? Bool
+        tabIDs = object["tabIds"] as? [Int]
+        windowIDs = object["windowIds"] as? [Int]
+        types = object["contextTypes"] as? [String]
+    }
+
+    func matches(_ context: Context) -> Bool {
+        if let types, !types.contains(context.type.rawValue) { return false }
+        if let contextIDs, !contextIDs.contains(context.contextID) { return false }
+        if let tabIDs, !tabIDs.contains(context.tabID) { return false }
+        if let windowIDs, !windowIDs.contains(context.windowID) { return false }
+        if let frameIDs, !frameIDs.contains(context.frameID) { return false }
+        if let incognito, incognito != context.incognito { return false }
+        if let documentIDs, !(context.documentID.map(documentIDs.contains) ?? false) { return false }
+        if let documentURLs, !(context.documentURL.map { documentURLs.contains($0.absoluteString) } ?? false) { return false }
+        if let documentOrigins, !(context.documentOrigin.map(documentOrigins.contains) ?? false) { return false }
+        return true
+    }
+}
+
+/// Chrome's `contextId`: opaque, and the same for as long as a context lives. One that closes is forgotten, so one
+/// that opens again is a new context with a new name. Names are kept per extension: a call from one extension must not
+/// forget another extension's live contexts, and two extensions may hold a page with the same object identity.
+nonisolated final class ContextNames {
+    private var names: [String: [String: String]] = [:]
+
+    /// The name of a context held by this extension: its background, its offscreen page, its side panel, its popup.
+    func name(of object: AnyObject, extensionID: String) -> String {
+        name("object:\(ObjectIdentifier(object))", extensionID: extensionID)
+    }
+
+    /// Forgets every context of this extension that has closed, and no other extension's.
+    func keeping(_ live: Set<String>, extensionID: String) {
+        names[extensionID] = (names[extensionID] ?? [:]).filter { live.contains($0.value) }
+    }
+
+    private func name(_ key: String, extensionID: String) -> String {
+        var held = names[extensionID] ?? [:]
+        if let name = held[key] { return name }
+        let name = UUID().uuidString
+        held[key] = name
+        names[extensionID] = held
+        return name
+    }
+}
+
 /// `chrome.runtime.getContexts`: which of its pages an extension has open, as Chrome answers. Its background, its
 /// offscreen page, its popup while showing, its side panel while open. Extensions ask before making an offscreen page
 /// (Boost My Bass) or to see whether their popup is open. Every extension may ask about its own pages.
@@ -173,49 +279,60 @@ final class BridgeContexts: BridgeNamespace {
     /// The extensions it answers: one profile's.
     unowned let host: ExtensionHost
     init(host: ExtensionHost) { self.host = host }
+    private let names = ContextNames()
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         guard fn == "getContexts" else { throw BridgeError.unsupported(Self.name, fn) }
         guard let context = host.context(for: extensionID) else { return [Any]() }
-        var pages: [Page] = []
-        let background = (context.webExtension.manifest["background"] as? [String: Any])?["service_worker"] as? String
-        pages.append(Page(type: "BACKGROUND", url: background.flatMap { URL(string: $0, relativeTo: context.baseURL)?.absoluteURL }))
-        if let url = host.bridge.offscreen.pageURL(for: extensionID) { pages.append(Page(type: "OFFSCREEN_DOCUMENT", url: url)) }
-        if let page = host.shownPopupPage(for: extensionID) { pages.append(Page(type: "POPUP", url: URL(string: page, relativeTo: context.baseURL)?.absoluteURL)) }
-        for controller in WindowManager.shared.controllers where controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
+        var contexts: [Context] = []
+        if context.webExtension.hasBackgroundContent,
+           let background = Self.background(manifest: context.webExtension.manifest, baseURL: context.baseURL,
+                                            contextID: names.name(of: context, extensionID: extensionID)) {
+            contexts.append(background)
+        }
+        if let page = host.bridge.offscreen.page(for: extensionID) {
+            contexts.append(Context(type: .offscreenDocument, contextID: names.name(of: page, extensionID: extensionID), documentURL: page.url))
+        }
+        if let popup = host.shownPopup(for: extensionID) {
+            contexts.append(Self.popup(popup, contextID: names.name(of: popup, extensionID: extensionID)))
+        }
+        // A private window has no extension controller, and its side panel is never one to report.
+        for controller in WindowManager.shared.controllers
+        where !controller.tabManager.isPrivate && controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
             let panel = controller.root.sidePanel
-            pages.append(Page(type: "SIDE_PANEL", url: panel.webView?.url, tabID: panel.tabID))
+            contexts.append(Context(type: .sidePanel, contextID: names.name(of: panel, extensionID: extensionID), documentURL: panel.webView?.url,
+                                    tabID: panel.tabID ?? -1))
         }
-        return Self.contexts(pages, extensionID: extensionID, filter: args.object(0))
+        names.keeping(Set(contexts.map(\.contextID)), extensionID: extensionID)
+        return Self.matching(contexts, filter: args.object(0)).map(\.dictionary)
     }
 
-    /// One of the extension's pages that's open.
-    nonisolated struct Page {
-        var type: String
-        var url: URL?
-        /// The tab a side panel was opened for, when the extension gave its options for one tab.
-        var tabID: Int?
+    /// Chrome's POPUP context for a showing popup: the page's live address, query and all, and no tab of its own.
+    static func popup(_ view: WKWebView, contextID: String) -> Context {
+        Context(type: .popup, contextID: contextID, documentURL: view.url)
     }
 
-    /// Chrome's answer for these pages: a side panel opened for one tab names it (Claude's panel checks that it's
-    /// its tab's), any other page -1. Each field of the filter given narrows the answer; addresses are compared
-    /// whole, query included, as Chrome does.
-    nonisolated static func contexts(_ pages: [Page], extensionID: String, filter: [String: Any]) -> [[String: Any]] {
-        var found: [[String: Any]] = []
-        for page in pages {
-            let address = page.url?.absoluteString ?? ""
-            let origin = page.url.flatMap { url in url.scheme.map { "\($0)://\(url.host() ?? "")" } } ?? ""
-            let type = page.type
-            found.append(["contextType": type, "contextId": "\(type.lowercased())-\(found.count)", "tabId": page.tabID ?? -1, "windowId": -1,
-                          "documentId": "\(type.lowercased())-\(extensionID)", "frameId": type == "BACKGROUND" ? -1 : 0,
-                          "documentUrl": address, "documentOrigin": origin, "incognito": false])
+    /// Chrome's context for an extension's background, when its manifest declares one: an MV3 service worker, which
+    /// has no document; or an MV2 background page, declared or the one Chrome generates from its scripts.
+    nonisolated static func background(manifest: [String: Any], baseURL: URL, contextID: String) -> Context? {
+        guard let background = manifest["background"] as? [String: Any] else { return nil }
+        let version = (manifest["manifest_version"] as? NSNumber)?.intValue ?? 2
+        if version >= 3 {
+            guard background["service_worker"] is String else { return nil }
+            return Context(type: .background, contextID: contextID, frameID: -1)
         }
-        if let types = filter["contextTypes"] as? [String] { found = found.filter { types.contains($0["contextType"] as? String ?? "") } }
-        if let urls = filter["documentUrls"] as? [String] { found = found.filter { urls.contains($0["documentUrl"] as? String ?? "") } }
-        if let origins = filter["documentOrigins"] as? [String] { found = found.filter { origins.contains($0["documentOrigin"] as? String ?? "") } }
-        if let tabs = filter["tabIds"] as? [Int] { found = found.filter { tabs.contains($0["tabId"] as? Int ?? -1) } }
-        if filter["incognito"] as? Bool == true { found = [] }
-        return found
+        let page = background["page"] as? String
+        let scripts = background["scripts"] as? [Any] ?? []
+        guard page != nil || !scripts.isEmpty else { return nil }
+        return Context(type: .background, contextID: contextID,
+                       documentURL: URL(string: page ?? "_generated_background_page.html", relativeTo: baseURL)?.absoluteURL)
+    }
+
+    /// The contexts a filter keeps, in Chrome's way: every field given narrows the answer, any value in one of its
+    /// lists matches, and a list with nothing in it matches nothing.
+    nonisolated static func matching(_ contexts: [Context], filter: [String: Any]) -> [Context] {
+        let filter = ContextFilter(filter)
+        return contexts.filter(filter.matches)
     }
 }
 
@@ -741,8 +858,8 @@ final class BridgeOffscreen: BridgeNamespace {
     unowned let host: ExtensionHost
     init(host: ExtensionHost) { self.host = host }
     private var pages: [String: WKWebView] = [:]
-    /// The extension's offscreen page's address, if it has one open (for runtime.getContexts).
-    func pageURL(for extensionID: String) -> URL? { pages[extensionID]?.url }
+    /// The extension's offscreen page, if it has one open (for runtime.getContexts).
+    func page(for extensionID: String) -> WKWebView? { pages[extensionID] }
     /// Off screen, but in a window: a page in no window counts as hidden, and WebKit pauses its sound.
     private var window: NSWindow?
 

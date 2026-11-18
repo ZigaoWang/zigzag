@@ -705,8 +705,9 @@
     onStatusChanged: event('tabCapture.onStatusChanged'),
   });
 
-  // runtime.getContexts: Zigzag knows which of the extension's pages are open (its offscreen page, popup, side panel).
-  if (typeof api.runtime.getContexts !== 'function') {
+  // runtime.getContexts: MV3 only, as in Chrome. Zigzag knows which of the extension's pages are open (its offscreen
+  // page, popup, side panel).
+  if (manifest.manifest_version === 3 && typeof api.runtime.getContexts !== 'function') {
     try { api.runtime.getContexts = method('contexts', 'getContexts'); } catch (e) {}
   }
 

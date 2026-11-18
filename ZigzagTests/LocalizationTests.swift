@@ -135,6 +135,13 @@ struct LocalizationTests {
         #expect(found.isEmpty, "Use Words.sentences:\n\(found.joined(separator: "\n"))")
     }
 
+    @Test func onlyEnglishLimitNamesLowercaseForASubsequentListItem() {
+        #expect(Words.lowercasedForList("Cookie partition details") == "cookie partition details")
+        #expect(Words.lowercasedForList("Cookie 分区详情") == "Cookie 分区详情")
+        #expect(Words.lowercasedForList("Détails des cookies") == "Détails des cookies")
+        #expect(Words.lowercasedForList("") == "")
+    }
+
     // MARK: Simplified Chinese
 
     /// The built app's Chinese, as String(localized:) finds it when Zigzag runs in Simplified Chinese.

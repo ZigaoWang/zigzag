@@ -155,6 +155,383 @@ struct ExtensionScriptTests {
         #expect(((api["runtime"]?["enums"] as? [String: [String: String]])?["ContextType"])?["OFFSCREEN_DOCUMENT"] == "OFFSCREEN_DOCUMENT")
     }
 
+    /// A fake extension world for api-surface.js: WebKit's runtime with the manifest and the diagnostics channel an
+    /// extension's background has, and none of the API namespaces the surface must fill.
+    private static func surfaceWorld(_ surface: String? = nil, version: Int? = nil,
+                                     permissions: [String] = ["history"], setup: String = "") throws -> JSContext {
+        let list = "[" + permissions.map { "'\($0)'" }.joined(separator: ", ") + "]"
+        let manifest = version.map { "{ permissions: \(list), manifest_version: \($0) }" } ?? "{ permissions: \(list) }"
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+        var __notes = [], __console = [];
+        var console = {
+          log: (m) => __console.push(String(m)), warn: (m) => __console.push(String(m)),
+          error: (m) => __console.push(String((m && m.message) || m)),
+        };
+        var chrome = {
+          runtime: {
+            id: 'x',
+            getManifest: () => (\(manifest)),
+            sendNativeMessage: (host, message) => { __notes.push({ host, ...message }); return Promise.resolve(); },
+          },
+        };
+        // WebKit's lastError is a property of the runtime object, as it is here: the surface must put this one back.
+        var __nativeLastError = () => undefined;
+        Object.defineProperty(chrome.runtime, 'lastError', { get: __nativeLastError, configurable: true, enumerable: true });
+        var browser = chrome;
+        """)
+        context.evaluateScript(setup)
+        let script = try #require(surface ?? (ExtensionBridgeScript.surface.isEmpty ? nil : ExtensionBridgeScript.surface),
+                                  "the generated surface script")
+        context.evaluateScript(script)
+        #expect(context.evaluateScript("globalThis.__zigzagSurface === true")?.toBool() == true, "the surface started")
+        return context
+    }
+
+    /// A fake extension background for bridge.js: WebKit's runtime, a native bridge that refuses every call, and none
+    /// of the namespaces the bridge must install.
+    private static func bridgeWorld(permissions: [String]) -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        let list = "[" + permissions.map { "'\($0)'" }.joined(separator: ", ") + "]"
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+        var __warned = [];
+        var console = { log: () => {}, warn: (m) => __warned.push(String(m)), error: () => {} };
+        const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false, hasListeners: () => false });
+        var chrome = {
+          runtime: { id: 'x', getManifest: () => ({ permissions: \(list) }),
+                     sendNativeMessage: (host, message) => Promise.resolve({ error: message.ns + '.' + message.fn + ' could not be answered' }),
+                     connectNative: () => ({ onMessage: event(), onDisconnect: event(), postMessage: () => {} }) },
+        };
+        var browser = chrome;
+        """)
+        context.evaluateScript(ExtensionBridgeScript.source)
+        return context
+    }
+
+    /// A fake extension background for the compatibility prelude: WebKit's runtime, and the namespaces WebKit supplies
+    /// that the layer fills in. The ones it stands up whole are left absent, as WebKit leaves them.
+    private static func compatibilityWorld(permissions: [String]) -> JSContext {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        let list = "[" + permissions.map { "'\($0)'" }.joined(separator: ", ") + "]"
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var clearTimeout = () => {}, setInterval = () => 0, clearInterval = () => {};
+        var __flush = () => { for (let i = 0; i < 20 && __timers.length; i++) { const t = __timers.splice(0); t.forEach((f) => f()); } };
+        var console = { log: () => {}, warn: () => {}, error: () => {} };
+        var chrome = {
+          runtime: { id: 'x', getManifest: () => ({ name: 'Test extension', version: '1.0', permissions: \(list) }),
+                     sendNativeMessage: () => Promise.resolve() },
+          action: {}, tabs: {}, i18n: {}, storage: {},
+        };
+        var browser = chrome;
+        """)
+        context.evaluateScript(ExtensionShims.compatibility)
+        return context
+    }
+
+    @Test func aBridgedCallbackFailureKeepsMainsQuietShape() {
+        let context = Self.bridgeWorld(permissions: ["history", "identity"])
+        #expect(context.evaluateScript("typeof chrome.history.search")?.toString() == "function")
+        context.evaluateScript("""
+        var __called = 0, __during = null, __args = -1, __value = null, __before = chrome.runtime.lastError;
+        chrome.history.search({ text: '' }, (...args) => {
+          __called++;
+          __during = chrome.runtime.lastError;
+          __args = args.length;
+          __value = args[0];
+        });
+        var __immediate = __called;
+        var __returned = chrome.runtime.lastError;
+        """)
+        // Main's bridge callback gets one undefined answer and no Zigzag lastError; the Promise still rejects.
+        #expect(context.evaluateScript("__immediate").toInt32() == 0)
+        #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__called").toInt32() == 1)
+        #expect(context.evaluateScript("__during === undefined").toBool())
+        #expect(context.evaluateScript("__args").toInt32() == 1)
+        #expect(context.evaluateScript("__value === undefined").toBool())
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+        context.evaluateScript("""
+        var __error = null, __seen = 'not checked';
+        chrome.history.getVisits({ url: 'https://a.example/' }).then(
+          () => { __error = 'resolved'; },
+          (e) => { __error = e.message; __seen = chrome.runtime.lastError; });
+        """)
+        #expect(context.evaluateScript("__error").toString() == "history.getVisits could not be answered")
+        #expect(context.evaluateScript("__seen === undefined && chrome.runtime.lastError === undefined").toBool())
+        context.evaluateScript("""
+        var __signIn = null, __signInArgs = -1, __signInValue = null;
+        chrome.identity.getAuthToken({ interactive: false }, (...args) => {
+          __signIn = chrome.runtime.lastError;
+          __signInArgs = args.length;
+          __signInValue = args[0];
+        });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__signIn === undefined").toBool())
+        #expect(context.evaluateScript("__signInArgs").toInt32() == 1)
+        #expect(context.evaluateScript("__signInValue === undefined").toBool())
+        // The extension's log still says what failed.
+        #expect(context.evaluateScript("__warned.length").toInt32() == 1)
+    }
+
+    @Test func aCompatibilityLayerFailureKeepsMainsCallbackShape() {
+        let context = Self.compatibilityWorld(permissions: ["debugger"])
+        context.evaluateScript("""
+        var __called = 0, __during = null, __args = -1, __value = null, __before = chrome.runtime.lastError;
+        chrome.debugger.attach({ tabId: 1 }, (...args) => {
+          __called++;
+          __during = chrome.runtime.lastError;
+          __args = args.length;
+          __value = args[0];
+        });
+        var __returned = chrome.runtime.lastError;
+        """)
+        #expect(context.evaluateScript("__called").toInt32() == 0)
+        #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__called").toInt32() == 1)
+        #expect(context.evaluateScript("__during === undefined").toBool())
+        #expect(context.evaluateScript("__args").toInt32() == 1)
+        #expect(context.evaluateScript("__value === undefined").toBool())
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+        // Main's Promise form still rejects with an Error and has no Zigzag lastError.
+        context.evaluateScript("""
+        var __promise = chrome.debugger.sendCommand({ tabId: 1 }, 'Runtime.enable', {}), __seen = 'not checked';
+        __seen = chrome.runtime.lastError;
+        __promise.then(() => { __error = 'resolved'; }, (e) => { __error = { isError: e instanceof Error, message: e.message }; });
+        """)
+        #expect(context.evaluateScript("__seen === undefined").toBool())
+        #expect(context.evaluateScript("__error.isError").toBool())
+        #expect(context.evaluateScript("__error.message").toString() == "Debugging pages isn't available in Zigzag")
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    @Test func convertedCompatibilityMembersKeepMainsQuietAnswers() {
+        let context = Self.compatibilityWorld(permissions: ["action", "tabs", "tabGroups", "sessions", "debugger", "fontSettings", "management", "i18n", "storage"])
+        context.evaluateScript("""
+        var __results = [], __promiseErrors = [], __promiseAnswers = 0;
+        var __checks = [
+          ['action.setBadgeTextColor', (cb) => chrome.action.setBadgeTextColor('red', cb)],
+          ['action.getBadgeTextColor', (cb) => chrome.action.getBadgeTextColor(cb)],
+          ['action.getUserSettings', (cb) => chrome.action.getUserSettings(cb)],
+          ['tabs.ungroup', (cb) => chrome.tabs.ungroup(1, cb)],
+          ['tabs.discard', (cb) => chrome.tabs.discard(1, cb)],
+          ['tabs.highlight', (cb) => chrome.tabs.highlight({ windowId: 1, tabs: [1] }, cb)],
+          ['tabGroups.query', (cb) => chrome.tabGroups.query({}, cb)],
+          ['sessions.getRecentlyClosed', (cb) => chrome.sessions.getRecentlyClosed(cb)],
+          ['sessions.getDevices', (cb) => chrome.sessions.getDevices(cb)],
+          ['debugger.detach', (cb) => chrome.debugger.detach({ tabId: 1 }, cb)],
+          ['debugger.getTargets', (cb) => chrome.debugger.getTargets(cb)],
+          ['fontSettings.getFontList', (cb) => chrome.fontSettings.getFontList(cb)],
+          ['fontSettings.getFont', (cb) => chrome.fontSettings.getFont({ genericFamily: 'standard' }, cb)],
+          ['fontSettings.setFont', (cb) => chrome.fontSettings.setFont({ genericFamily: 'standard', fontId: 'x' }, cb)],
+          ['fontSettings.clearFont', (cb) => chrome.fontSettings.clearFont({ genericFamily: 'standard' }, cb)],
+          ['management.getAll', (cb) => chrome.management.getAll(cb)],
+          ['i18n.detectLanguage', (cb) => chrome.i18n.detectLanguage('hello', cb)],
+        ];
+        for (const [name, call] of __checks) {
+          call((...args) => __results.push(name + ' ' + (chrome.runtime.lastError ? 'failed' : 'quiet') + ' ' + args.length + ' ' + JSON.stringify(args[0])));
+          try {
+            const answer = call();
+            if (!answer || typeof answer.then !== 'function') { __promiseErrors.push(name + ' returned no Promise'); continue; }
+            answer.then(() => { __promiseAnswers++; }, () => { __promiseErrors.push(name); });
+          } catch (e) { __promiseErrors.push(name + ' threw'); }
+        }
+        """)
+        context.evaluateScript("__flush()")
+        let expected = [
+            "action.setBadgeTextColor quiet 1 undefined",
+            "action.getBadgeTextColor quiet 1 [0,0,0,255]",
+            "action.getUserSettings quiet 1 {\"isOnToolbar\":true}",
+            "tabs.ungroup quiet 1 undefined", "tabs.discard quiet 1 undefined", "tabs.highlight quiet 1 undefined",
+            "tabGroups.query quiet 1 []", "sessions.getRecentlyClosed quiet 1 []", "sessions.getDevices quiet 1 []",
+            "debugger.detach quiet 1 undefined", "debugger.getTargets quiet 1 []",
+            "fontSettings.getFontList quiet 1 []", "fontSettings.getFont quiet 1 {\"fontId\":\"\"}",
+            "fontSettings.setFont quiet 1 undefined", "fontSettings.clearFont quiet 1 undefined",
+            "management.getAll quiet 1 []",
+            "i18n.detectLanguage quiet 1 {\"isReliable\":false,\"languages\":[]}",
+        ]
+        #expect(context.evaluateScript("__results.join()").toString() == expected.joined(separator: ","))
+        #expect(context.evaluateScript("__promiseAnswers").toInt32() == Int32(expected.count))
+        #expect(context.evaluateScript("__promiseErrors.join()").toString().isEmpty)
+        // The existing emulations still answer too: the extension's own manifest and empty managed storage.
+        context.evaluateScript("""
+        chrome.management.getSelf((info) => { globalThis.__self = info.name + ' ' + info.version + ' ' + info.enabled; });
+        chrome.storage.managed.get((values) => { globalThis.__managed = JSON.stringify(values); });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__self").toString() == "Test extension 1.0 true")
+        #expect(context.evaluateScript("__managed").toString() == "{}")
+        #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// declarativeNetRequest.updateStaticRules: WebKit does not switch single built-in rules off. Main answers the
+    /// call quietly, the rule sets stay as they were, rather than failing it and stopping a background that treats
+    /// switching its exceptions off as fatal. PR A keeps main's quiet answer; only PR B's error layer reports it.
+    @Test func unknownStaticRuleSwitchingKeepsMainsQuietAnswer() {
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("var __background = true, __page = null, __backgroundPort = null; var __toBackground = () => {}, __connectToBackground = () => {};")
+        context.evaluateScript(Self.fakeWorld)
+        context.evaluateScript("chrome.declarativeNetRequest = { GUARANTEED_MINIMUM_STATIC_RULES: 30000 };")
+        context.evaluateScript(ExtensionBridgeScript.differences)
+        context.evaluateScript("""
+        var __args = -1, __value = 'unset', __during = 'unset';
+        chrome.declarativeNetRequest.updateStaticRules({ ruleIds: [1], enabled: false }, (...args) => {
+          __args = args.length; __value = args[0]; __during = chrome.runtime.lastError;
+        });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__args").toInt32() == 1)
+        #expect(context.evaluateScript("__value === undefined").toBool())
+        #expect(context.evaluateScript("__during === undefined").toBool())
+        context.evaluateScript("var __resolved = false; chrome.declarativeNetRequest.updateStaticRules({ ruleIds: [1], enabled: false }).then(() => { __resolved = true; }, () => { __resolved = 'rejected'; });")
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__resolved").toBool())
+    }
+
+    @Test func anUnsupportedCallbackGetsNoResultAndNoZigzagLastError() throws {
+        let context = try Self.surfaceWorld()
+        #expect(context.evaluateScript("typeof chrome.history.search")?.toString() == "function")
+        context.evaluateScript("""
+        var __result = 'not called', __seen = null, __nativeStayed = false;
+        var __before = chrome.runtime.lastError;
+        chrome.history.search({ text: '' }, (...args) => {
+          __seen = chrome.runtime.lastError;
+          __nativeStayed = Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get === __nativeLastError;
+          __result = args.length;
+        });
+        var __returned = chrome.runtime.lastError;
+        """)
+        // Nothing before the call returns: the callback is asynchronous, with main's no-result answer.
+        #expect(context.evaluateScript("__result").toString() == "not called")
+        #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__result").toInt32() == 0)
+        #expect(context.evaluateScript("__seen === undefined").toBool())
+        #expect(context.evaluateScript("__nativeStayed").toBool())
+    }
+
+    @Test func anUnsupportedCallbackThrowLeavesWebKitsLastErrorAlone() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        var __during = null, __ran = 0, __thrown = 0, __gone = null, __goneAfterThrow = null;
+        var __native = Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get;
+        chrome.history.search({ text: '' }, () => {
+          __ran++;
+          __during = chrome.runtime.lastError;
+          setTimeout(() => { __gone = chrome.runtime.lastError === undefined; }, 0);
+        });
+        chrome.history.getVisits({ url: 'https://a.example/' }, () => {
+          __thrown++;
+          setTimeout(() => { __goneAfterThrow = chrome.runtime.lastError === undefined; }, 0);
+          throw new Error("the extension's own failure");
+        });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__ran").toInt32() == 1)
+        #expect(context.evaluateScript("__during === undefined").toBool())
+        #expect(context.evaluateScript("__gone").toBool())
+        #expect(context.evaluateScript("__thrown").toInt32() == 1)
+        #expect(context.evaluateScript("__goneAfterThrow").toBool())
+        #expect(context.evaluateScript("Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get === __native").toBool())
+        #expect(context.evaluateScript("__console.join()").toString().contains("the extension's own failure"))
+    }
+
+    @Test func anUnsupportedPromiseRejectsWithTheFeatureNameOnly() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        var __error = null, __during = 'not checked';
+        var __promise = chrome.history.getVisits({ url: 'https://a.example/' });
+        __during = chrome.runtime.lastError;
+        __promise.then(
+          () => { __error = 'resolved'; },
+          (e) => { __error = { name: e.name, message: e.message, isError: e instanceof Error }; },
+        );
+        """)
+        #expect(context.evaluateScript("__error.name").toString() == "Error")
+        #expect(context.evaluateScript("__error.message").toString() == "chrome.history.getVisits isn't available in Zigzag")
+        #expect(context.evaluateScript("__error.isError").toBool())
+        // The promise form never sets lastError, before or after it settles.
+        #expect(context.evaluateScript("__during === undefined && chrome.runtime.lastError === undefined").toBool())
+    }
+
+    @Test func anUnsupportedCallIsNotedOnce() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        chrome.history.search({ text: 'a' }, () => {});
+        chrome.history.search({ text: 'b' }, () => {});
+        chrome.history.getVisits({ url: 'https://a.example/' });
+        """)
+        #expect(context.evaluateScript("__notes.length").toInt32() == 2)
+        #expect(context.evaluateScript("__notes.map((n) => n.text).join()").toString() == "chrome.history.search,chrome.history.getVisits")
+        #expect(context.evaluateScript("__notes[0].host + ' ' + __notes[0].where + ' ' + __notes[0].kind").toString()
+                == "zigzag.diagnostics surface unavailable")
+        // A third call to the same member is not noted again.
+        context.evaluateScript("chrome.history.search({ text: 'c' }).catch(() => {});")
+        #expect(context.evaluateScript("__notes.length").toInt32() == 2)
+    }
+
+    @Test func unsupportedEventsStayInertWithoutLastError() throws {
+        let context = try Self.surfaceWorld()
+        context.evaluateScript("""
+        var __fired = 0, __otherFired = 0, __rules = [];
+        var __event = chrome.history.onVisited, __fresh = chrome.history.onVisitRemoved;
+        var __listener = () => { __fired++; }, __other = () => { __otherFired++; };
+        __event.addListener(__listener);
+        __event.addListener(__other);
+        __event.addListener('not a listener');
+        __event.addRules([], (...args) => __rules.push({ name: 'add', count: args.length, value: JSON.stringify(args[0]), error: chrome.runtime.lastError }));
+        __event.getRules([], (...args) => __rules.push({ name: 'get', count: args.length, value: JSON.stringify(args[0]), error: chrome.runtime.lastError }));
+        __event.removeRules([], (...args) => __rules.push({ name: 'remove', count: args.length, value: args[0], error: chrome.runtime.lastError }));
+        """)
+        #expect(context.evaluateScript("__event !== __fresh").toBool())
+        #expect(context.evaluateScript("__fresh.hasListeners()").toBool() == false)
+        #expect(context.evaluateScript("__event.hasListeners()").toBool() == false)
+        #expect(context.evaluateScript("__event.hasListener(__listener)").toBool() == false)
+        #expect(context.evaluateScript("__event.hasListener(__other)").toBool() == false)
+        #expect(context.evaluateScript("typeof __event.fire === 'undefined'").toBool())
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__fired + __otherFired").toInt32() == 0)
+        #expect(context.evaluateScript("__rules.map((r) => r.name + ' ' + r.count + ' ' + r.value).join()").toString()
+                == "add 1 [],get 1 [],remove 0 undefined")
+        #expect(context.evaluateScript("__rules.every((r) => r.error === undefined)").toBool())
+        context.evaluateScript("__event.removeListener(__listener); __event.removeListener(__other);")
+        #expect(context.evaluateScript("__event.hasListeners()").toBool() == false)
+    }
+
+    @Test func storageAreasDoNotGainFunctionStubs() throws {
+        let context = try Self.surfaceWorld(permissions: ["storage"], setup: """
+        var __nativeStorageGet = () => Promise.resolve({ native: true });
+        chrome.storage = { local: { get: __nativeStorageGet }, sync: {}, session: {}, managed: {} };
+        """)
+        let functions = ["get", "getKeys", "getBytesInUse", "set", "remove", "clear", "setAccessLevel"]
+        for area in ["local", "sync", "session", "managed"] {
+            for function in functions where !(area == "local" && function == "get") {
+                #expect(context.evaluateScript("typeof chrome.storage.\(area).\(function)").toString() == "undefined",
+                        "\(area).\(function)")
+            }
+            #expect(context.evaluateScript("typeof chrome.storage.\(area).onChanged.addListener").toString() == "function")
+        }
+        #expect(context.evaluateScript("chrome.storage.local.get === __nativeStorageGet").toBool())
+        #expect(context.evaluateScript("chrome.storage.local.QUOTA_BYTES").toInt32() == 10_485_760)
+        #expect(context.evaluateScript("chrome.storage.sync.MAX_ITEMS").toInt32() == 512)
+    }
+
     /// A fake extension world for webkit-differences.js: the background or one of its pages in a tab, with ports
     /// that the test carries between the two.
     private static let fakeWorld = """
@@ -877,6 +1254,168 @@ struct ExtensionScriptTests {
 
     private static func quoted(_ text: String) -> String {
         String(data: try! JSONSerialization.data(withJSONObject: [text]), encoding: .utf8)!.dropFirst().dropLast().description
+    }
+
+    // MARK: - runtime contexts (Task 8a: getContexts and getBackgroundPage)
+
+    /// `runtime.getContexts` is Chrome's MV3 member; an MV2 extension never had it, so the bridge doesn't give it one.
+    @Test func contextsAreAnMV3MemberOnly() {
+        for (version, present) in [(3, true), (2, false)] {
+            let context = JSContext()!
+            context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+            context.evaluateScript("""
+            var window = globalThis;
+            var __timers = [];
+            var setTimeout = (f) => { __timers.push(f); return __timers.length; }, clearTimeout = () => {};
+            var setInterval = () => 0, clearInterval = () => {};
+            var console = { warn: () => {}, error: () => {}, log: () => {} };
+            var navigator = { userAgent: 'Chrome/140.0.0.0 Safari/537.36' };
+            const event = () => ({ addListener: () => {}, removeListener: () => {}, hasListener: () => false });
+            var chrome = {
+              runtime: { id: 'x', getManifest: () => ({ manifest_version: \(version) }), onMessage: event(), onConnect: event(),
+                         sendNativeMessage: () => Promise.resolve({ value: [] }) },
+            };
+            """)
+            context.evaluateScript(ExtensionBridgeScript.source)
+            #expect(context.evaluateScript("typeof chrome.runtime.getContexts").toString() == (present ? "function" : "undefined"),
+                    "manifest \(version)")
+        }
+    }
+
+    /// The API surface fills every missing runtime function, but not Chrome's MV3-only `getContexts` in an MV2
+    /// extension: there it must stay absent, so feature detection takes Chrome's path.
+    @Test func theAPISurfaceLeavesGetContextsOutOfMV2() throws {
+        let v2 = try Self.surfaceWorld(version: 2)
+        #expect(v2.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
+        #expect(v2.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
+        let v3 = try Self.surfaceWorld(version: 3)
+        #expect(v3.evaluateScript("typeof chrome.runtime.getContexts").toString() == "function")
+        // In the app the bridge answers; where only the surface ran, the member still fails loudly rather than doing
+        // nothing.
+        v3.evaluateScript("var __error = null; chrome.runtime.getContexts({}).catch((e) => { __error = e.message; });")
+        #expect(v3.evaluateScript("__error").toString() == "chrome.runtime.getContexts isn't available in Zigzag")
+    }
+
+    /// An MV3 extension has no background page, and Chrome says so rather than handing back WebKit's null. Its page
+    /// still has the member, by promise or callback, with `runtime.lastError` only for as long as the callback runs.
+    @Test func anMV3PageIsToldThereIsNoBackgroundPage() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
+        chrome.runtime.getBackgroundPage = () => null;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        #expect(page.evaluateScript("typeof chrome.runtime.getBackgroundPage").toString() == "function")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then(() => { globalThis.__promise = 'page'; }, (e) => { globalThis.__promise = e.message; });
+        chrome.runtime.getBackgroundPage(() => { globalThis.__heard = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none'; });
+        """)
+        #expect(page.evaluateScript("__promise").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
+        // The error lives only while the callback runs.
+        #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// WebKit's own `runtime.lastError` is there before the failing callback and again after it, as the surface's
+    /// unavailable calls already keep it.
+    @Test func theBackgroundPageErrorPutsWebKitsLastErrorBack() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 3 });
+        chrome.runtime.getBackgroundPage = () => null;
+        var __nativeLastError = () => ({ message: 'native' });
+        Object.defineProperty(chrome.runtime, 'lastError', { get: __nativeLastError, configurable: true, enumerable: true });
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        var __during = null;
+        chrome.runtime.getBackgroundPage(() => { __during = chrome.runtime.lastError && chrome.runtime.lastError.message; });
+        """)
+        #expect(page.evaluateScript("__during").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("Object.getOwnPropertyDescriptor(chrome.runtime, 'lastError').get === __nativeLastError").toBool())
+        #expect(page.evaluateScript("chrome.runtime.lastError.message").toString() == "native")
+    }
+
+    /// An MV2 page still has its background page, and gets it by promise and by callback alike.
+    @Test func anMV2PageKeepsItsBackgroundPage() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        globalThis.__background = { isBackgroundPage: true };
+        chrome.runtime.getBackgroundPage = () => __background;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then((p) => { globalThis.__promise = !!p.isBackgroundPage; });
+        chrome.runtime.getBackgroundPage((p) => { globalThis.__heard = !!p.isBackgroundPage; });
+        """)
+        #expect(page.evaluateScript("__promise").toBool())
+        #expect(page.evaluateScript("__heard").toBool())
+        #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
+    }
+
+    /// An MV2 page whose background isn't running hears the same words Chrome uses, not WebKit's null.
+    @Test func anMV2PageWithoutABackgroundHearsChrome() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        chrome.runtime.getBackgroundPage = () => null;
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        page.evaluateScript("""
+        chrome.runtime.getBackgroundPage().then(() => { globalThis.__promise = 'page'; }, (e) => { globalThis.__promise = e.message; });
+        chrome.runtime.getBackgroundPage(() => { globalThis.__heard = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'none'; });
+        """)
+        #expect(page.evaluateScript("__promise").toString() == "You do not have a background page.")
+        #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
+    }
+
+    /// Chrome's MV3 service worker has no `getBackgroundPage`, but PR A stopped standing in for the whole runtime to
+    /// hide it: that Proxy was what every MV3 worker then carried into its keepalive port. The member stays plainly
+    /// visible in a worker, answering as WebKit left it; only a page is corrected, as the tests above show.
+    @Test func anMV3WorkerKeepsItsGetBackgroundPageMember() {
+        let worker = Self.workerWorld(worker: true, setup: """
+        var __manifest = () => ({ manifest_version: 3 });
+        Object.defineProperty(chrome.runtime, 'getManifest', { value: __manifest, configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(chrome.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
+        var browser = { runtime: { id: 'x' } };
+        Object.defineProperty(browser.runtime, 'getManifest', { value: __manifest, configurable: false, enumerable: true, writable: false });
+        Object.defineProperty(browser.runtime, 'getBackgroundPage', { value: () => null, configurable: false, enumerable: true });
+        """)
+        worker.evaluateScript("__zigzagAfterSurface()")
+        for root in ["chrome", "browser"] {
+            #expect(worker.evaluateScript("'getBackgroundPage' in \(root).runtime").toBool(), "\(root)")
+            #expect(worker.evaluateScript("typeof \(root).runtime.getBackgroundPage").toString() == "function", "\(root)")
+            #expect(worker.evaluateScript("\(root).runtime.getBackgroundPage() === null").toBool(), "\(root)")
+            // Enumeration and descriptors still read as WebKit left them.
+            #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getManifest')").toBool(), "\(root)")
+            #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getBackgroundPage')").toBool(), "\(root)")
+            #expect(worker.evaluateScript("typeof Object.getOwnPropertyDescriptor(\(root).runtime, 'getManifest').value").toString() == "function", "\(root)")
+            #expect(worker.evaluateScript("Object.getOwnPropertyDescriptor(\(root).runtime, 'getManifest').enumerable").toBool(), "\(root)")
+            #expect(worker.evaluateScript("\(root).runtime.getManifest().manifest_version").toInt32() == 3, "\(root)")
+            #expect(worker.evaluateScript("typeof JSON.stringify(\(root).runtime)").toString() == "string", "\(root)")
+        }
+    }
+
+    /// Two globals that share one runtime still share it when a member has to be hidden from both. `getContexts` in
+    /// an MV2 extension is still hidden this way; the MV3 worker's `getBackgroundPage` is no longer.
+    @Test func aSharedRuntimeStaysOneAcrossGlobals() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        Object.defineProperty(chrome.runtime, 'getContexts', { value: () => [], configurable: false });
+        var browser = { runtime: chrome.runtime };
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        #expect(page.evaluateScript("chrome.runtime === browser.runtime").toBool())
+        #expect(page.evaluateScript("'getContexts' in browser.runtime").toBool() == false)
+    }
+
+    /// An MV2 page has no `getContexts` even where WebKit's property can't be deleted, and the rest of runtime stays.
+    @Test func anMV2PageHasNoGetContextsEvenWhenWebKitWontGiveItUp() {
+        let page = Self.workerWorld(worker: false, setup: """
+        chrome.runtime.getManifest = () => ({ manifest_version: 2 });
+        Object.defineProperty(chrome.runtime, 'getContexts', { value: () => [], configurable: false });
+        """)
+        page.evaluateScript("__zigzagAfterSurface()")
+        #expect(page.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
+        #expect(page.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
+        #expect(page.evaluateScript("typeof chrome.runtime.getManifest").toString() == "function")
     }
 }
 

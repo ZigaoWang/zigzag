@@ -37,6 +37,25 @@ final class ExtensionBridge {
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
+    /// What the bridge answers, by the namespace's name in an extension's call (`history`, `system.display`). The
+    /// compatibility overlay names one of these as a `swift:` implementation, so a claim cannot promise a handler
+    /// nobody wrote.
+    static let handlerNames: Set<String> = Set(handlerTypes.map { $0.name })
+
+    /// The handler classes' own names (`BridgeContexts`), which a claim may name instead of the namespace an
+    /// extension calls (`contexts`). Both name the same code; neither is a second list of what the bridge answers.
+    static let handlerTypeNames: Set<String> = Set(handlerTypes.map { String(describing: $0) })
+
+    /// One handler per namespace. `init` makes the ones a profile owns; the rest are made for each profile too.
+    private static let handlerTypes: [any BridgeNamespace.Type] = [
+        BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self,
+        BridgeNotifications.self, BridgeIdle.self, BridgeDisplay.self, BridgeContexts.self,
+        BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
+        BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self,
+        BridgeOffscreen.self, BridgeSidePanel.self, BridgeTabCapture.self, BridgeProxy.self,
+        BridgeWebRequest.self, BridgeUserScripts.self,
+    ]
+
     init(host: ExtensionHost) {
         self.host = host
         sidePanel = BridgeSidePanel(host: host)
@@ -45,10 +64,10 @@ final class ExtensionBridge {
         proxy = BridgeProxy(host: host)
         webRequest = BridgeWebRequest(host: host)
         userScripts = BridgeUserScripts(host: host)
-        let others: [any BridgeNamespace.Type] = [BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self, BridgeNotifications.self, BridgeIdle.self,
-                                                  BridgeDisplay.self, BridgeContexts.self, BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
-                                                  BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self]
-        let all: [any BridgeNamespace] = others.map { $0.init(host: host) } + [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts]
+        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts]
+        let directNames = Set(direct.map { type(of: $0).name })
+        let others = Self.handlerTypes.filter { !directNames.contains($0.name) }.map { $0.init(host: host) }
+        let all: [any BridgeNamespace] = others + direct
         namespaces = Dictionary(uniqueKeysWithValues: all.map { (type(of: $0).name, $0) })
     }
 

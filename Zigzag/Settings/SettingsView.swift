@@ -2171,9 +2171,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // says something is missing without saying what.
         var summary = detail.isEmpty ? "" : Words.list(detail)
         if let manifest = ExtensionStore.manifest(for: id) {
-            let limits = ExtensionReport(extension: ext, manifest: manifest, id: id).limits
+            // The lines only: the overlay is decoded once, behind ExtensionCompatibility.shared, and each row does
+            // not build a whole report for them.
+            let limits = ExtensionReport.limits(for: ext, manifest: manifest, id: id)
             if let first = limits.first {
-                let names = Words.list([first] + limits.dropFirst().map { $0.prefix(1).lowercased() + $0.dropFirst() })
+                let names = Words.list([first.text] + limits.dropFirst().map { Words.lowercasedForList($0.text) })
                 let note = String(localized: "\(names) won’t work in Zigzag.",
                                   comment: "Under an extension's name in Settings › Extensions, after its version: the features it uses that Zigzag lacks, like “Side panel and notifications won’t work in Zigzag.”")
                 summary = summary.isEmpty ? note : summary + "\n" + note

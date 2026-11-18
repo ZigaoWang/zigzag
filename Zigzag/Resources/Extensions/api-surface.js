@@ -18,6 +18,12 @@
     let manifest = {};
     try { manifest = api.runtime.getManifest() || {}; } catch (e) {}
     const asked = new Set([...(manifest.permissions || []), ...(manifest.optional_permissions || [])]);
+    // Chrome's runtime.getContexts is MV3's alone. An MV2 extension has no member at all, not even a stand-in that
+    // would make feature detection take the wrong path.
+    const mv3 = manifest.manifest_version === 3;
+    // Members Chrome added with MV3: an MV2 extension has none of them, not even a constant its feature detection
+    // would find. Only the members Chrome reserves for MV3 belong here, never every constant of a namespace.
+    const mv3Only = { 'chrome.runtime': new Set(['ContextType']) };
     const inWorker = typeof window === 'undefined';
     const noted = new Set();
     const note = (name) => {
@@ -51,10 +57,32 @@
     };
     // `path` is where `target` sits under chrome, for the stand-in that's needed where WebKit refuses a member.
     const fill = (target, spec, name, path) => {
-      for (const fn of spec.functions || []) if (typeof target[fn] !== 'function') put(target, fn, unavailable(`${name}.${fn}`), path);
+      // An MV2 extension must not see an MV3-only constant, even one webkit-differences.js already added: remove it
+      // before filling (the stand-in that hides a member WebKit won't give up is the differences script's own).
+      const reserved = mv3 ? null : mv3Only[name];
+      if (reserved) for (const key of reserved) {
+        if (!(key in target)) continue;
+        try { delete target[key]; } catch (e) {}
+        if (key in target && typeof globalThis.__zigzagRemoveMember === 'function') {
+          try { globalThis.__zigzagRemoveMember(path || [], key); } catch (e) {}
+        }
+      }
+      for (const fn of spec.functions || []) {
+        if (!mv3 && name === 'chrome.runtime' && fn === 'getContexts') continue;
+        // A storage area's calls are WebKit's own: where WebKit has none of one, the extension sees none, as on main.
+        // A stand-in here would defeat feature detection (`setAccessLevel` would stop reading as undefined).
+        if (name.startsWith('chrome.storage.')) continue;
+        if (typeof target[fn] !== 'function') put(target, fn, unavailable(`${name}.${fn}`), path);
+      }
       for (const ev of spec.events || []) put(target, ev, event(), path);
-      for (const [key, value] of Object.entries(spec.constants || {})) if (target[key] === undefined) put(target, key, value, path);
-      for (const [key, values] of Object.entries(spec.enums || {})) if (target[key] === undefined) put(target, key, Object.freeze({ ...values }), path);
+      for (const [key, value] of Object.entries(spec.constants || {})) {
+        if (reserved && reserved.has(key)) continue;
+        if (target[key] === undefined) put(target, key, value, path);
+      }
+      for (const [key, values] of Object.entries(spec.enums || {})) {
+        if (reserved && reserved.has(key)) continue;
+        if (target[key] === undefined) put(target, key, Object.freeze({ ...values }), path);
+      }
       for (const [key, inner] of Object.entries(spec.objects || {})) {
         const object = put(target, key, {}, path);
         if (!object || typeof object !== 'object') continue;

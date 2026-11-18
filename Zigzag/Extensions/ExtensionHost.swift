@@ -311,6 +311,12 @@ final class ExtensionHost: NSObject {
         openPopups.values.first { $0.extensionID == id && $0.popover.isShown }?.page
     }
 
+    /// The popup page itself while an extension is showing one: its live address, query and all, and what names its
+    /// context in `runtime.getContexts`. `shownPopupPage` is the path alone, for tab capture.
+    func shownPopup(for id: String) -> WKWebView? {
+        openPopups.values.first { $0.extensionID == id && $0.popover.isShown }?.webView
+    }
+
     /// Whether you can see an extension's popup in this window: its pinned button there shows as active.
     func isPopupOnScreen(_ id: String, in window: NSWindow?) -> Bool {
         openPopups.values.contains { $0.extensionID == id && $0.window === window && $0.isOnScreen }
@@ -862,6 +868,9 @@ final class ExtensionHost: NSObject {
         weak var action: WKWebExtension.Action?
         let popover: NSPopover
         let page: String?
+        /// The popup's page while it shows: its live address, query and all, and the identity runtime.getContexts
+        /// names its context by. `page` stays the path, which is what tab capture keys on.
+        let webView: WKWebView?
         /// The window it opened from; the popover's own view is in a window of its own.
         weak var window: NSWindow?
         let fromPin: Bool
@@ -1510,8 +1519,9 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         let key = ObjectIdentifier(popover)
         popupCloseObservers.removeValue(forKey: key)?.forEach(NotificationCenter.default.removeObserver)
         // Read now, while WebKit is showing it: asked for after it closes, WebKit would make a new popup page to answer.
-        let page = action.popupWebView?.url?.path
-        openPopups[key] = OpenPopup(extensionID: extensionID, action: action, popover: popover, page: page, window: window, fromPin: fromPin)
+        let view = action.popupWebView
+        let page = view?.url?.path
+        openPopups[key] = OpenPopup(extensionID: extensionID, action: action, popover: popover, page: page, webView: view, window: window, fromPin: fromPin)
         let opening = bridge.tabCapture.currentOpening(extensionID)
         let place = PopupPlace(extensionID, window)
         let closing = NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self] _ in
