@@ -250,6 +250,12 @@ struct MCPSnapshotTests {
 
     private func number(_ ref: String) -> Int { Int(ref.dropFirst()) ?? 0 }
 
+    /// The refs `read` gives a page's fields, as a Sendable set so two pages can be read at once.
+    private func fieldRefs(in webView: WKWebView) async throws -> Set<String> {
+        let fields = try await MCPPageScript.run("read", ["maxChars": 1000], in: webView).get()["fields"] as? [[String: Any]] ?? []
+        return Set(fields.compactMap { $0["ref"] as? String })
+    }
+
     /// An unchanged element keeps its ref and a new one gets a higher number. A changed or removed one is refused,
     /// never mistaken for another, and a new page never reuses a number.
     @Test func refsStandForOneElementAsItWas() async throws {
@@ -289,10 +295,9 @@ struct MCPSnapshotTests {
         let html = "<input id='q' aria-label='Search'><button id='go' onclick=\"document.title = 'clicked'\">Go</button>"
         let (one, loadingOne) = await page(html), (two, loadingTwo) = await page(html)
         _ = (loadingOne, loadingTwo)
-        async let first = MCPPageScript.run("read", ["maxChars": 1000], in: one)
-        async let second = MCPPageScript.run("read", ["maxChars": 1000], in: two)
-        let refsOne = Set(((try await first.get())["fields"] as? [[String: Any]] ?? []).compactMap { $0["ref"] as? String })
-        let refsTwo = Set(((try await second.get())["fields"] as? [[String: Any]] ?? []).compactMap { $0["ref"] as? String })
+        async let first = fieldRefs(in: one)
+        async let second = fieldRefs(in: two)
+        let refsOne = try await first, refsTwo = try await second
         #expect(!refsOne.isEmpty && refsOne.isDisjoint(with: refsTwo), "\(refsOne) \(refsTwo)")
         let go = try #require((try await MCPPageScript.run("click", ["selector": "#go"], in: one).get()["clicked"] as? [String: Any])?["ref"] as? String)
         _ = try await one.evaluateJavaScript("document.title = 'one'")
