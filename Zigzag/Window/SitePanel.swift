@@ -980,6 +980,15 @@ final class SitePanel: FloatingPanelView {
                 })
             case .openIn:
                 rows.append(openInRow())
+                if let rule = Library.shared.siteRoute(for: url) {
+                    let edit = IconButton(symbol: "slider.horizontal.3", size: .compact, toolTip: String(localized: "Edit Space Rule…", comment: "Edit the winning rule from Site Controls."))
+                    edit.onClick = { [weak self] _ in
+                        guard let self, let host = self.controller?.window?.contentView else { return }
+                        self.close()
+                        SiteRouteSheet.edit(rule, in: host)
+                    }
+                    rows.append(.custom(String(localized: "Edit Space Rule…", comment: "Edit the winning rule from Site Controls."), control: edit))
+                }
             case .alwaysTranslate:
                 guard let language = tab.foreignLanguage else { break }
                 let name = PageTranslator.name(of: language)
@@ -1075,15 +1084,19 @@ final class SitePanel: FloatingPanelView {
         let route = Library.shared.siteRoute(for: url)
         let site = route?.site ?? SiteRoutes.site(of: url) ?? self.site
         let selected = route.flatMap { route in spaces.firstIndex { $0.id == route.spaceID }.map { $0 + 1 } } ?? 0
-        let pageSite = SiteRoutes.site(of: url)
-        return .choice(String(localized: "Open in", comment: "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from."),
+        let position = route.flatMap { rule in Library.shared.siteRoutes.firstIndex { $0.id == rule.id } }
+        return .choice(String(localized: "Open in", comment: "Destination space in Site Controls."),
                        options: [Self.anySpace] + spaces.map(\.name), selected: selected,
-                       status: { index in
-                           // Said only when the choice is a parent site's: what else it covers.
-                           guard index > 0, site != pageSite else { return nil }
-                           return String(localized: "All of \(site)", comment: "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).")
-                       }) { index in
-            Library.shared.setSiteRoute(site, to: index > 0 && spaces.indices.contains(index - 1) ? spaces[index - 1].id : nil)
+                       status: { _ in
+                           guard let position, let route else { return nil }
+                           return String(localized: "Rule \(position + 1) · \(route.match.title) · \(site)", comment: "Winning rule in Site Controls.")
+                       }) { [weak self] index in
+            if index > 0, spaces.indices.contains(index - 1) {
+                var updated = route ?? SiteRoutes.Route(match: .domain, site: site, spaceID: spaces[index - 1].id)
+                updated.spaceID = spaces[index - 1].id
+                Library.shared.saveRoute(updated)
+            } else if let route { Library.shared.removeRoute(route.id) }
+            self?.rebuildRows()
         }
     }
 

@@ -119,6 +119,34 @@
         }
       }
     },
+    "%@ and all its subdomains." : {
+      "comment" : "Preview of a domain rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 及其所有子域名。"
+          }
+        }
+      }
+    },
+    "%@ and pages below it, such as %@/repo." : {
+      "comment" : "Preview of a path rule.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ and pages below it, such as %2$@/repo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 及其子路径，例如 %2$@/repo。"
+          }
+        }
+      }
+    },
     "%@ are handed to %@" : {
       "comment" : "A download rule in a sentence: what it catches, then the script it is given to. The placeholders are the two parts.",
       "localizations" : {
@@ -2180,6 +2208,17 @@
         }
       }
     },
+    "About Match Types" : {
+      "comment" : "Button opening space rule help.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于匹配方式"
+          }
+        }
+      }
+    },
     "About Zigzag" : {
       "comment" : "Title of the About window.\nZigzag menu item.",
       "localizations" : {
@@ -3799,6 +3838,287 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "书签和历史记录，需要你的许可"
+          }
+        }
+      }
+    },
+    "Domain and subdomains" : {
+      "comment" : "Space rule matching a domain and its subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "域名及其子域名"
+          }
+        }
+      }
+    },
+    "Edit Space Rule" : {
+      "comment" : "Existing space rule sheet title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则"
+          }
+        }
+      }
+    },
+    "Edit Space Rule…" : {
+      "comment" : "Edit the winning rule from Site Controls.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则…"
+          }
+        }
+      }
+    },
+    "Enter a host and path, such as github.com/org1." : {
+      "comment" : "Example input for a path rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入主机名和路径，例如 github.com/org1。"
+          }
+        }
+      }
+    },
+    "Domain only" : {
+      "comment" : "Space rule matching only the named host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
+    "Every page on github.com itself." : {
+      "comment" : "Exact host example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅匹配 github.com 上的所有页面。"
+          }
+        }
+      }
+    },
+    "The page at github.com/org1 and pages beneath it, such as github.com/org1/repo." : {
+      "comment" : "Path example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配 github.com/org1 页面及其子路径，例如 github.com/org1/repo。"
+          }
+        }
+      }
+    },
+    "Pages on github.com and its subdomains, such as gist.github.com." : {
+      "comment" : "Domain example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配 github.com 及其子域名（例如 gist.github.com）上的页面。"
+          }
+        }
+      }
+    },
+    "Move Above Rule %lld" : {
+      "comment" : "Move a space rule above the rule hiding it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到第 %lld 条规则上方"
+          }
+        }
+      }
+    },
+    "Pages on %@ only." : {
+      "comment" : "Preview of an exact host rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅匹配 %@ 上的网页。"
+          }
+        }
+      }
+    },
+    "Path and subpaths" : {
+      "comment" : "Space rule matching a path and its descendants on one host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "路径及其子路径"
+          }
+        }
+      }
+    },
+    "Rule %lld covers every URL this rule matches." : {
+      "comment" : "Below a space rule made unreachable by an earlier rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此规则匹配的所有网址都已被第 %lld 条规则覆盖。"
+          }
+        }
+      }
+    },
+    "Blocks rule %lld." : {
+      "comment" : "Below a space rule that makes one later rule unreachable.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 条规则会被此规则完全覆盖。"
+          }
+        }
+      }
+    },
+    "Blocks rules %@." : {
+      "comment" : "Below a space rule that makes several later rules unreachable. The argument lists their positions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以下规则会被此规则完全覆盖：%@。"
+          }
+        }
+      }
+    },
+    "Rule %lld · %@ · %@" : {
+      "comment" : "Winning rule in Site Controls.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rule %1$lld · %2$@ · %3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "规则 %1$lld · %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "Reorder “%@”" : {
+      "comment" : "Drag handle and reorder menu for a space in Settings.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整“%@”的顺序"
+          }
+        }
+      }
+    },
+    "Reorder or remove rule %lld" : {
+      "comment" : "Drag handle and menu for a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整第 %lld 条规则的顺序或移除该规则"
+          }
+        }
+      }
+    },
+    "Host and path" : {
+      "comment" : "Label above an address that matches a host and path.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主机名和路径"
+          }
+        }
+      }
+    },
+    "Hostname" : {
+      "comment" : "Label above a space rule that takes only a hostname.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主机名"
+          }
+        }
+      }
+    },
+    "Enabled" : {
+      "comment" : "Label above a space rule's switch.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用"
+          }
+        }
+      }
+    },
+    "Rule %lld" : {
+      "comment" : "A rule’s position in the ordered list in Settings.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "规则 %lld"
+          }
+        }
+      }
+    },
+    "Enter one hostname, such as github.com, without a path." : {
+      "comment" : "Example input for a domain-only space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入一个主机名（如 github.com），无需填写路径。"
+          }
+        }
+      }
+    },
+    "Enter the parent hostname, such as github.com, without a wildcard or path." : {
+      "comment" : "Example input for a space rule that includes subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入上级主机名（如 github.com），无需填写通配符或路径。"
+          }
+        }
+      }
+    },
+    "The http:// or https:// prefix is optional." : {
+      "comment" : "Space rule address tooltip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以省略 http:// 或 https:// 前缀。"
+          }
+        }
+      }
+    },
+    "The first enabled match chooses the space. Drag to reorder." : {
+      "comment" : "Byline under Sites in Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一条已启用且匹配的规则决定打开链接的空间。拖动即可调整顺序。"
           }
         }
       }

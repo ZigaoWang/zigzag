@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
+- Space rules can send different paths on the same site to different spaces. Edit or disable rules in place in Settings › Spaces, and drag spaces or rules to reorder them. The first match wins, and a warning shows when an earlier rule covers a later one.
 - A download rule that runs a script shows it on the page: Running script while it works, then Ran script or Script failed with the script's last line, so a rule never runs out of sight. A rule that hands a link to an app, a download manager or your default browser says so once per session, after it worked. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 
 ## [0.9.2] - 2026-11-18

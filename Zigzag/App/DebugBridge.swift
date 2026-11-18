@@ -972,9 +972,14 @@ enum DebugBridge {
         // and every window's spaces and tabs, in the log.
         case "route":
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
-            guard let site = f.first.flatMap(SiteRoutes.entry(from:)) else { break }
+            guard let text = f.first else { break }
+            let match = SiteRoutes.suggestedMatch(for: text)
+            guard let site = SiteRoutes.entry(from: text, match: match) else { break }
+            let existing = Library.shared.siteRoutes.first { $0.site == site && $0.match == match }
             let name = f.count > 1 ? f[1] : "any"
-            Library.shared.setSiteRoute(site, to: Library.shared.spaces.first { $0.name == name }?.id)
+            if let space = Library.shared.spaces.first(where: { $0.name == name }) {
+                Library.shared.saveRoute(.init(id: existing?.id ?? UUID(), match: match, site: site, spaceID: space.id))
+            } else if name == "any", let existing { Library.shared.removeRoute(existing.id) }
         // sendclick x y [cmd]: a click handed straight to the window (window points, top-left origin), for a copy that
         // stays behind the app you're using, where posted events don't reach the page.
         case "sendclick":

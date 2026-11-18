@@ -1,16 +1,42 @@
 import Foundation
 
-/// Sites that always open in a space you chose (#286), as Arc's Air Traffic Control does: youtube.com in Media, so
-/// however you get there (a link from Mail, ⌘T, a link in another space) it opens with Media's profile, cookies and
-/// all. A site is a host without "www.", as the other choices for a site are, and covers its subdomains; the most
-/// specific one listed wins, so music.youtube.com can go elsewhere than youtube.com.
-///
-/// Each site is kept with its space (`SpaceInfo.routedSites`), in the library, so a space that's removed takes its
-/// sites with it (they open anywhere again) and ⌘Z that brings the space back brings them back too.
+/// Settings › Spaces tests these rules in display order. The first match owns the link.
 enum SiteRoutes {
-    struct Route: Equatable, Sendable {
+    enum Match: String, Codable, CaseIterable, Sendable {
+        case host, domain, path
+
+        var title: String {
+            switch self {
+            case .host: String(localized: "Domain only", comment: "Space rule matching only the named host.")
+            case .path: String(localized: "Path and subpaths", comment: "Space rule matching a path and its descendants on one host.")
+            case .domain: String(localized: "Domain and subdomains", comment: "Space rule matching a domain and its subdomains.")
+            }
+        }
+    }
+
+    struct Route: Codable, Identifiable, Equatable, Sendable {
+        var id = UUID()
+        var match: Match = .domain
         var site: String
         var spaceID: UUID
+        var isEnabled = true
+
+        private var host: String { String(site.prefix { $0 != "/" }) }
+        private var path: Substring { site.dropFirst(host.count) }
+
+        func matches(_ urlHost: String, path urlPath: String) -> Bool {
+            switch match {
+            case .domain: SiteRoutes.covers(host, urlHost)
+            case .host: host == urlHost
+            case .path: host == urlHost && (urlPath == path || urlPath.hasPrefix(String(path) + "/"))
+            }
+        }
+
+        /// True only when every URL covered by the later rule is also covered here.
+        func includes(_ other: Route) -> Bool {
+            if other.match == .domain { return match == .domain && SiteRoutes.covers(host, other.host) }
+            return matches(other.host, path: String(other.path))
+        }
     }
 
     /// How a page was asked for. Only what you did yourself is routed; what a page does on its own stays where it is,
@@ -47,55 +73,109 @@ enum SiteRoutes {
 
     // MARK: Sites
 
-    /// A page's site as routes have it: its host without "www." or a trailing dot, for a web page only.
-    static func site(of url: URL?) -> String? {
+    private static func host(of url: URL?) -> String? {
         guard let url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               var host = url.host(percentEncoded: false)?.lowercased(), !host.isEmpty else { return nil }
-        if host.hasSuffix("."), host.count > 1 { host.removeLast() }
-        if host.hasPrefix("www."), host.count > 4 { host.removeFirst(4) }
+        if host.hasSuffix(".") { host.removeLast() }
+        if host.contains(":") && !host.hasPrefix("[") { return "[\(host)]" }
         return host.isEmpty ? nil : host
     }
 
-    /// Whether a listed site covers a page's: the same, or a subdomain of it.
+    static func site(of url: URL?) -> String? { host(of: url)?.withoutWWW }
+
     static func covers(_ entry: String, _ site: String) -> Bool { site == entry || site.hasSuffix("." + entry) }
 
-    /// The site in what you typed into Add Site: a host ("youtube.com"), an address ("https://www.youtube.com/feed")
-    /// or a pattern ("*.youtube.com"). Nil when there's no host in it.
-    static func entry(from text: String) -> String? {
-        var typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !typed.isEmpty, !typed.contains(where: \.isWhitespace) else { return nil }
-        if !typed.contains("://") {
-            while typed.hasPrefix("*") || typed.hasPrefix(".") { typed.removeFirst() }
-            typed = "https://" + typed
+    static func address(_ text: String) -> URL? {
+        var input = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty, !input.contains(where: \.isWhitespace) else { return nil }
+        if !input.contains("://") { input = "https://" + input }
+        guard let parts = URLComponents(string: input), let url = parts.url,
+              let host = host(of: url), let schemeEnd = input.range(of: "://")?.upperBound,
+              parts.user == nil, parts.password == nil else { return nil }
+        // Validate the authority itself. URL accepts non-DNS characters, empty ports and escaped hostnames.
+        let authority = input[schemeEnd...]
+            .prefix { !"/?#".contains($0) }
+        guard !authority.contains("%"), !authority.contains("@") else { return nil }
+        if host.hasPrefix("[") && host.hasSuffix("]") {
+            var bytes = in6_addr()
+            guard authority.last == "]", inet_pton(AF_INET6, String(host.dropFirst().dropLast()), &bytes) == 1 else { return nil }
+        } else {
+            guard !authority.contains(":"), host.utf8.count <= 253 else { return nil }
+            let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+            guard labels.allSatisfy({ label in
+                (1...63).contains(label.utf8.count) && label.first != "-" && label.last != "-" &&
+                label.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }
+            }) else { return nil }
+            if labels.count > 1 && labels.allSatisfy({ $0.allSatisfy(\.isNumber) }) {
+                var bytes = in_addr()
+                guard inet_pton(AF_INET, host, &bytes) == 1 else { return nil }
+            }
         }
-        guard let site = site(of: URL(string: typed)) else { return nil }
-        let name = site.trimmingCharacters(in: CharacterSet(charactersIn: "[]."))
-        return name.isEmpty ? nil : name
+        return url
     }
 
-    // MARK: The list
+    private static func path(of url: URL) -> String {
+        var path = url.standardized.path(percentEncoded: true)
+        while path.hasSuffix("/") { path.removeLast() }
+        return path
+    }
 
-    /// Every route, from the spaces that keep them, in the spaces' order.
-    static func routes(in spaces: [SpaceInfo]) -> [Route] {
+    static func suggestedMatch(for text: String) -> Match {
+        guard let url = address(text), !path(of: url).isEmpty else { return .host }
+        return .path
+    }
+
+    static func entry(from text: String, match: Match = .domain) -> String? {
+        guard let url = address(text), let host = host(of: url) else { return nil }
+        switch match {
+        case .host, .domain:
+            let path = url.path(percentEncoded: true)
+            guard (path.isEmpty || path == "/"), url.query() == nil, url.fragment() == nil else { return nil }
+            return host
+        case .path:
+            let path = path(of: url)
+            return path.isEmpty ? nil : host + path
+        }
+    }
+
+    /// Old libraries preferred the most specific domain. Preserve that result when assigning the initial order.
+    static func migrated(from spaces: [SpaceInfo]) -> [Route] {
         spaces.flatMap { space in (space.routedSites ?? []).map { Route(site: $0, spaceID: space.id) } }
+            .sorted { $0.site.count > $1.site.count }
     }
 
-    /// The route that covers a page: the most specific listed site that does.
     static func route(for url: URL?, in routes: [Route]) -> Route? {
-        guard let site = site(of: url) else { return nil }
-        return routes.filter { covers($0.site, site) }.max { $0.site.count < $1.site.count }
+        guard let url, let host = host(of: url) else { return nil }
+        let path = path(of: url)
+        return routes.first { $0.isEnabled && $0.matches(host, path: path) }
     }
 
-    /// The spaces with `site` sent to `space`, or to no space (nil: Any space). A site is kept by one space at most,
-    /// so choosing another takes it from the one it was in.
-    static func setting(_ site: String, to space: UUID?, in spaces: [SpaceInfo]) -> [SpaceInfo] {
-        spaces.map { info in
-            var info = info
-            var sites = (info.routedSites ?? []).filter { $0 != site }
-            if info.id == space { sites.append(site) }
-            info.routedSites = sites.isEmpty ? nil : sites.sorted()
-            return info
+    static func blocker(for rule: Route, in rules: [Route]) -> Int? {
+        guard rule.isEnabled, !rule.site.isEmpty else { return nil }
+        return rules.prefix { $0.id != rule.id }.firstIndex { $0.isEnabled && !$0.site.isEmpty && $0.includes(rule) }
+    }
+
+    struct Coverage: Equatable {
+        var blockedBy: Int?
+        var blocks: [Int] = []
+    }
+
+    static func coverage(in rules: [Route]) -> [Coverage] {
+        var result = Array(repeating: Coverage(), count: rules.count)
+        for (index, rule) in rules.enumerated() {
+            if let first = blocker(for: rule, in: rules) {
+                result[index].blockedBy = first
+                result[first].blocks.append(index)
+            }
         }
+        return result
+    }
+
+    static func move(_ id: UUID, before next: UUID?, in rules: inout [Route]) {
+        guard id != next, let index = rules.firstIndex(where: { $0.id == id }) else { return }
+        let rule = rules.remove(at: index)
+        let target = rules.firstIndex { $0.id == next } ?? rules.endIndex
+        rules.insert(rule, at: target)
     }
 
     // MARK: Deciding
@@ -125,6 +205,17 @@ enum SiteRoutes {
     }
 }
 
+extension SiteRoutes.Route {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        match = try values.decode(SiteRoutes.Match.self, forKey: .match)
+        site = try values.decode(String.self, forKey: .site)
+        spaceID = try values.decode(UUID.self, forKey: .spaceID)
+        isEnabled = try values.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+    }
+}
+
 // MARK: - Opening a routed page
 
 extension BrowserWindowController {
@@ -145,8 +236,7 @@ extension BrowserWindowController {
                     by sender: Tab.LoadSender, httpFallback: Bool = false) -> Bool {
         guard let space = routedSpace(for: url, arrival: arrival, from: tab) else { return false }
         if commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
-        let key = TabManager.normalize(url)
-        if !inBackground, let open = tabManager.tabs(in: space).first(where: { $0.url.map(TabManager.normalize) == key }) {
+        if !inBackground, let open = tabManager.tabs(in: space).first(where: { $0.url == url }) {
             tabManager.select(open)
         } else {
             if !inBackground { tabManager.switchToSpace(space) }

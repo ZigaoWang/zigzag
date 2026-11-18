@@ -954,11 +954,40 @@ struct ControlMenuTests {
 
     @Test func aSpaceRowInSettingsOffersItsMenuEverywhere() {
         let row = SpaceSettingsRow(space: SpaceInfo(name: "Work", color: .sky))
+        let buttons = row.subviews.compactMap { $0 as? InteractiveView }
+        #expect(buttons.count == 2)
+        #expect(buttons.contains { $0 === row.editButton })
+        #expect(row.grip.symbol == "line.3.horizontal")
         #expect(row.offersMenu)
         #expect(row.isAccessibilitySelectorAllowed(#selector(NSView.accessibilityPerformShowMenu)))
         let edit = String(localized: "Edit Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")
         // A right-click finds the same menu.
         #expect(row.menu(for: rightClick())?.items.first?.title == edit)
+    }
+
+    @Test func reorderMenuMovesOnePlaceAndOmitsUnavailableDirections() {
+        let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+        let order = [a, b, c, d]
+        let up = String(localized: "Move Up", comment: "Move a row one place up in Settings.")
+        let down = String(localized: "Move Down", comment: "Move a row one place down in Settings.")
+        var destinations: [UUID?] = []
+        func menu(_ id: UUID, in ids: [UUID]) -> NSMenu {
+            let menu = NSMenu()
+            SettingsReorderMenu.addMoves(to: menu, for: id, in: ids) { destinations.append($0) }
+            return menu
+        }
+        #expect(menu(a, in: [a]).items.isEmpty)
+        #expect(menu(UUID(), in: order).items.isEmpty)
+        let first = menu(a, in: order), middle = menu(b, in: order), last = menu(d, in: order)
+        #expect(first.items.map(\.title) == [down])
+        #expect(middle.items.map(\.title) == [up, down])
+        #expect(last.items.map(\.title) == [up])
+        first.performActionForItem(at: 0)
+        middle.performActionForItem(at: 0)
+        middle.performActionForItem(at: 1)
+        menu(c, in: order).performActionForItem(at: 1)
+        last.performActionForItem(at: 0)
+        #expect(destinations == [c, a, d, nil, c])
     }
 
     @Test func aControlWithoutAMenuOffersNone() {

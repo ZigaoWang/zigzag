@@ -531,11 +531,13 @@ final class Library {
     private struct Stored: Codable {
         var spaces: [SpaceInfo]
         var favorites: [Bookmark]?
+        var siteRoutes: [SiteRoutes.Route]?
         var favoriteSplits: [PinnedSplit]?
         var searchEngine: SearchEngine
         var importedFromArc: Bool?
     }
 
+    private(set) var siteRoutes: [SiteRoutes.Route] = []
     private(set) var spaces: [SpaceInfo]
     /// Favorites: tiles at the top of the sidebar, the same in every space of a profile. Every profile's are here,
     /// each profile's in its own order; whose a favorite is, is in `directory`. `favorites(in:)` is one profile's.
@@ -568,6 +570,8 @@ final class Library {
         savedDirectory = directory
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = Self.keepingDefaultColors(stored.spaces.map(\.upgraded))
+            siteRoutes = stored.siteRoutes ?? SiteRoutes.migrated(from: spaces)
+            for i in spaces.indices { spaces[i].routedSites = nil }
             favorites = stored.favorites ?? []
             favoriteSplits = stored.favoriteSplits ?? []
             searchEngine = stored.searchEngine
@@ -592,7 +596,7 @@ final class Library {
 
     func saveNow() {
         saveDebouncer.cancel()
-        JSONStore.save(Stored(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
+        JSONStore.save(Stored(spaces: spaces, favorites: favorites, siteRoutes: siteRoutes, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
                               searchEngine: searchEngine, importedFromArc: importedFromArc), to: Paths.library)
         // Only what reached the disk counts as saved: a write that failed is tried again with the next save.
         if directory != savedDirectory, JSONStore.save(directory, to: Paths.profiles) { savedDirectory = directory }
@@ -779,30 +783,39 @@ final class Library {
     func removeSpace(_ id: UUID) {
         guard spaces.count > 1, let i = index(of: id) else { return }
         spaces.remove(at: i)
+        siteRoutes.removeAll { $0.spaceID == id }
         commit()
     }
 
     /// Puts back a removed space, bookmarks and all, at its old place (undo).
-    func insertSpace(_ space: SpaceInfo, at index: Int) {
+    func insertSpace(_ space: SpaceInfo, at index: Int, routes: [(offset: Int, element: SiteRoutes.Route)] = []) {
         guard self.index(of: space.id) == nil else { return }
         spaces.insert(space, at: max(0, min(index, spaces.count)))
+        for (offset, rule) in routes { siteRoutes.insert(rule, at: min(offset, siteRoutes.count)) }
         commit()
     }
 
     // MARK: Sites that open in a space (#286)
 
-    /// Every site sent to a space, in the spaces' order.
-    var siteRoutes: [SiteRoutes.Route] { SiteRoutes.routes(in: spaces) }
-
-    /// The route that covers a page, if any.
     func siteRoute(for url: URL?) -> SiteRoutes.Route? { SiteRoutes.route(for: url, in: siteRoutes) }
 
-    /// Sends `site` to a space from now on, or (nil) lets it open in any space again.
-    func setSiteRoute(_ site: String, to space: UUID?) {
-        guard space.map({ self.space($0) != nil }) ?? true else { return }
-        let next = SiteRoutes.setting(site, to: space, in: spaces)
-        guard next != spaces else { return }
-        spaces = next
+    func saveRoute(_ rule: SiteRoutes.Route) {
+        guard space(rule.spaceID) != nil else { return }
+        if let index = siteRoutes.firstIndex(where: { $0.id == rule.id }) {
+            siteRoutes[index] = rule
+        } else {
+            siteRoutes.append(rule)
+        }
+        commit()
+    }
+
+    func removeRoute(_ id: UUID) {
+        siteRoutes.removeAll { $0.id == id }
+        commit()
+    }
+
+    func moveRoute(_ id: UUID, before next: UUID?) {
+        SiteRoutes.move(id, before: next, in: &siteRoutes)
         commit()
     }
 
@@ -1574,6 +1587,7 @@ final class Library {
 
     /// Spaces, bookmarks and favorites as they are now, for undo.
     struct Snapshot: Equatable {
+        fileprivate let siteRoutes: [SiteRoutes.Route]
         fileprivate let spaces: [SpaceInfo]
         fileprivate let favorites: [Bookmark]
         fileprivate let favoriteSplits: [PinnedSplit]
@@ -1584,10 +1598,11 @@ final class Library {
     }
 
     var snapshot: Snapshot {
-        Snapshot(spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits, spaceProfiles: directory.assignments)
+        Snapshot(siteRoutes: siteRoutes, spaces: spaces, favorites: favorites, favoriteSplits: favoriteSplits, spaceProfiles: directory.assignments)
     }
 
     func restore(_ snapshot: Snapshot) {
+        siteRoutes = snapshot.siteRoutes
         spaces = snapshot.spaces
         favorites = snapshot.favorites
         favoriteSplits = snapshot.favoriteSplits
