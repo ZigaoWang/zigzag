@@ -20,8 +20,11 @@ enum Passkeys {
     /// `isPrivate`: private windows have no extensions, so no password manager to hand passkeys to. Otherwise it's
     /// the page's own profile that has one or not.
     static func attach(to configuration: WKWebViewConfiguration, isPrivate: Bool, profile: Profile) {
-        guard !available else { return }
         let controller = configuration.userContentController
+        if !controller.userScripts.contains(where: { ($0.source as NSString).hasPrefix(keeperMarker) }) {
+            controller.addUserScript(WKUserScript(source: keeper, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .page))
+        }
+        guard !available else { return }
         if isPrivate { install(in: controller); return }
         controllers.setObject(profile, forKey: controller)
         if !passwordManagerOn(in: profile) { install(in: controller) }
@@ -59,6 +62,19 @@ enum Passkeys {
     }
 
     private static let marker = "/* zigzag passkeys */"
+
+    /// WebKit drops `navigator.credentials` once nothing holds it and hands out a new one without what was set on it,
+    /// so a password manager's passkey hook (Bitwarden sets `navigator.credentials.get`) vanished mid-page (#344).
+    /// Held for the page's life.
+    private static let keeperMarker = "/* zigzag credentials keeper */"
+
+    private static let keeper = """
+    \(keeperMarker)
+    (() => {
+      const credentials = navigator.credentials;
+      if (credentials) addEventListener('pagehide', () => credentials, { passive: true });
+    })();
+    """
 
     private static let shim = """
     (() => {

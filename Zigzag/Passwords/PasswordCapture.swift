@@ -621,6 +621,7 @@ enum PasswordManagers {
         "bfogiafebfohielmmehodmfbbebbbpei": "Keeper",
         "eiaeiblijfjekdanodkjadfinkhbfgcd": "NordPass",
         "pejdijmoenmkgeppbflobdenhhabjlaj": "iCloud Passwords",
+        "mnilpkfepdibngheginihjpknnopchbn": "Strongbox",
     ]
 
     /// The password manager installed and turned on in a profile, by name. Read from what the profile has

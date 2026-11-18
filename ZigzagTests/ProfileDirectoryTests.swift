@@ -287,6 +287,7 @@ struct ProfileChoiceTests {
         #expect(PasswordManagers.active(among: []) == nil)
         #expect(PasswordManagers.active(among: ["not-a-password-manager"]) == nil)
         #expect(PasswordManagers.active(among: ["nngceckbapebfimnlniiiahkandclblb"]) == "Bitwarden")
+        #expect(PasswordManagers.active(among: ["mnilpkfepdibngheginihjpknnopchbn"]) == "Strongbox")
         // Several on: always the same one.
         #expect(PasswordManagers.active(among: ["nngceckbapebfimnlniiiahkandclblb", "aeblfdkhhhdcdjpifhhbdiojplfjncoa"]) == "1Password")
     }
