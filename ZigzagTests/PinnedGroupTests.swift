@@ -186,6 +186,25 @@ import Testing
         }
     }
 
+    /// A split in a group pins as a pinned split in the group's folder, and comes back side by side.
+    @Test func aSplitInAGroupStaysASplit() throws {
+        try withTabs(["0", "1", "2"]) { manager, tabs, space in
+            manager.makeSplit(tabs[1], with: tabs[2])
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Mixed"))
+            #expect(manager.tabs(inGroup: groupID).count == 3)
+            manager.bookmarkTab(tabs[0], in: space)
+            let folder = try #require(tabs[0].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+            #expect(folder.bookmarkIDs.count == 3)
+            let pinned = try #require(tabs[1].bookmarkID.flatMap(Library.shared.pinnedSplit(containing:)))
+            #expect(Set(pinned.ids) == Set([tabs[1], tabs[2]].compactMap(\.bookmarkID)))
+            // Unpinning a page of the split brings back the whole group, the split side by side.
+            manager.unbookmark(pinned.ids[0], toIndex: 0)
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(Set(manager.tabs(inGroup: groupID).map(\.id)) == Set(tabs.map(\.id)))
+            #expect(manager.split(for: tabs[1])?.contains(tabs[2].id) == true)
+        }
+    }
+
     /// A tab in no group still pins on its own: one page, in no folder.
     @Test func aTabOutsideAGroupStillPinsOnItsOwn() throws {
         try withTabs(["0"]) { manager, tabs, space in
