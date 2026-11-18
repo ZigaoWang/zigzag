@@ -488,7 +488,8 @@ import WebKit
         next.close()
     }
 
-    /// Time to a PDF's first page: in a helper of its own against the one shared helper, the first time and after.
+    /// Time to a PDF's first page in its own helper vs. the shared one. Medians with a loose bound, since a busy Mac
+    /// slows single launches.
     @Test @MainActor func aHelperOfItsOwnOpensAboutAsFast() async throws {
         let data = Self.pdf(pages: 4)
         func firstPage(ownHelper: Bool) async throws -> (SafePDF, Double) {
@@ -498,8 +499,9 @@ import WebKit
             _ = try #require(await document.render(page: 0, rect: CGRect(x: 0, y: 0, width: 300, height: 400), scale: 2, dark: false))
             return (document, Date().timeIntervalSince(start) * 1000)
         }
-        // The shared helper, started for the first PDF, then already running for the next ones.
+        // The shared helper: cold for the first PDF, warm after.
         let (first, sharedCold) = try await firstPage(ownHelper: false)
+        let sharedPID = try #require(first.helperProcess)
         var sharedWarm: [Double] = []
         for _ in 0..<5 {
             let (document, ms) = try await firstPage(ownHelper: false)
@@ -507,18 +509,26 @@ import WebKit
             document.close()
         }
         first.close()
-        // Each in a helper of its own, started for it.
+        // Each in its own helper.
         var own: [Double] = []
+        var ownPIDs: [pid_t] = []
         for _ in 0..<6 {
             let (document, ms) = try await firstPage(ownHelper: true)
             own.append(ms)
+            ownPIDs.append(try #require(document.helperProcess))
             document.close()
         }
-        let average = { (values: [Double]) in values.reduce(0, +) / Double(values.count) }
-        print(String(format: "PDF first page ms: shared cold %.1f, shared warm %.1f; own first %.1f, own after %.1f",
-                     sharedCold, average(sharedWarm), own[0], average(Array(own.dropFirst()))))
-        // A helper's start is small next to what a PDF takes to arrive.
-        #expect(average(Array(own.dropFirst())) < average(sharedWarm) + 150)
+        let median = { (values: [Double]) in
+            let sorted = values.sorted()
+            return sorted.count % 2 == 1 ? sorted[sorted.count / 2] : (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2
+        }
+        print(String(format: "PDF first page ms: shared cold %.1f, shared warm median %.1f; own first %.1f, own median %.1f",
+                     sharedCold, median(sharedWarm), own[0], median(own)))
+        #expect(Set(ownPIDs).count == ownPIDs.count)
+        #expect(!ownPIDs.contains(sharedPID))
+        // A helper's start is small next to a PDF's arrival: within twice the shared time plus a second.
+        #expect(median(own) < median(sharedWarm) * 2 + 1000)
+        #expect(own.allSatisfy { $0 < 5000 })
     }
 
     @Test @MainActor func aPDFThatHadTheHelperToItselfFailsAtOnce() async throws {
