@@ -50,12 +50,8 @@
     }
   }
 
-  // No rule sizes an extension page's <svg>. One did: `svg:not([width]) { width: 100% }`, for Sound Booster's mute
-  // button, on the belief that Chrome gives such an icon 100% and WebKit gives it none. Measured against Chrome 113 at
-  // the same viewport, the two engines agree on every shape that matters: an icon given a height is as wide as its
-  // height allows, an icon with no size of its own at all is as wide as its container in both, an icon in a fixed-height
-  // button is 0×0 in both. The rule therefore never reproduced Chrome: it took a correctly sized icon and made it as
-  // wide as its row, squeezing the text beside it one letter to a line (Dashlane's webcard, #340). None is injected.
+  // No rule sizes an extension page's <svg>: WebKit already sizes them as Chrome does. `svg:not([width]) { width:
+  // 100% }` (#45) stretched sized icons across their row (Dashlane, #340).
 
   // An extension's pages and its background service worker posting to each other (navigator.serviceWorker and the
   // worker's clients): in Chrome the worker controls its extension's pages and they reach it, in WebKit nothing the

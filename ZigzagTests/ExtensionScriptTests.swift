@@ -756,10 +756,7 @@ struct ExtensionScriptTests {
     }
 
     @Test func extensionPagesGetNoRuleSizingTheirIcons() {
-        // WebKit and Chrome size an <svg> the same way at the same viewport: from its height, or from its viewBox
-        // ratio, or as wide as its container when it has no size at all. Zigzag once added `width: 100%` for the
-        // icons it was thought to lose, which stretched an already sized icon across its row and squeezed the text
-        // beside it to one letter a line (Dashlane's webcard, #340). Nothing is added now.
+        // WebKit sizes an <svg> as Chrome does; a `width: 100%` rule stretched Dashlane's icons (#340).
         let context = Self.workerWorld(worker: false, setup: """
         var __styles = [];
         var document = { createElement: () => ({ textContent: '' }), documentElement: { prepend: (node) => __styles.push(node.textContent) } };
