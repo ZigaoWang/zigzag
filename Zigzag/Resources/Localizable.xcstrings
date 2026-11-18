@@ -5110,7 +5110,7 @@
       }
     },
     "Close" : {
-      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.",
+      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.\nTooltip of the × on a notice over the page, like a script's while it runs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14954,6 +14954,17 @@
         }
       }
     },
+    "Ran script: %@" : {
+      "comment" : "A notice over the page saying a download rule's script has finished and exited 0. The placeholder is the script's file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本运行完成：%@"
+          }
+        }
+      }
+    },
     "Read and change cookies on the sites it can access" : {
       "comment" : "One thing an extension can do, listed in its install sheet and in Settings.",
       "localizations" : {
@@ -16252,6 +16263,17 @@
         }
       }
     },
+    "Running script: %@" : {
+      "comment" : "A notice over the page while a download rule's script runs. The placeholder is the script's file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在运行脚本：%@"
+          }
+        }
+      }
+    },
     "Runs on this site when you click it" : {
       "comment" : "Tooltip line under an extension's name in Site Controls: its site access is When You Click It, and it hasn't been clicked on this site yet.",
       "localizations" : {
@@ -16628,6 +16650,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "脚本"
+          }
+        }
+      }
+    },
+    "Script failed: %@" : {
+      "comment" : "A notice over the page saying a download rule's script has failed. The placeholder is the script's file name, and the script's own last words are under it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本运行失败：%@"
           }
         }
       }
@@ -23181,6 +23214,17 @@
         }
       }
     },
+    "handed this link to %@" : {
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder is the app's own name, like mpv.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将链接交给 %@"
+          }
+        }
+      }
+    },
     "history" : {
       "comment" : "Item in the short list of what a browser holds, in the Import window: its browsing history.",
       "localizations" : {
@@ -23931,6 +23975,17 @@
         }
       }
     },
+    "sent this link to %@" : {
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将链接发送到 %@"
+          }
+        }
+      }
+    },
     "separate profile per space each own container isolate new space" : {
       "comment" : "Words that find the Give new spaces their own profile setting with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -24216,7 +24271,7 @@
       }
     },
     "Every site" : {
-      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.",
+      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.\nUnder a download rule in Settings › Downloads: the answer beside it was given for every site, not just one.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

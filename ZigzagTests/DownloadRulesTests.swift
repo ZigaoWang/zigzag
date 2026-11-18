@@ -186,6 +186,34 @@ struct DownloadRuleTests {
         #expect(!expanded.contains("{link}"))
     }
 
+    /// A script rule's notice says what it is doing while it runs, and how it went when it stops: green when it exited
+    /// 0, the script's own last words when it didn't.
+    @Test func aScriptNoticeSaysHowItWent() {
+        let running = ScriptNotice(script: "yt-dlp.sh", state: .running)
+        #expect(running.title == "Running script: yt-dlp.sh")
+        #expect(running.detail == nil)
+        #expect(running.symbol == "terminal")
+        #expect(running.tone == .plain)
+        #expect(!running.isOver)
+
+        let ran = ScriptNotice(script: "yt-dlp.sh", state: .ran)
+        #expect(ran.title == "Ran script: yt-dlp.sh")
+        #expect(ran.detail == nil)
+        #expect(ran.symbol == "checkmark.circle.fill")
+        #expect(ran.tone == .good)
+        #expect(ran.isOver)
+
+        let failed = ScriptNotice(script: "yt-dlp.sh", state: .failed("  ERROR: no such video\n"))
+        #expect(failed.title == "Script failed: yt-dlp.sh")
+        #expect(failed.detail == "ERROR: no such video")
+        #expect(failed.symbol == "exclamationmark.triangle.fill")
+        #expect(failed.tone == .bad)
+        #expect(failed.isOver)
+
+        // A script that said nothing has nothing to show under the title.
+        #expect(ScriptNotice(script: "yt-dlp.sh", state: .failed("   \n")).detail == nil)
+    }
+
     /// The link's own parts, so a rule can send an address somewhere else: the host, the path and the query on their
     /// own, exactly as the address has them.
     @Test func theLinksOwnPartsAreTokensOfTheirOwn() {
@@ -976,6 +1004,104 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc)?.field == .method)
         rpc.rpcMethod = "aria2.addUri"
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
+    }
+
+    // MARK: What an automation says for itself
+
+    /// Only the handoffs that would otherwise be **silent** are announced — an app, a service, the Mac's own browser,
+    /// and an address of some other app's — and a rule says its line once, so the tab it opened isn't covered by a
+    /// line saying it opened it.
+    @Test func onlyTheHandoffsYouCantSeeAreAnnounced() {
+        func action(_ kind: DownloadRuleAction.Kind) -> DownloadRuleAction { DownloadRuleAction(kind: kind) }
+
+        var app = action(.openApp)
+        app.appPath = "/Applications/mpv.app"
+        var service = action(.jsonRPC)
+        service.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc"
+        service.rpcMethod = "aria2.addUri"
+        var script = action(.runScript)
+        script.scriptPath = "yt-dlp.sh"
+        var web = action(.openURL)
+        web.urlTemplate = "{link}"
+
+        // An app and a service leave Zigzag with nothing on screen saying so: a line each.
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: app), elsewhere: .app("mpv")) == "Videos: handed this link to mpv")
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: service), elsewhere: .service("aria2.addUri · 127.0.0.1")) == "Videos: sent this link to aria2.addUri · 127.0.0.1")
+        // A rule that was never named says what happened without inventing a name for it.
+        #expect(HandoffNotice.line(for: DownloadRule(name: "", action: app), elsewhere: .app("mpv")) == "handed this link to mpv")
+        // Nothing that shows itself: a script's card, a tab, Mini, a question, a download's file.
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: script), elsewhere: nil) == nil)
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: web), elsewhere: nil) == nil)
+        // And nothing without a rule to name.
+        #expect(HandoffNotice.line(for: nil, elsewhere: .app("mpv")) == nil)
+    }
+
+    /// A rule says its line once a session: the first handoff announces, and the ones after it don't, so a rule that
+    /// fires all afternoon doesn't bury the page in notices.
+    @Test func aRuleSaysItsLineOnceASession() {
+        HandoffNotice.forgetSaid()
+        defer { HandoffNotice.forgetSaid() }
+        let rule = DownloadRule(name: "Videos", match: .any, action: DownloadRuleAction(kind: .openApp))
+        #expect(HandoffNotice.takeLine(for: rule, elsewhere: .app("mpv")) == "Videos: handed this link to mpv")
+        #expect(HandoffNotice.takeLine(for: rule, elsewhere: .app("mpv")) == nil)
+        // A different rule has its own line.
+        let other = DownloadRule(name: "Music", match: .any, action: DownloadRuleAction(kind: .openApp))
+        #expect(HandoffNotice.takeLine(for: other, elsewhere: .app("mpv")) == "Music: handed this link to mpv")
+        // One that has nothing to say doesn't use up its turn: it says so if it ever hands off for real.
+        let quiet = DownloadRule(name: "Quiet", match: .any, action: DownloadRuleAction(kind: .runScript))
+        #expect(HandoffNotice.takeLine(for: quiet, elsewhere: nil) == nil)
+        #expect(HandoffNotice.takeLine(for: quiet, elsewhere: .app("mpv")) == "Quiet: handed this link to mpv")
+    }
+
+    /// Where an Open URL will open is decided in **one** place, so what a notice says and what the action does can
+    /// never drift apart: the card's answer for this handoff, else the rule's own.
+    @Test func aWebAddressOpensWhereTheRuleSaysItDoes() {
+        var web = DownloadRuleAction(kind: .openURL)
+        let rule = DownloadRule(name: "Videos", match: .any, action: web)
+
+        // The rule's own answer, until the card answers for this hand-off alone.
+        for choice in OpenInZigzag.Choice.allCases {
+            web.openIn = choice
+            let told = DownloadRule(name: "Videos", match: .any, action: web)
+            #expect(DownloadHandoff.opening(told, at: nil) == choice)
+            #expect(DownloadHandoff.opening(told, at: .mini) == .mini)
+        }
+
+        // Ask is a place only the question can answer: nothing to open until it does.
+        web.openIn = .ask
+        #expect(DownloadHandoff.opening(rule, at: nil) == .ask)
+        #expect(DownloadHandoff.opening(rule, at: nil).place == nil)
+        #expect(DownloadHandoff.opening(rule, at: .defaultBrowser).place == nil)
+    }
+
+    // MARK: The order the rules are in
+    /// A drag in the rules list names the row it was dropped on, not a position, because that list shows only the
+    /// handoffs: its numbering leaves the file types out, so a place in it isn't a place in the store. The rule lands
+    /// just before the one it was dropped on, and everything else stays where it was — a file type between the two,
+    /// included.
+    @Test func aRuleMovesToSitBeforeTheOneItWasDroppedOn() {
+        let a = rule(.any)
+        let b = rule(.any)
+        let c = rule(.any)
+        let type = destination("pdf")
+
+        func order(_ rules: [DownloadRule]) -> [UUID] { rules.map(\.id) }
+        func moved(_ rules: [DownloadRule], _ id: UUID, before: UUID?) -> [UUID] {
+            order(DownloadRulesStore.moved(rules, id: id, before: before))
+        }
+
+        // Down the list, up the list, and to the end.
+        #expect(moved([a, b, c], c.id, before: a.id) == order([c, a, b]))
+        #expect(moved([a, b, c], a.id, before: c.id) == order([b, a, c]))
+        #expect(moved([a, b, c], a.id, before: nil) == order([b, c, a]))
+        // Dropped where it already is, nothing moves: it is already just before that rule.
+        #expect(moved([a, b, c], a.id, before: b.id) == order([a, b, c]))
+        #expect(moved([a, b, c], b.id, before: c.id) == order([a, b, c]))
+        // A file type sitting between them stays where it is: the handoff is placed before its neighbor, not last.
+        #expect(moved([a, type, b], b.id, before: a.id) == order([b, a, type]))
+        // A rule that isn't in the list it was dropped into leaves the order alone.
+        #expect(moved([a, b], c.id, before: a.id) == order([a, b]))
+        #expect(moved([], a.id, before: nil) == [])
     }
 }
 

@@ -317,7 +317,20 @@ enum DownloadHandoff {
             // download is never cancelled for it — so there is nothing to do here but let it be saved.
             outcome = .noMatch
         }
+        // Only once it worked: a failed handoff shows its failure instead.
+        if outcome == .handedOff { announce(rule, request: request, values: values, secret: secret) }
         return outcome
+    }
+
+    /// Says what a rule did, where its tab is — in the window holding it, so a rule that fires in a background tab
+    /// says so there rather than in the one you are looking at. Only for a handoff that leaves Zigzag and only once a
+    /// session: everything else shows itself (see `HandoffNotice.takeLine`).
+    private static func announce(_ rule: DownloadRule, request: Request, values: HandoffValues, secret: String) {
+        let choice = opening(rule, at: request.place)
+        guard let host = handoffHost(for: request),
+              let line = HandoffNotice.takeLine(for: rule, elsewhere: elsewhere(of: rule.action, at: choice, values: values, secret: secret))
+        else { return }
+        host.promptToast(line, symbol: rule.action.kind.symbol, duration: 4)
     }
 
     /// A rule that ran, but not: said over the page, and noted without the link, the cookies or the secret.
@@ -332,6 +345,28 @@ enum DownloadHandoff {
         guard let controller = WindowManager.shared.controller(for: window) ?? WindowManager.shared.keyController else { return }
         Toast.show(String(localized: "Couldn’t hand off: \(reason)", comment: "Toast when a download rule's action fails for a link or a download. The placeholder is the reason, a few words."),
                    symbol: "exclamationmark.triangle", duration: 4, in: controller)
+    }
+
+    /// Where a handoff went, when there's nowhere in Zigzag that shows it: an app on this Mac, or a service. Nil for
+    /// everything else — a link opened in a tab or in Mini, a script's card, a download's file — which shows itself.
+    private static func elsewhere(of action: DownloadRuleAction, at choice: OpenInZigzag.Choice,
+                                  values: HandoffValues, secret: String) -> HandoffNotice.Elsewhere? {
+        switch action.kind {
+        case .openApp:
+            return .app(action.summary)
+        case .jsonRPC:
+            return .service(action.summary)
+        case .openURL:
+            // A non-web address opens in its own app. A web address is only announced when it goes to another browser.
+            guard let url = URL(string: DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)),
+                  let scheme = url.scheme else { return nil }
+            if !OpenInZigzag.handles(url) { return .app(ExternalLinks.appName(forScheme: scheme)) }
+            // When Zigzag is the default browser, the link comes back here and opens in a tab.
+            guard choice == .defaultBrowser, !DefaultBrowser.isDefault else { return nil }
+            return .app(ExternalLinks.appName(forScheme: "https"))
+        case .runScript, .saveToFolder, .openFile:
+            return nil
+        }
     }
 
     /// An app handed a `{cookies}` path may read it a moment later than the open call returns. The file waits a few
@@ -496,18 +531,31 @@ enum DownloadHandoff {
         let cookieFile = values.cookieFile
         let link = values.link
         let isPrivate = request.isPrivate
+        // While it runs, and how it went: a card over the page it was handed, in the window its tab is in. A run that
+        // comes and goes in a moment never flashes "running" — the card appears with how it ended instead.
+        let script = ScriptNotice(script: (path as NSString).lastPathComponent, state: .running)
+        let card = handoffHost(for: request).map { NoticeCard.show(script, tab: request.tab, in: $0) }
         process.terminationHandler = { finished in
             errorPipe.fileHandleForReading.readabilityHandler = nil
             errors.append(errorPipe.fileHandleForReading.readDataToEndOfFile())
             if !cookieFile.isEmpty { HandoffCookies.removeFile(URL(fileURLWithPath: cookieFile)) }
-            guard finished.terminationStatus != 0 else { return }
-            // The script ran and failed. Say so: a silent failure looks like a download that never happened.
             let said = errors.text
-            let reason = said.isEmpty
-                ? String(localized: "The script exited with status \(finished.terminationStatus).", comment: "Why a download rule failed: the script finished with an error code. The placeholder is a number, like 1.")
-                : String(localized: "The script failed: \(said)", comment: "Why a download rule failed: the script exited with an error code and printed this. The placeholder is the script's own last line of error text.")
+            let status = finished.terminationStatus
             Task { @MainActor in
-                report(.failed(reason), rule: rule, url: link, isPrivate: isPrivate)
+                // The card says how it went, where there is one and it hasn't been put away. Anything else falls back
+                // to the notice below, so a script that fails is never silent.
+                let ended: ScriptNotice.State = status == 0 ? .ran : .failed(said)
+                let onCard = card?.say(ScriptNotice(script: script.script, state: ended)) == true
+                guard status != 0 else { return }
+                let reason = said.isEmpty
+                    ? String(localized: "The script exited with status \(status).", comment: "Why a download rule failed: the script finished with an error code. The placeholder is a number, like 1.")
+                    : String(localized: "The script failed: \(said)", comment: "Why a download rule failed: the script exited with an error code and printed this. The placeholder is the script's own last line of error text.")
+                // The card said it over the page; the diagnostics still note it, as they note every failed handoff.
+                if onCard {
+                    Diagnostics.note("Handoff failed", site: link.host(), "\(rule?.name ?? "Rule"): \(reason)", isPrivate: isPrivate)
+                } else {
+                    report(.failed(reason), rule: rule, url: link, isPrivate: isPrivate)
+                }
             }
         }
         do {
@@ -516,6 +564,13 @@ enum DownloadHandoff {
             return .failed(error.localizedDescription)
         }
         return .handedOff
+    }
+
+    /// The window a rule's notice belongs in: the one holding the tab it was handed (a rule in a background window
+    /// says so there), else the window the request came from.
+    private static func handoffHost(for request: Request) -> PromptHost? {
+        if let tab = request.tab, let host = WindowManager.shared.promptHost(holding: tab) { return host }
+        return WindowManager.shared.promptHost(for: request.window)
     }
 
     // MARK: JSON-RPC and XML-RPC
