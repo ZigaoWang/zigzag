@@ -1,0 +1,34 @@
+var y=Object.defineProperty;var f=(t,e)=>{for(var s in e)y(t,s,{get:e[s],enumerable:!0})};var m={};f(m,{SuggestionInput:()=>r});import*as n from"../code_highlighter/code_highlighter.js";import*as i from"../../lit/lit.js";import*as a from"../../visual_logging/visual_logging.js";var l=`*{box-sizing:border-box;font-size:inherit;margin:0;padding:0}:host{position:relative}devtools-editable-content{background:transparent;border:none;color:var(--override-color-recorder-input,var(--sys-color-on-surface));cursor:text;display:inline-block;line-height:18px;min-height:18px;min-width:0.5em;outline:none;overflow-wrap:anywhere}devtools-editable-content:hover,
+devtools-editable-content:focus{box-shadow:0 0 0 1px var(--sys-color-divider);border-radius:2px}devtools-editable-content[placeholder]:empty::before{content:attr(placeholder);color:var(--sys-color-on-surface);opacity:50%}devtools-editable-content[placeholder]:empty:focus::before{content:""}devtools-suggestion-box{position:absolute;display:none}devtools-editable-content:focus ~ devtools-suggestion-box{display:block}.suggestions{background-color:var(--sys-color-cdt-base-container);box-shadow:var(--drop-shadow);min-height:1em;min-width:150px;overflow:hidden auto;position:relative;z-index:100;max-height:350px}.suggestions > li{padding:1px;border:1px solid transparent;white-space:nowrap;font-family:var(--source-code-font-family);font-size:var(--source-code-font-size);color:var(--sys-color-on-surface)}.suggestions > li:hover{background-color:var(--sys-color-state-hover-on-subtle)}.suggestions > li.selected{background-color:var(--sys-color-primary);color:var(--sys-color-cdt-base-container)}.strikethrough{text-decoration:line-through}
+/*# sourceURL=${import.meta.resolve("./suggestionInput.css")} */`;var x=(t,e)=>(t%e+e)%e;function p(t,e="Assertion failed!"){if(!t)throw new Error(e)}var{html:d,Directives:E}=i,{classMap:v}=E,b={hasChanged(t,e){return JSON.stringify(t)!==JSON.stringify(e)},attribute:!1},h=class extends HTMLElement{static get observedAttributes(){return["disabled","placeholder"]}set disabled(e){this.contentEditable=String(!e)}get disabled(){return this.contentEditable!=="true"}set value(e){this.innerText=e,this.#t()}get value(){return this.innerText}set mimeType(e){this.#e=e,this.#t()}get mimeType(){return this.#e}#e="";constructor(){super(),this.contentEditable="true",this.tabIndex=0,this.addEventListener("focus",()=>{this.textContent=this.innerText}),this.addEventListener("blur",this.#t.bind(this))}#t(){this.#e&&n.CodeHighlighter.highlightNode(this,this.#e)}attributeChangedCallback(e,s,o){e==="disabled"&&(this.disabled=o!==null)}},c=class t extends Event{static eventName="suggest";constructor(e){super(t.eventName),this.suggestion=e}},u=class t extends Event{static eventName="suggestioninit";listeners;constructor(e){super(t.eventName),this.listeners=e}},w=(t,e)=>t.toLowerCase().startsWith(e.toLowerCase()),g=class extends i.LitElement{static properties={options:b,expression:{type:String},suggestionFilter:{attribute:!1},hideExactMatch:{type:Boolean},cursor:{state:!0}};#e=[];constructor(){super(),this.options=[],this.expression="",this.hideExactMatch=!1,this.cursor=0}#t(){return this.#e.length>0&&!(this.hideExactMatch&&this.#e.length===1&&this.#e[0]===this.expression)}#i=e=>{if(p(e instanceof KeyboardEvent,"Bound to the wrong event."),this.#t())switch(e.key){case"ArrowDown":e.stopPropagation(),e.preventDefault(),this.#s(1);break;case"ArrowUp":e.stopPropagation(),e.preventDefault(),this.#s(-1);break}e.key==="Enter"&&(this.#t()&&this.#e[this.cursor]&&this.#o(this.#e[this.cursor]),e.preventDefault())};#s(e){this.cursor=x(this.cursor+e,this.#e.length)}#o(e){this.dispatchEvent(new c(e))}connectedCallback(){super.connectedCallback(),this.dispatchEvent(new u([["keydown",this.#i]]))}willUpdate(e){e.has("options")&&(this.options=Object.freeze([...this.options].sort())),(e.has("expression")||e.has("options"))&&(this.cursor=0,this.#e=this.options.filter(s=>(this.suggestionFilter||w)(s,this.expression)))}render(){if(this.#t())return d`<style>${l}</style><ul class="suggestions">
+      ${this.#e.map((e,s)=>d`
+        <li class=${v({selected:s===this.cursor})}
+            @mousedown=${this.#o.bind(this,e)}
+            jslog=${a.item("suggestion").track({click:!0,resize:!0})}>
+          ${e}
+        </li>`)}
+    </ul>`}},r=class extends i.LitElement{static shadowRootOptions={...i.LitElement.shadowRootOptions,delegatesFocus:!0};static properties={options:b,autocomplete:{type:Boolean},suggestionFilter:{attribute:!1},hideExactMatch:{type:Boolean},expression:{state:!0},placeholder:{type:String},value:{type:String},disabled:{type:Boolean},strikethrough:{type:Boolean},mimeType:{type:String},jslogContext:{type:String}};constructor(){super(),this.options=[],this.expression="",this.placeholder="",this.value="",this.disabled=!1,this.strikethrough=!0,this.mimeType="",this.autocomplete=!0,this.hideExactMatch=!1,this.addEventListener("blur",this.#i);let e=a.value().track({keydown:"ArrowUp|ArrowDown|Enter",change:!0,click:!0});this.jslogContext&&(e=e.context(this.jslogContext)),this.setAttribute("jslog",e.toString())}#e;get#t(){if(this.#e)return this.#e;let e=this.renderRoot.querySelector("devtools-editable-content");if(!e)throw new Error("Attempted to query node before rendering.");return this.#e=e,e}#i=()=>{window.getSelection()?.removeAllRanges(),this.value=this.#t.value,this.expression=this.#t.value};#s=e=>{p(e.target instanceof Node);let s=document.createRange();s.selectNodeContents(e.target);let o=window.getSelection();o.removeAllRanges(),o.addRange(s)};#o=e=>{e.key==="Enter"&&e.preventDefault()};#r=e=>{this.expression=e.target.value};#n=e=>{for(let[s,o]of e.listeners)this.addEventListener(s,o)};#a=e=>{this.#t.value=e.suggestion,setTimeout(this.blur.bind(this),0)};willUpdate(e){e.has("value")&&(this.expression=this.value)}render(){return d`<style>${l}</style>
+      <style>${n.codeHighlighterStyles}</style>
+      <devtools-editable-content
+        ?disabled=${this.disabled}
+        class=${v({strikethrough:!this.strikethrough})}
+        .enterKeyHint=${"done"}
+        .value=${this.value}
+        .mimeType=${this.mimeType}
+        @focus=${this.#s}
+        @input=${this.#r}
+        @keydown=${this.#o}
+        autocapitalize="off"
+        inputmode="text"
+        placeholder=${this.placeholder}
+        spellcheck="false"
+      ></devtools-editable-content>
+      <devtools-suggestion-box
+        @suggestioninit=${this.#n}
+        @suggest=${this.#a}
+        .options=${this.options}
+        .suggestionFilter=${this.suggestionFilter}
+        .hideExactMatch=${this.hideExactMatch}
+        .expression=${this.autocomplete?this.expression:""}
+      ></devtools-suggestion-box>`}};customElements.define("devtools-editable-content",h);customElements.define("devtools-suggestion-box",g);customElements.define("devtools-suggestion-input",r);export{m as SuggestionInput};
+//# sourceMappingURL=suggestion_input.js.map

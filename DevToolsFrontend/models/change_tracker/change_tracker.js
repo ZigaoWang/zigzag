@@ -1,0 +1,2 @@
+var s=Object.defineProperty;var g=(a,e)=>{for(var t in e)s(a,t,{get:e[t],enumerable:!0})};var m={};g(m,{ChangeTracker:()=>o});import*as n from"../../core/host/host.js";import*as r from"../../core/root/root.js";var o=class{#e;constructor(e){this.#e=e}get isTracking(){return!!r.Runtime.hostConfig.devToolsComments?.enabled&&this.#e.isAgentAttached()}trackChange(e,t){if(!this.isTracking)return;this.#e.createCommentThread(t,e,"DEVELOPER",!0).save(),n.userMetrics.changeRecorded(1)}};export{m as ChangeTracker};
+//# sourceMappingURL=change_tracker.js.map

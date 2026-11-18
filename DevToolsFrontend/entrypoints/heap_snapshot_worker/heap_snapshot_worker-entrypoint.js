@@ -1,0 +1,2 @@
+import*as e from"../../core/platform/platform.js";import*as r from"./heap_snapshot_worker.js";var o=new r.HeapSnapshotWorkerDispatcher.HeapSnapshotWorkerDispatcher(e.HostRuntime.HOST_RUNTIME.workerScope.postMessage.bind(e.HostRuntime.HOST_RUNTIME.workerScope));e.HostRuntime.HOST_RUNTIME.workerScope.onmessage=o.dispatchMessage.bind(o);e.HostRuntime.HOST_RUNTIME.workerScope.postMessage("workerReady");
+//# sourceMappingURL=heap_snapshot_worker-entrypoint.js.map

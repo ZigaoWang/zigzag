@@ -151,6 +151,19 @@ IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 ```
 
+### Chrome DevTools frontend
+
+Settings › Developer › Chrome DevTools (Preview). `DevToolsFrontend/` is the built frontend of Chrome's DevTools
+([github.com/ChromeDevTools/devtools-frontend](https://github.com/ChromeDevTools/devtools-frontend)), at the
+Chromium commit in `DevToolsFrontend/REVISION`, fetched unmodified by `scripts/update-devtools-frontend.py`.
+
+```
+Copyright 2014 The Chromium Authors
+```
+
+License: BSD 3-Clause, in `DevToolsFrontend/LICENSE`. Its own third-party code keeps its notices in its files
+under `DevToolsFrontend/third_party`.
+
 ### Readability
 
 Reader view. `Zigzag/Resources/Reader/Readability.js` and `Zigzag/Resources/Reader/Readability-readerable.js`
