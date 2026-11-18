@@ -137,10 +137,11 @@ enum SiteRoutes {
         }
     }
 
-    /// Old libraries preferred the most specific domain. Preserve that result when assigning the initial order.
+    /// Read each space's legacy sites in their saved order.
     static func migrated(from spaces: [SpaceInfo]) -> [Route] {
-        spaces.flatMap { space in (space.routedSites ?? []).map { Route(site: $0, spaceID: space.id) } }
-            .sorted { $0.site.count > $1.site.count }
+        spaces.flatMap { space in
+            (space.routedSites ?? []).map { Route(match: .domain, site: $0, spaceID: space.id) }
+        }
     }
 
     static func route(for url: URL?, in routes: [Route]) -> Route? {

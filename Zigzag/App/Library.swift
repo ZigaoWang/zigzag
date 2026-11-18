@@ -579,6 +579,8 @@ final class Library {
             wasRead = true
             // What an older Zigzag may have left that this one doesn't allow.
             tidyFavorites()
+            // Save the new rule IDs and order on the first launch after upgrade.
+            if stored.siteRoutes == nil { saveNow() }
         } else {
             wasRead = false
             spaces = [SpaceInfo(name: String(localized: "Personal", comment: "The name of the first space in a new Zigzag. People can rename it."), color: .sky, defaultColor: .sky)]

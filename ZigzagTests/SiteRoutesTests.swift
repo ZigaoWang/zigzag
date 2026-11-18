@@ -203,13 +203,17 @@ struct SiteRoutesTests {
 
     // MARK: Keeping them
 
-    @Test func legacyDomainsKeepTheirPreviousPrecedence() throws {
+    @Test func legacyDomainsMigrateInStoredSpaceAndSiteOrder() throws {
         var general = SpaceInfo(id: media, name: "General", color: .sky)
-        general.routedSites = ["example.com"]
+        general.routedSites = ["example.com", "another.test"]
         var specific = SpaceInfo(id: work, name: "Work", color: .sky)
         specific.routedSites = ["code.example.com"]
         let rules = SiteRoutes.migrated(from: [general, specific])
-        #expect(SiteRoutes.route(for: url("https://www.code.example.com"), in: rules)?.spaceID == work)
+        #expect(rules.map(\.site) == ["example.com", "another.test", "code.example.com"])
+        #expect(rules.map(\.spaceID) == [media, media, work])
+        #expect(rules.allSatisfy { $0.match == .domain && $0.isEnabled })
+        #expect(SiteRoutes.route(for: url("https://www.code.example.com"), in: rules)?.spaceID == media)
+        #expect(SiteRoutes.coverage(in: rules) == [.init(blocks: [2]), .init(), .init(blockedBy: 0)])
         #expect(SiteRoutes.route(for: url("https://example.com"), in: rules)?.spaceID == media)
         #expect(try JSONDecoder().decode([SiteRoutes.Route].self, from: JSONEncoder().encode(rules)) == rules)
     }

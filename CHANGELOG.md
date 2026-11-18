@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### New
-- Space rules can send different paths on the same site to different spaces. Edit or disable rules in place in Settings › Spaces, and drag spaces or rules to reorder them. The first match wins, and a warning shows when an earlier rule covers a later one.
+- Space rules can send different paths on the same site to different spaces. Edit or disable rules in place in Settings › Spaces, and drag spaces or rules to reorder them. The first enabled match wins. Both rows show a warning when an earlier rule covers a later one. On upgrade, existing sites become domain and subdomain rules in the order Zigzag reads them.
 
 ## [0.9.3] - 2026-11-18
 
