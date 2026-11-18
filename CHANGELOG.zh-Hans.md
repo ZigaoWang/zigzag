@@ -12,17 +12,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
-### 新功能
-- 可以为你选择的网站保留 Cookie。“清除 Cookie…”会让你在其他所有网站上退出登录，这些网站则不受影响；打开“设置 › 隐私”中的“退出 Zigzag 时清除 Cookie”后，每次退出都会清除其余网站的 Cookie。在网站设置中打开“保留 Cookie”，或在“设置 › 隐私”中添加网站；一个网站同时包括 http、https 和所有子域名。感谢 [mrfragger](https://github.com/mrfragger)。([#334](https://github.com/ZigaoWang/zigzag/issues/334))
-- 用到 Hyper 键（⌃⌥⇧⌘ 一起按）的快捷键，在“设置 › 快捷键”、命令栏和录制快捷键时只显示一个 ✦ 键帽，不再列出四个修饰键。在设置里搜“hyper”也能找到。感谢 [JonasNowak](https://github.com/JonasNowak)。([#352](https://github.com/ZigaoWang/zigzag/pull/352))
-
-### 修复
-- 在扩展弹窗里改的设置不会再自己变回去了。Strongbox 的“填充”开关每次点完显示的都是点之前的状态，重新打开又反过来，因为 WebKit 有时会在扩展上一次保存还没完成时就先读了存储。现在每个扩展的保存和读取都按它调用的顺序完成，和 Chrome 一样。感谢 [bkonia](https://github.com/bkonia)。([#350](https://github.com/ZigaoWang/zigzag/issues/350))
-- 按住分组的名字把整个标签页分组拖到固定标签页那里，现在会把整组固定成一个文件夹，和“固定分组”、⌘D 一样。之前分组那一行根本放不进去，松手后又回到标签页里。单独拖分组里的一个标签页，还是只固定那一个。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
-
 ## [0.9.3] - 2026-11-18
 
-来自其他 App 的链接会在 Zigzag Mini 中打开；网站可以有自己的图标；空间编辑器更清爽；更新卡片会显示进度；每个网站的设置都能单独修改；已固定的文件夹可以全部在标签页中打开；另外修复了通行密钥、Proton Pass、YouTube 上 ⌘ 点击、固定分组、GitHub 上的查找等问题。
+来自其他 App 的链接会在 Zigzag Mini 中打开；网站可以有自己的图标；空间编辑器更清爽；更新卡片会显示进度；每个网站的设置都能单独修改；已固定的文件夹可以全部在标签页中打开；清除 Cookie 时可以保留你选的网站；另外修复了通行密钥、Proton Pass、YouTube 上 ⌘ 点击、固定分组、GitHub 上的查找等问题。
 
 ### 新功能
 - 运行脚本的下载规则会在网页上显示进度：运行时显示“正在运行脚本”，结束后显示“脚本运行完成”或“脚本运行失败”，并附上脚本最后输出的一行，规则不会再悄悄运行。把链接交给 App、下载工具或默认浏览器的规则，成功后每次打开 Zigzag 会提示一次。感谢 [Lakeland97](https://github.com/Lakeland97)。([#307](https://github.com/ZigaoWang/zigzag/pull/307))
@@ -33,6 +25,8 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - Raindrop.io 等只在需要时才申请网站权限的扩展，在“网站访问权限”里选“在所有网站上”后就能正常使用。之前这个选项实际上没给它们任何网站的权限，它们访问自己服务器的请求都会被拦下，Raindrop 看起来像坏了或没登录。没选之前，菜单也不再显示它已选中。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
 - AI 应用可以用 `snapshot` 像读屏软件那样查看网页，并按引用操作找到的内容：每个链接、按钮、栏位和菜单都有一个像 `e12` 这样的简短引用，`click`、`type`、`scroll` 和 `press_key` 都可以用它，不必再去猜 CSS 选择器。引用只代表某个元素当时的样子，所以网页改动了它或重新载入后，应用会被告知重新查看，而不会点到别的东西。快照只包含网页上看得到的内容：网页对你隐藏的文字不会出现，按钮按它显示的文字命名（只显示一个符号时，比如 ×，则按它的标签命名），指向其他网站的链接和混用不同字母的词会被标出，网页的文字都放在引号里，不会被当成 Zigzag 自己的话。目标被别的东西挡住时（就像 Cookie 横幅挡住你一样），点按会被拒绝；`type` 和 `press_key` 也不会再使用已停用或键盘无法进入的栏位。现在任何工具都不会给出银行卡信息、一次性验证码之类的内容，规则和 Zigzag 不为休眠的标签页保存它们时一样；由你保存的资料填写的内容，在应用自己键入之前只会显示为“已填写”。([#214](https://github.com/ZigaoWang/zigzag/issues/214))
 - 右键点按已固定的文件夹，菜单里有“全部在标签页中打开”，会按顺序打开它和其中文件夹里的所有已固定标签页，并显示第一个。超过 10 个会先问你，⌘Z 可以再把它们关掉。里面还有文件夹时，菜单里还有“全部展开”和“全部折叠”，一次展开或折叠整个文件夹树。感谢 [mrfragger](https://github.com/mrfragger)。([#343](https://github.com/ZigaoWang/zigzag/issues/343))
+- 可以为你选择的网站保留 Cookie。“清除 Cookie…”会让你在其他所有网站上退出登录，这些网站则不受影响；打开“设置 › 隐私”中的“退出 Zigzag 时清除 Cookie”后，每次退出都会清除其余网站的 Cookie。在网站设置中打开“保留 Cookie”，或在“设置 › 隐私”中添加网站；一个网站同时包括 http、https 和所有子域名。感谢 [mrfragger](https://github.com/mrfragger)。([#334](https://github.com/ZigaoWang/zigzag/issues/334))
+- 用到 Hyper 键（⌃⌥⇧⌘ 一起按）的快捷键，在“设置 › 快捷键”、命令栏和录制快捷键时只显示一个 ✦ 键帽，不再列出四个修饰键。在设置里搜“hyper”也能找到。感谢 [JonasNowak](https://github.com/JonasNowak)。([#352](https://github.com/ZigaoWang/zigzag/pull/352))
 
 ### 修复
 - 固定一个分组时，整个分组会保持完整：固定成一个以分组名称命名的文件夹，里面的标签页按原顺序放好，而不是每个标签页各自固定。取消固定其中任何一个页面，整个分组都会回来。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
@@ -55,6 +49,8 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
 - 在空间之间轻扫时，窗口颜色会跟着手指从一个空间的颜色渐变到下一个，取消轻扫时会变回原来的颜色。以前要等手指松开，颜色才会变。
 - 登录页面在用户名栏提供通行密钥后（例如 GitHub），通行密钥仍然可以正常使用。以前重新载入这样的页面，或者再次请求通行密钥时，请求可能被拒绝，之后所有网站的通行密钥都会直接失败，没有任何提示，直到重新启动 Mac。如果你的通行密钥现在已经失效，更新后请重新启动一次 Mac。感谢 [vandenbulckjean](https://github.com/vandenbulckjean)。([#348](https://github.com/ZigaoWang/zigzag/issues/348))
+- 在扩展弹窗里改的设置不会再自己变回去了。Strongbox 的“填充”开关每次点完显示的都是点之前的状态，重新打开又反过来，因为 WebKit 有时会在扩展上一次保存还没完成时就先读了存储。现在每个扩展的保存和读取都按它调用的顺序完成，和 Chrome 一样。感谢 [bkonia](https://github.com/bkonia)。([#350](https://github.com/ZigaoWang/zigzag/issues/350))
+- 按住分组的名字把整个标签页分组拖到固定标签页那里，现在会把整组固定成一个文件夹，和“固定分组”、⌘D 一样。之前分组那一行根本放不进去，松手后又回到标签页里。单独拖分组里的一个标签页，还是只固定那一个。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 
 ## [0.9.2] - 2026-11-18
 
