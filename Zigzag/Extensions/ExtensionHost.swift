@@ -1583,7 +1583,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
-            replyHandler(nil, NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
+            replyHandler(nil, NativeMessagingHost.notFound)
             return
         }
         host.sendOnce(message, reply: replyHandler)
@@ -1625,7 +1625,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         guard mayUseNativeHosts(extensionContext),
               let host = NativeMessagingHost(name: port.applicationIdentifier, context: extensionContext, owner: self) else {
             companionAppMissing(for: extensionContext)
-            completionHandler(NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "No native host"]))
+            completionHandler(NativeMessagingHost.notFound)
             return
         }
         let key = ObjectIdentifier(port)
@@ -1814,6 +1814,10 @@ final class NativeMessagingHost {
         origin = host.origin
         extensionID = id
     }
+
+    /// Chrome's words for a host that isn't there. Extensions match them to tell "app not installed" from a failure
+    /// (Better Passwords then offers its setup instead of an error, #248).
+    static var notFound: NSError { NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "Specified native messaging host not found."]) }
 
     /// Chrome's rule for a host's name: lowercase words of letters, digits and underscores, joined by dots. Anything
     /// else (a slash, "..") could reach a file outside the hosts folder.
