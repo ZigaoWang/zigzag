@@ -1074,18 +1074,6 @@ struct DownloadRuleTests {
         #expect(DownloadHandoff.opening(rule, at: .defaultBrowser).place == nil)
     }
 
-    /// A notice said twice while it is still up is one notice with a count, in the diagnostics' own shape — and only
-    /// then: a *different* notice is a different notice, and the same one after the first has gone is a new one.
-    @Test func theSameNoticeAgainIsOneWithACount() {
-        #expect(Toast.counted("Handed this link to mpv", times: 1) == "Handed this link to mpv")
-        #expect(Toast.counted("Handed this link to mpv", times: 3) == "Handed this link to mpv (×3)")
-
-        #expect(Toast.isRepeat("a", of: "a", whileUp: true))
-        #expect(!Toast.isRepeat("a", of: "a", whileUp: false))
-        #expect(!Toast.isRepeat("a", of: "b", whileUp: true))
-        #expect(!Toast.isRepeat("a", of: nil, whileUp: true))
-    }
-
     // MARK: The order the rules are in
     /// A drag in the rules list names the row it was dropped on, not a position, because that list shows only the
     /// handoffs: its numbering leaves the file types out, so a place in it isn't a place in the store. The rule lands

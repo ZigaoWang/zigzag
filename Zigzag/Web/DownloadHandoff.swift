@@ -331,7 +331,7 @@ enum DownloadHandoff {
         guard let host = handoffHost(for: request),
               let line = HandoffNotice.takeLine(for: rule, elsewhere: elsewhere(of: rule.action, at: choice, values: values, secret: secret))
         else { return }
-        host.promptAutomation(line, symbol: rule.action.kind.symbol)
+        host.promptToast(line, symbol: rule.action.kind.symbol, duration: 4)
     }
 
     /// A rule that ran, but not: said over the page, and noted without the link, the cookies or the secret.
