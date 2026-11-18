@@ -7355,6 +7355,17 @@
         }
       }
     },
+    "Opens in" : {
+      "comment" : "Label of the choice of where a web address opens, in an Open URL download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开位置"
+          }
+        }
+      }
+    },
     "Search archive" : {
       "comment" : "Placeholder of the search field on the Archive page.",
       "localizations" : {
@@ -13225,17 +13236,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在上方打开"
-          }
-        }
-      }
-    },
-    "Open in" : {
-      "comment" : "Label of the choice of where a web address opens, in an Open URL download rule's sheet.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开位置"
           }
         }
       }
