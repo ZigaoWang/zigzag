@@ -220,6 +220,8 @@ enum CommandRanker {
         /// The page you're on has an address (a blank new tab doesn't).
         var hasPage = false
         var isPinned = false
+        /// Pinning or unpinning the page takes its whole group (#209) along.
+        var isGroup = false
         var isFavorite = false
         var inSplit = false
         /// Another tab, the last one you were on, can open beside this one.
@@ -244,10 +246,12 @@ enum CommandRanker {
         var list: [Action] = []
         if c.hasPage, !c.isPrivate, !c.isFavorite {
             list.append(c.isPinned
-                ? Action(id: "unpin", title: String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar."),
-                         keywords: ["unpin", "pin", "tab", "remove"], symbol: "pin.slash")
-                : Action(id: "pin", title: String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar."),
-                         keywords: ["pin", "tab", "keep", "bookmark"], symbol: "pin"))
+                ? Action(id: "unpin", title: c.isGroup ? String(localized: "Unpin Group", comment: "A command in the command bar, named as in the menu bar.")
+                         : String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar."),
+                         keywords: ["unpin", "pin", "tab", "group", "remove"], symbol: "pin.slash")
+                : Action(id: "pin", title: c.isGroup ? String(localized: "Pin Group", comment: "A command in the command bar, named as in the menu bar.")
+                         : String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar."),
+                         keywords: ["pin", "tab", "group", "keep", "bookmark"], symbol: "pin"))
         }
         if c.hasPage, !c.isFavorite, c.isPinned || !c.isPrivate {
             list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
@@ -361,6 +365,7 @@ enum CommandRanker {
         c.pageSizes = PageSizes.all
         c.isFavorite = tab.isFavorite
         c.isPinned = tab.bookmarkID != nil && !tab.isFavorite
+        c.isGroup = c.isPinned ? tab.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil : manager.pinsGroup(tab)
         c.inSplit = manager.split(for: tab) != nil
         c.canSplitWithRecent = splitPartner(for: tab, in: manager) != nil
         c.canMove = tab.bookmarkID == nil && tab.url != nil
