@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// What the History menu lists of the pages visited (#271): today's in the menu, each earlier day in a submenu.
+/// History menu (#271): today's pages in the menu, earlier days in submenus.
 struct HistoryMenuTests {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -18,7 +18,7 @@ struct HistoryMenuTests {
         HistoryEntry(url: URL(string: url)!, title: title, visitCount: 1, lastVisit: date(day, hour, minute))
     }
 
-    /// Monday, November 16, 2026, at 3 p.m.
+    /// Monday, November 16, 2026, 3 p.m.
     private var now: Date { date(16, 15) }
 
     @Test func todayAndEarlierDays() {
@@ -54,7 +54,7 @@ struct HistoryMenuTests {
         let grouped = HistoryMenuDays.group(pages, now: now, calendar: calendar, todayLimit: 15, dayLimit: 40)
         #expect(grouped.today.count == 15)
         #expect(grouped.today.first?.url.host == "site0.example")
-        // The rest of today, up to the day's cap, newest first after the ones in the menu.
+        // The rest of today, up to the cap, newest first after the menu's.
         #expect(grouped.earlierToday.count == 40)
         #expect(grouped.earlierToday.first?.url.host == "site15.example")
         #expect(grouped.earlier.first?.entries.count == 40)
@@ -64,7 +64,7 @@ struct HistoryMenuTests {
         let grouped = HistoryMenuDays.group([
             visit("https://week.example/", 9, 12),
             visit("https://older.example/", 8, 23),
-            // The clock was turned back: a visit “tomorrow” isn't listed.
+            // Clock set back: a "tomorrow" visit isn't listed.
             visit("https://later.example/", 17, 9),
         ], now: now, calendar: calendar, earlierDays: 7)
         #expect(grouped.today.isEmpty)

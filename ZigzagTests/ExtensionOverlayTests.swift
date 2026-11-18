@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// The loaded copy's manifest and background, for extensions whose shims or patches need one. Each test builds its
-/// own package in a temporary folder: nothing here reads or writes an installed extension.
+/// Overlay manifest and background for extensions with shims or patches. Each test builds its own temp package.
 @MainActor
 struct ExtensionOverlayTests {
     private static let prelude = "// Zigzag's prelude\n"
@@ -57,8 +56,7 @@ struct ExtensionOverlayTests {
         #expect(try Self.text("zigzag-prelude.js", in: fixture.overlay) == Self.prelude)
     }
 
-    /// Background scripts are read as UTF-8, as in Chrome and Firefox: their page says so, so a menu item titled "📋 Clip
-    /// ⌘⇧X" isn't shown as "ðŸ“‹ Clip âŒ˜â‡§X" (#277).
+    /// Background scripts are read as UTF-8 like Chrome and Firefox, so "📋 Clip ⌘⇧X" isn't mojibake (#277).
     @Test func backgroundScriptsAreReadAsUTF8() throws {
         let fixture = try Self.fixture(
             ["manifest_version": 3, "name": "Menu glyphs", "version": "1.0", "background": ["scripts": ["bg.js"], "type": "module"]],
@@ -69,9 +67,9 @@ struct ExtensionOverlayTests {
         let page = try Self.text(ExtensionStore.backgroundPageFile, in: fixture.overlay)
         #expect(page.hasPrefix("<!DOCTYPE html>\n<meta charset=\"utf-8\">"))
         #expect(page.contains(#"<script type="module" src="/bg.js"></script>"#))
-        // A path is only ever an attribute's value.
+        // Paths are only attribute values.
         #expect(ExtensionStore.backgroundPage(scripts: [#"a"><b.js"#], modules: false).contains(#"src="/a&quot;&gt;&lt;b.js""#))
-        // Scripts meant for a worker as well stay as they were.
+        // Scripts also used by a worker are unchanged.
         let worker = try Self.fixture(
             ["manifest_version": 3, "name": "Either", "version": "1.0", "background": ["scripts": ["bg.js"], "preferred_environment": ["service_worker"]]],
             files: ["bg.js": "x();"])
@@ -96,7 +94,7 @@ struct ExtensionOverlayTests {
         defer { try? FileManager.default.removeItem(at: fixture.work) }
 
         #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
-        // The key and its page are still the extension's own.
+        // The key and page are unchanged.
         #expect(try Self.background(in: fixture.overlay)["page"] as? String == "background.html")
         let page = try Self.text("background.html", in: fixture.overlay)
         let tag = #"<script src="/zigzag-prelude.js" data-zigzag-prelude="1"></script>"#
@@ -105,11 +103,11 @@ struct ExtensionOverlayTests {
         let comment = try #require(page.range(of: "<!--"))
         let first = try #require(page.range(of: "first.js"))
         let second = try #require(page.range(of: "second.js"))
-        // Before the first real script, and not inside the comment that names one.
+        // Before the first real script, outside the comment naming one.
         #expect(comment.upperBound < tagRange.lowerBound)
         #expect(tagRange.lowerBound < first.lowerBound)
         #expect(first.lowerBound < second.lowerBound)
-        // Nothing else about the page changed: CSP, addresses and script order are the extension's.
+        // CSP, URLs and script order are unchanged.
         #expect(page.replacingOccurrences(of: tag, with: "") == html)
     }
 
@@ -135,13 +133,13 @@ struct ExtensionOverlayTests {
             files: ["background.html": #"<html><head><script src="app.js"></script></head></html>"#])
         defer { try? FileManager.default.removeItem(at: fixture.work) }
 
-        // The overlay is made again from the package: a second pass must not add a second tag.
+        // Rebuilt from the package: no second tag.
         #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
         #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
         var page = try Self.text("background.html", in: fixture.overlay)
         #expect(page.components(separatedBy: "data-zigzag-prelude").count == 2)
 
-        // A page that already carries the marker is left as it is.
+        // A page already marked is left alone.
         let marked = #"<html><head><script src="/zigzag-prelude.js" data-zigzag-prelude="1"></script><script src="app.js"></script></head></html>"#
         let already = try Self.fixture(
             ["manifest_version": 2, "name": "Marked", "version": "1.0", "background": ["page": "background.html"]],
@@ -164,7 +162,7 @@ struct ExtensionOverlayTests {
         #expect(try Self.text("zigzag-entry.js", in: fixture.overlay) == "importScripts('zigzag-prelude.js', 'js/background.js');\n")
         #expect(try Self.text("zigzag-prelude.js", in: fixture.overlay) == Self.prelude)
 
-        // A module worker keeps its imports, the prelude first.
+        // A module worker keeps its imports, prelude first.
         let module = try Self.fixture(
             ["manifest_version": 3, "name": "Module worker", "version": "1.0",
              "background": ["service_worker": "background.js", "type": "module"]],
@@ -181,8 +179,7 @@ struct ExtensionOverlayTests {
             files: ["content.js": "content();"])
         defer { try? FileManager.default.removeItem(at: fixture.work) }
 
-        // No background to run a prelude, but the overlay is still made: its manifest is what patches and the language
-        // fill then build on.
+        // No background, but the overlay manifest is still written for patches and language fill.
         #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
         let manifest = try Self.manifest(in: fixture.overlay)
         #expect(manifest["background"] == nil)
@@ -192,8 +189,7 @@ struct ExtensionOverlayTests {
         #expect(FileManager.default.fileExists(atPath: fixture.overlay.appendingPathComponent(ConnectGuard.file).path))
     }
 
-    /// A background file is looked up inside the package only. A climb out, or an absolute address, finds nothing
-    /// rather than a file elsewhere on the Mac.
+    /// Background paths resolve inside the package only; `..` or absolute paths find nothing.
     @Test func backgroundsOutsideThePackageAreRefused() throws {
         let outside = try Self.fixture([:])
         defer { try? FileManager.default.removeItem(at: outside.work) }
@@ -213,8 +209,7 @@ struct ExtensionOverlayTests {
         }
     }
 
-    /// The marker records what the overlay was made from. An unpacked background page can be edited in place, so its
-    /// own bytes are part of it: the next load rebuilds the copy once.
+    /// The marker includes an unpacked background page's bytes, so editing it rebuilds the overlay once.
     @Test func editingAnUnpackedBackgroundPageRebuildsItsOverlay() throws {
         let fixture = try Self.fixture(
             ["manifest_version": 2, "name": "Edited page", "version": "1.0", "background": ["page": "background.html"]],
@@ -232,22 +227,21 @@ struct ExtensionOverlayTests {
         let edited = signature()
         #expect(edited != first)
 
-        // The rebuilt overlay is the edited page, still with one prelude before its first script.
+        // Rebuilt from the edited page, one prelude before its first script.
         #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
         let page = try Self.text("background.html", in: fixture.overlay)
         #expect(page.contains("edited.js"))
         #expect(page.components(separatedBy: "data-zigzag-prelude").count == 2)
     }
 
-    /// A service worker and a persistent MV2 page stay awake. An MV2 event page must be able to suspend, so it gets the
-    /// prelude but not the native keepalive port.
+    /// Workers and persistent MV2 pages stay awake; MV2 event pages get the prelude without the keepalive port so they can suspend.
     @Test func anMV2EventPageMaySuspendWhileAWorkerStaysAwake() {
         let awake = ExtensionShims.backgroundPrelude(keepsAlive: true)
         let eventPage = ExtensionShims.backgroundPrelude(keepsAlive: false)
         #expect(awake.contains(ExtensionShims.nativeKeepAlive))
         #expect(!eventPage.contains(ExtensionShims.nativeKeepAlive))
         #expect(!eventPage.contains(ExtensionShims.keepAliveHost))
-        // The rest of the prelude, the WebSocket stand-in included, still runs in the page.
+        // The rest of the prelude, including the WebSocket stand-in, still runs.
         #expect(eventPage.contains("class WebSocket"))
 
         #expect(ExtensionShims.keepsAlive(manifest: ["background": ["service_worker": "worker.js"]]))

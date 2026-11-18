@@ -122,8 +122,7 @@ struct PageErrorCountTests {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
     }
 
-    /// What a page says went wrong goes into Diagnostics only from the page itself, never a frame in it, cut short and
-    /// on one line, whatever the page sends.
+    /// Page error reports reach Diagnostics only from the main frame, truncated to one line.
     @Test func onlyThePageItselfIsHeardAndBriefly() async throws {
         #expect(PageErrors.script.isForMainFrameOnly)
         let long = String(repeating: "x", count: 5000)

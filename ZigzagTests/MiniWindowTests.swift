@@ -52,9 +52,7 @@ struct MiniWindowTests {
         #expect(!MiniWindowController.takes(URL(fileURLWithPath: "/tmp/page.html"), settingOn: true, needsOnboarding: false))
     }
 
-    /// Every way another app hands Zigzag a page, as AppDelegate takes it: an Apple Event link (`open location`, what
-    /// Python's webbrowser and most apps send), a URL handed over as a document (`open -a`, Finder), and Handoff,
-    /// which all end in `takes` (#246).
+    /// Every way another app hands over a page ends in `takes` (#246): Apple Event `open location` (Python webbrowser, most apps), document open (`open -a`, Finder), and Handoff.
     @Test func everyLinkFromAnotherAppGoesToZigzagMiniWhenOn() {
         func viaAppleEvent(_ string: String) -> Bool? {
             Scripting.webAddress(string).map { MiniWindowController.takes($0, settingOn: true, needsOnboarding: false) }
@@ -62,13 +60,13 @@ struct MiniWindowTests {
         func viaDocument(_ url: URL) -> Bool? {
             AppDelegate.opensAsDocument(url) ? MiniWindowController.takes(url, settingOn: true, needsOnboarding: false) : nil
         }
-        // A script's local plot server and an OAuth page from another app: Zigzag Mini.
+        // A script's local plot server or another app's OAuth page: Mini.
         #expect(viaAppleEvent("http://127.0.0.1:54123/") == true)
         #expect(viaAppleEvent("https://github.com/login/oauth/authorize?client_id=x") == true)
         #expect(viaDocument(URL(string: "https://accounts.google.com/o/oauth2/auth")!) == true)
-        // A file opened from Finder or `open page.html`: a tab, to keep.
+        // A file from Finder or `open page.html`: a tab.
         #expect(viaDocument(URL(fileURLWithPath: "/tmp/report.html")) == false)
-        // Never Zigzag's own pages, an extension's or a script's: nothing opens.
+        // Zigzag, extension and script URLs: nothing opens.
         #expect(viaAppleEvent("zigzag://settings") == nil)
         #expect(viaAppleEvent("javascript:alert(1)") == nil)
         #expect(viaDocument(URL(string: "zigzag://history")!) == nil)
@@ -80,7 +78,7 @@ struct MiniWindowTests {
         let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        // Never set: on, as in Little Arc.
+        // Unset: on, as in Little Arc.
         #expect(MiniWindowController.opensExternalLinks(in: defaults))
         // Turned off in Settings: stays off.
         defaults.set(false, forKey: "OpensExternalLinksInMini")
@@ -103,7 +101,7 @@ struct MiniWindowTests {
     @Test func opensAtTheSizeLastLeftAt() {
         #expect(MiniWindowController.size(remembered: nil) == Tokens.Metric.miniWindowSize)
         #expect(MiniWindowController.size(remembered: NSSize(width: 700.4, height: 820)) == NSSize(width: 700, height: 820))
-        // Never smaller than it can be made.
+        // Never below the minimum size.
         #expect(MiniWindowController.size(remembered: NSSize(width: 100, height: 820)) == Tokens.Metric.miniWindowSize)
         #expect(MiniWindowController.size(remembered: .zero) == Tokens.Metric.miniWindowSize)
     }
@@ -111,15 +109,15 @@ struct MiniWindowTests {
     // MARK: A page that opens an app (#246)
 
     @Test func closesOnceItsPageHandedOffToAnApp() {
-        // A sign-in page from another app sending you back to that app on its own: done.
+        // A sign-in page from another app that returns to that app: closes.
         #expect(MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: true, linkClick: false))
-        // A link that went straight to an app leaves nothing to show, wherever the window came from.
+        // A link that went straight to an app leaves nothing to show.
         #expect(MiniWindowController.closesAfterOpeningApp(hasPage: false, fromAnotherApp: false, isMainFrame: true, linkClick: true))
-        // A link you click (mailto:, an Open in App link) leaves the page you were reading.
+        // A clicked mailto: or Open in App link leaves the page open.
         #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: true, linkClick: true))
-        // A frame in the page opening an app isn't the page ending there.
+        // A subframe opening an app doesn't close it.
         #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: false, linkClick: false))
-        // One you opened yourself, for a quick look, stays.
+        // One opened by you stays.
         #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: false, isMainFrame: true, linkClick: false))
     }
 

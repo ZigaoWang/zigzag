@@ -173,7 +173,7 @@ struct WebStoreButtonTests {
 }
 
 extension WebStoreButtonTests {
-    /// In a private window the store hears nothing about your extensions and can't add one.
+    /// Private windows tell the store nothing and can't install.
     @Test func privateWindowsGetNoAnswer() {
         let page = URL(string: "https://chromewebstore.google.com/detail/abc")
         #expect(WebStoreButton.answers(scheme: "https", host: "chromewebstore.google.com", port: 0, isMainFrame: true, page: page, isPrivate: false))

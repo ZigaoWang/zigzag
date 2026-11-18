@@ -99,7 +99,7 @@ struct DeveloperBarToolsTests {
     }
 
     @Test func everyToolIsReachable() {
-        // A button's tools and what ⋯ holds are all the tools this Mac's WebKit has, each once.
+        // Bar tools plus ⋯ cover every WebKit tool, each once.
         let placed = DeveloperBarTools.parts.flatMap(\.tools) + DeveloperBarTools.moreTools
         #expect(Set(placed).count == placed.count)
         #expect(Set(placed) == Set(DeveloperTool.allCases.filter(\.isAvailable)))

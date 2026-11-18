@@ -137,7 +137,7 @@ import Testing
 
     // MARK: Groups of tabs pinned (#325)
 
-    /// A window with tabs `titles` in that order in the first space, for one test, the library put back after.
+    /// A window with tabs `titles` in the first space; the library is restored after.
     private func withTabs(_ titles: [String], _ body: (TabManager, [Tab], UUID) throws -> Void) rethrows {
         let space = Library.shared.spaces[0].id
         let before = Library.shared.snapshot
@@ -148,7 +148,7 @@ import Testing
         try body(manager, tabs, space)
     }
 
-    /// Pinning a tab of a group pins the group as one folder; unpinning brings the group back.
+    /// Pinning a tab in a group pins the whole group as one folder; unpinning restores the group.
     @Test func pinningAGroupOfTabsKeepsItWholeAsOneFolder() throws {
         try withTabs(["0", "1", "2", "3"]) { manager, tabs, space in
             let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
@@ -158,11 +158,11 @@ import Testing
             #expect(folder.name == "Reading")
             #expect(folder.groupID == groupID)
             #expect(folder.bookmarkIDs == tabs.compactMap(\.bookmarkID))
-            // One entry: every page is in the one folder, none a pinned split of its own.
+            // One entry: every page in the folder, none as its own pinned split.
             #expect(Library.shared.pinnedSplit(containing: page) == nil)
             #expect(Library.shared.bookmarks(in: space).filter { folder.bookmarkIDs.contains($0.id) }.map(\.id) == folder.bookmarkIDs)
             #expect(manager.tabs(in: space).isEmpty)
-            // Unpinning a page brings the group back whole.
+            // Unpinning a page restores the whole group.
             manager.unbookmark(folder.bookmarkIDs[2], toIndex: 0)
             #expect(Library.shared.folder(folder.id) == nil)
             #expect(manager.groups(in: space).map(\.id) == [groupID])
@@ -171,7 +171,7 @@ import Testing
         }
     }
 
-    /// A group of one tab is a group too: it pins as a folder of one page and comes back as a group.
+    /// A one-tab group pins as a one-page folder and comes back as a group.
     @Test func aGroupOfOneTabPinsAsAGroupToo() throws {
         try withTabs(["0"]) { manager, tabs, space in
             let groupID = try #require(manager.makeGroup(with: [tabs[0]], name: "Solo"))
@@ -185,7 +185,7 @@ import Testing
         }
     }
 
-    /// A split in a group pins as a pinned split in the group's folder, and comes back side by side.
+    /// A split in a group pins as a pinned split in the folder and comes back side by side.
     @Test func aSplitInAGroupStaysASplit() throws {
         try withTabs(["0", "1", "2"]) { manager, tabs, space in
             manager.makeSplit(tabs[1], with: tabs[2])
@@ -196,7 +196,7 @@ import Testing
             #expect(folder.bookmarkIDs.count == 3)
             let pinned = try #require(tabs[1].bookmarkID.flatMap(Library.shared.pinnedSplit(containing:)))
             #expect(Set(pinned.ids) == Set([tabs[1], tabs[2]].compactMap(\.bookmarkID)))
-            // Unpinning a page of the split brings back the whole group, the split side by side.
+            // Unpinning one split page restores the group with the split.
             manager.unbookmark(pinned.ids[0], toIndex: 0)
             #expect(Library.shared.folder(folder.id) == nil)
             #expect(Set(manager.tabs(inGroup: groupID).map(\.id)) == Set(tabs.map(\.id)))
@@ -204,7 +204,7 @@ import Testing
         }
     }
 
-    /// A folded group pins as a shut folder that hides its open pages, and comes back folded.
+    /// A collapsed group pins as a closed folder and comes back collapsed.
     @Test func aFoldedGroupPinsShut() throws {
         try withTabs(["0", "1"]) { manager, tabs, space in
             let groupID = try #require(manager.makeGroup(with: tabs, name: "Folded"))
@@ -218,7 +218,7 @@ import Testing
         }
     }
 
-    /// Dragging one tab of a group to the pinned pages pins just that tab; the group keeps the rest.
+    /// Dragging one tab of a group to pinned pins only that tab.
     @Test func aTabPinnedOutOfItsGroupLeavesTheRest() throws {
         try withTabs(["0", "1"]) { manager, tabs, space in
             let groupID = try #require(manager.makeGroup(with: tabs, name: "Two"))
@@ -229,7 +229,7 @@ import Testing
         }
     }
 
-    /// A tab in no group still pins on its own: one page, in no folder.
+    /// An ungrouped tab pins on its own, outside any folder.
     @Test func aTabOutsideAGroupStillPinsOnItsOwn() throws {
         try withTabs(["0"]) { manager, tabs, space in
             manager.bookmarkTab(tabs[0], in: space)
@@ -239,7 +239,7 @@ import Testing
         }
     }
 
-    /// A folder saved before groups could be pinned has no group, and keeps its pages: an older store still reads.
+    /// Folders saved before group pinning decode with no group and keep their pages.
     @Test func anOlderFolderReadsWithNoGroupAndItsPages() throws {
         let page = UUID()
         let json = #"{"id":"\#(UUID())","name":"Old","bookmarkIDs":["\#(page)"],"isOpen":true}"#

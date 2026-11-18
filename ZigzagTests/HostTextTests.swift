@@ -89,12 +89,11 @@ struct HostTextTests {
     }
 }
 
-/// An address shown in a line of text never reads as another site's: no user name ahead of the host, the start of a
-/// long host cut rather than its end, and escapes never decoded into a "/" or "@" of their own.
+/// Addresses in text can't impersonate another site: no userinfo, long hosts cut at the start, escapes not decoded into "/" or "@".
 @MainActor
 struct AddressTextTests {
     @Test func aLongHostKeepsItsEndEvenWithoutAKnownDomain() {
-        // A port, or an international label the list can't spell: still cut at the start.
+        // Ports and unlisted IDN labels are still cut at the start.
         #expect(AddressView.lineBreak(forName: "accounts.google.com.aaaaaaaaaaaaaaaa.xn--80ak6aa92e.example") == .byTruncatingHead)
         #expect(AddressView.lineBreak(forName: "accounts.google.com.aaaaaaaaaaaaaaaa.evil.example:8443") == .byTruncatingHead)
         #expect(AddressView.lineBreak(forName: "xn--80ak6aa92e.com") == .byTruncatingMiddle)
@@ -116,23 +115,22 @@ struct AddressTextTests {
         #expect(LinkStatusController.describe(link) == "evil.example")
         let path = try #require(URL(string: "https://evil.example/%2F%2Fgood.example%40x/caf%C3%A9?q=a%20b%E2%80%AEfdp.exe"))
         #expect(LinkStatusController.describe(path) == "evil.example/%2F%2Fgood.example%40x/café?q=a%20b%E2%80%AEfdp.exe")
-        // An international host shows as the address shows it, never decoded into lookalike letters.
+        // IDN hosts show as punycode, never decoded into lookalikes.
         let idn = try #require(URL(string: "https://xn--pple-43d.com/caf%C3%A9"))
         #expect(LinkStatusController.describe(idn) == "xn--pple-43d.com/café")
         #expect(AddressText.readable("%E2%80%8Bx%zz%") == "%E2%80%8Bx%zz%")
     }
 
-    /// A site's name in a sentence that wraps (the extension sheet's "Read and change what you see on …") never
-    /// breaks at its hyphens: "custom-" at the end of one line and "progress-bar.com" on the next read as two names.
+    /// Site names in wrapping text (the extension sheet) never break at hyphens.
     @Test func aWrappedLineKeepsASitesNameWhole() {
         let line = "Read and change what you see on custom-progress-bar.com and 5 other sites"
         let kept = AddressText.keepingHostsWhole(line)
         #expect(kept.replacingOccurrences(of: "\u{2060}", with: "") == line)
         #expect(kept.contains("custom-\u{2060}progress-\u{2060}bar.com"))
-        // Hyphens in plain words, and text with no name in it, are left as they are.
+        // Hyphens in plain words, and text with no host, are unchanged.
         #expect(AddressText.keepingHostsWhole("A built-in tool") == "A built-in tool")
         #expect(AddressText.keepingHostsWhole("x-y.example and a-b") == "x-\u{2060}y.example and a-b")
-        // Laid out at every width the sheet could give it, no line ends inside the name.
+        // At every width the sheet could use, no line breaks inside the name.
         let font = Tokens.Font.body()
         for width in stride(from: CGFloat(160), through: 420, by: 2) {
             let storage = NSTextStorage(string: kept, attributes: [.font: font])
@@ -154,8 +152,7 @@ struct AddressTextTests {
     }
 }
 
-/// The whole address where there's room (the bar above the page, a pop-up, Zigzag Mini): no scheme, no "www.", the
-/// host as WebKit loads it and never with a user name ahead of it, and the host never cut for the rest's sake.
+/// The full address where there's room (bar, popup, Mini): no scheme or "www.", the host as loaded, no userinfo, host never cut for the path.
 @MainActor
 struct FullAddressTests {
     private func parts(_ text: String) -> FullAddress.Parts? { URL(string: text).flatMap(FullAddress.parts(of:)) }
@@ -172,7 +169,7 @@ struct FullAddressTests {
     @Test func noSchemeNoWWWNoTrailingSlashOnAFrontPage() {
         #expect(parts("https://www.linux.do/") == .init(host: "linux.do", rest: ""))
         #expect(parts("http://www.example.com") == .init(host: "example.com", rest: ""))
-        // Only a leading "www." goes.
+        // Only a leading "www." is removed.
         #expect(parts("https://mail.www.example.com/")?.host == "mail.www.example.com")
         #expect(parts("https://www2.example.com/")?.host == "www2.example.com")
     }
@@ -186,7 +183,7 @@ struct FullAddressTests {
         #expect(parts("https://xn--bcher-kva.de/a") == .init(host: "xn--bcher-kva.de", rest: "/a"))
         #expect(parts("https://bücher.de/")?.host == "xn--bcher-kva.de")
         #expect(parts("https://xn--80ak6aa92e.com/")?.host == "xn--80ak6aa92e.com")
-        // The rest reads as text, but never with an escape decoded into a separator or an invisible mark.
+        // The path shows as text, but escapes never decode into separators or invisible marks.
         #expect(parts("https://例子.中国/路径")?.rest == "/路径")
         #expect(parts("https://example.com/a%2Fb%40c")?.rest == "/a%2Fb%40c")
         #expect(parts("https://example.com/%E2%80%AEtxt.exe")?.rest == "/%E2%80%AEtxt.exe")
@@ -218,7 +215,7 @@ struct FullAddressTests {
         #expect(full.rest.count == FullAddress.longestRest)
     }
 
-    /// Every character 10 wide.
+    /// Every character is 10 wide.
     private func shown(_ parts: FullAddress.Parts, _ room: CGFloat) -> FullAddress.Shown {
         FullAddress.shown(parts, room: room) { CGFloat($0.count) * 10 }
     }
@@ -227,14 +224,14 @@ struct FullAddressTests {
         let page = FullAddress.Parts(host: "linux.do", rest: "/t/topic/482293")
         // Whole: 23 characters.
         #expect(shown(page, 230) == .whole)
-        // The host, four of the rest and "…" (13): the rest is cut at its end.
+        // Host, four path characters and "…" (13): the path is cut at its end.
         #expect(shown(page, 130) == .whole)
-        // Less than that: the host alone.
+        // Less: host only.
         #expect(shown(page, 129) == .host)
         #expect(shown(page, 40) == .host)
-        // A front page is the host itself, cut the usual way when it must be.
+        // A front page is just the host, cut normally if needed.
         #expect(shown(FullAddress.Parts(host: "linux.do", rest: ""), 10) == .whole)
-        // A short rest that fits whole needs nothing more.
+        // A short path that fits needs nothing more.
         #expect(shown(FullAddress.Parts(host: "a.io", rest: "/x"), 60) == .whole)
     }
 
@@ -259,14 +256,14 @@ struct FullAddressTests {
     }
 
     @Test func theBarAboveThePageShowsTheSiteInItsPill() {
-        // #275: the site in the pill, as a split pane's, named as the sidebar's address names it; a new tab's prompt.
+        // #275: the pill names a split pane's site like the sidebar address; a new tab shows its prompt.
         let bar = TopBarView()
         bar.showPage(url: URL(string: "https://www.example.com/some/long/path?q=1"), notSecure: false)
         #expect(bar.pill.text == "example.com")
         #expect(!bar.pill.hasSiteControls)
         bar.showPage(url: nil, notSecure: false)
         #expect(bar.pill.text == String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab."))
-        // A page that isn't secure keeps its mark, and says so.
+        // An insecure page keeps its mark and label.
         bar.showPage(url: URL(string: "http://example.com"), notSecure: true)
         #expect(bar.pill.notSecure)
         #expect(bar.pill.accessibilityLabel()?.contains(SitePanel.notSecure) == true)

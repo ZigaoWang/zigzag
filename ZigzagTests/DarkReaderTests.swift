@@ -302,16 +302,14 @@ struct DarkReaderTests {
 
     @Test func onlyStyleAndPicturesOnTheWebAreFetched() async throws {
         #expect(await DarkPages.fetchable(URL(string: "https://8.8.8.8/a.css")))
-        // This Mac and its network in every spelling a resolver takes, and names that are its network's.
+        // Localhost and LAN addresses in every resolver spelling.
         for text in ["file:///etc/hosts", "http://localhost:8080/a.css", "http://localhost./a.css", "http://192.168.1.1/a.css", "http://10.0.0.2/a.css",
                      "http://127.1/a.css", "http://2130706433/a.css", "http://0x7f.0.0.1/a.css", "http://0177.0.0.1/a.css", "http://router.lan/a.css",
                      "http://router/a.css", "http://100.64.0.1/a.css", "http://[::1]/a.css", "http://169.254.169.254/latest"] {
             #expect(await !DarkPages.fetchable(URL(string: text)), "\(text)")
         }
         #expect(IconAddress.isPublicName("8.8.8.8"))
-        // A name nothing resolves on this Mac goes by its name, as an icon does, only behind a proxy (which looks
-        // names up itself); a local one never. Without one, it could be a site rebinding its name to this network.
-        // (Its lookup answered nothing, as it would with no DNS here: a proxy's fake-IP DNS answers every name.)
+        // Unresolvable names go by name only behind a proxy (it resolves itself); local names never, to block DNS rebinding.
         let nowhere = "zigzag-test-\(UUID().uuidString.lowercased()).invalid"
         let unresolved = try #require(URL(string: "https://\(nowhere)/a.css"))
         _ = await IconAddress.addresses(of: nowhere, resolver: { _ in [] })

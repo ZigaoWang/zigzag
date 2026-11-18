@@ -185,7 +185,7 @@ struct ProfileChoiceTests {
         #expect(ProfileKey.fillsPasswords.name(in: Profile.defaultID) == "PasswordsAutofill")
         #expect(ProfileKey.extensionsPinned.name(in: Profile.defaultID) == "ExtensionsPinned")
         #expect(ProfileKey.extensionsPinned.name(in: work) == "ExtensionsPinned.\(work.uuidString)")
-        // What a profile decides about its extensions is its own too, and goes with it.
+        // Extension site settings are per profile too.
         #expect(ProfileKey.extensionsOffSites.name(in: Profile.defaultID) == "ExtensionsOffSites")
         #expect(ProfileKey.extensionsOffSites.name(in: work) == "ExtensionsOffSites.\(work.uuidString)")
     }
@@ -234,33 +234,33 @@ struct ProfileChoiceTests {
             #expect(ProfileKey.offersToSavePasswords.choice(in: profile, defaults: defaults) == false)
             #expect(ProfileKey.fillsPasswords.choice(in: profile, defaults: defaults) == false)
         }
-        // Chosen again: what Zigzag did before stays what's put back, not the off it is now.
+        // Chosen again: restores Zigzag's previous state, not the current off.
         PasswordFiller.useICloud(in: work, saves: false, fills: false, defaults: defaults)
         PasswordFiller.useZigzag(in: work, defaults: defaults)
         #expect(PasswordFiller.chosen(in: work, defaults: defaults) == .zigzag)
         #expect(ProfileKey.offersToSavePasswords.choice(in: work, defaults: defaults) == true)
         #expect(ProfileKey.fillsPasswords.choice(in: work, defaults: defaults) == false)
-        // The other profile is still iCloud's.
+        // The other profile still uses iCloud.
         #expect(PasswordFiller.chosen(in: home, defaults: defaults) == .iCloud)
         PasswordFiller.useZigzag(in: home, defaults: defaults)
         #expect(ProfileKey.offersToSavePasswords.choice(in: home, defaults: defaults) == true)
         #expect(ProfileKey.fillsPasswords.choice(in: home, defaults: defaults) == true)
-        // Both off before: Zigzag, chosen, does both.
+        // Both off before: choosing Zigzag turns both on.
         let other = UUID()
         PasswordFiller.useICloud(in: other, saves: false, fills: false, defaults: defaults)
         PasswordFiller.useZigzag(in: other, defaults: defaults)
         #expect(ProfileKey.offersToSavePasswords.choice(in: other, defaults: defaults) == true)
         #expect(ProfileKey.fillsPasswords.choice(in: other, defaults: defaults) == true)
-        // A removed profile leaves the choice behind too.
+        // Removing a profile removes its choice.
         ProfileKey.forget(work, in: defaults)
         #expect(PasswordFiller.chosen(in: work, defaults: defaults) == nil)
     }
 
     @Test func theChoiceShowsWhoFillsUntilOneIsMade() {
-        // Nothing chosen: iCloud only when its extension is on and Zigzag stepped aside for it.
+        // Nothing chosen: iCloud only when its extension is on and Zigzag stepped aside.
         #expect(PasswordFiller.current(chosen: nil, iCloudOn: false, zigzagSaves: true, zigzagFills: true) == .zigzag)
         #expect(PasswordFiller.current(chosen: nil, iCloudOn: true, zigzagSaves: false, zigzagFills: false) == .iCloud)
-        // Passwords brought over from another browser are still filled by Zigzag.
+        // Passwords imported from another browser are still filled by Zigzag.
         #expect(PasswordFiller.current(chosen: nil, iCloudOn: true, zigzagSaves: false, zigzagFills: true) == .zigzag)
         #expect(PasswordFiller.current(chosen: .zigzag, iCloudOn: true, zigzagSaves: false, zigzagFills: false) == .zigzag)
         #expect(PasswordFiller.current(chosen: .iCloud, iCloudOn: false, zigzagSaves: false, zigzagFills: false) == .iCloud)
@@ -277,7 +277,7 @@ struct ProfileChoiceTests {
     @Test func addingICloudPasswordsByHandOffersItOnce() {
         #expect(PasswordFiller.offersSwitch(chosen: nil, zigzagHandles: true, offered: false))
         #expect(!PasswordFiller.offersSwitch(chosen: nil, zigzagHandles: true, offered: true))
-        // Zigzag already stepped aside, or you chose: nothing to ask.
+        // Zigzag already stepped aside, or a choice was made: nothing to ask.
         #expect(!PasswordFiller.offersSwitch(chosen: nil, zigzagHandles: false, offered: false))
         #expect(!PasswordFiller.offersSwitch(chosen: .zigzag, zigzagHandles: true, offered: false))
         #expect(!PasswordFiller.offersSwitch(chosen: .iCloud, zigzagHandles: true, offered: false))

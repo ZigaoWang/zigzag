@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// Groups of tabs (#209): a folder among the tabs, one unbroken run of the list, that keeps itself whole as tabs come
-/// and go, folds open and shut, comes back with the session, and is kept or closed by Clear as one.
+/// Tab groups (#209): a folder over one contiguous run of tabs that stays intact, collapses, restores with the session, and is cleared as one.
 struct TabGroupRulesTests {
     let a = UUID(), b = UUID(), c = UUID(), d = UUID(), e = UUID()
     let g = UUID(), h = UUID()
@@ -24,7 +23,7 @@ struct TabGroupRulesTests {
 
     @Test func aGroupInTwoRunsKeepsTheLongerOne() {
         let nodes = [node(a), node(b), node(c), node(d)]
-        // d is in g but far from it, past h's tab: it leaves g.
+        // d is in g but separated by h's tab: it leaves g.
         let settled = TabGroups.settled(nodes, groups: [a: g, b: g, c: h, d: g], riders: [:], known: [g, h])
         #expect(settled == [a: g, b: g, c: h])
     }
@@ -35,7 +34,7 @@ struct TabGroupRulesTests {
     }
 
     @Test func aSplitsOtherPageIsInItsRowsGroup() {
-        // b rides in a's row wherever it is in the list; c rides in a pinned page's row, in no group.
+        // b rides in a's row; c rides in a pinned page's row, in no group.
         let nodes = [node(b), node(a), node(d), node(c)]
         let riders: [UUID: UUID?] = [b: a, c: nil]
         let settled = TabGroups.settled(nodes, groups: [a: g, d: g, c: g], riders: riders, known: [g])
@@ -45,7 +44,7 @@ struct TabGroupRulesTests {
     @Test func aGroupMovesWholeAndNeverIntoAnother() {
         let nodes = [node(a), node(b), node(c), node(d, c), node(e)]
         let groups = [a: g, b: g]
-        // Asked to go between c and the tab nested under it: just after them.
+        // Moving between c and its child: placed after both.
         let moved = TabGroups.moving([a, b], to: 1, in: nodes, groups: groups)
         #expect(moved.map(\.id) == [c, d, a, b, e])
         // Into another group's tabs: after them.
@@ -60,11 +59,11 @@ struct TabGroupRulesTests {
         #expect(parents == [d: c])
         let units = TabManager.units([a, b, c, d], groups: [], parents: parents)
         #expect(units == [[a], [b], [c, d]])
-        // c was seen just now, d long ago: the group stays, both its tabs, and only b goes.
+        // c seen just now, d long ago: the group stays whole; only b goes.
         let minutes: [UUID: TimeInterval] = [a: 0, b: 400 * 60, c: 1 * 60, d: 500 * 60]
         let kept = TabManager.clearing([a, b, c, d], current: a, groups: [], parents: parents, busy: [], ages: minutes)
         #expect(kept.ids == [b])
-        // Both left alone: they go together.
+        // Both stale: they go together.
         let old: [UUID: TimeInterval] = [a: 0, b: 60, c: 400 * 60, d: 500 * 60]
         let gone = TabManager.clearing([a, b, c, d], current: a, groups: [], parents: parents, busy: [], ages: old)
         #expect(gone.ids == [c, d])
@@ -74,7 +73,7 @@ struct TabGroupRulesTests {
 @MainActor struct TabGroupsTests {
     private var space: UUID { Library.shared.spaces[0].id }
 
-    /// A window with tabs a, b, c, d, e in that order, closed when the test is done.
+    /// A window with tabs a–e, closed after the test.
     private func window(_ body: (TabManager, [Tab]) throws -> Void) rethrows {
         let manager = TabManager(spaceID: space)
         defer { manager.invalidate() }
@@ -103,10 +102,10 @@ struct TabGroupRulesTests {
             #expect(order(manager) == [t[0], t[1], t[4], t[2], t[3]].map(\.id))
             #expect(manager.tabs(inGroup: id).count == 3)
             manager.setGroup(of: t[0], to: nil)
-            // Out, just after the group's tabs.
+            // Out, just after the group.
             #expect(order(manager) == [t[1], t[4], t[0], t[2], t[3]].map(\.id))
             #expect(t[0].groupID == nil)
-            // Moved away from its group, a tab leaves it; moved within it, it stays.
+            // Moving out of the group leaves it; moving within stays.
             manager.move(t[1], to: 1)
             #expect(t[1].groupID == id)
             manager.move(t[4], to: 4)
@@ -124,7 +123,7 @@ struct TabGroupRulesTests {
             let opened = manager.newTab(url: nil, spaceID: space, select: false, opener: t[1])
             #expect(order(manager)[2] == opened.id)
             #expect(opened.groupID == id)
-            // Opened from a tab outside it, next to it, it isn't.
+            // Opened from an outside tab next to it: not in the group.
             let other = manager.newTab(url: nil, spaceID: space, select: false, opener: t[4])
             #expect(other.groupID == nil)
         }
@@ -149,7 +148,7 @@ struct TabGroupRulesTests {
             let closed = manager.close([t[1], t[2]])
             #expect(manager.group(id) == nil)
             #expect(manager.groups(in: space).isEmpty)
-            // Undo Close Tabs: each back where it was, the group with them, named and folded as it was.
+            // Undo Close Tabs restores each tab and the group with its name and collapse state.
             manager.together { for tab in closed.reversed() { manager.reopenClosedTab(tab, select: false) } }
             #expect(manager.group(id)?.name == "Trip")
             #expect(manager.group(id)?.isOpen == false)
@@ -165,7 +164,7 @@ struct TabGroupRulesTests {
             #expect(manager.group(id) == nil)
             #expect(order(manager) == t.map(\.id))
             #expect(t.allSatisfy { $0.groupID == nil })
-            // Gone for good: a tab of it brought back doesn't bring it back.
+            // Deleted: reopening one of its tabs doesn't restore it.
             manager.close(t[1])
             let back = manager.reopenClosedTab(select: false)
             #expect(back?.groupID == nil)
@@ -184,7 +183,7 @@ struct TabGroupRulesTests {
             // And again.
             manager.restore(after, undoing: before)
             #expect(manager.tabs(inGroup: id).map(\.id) == [t[3].id, t[4].id])
-            // A rename is a change to undo too.
+            // Renames are undoable.
             let named = manager.arrangement
             manager.renameGroup(id, to: "H")
             #expect(!named.isSame(as: manager.arrangement))
@@ -224,7 +223,7 @@ struct TabGroupRulesTests {
         let read = try JSONDecoder().decode(SessionState.self, from: data)
         #expect(read.windows[0].tabGroups == [group])
         #expect(read.windows[0].spaces[0].tabs[0].groupID == group.id)
-        // Read back into a window as restoring does: the groups first, then the tabs.
+        // Restored like at launch: groups first, then tabs.
         let manager = TabManager(spaceID: space)
         defer { manager.invalidate() }
         manager.restoreGroups(read.windows[0].tabGroups ?? [])
@@ -234,7 +233,7 @@ struct TabGroupRulesTests {
         manager.structureChanged()
         #expect(manager.group(group.id) == group)
         #expect(manager.tabs(inGroup: group.id).map(\.id) == [restored.id])
-        // A session from before groups has none.
+        // Pre-group sessions have none.
         let old = #"{"windows":[{"frame":[0,0,1,1],"sidebarVisible":true,"sidebarWidth":240,"currentSpaceID":"\#(space.uuidString)","spaces":[],"bookmarkTabs":[]}]}"#
         #expect(try JSONDecoder().decode(SessionState.self, from: Data(old.utf8)).windows[0].tabGroups == nil)
     }

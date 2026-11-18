@@ -157,12 +157,11 @@ struct PageIconTests {
     }
 }
 
-/// An icon for a whole site, set in Site Controls (#310): shown under a tab's own, kept per site with its subdomains,
-/// forgotten from Settings, and only for the window in a private one.
+/// Site-wide icon from Site Controls (#310): under a tab's own, per site with subdomains, removable in Settings, per window in private ones.
 @MainActor
 @Suite(.serialized)
 struct SiteIconTests {
-    /// A site no other test uses, so a test running beside these never sees its icon.
+    /// A unique site so parallel tests never see its icon.
     private let site = "site-icon-\(UUID().uuidString.prefix(8).lowercased()).test"
     private var url: URL { URL(string: "https://www.\(site)/page")! }
 
@@ -185,7 +184,7 @@ struct SiteIconTests {
         #expect(Tab.chosenIcon(own: "🐢", bookmarkID: nil, site: "🌐") { _ in nil } == "🐢")
         #expect(Tab.chosenIcon(own: nil, bookmarkID: nil, site: "🌐") { _ in nil } == "🌐")
         #expect(Tab.chosenIcon(own: nil, bookmarkID: nil, site: nil) { _ in nil } == nil)
-        // A pinned page's or favorite's own icon, then the site's.
+        // A pinned page's or favorite's icon first, then the site's.
         #expect(Tab.chosenIcon(own: "🐢", bookmarkID: id, site: "🌐") { _ in withIcon } == "⭐️")
         #expect(Tab.chosenIcon(own: "🐢", bookmarkID: id, site: "🌐") { _ in without } == "🌐")
         let favicon = NSImage(size: NSSize(width: 16, height: 16))
@@ -203,17 +202,17 @@ struct SiteIconTests {
             #expect(first.displayIcon === IconChoice.pageIcon("🦉"))
             #expect(second.displayIcon === IconChoice.pageIcon("🦉"))
             #expect(elsewhere.chosenIcon == nil)
-            // Made after it was set, a tab has it from the start.
+            // Tabs created later get it immediately.
             #expect(Tab(url: url, spaceID: UUID()).chosenIcon == "🦉")
-            // A tab's own icon still wins, and going back to none shows the site's again.
+            // A tab's own icon wins; clearing it shows the site's again.
             first.customIcon = "🐙"
             #expect(first.chosenIcon == "🐙")
             first.customIcon = nil
             #expect(first.chosenIcon == "🦉")
-            // A pinned page or favorite with no tab yet, and one with an icon of its own.
+            // A pinned page or favorite without a tab, and one with its own icon.
             #expect(Bookmark(url: url, title: "P").displayIcon === IconChoice.pageIcon("🦉"))
             #expect(Bookmark(url: url, title: "P", icon: "🎧").displayIcon === IconChoice.pageIcon("🎧"))
-            // History and the command bar, by address.
+            // History and the command bar, by URL.
             #expect(SiteIcons.shownIcon(for: url) === IconChoice.pageIcon("🦉"))
         }
     }
@@ -226,13 +225,13 @@ struct SiteIconTests {
             SiteIcons.set("star.fill", forSite: site)
             #expect(SiteIcons.all == [site: "star.fill"])
             #expect(SiteIcons.defaults.dictionary(forKey: "SiteIcons") as? [String: String] == [site: "star.fill"])
-            // A subdomain has the site's, until it has its own.
+            // Subdomains inherit the site's until they set their own.
             let mail = "mail.\(site)"
             #expect(SiteIcons.icon(forSite: mail) == "star.fill")
             SiteIcons.set("envelope.fill", forSite: mail)
             #expect(SiteIcons.icon(forSite: mail) == "envelope.fill")
             #expect(SiteIcons.icon(forSite: site) == "star.fill")
-            // Use Site Icon on the subdomain shows its own favicon again: what covered it goes too.
+            // Use Site Icon on the subdomain restores its favicon.
             SiteIcons.set(nil, forSite: mail)
             #expect(SiteIcons.icon(forSite: mail) == nil)
             #expect(SiteIcons.all.isEmpty)
@@ -257,20 +256,20 @@ struct SiteIconTests {
         try withDefaults {
             SiteIcons.set("🌳", forSite: site)
             let window = WKWebsiteDataStore.nonPersistent(), other = WKWebsiteDataStore.nonPersistent()
-            // It starts from what's kept.
+            // Starts from the kept icons.
             #expect(SiteIcons.icon(forSite: site, privateStore: window) == "🌳")
             SiteIcons.set("🎭", forSite: site, privateStore: window)
             SiteIcons.set("🎩", forSite: "other-\(site)", privateStore: window)
             #expect(SiteIcons.icon(forSite: site, privateStore: window) == "🎭")
-            // Nothing kept changes, and no other window sees it.
+            // Nothing persists and other windows don't see it.
             #expect(SiteIcons.all == [site: "🌳"])
             #expect(SiteIcons.icon(forSite: site, privateStore: other) == "🌳")
             #expect(SiteIcons.icon(forSite: "other-\(site)") == nil)
-            // Use Site Icon there takes it away for that window only.
+            // Use Site Icon there clears it for that window only.
             SiteIcons.set(nil, forSite: site, privateStore: window)
             #expect(SiteIcons.icon(forSite: site, privateStore: window) == nil)
             #expect(SiteIcons.icon(forSite: site) == "🌳")
-            // A private window's tabs show its own.
+            // Its tabs show its own.
             let tab = Tab(url: url, spaceID: UUID())
             tab.privateStore = other
             #expect(tab.chosenIcon == "🌳")

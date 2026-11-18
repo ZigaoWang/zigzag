@@ -52,7 +52,7 @@ struct HistoryClustersTests {
         #expect(shape(sessions) == [["github.com 2"], ["github.com 1"], ["github.com 1"], ["github.com 1"]])
         #expect(HistoryClusters.continues(visit("https://a.com", 30, 12, 40), with: visit("https://b.com", 30, 12, 0), calendar: calendar))
         #expect(!HistoryClusters.continues(visit("https://a.com", 30, 12, 41), with: visit("https://b.com", 30, 12, 0), calendar: calendar))
-        // Browsing straight on from the afternoon into the evening starts a new session, so its heading is right.
+        // Continuous browsing from afternoon into evening starts a new session, so the heading is right.
         #expect(!HistoryClusters.continues(visit("https://a.com", 30, 17, 5), with: visit("https://b.com", 30, 16, 55), calendar: calendar))
         #expect(HistoryClusters.continues(visit("https://a.com", 30, 16, 59), with: visit("https://b.com", 30, 16, 30), calendar: calendar))
     }
@@ -82,7 +82,7 @@ struct HistoryClustersTests {
         #expect(title(date(12, 1, month: 12, year: 2025)) == "Friday late night, December 12, 2025")
     }
 
-    /// Pages visited after midnight, looked at while it's still night, are tonight's; by morning they're last night's.
+    /// Visits after midnight are "tonight" until morning, then "last night".
     @Test func afterMidnightIsTonightUntilMorning() {
         let title = { (start: Date, now: Date) in HistoryClusters.title(startingAt: start, now: now, calendar: calendar) }
         #expect(title(date(31, 2, 54), date(31, 2, 57)) == "Tonight")
@@ -99,7 +99,7 @@ struct HistoryClustersTests {
         #expect(body.contains("session.title"))
         #expect(!body.contains("span("))
         #expect(!body.contains("timeOf("))
-        // One site's row already counts its pages: the heading counts them only over more than one row.
+        // A single site row counts its pages; the heading counts only with more than one row.
         #expect(body.contains("session.clusters.length > 1 ? pages(items.length) : ''"))
     }
 }

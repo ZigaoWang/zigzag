@@ -3,11 +3,10 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// A ⌘-click on a link the page's script follows itself, as YouTube's video links are, opens a new tab instead of
-/// moving the page (#317): the page never hears that click, and WebKit asks about the link with ⌘ held.
+/// ⌘-click on a script-routed link (YouTube) opens a new tab (#317): the page never sees the click.
 @MainActor
 struct CommandClickedLinksTests {
-    /// Loads the page, then cancels every link it's asked about, writing each one down with its keys.
+    /// Cancels every navigation, recording the URL and modifiers.
     private final class Links: NSObject, WKNavigationDelegate {
         var done: CheckedContinuation<Void, Never>?
         var clicked: [(url: String, flags: NSEvent.ModifierFlags)] = []
@@ -19,7 +18,7 @@ struct CommandClickedLinksTests {
         }
     }
 
-    /// Each element's click handler takes the click as YouTube's router does: it cancels it and moves the page.
+    /// Click handlers that cancel and route, like YouTube's router.
     private static let html = """
     <style>body { margin: 0 } a, button, div { display: block; width: 100%; height: 100px; margin: 0; padding: 0; border: 0 }</style>
     <a id="video" href="https://example.com/watch?v=1">video</a>
@@ -53,7 +52,7 @@ struct CommandClickedLinksTests {
         return (webView, window, links)
     }
 
-    /// A click `y` CSS pixels from the page's top, with `flags` held, as the window hands it to the page.
+    /// A click `y` CSS pixels from the top with `flags`.
     private func click(_ webView: WKWebView, y: Double, flags: NSEvent.ModifierFlags) async throws {
         guard let window = webView.window else { return }
         window.makeFirstResponder(webView)
@@ -89,7 +88,7 @@ struct CommandClickedLinksTests {
         withExtendedLifetime(window) {}
     }
 
-    /// A link in text being edited, a button and a script's link have nothing for WebKit to open: the page has them.
+    /// ⌘-clicks on editable text, buttons and script links stay with the page.
     @Test func otherCommandClicksAreThePages() async throws {
         let (webView, window, links) = await page()
         try await click(webView, y: 150, flags: .command)
