@@ -176,59 +176,26 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.captureButton.onClick = { [weak self] _ in
-            guard let self else { return }
-            var items: [MenuPanel.Entry] = []
-            // Every tab using either one, not just the one in front: the camera can be on in the background, and the
-            // button says whose it is. Choosing one brings that tab forward; stopping one leaves the other alone.
-            let using = tabManager.allTabs.filter { $0.isUsingCamera || $0.isUsingMicrophone }
-            // The other tabs first, by name, so it's clear whose camera or microphone this is. Choosing one brings it
-            // forward; the one in front has the toggles below.
-            for tab in using where tab !== tabManager.selectedTab {
-                let name = tab.displayTitle.isEmpty ? String(localized: "Another page", comment: "Stands for a page with no title in the camera button's menu.") : tab.displayTitle
-                if tab.isUsingCamera {
-                    items.append(.item(.init(title: String(localized: "\(name) is using the camera", comment: "Menu item of the address bar's camera button: the page using the camera, by name."), symbol: "video.fill") {
-                        self.tabManager.select(tab)
+            guard let self, let tab = self.tabManager.selectedTab, let origin = SiteOrigin.of(tab.url) else { return }
+            var items: [MenuPanel.Entry] = [
+                .item(.init(title: String(localized: "Stop Camera and Microphone", comment: "Menu item of the address bar's camera button: stops the page using the camera and microphone."), symbol: "stop.circle") { tab.stopCapture() }),
+            ]
+            // An answer to the question holds for this page only (Ask); Always Allow keeps it for the site, and
+            // Ask Every Time takes that back. A private window keeps nothing for a site.
+            // Only what the page is using now: an audio call never grants the camera for good, nor overrides a Block.
+            let inUse = [tab.isUsingCamera ? SitePermission.camera : nil, tab.isUsingMicrophone ? SitePermission.microphone : nil].compactMap { $0 }
+            if !tab.isPrivate, !inUse.isEmpty {
+                let allAllowed = inUse.allSatisfy { SitePermissions.choice($0, origin: origin) == .allow }
+                if allAllowed {
+                    items.append(.item(.init(title: String(localized: "Ask Every Time", comment: "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit."), symbol: "arrow.counterclockwise") {
+                        inUse.forEach { SitePermissions.setChoice(.ask, for: $0, origin: origin) }
                     }))
-                }
-                if tab.isUsingMicrophone {
-                    items.append(.item(.init(title: String(localized: "\(name) is using the microphone", comment: "Menu item of the address bar's camera button: the page using the microphone, by name."), symbol: "mic.fill") {
-                        self.tabManager.select(tab)
+                } else {
+                    items.append(.item(.init(title: String(localized: "Always Allow on This Site", comment: "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking."), symbol: "checkmark.circle") {
+                        inUse.forEach { SitePermissions.setChoice(.allow, for: $0, origin: origin) }
                     }))
                 }
             }
-            if let tab = tabManager.selectedTab {
-                // Two toggles, not one stop: each turns its own off and back on, and off only mutes it, so the page
-                // keeps its stream and turning it on again needs no reload (#315).
-                if tab.isUsingCamera {
-                    let live = tab.isCameraLive
-                    items.append(.item(.init(title: live ? String(localized: "Turn Camera Off", comment: "Menu item of the address bar's camera button: mutes this page's camera, keeping its stream so it can be turned back on without a reload.") : String(localized: "Turn Camera On", comment: "Menu item of the address bar's camera button: turns this page's camera back on after muting it, without a reload."),
-                                              symbol: live ? "video.slash" : "video.fill") { tab.setCamera(!live) }))
-                }
-                if tab.isUsingMicrophone {
-                    let live = tab.isMicrophoneLive
-                    items.append(.item(.init(title: live ? String(localized: "Turn Microphone Off", comment: "Menu item of the address bar's camera button: mutes this page's microphone, keeping its stream so it can be turned back on without a reload.") : String(localized: "Turn Microphone On", comment: "Menu item of the address bar's camera button: turns this page's microphone back on after muting it, without a reload."),
-                                              symbol: live ? "mic.slash" : "mic.fill") { tab.setMicrophone(!live) }))
-                }
-                // An answer to the question holds for this page only (Ask); Always Allow keeps it for the site, and
-                // Ask Every Time takes that back. A private window keeps nothing for a site.
-                // Only what the page is using now: an audio call never grants the camera for good, nor overrides a Block.
-                if let origin = SiteOrigin.of(tab.url), !tab.isPrivate {
-                    let inUse = [tab.isUsingCamera ? SitePermission.camera : nil, tab.isUsingMicrophone ? SitePermission.microphone : nil].compactMap { $0 }
-                    if !inUse.isEmpty {
-                        let allAllowed = inUse.allSatisfy { SitePermissions.choice($0, origin: origin) == .allow }
-                        if allAllowed {
-                            items.append(.item(.init(title: String(localized: "Ask Every Time", comment: "Menu item of the address bar's camera button: the site, allowed the camera and microphone for good, asks again on every visit."), symbol: "arrow.counterclockwise") {
-                                inUse.forEach { SitePermissions.setChoice(.ask, for: $0, origin: origin) }
-                            }))
-                        } else {
-                            items.append(.item(.init(title: String(localized: "Always Allow on This Site", comment: "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking."), symbol: "checkmark.circle") {
-                                inUse.forEach { SitePermissions.setChoice(.allow, for: $0, origin: origin) }
-                            }))
-                        }
-                    }
-                }
-            }
-            guard !items.isEmpty else { return }
             MenuPanel.show(items, from: self.sidebar.address.captureButton)
         }
         sidebar.onNowPlayingShow = { [weak self] tab in self?.tabManager.select(tab) }
@@ -240,8 +207,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         sidebar.updateCard.onHide = { Updater.shared.dismissCard() }
         sidebar.setUpdateCard(Updater.shared.cardState)
-        // A background tab's camera or microphone shows here too, so it's never on with nothing saying so.
-        tokens.append(Tab.captureChanged.observe { [weak self] in self?.refreshCapture() })
         tokens.append(Updater.changed.observe { [weak self] in
             guard let self else { return }
             // Closed in this window: it goes as a closed card does; in the others it fades.
@@ -658,28 +623,6 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.showEmptyPage(of: space, isPrivate: tabManager.isPrivate, animated: animated)
     }
 
-    /// The address bar's capture button: this page's camera or microphone, or the tab whose is on while this one
-    /// isn't. Nothing says "this page" when it's another's. What's on comes before what's merely muted, so a camera
-    /// running anywhere is always said, named if it's another tab's (#315).
-    private func refreshCapture() {
-        let current = tabManager.selectedTab
-        let live = tabManager.allTabs.filter { $0.isCameraLive || $0.isMicrophoneLive }
-        let held = tabManager.allTabs.filter { $0.isUsingCamera || $0.isUsingMicrophone }
-        if let current, current.isCameraLive || current.isMicrophoneLive {
-            sidebar.address.setCapture(camera: current.captureState(forCamera: true), microphone: current.captureState(forCamera: false))
-        } else if let using = live.first {
-            sidebar.address.setCapture(camera: using.captureState(forCamera: true), microphone: using.captureState(forCamera: false),
-                                       elsewhere: using.displayTitle)
-        } else if let current, current.isUsingCamera || current.isUsingMicrophone {
-            sidebar.address.setCapture(camera: current.captureState(forCamera: true), microphone: current.captureState(forCamera: false))
-        } else if let using = held.first {
-            sidebar.address.setCapture(camera: using.captureState(forCamera: true), microphone: using.captureState(forCamera: false),
-                                       elsewhere: using.displayTitle)
-        } else {
-            sidebar.address.setCapture(camera: .off, microphone: .off)
-        }
-    }
-
     private func showSelectedTab() {
         previews.hide()
         let tab = tabManager.selectedTab
@@ -719,7 +662,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.refreshRows()
         }
         reloadFavorites()
-        refreshCapture()
+        sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
         updateWindowTitle()
         refreshExtensionActions()
         updateNowPlaying()
@@ -1613,7 +1556,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .developer:
             showDeveloperBarTools()
         case .capture:
-            refreshCapture()
+            sidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
         case .reader:
             updateReaderButton()
         case .language:

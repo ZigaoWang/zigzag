@@ -381,28 +381,6 @@
         }
       }
     },
-    "%@ is using the camera" : {
-      "comment" : "Menu item of the address bar's camera button: the page using the camera, by name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 正在使用摄像头"
-          }
-        }
-      }
-    },
-    "%@ is using the microphone" : {
-      "comment" : "Menu item of the address bar's camera button: the page using the microphone, by name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 正在使用麦克风"
-          }
-        }
-      }
-    },
     "%@ is using this tab" : {
       "comment" : "On the bar over a tab an AI app is using through MCP. The placeholder is the app's name, as it gives it.",
       "localizations" : {
@@ -1855,17 +1833,6 @@
         }
       }
     },
-    ", " : {
-      "comment" : "Between the camera's and the microphone's states in the address bar's capture button tooltip.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "，"
-          }
-        }
-      }
-    },
     "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step." : {
       "comment" : "Steps in the note from the 1Password extension's button. Keep each step on its own line starting with its number and a period (1. 2. 3.); the line after the blank line is a note. Settings › Browser and Add Browser are names in 1Password.",
       "localizations" : {
@@ -3143,17 +3110,6 @@
         }
       }
     },
-    "Another page" : {
-      "comment" : "Stands for a page with no title in the camera button's menu.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "另一个页面"
-          }
-        }
-      }
-    },
     "Any address" : {
       "comment" : "How a download rule matches an address: the catch-all, for every address.",
       "localizations" : {
@@ -3869,28 +3825,6 @@
         }
       }
     },
-    "Camera off" : {
-      "comment" : "Part of the address bar's capture button tooltip: the page's camera is muted from it and can be turned back on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "摄像头已关闭"
-          }
-        }
-      }
-    },
-    "Camera on" : {
-      "comment" : "Part of the address bar's capture button tooltip: the page has the camera on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "摄像头已打开"
-          }
-        }
-      }
-    },
     "Clear %@" : {
       "comment" : "Tooltip of the × on a site's row in Settings › Privacy › Sites: forgets that one choice for the site.",
       "localizations" : {
@@ -3909,72 +3843,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跟随设置"
-          }
-        }
-      }
-    },
-    "Microphone off" : {
-      "comment" : "Part of the address bar's capture button tooltip: the page's microphone is muted from it and can be turned back on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "麦克风已关闭"
-          }
-        }
-      }
-    },
-    "Microphone on" : {
-      "comment" : "Part of the address bar's capture button tooltip: the page has the microphone on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "麦克风已打开"
-          }
-        }
-      }
-    },
-    "Turn Camera Off" : {
-      "comment" : "Menu item of the address bar's camera button: mutes this page's camera, keeping its stream so it can be turned back on without a reload.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭摄像头"
-          }
-        }
-      }
-    },
-    "Turn Camera On" : {
-      "comment" : "Menu item of the address bar's camera button: turns this page's camera back on after muting it, without a reload.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开摄像头"
-          }
-        }
-      }
-    },
-    "Turn Microphone Off" : {
-      "comment" : "Menu item of the address bar's camera button: mutes this page's microphone, keeping its stream so it can be turned back on without a reload.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭麦克风"
-          }
-        }
-      }
-    },
-    "Turn Microphone On" : {
-      "comment" : "Menu item of the address bar's camera button: turns this page's microphone back on after muting it, without a reload.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开麦克风"
           }
         }
       }

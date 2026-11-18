@@ -1193,34 +1193,13 @@ final class Tab: NSObject {
 
     // MARK: Camera and microphone
 
-    /// Sent whenever any tab's camera or microphone begins or ends, whichever tab is in front: the window's capture
-    /// button listens so a page using one in the background still shows.
-    static let captureChanged = Signal<Void>()
+    var isUsingCamera: Bool { webView?.cameraCaptureState == .active }
+    var isUsingMicrophone: Bool { webView?.microphoneCaptureState == .active }
 
-    /// Whether the page holds the camera, or the microphone: on, or muted from the address bar with its stream
-    /// kept, so turning it back on needs no reload. A call muted by either is still the call you can unmute.
-    var isUsingCamera: Bool { webView.map { $0.cameraCaptureState != .none } ?? false }
-    var isUsingMicrophone: Bool { webView.map { $0.microphoneCaptureState != .none } ?? false }
-
-    /// Whether it's on now rather than muted.
-    var isCameraLive: Bool { webView?.cameraCaptureState == .active }
-    var isMicrophoneLive: Bool { webView?.microphoneCaptureState == .active }
-
-    /// How the address bar should draw the camera or the microphone, on this page.
-    func captureState(forCamera camera: Bool) -> AddressView.CaptureState {
-        let state = camera ? webView?.cameraCaptureState : webView?.microphoneCaptureState
-        switch state {
-        case .active: return .live
-        case .muted: return .muted
-        default: return .off
-        }
+    func stopCapture() {
+        webView?.setCameraCaptureState(.none) { }
+        webView?.setMicrophoneCaptureState(.none) { }
     }
-
-    /// Turns the page's camera, or its microphone, off or back on from the address bar. Off mutes rather than ends:
-    /// the page keeps its stream, so turning it on again works at once, without asking again or reloading. The other
-    /// one is untouched.
-    func setCamera(_ on: Bool) { webView?.setCameraCaptureState(on ? .active : .muted) { } }
-    func setMicrophone(_ on: Bool) { webView?.setMicrophoneCaptureState(on ? .active : .muted) { } }
 
     // MARK: Snapshots
 
@@ -1437,10 +1416,10 @@ final class Tab: NSObject {
                 MainActor.assumeIsolated { self?.changed.send(.navigation) }
             },
             webView.observe(\.cameraCaptureState, options: [.new]) { [weak self] _, _ in
-                MainActor.assumeIsolated { self?.changed.send(.capture); Tab.captureChanged.send() }
+                MainActor.assumeIsolated { self?.changed.send(.capture) }
             },
             webView.observe(\.microphoneCaptureState, options: [.new]) { [weak self] _, _ in
-                MainActor.assumeIsolated { self?.changed.send(.capture); Tab.captureChanged.send() }
+                MainActor.assumeIsolated { self?.changed.send(.capture) }
             },
             webView.observe(\.themeColor, options: [.new]) { [weak self] wv, _ in
                 MainActor.assumeIsolated {

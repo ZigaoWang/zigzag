@@ -31,31 +31,12 @@ final class AddressView: InteractiveView {
     /// Shown on articles: opens Reader.
     let readerButton = AddressView.button("doc.plaintext", toolTip: String(localized: "Show Reader", comment: "Tooltip of the address bar's Reader button."))
 
-    /// What the page's camera or microphone is doing: not held at all, on, or muted from the button with its stream
-    /// kept, so it can be turned back on without a reload.
-    enum CaptureState { case off, live, muted }
-
-    func setCapture(camera: CaptureState, microphone: CaptureState, elsewhere: String? = nil) {
-        wantsCapture = camera != .off || microphone != .off
-        // A muted one still shows, so it can be turned back on here, but quietly: orange says something is on now.
-        let live = camera == .live || microphone == .live
-        captureButton.tint = live ? .systemOrange : Tokens.Color.textSecondary
-        // The symbol follows something on if anything is, so a muted camera doesn't hide a live microphone.
-        captureButton.symbol = camera == .live ? "video.fill" : microphone == .live ? "mic.fill"
-            : camera == .muted ? "video.slash" : "mic.slash"
-        // What each one is doing, so neither is taken for something it isn't: "Camera off, microphone on".
-        func said(_ state: CaptureState, _ on: String, _ off: String) -> String? {
-            state == .live ? on : state == .muted ? off : nil
-        }
-        let words = [said(camera, String(localized: "Camera on", comment: "Part of the address bar's capture button tooltip: the page has the camera on."),
-                                    String(localized: "Camera off", comment: "Part of the address bar's capture button tooltip: the page's camera is muted from it and can be turned back on.")),
-                     said(microphone, String(localized: "Microphone on", comment: "Part of the address bar's capture button tooltip: the page has the microphone on."),
-                                         String(localized: "Microphone off", comment: "Part of the address bar's capture button tooltip: the page's microphone is muted from it and can be turned back on."))]
-            .compactMap { $0 }
-        let what = words.joined(separator: String(localized: ", ", comment: "Between the camera's and the microphone's states in the address bar's capture button tooltip."))
-        // Another tab using it says whose, so the icon here isn't mistaken for this page's.
-        captureButton.toolTip = elsewhere.map { String(localized: "\($0): \(what)", comment: "Tooltip of the address bar's capture button while another tab uses the camera or microphone; the tab's name comes first, then what it's doing.") }
-            ?? what
+    func setCapture(camera: Bool, microphone: Bool) {
+        wantsCapture = camera || microphone
+        captureButton.symbol = camera ? "video.fill" : "mic.fill"
+        captureButton.tint = .systemOrange
+        captureButton.toolTip = camera && microphone ? String(localized: "Using your camera and microphone", comment: "Tooltip of the address bar's capture button: the page uses both.")
+            : camera ? String(localized: "Using your camera", comment: "Tooltip of the address bar's capture button: the page uses the camera.") : String(localized: "Using your microphone", comment: "Tooltip of the address bar's capture button: the page uses the microphone.")
         reflow(animated: true)
     }
 
