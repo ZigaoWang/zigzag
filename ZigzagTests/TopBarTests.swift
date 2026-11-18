@@ -184,8 +184,7 @@ struct TopBarTests {
     }
 
     @Test func theSiteIsInAPillOverThePagesMiddleWithTheButtonsAtTheEnd() throws {
-        // #275: the address's buttons at the trailing end, the pill as wide as its site, centered over the page, as
-        // a split pane's strip places its own.
+        // #275: address buttons trailing, pill sized to the site and centered over the page, like a split pane's strip.
         let frames = TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: inset,
                                        addressWidth: 54, pill: 120, pillCenter: 480)
         let pill = try #require(frames.pill)
@@ -195,11 +194,11 @@ struct TopBarTests {
         #expect(pill.minX > frames.buttons[2].maxX && pill.maxX < frames.address.minX)
         #expect(pill == PaneHeaderView.pillFrame(center: 480, room: frames.buttons[2].maxX + Tokens.Space.x2...frames.address.minX - Tokens.Space.x2,
                                                  fitting: 120, overCard: false, midY: Tokens.Sidebar.lightsCenter))
-        // On the page's card, a field's width, as a pane's over its card.
+        // On the card: field width, like a pane over its card.
         let onCard = TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: inset,
                                        addressWidth: 54, pill: 120, pillCenter: 480, onCard: true)
         #expect(onCard.pill?.width == PaneHeaderView.addressMaxWidth && onCard.pill?.midX == 480)
-        // Centered over a page whose middle is near the buttons, it's nudged clear of them rather than cut.
+        // Centered near the buttons: nudged clear instead of cut.
         let nudged = try #require(TopBarView.frames(width: 1000, buttons: 3, trafficLightsWidth: 0, trailingInset: inset,
                                                     addressWidth: 54, pill: 300, pillCenter: 900).pill)
         #expect(nudged.width == 300 && nudged.maxX == frames.address.minX - Tokens.Space.x2)
@@ -217,13 +216,13 @@ struct TopBarTests {
         let bar = root.topBar, address = sidebar.address
         #expect(address.buttonsOnly && address.frame.width == address.buttonsWidth)
         #expect(!bar.pill.isHidden && bar.pill.frame.width == bar.pill.fittingWidth)
-        // Over the page's middle.
+        // Centered over the page.
         #expect(abs(bar.frame.minX + bar.pill.frame.midX - root.cardFrame.midX) <= 0.5)
-        // Its Site Controls is the address's own, last, where the page's right edge is.
+        // Site Controls is the address's own button, last, at the page's right edge.
         #expect(address.siteControlsButton.superview === address && !address.siteControlsButton.isHidden)
         #expect(address.frame.maxX == bar.bounds.width - bar.trailingInset)
         #expect(address.siteControlsButton.frame.maxX == address.bounds.width)
-        // Back in the sidebar, the field again.
+        // Back in the sidebar: the field again.
         sidebar.holdsAddress = true
         #expect(!address.buttonsOnly)
         root.layoutSubtreeIfNeeded()

@@ -2,8 +2,7 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// Sites that always open in a space (#286): which site a page is, which listed site covers it, which ways of getting
-/// to a page are routed and which aren't, and what removing a space does to its sites.
+/// Sites that always open in a space (#286): site matching, coverage, which arrivals route, and removing a space.
 @MainActor
 struct SiteRoutesTests {
     private let media = UUID()
@@ -189,7 +188,7 @@ struct SiteRoutesTests {
         #expect(target("https://youtube.com/", .typed, place: .mini) == nil)
         #expect(target("https://youtube.com/", .linkClick, place: .peek) == nil)
         #expect(target("https://youtube.com/", .linkClick, place: .webApp) == nil)
-        // Open in Zigzag, from Zigzag Mini, is routed.
+        // Open in Zigzag from Mini is routed.
         #expect(target("https://youtube.com/", .fromMini, place: .mini) == media)
     }
 
@@ -197,7 +196,7 @@ struct SiteRoutesTests {
         #expect(target("https://github.com/login/oauth/authorize?client_id=1", .linkClick) == nil)
         #expect(target("https://github.com/x?redirect_uri=https%3A%2F%2Fexample.com", .linkNewTab) == nil)
         #expect(target("https://github.com/login", .linkClick) == nil)
-        // Typed, it's where you said.
+        // Typed: stays where you typed.
         #expect(target("https://github.com/login", .typed) == work)
         #expect(target("https://github.com/zigzag", .linkClick) == work)
     }

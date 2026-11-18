@@ -1,18 +1,12 @@
 import Foundation
 import WebKit
 
-/// WebKit's feature flags (#173), as Safari's Develop › Feature Flags lists them: the switches the Mac's own WebKit
-/// has for features that are new, being tried or for debugging, each with WebKit's name, a line about it and its
-/// default. They're in Settings › Developer while Developer Mode's main switch is on.
-///
-/// Only a flag someone changed is kept (its key and whether it's on); every other one stays WebKit's default, which can
-/// change with each macOS update. The changes are Zigzag's, for every profile, as Safari's are its own, and they're
-/// set on every page Zigzag makes (`WebKitSetup.configure`) while Developer Mode is on. Turning a flag back to its
-/// default, or Reset to Defaults, forgets it. A few start where Zigzag wants them, not WebKit (`ownDefaults`).
-///
-/// WebKit lists its flags only through unpublished API (`+[WKPreferences _features]`, `_WKFeature`,
-/// `-[WKPreferences _setEnabled:forFeature:]`), so every call is made only when WebKit still answers it, and with no
-/// list there's no group in Settings at all.
+/// WebKit's feature flags (#173), as Safari's Develop › Feature Flags, in Settings › Developer while Developer Mode is
+/// on. Only changed flags are stored (key and value); the rest follow WebKit's defaults, which can change with macOS.
+/// Stored app-wide for every profile and applied to every page while Developer Mode is on (`WebKitSetup.configure`).
+/// Resetting a flag forgets it. Some start at Zigzag's own value (`ownDefaults`). Uses private API (`+[WKPreferences
+/// _features]`, `_WKFeature`, `-[WKPreferences _setEnabled:forFeature:]`), each call guarded; without a list Settings
+/// shows no group.
 enum FeatureFlags {
     /// One of WebKit's flags.
     struct Flag: Equatable {
@@ -69,12 +63,9 @@ enum FeatureFlags {
 
     private static let key = "WebKitFeatureFlags"
 
-    /// Where Zigzag starts a flag otherwise than WebKit does, on every page, Developer Mode or not. Settings shows
-    /// these as the flag's default, so turning one back is a change that's kept.
-    ///
-    /// Prefer Page Rendering Updates near 60fps: off, as in Chrome. On, a page draws at most 60 times a second on a
-    /// 120 Hz display: its animations, a site's own smooth scrolling and anything that moves as you scroll step along
-    /// at half the screen's rate, which reads as stutter next to the system's own scrolling.
+    /// Flags Zigzag sets differently from WebKit on every page, Developer Mode or not; Settings shows them as the
+    /// default. PreferPageRenderingUpdatesNear60FPS: off, as in Chrome; on, pages draw at 60 fps on 120 Hz displays, so
+    /// animations and scrolling stutter next to native scrolling.
     static let ownDefaults: [String: Bool] = ["PreferPageRenderingUpdatesNear60FPSEnabled": false]
 
     /// The flags you can change, the ones WebKit keeps to itself left out; nil when there's no list to show.
@@ -82,7 +73,7 @@ enum FeatureFlags {
         engine.flags.map { $0.filter { $0.status != .embedder && !$0.name.isEmpty }.map(withOwnDefault) }
     }
 
-    /// A flag with Zigzag's own default, where it has one.
+    /// Applies Zigzag's default, if any.
     private static func withOwnDefault(_ flag: Flag) -> Flag {
         guard let own = ownDefaults[flag.key], own != flag.defaultValue else { return flag }
         return Flag(key: flag.key, name: flag.name, details: flag.details, status: flag.status, defaultValue: own)
@@ -129,7 +120,7 @@ enum FeatureFlags {
     /// What a new page is made with: every change, while Developer Mode is on. A flag this WebKit no longer has is
     /// kept and passed over.
     static func apply(to preferences: WKPreferences) {
-        // Zigzag's own defaults first, for the flags this WebKit has, so a change made in Settings comes after them.
+        // Zigzag's defaults first so Settings changes override them.
         let listed = Set((engine.flags ?? []).map(\.key))
         for (key, on) in ownDefaults.sorted(by: { $0.key < $1.key }) where listed.contains(key) { engine.set(on, key: key, in: preferences) }
         guard DeveloperTools.isOn else { return }
@@ -145,8 +136,8 @@ enum FeatureFlags {
         for webView in openWebViews { engine.set(on, key: key, in: webView.configuration.preferences) }
     }
 
-    /// Every open page, a sleeping tab's left alone: it wakes with what's set then. Each has preferences of its own
-    /// (`WebKitSetup.separatePreferences`), so each is set: browser windows' tabs, Mini and web app windows, pop-ups.
+    /// Every open web view except sleeping tabs, which pick up settings on wake. Each has its own preferences
+    /// (`WebKitSetup.separatePreferences`), so each is set: tabs, Mini, web apps, pop-ups.
     static var openWebViews: [WKWebView] {
         let tabs: [Tab] = WindowManager.shared.controllers.flatMap(\.tabManager.allTabs)
             + MiniWindowController.all.map(\.tab) + WebAppWindowController.all.map(\.tab)

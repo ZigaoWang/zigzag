@@ -1,8 +1,8 @@
 import Foundation
 
-/// Tabs that tidy themselves: an ordinary tab you haven't looked at in a while leaves the sidebar for the archive,
-/// where the command bar and the Archive page (zigzag://archive) still find it. Pinned pages, favorites, what's on screen, anything playing or in a call,
-/// and private windows are never archived. The archive keeps a month, newest first, and survives quitting.
+/// Tabs not looked at for a while move from the sidebar to the archive, still found by the command bar and
+/// zigzag://archive. Pinned, favorites, visible, playing, in a call and private tabs are never archived. Keeps a month,
+/// newest first, saved to disk.
 nonisolated struct ArchivedTab: Codable, Equatable, Identifiable {
     var id = UUID()
     let url: URL
@@ -58,7 +58,7 @@ final class TabArchive {
     private static let keep: TimeInterval = 30 * 24 * 3600
     private static let limit = 500
 
-    /// Where it's kept; nil keeps it in memory only (tests).
+    /// Nil keeps it in memory only (tests).
     private let file: URL?
 
     init(file: URL? = Paths.file("Archive.json"), entries: [ArchivedTab]? = nil) {
@@ -151,7 +151,7 @@ final class TabArchive {
     static func flush() { writer.sync {} }
 }
 
-/// The Archive page's days, newest first: Today, Yesterday, then each earlier day by its date.
+/// Archive page days, newest first: Today, Yesterday, then by date.
 nonisolated enum ArchiveDays {
     struct Day: Equatable {
         /// The day's first moment.
@@ -159,7 +159,7 @@ nonisolated enum ArchiveDays {
         let entries: [ArchivedTab]
     }
 
-    /// `entries` in any order; each day's newest first.
+    /// Groups entries by day, each day newest first.
     static func group(_ entries: [ArchivedTab], calendar: Calendar = .current) -> [Day] {
         var byDay: [Date: [ArchivedTab]] = [:]
         for entry in entries { byDay[calendar.startOfDay(for: entry.archivedAt), default: []].append(entry) }
@@ -168,7 +168,7 @@ nonisolated enum ArchiveDays {
         }
     }
 
-    /// “Today”, “Yesterday”, then the weekday and date (“Saturday, November 14”), with the year when it isn't this one.
+    /// “Today”, “Yesterday”, then weekday and date (“Saturday, November 14”), with the year if not this year.
     static func title(of day: Date, now: Date = Date(), calendar: Calendar = .current, locale: Locale = Words.dates) -> String {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: day), to: calendar.startOfDay(for: now)).day ?? 0
         if days <= 0 { return String(localized: "Today", comment: "Heading of the tabs archived today, on the Archive page.") }
@@ -182,7 +182,7 @@ nonisolated enum ArchiveDays {
         return formatter.string(from: day)
     }
 
-    /// Every word is in the title, the address or the name of the space it came from.
+    /// True when every word is in the title, address or space name.
     static func matches(_ entry: ArchivedTab, words: [String], space: String?) -> Bool {
         let haystack = [entry.title, entry.url.absoluteString, space ?? ""].joined(separator: " ").lowercased()
         return words.allSatisfy { haystack.contains($0) }
@@ -194,8 +194,8 @@ nonisolated enum ArchiveDays {
 }
 
 extension TabManager {
-    /// An archived tab back as a tab, in front, in the space it was archived from (the one you're in when that space
-    /// is gone, or in a private window), and out of the archive. Already open there: that tab.
+    /// Restores an archived tab in front, in its original space (or the current one if that's gone or private), and
+    /// removes it from the archive. Selects it if already open there.
     @discardableResult
     func restore(_ entry: ArchivedTab, from archive: TabArchive = .shared) -> Tab {
         archive.remove(url: entry.url)

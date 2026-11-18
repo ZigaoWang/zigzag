@@ -10,28 +10,24 @@ enum ExtensionPopups {
         shown.compactMap { key, place in key != opening && place == window ? key : nil }
     }
 
-    /// How far in from the window's edges a popup keeps.
+    /// Inset from the window's edges for popups.
     static let windowMargin = Tokens.Space.x2
 
-    /// Where a popup `width` wide points, in the same terms as `anchor` and `room`, so the whole popup stays inside
-    /// `room` (the window), `margin` in from its sides: the anchor's middle when it fits there; otherwise moved
-    /// toward the page as far as it has to, along `reach` (the anchor itself, or for a pinned button the address it
-    /// sits in) while that's enough. A popup wider than a sidebar's address, which is near the window's edge, points
-    /// just past the address's end rather than hang out of the window. One wider than the window goes in its middle.
+    /// X a popup `width` wide points at so it stays inside `room` minus `margin`: the anchor's middle if it fits, else
+    /// shifted toward the page along `reach` (the anchor, or the address for a pinned button). Past `reach` it points just
+    /// beyond its end; wider than the window, it's centered.
     static func pointingX(anchor: NSRect, reach: NSRect, width: CGFloat, room: NSRect, margin: CGFloat = windowMargin) -> CGFloat {
         let least = room.minX + margin + width / 2, most = room.maxX - margin - width / 2
         let wanted = least <= most ? min(max(anchor.midX, least), most) : room.midX
-        // The arrow keeps a little in from the reach's ends, where the corners round off.
+        // Keep the arrow off the rounded corners.
         let inset = min(reach.width / 2, Tokens.Space.x3)
         let along = min(max(wanted, reach.minX + inset), reach.maxX - inset)
         let fits = least > most || (along >= least - 0.5 && along <= most + 0.5)
         return fits ? along : wanted
     }
 
-    /// Where to show a popup `width` wide from, given its anchor (`rect` in `view`): `rect` itself when the popup
-    /// fits the window centered on it; otherwise a sliver at the point `pointingX` picks, on `view` while that's
-    /// within it, or on the window's content past its end (a popover keeps its arrow within the view it's shown
-    /// from). `reach` defaults to `rect`.
+    /// Rect to show a popup `width` wide from: `rect` when it fits centered, else a sliver at `pointingX`, on `view` or past
+    /// its end on the window's content (a popover's arrow must stay within its view). `reach` defaults to `rect`.
     @MainActor
     static func positioning(_ rect: NSRect, in view: NSView, reach: NSRect? = nil, width: CGFloat) -> (view: NSView, rect: NSRect) {
         guard width > 0, let content = view.window?.contentView else { return (view, rect) }
@@ -104,36 +100,31 @@ struct KeepAlivePorts<Port: AnyObject> {
     func port(for id: String) -> Port? { ports[id] }
 }
 
-/// Whether the 1Password app trusts Zigzag, as its helper's replies tell it. Trust belongs to the app, not a
-/// profile, so one record serves the whole session.
-///
-/// The helper turns a browser away with a `BrowserVerificationFailed` reply, but not only when you haven't added it:
-/// it also says so when the 1Password app is slow to check Zigzag's signature (starting up, waking, locked), and a
-/// one-off message can be turned away while the connection beside it works. So a turn-away only counts when nothing
-/// gets through for a few seconds after it: 1Password working, with Zigzag in its browser list, kept showing the
-/// note to add Zigzag. Only replies a trusted browser hears count as getting through; a type Zigzag doesn't know
-/// proves nothing either way.
+/// Whether 1Password trusts Zigzag, from its helper's replies. Per app, not per profile.
+/// `BrowserVerificationFailed` also comes while 1Password is slow to check the signature (launch, wake, locked), and a
+/// single message can fail while another connection works. So it only counts when nothing trusted arrives for a few
+/// seconds after; otherwise working setups kept showing the add-Zigzag note. Unknown reply types prove nothing.
 struct OnePasswordTrust {
     enum Reply: Equatable {
         /// Turned away: Zigzag may not be in 1Password's list of browsers.
         case turnedAway
-        /// Something only a trusted browser hears (the app's lock state, a new client, autofill).
+        /// Only a trusted browser gets these (lock state, new client, autofill).
         case connected
-        /// Said either way (the app quit, went offline, or couldn't be reached), or a reply Zigzag doesn't know.
+        /// Proves nothing: the app quit, went offline or couldn't be reached, or an unknown reply.
         case other
     }
 
-    /// The replies the helper sends only to a browser it trusts, as 1Password's helper has been seen to send them.
+    /// Reply types the helper sends only to trusted browsers, as observed.
     static let trustedTypes: Set<String> = ["Success", "ClientCreated", "LockStateChanged", "AutofillChangeEvent",
                                             "AutofillItemUpdated", "SecurityReviewEligibility"]
-    /// The replies said whether or not the app trusts Zigzag.
+    /// Reply types sent whether trusted or not.
     static let neutralTypes: Set<String> = ["Offline", "AppQuit", "BrowserHelperNotRegistered", "MainAppNotRunning", "MainAppOpenTimeout",
                                             "CannotOpenMainApp", "LostConnectionToApp", "Error", "Failure"]
 
-    /// How long a turn-away waits for another connection to get through before it's shown.
+    /// How long a rejection waits for another connection to succeed before it's shown.
     static let grace: TimeInterval = 5
 
-    /// The type a helper reply carries, inside its content's content.
+    /// The type in a helper reply's inner content.
     static func type(of message: Any) -> String? {
         let content = (message as? [String: Any])?["content"] as? [String: Any]
         return (content?["content"] as? [String: Any])?["type"] as? String
@@ -144,16 +135,16 @@ struct OnePasswordTrust {
         return trustedTypes.contains(type) ? .connected : .other
     }
 
-    /// A type neither trusted nor neutral, heard for the first time this session: worth a line in the log.
+    /// An unknown type, first seen this session; logged once.
     mutating func isNewUnknown(_ type: String) -> Bool {
         guard type != "BrowserVerificationFailed", !Self.trustedTypes.contains(type), !Self.neutralTypes.contains(type) else { return false }
         return unknownTypes.insert(String(type.prefix(64))).inserted
     }
     private var unknownTypes: Set<String> = []
 
-    /// Something trusted got through this session.
+    /// Something trusted arrived this session.
     private(set) var connected = false
-    /// When it was first turned away, with nothing through since.
+    /// First rejection with nothing trusted since.
     private(set) var turnedAwayAt: Date?
     private var told = false
 
@@ -163,22 +154,21 @@ struct OnePasswordTrust {
             connected = true
             turnedAwayAt = nil
         case .turnedAway:
-            // Never once something trusted got through this session: a working 1Password turns one-off messages
-            // away too (slow to check the signature on waking or unlocking), and the note to add Zigzag, shown then,
-            // was the false alarm people reported. Removing Zigzag from 1Password's list shows after a relaunch.
+            // Once trusted this session, ignore rejections: working 1Password also rejects single messages while checking the
+            // signature on wake or unlock, which caused false add-Zigzag notes. Removal shows after a relaunch.
             if !connected, turnedAwayAt == nil { turnedAwayAt = now }
         case .other:
             break
         }
     }
 
-    /// Whether Zigzag needs adding in 1Password: turned away at least `grace` ago, and nothing through since.
+    /// Needs adding: rejected at least `grace` ago, nothing trusted since.
     func needsAdding(at now: Date = Date()) -> Bool {
         guard !connected, let turnedAwayAt else { return false }
         return now.timeIntervalSince(turnedAwayAt) >= Self.grace
     }
 
-    /// Whether to say so now: only the first time it needs adding.
+    /// Only the first time.
     mutating func tell(at now: Date = Date()) -> Bool {
         guard needsAdding(at: now), !told else { return false }
         told = true
@@ -311,8 +301,8 @@ final class ExtensionHost: NSObject {
         openPopups.values.first { $0.extensionID == id && $0.popover.isShown }?.page
     }
 
-    /// The popup page itself while an extension is showing one: its live address, query and all, and what names its
-    /// context in `runtime.getContexts`. `shownPopupPage` is the path alone, for tab capture.
+    /// Live popup URL (with query) while shown; also its `runtime.getContexts` identity. `shownPopupPage` is the path only,
+    /// for tab capture.
     func shownPopup(for id: String) -> WKWebView? {
         openPopups.values.first { $0.extensionID == id && $0.popover.isShown }?.webView
     }
@@ -360,7 +350,7 @@ final class ExtensionHost: NSObject {
     func repositionPinPopups(of controller: BrowserWindowController) {
         for popup in openPopups.values where popup.fromPin && popup.window === controller.window && popup.popover.isShown {
             let anchor = controller.popupAnchor(forPin: popup.extensionID)
-            // Where it's asked to show from moves with the button, so a later resize of the popup keeps to it too.
+            // Track the button so later popup resizes stay anchored to it.
             let key = ObjectIdentifier(popup.popover)
             if anchor.view === controller.sidebar.address, popupPlaces[key]?.view === anchor.view {
                 popupPlaces[key]?.rect = anchor.rect
@@ -373,13 +363,11 @@ final class ExtensionHost: NSObject {
     private var actionClicks: [String: Date] = [:]
     func lastActionClick(_ id: String) -> Date { actionClicks[id] ?? .distantPast }
 
-    /// When each extension last sent a tab to an address (tabs.update). Downie's button sends the tab to its app's
-    /// link: the tab count stays the same, yet the click did something.
+    /// Last tabs.update per extension. Downie's button sends the tab to its app link, so the tab count doesn't change.
     private var tabLoads: [String: Date] = [:]
     func noteTabLoad(_ id: String) { tabLoads[id] = Date() }
 
-    /// Whether a click on an extension's button showed nothing at all, so its options page opens instead: no popup,
-    /// no side panel, no new tab, and no tab sent anywhere since the click.
+    /// Whether an action click did nothing (no popup, side panel, new tab or tabs.update), so the options page opens.
     static func clickShowedNothing(clickedAt: Date, popupShown: Bool, sidePanelShown: Bool, tabsBefore: Int, tabsNow: Int, tabLoadedAt: Date?) -> Bool {
         if popupShown || sidePanelShown || tabsNow != tabsBefore { return false }
         if let tabLoadedAt, tabLoadedAt >= clickedAt { return false }
@@ -423,7 +411,7 @@ final class ExtensionHost: NSObject {
 
     private func watchGestures() {
         gestureMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
-            // A key held down repeats on its own: only the press counts.
+            // Ignore key repeats.
             if let self, ExtensionUse.isGesture(event.type, isRepeat: event.type == .keyDown && event.isARepeat) {
                 if let id = self.extensionPage(under: event) {
                     self.use.touched(id)
@@ -451,16 +439,14 @@ final class ExtensionHost: NSObject {
         return view as? WKWebView
     }
 
-    /// The web page in one of this profile's tabs that the click or key landed in. Private tabs are left out: no
-    /// extension hears of them.
+    /// The page in this profile's tabs that got the click or key. Private tabs are excluded; extensions don't see them.
     private func webPage(under event: NSEvent) -> Tab? {
         guard let page = webView(under: event) as? BrowserWebView, page.configuration.websiteDataStore === profile.store,
               let tab = page.owner, !tab.isPrivate else { return nil }
         return tab
     }
 
-    /// A click or key in a web page counts for an extension when its content script there told its background
-    /// about it (`ExtensionUse.carriesPageGesture`).
+    /// A page click or key counts for an extension once its content script reported it (`ExtensionUse.carriesPageGesture`).
     func hasCarriedPageGesture(_ id: String, contentMessage: (hosts: [String], age: TimeInterval)?) -> Bool {
         guard let contentMessage else { return false }
         let now = Date()
@@ -598,8 +584,7 @@ final class ExtensionHost: NSObject {
             profile.installs.save(known, for: id)
             state = known
         }
-        // webRequestBlocking was granted from the manifest before it was recorded, along with webRequest: a record that
-        // has webRequest takes it quietly, once, rather than asking again for access the extension always had.
+        // Old records got webRequestBlocking with webRequest without recording it; add it once instead of asking again.
         if var known = state, let granted = known.grantedPermissions,
            let carried = Self.carryingBlocking(granted, declared: declared) {
             known.grantedPermissions = carried
@@ -623,8 +608,7 @@ final class ExtensionHost: NSObject {
         if !wanted.isEmpty { askForNewAccess(wanted, for: context) }
     }
 
-    /// A record that has webRequest and a manifest with webRequestBlocking: the record with it added, as it was always
-    /// granted alongside before it was recorded; nil when nothing changes.
+    /// Adds webRequestBlocking to a record with webRequest when the manifest asks for it; nil when unchanged.
     static func carryingBlocking(_ granted: [String], declared: Set<String>) -> [String]? {
         guard declared.contains("webRequestBlocking"), granted.contains("webRequest"), !granted.contains("webRequestBlocking") else { return nil }
         return (granted + ["webRequestBlocking"]).sorted()
@@ -645,9 +629,9 @@ final class ExtensionHost: NSObject {
 
     /// A record from before the bridge's permissions were kept: those its manifest asks for are added, as they were
     /// always given, and Zigzag's own two, recorded then whatever was asked, stay only as the manifest asks.
-    /// `declared` is the manifest the person approved: a store package's, kept in Zigzag's own folder. A folder's can
-    /// have changed since, so for one (`fromFolder`) nothing is added and what it asks for beyond the record is asked
-    /// about; Zigzag's own two that the record has stay while its manifest still asks for them.
+    /// `declared` is the approved manifest (a store package's copy in Zigzag's folder). A folder extension's may have
+    /// changed (`fromFolder`): nothing is added, extra permissions are asked about, and Zigzag's own two stay while the
+    /// manifest still asks for them.
     static func migratedGrants(_ granted: Set<String>, declared: Set<String>, fromFolder: Bool = false) -> Set<String> {
         let kept = granted.subtracting(zigzagGranted)
         if fromFolder { return kept.union(granted.intersection(zigzagGranted).intersection(declared)) }
@@ -718,7 +702,7 @@ final class ExtensionHost: NSObject {
                 for pattern in Self.patterns(for: site) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
             }
         }
-        for site in ExtensionStore.extensionsOffSites.union(profile.installs.offSites(id)) {
+        for site in ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)) {
             for pattern in Self.patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
     }
@@ -763,7 +747,7 @@ final class ExtensionHost: NSObject {
     private func announceExistingWindows(to context: WKWebExtensionContext) {
         for window in openWindows {
             controller.didOpenWindow(window)
-            // Windows sharing their tabs (#162) list the same ones: each is told of once, in the window it's in.
+            // Shared-tab windows (#162) list the same tabs; report each in the window it's in.
             for tab in window.tabManager.allTabs where tab.extensionHost === self && window.holds(tab) {
                 tab.toldTo = self
                 controller.didOpenTab(tab)
@@ -868,8 +852,7 @@ final class ExtensionHost: NSObject {
         weak var action: WKWebExtension.Action?
         let popover: NSPopover
         let page: String?
-        /// The popup's page while it shows: its live address, query and all, and the identity runtime.getContexts
-        /// names its context by. `page` stays the path, which is what tab capture keys on.
+        /// Live popup URL (with query) and its runtime.getContexts identity. `page` is the path, which tab capture keys on.
         let webView: WKWebView?
         /// The window it opened from; the popover's own view is in a window of its own.
         weak var window: NSWindow?
@@ -905,19 +888,18 @@ final class ExtensionHost: NSObject {
     let popupsChanged = Signal<Void>()
     /// Watches each open popup closing, to end what it started (endCapturesWhenClosed).
     private var popupCloseObservers: [ObjectIdentifier: [NSObjectProtocol]] = [:]
-    /// Each popup's size, watched: a popup's page sizes it after it shows, and a wider one moves to stay in the window.
+    /// Popup sizes, observed: the page sizes itself after showing, and a wider popup moves to stay in the window.
     private var popupSizeWatches: [ObjectIdentifier: NSKeyValueObservation] = [:]
 
-    /// Where `popover` shows from so it stays inside the window: `rect` on `view`, narrowed toward the page where
-    /// the popup is too wide to sit centered on it (a sidebar's address, near the window's edge). A pinned button's
-    /// popup may point anywhere along the address the button sits in.
+    /// Where `popover` shows from to stay inside the window: `rect` on `view`, shifted toward the page when too wide to
+    /// center (sidebar address near the edge). A pinned button's popup may point anywhere along its address.
     private func keptInWindow(_ popover: NSPopover, _ rect: NSRect, of view: NSView) -> (view: NSView, rect: NSRect) {
         let reach = view is AddressView ? view.bounds : rect
         return ExtensionPopups.positioning(rect, in: view, reach: reach.union(rect), width: popover.contentSize.width)
     }
 
-    /// Shows `popover` from `rect` on `view`, inside the window, and keeps it there as its page resizes it. Its size
-    /// is known once it's shown: it's moved then, before it's drawn.
+    /// Shows `popover` from `rect` on `view`, inside the window, and keeps it there on resize. Its size is known once
+    /// shown, so it's moved before it draws.
     private func show(_ popover: NSPopover, from rect: NSRect, of view: NSView) {
         popover.show(relativeTo: rect, of: view, preferredEdge: .maxY)
         let key = ObjectIdentifier(popover)
@@ -928,7 +910,7 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    /// Where a popup was asked to show from, and the view it's shown from now.
+    /// The requested anchor and the view it's shown from now.
     private struct PopupAnchor {
         weak var view: NSView?
         var rect: NSRect
@@ -943,7 +925,7 @@ final class ExtensionHost: NSObject {
         if place.view === anchor.shownOn {
             if place.rect != popover.positioningRect { popover.positioningRect = place.rect }
         } else {
-            // It needs the window's room past its anchor's end, or no longer does: shown again from there.
+            // Needs (or no longer needs) the room past the anchor's end: show again.
             popover.show(relativeTo: place.rect, of: place.view, preferredEdge: .maxY)
             popupPlaces[key]?.shownOn = place.view
         }
@@ -1024,8 +1006,7 @@ final class ExtensionHost: NSObject {
         let clickedAt = Date()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self else { return }
-            // Its side panel opening (Claude's, from its own click handler) is it doing something. So is sending the tab
-            // to an address: Downie sends it to its app's link, which opens Downie or asks first (#239).
+            // Opening a side panel counts as doing something, and so does tabs.update: Downie sends the tab to its app link (#239).
             let sidePanelShown = WindowManager.shared.controllers.contains { $0.root.showsSidePanel && $0.root.sidePanel.extensionID == item.id }
             let tabsNow = WindowManager.shared.openTabs.count
             guard Self.clickShowedNothing(clickedAt: clickedAt, popupShown: self.popupShownAt != nil, sidePanelShown: sidePanelShown,
@@ -1039,8 +1020,8 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    /// action.openPopup() from the extension's page in a frame on a site (FramedExtensionPopups): its popup, from its
-    /// button when pinned, else the address. Nil when it opens; otherwise Chrome-style words for the extension.
+    /// action.openPopup() from an extension page framed on a site (FramedExtensionPopups): from the pinned button or the
+    /// address. Nil on success, else a Chrome-style error.
     func openPopup(_ extensionID: String, from tab: Tab) -> String? {
         guard !tab.isPrivate, let context = context(for: extensionID), tab.isSeen(by: context),
               let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.tab(with: tab.id) === tab }),
@@ -1083,7 +1064,7 @@ final class ExtensionHost: NSObject {
         Self.onePasswordTrust.heard(reply)
         switch reply {
         case .connected:
-            // It trusts Zigzag: no note about adding it, in any profile, for the rest of the session.
+            // Trusted: no add-Zigzag note in any profile this session.
             guard !wasConnected else { return }
             for profile in Profiles.shared.all {
                 profile.startedExtensions?.setAttention(nil, for: id)
@@ -1093,7 +1074,7 @@ final class ExtensionHost: NSObject {
                 ExtensionLog.write("1Password turned one connection away after another got through; not asking to add Zigzag")
                 return
             }
-            // Given a moment: another connection getting through means this was the app being slow, not untrusting.
+            // Wait: a success on another connection means 1Password was just slow.
             DispatchQueue.main.asyncAfter(deadline: .now() + OnePasswordTrust.grace + 0.1) { [weak self] in
                 self?.askToAddIfStillTurnedAway(for: id)
             }
@@ -1102,14 +1083,14 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    /// Turned away, and nothing got through since: 1Password really doesn't trust Zigzag yet.
+    /// Rejected with nothing trusted since: Zigzag isn't trusted yet.
     private func askToAddIfStillTurnedAway(for id: String) {
         guard Self.onePasswordTrust.needsAdding() else { return }
         setAttention(Attention(
             title: String(localized: "Connect 1Password to Zigzag", comment: "Title of the note shown from the 1Password extension's button until the 1Password app trusts Zigzag."),
             message: String(localized: "1. In 1Password, open Settings › Browser.\n2. Click Add Browser and choose Zigzag.\n3. Come back and click 1Password again.\n\n1Password only works with browsers it trusts, so this is a one-time step.", comment: "Steps in the note from the 1Password extension's button. Keep each step on its own line starting with its number and a period (1. 2. 3.); the line after the blank line is a note. Settings › Browser and Add Browser are names in 1Password."),
             buttonTitle: String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), appBundleID: "com.1password.1password"), for: id)
-        // Said where you're looking, once a session, instead of leaving 1Password's spinner going.
+        // Shown once a session, instead of a 1Password spinner that never ends.
         if let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first,
            Self.onePasswordTrust.tell() {
             Toast.show(String(localized: "1Password doesn’t trust Zigzag yet. In 1Password, go to Settings › Browser › Add Browser and choose Zigzag.", comment: "Toast when the 1Password app turns Zigzag away. Settings › Browser › Add Browser are names in 1Password; match 1Password's own translation."),
@@ -1121,8 +1102,8 @@ final class ExtensionHost: NSObject {
         }
     }
 
-    /// An extension asked for its companion app, and that app isn't on this Mac. Noted only: as in Chrome, the extension
-    /// hears the host isn't there and says so itself. For many (Bitwarden, Better Passwords) the app is optional (#248).
+    /// A companion app isn't installed. Logged only: as in Chrome, the extension handles it. Often optional (Bitwarden,
+    /// Better Passwords, #248).
     fileprivate func companionAppMissing(for context: WKWebExtensionContext) {
         ExtensionLog.write("\(context.webExtension.displayName ?? context.uniqueIdentifier) asked for a companion app that isn't installed")
     }
@@ -1255,25 +1236,24 @@ struct ExtensionUse {
     /// How long after you use it an extension may start capturing the tab, without its popup or window open.
     static let captureWindow: TimeInterval = 15
 
-    /// How long a click or key in a web page counts for an extension whose content script there messaged its
-    /// background about it, as Chrome carries the page's activation over.
+    /// How long a page click or key carries over to an extension's background, like Chrome's transient activation.
     static let pageGestureWindow: TimeInterval = 1
 
     private(set) var invocations: [String: Invocation] = [:]
     private var gestures: [String: Date] = [:]
-    /// The last click or key in a web page, and the host of the page it landed in.
+    /// Last page click or key, and its page's host.
     private var lastPageGesture: (host: String?, at: Date)?
 
     mutating func pageGesture(on host: String?, at date: Date = Date()) { lastPageGesture = (host?.lowercased(), date) }
 
-    /// Whether a call made in answer to a content script's message (from a page at one of `messageHosts`, sent at
-    /// `messageAt`) carries a click or key you made in that page: one under `pageGestureWindow` ago, on the same
-    /// host, with the message sent after it. A page's script can't make the click, only send the message.
+    /// Whether a call answering a content script message (from `messageHosts`, sent at `messageAt`) carries a user gesture:
+    /// within `pageGestureWindow`, same host, message sent after it. Page scripts can send the message but can't make the
+    /// click.
     func carriesPageGesture(messageHosts: [String], messageAt: Date, now: Date = Date()) -> Bool {
         guard let gesture = lastPageGesture, let host = gesture.host, !host.isEmpty else { return false }
         let since = now.timeIntervalSince(gesture.at)
         guard since >= 0, since < Self.pageGestureWindow else { return false }
-        // The message answers the click: sent after it (a little slack for the two clocks), and not in the future.
+        // Message sent after the click (with clock slack) and not in the future.
         guard messageAt >= gesture.at.addingTimeInterval(-0.05), messageAt <= now.addingTimeInterval(0.05) else { return false }
         return messageHosts.contains { $0.lowercased() == host }
     }
@@ -1285,7 +1265,7 @@ struct ExtensionUse {
 
     mutating func touched(_ id: String, at date: Date = Date()) { gestures[id] = date }
 
-    /// A click, or a key pressed (not one repeating while held), as Chrome's transient activation counts them.
+    /// A click or non-repeat key press, as Chrome's transient activation counts them.
     static func isGesture(_ type: NSEvent.EventType, isRepeat: Bool) -> Bool {
         switch type {
         case .leftMouseDown, .rightMouseDown: true
@@ -1415,7 +1395,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // What Chrome grants quietly is granted; the rest only if you allow it, asked only in answer to something you
         // just did with the extension, as Chrome requires. Allowed is kept; not allowed holds until Zigzag quits.
         let (asked, quiet) = Self.sort(permissions)
-        // What the person allowed is recorded as theirs, Zigzag's own two (native messaging, scripting) included.
+        // Record what the user allowed as theirs, including Zigzag's own two (native messaging, scripting).
         let finish = { (granted: Set<WKWebExtension.Permission>, approved: Bool) in
             completionHandler(granted, nil)
             DispatchQueue.main.async { self.saveGrants(of: extensionContext, approving: approved ? Set(granted.map(\.rawValue)) : []) }
@@ -1500,6 +1480,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         if let popup = (action.associatedTab as? PopupTab)?.popup ?? PopupWindowController.key, popup.window?.isVisible == true {
             endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: popup.window, fromPin: false)
             popup.showExtensionPopover(popover)
+            popover.contentViewController?.view.window?.makeKey()
             popupsChanged.send()
             completionHandler(nil)
             return
@@ -1520,6 +1501,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         closeOtherPopups(than: popover, in: place.view.window)
         endCapturesWhenClosed(popover, action: action, extensionID: context.uniqueIdentifier, window: place.view.window, fromPin: fromPin)
         show(popover, from: place.rect, of: place.view)
+        // Key, as in Chrome: WebKit sends the pointer's moves only to a key window's page, so tooltips and hover need it (#277).
+        popover.contentViewController?.view.window?.makeKey()
         popupsChanged.send()
         completionHandler(nil)
     }
@@ -1535,13 +1518,28 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         openPopups[key] = OpenPopup(extensionID: extensionID, action: action, popover: popover, page: page, webView: view, window: window, fromPin: fromPin)
         let opening = bridge.tabCapture.currentOpening(extensionID)
         let place = PopupPlace(extensionID, window)
-        let closing = NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.popupClosedAt[place] = ProcessInfo.processInfo.systemUptime }
+        // Saved first responder: the field, not AppKit's field editor.
+        let responder = window?.firstResponder
+        let focused = ((responder as? NSText)?.isFieldEditor == true ? (responder as? NSText)?.delegate as? NSView : responder as? NSView)
+            .flatMap { $0.window === window ? $0 : nil }
+        let closing = NotificationCenter.default.addObserver(forName: NSPopover.willCloseNotification, object: popover, queue: .main) { [weak self, weak popover, weak window] _ in
+            MainActor.assumeIsolated {
+                self?.popupClosedAt[place] = ProcessInfo.processInfo.systemUptime
+                // Return key status to the opener unless you moved to another window.
+                let popupWindow = popover?.contentViewController?.view.window
+                if let window, window.isVisible, NSApp.keyWindow == nil || NSApp.keyWindow === popupWindow {
+                    window.makeKey()
+                }
+            }
         }
-        let closed = NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self, weak popover] _ in
+        let closed = NotificationCenter.default.addObserver(forName: NSPopover.didCloseNotification, object: popover, queue: .main) { [weak self, weak popover, weak window, weak focused] _ in
             MainActor.assumeIsolated {
                 // WebKit shows the same popover again for a new opening; a late notice for the last one is passed over.
                 guard popover?.isShown != true else { return }
+                // Restore the page or field focus unless something else in the window took it.
+                if let window, let focused, focused.window === window, (window.firstResponder as? NSView)?.window !== window {
+                    window.makeFirstResponder(focused)
+                }
                 self?.popupCloseObservers.removeValue(forKey: key)?.forEach(NotificationCenter.default.removeObserver)
                 self?.popupSizeWatches[key] = nil
                 self?.popupPlaces[key] = nil
@@ -1653,11 +1651,11 @@ extension Tab: WKWebExtensionTab {
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
-        // Counted among the tabs the window lists (`tabs(for:)`): those that are in it.
+        // Counted among `tabs(for:)`: the tabs in it.
         guard let window = windowController else { return 0 }
         return window.tabManager.extensionPlace(of: self, seenBy: Tab.seers(context)) { $0.isSeen(by: context) && window.holds($0) } ?? 0
     }
-    /// Whose extensions a context runs with: which tabs it sees depends only on that.
+    /// The profile a context's extensions run with; it decides which tabs it sees.
     static func seers(_ context: WKWebExtensionContext) -> ObjectIdentifier {
         context.webExtensionController.map(ObjectIdentifier.init) ?? ObjectIdentifier(context)
     }
@@ -1727,8 +1725,8 @@ extension Tab: WKWebExtensionTab {
 extension BrowserWindowController: WKWebExtensionWindow {
     // A private window is never listed, but should one be reached anyway, its tabs stay unseen.
     // An extension sees the tabs of its own profile: the window may be showing a space on another.
-    /// While windows share their tabs (#162), only those that are in this one: an extension hears of each tab in one
-    /// window, the one it's on screen in or last was.
+    /// With shared tabs (#162), only the ones in this window; an extension sees each tab in one window (where it's shown
+    /// or last was).
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {
         tabManager.isPrivate ? [] : tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && self.holds($0) }
     }
@@ -1812,8 +1810,7 @@ final class NativeMessagingHost {
         extensionID = id
     }
 
-    /// Chrome's words for a host that isn't there. Extensions match them to tell "app not installed" from a failure
-    /// (Better Passwords then offers its setup instead of an error, #248).
+    /// Chrome's error for a missing host. Extensions match it to tell "not installed" from a failure (Better Passwords, #248).
     static var notFound: NSError { NSError(domain: "Zigzag", code: 1, userInfo: [NSLocalizedDescriptionKey: "Specified native messaging host not found."]) }
 
     /// Chrome's rule for a host's name: lowercase words of letters, digits and underscores, joined by dots. Anything
@@ -2080,14 +2077,13 @@ enum ExtensionLog {
     nonisolated(unsafe) private static var last: (line: String, at: Date)?
     /// The file stays small: past this size it starts over.
     nonisolated private static let limit = 1_000_000
-    /// The longest one line may be. Lines carry what extensions name (their own names, hosts, errors), so one can't
-    /// fill the file, or start lines of its own that read as Zigzag's.
+    /// Max line length. Lines include extension-supplied text, so cap it to keep one from filling the log or faking lines.
     nonisolated static let lineLimit = 500
 
-    /// The line as written: on one line, control characters made spaces, and cut at `lineLimit`.
+    /// One line, control characters as spaces, cut at `lineLimit`.
     nonisolated static func entry(_ line: String) -> String {
         var scalars = String.UnicodeScalarView()
-        // Counted as they go: a String's scalar count is walked from the start each time it's asked.
+        // Count as we go: String's scalar count walks from the start each time.
         var count = 0
         for scalar in line.unicodeScalars {
             guard count < lineLimit else { return String(scalars) + "…" }

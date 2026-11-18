@@ -246,33 +246,33 @@ nonisolated enum TabTree {
     }
 }
 
-/// A group of tabs (#209): a folder in the Tabs part of the sidebar, as pinned pages have, that folds open or shut and
-/// has a name. Its tabs stay in the space's own list, one unbroken run of it, each tab saying which group it's in.
+/// A tab group (#209): a named, foldable folder in the sidebar's Tabs section. Its tabs stay in the space's list as one
+/// contiguous run, each with `groupID`.
 nonisolated struct TabGroup: Codable, Equatable, Identifiable, Sendable {
     var id = UUID()
     var name: String
     var isOpen = true
 }
 
-/// The rules that keep each group of tabs one unbroken run of the list, worked on ids so they can be checked on their
-/// own. A tab nested under another is in that one's group; a tab put down among a group's tabs joins it; the pages
-/// that ride in a split's row are in the group of the row they ride in; a group in two runs keeps the longer one.
+/// Rules keeping each group one contiguous run, on ids so they're testable. Nested tabs share their parent's group; a
+/// tab placed among a group's tabs joins it; split partners share their row's group; a group in two runs keeps the
+/// longer.
 nonisolated enum TabGroups {
-    /// Which group each tab is in, put right. `nodes`: the list in order. `groups`: the group each tab says it's in.
-    /// `riders`: the tabs drawn in another's row (a split's other pages), each with the tab whose row carries it (nil:
-    /// a pinned page's row, outside every group). `known`: the groups that exist. Tabs in no group are left out.
+    /// Normalized group per tab. `nodes`: list order. `groups`: each tab's claimed group. `riders`: tabs drawn in
+    /// another's row, with that row's tab (nil: a pinned page's row, never grouped). `known`: existing groups.
+    /// Ungrouped tabs omitted.
     static func settled(_ nodes: [TabTree.Node], groups: [UUID: UUID], riders: [UUID: UUID?], known: Set<UUID>) -> [UUID: UUID] {
         var result = groups.filter { known.contains($0.value) }
         let rows = nodes.filter { riders[$0.id] == nil }
-        // A nested tab is in its parent's group: the parent comes first in the list.
+        // Nested tabs take their parent's group (parents come first).
         for node in rows { if let parent = node.parent { result[node.id] = result[parent] } }
-        // The top-level tabs, each with what's nested under it: the units a group is made of.
+        // Top-level tabs with their nested tabs: the units groups are made of.
         var units: [[UUID]] = []
         for node in rows {
             if node.parent == nil || units.isEmpty { units.append([node.id]) } else { units[units.count - 1].append(node.id) }
         }
         var unitGroup = units.map { result[$0[0]] }
-        // A tab among a group's tabs, in no group of its own, joins it.
+        // An ungrouped tab among a group's tabs joins it.
         var first: [UUID: Int] = [:], last: [UUID: Int] = [:]
         for (i, group) in unitGroup.enumerated() {
             guard let group else { continue }
@@ -282,7 +282,7 @@ nonisolated enum TabGroups {
         for i in unitGroup.indices where unitGroup[i] == nil {
             unitGroup[i] = first.first { $0.value < i && (last[$0.key] ?? 0) > i }?.key
         }
-        // A group in more than one run keeps its longest (the first of equals); the rest leave it.
+        // A group in several runs keeps the longest (first on ties).
         var runs: [(group: UUID, range: Range<Int>)] = []
         for (i, group) in unitGroup.enumerated() {
             guard let group else { continue }
@@ -301,15 +301,15 @@ nonisolated enum TabGroups {
         return result
     }
 
-    /// The tabs of each group in list order, by group.
+    /// Each group's tabs in list order.
     static func members(_ nodes: [TabTree.Node], groups: [UUID: UUID]) -> [UUID: [UUID]] {
         var result: [UUID: [UUID]] = [:]
         for node in nodes { if let group = groups[node.id] { result[group, default: []].append(node.id) } }
         return result
     }
 
-    /// For Clear: each tab of a group counts as nested under the group's first tab, so the group is kept or closed as
-    /// one, as a tab with the tabs under it is. `parents`: the tab each nested tab is under.
+    /// For Clear: a group's tabs count as nested under its first tab, so the group is kept or closed whole. `parents`:
+    /// each nested tab's parent.
     static func clearParents(_ parents: [UUID: UUID], nodes: [TabTree.Node], groups: [UUID: UUID]) -> [UUID: UUID] {
         var result = parents
         for (_, ids) in members(nodes, groups: groups) {
@@ -318,8 +318,8 @@ nonisolated enum TabGroups {
         return result
     }
 
-    /// The list with a group's tabs (`ids`, in order) taken out and put back together at `index` in the list without
-    /// them, moved on past a run of nested tabs or another group's tabs it would break into (`groups`: each tab's).
+    /// The list with a group's tabs (`ids`) moved to `index` (counted without them), pushed past any nest or other
+    /// group it would split (`groups`: each tab's).
     static func moving(_ ids: [UUID], to index: Int, in nodes: [TabTree.Node], groups: [UUID: UUID]) -> [TabTree.Node] {
         let moving = Set(ids)
         let block = nodes.filter { moving.contains($0.id) }

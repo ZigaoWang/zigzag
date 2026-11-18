@@ -10,7 +10,7 @@ struct TileLayoutTests {
 
     // MARK: Places
 
-    /// A tab dropped on a split's row in the sidebar joins it: a quarter of the half on its side, then the last half.
+    /// A tab dropped on a split row joins it: a quarter of the half on its side, then the last half.
     @Test func aTabJoinsASplitFromTheSidebar() {
         #expect(TileShape.joining([.left, .right], onRight: true) == .place(region: .bottomRight, regions: [.left, .topRight]))
         #expect(TileShape.joining([.left, .right], onRight: false) == .place(region: .bottomLeft, regions: [.topLeft, .right]))
@@ -347,7 +347,7 @@ struct TileLayoutTests {
     }
 
     @MainActor @Test func theRowSplitsIntoAPartForEachPage() {
-        // Parts of one width, each meeting the next, the first at the row's start and the last at its end.
+        // Equal parts, contiguous, from row start to end.
         for count in 2...4 {
             let parts = TabRowView.splitParts(count: count, end: 220)
             #expect(parts.count == count && parts[0].start == 0 && parts[count - 1].end == 220)
@@ -356,7 +356,7 @@ struct TileLayoutTests {
             #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 1)
         }
         #expect(TabRowView.splitParts(count: 1, end: 220).count == 1)
-        // Titles while a part has room for a few letters: a usual sidebar's thirds and quarters, not much narrower.
+        // Titles show while a part fits a few letters: thirds and quarters of a usual sidebar.
         #expect(TabRowView.segmentShowsTitle(width: 228 / 3, size: .medium))
         #expect(TabRowView.segmentShowsTitle(width: 228 / 4, size: .medium))
         #expect(!TabRowView.segmentShowsTitle(width: 200 / 4, size: .medium))

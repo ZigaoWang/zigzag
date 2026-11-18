@@ -172,9 +172,8 @@ nonisolated enum ContextType: String {
     case developerTools = "DEVELOPER_TOOLS"
 }
 
-/// One of an extension's contexts, as `runtime.getContexts` describes it. Only what Zigzag can name truthfully is set:
-/// WebKit gives no Chrome tab or document identity, so `tabID` is -1 except for a side panel opened for a tab, and
-/// `documentID` stays empty rather than being made up.
+/// An extension context for `runtime.getContexts`. WebKit has no Chrome tab or document IDs, so `tabID` is -1 except
+/// for a tab's side panel, and `documentID` stays empty rather than invented.
 nonisolated struct Context {
     var type: ContextType
     var contextID: String
@@ -185,14 +184,13 @@ nonisolated struct Context {
     var frameID = 0
     var incognito = false
 
-    /// The document's origin as Chrome reports it: the extension's actual scheme (`webkit-extension://` until the
-    /// scheme is decided), never a translated one.
+    /// Origin with the real scheme (`webkit-extension://` for now), never translated.
     var documentOrigin: String? {
         guard let documentURL, let scheme = documentURL.scheme, let host = documentURL.host() else { return nil }
         return "\(scheme)://\(host)"
     }
 
-    /// Chrome's ExtensionContext, with the fields Zigzag has no truthful value for left out.
+    /// Chrome's ExtensionContext, minus fields Zigzag can't fill truthfully.
     var dictionary: [String: Any] {
         var answer: [String: Any] = ["contextType": type.rawValue, "contextId": contextID, "tabId": tabID,
                                      "windowId": windowID, "frameId": frameID, "incognito": incognito]
@@ -203,8 +201,8 @@ nonisolated struct Context {
     }
 }
 
-/// The fields of Chrome's `ContextFilter`: every field given narrows the answer at once, and within one list any value
-/// matches. An explicit empty list matches nothing, and a document field leaves out a context with no document.
+/// Chrome's `ContextFilter`: fields combine with AND, list values with OR. An empty list matches nothing; a document
+/// field excludes contexts without a document.
 nonisolated struct ContextFilter {
     private let contextIDs: [String]?
     private let documentIDs: [String]?
@@ -242,18 +240,17 @@ nonisolated struct ContextFilter {
     }
 }
 
-/// Chrome's `contextId`: opaque, and the same for as long as a context lives. One that closes is forgotten, so one
-/// that opens again is a new context with a new name. Names are kept per extension: a call from one extension must not
-/// forget another extension's live contexts, and two extensions may hold a page with the same object identity.
+/// Chrome's `contextId`: opaque and stable for a context's lifetime; a reopened context gets a new one. Kept per
+/// extension so one extension's call can't drop another's, and two extensions can hold the same page object.
 nonisolated final class ContextNames {
     private var names: [String: [String: String]] = [:]
 
-    /// The name of a context held by this extension: its background, its offscreen page, its side panel, its popup.
+    /// The ID of this extension's context (background, offscreen, side panel, popup).
     func name(of object: AnyObject, extensionID: String) -> String {
         name("object:\(ObjectIdentifier(object))", extensionID: extensionID)
     }
 
-    /// Forgets every context of this extension that has closed, and no other extension's.
+    /// Drops this extension's closed contexts only.
     func keeping(_ live: Set<String>, extensionID: String) {
         names[extensionID] = (names[extensionID] ?? [:]).filter { live.contains($0.value) }
     }
@@ -296,7 +293,7 @@ final class BridgeContexts: BridgeNamespace {
         if let popup = host.shownPopup(for: extensionID) {
             contexts.append(Self.popup(popup, contextID: names.name(of: popup, extensionID: extensionID)))
         }
-        // A private window has no extension controller, and its side panel is never one to report.
+        // Private windows have no extension controller; their side panels aren't reported.
         for controller in WindowManager.shared.controllers
         where !controller.tabManager.isPrivate && controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
             let panel = controller.root.sidePanel
@@ -307,13 +304,13 @@ final class BridgeContexts: BridgeNamespace {
         return Self.matching(contexts, filter: args.object(0)).map(\.dictionary)
     }
 
-    /// Chrome's POPUP context for a showing popup: the page's live address, query and all, and no tab of its own.
+    /// POPUP context for a shown popup: live URL with query, no tab.
     static func popup(_ view: WKWebView, contextID: String) -> Context {
         Context(type: .popup, contextID: contextID, documentURL: view.url)
     }
 
-    /// Chrome's context for an extension's background, when its manifest declares one: an MV3 service worker, which
-    /// has no document; or an MV2 background page, declared or the one Chrome generates from its scripts.
+    /// Background context when declared: an MV3 service worker (no document) or an MV2 background page, declared or
+    /// generated from scripts.
     nonisolated static func background(manifest: [String: Any], baseURL: URL, contextID: String) -> Context? {
         guard let background = manifest["background"] as? [String: Any] else { return nil }
         let version = (manifest["manifest_version"] as? NSNumber)?.intValue ?? 2
@@ -328,8 +325,7 @@ final class BridgeContexts: BridgeNamespace {
                        documentURL: URL(string: page ?? "_generated_background_page.html", relativeTo: baseURL)?.absoluteURL)
     }
 
-    /// The contexts a filter keeps, in Chrome's way: every field given narrows the answer, any value in one of its
-    /// lists matches, and a list with nothing in it matches nothing.
+    /// Contexts matching a filter, Chrome's rules (see `ContextFilter`).
     nonisolated static func matching(_ contexts: [Context], filter: [String: Any]) -> [Context] {
         let filter = ContextFilter(filter)
         return contexts.filter(filter.matches)
@@ -358,33 +354,31 @@ final class BridgeRuntime: BridgeNamespace {
 
 // MARK: - Context menu items kept
 
-/// An extension's right-click menu items, kept across relaunches as Chrome keeps them. WebKit forgets them when
-/// Zigzag quits, and an extension whose background only wakes for events adds them once, on install (Downie: its
-/// items were gone from every menu after a relaunch, #239). webkit-differences.js tells this what the extension
-/// creates, changes and removes, and asks once each time the extension starts what to put back.
+/// Extension context menu items, persisted across relaunches like Chrome. WebKit drops them on quit, and an
+/// event-driven background adds them only on install (Downie lost its items after relaunch, #239).
+/// webkit-differences.js reports creates, updates and removes, and asks once per start what to restore.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeContextMenus: BridgeNamespace {
     static let name = "contextMenusKept"
     static let permission = ""
-    /// The extensions it answers: one profile's.
+    /// One profile's extensions.
     unowned let host: ExtensionHost
-    /// Asked to put its items back since it last started: once per start, so items it removed stay removed.
+    /// Restored since last start; once per start so removed items stay removed.
     private var restored: Set<String> = []
-    /// What each extension has, read from its file once and kept here: an extension that changes an item on every
-    /// selection never has its file read or written each time.
+    /// Items per extension, read from disk once, so an extension updating items on every selection doesn't hit the disk.
     private var cache: [String: Kept] = [:]
-    /// Writes waiting for the extension to stop changing its items for a moment.
+    /// Writes waiting for changes to settle.
     private var pending: [String: DispatchWorkItem] = [:]
     private var quitting: NSObjectProtocol?
-    /// Files are written here, never on the main thread.
+    /// Off the main thread.
     private static let disk = DispatchQueue(label: "app.zigzag.context-menus-kept", qos: .utility)
-    /// How long changes gather before they're written.
+    /// Debounce before writing.
     static let writeDelay: TimeInterval = 1
 
     init(host: ExtensionHost) {
         self.host = host
-        // Quitting within the moment after a change still keeps it.
+        // Quitting right after a change still saves it.
         quitting = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.flush(waiting: true) }
         }
@@ -397,7 +391,7 @@ final class BridgeContextMenus: BridgeNamespace {
         switch fn {
         case "change":
             guard let op = args.first as? String else { throw BridgeError.unsupported(Self.name, fn) }
-            // What was kept for another version is the old one's: the update's own install listener adds its items.
+            // Items saved for an older version are dropped; the update's onInstalled adds new ones.
             if kept.version != version { kept = Kept(version: version, items: []) }
             kept.items = Self.apply(op, args: Array(args.dropFirst()), to: kept.items)
             save(kept, for: extensionID)
@@ -415,18 +409,18 @@ final class BridgeContextMenus: BridgeNamespace {
         }
     }
 
-    /// Turned off or removed: what's waiting is written now, before its folder can go, and read again next time.
+    /// Disabled or removed: flush pending writes before the folder can go; reload next time.
     func release(_ extensionID: String) {
         restored.remove(extensionID)
         flush(extensionID, waiting: true)
         cache[extensionID] = nil
     }
 
-    /// More than any extension's menu has; past it, new items aren't kept (they still show this session).
+    /// Item cap; past it new items aren't saved (they still show this session).
     static let maxItems = 500
-    /// The most one item may take as JSON: a bigger one isn't kept (it still shows this session).
+    /// Per-item JSON cap; bigger items aren't saved (still shown this session).
     static let maxItemBytes = 4 * 1024
-    /// The most one extension's file may take: items past it aren't kept.
+    /// Per-extension file cap; items past it aren't saved.
     static let maxFileBytes = 256 * 1024
 
     private static func size(_ item: [String: Any]) -> Int {
@@ -439,8 +433,8 @@ final class BridgeContextMenus: BridgeNamespace {
         var items: [[String: Any]]
     }
 
-    /// The items with one change made, as chrome.contextMenus makes it. An item without an ID of its own can't be
-    /// told apart from a new one, so it isn't kept (Chrome asks for one from extensions whose background sleeps).
+    /// Applies one chrome.contextMenus change. Items without an ID can't be matched later, so they aren't saved (Chrome
+    /// requires IDs from event-driven backgrounds).
     static func apply(_ op: String, args: [Any], to items: [[String: Any]]) -> [[String: Any]] {
         func id(_ value: Any?) -> String? {
             if let text = value as? String { return text }
@@ -450,7 +444,7 @@ final class BridgeContextMenus: BridgeNamespace {
         switch op {
         case "create":
             guard let properties = args.first as? [String: Any], let new = id(properties["id"]), size(properties) <= maxItemBytes else { return items }
-            // Made again with the same ID: the newer one stands, where the first was.
+            // Same ID again: replace in place.
             if let index = items.firstIndex(where: { id($0["id"]) == new }) {
                 var items = items
                 items[index] = properties
@@ -458,9 +452,8 @@ final class BridgeContextMenus: BridgeNamespace {
             }
             return items.count < maxItems ? items + [properties] : items
         case "update":
-            // Its title stays the one it was made with (with its %s, which the menu fills in with the selection):
-            // a title changed as you go is often about what's on the page or selected ("Search “…”"), and that's
-            // never written to disk. The extension sets it again once it's running.
+            // Keep the original title (with its %s). Titles updated on the fly often contain page or selection text, which must
+            // not hit disk; the extension sets them again once running.
             guard let target = id(args.first), let changes = args.dropFirst().first as? [String: Any] else { return items }
             let kept = changes.filter { $0.key != "id" && $0.key != "title" }
             guard !kept.isEmpty else { return items }
@@ -471,7 +464,7 @@ final class BridgeContextMenus: BridgeNamespace {
             }
         case "remove":
             guard let target = id(args.first) else { return items }
-            // Its items go with it, and theirs.
+            // Remove its children too.
             var gone: Set<String> = [target]
             var remaining = items
             while let index = remaining.firstIndex(where: { id($0["id"]).map(gone.contains) == true || id($0["parentId"]).map(gone.contains) == true }) {
@@ -486,17 +479,15 @@ final class BridgeContextMenus: BridgeNamespace {
         }
     }
 
-    /// What to put back as the extension starts: what it had, unless it's new (it adds its own on install), was
-    /// updated since (its install listener adds the new version's), or runs a background that never sleeps, which
-    /// adds them itself each time it starts, as Chrome expects of it.
+    /// Items to restore on start, except for a new extension (adds its own on install), an updated one (its onInstalled
+    /// adds them), or a persistent background (adds them on every start, as Chrome expects).
     static func toRestore(_ kept: Kept, version: String, isNewInstall: Bool, persistentBackground: Bool) -> [[String: Any]] {
         guard !isNewInstall, !persistentBackground, kept.version == version else { return [] }
         return kept.items
     }
 
-    /// Whether the extension is told Zigzag was updated (onInstalled, "chrome_update", as Chrome tells it after an
-    /// update of its own), so it adds its items again: once, the first time it starts with nothing kept for it. Items
-    /// it added before Zigzag kept them were never seen here, and it adds them only when told it was installed.
+    /// Whether to send onInstalled with "chrome_update" so the extension re-adds its items: once, on its first start with
+    /// nothing saved. Items added before this store existed were never seen here.
     static func addsItemsAgain(neverKept: Bool, isNewInstall: Bool, persistentBackground: Bool) -> Bool {
         neverKept && !isNewInstall && !persistentBackground
     }
@@ -518,7 +509,7 @@ final class BridgeContextMenus: BridgeNamespace {
         return kept
     }
 
-    /// Kept now, written a moment after the last change.
+    /// Kept now, written after the debounce.
     private func save(_ kept: Kept, for extensionID: String) {
         cache[extensionID] = kept
         pending[extensionID]?.cancel()
@@ -527,8 +518,7 @@ final class BridgeContextMenus: BridgeNamespace {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.writeDelay, execute: work)
     }
 
-    /// Writes what's waiting, for one extension or for all of them. `waiting`: before going on (Zigzag quitting,
-    /// the extension going).
+    /// Flushes pending writes, for one extension or all. `waiting`: block until done (quitting, extension removed).
     private func flush(_ only: String? = nil, waiting: Bool = false) {
         for (extensionID, work) in pending where only == nil || only == extensionID {
             work.cancel()
@@ -543,14 +533,14 @@ final class BridgeContextMenus: BridgeNamespace {
         }
     }
 
-    /// The file's contents, as many items as fit in `maxFileBytes`.
+    /// File contents, as many items as fit in `maxFileBytes`.
     static func encoded(_ kept: Kept) -> Data? {
         var items = kept.items
         while true {
             let saved: [String: Any] = ["version": kept.version, "items": items]
             guard JSONSerialization.isValidJSONObject(saved), let data = try? JSONSerialization.data(withJSONObject: saved) else { return nil }
             if data.count <= maxFileBytes || items.isEmpty { return data }
-            // The last made go first; the menu keeps its top.
+            // Drop the newest first; the menu keeps its top items.
             items.removeLast(max(1, items.count / 10))
         }
     }
@@ -858,7 +848,7 @@ final class BridgeOffscreen: BridgeNamespace {
     unowned let host: ExtensionHost
     init(host: ExtensionHost) { self.host = host }
     private var pages: [String: WKWebView] = [:]
-    /// The extension's offscreen page, if it has one open (for runtime.getContexts).
+    /// Open offscreen page, for runtime.getContexts.
     func page(for extensionID: String) -> WKWebView? { pages[extensionID] }
     /// Off screen, but in a window: a page in no window counts as hidden, and WebKit pauses its sound.
     private var window: NSWindow?
@@ -909,7 +899,7 @@ final class BridgeOffscreen: BridgeNamespace {
             place(page)
             // As in Chrome, done once the page has loaded and its scripts listen: extensions message it right away.
             let loaded = PageLoad()
-            // It stays one of the extension's pages: it can't be sent to a site, where nothing would show it.
+            // Stay on extension pages; a site wouldn't be visible here.
             let stays = ExtensionPageGuard(base: context.baseURL, loaded: loaded)
             stays.attach(to: page)
             page.load(URLRequest(url: url))
@@ -933,9 +923,8 @@ final class BridgeOffscreen: BridgeNamespace {
     }
 }
 
-/// Keeps a side panel or offscreen page on the extension's own pages, which have no address bar to say where they
-/// are: the page itself can't go to a site. A link you click in a side panel opens in a tab instead (`onLink`).
-/// Frames inside the page may still show sites, as in Chrome.
+/// Keeps a side panel or offscreen page on extension pages, since they have no address bar. Clicked links open in a
+/// tab (`onLink`). Frames may still show sites, as in Chrome.
 @MainActor
 final class ExtensionPageGuard: NSObject, WKNavigationDelegate {
     let base: URL
@@ -949,13 +938,13 @@ final class ExtensionPageGuard: NSObject, WKNavigationDelegate {
         self.onLink = onLink
     }
 
-    /// Made the page's navigation delegate, and kept as long as the page is.
+    /// Navigation delegate, retained for the page's lifetime.
     func attach(to page: WKWebView) {
         page.navigationDelegate = self
         objc_setAssociatedObject(page, &Self.key, self, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 
-    /// Whether the page may go there: one of the extension's own pages, or a blank one.
+    /// Allowed: the extension's own pages or about:blank.
     static func staysInExtension(_ url: URL?, base: URL) -> Bool {
         guard let url else { return false }
         if url.absoluteString == "about:blank" || url.absoluteString == "about:srcdoc" { return true }
@@ -1519,13 +1508,12 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
         end(webView, .success(url))
     }
 
-    /// The window says which site its page is on now, as the sign-in moves from site to site, so a page can't pass
-    /// for the provider it was sent to.
+    /// Shows the current site as the sign-in moves between sites, so a page can't pass as the provider.
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         flows[ObjectIdentifier(webView)]?.window?.subtitle = Self.shownAddress(webView.url)
     }
 
-    /// The site of an address, as the sign-in window shows it: the host for a secure page, the scheme too otherwise.
+    /// Site shown for a URL: host for https, scheme and host otherwise.
     static func shownAddress(_ url: URL?) -> String {
         guard let url, let host = url.host(), !host.isEmpty else { return url?.scheme.map { "\($0):" } ?? "" }
         let port = url.port.map { ":\($0)" } ?? ""
@@ -1564,6 +1552,9 @@ final class BridgeSidePanel: BridgeNamespace {
     /// Pages set for one tab, by the extension's id for the tab.
     private var tabPaths: [String: [Int: String]] = [:]
     private var disabled: Set<String> = []
+    /// Per-tab setting that overrides the global one, as in Chrome. ChatGPT disables its panel globally, enables it for
+    /// the clicked tab, then opens it.
+    private var tabEnabled: [String: [Int: Bool]] = [:]
     private var opensOnClick: Set<String> = []
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
@@ -1572,6 +1563,7 @@ final class BridgeSidePanel: BridgeNamespace {
             let options = args.object(0)
             if let tab = options["tabId"] as? Int {
                 if let path = options.string("path") { tabPaths[extensionID, default: [:]][tab] = path }
+                if let enabled = options["enabled"] as? Bool { tabEnabled[extensionID, default: [:]][tab] = enabled }
                 // Off for that tab: its page goes, and its panel with it.
                 if options["enabled"] as? Bool == false {
                     tabPaths[extensionID]?[tab] = nil
@@ -1587,7 +1579,7 @@ final class BridgeSidePanel: BridgeNamespace {
             return nil
         case "getOptions":
             let tab = args.object(0)["tabId"] as? Int
-            var options: [String: Any] = ["enabled": !disabled.contains(extensionID)]
+            var options: [String: Any] = ["enabled": isEnabled(extensionID, tab: tab)]
             if let path = path(for: extensionID, tab: tab) { options["path"] = path }
             if let tab { options["tabId"] = tab }
             return options
@@ -1599,10 +1591,9 @@ final class BridgeSidePanel: BridgeNamespace {
         case "getPanelBehavior":
             return ["openPanelOnActionClick": opensOnClick.contains(extensionID)]
         case "open":
-            // Chrome lets a panel open only in answer to something you did with this extension: its button, its menu
-            // item or shortcut, or a click in its own pages. A click or key in a web page counts only when the
-            // extension's own content script there passed it on, the call following its message a moment after
-            // (bridge.js says when that message came, and from which page). A click on another extension never does.
+            // Chrome only opens a panel on a user gesture with this extension: its button, menu item, shortcut, or a click in its
+            // pages. A page click or key counts only when its content script relayed it and the call follows that message
+            // (bridge.js reports when and from which page). Clicks on another extension never count.
             let carried = args.indices.contains(1) ? (args[1] as? [String: Any])?["contentMessage"] as? [String: Any] : nil
             let message = carried.flatMap { message -> (hosts: [String], age: TimeInterval)? in
                 guard let hosts = message["hosts"] as? [String], let age = (message["age"] as? NSNumber)?.doubleValue else { return nil }
@@ -1621,6 +1612,13 @@ final class BridgeSidePanel: BridgeNamespace {
             throw BridgeError.unsupported(Self.name, fn)
         }
     }
+
+    /// Shown for the tab: the per-tab setting, else the global one.
+    private func isEnabled(_ extensionID: String, tab: Int?) -> Bool {
+        Self.isEnabled(everywhere: !disabled.contains(extensionID), forTab: tab.flatMap { tabEnabled[extensionID]?[$0] })
+    }
+
+    nonisolated static func isEnabled(everywhere: Bool, forTab: Bool?) -> Bool { forTab ?? everywhere }
 
     /// The page to show: what the extension set for the tab, else for every tab, else its manifest's.
     private func path(for extensionID: String, tab: Int? = nil) -> String? {
@@ -1644,7 +1642,7 @@ final class BridgeSidePanel: BridgeNamespace {
 
     @discardableResult
     func open(_ extensionID: String, in controller: BrowserWindowController?, tab: Int? = nil) -> Bool {
-        guard let controller, !disabled.contains(extensionID), let path = path(for: extensionID, tab: tab),
+        guard let controller, isEnabled(extensionID, tab: tab), let path = path(for: extensionID, tab: tab),
               let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
               let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
         let root = controller.root
@@ -1682,6 +1680,7 @@ final class BridgeSidePanel: BridgeNamespace {
         close(extensionID)
         paths[extensionID] = nil
         tabPaths[extensionID] = nil
+        tabEnabled[extensionID] = nil
         opensOnClick.remove(extensionID)
         disabled.remove(extensionID)
     }
@@ -1907,7 +1906,7 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     private func ensureReachable(_ tab: Tab, in controller: BrowserWindowController, by extensionID: String) throws {
         guard !controller.tabManager.isPrivate, !tab.isPrivate, let webView = tab.webView, let url = webView.url ?? tab.url,
               let context = host.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
-        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites,
+        guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites(in: host.profile),
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: host.profile.installs.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
         }
@@ -2127,8 +2126,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         }
     }
 
-    /// The most one chunk of sound may be, as base64: the taps send a few thousand samples at a time (16384 at
-    /// most, 44 KB). The page's own world can post to the handler too, so anything bigger is dropped unread.
+    /// Max audio chunk as base64: taps send up to 16384 samples (44 KB). Page scripts can post here too, so larger ones
+    /// are dropped unread.
     nonisolated static let maxChunkCharacters = 64 * 1024
 
     nonisolated static func acceptsChunk(pcm: String, rate: Double) -> Bool {

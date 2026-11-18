@@ -116,8 +116,8 @@ enum ContentBlocker {
         removeOld(withPrefix: identifierPrefix, keeping: current)
     }
 
-    /// Takes every compiled list named with `prefix` out of the store but `current`: a list's version is in its name,
-    /// so each change leaves the one before behind.
+    /// Removes compiled lists with `prefix` except `current`; versions are in the name, so each change leaves the old
+    /// one behind.
     static func removeOld(withPrefix prefix: String, keeping current: String) {
         let store = WKContentRuleListStore.default()!
         store.getAvailableContentRuleListIdentifiers { identifiers in
@@ -237,7 +237,7 @@ enum AdBlockers {
     static func active(in profile: Profile) -> String? {
         guard #available(macOS 15.4, *) else { return nil }
         let installs = profile.installs
-        let offSites = ExtensionStore.extensionsOffSites
+        let offSites = ExtensionStore.extensionsOffSites(in: profile)
         return active(among: known.keys.filter { id in
             guard installs.isEnabled(id), installs.isInstalled(id) else { return false }
             return reachesYouTube(access: installs.siteAccess(id), approved: installs.state(id)?.grantedMatchPatterns,
@@ -272,7 +272,7 @@ enum AdBlockers {
 }
 
 extension Data {
-    /// FNV-1a: stable across launches, unlike `hashValue`. Names a compiled content rule list by its rules' version.
+    /// FNV-1a, stable across launches unlike `hashValue`. Puts the rules' version in a compiled list's name.
     var hashValueStable: UInt64 {
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in self { hash = (hash ^ UInt64(byte)) &* 0x100000001b3 }

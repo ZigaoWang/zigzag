@@ -155,8 +155,7 @@ struct ExtensionScriptTests {
         #expect(((api["runtime"]?["enums"] as? [String: [String: String]])?["ContextType"])?["OFFSCREEN_DOCUMENT"] == "OFFSCREEN_DOCUMENT")
     }
 
-    /// A fake extension world for api-surface.js: WebKit's runtime with the manifest and the diagnostics channel an
-    /// extension's background has, and none of the API namespaces the surface must fill.
+    /// A fake extension world for api-surface.js: WebKit's runtime, manifest and diagnostics channel, no API namespaces.
     private static func surfaceWorld(_ surface: String? = nil, version: Int? = nil,
                                      permissions: [String] = ["history"], setup: String = "") throws -> JSContext {
         let list = "[" + permissions.map { "'\($0)'" }.joined(separator: ", ") + "]"
@@ -193,8 +192,7 @@ struct ExtensionScriptTests {
         return context
     }
 
-    /// A fake extension background for bridge.js: WebKit's runtime, a native bridge that refuses every call, and none
-    /// of the namespaces the bridge must install.
+    /// A fake background for bridge.js: WebKit's runtime, a bridge that refuses every call, no namespaces.
     private static func bridgeWorld(permissions: [String]) -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
@@ -218,8 +216,7 @@ struct ExtensionScriptTests {
         return context
     }
 
-    /// A fake extension background for the compatibility prelude: WebKit's runtime, and the namespaces WebKit supplies
-    /// that the layer fills in. The ones it stands up whole are left absent, as WebKit leaves them.
+    /// A fake background for the compatibility prelude: WebKit's runtime and the namespaces it supplies; ones the layer adds whole are absent.
     private static func compatibilityWorld(permissions: [String]) -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
@@ -255,7 +252,7 @@ struct ExtensionScriptTests {
         var __immediate = __called;
         var __returned = chrome.runtime.lastError;
         """)
-        // Main's bridge callback gets one undefined answer and no Zigzag lastError; the Promise still rejects.
+        // The callback gets one undefined result and no lastError; the promise still rejects.
         #expect(context.evaluateScript("__immediate").toInt32() == 0)
         #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
         context.evaluateScript("__flush()")
@@ -284,7 +281,7 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__signIn === undefined").toBool())
         #expect(context.evaluateScript("__signInArgs").toInt32() == 1)
         #expect(context.evaluateScript("__signInValue === undefined").toBool())
-        // The extension's log still says what failed.
+        // The failure is still logged.
         #expect(context.evaluateScript("__warned.length").toInt32() == 1)
     }
 
@@ -308,7 +305,7 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__args").toInt32() == 1)
         #expect(context.evaluateScript("__value === undefined").toBool())
         #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
-        // Main's Promise form still rejects with an Error and has no Zigzag lastError.
+        // The promise form rejects with an Error and sets no lastError.
         context.evaluateScript("""
         var __promise = chrome.debugger.sendCommand({ tabId: 1 }, 'Runtime.enable', {}), __seen = 'not checked';
         __seen = chrome.runtime.lastError;
@@ -368,7 +365,7 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__results.join()").toString() == expected.joined(separator: ","))
         #expect(context.evaluateScript("__promiseAnswers").toInt32() == Int32(expected.count))
         #expect(context.evaluateScript("__promiseErrors.join()").toString().isEmpty)
-        // The existing emulations still answer too: the extension's own manifest and empty managed storage.
+        // Existing emulations still answer: the manifest and empty managed storage.
         context.evaluateScript("""
         chrome.management.getSelf((info) => { globalThis.__self = info.name + ' ' + info.version + ' ' + info.enabled; });
         chrome.storage.managed.get((values) => { globalThis.__managed = JSON.stringify(values); });
@@ -379,9 +376,7 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("chrome.runtime.lastError === undefined").toBool())
     }
 
-    /// declarativeNetRequest.updateStaticRules: WebKit does not switch single built-in rules off. Main answers the
-    /// call quietly, the rule sets stay as they were, rather than failing it and stopping a background that treats
-    /// switching its exceptions off as fatal. PR A keeps main's quiet answer; only PR B's error layer reports it.
+    /// WebKit can't disable single static rules; the call succeeds silently so backgrounds that treat failure as fatal keep running.
     @Test func unknownStaticRuleSwitchingKeepsMainsQuietAnswer() {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
@@ -417,7 +412,7 @@ struct ExtensionScriptTests {
         });
         var __returned = chrome.runtime.lastError;
         """)
-        // Nothing before the call returns: the callback is asynchronous, with main's no-result answer.
+        // The callback is asynchronous, with no result.
         #expect(context.evaluateScript("__result").toString() == "not called")
         #expect(context.evaluateScript("__before === undefined && __returned === undefined").toBool())
         context.evaluateScript("__flush()")
@@ -466,7 +461,7 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__error.name").toString() == "Error")
         #expect(context.evaluateScript("__error.message").toString() == "chrome.history.getVisits isn't available in Zigzag")
         #expect(context.evaluateScript("__error.isError").toBool())
-        // The promise form never sets lastError, before or after it settles.
+        // The promise form never sets lastError.
         #expect(context.evaluateScript("__during === undefined && chrome.runtime.lastError === undefined").toBool())
     }
 
@@ -481,7 +476,7 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("__notes.map((n) => n.text).join()").toString() == "chrome.history.search,chrome.history.getVisits")
         #expect(context.evaluateScript("__notes[0].host + ' ' + __notes[0].where + ' ' + __notes[0].kind").toString()
                 == "zigzag.diagnostics surface unavailable")
-        // A third call to the same member is not noted again.
+        // A third call to the same member isn't logged again.
         context.evaluateScript("chrome.history.search({ text: 'c' }).catch(() => {});")
         #expect(context.evaluateScript("__notes.length").toInt32() == 2)
     }
@@ -591,9 +586,7 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("chrome.runtime.OnInstalledReason.INSTALL")?.toString() == "install")
     }
 
-    /// Proton Pass swaps `chrome` and `browser` for stand-ins that answer nothing once it has started. WebKit delivers
-    /// messages through `browser`, so its background heard nothing and its popup said the browser was having
-    /// difficulties (#287). `browser` stays WebKit's; `chrome` is the extension's to replace, as in Chrome.
+    /// Proton Pass replaces `chrome` and `browser` with dead stand-ins after start; WebKit delivers messages via `browser`, so its popup failed (#287). `browser` stays WebKit's; `chrome` may be replaced, as in Chrome.
     @Test func browserStaysWebKitsWhenAnExtensionReplacesIt() {
         let protonsGuard = """
         (() => {
@@ -608,22 +601,52 @@ struct ExtensionScriptTests {
             context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
             context.evaluateScript("var __background = true, __page = null, __backgroundPort = null; var __toBackground = () => {}, __connectToBackground = () => {};")
             context.evaluateScript(Self.fakeWorld)
-            // As WebKit has it: an own property of the global object, the same API as `chrome`.
+            // As WebKit defines it: an own property of the global, same object as `chrome`.
             context.evaluateScript("Object.defineProperty(globalThis, 'browser', { value: chrome, writable: true, configurable: true, enumerable: true }); var __native = browser;")
             context.evaluateScript(script)
             context.evaluateScript("__flush()")
             context.evaluateScript(protonsGuard)
             #expect(context.evaluateScript("browser === __native && browser.runtime.id === 'x'")?.toBool() == true)
             #expect(context.evaluateScript("chrome.runtime === undefined")?.toBool() == true)
-            // Setting it again, plainly or in strict code, is no error and changes nothing.
+            // Reassigning, strict or not, is a silent no-op.
             #expect(context.evaluateScript("(() => { 'use strict'; browser = {}; return browser === __native; })()")?.toBool() == true)
         }
-        // The loaded copy's content scripts get it first, ahead of the reconnect guard.
+        // Content scripts get it first, before the reconnect guard.
         #expect(ExtensionStore.contentScriptsFirst.hasPrefix(ExtensionBridgeScript.keepsBrowser))
     }
 
+    @Test func idleCallbacksRunInExtensionPagesAndContentScripts() {
+        // Proton Pass's content script stopped on requestIdleCallback, which WebKit doesn't have (#287).
+        #expect(ExtensionStore.contentScriptsFirst.contains(ExtensionBridgeScript.idleCallbacks))
+        #expect(ExtensionBridgeScript.differences.contains(ExtensionBridgeScript.idleCallbacks))
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = new Map(), __last = 0, document = {};
+        var setTimeout = (f) => { __timers.set(++__last, f); return __last; };
+        var clearTimeout = (id) => { __timers.delete(id); };
+        var __flush = () => { const t = [...__timers.values()]; __timers.clear(); t.forEach((f) => f()); };
+        """)
+        context.evaluateScript(ExtensionBridgeScript.idleCallbacks)
+        context.evaluateScript("""
+        var __ran = [];
+        requestIdleCallback((deadline) => __ran.push(['a', deadline.didTimeout, deadline.timeRemaining() > 0]));
+        cancelIdleCallback(requestIdleCallback(() => __ran.push(['b'])));
+        __flush();
+        """)
+        #expect(context.evaluateScript("JSON.stringify(__ran)")?.toString() == "[[\"a\",false,true]]")
+        // A worker has none in Chrome either, and one WebKit has is left as it is.
+        let worker = JSContext()!
+        worker.evaluateScript(ExtensionBridgeScript.idleCallbacks)
+        #expect(worker.evaluateScript("typeof requestIdleCallback")?.toString() == "undefined")
+        let own = JSContext()!
+        own.evaluateScript("var document = {}; var mine = () => 7; var requestIdleCallback = mine;")
+        own.evaluateScript(ExtensionBridgeScript.idleCallbacks)
+        #expect(own.evaluateScript("requestIdleCallback === mine")?.toBool() == true)
+    }
+
     @Test func browserIsKeptOnceAnExtensionPageGetsIt() {
-        // An extension page may get its API a moment after Zigzag's scripts run: kept then, before the page's own timers.
+        // Extension pages may get the API after Zigzag's scripts run; it's kept before the page's timers fire.
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -789,6 +812,15 @@ struct ExtensionScriptTests {
         context.evaluateScript("__current = { id: 7, url: 'https://a.example/' }; chrome.tabs.getCurrent().then((tab) => { globalThis.__inTab = tab; });")
         context.evaluateScript("__flush()")
         #expect(context.evaluateScript("__inTab.id").toInt32() == 7)
+        // A popup: WebKit gives the tab in front, Chrome undefined; Proton Pass sized its popup to fit a tab (#287).
+        context.evaluateScript("""
+        chrome.extension = { getViews: (filter) => (filter && filter.type === 'popup' ? [globalThis] : []) };
+        chrome.tabs.getCurrent().then((tab) => { globalThis.__inPopup = tab; });
+        chrome.tabs.getCurrent((tab) => { globalThis.__popupCalled = [tab]; });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__inPopup === undefined && '__inPopup' in globalThis").toBool())
+        #expect(context.evaluateScript("__popupCalled.length === 1 && __popupCalled[0] === undefined").toBool())
     }
 
     @Test func workerMessagingIsLeftAloneUntilAnExtensionUsesIt() {
@@ -998,14 +1030,14 @@ struct ExtensionScriptTests {
     }
 
     @Test func wasmPolicySurvivesWebKitDroppingItsKeyword() throws {
-        // Bitwarden's: script loading keeps its limits under script-src-elem, attributes and workers under their own.
+        // Bitwarden: script-src limits move to script-src-elem; attributes and workers keep their own.
         let bitwarden = "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
         #expect(ExtensionStore.wasmCompatiblePolicy(bitwarden)
                 == "script-src-elem 'self'; script-src-attr 'none'; worker-src 'self'; object-src 'self'")
-        // Directives the extension set itself stay as they are.
+        // Directives the extension set stay unchanged.
         #expect(ExtensionStore.wasmCompatiblePolicy("script-src 'self' 'WASM-UNSAFE-EVAL'; worker-src blob:;")
                 == "script-src-elem 'self'; script-src-attr 'none'; worker-src blob:")
-        // No WebAssembly asked for, or a default-src it would fall back to: left alone.
+        // No wasm requested, or a default-src fallback: unchanged.
         #expect(ExtensionStore.wasmCompatiblePolicy("script-src 'self'; object-src 'self'") == nil)
         #expect(ExtensionStore.wasmCompatiblePolicy("default-src 'self'; script-src 'self' 'wasm-unsafe-eval'") == nil)
 
@@ -1013,7 +1045,7 @@ struct ExtensionScriptTests {
         let policies = try #require(ExtensionStore.allowingWasm(manifest)["content_security_policy"] as? [String: String])
         #expect(policies["extension_pages"]?.hasPrefix("script-src-elem 'self';") == true)
         #expect(policies["sandbox"] == "sandbox allow-scripts; script-src 'self'")
-        // Manifest V2 isn't parsed with the restriction.
+        // MV2 isn't restricted.
         let v2: [String: Any] = ["manifest_version": 2, "content_security_policy": ["extension_pages": bitwarden]]
         #expect((ExtensionStore.allowingWasm(v2)["content_security_policy"] as? [String: String])?["extension_pages"] == bitwarden)
     }
@@ -1258,7 +1290,7 @@ struct ExtensionScriptTests {
 
     // MARK: - runtime contexts (Task 8a: getContexts and getBackgroundPage)
 
-    /// `runtime.getContexts` is Chrome's MV3 member; an MV2 extension never had it, so the bridge doesn't give it one.
+    /// `runtime.getContexts` is MV3 only; the bridge doesn't add it for MV2.
     @Test func contextsAreAnMV3MemberOnly() {
         for (version, present) in [(3, true), (2, false)] {
             let context = JSContext()!
@@ -1282,22 +1314,19 @@ struct ExtensionScriptTests {
         }
     }
 
-    /// The API surface fills every missing runtime function, but not Chrome's MV3-only `getContexts` in an MV2
-    /// extension: there it must stay absent, so feature detection takes Chrome's path.
+    /// The API surface fills missing runtime functions but leaves MV3's `getContexts` absent in MV2, so feature detection works.
     @Test func theAPISurfaceLeavesGetContextsOutOfMV2() throws {
         let v2 = try Self.surfaceWorld(version: 2)
         #expect(v2.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
         #expect(v2.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
         let v3 = try Self.surfaceWorld(version: 3)
         #expect(v3.evaluateScript("typeof chrome.runtime.getContexts").toString() == "function")
-        // In the app the bridge answers; where only the surface ran, the member still fails loudly rather than doing
-        // nothing.
+        // Where only the surface ran, the member rejects rather than doing nothing.
         v3.evaluateScript("var __error = null; chrome.runtime.getContexts({}).catch((e) => { __error = e.message; });")
         #expect(v3.evaluateScript("__error").toString() == "chrome.runtime.getContexts isn't available in Zigzag")
     }
 
-    /// An MV3 extension has no background page, and Chrome says so rather than handing back WebKit's null. Its page
-    /// still has the member, by promise or callback, with `runtime.lastError` only for as long as the callback runs.
+    /// MV3 has no background page: Chrome's error, not WebKit's null, via promise or callback; `runtime.lastError` only during the callback.
     @Test func anMV3PageIsToldThereIsNoBackgroundPage() {
         let page = Self.workerWorld(worker: false, setup: """
         chrome.runtime.getManifest = () => ({ manifest_version: 3 });
@@ -1311,12 +1340,11 @@ struct ExtensionScriptTests {
         """)
         #expect(page.evaluateScript("__promise").toString() == "You do not have a background page.")
         #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
-        // The error lives only while the callback runs.
+        // The error exists only during the callback.
         #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
     }
 
-    /// WebKit's own `runtime.lastError` is there before the failing callback and again after it, as the surface's
-    /// unavailable calls already keep it.
+    /// WebKit's own `runtime.lastError` is restored after the failing callback.
     @Test func theBackgroundPageErrorPutsWebKitsLastErrorBack() {
         let page = Self.workerWorld(worker: false, setup: """
         chrome.runtime.getManifest = () => ({ manifest_version: 3 });
@@ -1334,7 +1362,7 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("chrome.runtime.lastError.message").toString() == "native")
     }
 
-    /// An MV2 page still has its background page, and gets it by promise and by callback alike.
+    /// MV2 pages get their background page by promise and callback.
     @Test func anMV2PageKeepsItsBackgroundPage() {
         let page = Self.workerWorld(worker: false, setup: """
         chrome.runtime.getManifest = () => ({ manifest_version: 2 });
@@ -1351,7 +1379,7 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("chrome.runtime.lastError === undefined").toBool())
     }
 
-    /// An MV2 page whose background isn't running hears the same words Chrome uses, not WebKit's null.
+    /// MV2 pages without a running background get Chrome's error text, not WebKit's null.
     @Test func anMV2PageWithoutABackgroundHearsChrome() {
         let page = Self.workerWorld(worker: false, setup: """
         chrome.runtime.getManifest = () => ({ manifest_version: 2 });
@@ -1366,9 +1394,7 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("__heard").toString() == "You do not have a background page.")
     }
 
-    /// Chrome's MV3 service worker has no `getBackgroundPage`, but PR A stopped standing in for the whole runtime to
-    /// hide it: that Proxy was what every MV3 worker then carried into its keepalive port. The member stays plainly
-    /// visible in a worker, answering as WebKit left it; only a page is corrected, as the tests above show.
+    /// MV3 workers keep WebKit's `getBackgroundPage`; hiding it needed a runtime Proxy that leaked into the keepalive port. Only pages are corrected.
     @Test func anMV3WorkerKeepsItsGetBackgroundPageMember() {
         let worker = Self.workerWorld(worker: true, setup: """
         var __manifest = () => ({ manifest_version: 3 });
@@ -1383,7 +1409,7 @@ struct ExtensionScriptTests {
             #expect(worker.evaluateScript("'getBackgroundPage' in \(root).runtime").toBool(), "\(root)")
             #expect(worker.evaluateScript("typeof \(root).runtime.getBackgroundPage").toString() == "function", "\(root)")
             #expect(worker.evaluateScript("\(root).runtime.getBackgroundPage() === null").toBool(), "\(root)")
-            // Enumeration and descriptors still read as WebKit left them.
+            // Enumeration and descriptors are unchanged.
             #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getManifest')").toBool(), "\(root)")
             #expect(worker.evaluateScript("Object.keys(\(root).runtime).includes('getBackgroundPage')").toBool(), "\(root)")
             #expect(worker.evaluateScript("typeof Object.getOwnPropertyDescriptor(\(root).runtime, 'getManifest').value").toString() == "function", "\(root)")
@@ -1393,8 +1419,7 @@ struct ExtensionScriptTests {
         }
     }
 
-    /// Two globals that share one runtime still share it when a member has to be hidden from both. `getContexts` in
-    /// an MV2 extension is still hidden this way; the MV3 worker's `getBackgroundPage` is no longer.
+    /// Globals sharing one runtime still share it when a member is hidden (MV2 `getContexts`).
     @Test func aSharedRuntimeStaysOneAcrossGlobals() {
         let page = Self.workerWorld(worker: false, setup: """
         chrome.runtime.getManifest = () => ({ manifest_version: 2 });
@@ -1406,7 +1431,7 @@ struct ExtensionScriptTests {
         #expect(page.evaluateScript("'getContexts' in browser.runtime").toBool() == false)
     }
 
-    /// An MV2 page has no `getContexts` even where WebKit's property can't be deleted, and the rest of runtime stays.
+    /// MV2 pages lack `getContexts` even when WebKit's property can't be deleted; the rest of runtime stays.
     @Test func anMV2PageHasNoGetContextsEvenWhenWebKitWontGiveItUp() {
         let page = Self.workerWorld(worker: false, setup: """
         chrome.runtime.getManifest = () => ({ manifest_version: 2 });

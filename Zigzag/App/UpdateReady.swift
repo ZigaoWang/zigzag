@@ -1,40 +1,36 @@
 import Foundation
 
-/// An update Sparkle has downloaded and staged, waiting for Zigzag to restart into it: what the sidebar's card, the
-/// Zigzag menu and Settings › General show, and whether you've put the card away for now.
-///
-/// Sparkle installs a staged update whenever Zigzag quits, so putting the card away never loses it. Once staged,
-/// Sparkle stops reading the feed until the update is installed, so a newer version can come out meanwhile: `isStale`
-/// says when the feed has one, and the staged update is then let go for it.
+/// An update Sparkle downloaded and staged, for the card, the Zigzag menu and Settings. Sparkle installs it on quit. It
+/// stops reading the feed once staged, so `isStale` lets a newer release replace it.
 nonisolated struct UpdateReadiness: Equatable, Sendable {
     struct Staged: Equatable, Sendable {
-        /// What people see: 0.9.2, 0.9.2-beta.3.
+        /// Display version, e.g. 0.9.2-beta.3.
         var version: String
-        /// Sparkle's version, the build number, which is what's compared.
+        /// Build number (CFBundleVersion), used for comparisons.
         var build: String
     }
 
     private(set) var staged: Staged?
-    /// The build whose card you put away, for as long as Zigzag runs. A newer one brings the card back.
+    /// Build whose card was dismissed this run; a newer build shows it again.
     private(set) var dismissedBuild: String?
 
     /// The card in the sidebar.
     var showsCard: Bool { staged != nil && staged?.build != dismissedBuild }
-    /// Zigzag › Restart to Update and Settings' Restart: there while an update is staged, card put away or not.
+    /// Restart to Update is available whenever an update is staged.
     var canRestart: Bool { staged != nil }
 
-    /// An update is staged. One older than the one already staged never takes its place.
+    /// An older build never replaces a staged one.
     mutating func stage(version: String, build: String) {
         if let staged, Self.isNewer(staged.build, than: build) { return }
         staged = Staged(version: version, build: build)
     }
 
-    /// The card's ×: away until a newer update is staged. The update still installs when Zigzag quits.
+    /// Hides the card until a newer update is staged; it still installs on quit.
     mutating func dismiss() {
         dismissedBuild = staged?.build
     }
 
-    /// Check for Updates… found the one already staged: the card comes back for it.
+    /// A check found the staged update: show the card again.
     mutating func undismiss() {
         dismissedBuild = nil
     }
@@ -42,7 +38,7 @@ nonisolated struct UpdateReadiness: Equatable, Sendable {
     /// You put the card away for the update that's staged.
     var isDismissed: Bool { staged != nil && staged?.build == dismissedBuild }
 
-    /// The staged update is gone: installed, let go for a newer one, or no longer on the feed.
+    /// Installed, replaced, or gone from the feed.
     mutating func clear() {
         staged = nil
     }
@@ -53,7 +49,7 @@ nonisolated struct UpdateReadiness: Equatable, Sendable {
         return Self.isNewer(feedNewest, than: staged.build)
     }
 
-    /// Build numbers compared as Sparkle compares them: by each number in turn (116 after 99, 1.10 after 1.9).
+    /// Compares as Sparkle does, number by number (116 > 99, 1.10 > 1.9).
     static func isNewer(_ a: String, than b: String) -> Bool {
         let x = parts(a), y = parts(b)
         for i in 0..<max(x.count, y.count) {
@@ -68,24 +64,21 @@ nonisolated struct UpdateReadiness: Equatable, Sendable {
     }
 }
 
-/// What the update card shows: an update you asked for coming in and being prepared, then ready to restart into.
-/// The card is the one place an update shows itself; a toast only says a check is under way, or what it found when
-/// that's nothing.
+/// The update card's state for a manual update: downloading, preparing, then ready.
 nonisolated enum UpdateCardState: Equatable, Sendable {
-    /// Coming in: how much of how much, the total 0 until Sparkle knows the size.
+    /// `total` is 0 until the size is known.
     case downloading(version: String, received: UInt64, total: UInt64)
-    /// Downloaded: Sparkle unpacks it and checks its signature.
+    /// Sparkle is unpacking and checking the signature.
     case preparing(version: String)
     case ready(version: String)
 
-    /// As written (0.9.2-beta.1).
     var version: String {
         switch self {
         case .downloading(let version, _, _), .preparing(let version), .ready(let version): version
         }
     }
 
-    /// How much has come, 0 to 1, while the size is known.
+    /// Download fraction, 0 to 1, when the size is known.
     var share: Double? {
         guard case .downloading(_, let received, let total) = self, total > 0 else { return nil }
         return min(1, Double(received) / Double(total))
@@ -93,17 +86,16 @@ nonisolated enum UpdateCardState: Equatable, Sendable {
 
     var isReady: Bool { if case .ready = self { true } else { false } }
 
-    /// Moved on enough from `old` to draw again: another step, or a whole percent more of the download.
+    /// Changed enough to redraw: a new step or a whole percent.
     func differsVisibly(from old: UpdateCardState?) -> Bool {
         guard let old, let share, let before = old.share, old.version == version else { return self != old }
         return abs(share - before) >= 0.01 || (share >= 1) != (before >= 1)
     }
 }
 
-/// Zigzag's version as people read it: 0.9.2-beta.1 is "0.9.2 beta 1", and a stable version stays as it is. Every
-/// place that shows a version to people goes through it; reports and logs keep the version as written.
+/// Display version: 0.9.2-beta.1 reads "0.9.2 beta 1". Reports and logs keep the raw version.
 nonisolated enum VersionName {
-    /// This copy of Zigzag's version, as written (0.9.2-beta.1).
+    /// Raw version, e.g. 0.9.2-beta.1.
     static var running: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
 
     static func display(_ version: String) -> String {
@@ -119,30 +111,26 @@ nonisolated enum VersionName {
     }
 }
 
-/// How often Zigzag looks for updates on its own, quietly: every few hours while it runs, and on waking from sleep
-/// when it's been a while, never more than once an hour.
+/// Background update checks: every few hours, and after waking if it's been a while, at most once an hour.
 nonisolated enum UpdateSchedule {
-    /// Sparkle's own interval (SUScheduledCheckInterval), and how often a staged update is checked against the feed.
+    /// Sparkle's SUScheduledCheckInterval; also how often a staged update is checked against the feed.
     static let interval: TimeInterval = 4 * 60 * 60
     /// The least time between two checks, however many wakes come between.
     static let minimumGap: TimeInterval = 60 * 60
 
-    /// Whether to look now: on a wake, after `minimumGap`; on the clock, after `interval`.
+    /// On wake, after `minimumGap`; on the timer, after `interval`.
     static func shouldCheck(lastCheck: Date?, now: Date, onWake: Bool) -> Bool {
         guard let lastCheck else { return true }
         let since = now.timeIntervalSince(lastCheck)
-        // A clock set back: the last check looks like it's to come, so look now.
+        // Clock set back.
         if since < 0 { return true }
         return since >= (onWake ? minimumGap : interval)
     }
 }
 
-/// The newest version on an update feed (a Sparkle appcast), read without downloading anything else: only to tell
-/// whether the update Sparkle has staged is still the newest. Sparkle itself does every download, check and install.
-///
-/// A staged update is let go only for one Sparkle will fetch in its place, so an item counts only when Sparkle's own
-/// background check would take it: the filters follow Sparkle's (SUAppcastDriver), and where one can't be told for
-/// sure (a phased rollout without a date it reads), the item doesn't count.
+/// Reads the newest version on the appcast, only to tell whether the staged update is still newest; Sparkle does all
+/// downloads and installs. Filters mirror SUAppcastDriver; an item that can't be judged for sure (a phased rollout
+/// without a readable date) doesn't count.
 nonisolated enum UpdateFeed {
     struct Item: Equatable, Sendable {
         var build: String
@@ -151,10 +139,9 @@ nonisolated enum UpdateFeed {
 
     /// What Sparkle knows of this copy of Zigzag when it reads the feed in the background.
     struct Host: Sendable {
-        /// The running build (CFBundleVersion).
         var build: String
         var system: OperatingSystemVersion
-        /// Sparkle's phased rollout group, 0 to 6; nil before Sparkle has picked one, taken as the last group.
+        /// Phased rollout group 0–6; nil means not picked yet, treated as the last group.
         var phasedGroup: Int?
         var now: Date
         var isIntel: Bool
@@ -165,7 +152,7 @@ nonisolated enum UpdateFeed {
             #else
             let intel = false
             #endif
-            // Sparkle keeps its group's seed in the app's defaults, and takes it modulo seven.
+            // Sparkle stores the seed in defaults and uses it modulo 7.
             let seed = UserDefaults.standard.object(forKey: "SUUpdateGroupIdentifier") as? NSNumber
             return Host(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0",
                         system: ProcessInfo.processInfo.operatingSystemVersion,
@@ -173,11 +160,9 @@ nonisolated enum UpdateFeed {
         }
     }
 
-    /// The newest item a background check by Sparkle would offer this Mac, by build. Skipped, as Sparkle skips
-    /// them: items for another channel or OS, with only a delta or nothing to download, informational only, for a
-    /// newer or older macOS, for Apple silicon on an Intel Mac, that can't update this build
-    /// (`minimumUpdateVersion`), a major upgrade Sparkle doesn't fetch by itself (`minimumAutoupdateVersion`), and
-    /// one not yet rolled out to this Mac's phased rollout group.
+    /// The newest item Sparkle's background check would offer, skipping what Sparkle skips: other channels or OS,
+    /// delta-only or informational, unsupported macOS or hardware, `minimumUpdateVersion`, `minimumAutoupdateVersion`,
+    /// and not yet rolled out to this group.
     static func newest(in data: Data, host: Host = .current) -> Item? {
         let reader = Reader()
         let parser = XMLParser(data: data)
@@ -195,7 +180,7 @@ nonisolated enum UpdateFeed {
                     && !(item.maximumSystem.map { UpdateReadiness.isNewer(running, than: $0) } ?? false)
                     && !newer(item.minimumUpdate, than: host.build)
                     && !newer(item.minimumAutoupdate, than: host.build)
-                    // Sparkle takes macOS 27 and later as Apple silicon only.
+                    // Sparkle treats macOS 27+ as Apple silicon only.
                     && !(host.isIntel && (item.hardware.contains("arm64") || !newer("27", than: item.minimumSystem ?? "0")))
                     && rolledOut(item, to: host)
             }
@@ -203,7 +188,7 @@ nonisolated enum UpdateFeed {
             .map { Item(build: $0.build, version: $0.version.isEmpty ? $0.build : $0.version) }
     }
 
-    /// Sparkle's phased rollout: group n gets an item n intervals after its date.
+    /// Group n gets an item n intervals after its date.
     private static func rolledOut(_ item: Reader.Entry, to host: Host) -> Bool {
         guard let interval = item.phasedInterval else { return true }
         guard let seconds = TimeInterval(interval), let date = item.date.flatMap({ pubDate.date(from: $0) }) else { return false }
@@ -224,13 +209,13 @@ nonisolated enum UpdateFeed {
             var minimumUpdate: String?, minimumAutoupdate: String?, phasedInterval: String?, date: String?, os: String?
             var hardware: Set<String> = []
             var informational = false
-            /// An enclosure of the whole app, not only a delta from one version.
+            /// A full app enclosure, not just a delta.
             var hasFullEnclosure = false
         }
         var items: [Entry] = []
         private var current: Entry?
         private var text = ""
-        /// Inside sparkle:deltas or sparkle:informationalUpdate, whose contents aren't the item's own.
+        /// Inside sparkle:deltas or sparkle:informationalUpdate.
         private var nested = false
 
         func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String] = [:]) {

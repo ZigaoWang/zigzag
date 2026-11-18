@@ -118,17 +118,15 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
         return info
     }
 
-    /// A space you just made goes on `profile`, or, with `ownProfile` (Settings › Spaces › Give new spaces their own
-    /// profile, #291), on a new profile of its own: named after it, in its color as `ownColor` picks. That profile, if
-    /// one was made. `usedColors` are the colors the profiles have now.
+    /// Puts a new space on `profile`, or with `ownProfile` (#291) on a new profile named after it, colored by
+    /// `ownColor`. Returns the new profile, if any. `usedColors`: colors profiles have now.
     @discardableResult
     @MainActor mutating func place(newSpace space: SpaceInfo, on profile: UUID, ownProfile: Bool, usedColors: [SpaceColor]) -> ProfileInfo? {
         guard ownProfile else { assign(space: space.id, to: profile); return nil }
         return addOwn(for: space.id, named: space.name, taken: all.map(\.displayName), color: Self.ownColor(for: space.color, used: usedColors))
     }
 
-    /// The color of a profile made for a space: the space's, when that's one a profile can have and no profile has
-    /// it yet, else the next one no profile has.
+    /// The space's color if a profile can have it and none does, else the next unused one.
     @MainActor static func ownColor(for spaceColor: SpaceColor, used: [SpaceColor]) -> SpaceColor {
         spaceColor.isNeutral || used.contains(spaceColor) ? SpaceColor.next(unused: used) : spaceColor
     }
@@ -207,13 +205,15 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
 /// profile's is the plain name Zigzag has always used, so what was chosen before there were profiles is its.
 nonisolated enum ProfileKey: String, CaseIterable {
     case extensionsPinned = "ExtensionsPinned"
+    /// Sites with every extension off, per profile.
+    case extensionsOffSites = "ExtensionsOffSites"
     case offersToSavePasswords = "PasswordsOfferToSave"
     case fillsPasswords = "PasswordsAutofill"
-    /// Who fills passwords there: Zigzag or the iCloud Passwords extension (PasswordFiller). Unset until chosen.
+    /// Zigzag or iCloud Passwords (PasswordFiller); unset until chosen.
     case passwordFiller = "PasswordsFiller"
-    /// Whether Zigzag saved and filled there before iCloud Passwords took over, to put back when Zigzag does again.
+    /// Zigzag's saving and filling before iCloud took over, restored when switching back.
     case passwordsBeforeICloud = "PasswordsBeforeICloud"
-    /// The one offer to use iCloud Passwords, once its extension went in by hand, has been made.
+    /// The one-time iCloud Passwords offer, after its extension was installed by hand, was shown.
     case iCloudPasswordsOffered = "PasswordsICloudOffered"
 
     func name(in profile: UUID) -> String {

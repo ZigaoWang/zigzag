@@ -3,8 +3,7 @@ import AppKit
 /// One line in the command bar.
 struct CommandResult: Equatable {
     enum Kind: Equatable {
-        /// `httpFallback`: an address typed without a scheme, tried over http if https can't reach it
-        /// (`CommandRanker.Destination`).
+        /// `httpFallback`: a scheme-less address, retried over http if https fails (`CommandRanker.Destination`).
         case open(URL, httpFallback: Bool = false)
         case search(String)
         /// A search on one site, from the address bar's site search.
@@ -46,21 +45,19 @@ struct CommandResult: Equatable {
 
 /// Turns what you typed into ranked results: URLs, searches, open tabs, bookmarks and history.
 enum CommandRanker {
-    /// Where Zigzag goes for text you gave it (typed, pasted, dropped or selected), and where it goes instead when
-    /// the secure address it chose can't be reached: as Chrome, Safari and Firefox do, an address typed without a
-    /// scheme is tried over https first, then once over http, so a server that only speaks http (a development
-    /// server on localtest.me:3000) still opens. Never for a scheme you typed, an address that goes over http
-    /// anyway (localhost, an IP address, a local network's name), a link or a search.
+    /// Where typed, pasted, dropped or selected text goes. A scheme-less address tries https, then http once, as
+    /// Chrome, Safari and Firefox do, so http-only dev servers (localtest.me:3000) still open. Not for typed schemes,
+    /// addresses already on http (localhost, IPs, local names), links or searches.
     struct Destination: Equatable {
         let url: URL
-        /// Zigzag gave it https because it had no scheme, so it's tried once more over http (`Tab.load`).
+        /// Retried once over http (`Tab.load`).
         var httpFallback = false
     }
 
     /// A URL if the text looks like an address, otherwise nil.
     static func url(from text: String) -> URL? { destination(from: text)?.url }
 
-    /// Where the text goes if it looks like an address, otherwise nil.
+    /// Nil unless the text looks like an address.
     static func destination(from text: String) -> Destination? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains(" ") else { return nil }
@@ -84,13 +81,12 @@ enum CommandRanker {
         if localTLDs.contains(tld) { return URL(string: "http://" + trimmed).map { Destination(url: $0) } }
         // A real top-level domain, so "node.js" and "readme.txt" are searched, not opened.
         guard knownTLDs.contains(tld) || tld.hasPrefix("xn--") else { return nil }
-        // Secure first; the same address over http if that can't be reached.
+        // https first, then http.
         return URL(string: "https://" + trimmed).map { Destination(url: $0, httpFallback: true) }
     }
 
-    /// Selected text without the sentence around it: quotes, brackets and punctuation at either end. A parenthesis is
-    /// the address's own when it has the other one (en.wikipedia.org/wiki/Mercury_(planet)); one that wraps the whole
-    /// address, or has no partner in it, is the sentence's.
+    /// Strips surrounding quotes, brackets and punctuation. A parenthesis stays if its pair is inside
+    /// (en.wikipedia.org/wiki/Mercury_(planet)); one wrapping the whole text or unpaired is stripped.
     static func withoutSurroundings(_ text: String) -> String {
         let around = CharacterSet(charactersIn: "\"'“”‘’«»<>[]{}.,;:!?。，；：！？")
         var bare = text.trimmingCharacters(in: around)
@@ -108,8 +104,8 @@ enum CommandRanker {
         }
     }
 
-    /// The web address some selected text is, when it's only that (#234): "example.com", or a whole https address,
-    /// the quotes, brackets or full stop around it in a sentence left off. Only the web: never a file or about: page.
+    /// Selected text that is only a web address (#234): "example.com" or a full https URL, minus surrounding
+    /// punctuation. Never file: or about:.
     static func destination(fromSelection text: String) -> Destination? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 2048, !trimmed.contains(where: \.isNewline) else { return nil }
@@ -150,8 +146,7 @@ enum CommandRanker {
         tabs.filter { !(leavingOutFailed && failed($0)) }.prefix(6).filter { $0 !== selected }
     }
 
-    /// An address to read in a row, the pane strip or a tab's hover card: no "https://", no "www.", never a user
-    /// name and password ahead of the host (`AddressText`).
+    /// For display: no "https://", no "www.", never user info before the host (`AddressText`).
     static func displayURL(_ url: URL) -> String {
         var text = AddressText.withoutUserInfo(url).absoluteString
         for prefix in ["https://", "http://"] where text.hasPrefix(prefix) { text.removeFirst(prefix.count) }
@@ -220,6 +215,8 @@ enum CommandRanker {
         /// The page you're on has an address (a blank new tab doesn't).
         var hasPage = false
         var isPinned = false
+        /// Pin and unpin act on the whole group (#209).
+        var isGroup = false
         var isFavorite = false
         var inSplit = false
         /// Another tab, the last one you were on, can open beside this one.
@@ -244,10 +241,12 @@ enum CommandRanker {
         var list: [Action] = []
         if c.hasPage, !c.isPrivate, !c.isFavorite {
             list.append(c.isPinned
-                ? Action(id: "unpin", title: String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar."),
-                         keywords: ["unpin", "pin", "tab", "remove"], symbol: "pin.slash")
-                : Action(id: "pin", title: String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar."),
-                         keywords: ["pin", "tab", "keep", "bookmark"], symbol: "pin"))
+                ? Action(id: "unpin", title: c.isGroup ? String(localized: "Unpin Group", comment: "A command in the command bar, named as in the menu bar.")
+                         : String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar."),
+                         keywords: ["unpin", "pin", "tab", "group", "remove"], symbol: "pin.slash")
+                : Action(id: "pin", title: c.isGroup ? String(localized: "Pin Group", comment: "A command in the command bar, named as in the menu bar.")
+                         : String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar."),
+                         keywords: ["pin", "tab", "group", "keep", "bookmark"], symbol: "pin"))
         }
         if c.hasPage, !c.isFavorite, c.isPinned || !c.isPrivate {
             list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
@@ -361,6 +360,7 @@ enum CommandRanker {
         c.pageSizes = PageSizes.all
         c.isFavorite = tab.isFavorite
         c.isPinned = tab.bookmarkID != nil && !tab.isFavorite
+        c.isGroup = c.isPinned ? tab.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil : manager.pinsGroup(tab)
         c.inSplit = manager.split(for: tab) != nil
         c.canSplitWithRecent = splitPartner(for: tab, in: manager) != nil
         c.canMove = tab.bookmarkID == nil && tab.url != nil
@@ -403,7 +403,7 @@ enum CommandRanker {
                 for entry in profile.history.recent(limit: 8) {
                     let title = entry.title.isEmpty ? HistoryStore.fileName(of: entry.url) ?? displayURL(entry.url) : entry.title
                     add(CommandResult(kind: .history(entry.url), title: title,
-                                      detail: detail(displayURL(entry.url), under: title), icon: FaviconStore.shared.cachedIcon(for: entry.url)),
+                                      detail: detail(displayURL(entry.url), under: title), icon: SiteIcons.shownIcon(for: entry.url, privateStore: manager?.privateStore)),
                         key: TabManager.normalize(entry.url))
                 }
                 // No history yet: say what this is for rather than showing nothing.
@@ -445,7 +445,7 @@ enum CommandRanker {
             if let destination = destination(from: query) {
                 let url = destination.url
                 add(CommandResult(kind: .open(url, httpFallback: destination.httpFallback), title: displayURL(url), detail: "",
-                                  icon: FaviconStore.shared.cachedIcon(for: url), symbol: "globe"),
+                                  icon: SiteIcons.shownIcon(for: url, privateStore: manager?.privateStore), symbol: "globe"),
                     key: TabManager.normalize(url))
             } else {
                 add(CommandResult(kind: .search(query), title: query, detail: engine.name, symbol: "magnifyingglass"), key: "search:\(query)")
@@ -490,7 +490,7 @@ enum CommandRanker {
                 add(CommandResult(kind: .history(entry.url), title: entry.title.isEmpty ? displayURL(entry.url) : entry.title,
                                   detail: space.map { String(localized: "Archived from \($0)", comment: "Under a command bar result for a tab that tidied itself away. The name is the space it was in.") }
                                       ?? String(localized: "Archived", comment: "Under a command bar result for a tab that tidied itself away."),
-                                  icon: FaviconStore.shared.cachedIcon(for: entry.url), symbol: "archivebox"), key: key)
+                                  icon: SiteIcons.shownIcon(for: entry.url, privateStore: manager?.privateStore), symbol: "archivebox"), key: key)
             }
         }
 
@@ -501,7 +501,7 @@ enum CommandRanker {
             guard !seen.contains(key), !SearchFolding.isSearchResultsPage(entry.url) else { continue }
             let title = entry.title.isEmpty ? displayURL(entry.url) : entry.title
             add(CommandResult(kind: .history(entry.url), title: title,
-                              detail: detail(displayURL(entry.url), under: title), icon: FaviconStore.shared.cachedIcon(for: entry.url)), key: key)
+                              detail: detail(displayURL(entry.url), under: title), icon: SiteIcons.shownIcon(for: entry.url, privateStore: manager?.privateStore)), key: key)
             historyCount += 1
         }
 

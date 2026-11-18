@@ -188,7 +188,7 @@ struct SettingsSearchTests {
         #expect(settings.debugFound.contains("How it works"))
     }
 
-    /// A shortcut with the Globe key, as macOS gives Enter Full Screen, shows the Globe first, never a lone letter.
+    /// Globe key shortcuts (Enter Full Screen) show the Globe first.
     @Test func globeKeyShowsInAShortcut() {
         let fullScreen = Shortcuts.Combo(key: "f", modifiers: NSEvent.ModifierFlags.function.rawValue)
         #expect(Shortcuts.caps(fullScreen) == [Shortcuts.globe, "F"])

@@ -14,8 +14,8 @@ import Foundation
 /// The helper's requests, for the one PDF each connection holds. Each reply's last value says whether the helper
 /// has the PDF at all: false when it started afresh since (`open` again, then ask again).
 @objc(ZigzagPDFRendering) nonisolated protocol PDFRendering {
-    /// Sent first, and only when the connection has a helper process of its own: the helper then ends once the
-    /// connection goes. One shared by every PDF isn't told, and stays on.
+    /// Sent first, only when the connection has its own helper process, which then exits when the connection closes.
+    /// The shared helper isn't told and stays running.
     func ownInstance()
     /// Reads the PDF. Nil when it isn't one, is empty, is locked with a password, or is past the limits.
     func open(_ data: Data, reply: @escaping @Sendable (RemotePDFInfo?) -> Void)
@@ -60,10 +60,10 @@ nonisolated enum PDFLimits {
     static let maxPageText = 500_000
     static let maxLinks = 5_000
     static let maxOutline = 10_000
-    /// In UTF-16 units, as the page text is, so combining marks piled on one character can't get past it.
+    /// UTF-16 units, like page text, so stacked combining marks can't exceed it.
     static let maxTitle = 1_000
 
-    /// `text` cut to `maxTitle` UTF-16 units, at a whole character.
+    /// `text` clipped to `maxTitle` UTF-16 units, at a character boundary.
     static func clippedTitle(_ text: String) -> String {
         guard text.utf16.count > maxTitle else { return text }
         var clipped = "", used = 0

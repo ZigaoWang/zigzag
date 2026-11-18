@@ -374,7 +374,7 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError() }
-    /// Answered and fading away: clicks go through to what's under it at once.
+    /// Answered and fading: clicks pass through immediately.
     private var isLeaving = false
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
     override var isFlipped: Bool { true }
@@ -438,9 +438,8 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
             guard let sheet, event.window === host.window else { return event }
             return sheet.handle(event)
         }
-        // The notes are about the app, not a tab, but they cover the page: another tab or space chosen (from the
-        // menu bar, a link from another app), they go rather than sit over a page they weren't opened on. A tab
-        // closing behind, or a split rearranged, says "selection" too while the same tab stays in front: they stay.
+        // The notes cover the page, so another tab or space chosen (menu bar, external link) closes them. A tab closing
+        // behind or a split change also posts "selection" with the same front tab: they stay.
         let tabs = controller.tabManager
         let openedOn = Front(of: tabs)
         sheet.tabsToken = tabs.changed.observe { [weak sheet, weak tabs] change in
@@ -449,7 +448,7 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         }
     }
 
-    /// The tab and space in front: the notes stay while these do.
+    /// Front tab and space; the notes stay while these don't change.
     struct Front: Equatable {
         var tab: UUID?
         var space: UUID
@@ -460,16 +459,16 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
         }
     }
 
-    /// A sheet that asks for an answer (Install as App, a confirmation, an extension's, a page's dialog) is up in the
-    /// window: the notes don't stack on it.
+    /// A sheet needing an answer is open (Install as App, a confirmation, an extension's, a page dialog): don't stack
+    /// on it.
     private static func otherSheetIsUp(in controller: BrowserWindowController) -> Bool {
         let hosts = [controller.window?.contentView, controller.root.overlay].compactMap { $0 }
-        // A page's dialog sits over its page, not the window: it's asked for by window.
+        // Page dialogs sit over their page, so check each page host.
         return hosts.contains { $0.subviews.contains { $0 is FormSheet || $0 is ConfirmSheet || $0 is ExtensionSheet } }
             || PageDialogSheet.isShowing(in: controller.window)
     }
 
-    /// Another sheet is coming up in `window`: the notes, which only inform, make way for it rather than sit under it.
+    /// Another sheet is opening in `window`: the notes give way.
     static func makeRoom(in window: NSWindow?) {
         window?.contentView?.subviews.compactMap { $0 as? WhatsNewSheet }.forEach { $0.close() }
     }
@@ -554,8 +553,7 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
 
     override func layout() {
         super.layout()
-        // Over the page, as the window's other sheets are (an extension's, Install as App's): never across the bar
-        // above it, where the address and the developer tools are.
+        // Over the page like other sheets, never over the top bar with the address and developer tools.
         let page = pageFrame
         let maxHeight = page.height - Tokens.Space.x12
         let height = min(headerHeight + notesHeight() + footerHeight, maxHeight)
@@ -563,7 +561,7 @@ final class WhatsNewSheet: NSView, NSTextViewDelegate {
                              width: width, height: height)
     }
 
-    /// Where the page is in the window, in this view's terms: the whole window when there's no page to go by.
+    /// The page's frame in this view's coordinates; the whole window without a page.
     private var pageFrame: NSRect {
         guard let root = controller?.root, root.window === window else { return bounds }
         let card = convert(root.cardFrame, from: root)
@@ -794,7 +792,7 @@ final class WhatsNewOffer: FloatingPanelView {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         dismiss()
-        // A toast that went under it moves back up to the top of the page.
+        // Move a toast that was below it back to the top.
         if let controller { Toast.reposition(in: controller) }
     }
 

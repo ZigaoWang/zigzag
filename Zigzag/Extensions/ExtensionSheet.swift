@@ -79,7 +79,7 @@ final class ExtensionSheet: FloatingPanelView {
             limitsBox.layer?.cornerCurve = .continuous
             limitsIcon.image = Tokens.Symbol.image("exclamationmark.triangle", size: Tokens.Symbol.inline)
             limitsIcon.contentTintColor = Tokens.Color.textSecondary
-            // One sentence: English names run on in lower case ("…: side panel, notifications.").
+            // One sentence: English names in lower case ("…: side panel, notifications.").
             let names = content.report.limits.map { Words.lowercasedForList($0.text) }
             let list = Words.list(names)
             limitsText.stringValue = String(localized: "Won’t work in Zigzag: \(list).",
@@ -114,8 +114,7 @@ final class ExtensionSheet: FloatingPanelView {
         present(content, over: controller.root.overlay, card: controller.root.cardFrame, onConfirm: onConfirm, onCancel: onCancel)
     }
 
-    /// The same over any view of a window (a window that isn't a browser window, like one Settings shows in), at
-    /// the top of it.
+    /// Same, over any window's view (non-browser windows such as Settings), at the top.
     @discardableResult
     static func present(_ content: Content, over host: NSView,
                         onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void = {}) -> ExtensionSheet {
@@ -125,14 +124,14 @@ final class ExtensionSheet: FloatingPanelView {
     private static func present(_ content: Content, over host: NSView, card: NSRect,
                                 onConfirm: @escaping () -> Void, onCancel: @escaping () -> Void) -> ExtensionSheet {
         current?.finish(confirmed: false)
-        // One sheet at a time: What's New, which only informs, makes way.
+        // One sheet at a time: What's New is informational, so it closes.
         WhatsNewSheet.makeRoom(in: host.window)
         let sheet = ExtensionSheet(content)
         sheet.onConfirm = onConfirm
         sheet.onCancel = onCancel
         let top = host.isFlipped ? card.minY + Tokens.Space.x6 : card.maxY - Tokens.Space.x6 - sheet.frame.height
         sheet.frame.origin = NSPoint(x: round(card.midX - width / 2), y: top)
-        // Kept at the top, centered, as the window resizes.
+        // Stays top-centered as the window resizes.
         if !host.isFlipped { sheet.autoresizingMask = [.minXMargin, .maxXMargin, .minYMargin] }
         host.addSubview(sheet)
         sheet.needsLayout = true
@@ -204,7 +203,7 @@ final class ExtensionSheet: FloatingPanelView {
             let boxPad = Tokens.Space.x3
             let textWidth = inner - boxPad * 2 - Tokens.Space.x5
             limitsText.preferredMaxLayoutWidth = textWidth
-            // As tall as the lines need: a capped box clipped the rest of a long list silently.
+            // Sized to its lines; a capped box silently clipped long lists.
             let h = ceil(limitsText.sizeThatFits(NSSize(width: textWidth, height: .greatestFiniteMagnitude)).height)
             let boxHeight = h + boxPad * 2
             place(limitsBox, NSRect(x: pad, y: y, width: inner, height: boxHeight))

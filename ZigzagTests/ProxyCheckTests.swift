@@ -25,7 +25,7 @@ struct ProxyCheckTests {
         #expect(ProxyCheck.localProxy(in: clash, scheme: "file") == nil)
     }
 
-    /// Any proxy at all, here or elsewhere, for the address's scheme, SOCKS, or set up automatically.
+    /// Any proxy, for the URL's scheme, SOCKS, or auto-configured.
     @Test func anyProxyIsFound() {
         #expect(ProxyCheck.anyProxy(in: clash, scheme: "https"))
         #expect(ProxyCheck.anyProxy(in: ["HTTPSEnable": 1, "HTTPSProxy": "proxy.corp.example", "HTTPSPort": 3128], scheme: "https"))

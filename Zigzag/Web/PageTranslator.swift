@@ -92,17 +92,15 @@ enum PageTranslator {
         await status(from: source, to: target) != .unsupported
     }
 
-    /// Whether Apple can translate between these on this Mac now, once they're downloaded, or not at all.
+    /// Whether Apple can translate this pair here: installed, downloadable, or unsupported.
     static func status(from source: Locale.Language, to target: Locale.Language) async -> LanguageAvailability.Status {
         await LanguageAvailability().status(from: source, to: target)
     }
 
-    /// The language most of the page is in, whatever it is; nil when there's too little text to tell.
-    /// Told from the page's own paragraphs, the ones showing, each read on its own and counted by how much text it
-    /// has, and from the language the page says it's in (`lang`), when it says one: an English page quoting some
-    /// Chinese (a name, a few words in a table) stays English. Only text that's clearly another language overrides
-    /// what the page says: a Spanish page under an English menu, marked lang="en", is still Spanish (#218). A page
-    /// that's all menus goes by all of its text.
+    /// The page's main language, or nil when there's too little text. Each visible paragraph is detected separately
+    /// and weighted by length, combined with the page's `lang`. A few foreign words on an English page don't change
+    /// it; only clearly dominant text overrides `lang` (a Spanish page with lang="en" is Spanish, #218). Menu-only
+    /// pages use all their text.
     static func pageLanguage(of webView: WKWebView) async -> Locale.Language? {
         guard let json = try? await webView.runOwnScript(script("sample()")) as? String,
               let sample = try? JSONDecoder().decode(Sample.self, from: Data(json.utf8)) else { return nil }
@@ -121,10 +119,8 @@ enum PageTranslator {
         pageLanguage(blocks: blocks, declared: nil)
     }
 
-    /// The page's language from its blocks of text and the language it says it's in (`declared`, its `lang`).
-    /// Without one, the language with most of the text, if one has. With one, that language, as long as there's
-    /// enough text to go on and a fair part of it (a quarter) is in it; text three-quarters in another language
-    /// overrides it.
+    /// Without `declared`, the language with most text. With it, `declared` wins if there's enough text and at least
+    /// a quarter is in it; three quarters in another language overrides it.
     nonisolated static func pageLanguage(blocks: [String], declared: String?) -> Locale.Language? {
         let (amounts, total) = tally(blocks)
         guard total >= 80 else { return nil }
@@ -141,22 +137,19 @@ enum PageTranslator {
         return topLanguage
     }
 
-    /// The language a page's `lang` names, by its first part ("zh" of "zh-Hans-CN"); nil for none, or for one that
-    /// names no language ("und", "mul", "zxx", a private "x-" tag).
+    /// From the first subtag ("zh" of "zh-Hans-CN"); nil for none, "und", "mul", "zxx" or a private "x-" tag.
     nonisolated static func language(declared: String) -> Locale.Language? {
         let tag = declared.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "_", with: "-")
         guard let first = tag.split(separator: "-").first?.lowercased(), (2...3).contains(first.count),
               first.allSatisfy({ $0.isASCII && $0.isLetter }), !["und", "mul", "zxx", "mis"].contains(first) else { return nil }
-        // Old codes pages still use, as the language recognizer names them: Hebrew, Indonesian, Yiddish, and
-        // Norwegian, which it reads as Bokmål.
+        // Legacy codes mapped to what the recognizer uses: Hebrew, Indonesian, Yiddish, and Norwegian as Bokmål.
         guard let modern = legacyCodes[first] else { return Locale.Language(identifier: tag) }
         return Locale.Language(identifier: ([modern] + tag.split(separator: "-").dropFirst().map(String.init)).joined(separator: "-"))
     }
 
     private nonisolated static let legacyCodes = ["iw": "he", "in": "id", "ji": "yi", "no": "nb"]
 
-    /// How much text of each language the blocks have, by how much each says, and in all; blocks too short to
-    /// tell, or told with too little confidence, aren't counted.
+    /// Text amount per language, and in total; blocks too short or too uncertain are skipped.
     private nonisolated static func tally(_ blocks: [String]) -> (amounts: [NLLanguage: Int], total: Int) {
         var amounts: [NLLanguage: Int] = [:]
         var total = 0
@@ -232,23 +225,21 @@ enum PageTranslator {
         return dominantLanguage(ofBlocks: text.blockTexts) ?? seen
     }
 
-    /// The language a page on a site you translated is taken to be in: the one it was translated from before, when
-    /// it's the same language read again (Simplified Chinese where Wikipedia's variant switcher made it Traditional),
-    /// so it's translated as it was and never asks macOS for another download (#231).
+    /// On a site translated before, keeps the earlier source when it's the same language in another variant
+    /// (Wikipedia's switcher showing Traditional instead of Simplified), so no extra macOS download is needed (#231).
     nonisolated static func keeping(_ kept: Locale.Language?, over seen: Locale.Language?) -> Locale.Language? {
         guard let kept, let seen, seen.languageCode == kept.languageCode else { return seen }
         return kept
     }
 
-    /// The first of `sources` macOS hasn't downloaded for translating into `target` yet, when a translation failed:
-    /// its download sheet was closed without downloading it. Nil when they're all here, or can't be translated at all.
+    /// After a failed translation: the first source still not downloaded (its download sheet was closed). Nil if all
+    /// are here or unsupported.
     static func notDownloaded(_ sources: [Locale.Language], into target: Locale.Language) async -> Locale.Language? {
         for source in sources where await status(from: source, to: target) == .supported { return source }
         return nil
     }
 
-    /// What a failed translation says: a language not downloaded yet is named, with how to get it; anything else, to
-    /// try again.
+    /// Names a missing language and how to get it; otherwise says to try again.
     static func failureMessage(notDownloaded language: Locale.Language?) -> String {
         guard let language else {
             return String(localized: "Couldn’t translate this page. Try again in a moment.", comment: "Toast when translating a page fails.")
@@ -257,11 +248,10 @@ enum PageTranslator {
                       comment: "Toast when a page couldn't be translated because macOS's download of its language was closed without downloading it. The language is its name, like French.")
     }
 
-    /// Which groups to translate now, given what's on this Mac for each (`status`, in the same order). Languages
-    /// Apple can't translate are left out and named. A language still to download is translated only when it's
-    /// the page's own (the first group) and you asked: macOS's download sheet comes up only from something you
-    /// did, never for a menu of language names or for a page translating on its own (#231). Translating on its own
-    /// with its language not here yet, nothing runs, and `offer` says to offer it instead.
+    /// Which groups to translate given each one's `status` (same order). Unsupported languages are skipped and named.
+    /// A language still to download runs only if it's the page's own (first group) and you asked: macOS's download
+    /// sheet should only follow your action, never a menu of language names or an automatic translation (#231). For
+    /// automatic translation with the language missing, nothing runs and `offer` offers it instead.
     nonisolated static func runnable(_ groups: [Group], status: [LanguageAvailability.Status], asked: Bool)
         -> (groups: [Group], unsupported: [Locale.Language], offer: Bool) {
         var run: [Group] = [], unsupported: [Locale.Language] = []
@@ -285,8 +275,8 @@ enum PageTranslator {
     /// already in the target language is left as it is, so a page in English with a paragraph of Chinese has just
     /// that paragraph translated.
     nonisolated static func plan(_ text: PageText, page: Locale.Language?, into target: Locale.Language) -> [Group] {
-        // First the blocks whose own words tell their language for sure, so a block that can't be told (a title
-        // mixing Chinese and a product's name) can go with the page's text in its script.
+        // Confidently detected blocks first, so ambiguous ones (a title mixing Chinese and a product name) can join
+        // the page's text in their script.
         let used = Set(text.blocks.filter { $0 < text.blockTexts.count })
         var told: [Int: Locale.Language] = [:]
         var amounts: [String: (language: Locale.Language, amount: Int)] = [:]
@@ -310,9 +300,8 @@ enum PageTranslator {
                 languages[block] = language
             }
             guard var language, language.languageCode != target.languageCode else { continue }
-            // One language in another script (Traditional Chinese on a Simplified page, as Wikipedia's variant
-            // menus are) is translated with the page, not on its own: on its own it takes a second language
-            // download macOS asks for (#231).
+            // Another variant of the page's language (Traditional on a Simplified page) translates with the page;
+            // separately it would need a second download (#231).
             if let page, page.languageCode == language.languageCode { language = page }
             let key = code(of: language)
             if groups[key] == nil { order.append(key); groups[key] = ([:], [], 0) }
@@ -320,8 +309,8 @@ enum PageTranslator {
             groups[key]?.pieces.append(index)
             groups[key]?.size += piece.count
         }
-        // A language's pieces are translated together, from the script most of them are in: a Traditional title
-        // over a Simplified issue is translated as Simplified, never asking for a second download (#231).
+        // Each language's pieces translate together, from their majority script, so a Traditional title on a
+        // Simplified page needs no second download (#231).
         return order.compactMap { groups[$0] }.enumerated()
             .sorted { $0.element.size != $1.element.size ? $0.element.size > $1.element.size : $0.offset < $1.offset }
             .compactMap { entry in
@@ -330,14 +319,11 @@ enum PageTranslator {
             }
     }
 
-    /// The language a block of text reads as. Long enough, it's told from its own words. A few words in the page's
-    /// alphabet ("Home", "Inicio") can't be told apart reliably, so they're taken as the page's language; a few in
-    /// another script ("首页", "ニュース") can, and they're told from their own.
-    ///
-    /// Text mostly in a script other than Latin that can't be told for sure (a title like "类似Little Arc功能", which
-    /// reads as a little English) is in a language written in that script, the Latin words in it being names: the
-    /// page's when it's written so, else the one with most text on the page that is (`onPage`, most first), else
-    /// what those letters alone read as.
+    /// A block's language. Long text is detected from its own words. A few words in the page's script ("Home",
+    /// "Inicio") are unreliable, so they take the page's language; a few in another script ("首页", "ニュース") are
+    /// detected. Mostly non-Latin text that can't be told for sure ("类似Little Arc功能") is taken as a language in that
+    /// script, treating the Latin words as names: the page's if it uses that script, else the page's most common one
+    /// that does (`onPage`, most first), else what the letters alone suggest.
     nonisolated static func blockLanguage(_ text: String, page: Locale.Language?, onPage: [Locale.Language] = []) -> Locale.Language? {
         let letters = Array(text.unicodeScalars.filter { $0.properties.isAlphabetic })
         guard !letters.isEmpty else { return nil }
@@ -355,8 +341,7 @@ enum PageTranslator {
         return page
     }
 
-    /// The language a block reads as, when its own words say so clearly: enough of them, told with confidence, and,
-    /// for text mostly in another script than Latin, a language written in it.
+    /// Detected confidently from enough text and, for mostly non-Latin text, a language written in that script.
     private nonisolated static func surely(_ text: String) -> Locale.Language? {
         let letters = Array(text.unicodeScalars.filter { $0.properties.isAlphabetic })
         guard !letters.isEmpty else { return nil }
@@ -372,7 +357,7 @@ enum PageTranslator {
         return language
     }
 
-    /// Whether most of these letters, by how much they say, aren't Latin.
+    /// Weighted by how much each letter carries.
     private nonisolated static func mostlyOtherScript(_ letters: [Unicode.Scalar]) -> Bool {
         var latin = 0, other = 0
         for scalar in letters {
@@ -381,25 +366,24 @@ enum PageTranslator {
         return other > 0 && other >= latin
     }
 
-    /// Whether the language is written in the script of all these letters (Chinese in ideographs, Japanese in them
-    /// and kana, Russian in Cyrillic), by the script it's usually written in.
+    /// By the language's usual script (Chinese in ideographs, Japanese in those and kana, Russian in Cyrillic).
     nonisolated static func writes(_ language: Locale.Language, _ letters: [Unicode.Scalar]) -> Bool {
         guard !letters.isEmpty, let script = script(of: language) else { return false }
         return letters.allSatisfy { scripts(of: $0).contains(script) }
     }
 
-    /// Whether some of these letters are in a script told apart here that the language isn't written in.
+    /// Whether any letter is in a known script the language isn't written in.
     private nonisolated static func contradicts(_ language: Locale.Language, _ letters: [Unicode.Scalar]) -> Bool {
         guard let script = script(of: language) else { return false }
         return letters.contains { let known = scripts(of: $0); return !known.isEmpty && !known.contains(script) }
     }
 
-    /// The script a language is usually written in ("Hans" for Chinese, "Jpan" for Japanese, "Latn" for English).
+    /// "Hans" for Chinese, "Jpan" for Japanese, "Latn" for English.
     private nonisolated static func script(of language: Locale.Language) -> String? {
         (language.script ?? Locale.Language(identifier: language.maximalIdentifier).script)?.identifier
     }
 
-    /// The scripts (ISO 15924) a letter is written in, for the scripts told apart here; none for others.
+    /// ISO 15924 scripts for the scripts distinguished here; empty for others.
     private nonisolated static func scripts(of scalar: Unicode.Scalar) -> Set<String> {
         if scalar.properties.isIdeographic { return ["Hans", "Hant", "Jpan", "Kore"] }
         switch scalar.value {
@@ -561,15 +545,15 @@ struct TranslationRuns<Key: Hashable, Run: AnyObject> {
 }
 
 extension PageTranslator {
-    /// Whether a page is one that's read for its language and offered a translation: a site's page, never Zigzag's
-    /// own (History, Settings, which list other pages' titles in their languages) nor an error page in its place.
+    /// Site pages only: never Zigzag's own pages (History and Settings list titles in other languages) or error
+    /// pages.
     nonisolated static func readsLanguage(of url: URL?, errorPage: Bool) -> Bool {
         guard let scheme = url?.scheme?.lowercased(), !errorPage else { return false }
         return ["http", "https", "file"].contains(scheme)
     }
 
-    /// Whether an offer to translate, made for the page at `offeredFor`, still stands for the tab's page now: the same
-    /// page (a jump within it, by `#`, is the same page), still seen in another language, and not translated yet.
+    /// Whether an offer made for `offeredFor` still applies: same page (a `#` jump counts), still foreign, not yet
+    /// translated.
     nonisolated static func offerStands(offeredFor: URL?, now: URL?, foreign: Bool, translated: Bool) -> Bool {
         guard foreign, !translated, let offeredFor, let now else { return false }
         func page(_ url: URL) -> String {

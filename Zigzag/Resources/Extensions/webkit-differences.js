@@ -248,11 +248,10 @@
       extras.set(standIn, own);
       return setMemberIn(root, path.slice(0, -1), path[path.length - 1], standIn);
     };
-    // Takes a member away from chrome and browser alike, as Chrome has none where WebKit, the bridge or the API
-    // surface put one. A property the object won't give up is hidden behind a stand-in for the object that holds it:
-    // it is not there to `in`, to `typeof`, or to a read, and everything else passes through as before.
+    // Removes a member from chrome and browser where Chrome has none. A property that can't be deleted is hidden behind a
+    // proxy of its holder: absent to `in`, `typeof` and reads; everything else passes through.
     const removeMember = (path, key) => {
-      // The object a member was taken from -> the stand-in hiding it, so two globals sharing one runtime keep sharing.
+      // Holder -> proxy, so two globals sharing one runtime share the proxy.
       const removed = new Map();
       for (const root of roots) {
         const parent = path.reduce((object, part) => { kept.add(object); return object && object[part]; }, root);
@@ -264,16 +263,15 @@
         if (!(key in parent)) continue;
         let hidden = removed.get(parent);
         if (!hidden) {
-          // The stand-in's target carries the object's own descriptors, bar the hidden member: a proxy may not report
-          // a non-configurable property its extensible target doesn't have, or enumeration and descriptor reads
-          // throw. Reads still go to the real object, so methods see its data.
+          // The proxy target copies the holder's own descriptors minus the hidden one: a proxy can't report a non-configurable
+          // property its target lacks, or enumeration and descriptor reads throw. Reads still hit the real object.
           const descriptors = Object.getOwnPropertyDescriptors(parent);
           delete descriptors[key];
           for (const name of Reflect.ownKeys(descriptors)) {
             const descriptor = descriptors[name];
             if (!('value' in descriptor) || typeof descriptor.value !== 'function') continue;
             if (!bound.has(descriptor.value)) bound.set(descriptor.value, descriptor.value.bind(parent));
-            // A member nothing can redefine must read as the very value its descriptor reports.
+            // Non-redefinable members must read as their descriptor's exact value.
             if (descriptor.writable === false && descriptor.configurable === false) descriptor.value = bound.get(descriptor.value);
           }
           const target = Object.create(Object.getPrototypeOf(parent));
@@ -357,7 +355,7 @@
     }
 
     Object.defineProperty(globalThis, '__zigzagSetMember', { value: setMember, configurable: true });
-    // The API surface takes MV3-only members out of an MV2 world even where WebKit won't give one up.
+    // Strips MV3-only members from MV2 worlds even where WebKit won't let them go.
     Object.defineProperty(globalThis, '__zigzagRemoveMember', { value: removeMember, configurable: true });
 
     // A page asked to connect to its worker (below), when the worker looks for its clients.
@@ -513,9 +511,9 @@
       });
     }
 
-    // action.openPopup from the extension's own page in a frame on a site: WebKit takes the call from a site's process
-    // as a forged message and ends that process, so the click did nothing but reload the site. iCloud Passwords' "Enable
-    // Password AutoFill" under a field asks so (#248). Zigzag opens the popup itself, for a click in the frame.
+    // action.openPopup from an extension page framed in a site: WebKit treats the call from a site process as forged and
+    // kills it, so the site just reloaded (iCloud Passwords' "Enable Password AutoFill", #248). Zigzag opens the popup
+    // itself on a click in the frame.
     const framedOnSite = !isWorker && typeof window !== 'undefined' && window.top !== window && location.ancestorOrigins
       && Array.from(location.ancestorOrigins).some((origin) => !origin.startsWith('webkit-extension:'));
     const openPopupHandler = framedOnSite && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zigzagOpenPopup;
@@ -686,8 +684,8 @@
     // Tampermonkey takes "install" to mean the scripts it already has were planted, and turns every one off. Zigzag
     // knows what it installed (BridgeRuntime): only a real install is passed on as one, a moment later.
     const installed = api.runtime.onInstalled;
-    // The extension's own listeners, for telling it Zigzag was updated (contextMenus, below). WebKit can answer
-    // Zigzag before the extension's script has run, so one added a moment after is told as it's added.
+    // The extension's onInstalled listeners, for the Zigzag-updated event (contextMenus below). WebKit may answer before
+    // the script runs, so a listener added later still gets it.
     const installListeners = new Set();
     let updatedUntil = 0;
     const tellUpdated = (listener) => setTimeout(() => { try { listener({ reason: 'chrome_update' }); } catch (e) { console.error(e); } }, 0);
@@ -714,16 +712,14 @@
       if (has) setMember(['runtime', 'onInstalled'], 'hasListener', (listener) => has(guarded.get(listener) || listener));
     }
 
-    // contextMenus: Chrome keeps an extension's right-click menu items across restarts, WebKit forgets them when
-    // Zigzag quits. Extensions whose background sleeps add them once, on install, as Chrome tells them to, so Downie's
-    // were gone from every menu after a relaunch (#239). Zigzag keeps what each creates, changes and removes
-    // (ExtensionBridge's contextMenusKept) and puts it back once as the extension starts. One it already has (it
-    // added its own again) is left as it is. The first time, with nothing kept yet, it's told Zigzag was updated, as
-    // Chrome tells it after an update ("chrome_update"), so it adds the items it made before Zigzag kept them.
+    // contextMenus: Chrome keeps menu items across restarts; WebKit drops them on quit. Event-driven backgrounds add them
+    // only on install, so Downie's vanished after relaunch (#239). Zigzag records creates, updates and removes
+    // (contextMenusKept) and restores them once on start, skipping IDs the extension already re-added. With nothing saved
+    // yet, it sends onInstalled "chrome_update" so the extension re-adds its items.
     const keptMenus = globalThis.__zigzagContextMenus;
     const menuNames = ['contextMenus', 'menus'].filter((name) => api[name] && typeof api[name].create === 'function');
     if (keptMenus && menuNames.length) {
-      // Nothing from a page in a private window is kept: what it makes is for that window, and goes with it.
+      // Nothing from a private window's page is saved.
       let isPrivate = false;
       try { isPrivate = !!(api.extension && api.extension.inIncognitoContext); } catch (e) {}
       const note = (op, args) => { if (isPrivate) return; try { keptMenus.change(op, args).catch(() => {}); } catch (e) {} };
@@ -744,8 +740,7 @@
           setMember([name], op, recorded);
         }
       }
-      // Only its background puts them back: an extension page restored with the session can start first, and has
-      // no install listeners to tell.
+      // Only the background restores: a session-restored extension page may start first and has no install listeners.
       let isBackground = isWorker;
       try { isBackground = isBackground || (typeof api.extension.getBackgroundPage === 'function' && api.extension.getBackgroundPage() === globalThis); } catch (e) {}
       const putBack = (answer) => {
@@ -831,8 +826,7 @@
     const onConnect = api.runtime.onConnect;
     const connectRaw = onConnect && typeof onConnect.addListener === 'function' ? onConnect.addListener.bind(onConnect) : null;
     let keepOpen = null;
-    // Kept now, before afterSurface takes the member away in a worker as Chrome has none there: this is how WebKit
-    // wakes the background to answer.
+    // Kept before afterSurface removes it from workers (Chrome has none there); WebKit uses it to wake the background.
     const askBackground = typeof api.runtime.getBackgroundPage === 'function' ? api.runtime.getBackgroundPage.bind(api.runtime) : null;
     if (isWorker && onConnect && typeof onConnect.addListener === 'function' && askBackground) {
       const open = new Set();
@@ -1070,7 +1064,14 @@
     // with its icon: Zigzag's, as a data: URL (ExtensionBridge's favicons). A slow or missing answer leaves the tabs
     // as WebKit gave them; a call WebKit refuses is made again as it was, so the callback hears its lastError.
     // getCurrent outside a tab (a side panel, a popup) is undefined in Chrome, where WebKit says null: Claude's side
-    // panel checks for undefined exactly, and refused to open on null.
+    // panel checks for undefined exactly, and refused to open on null. In a popup WebKit gives the tab in front, and
+    // Proton Pass took its popup for its page open in a tab, sized it to fit the page and came up cut short (#287).
+    const inPopup = () => {
+      try {
+        const views = api.extension && typeof api.extension.getViews === 'function' ? api.extension.getViews({ type: 'popup' }) : null;
+        return Array.isArray(views) && views.includes(globalThis);
+      } catch (e) { return false; }
+    };
     const withFavicons = async (value) => {
       const ask = globalThis.__zigzagFavicons;
       const tabs = (Array.isArray(value) ? value : [value]).filter((tab) => tab && typeof tab === 'object' && typeof tab.url === 'string' && !tab.favIconUrl);
@@ -1087,7 +1088,7 @@
       const call = original.bind(api.tabs);
       setMember(['tabs'], name, (...args) => {
         const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
-        const result = Promise.resolve(call(...args)).then((value) => (name === 'getCurrent' && value === null ? undefined : withFavicons(value)));
+        const result = Promise.resolve(call(...args)).then((value) => (name === 'getCurrent' && (value === null || inPopup()) ? undefined : withFavicons(value)));
         if (!callback) return result;
         result.then((value) => callback(value), () => call(...args, callback));
         return undefined;
@@ -1111,16 +1112,14 @@
     const defaults = { webRTCIPHandlingPolicy: 'default', networkPredictionEnabled: true, hyperlinkAuditingEnabled: true,
       referrersEnabled: true, doNotTrackEnabled: false, thirdPartyCookiesAllowed: true, alternateErrorPagesEnabled: false,
       safeBrowsingEnabled: true, searchSuggestEnabled: true, spellingServiceEnabled: false, translationServiceEnabled: false };
-    // Chrome's exact words when an extension has no background page to hand over.
+    // Chrome's exact error when there's no background page.
     const noBackgroundPage = 'You do not have a background page.';
-    // runtime.getBackgroundPage: only an MV2 extension has a background page. In MV3 Chrome keeps the member on a
-    // page, but it always fails with these words; WebKit answers null where there's no page. So an MV3 page is always
-    // told so, and an MV2 page's null becomes the same error. A callback hears the error through runtime.lastError
-    // only while it runs, as from WebKit.
+    // runtime.getBackgroundPage: only MV2 has a background page. MV3 pages keep the member but it always fails with this
+    // error; WebKit returns null instead. So MV3 pages always get the error, and an MV2 null becomes it. The callback sees
+    // it in runtime.lastError only while running, as with WebKit.
     //
-    // A worker keeps whatever member WebKit gave it: hiding the member there needed a stand-in for the whole runtime
-    // object, which every MV3 worker then carried into its keepalive port. So it is plainly visible in an MV3 worker,
-    // answering as WebKit does rather than as Chrome's absent member would; only the page is corrected.
+    // Workers keep WebKit's member: hiding it needed a proxy of the whole runtime, which every MV3 worker then passed into
+    // its keepalive port. So MV3 workers answer as WebKit does; only pages are corrected.
     const correctGetBackgroundPage = (manifestV3) => {
       const noBackgroundError = () => new Error(noBackgroundPage);
       if (!isWorker) {
@@ -1152,7 +1151,7 @@
     const afterSurface = () => {
     const manifestV3 = (() => { try { return api.runtime.getManifest().manifest_version === 3; } catch (e) { return false; } })();
     correctGetBackgroundPage(manifestV3);
-    // Manifest V2 never had runtime.getContexts: not from WebKit, the bridge, or the API surface, which leaves it out.
+    // MV2 never had runtime.getContexts; WebKit, the bridge and the API surface all omit it.
     if (!manifestV3) removeMember(['runtime'], 'getContexts');
     if (api.privacy) {
       for (const group of Object.keys(api.privacy)) {

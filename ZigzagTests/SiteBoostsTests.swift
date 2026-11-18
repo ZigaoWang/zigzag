@@ -3,8 +3,7 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// Boosts: the selectors Zap Element makes, what's kept for a site, a private window's own copy, and the style sheet
-/// pages get.
+/// Boosts: Zap Element selectors, per-site storage, private window copies, and the injected style sheet.
 @MainActor
 @Suite(.serialized)
 struct SiteBoostsTests {
@@ -48,7 +47,7 @@ struct SiteBoostsTests {
     </body></html>
     """
 
-    /// The selector the picker makes for the element `query` finds, and whether it finds that element alone.
+    /// The selector the picker makes for `query`'s element, and whether it matches only that element.
     private func selector(for query: String, in webView: WKWebView) async throws -> (String?, Bool) {
         let script = PageBoosts.selectorSource + """
 
@@ -68,28 +67,28 @@ struct SiteBoostsTests {
     @Test func selectorsAreUniqueAndLasting() async throws {
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         await load(Self.page, in: webView)
-        // A stable id is the selector.
+        // A stable id is used.
         #expect(try await selector(for: "document.getElementById('promo')", in: webView) == ("#promo", true))
-        // A generated id is passed over for the element's class.
+        // Generated ids are skipped for a class.
         #expect(try await selector(for: "document.querySelector('.banner')", in: webView) == ("div.banner", true))
-        // Generated classes are left out; with another card on the page, its place among its siblings tells them apart.
+        // Generated classes are skipped; sibling position tells cards apart.
         let card = try await selector(for: "document.querySelector('.sc-bdVaJa')", in: webView)
         #expect(card.1)
         #expect(card.0 == "section.card:nth-of-type(1)")
-        // A list item by its place, under the list's id.
+        // A list item by position under the list's id.
         #expect(try await selector(for: "document.querySelectorAll('#list li')[1]", in: webView) == ("#list > li:nth-of-type(2)", true))
-        // Deeper, with no ids or classes: up through the parents to a landmark, never a bare tag and place.
+        // No ids or classes: climbs to a landmark, never a bare tag and position.
         #expect(try await selector(for: "document.querySelectorAll('p')[2]", in: webView) == ("main > article:nth-of-type(2) > p", true))
-        // Part of a drawing is the drawing; a state class (is-active) isn't kept, so it goes up to the body.
+        // Inside an SVG, the SVG is chosen; state classes (is-active) are dropped, so it climbs to body.
         let drawing = try await webView.evaluateJavaScript(PageBoosts.selectorSource + """
 
         (() => { try { return String(window.ZigzagBoostSelector(document.getElementById('p'))); } catch (e) { return 'threw ' + e; } })()
         """) as? String
         #expect(drawing == "body > button > svg")
         #expect(try await selector(for: "document.querySelector('svg')", in: webView) == ("body > button > svg", true))
-        // A class with a character CSS needs escaped.
+        // Classes with characters CSS needs escaped.
         #expect(try await selector(for: "document.querySelector('[class=\"md:flex\"]')", in: webView) == ("div.md\\:flex", true))
-        // The page itself is never zapped.
+        // Never the body.
         #expect(try await selector(for: "document.body", in: webView) == (nil, false))
         #expect(try await selector(for: "document.documentElement", in: webView) == (nil, false))
     }
@@ -107,11 +106,11 @@ struct SiteBoostsTests {
             #expect(site == "example.com")
             #expect(SiteBoosts.zap("#promo", forSite: site))
             #expect(SiteBoosts.zap("div.banner", forSite: site))
-            // The same one again is kept once.
+            // Duplicates are kept once.
             #expect(SiteBoosts.zap("#promo", forSite: site))
             #expect(SiteBoosts.boost(for: URL(string: "https://example.com/b")).zaps == ["#promo", "div.banner"])
             #expect(SiteBoosts.sites == ["example.com"])
-            // Only web pages have boosts: never Zigzag's own pages, files or extensions.
+            // Only web pages: never Zigzag pages, files or extensions.
             #expect(SiteBoosts.site(of: URL(string: "zigzag-history://history")) == nil)
             #expect(SiteBoosts.site(of: URL(string: "file:///tmp/a.html")) == nil)
             #expect(SiteBoosts.site(of: URL(string: "webkit-extension://abc/popup.html")) == nil)
@@ -131,15 +130,15 @@ struct SiteBoostsTests {
         try await withDefaults {
             SiteBoosts.zap("#kept", forSite: "example.com")
             let window = WKWebsiteDataStore.nonPersistent()
-            // A private window starts from what's kept.
+            // Private windows start from kept boosts.
             #expect(SiteBoosts.boost(forSite: "example.com", privateStore: window).zaps == ["#kept"])
             SiteBoosts.zap("#mine", forSite: "example.com", privateStore: window)
             SiteBoosts.zap("#other", forSite: "other.com", privateStore: window)
             #expect(SiteBoosts.boost(forSite: "example.com", privateStore: window).zaps == ["#kept", "#mine"])
-            // Nothing it did is kept, nor seen by other windows.
+            // Nothing persists or reaches other windows.
             #expect(SiteBoosts.all == ["example.com": SiteBoost(zaps: ["#kept"])])
             #expect(SiteBoosts.boost(forSite: "example.com", privateStore: .nonPersistent()).zaps == ["#kept"])
-            // Restore All there shows them in that window only.
+            // Restore All there applies to that window only.
             SiteBoosts.restoreZaps(forSite: "example.com", privateStore: window)
             #expect(SiteBoosts.boost(forSite: "example.com", privateStore: window).isEmpty)
             #expect(SiteBoosts.boost(forSite: "example.com").zaps == ["#kept"])
@@ -168,7 +167,7 @@ struct SiteBoostsTests {
             let shown = "getComputedStyle(document.getElementById('promo')).display"
             #expect(try await webView.evaluateJavaScript(shown) as? String == "none")
             #expect(try await webView.evaluateJavaScript("getComputedStyle(document.querySelector('.banner')).display") as? String == "block")
-            // Another site has none, and an error page none either.
+            // Other sites and error pages get none.
             PageBoosts.prepare(webView, for: URL(string: "https://other.com/"), privateStore: nil, errorPage: false)
             await load(Self.page, in: webView, at: "https://other.com/")
             #expect(try await webView.evaluateJavaScript(shown) as? String == "block")
@@ -178,17 +177,17 @@ struct SiteBoostsTests {
     }
 
     @Test func stylesArePlainCSSOnly() {
-        // Plain CSS, with inline pictures and the page's own fragments.
+        // Plain CSS, including data: images and same-page fragments.
         for good in ["", "body { color: red; }", ".ad { display: none !important }", "a::before { content: \"<3 a > b\"; }",
                      "div { background: url(data:image/png;base64,AAAA) }", "svg { fill: url(#grad) }", "@media (max-width: 600px) { nav { display: none } }",
                      "p { background-image: linear-gradient(red, blue) }"] {
             #expect(SiteBoosts.styleProblem(good) == nil, "\(good)")
         }
-        // Nothing that reads as HTML, however it's written.
+        // Nothing that parses as HTML, however written.
         for tag in ["</style><script>alert(1)</script>", "a{}</STYLE >", "\\3c /style>", "<!-- x -->"] {
             #expect(SiteBoosts.styleProblem(tag) == .tag, "\(tag)")
         }
-        // Nothing loaded from elsewhere: @import, url() and its kin, plain, escaped or split by a comment.
+        // No remote loads: @import, url() and similar, plain, escaped or split by comments.
         for remote in ["@import url(https://evil.example/x.css);", "@IMPORT 'x.css';", "@\\69mport 'x.css';",
                        "a { background: url(https://t.example/p.gif) }", "a { background: url('//t.example/p') }", "a { background: url(/beacon) }",
                        "a { background: \\75 rl(https://t.example) }", "a { background: u\\rl(https://t.example) }",
@@ -197,7 +196,7 @@ struct SiteBoostsTests {
                        "input[value^=a] { background: URL(https://t.example/?a) }"] {
             #expect(SiteBoosts.styleProblem(remote) == .loads, "\(remote)")
         }
-        // A comment splits a word, as the browser reads it: u/**/rl( is no url(.
+        // A comment splits a token, as the browser reads it: u/**/rl( isn't url(.
         #expect(SiteBoosts.styleProblem("a { x: u/**/rl(https://t.example) }") == nil)
         #expect(SiteBoosts.styleProblem(String(repeating: "a", count: SiteBoosts.maxStyle + 1)) == .tooLong)
     }
@@ -209,14 +208,14 @@ struct SiteBoostsTests {
             #expect(SiteBoosts.boost(forSite: "example.com").style == "body { color: red }")
             SiteBoosts.zap("#promo", forSite: "example.com")
             #expect(SiteBoosts.css(for: SiteBoosts.boost(forSite: "example.com")) == "#promo { display: none !important; }\nbody { color: red }")
-            // A private window's style is its own.
+            // Private windows keep their own style.
             let window = WKWebsiteDataStore.nonPersistent()
             SiteBoosts.setStyle("p { color: blue }", forSite: "example.com", privateStore: window)
             SiteBoosts.setStyle("p { color: green }", forSite: "private.com", privateStore: window)
             #expect(SiteBoosts.boost(forSite: "example.com", privateStore: window).style == "p { color: blue }")
             #expect(SiteBoosts.boost(forSite: "example.com").style == "body { color: red }")
             #expect(SiteBoosts.sites == ["example.com"])
-            // Empty turns it off; with no zaps left either, the site has nothing kept.
+            // Empty disables it; with no zaps left, the site has nothing stored.
             SiteBoosts.setStyle("  \n", forSite: "example.com")
             SiteBoosts.restoreZaps(forSite: "example.com")
             #expect(SiteBoosts.sites.isEmpty)
@@ -239,7 +238,7 @@ struct SiteBoostsTests {
             await load(Self.page, in: webView, at: url.absoluteString)
             let color = "getComputedStyle(document.getElementById('promo')).color"
             #expect(try await webView.evaluateJavaScript(color) as? String == "rgb(1, 2, 3)")
-            // Run again (a change while you're on the page), it replaces the sheet rather than adding another.
+            // Rerunning replaces the sheet instead of adding another.
             let again = PageBoosts.source(css: "#promo { color: rgb(4, 5, 6) }", site: "example.com") + "\n;true"
             _ = try await webView.evaluateJavaScript(again, in: nil, contentWorld: PageBoosts.world)
             #expect(try await webView.evaluateJavaScript(color) as? String == "rgb(4, 5, 6)")
@@ -250,17 +249,17 @@ struct SiteBoostsTests {
     @Test func thePickerLeavesThePageAsItWas() async throws {
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         await load("<html><body><button id='b' onclick='window.clicks = (window.clicks || 0) + 1'>Go</button></body></html>", in: webView)
-        // Each ends on a value: WebKit's async call throws on undefined.
+        // Each ends with a value: WebKit's async call throws on undefined.
         func run(_ script: String, in world: WKContentWorld = .page) async throws {
             _ = try await webView.evaluateJavaScript(script + "\n;true", in: nil, contentWorld: world)
         }
         try await run(PageBoosts.pickerSource(accent: "#3366ff", hint: "Pick"), in: PageBoosts.world)
-        // While picking, the page doesn't hear the click.
+        // While picking, the page doesn't get the click.
         try await run("document.getElementById('b').click()", in: PageBoosts.world)
         #expect(try await webView.evaluateJavaScript("window.clicks || 0") as? Int == 0)
         #expect(try await webView.evaluateJavaScript("document.querySelectorAll('zigzag-zap').length") as? Int == 1)
         try await run(PageBoosts.stopSource, in: PageBoosts.world)
-        // Once it's stopped, the page has its clicks again and nothing of the picker is left.
+        // After stopping, clicks reach the page and the picker is gone.
         try await run("document.getElementById('b').click()")
         #expect(try await webView.evaluateJavaScript("window.clicks || 0") as? Int == 1)
         #expect(try await webView.evaluateJavaScript("document.querySelectorAll('zigzag-zap').length") as? Int == 0)

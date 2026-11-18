@@ -25,32 +25,31 @@ enum WebKitSetup {
         return configuration
     }
 
-    /// A configuration WebKit hands over for a page another opened (a tab, or a pop-up window) shares that page's
-    /// preferences, the same object: a change made for one page (its WebRTC switch, Disable Styles) would reach the
-    /// other, whatever its site. Every web view made from one gets preferences of its own instead, the same in all
-    /// else, with what a tab's developer tools change back as WebKit has it; the page then sets its own (its tab's
-    /// choices, its WebRTC switch). Feature flags reach it as any open page (`FeatureFlags`).
+    /// A configuration WebKit hands over for an opened page (tab or pop-up) shares the opener's preferences object,
+    /// so per-page changes (WebRTC switch, Disable Styles) would leak across sites. Gives each web view its own copy,
+    /// identical otherwise, with developer-tools changes reset to WebKit's defaults; the page then applies its own
+    /// settings. Feature flags apply as to any open page (`FeatureFlags`).
     static func separatePreferences(of configuration: WKWebViewConfiguration) {
         guard let own = configuration.preferences.copy() as? WKPreferences else { return }
         PageStyles.set(true, in: own)
         configuration.preferences = own
     }
 
-    /// Sets one of WebKit's own unpublished preferences (`key`, as KVC has it: `_set<Key>:` behind it), only when this
-    /// WebKit still has it, and only when it differs (read only where WebKit has the getter too).
+    /// Sets a private WebKit preference by KVC key (`_set<Key>:`) if it exists and differs (reading only where the
+    /// getter exists too).
     static func setIfAvailable(_ on: Bool, key: String, in preferences: WKPreferences) {
         guard hasPreference(key) else { return }
         if preferences.responds(to: NSSelectorFromString("_" + key)), preferences.value(forKey: key) as? Bool == on { return }
         preferences.setValue(on, forKey: key)
     }
 
-    /// Whether this WebKit has one of its unpublished preferences, by its KVC key.
+    /// Whether this WebKit has a private preference with this KVC key.
     static func hasPreference(_ key: String) -> Bool {
         WKPreferences.instancesRespond(to: NSSelectorFromString("_set" + key.prefix(1).uppercased() + key.dropFirst() + ":"))
     }
 
-    /// WKWebView still goes Back on ⌫ (and Forward on ⇧⌫) when no field has the focus; Safari and Chrome dropped that
-    /// years ago, so a ⌫ that misses a text box would leave the page you were on.
+    /// WKWebView still goes Back on ⌫ (Forward on ⇧⌫) with no field focused; Safari and Chrome dropped that years
+    /// ago.
     static func turnOffBackspaceNavigation(_ preferences: WKPreferences) {
         setIfAvailable(false, key: "backspaceKeyNavigationEnabled", in: preferences)
     }
@@ -61,16 +60,15 @@ enum WebKitSetup {
         configuration.applicationNameForUserAgent = applicationNameForUserAgent
         configuration.preferences.isElementFullscreenEnabled = true
         configuration.preferences.isFraudulentWebsiteWarningEnabled = true
-        // Zigzag decides which pop-ups open (PopupNotice), so a site you've allowed gets real ones.
+        // PopupNotice decides which pop-ups open.
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         #if DEBUG
         // Testing on video sites: nothing plays until clicked, so nothing makes a sound.
         if UserDefaults.standard.bool(forKey: "DebugNoAutoplay") { configuration.mediaTypesRequiringUserActionForPlayback = .all }
         #endif
-        // WKWebView leaves a page's own Picture in Picture off for every video (Safari has it on), so sites like
-        // Bilibili say they "don't support it" and View › Picture in Picture finds nothing to float. Pages still need
-        // a click to float a video.
+        // WKWebView disables page-initiated Picture in Picture by default (Safari enables it), so sites like Bilibili
+        // say they "don't support it" and View › Picture in Picture finds nothing. Pages still need a click.
         setIfAvailable(true, key: "allowsPictureInPictureMediaPlayback", in: configuration.preferences)
         turnOffBackspaceNavigation(configuration.preferences)
         configuration.allowsAirPlayForMediaPlayback = true
@@ -166,14 +164,35 @@ enum PageScripts {
     static var all: [WKUserScript] {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
-        [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark]
+        [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark,
+         commandClickedLinks]
     }
 
-    /// The Apple Store's checkout draws one Apple Pay mark (#235). WebKit gives Apple Pay only to Safari, so the
-    /// store uses Apple's Apple Pay script for other browsers, marks the page `supports-applepay-ac` and writes the
-    /// mark as text, the Apple logo and Pay. Its payment option also has the Apple Pay logo as a
-    /// `-webkit-named-image`, which only WebKit draws: Chrome shows just the text, Safari just the logo, and Zigzag
-    /// drew both, one over the other. The logo goes in that case, as the store's own rule takes it off its button.
+    /// ⌘-click on a web link always opens a new tab, whatever the page's script does (#317). YouTube's script
+    /// followed its links in-page, so a ⌘-click moved the tab. Runs before the page's listeners and stops the event;
+    /// WebKit then follows the link and `Tab` opens it in a new tab. Links in editable text, same-page anchors and
+    /// download links are left to the page.
+    static let commandClickedLinks = WKUserScript(source: """
+    (() => {
+      if (!/^https?:$/.test(location.protocol)) return;
+      addEventListener('click', (e) => {
+        if (!e.isTrusted || e.button !== 0 || !e.metaKey || e.ctrlKey) return;
+        const link = e.composedPath().find((n) => n instanceof Element && (n.localName === 'a' || n.localName === 'area') &&
+                                              (n.hasAttribute('href') || n.hasAttribute('xlink:href')));
+        if (!link || link.hasAttribute('download') || link.isContentEditable) return;
+        let url;
+        try { url = new URL(link.getAttribute('href') ?? link.getAttribute('xlink:href'), document.baseURI); } catch (error) { return; }
+        if (!/^https?:$/.test(url.protocol)) return;
+        if (url.hash && url.href.split('#')[0] === location.href.split('#')[0]) return;
+        e.stopImmediatePropagation();
+      }, true);
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
+
+    /// The Apple Store checkout should show one Apple Pay mark (#235). WebKit gives Apple Pay only to Safari, so the
+    /// store uses Apple's script for other browsers, adds `supports-applepay-ac` and writes the mark as text. Its
+    /// option also has a `-webkit-named-image` logo only WebKit draws, so Zigzag showed both. Hide the logo in that
+    /// case, as the store does on its button.
     static let applePayMark = WKUserScript(source: """
     (() => {
       const host = location.hostname;
@@ -330,12 +349,11 @@ final class PageErrors: NSObject, WKScriptMessageHandler {
         }
     }
 
-    /// The most of a page's error text that goes into Diagnostics (and from there a problem report).
+    /// Max error text kept for Diagnostics (and problem reports).
     static let maxText = 300
 
-    /// What's kept of a page's word for an error: its first line's start, without characters that could pass for
-    /// Zigzag's own lines in a report (line breaks, controls, marks that reorder text). The page's message is any
-    /// text it likes, so it's the page's, never more.
+    /// Keeps the start of the first line, minus characters that could pass for Zigzag's own report lines (line
+    /// breaks, controls, bidi marks). The page controls this text.
     static func noteText(_ text: String) -> String {
         var kept = String.UnicodeScalarView()
         for scalar in text.unicodeScalars {
@@ -348,8 +366,7 @@ final class PageErrors: NSObject, WKScriptMessageHandler {
         return String(kept).trimmingCharacters(in: .whitespaces)
     }
 
-    /// Only the page's own document, the one the tab shows, is listened to: a frame in it (an ad) puts nothing in
-    /// Diagnostics, and nor does anything that isn't one of the script's own kinds.
+    /// Only the tab's main document is logged; frames (ads) and unknown message kinds are ignored.
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, let body = message.body as? [String: Any], let kind = body["kind"] as? String,
               ["error", "rejection", "http"].contains(kind), let text = body["text"] as? String, let webView = message.webView else { return }
@@ -396,8 +413,8 @@ final class ExtensionPageErrors: NSObject, WKScriptMessageHandler {
     }
 }
 
-/// action.openPopup() from an extension's own page in a frame on a site (webkit-differences.js), which WebKit won't
-/// take from a site's process (#248). Only a frame of the extension itself asks: a site can't post as one.
+/// action.openPopup() from an extension page framed on a site (webkit-differences.js), which WebKit won't accept from
+/// a site's process (#248). Only the extension's own frame can post this.
 final class FramedExtensionPopups: NSObject, WKScriptMessageHandlerWithReply {
     static let shared = FramedExtensionPopups()
     static let messageName = "zigzagOpenPopup"

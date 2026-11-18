@@ -68,7 +68,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Spaces** | Each with its own color, icon, pinned tabs and folders. Swipe on the sidebar, or nudge the mouse wheel sideways, to switch. |
 | **Favorites** | Your most used sites as tiles, above every space. Any tab, pinned tab or favorite can wear its own emoji or symbol. |
 | **Profiles** | Keep work and personal apart. Each profile has its own extensions, sign-ins, history and favorites, and every space is on one. |
-| **Sites in spaces** | In Settings › Spaces, route a host, a domain and its subdomains, or a path and its pages to a space. The first matching rule wins. For example, put github.com/org1 and github.com/org2 above a rule for all of github.com to open each organization in its own space. Site Controls shows the rule for the current page. A space on its own profile works like a Firefox container. |
+| **Sites in spaces** | In Settings › Spaces, route a host, a domain and its subdomains, or a path and its pages to a space. The first enabled matching rule wins. For example, put `github.com/org1` and `github.com/org2` above a rule for all of `github.com` to open each organization in its own space. Site Controls shows the rule for the current page. A space on its own profile works like a Firefox container. |
 | **Command bar** | ⌘T or ⌘L. Finds open tabs, history and sites. Type `you`, press Tab, and you're searching YouTube. Drag the bar anywhere in the window and it opens there from then on. |
 | **Tab groups** | Pick some tabs and choose Group Tabs, and they become a folder in the sidebar that opens and closes, renames, and moves as one. |
 | **Split view** | Up to four tabs: drag a tab onto the page's edges for a half, or its corners for a quarter. Drag a page by its strip to move it, and pin a split to keep it. |
@@ -79,13 +79,14 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 | **Now Playing** | Every tab playing sound in the background gets a card at the foot of the sidebar, up to three, to pause or mute it. |
 | **All tabs** | ⇧⌘\ shows every space at once. Type to filter, drag a tab to another space. |
 | **Clear** | Closes the tabs you've drifted away from and keeps the ones you're working with. Point at it to see which it would close. A split view stays or goes whole. Undo brings them back. |
-| **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps can open in it, like Little Arc, and Open in Zigzag Mini moves a tab into one. |
+| **Zigzag Mini** | ⌃⌘N opens a small window for one quick page, and ⌘O moves it into your browser window. Links from other apps open in it, like Little Arc (turn that off in Settings › Zigzag Mini), and Open in Zigzag Mini moves a tab into one. |
 | **Passwords** | In your Mac's Keychain, synced by iCloud Keychain. Touch ID, a generator, and a check for weak and reused ones. Passkeys work. |
 | **Dark pages** | Light sites drawn dark by Dark Reader's engine, with its fixes for thousands of sites, so photos stay true. Sites with a dark look of their own keep it. Pure black if you like it darker. On everywhere or per site. |
 | **Ad blocking** | Built in and on: about 130,000 EasyList, EasyPrivacy and EasyList China rules, compiled into WebKit content rule lists, plus uBlock Origin's filter lists, which update on their own. |
 | **WebRTC** | Turn on Protect IP address from WebRTC, and sites can't learn your real IP address through WebRTC while you use a proxy or VPN. Calls work on the sites you allow, and a site that tries WebRTC while it's blocked says so, with Allow for This Site. |
 | **Cookie pop-ups** | Turned down for you, never accepted, with DuckDuckGo's Autoconsent rules. Leave them alone everywhere or for one site if you'd rather answer yourself. |
 | **Site Controls** | One panel per site: zoom, permissions (camera, microphone, location, notifications, pop-ups, opening apps, screen sharing, WebRTC), each set to Ask, Allow or Block, JavaScript on or off, the certificate, extensions, and switches for dark pages, ad blocking and cookie pop-ups. When a site asks for one of these, it asks on one card over the page, for this time or always, and a site you said no to stops asking. |
+| **Boosts** | Zap Element hides the parts of a site you don't want, like a banner or a sidebar, and Edit Style gives a site CSS of your own. Both are in Site Controls' ⋯ menu and stay with the site. |
 | **Developer Mode** | For the sites you build, `localhost` to begin with: the console with an error count, Inspect Element, device sizes, light and dark, print styles, JavaScript, images or styles off, another user agent, and a QR code to open the page on your phone. |
 | **Extensions** | From the Chrome Web Store, where the store's own button reads Add to Zigzag. 1Password, Bitwarden, Dark Reader, Tampermonkey and most popular ones work; see below for what doesn't. |
 | **Import** | Bookmarks, history, passwords, sign-ins and extensions from Arc, Chrome, Safari, Dia, Edge, Brave, Vivaldi, Opera, Comet, Helium, Yandex, Whale, Chromium, Thorium, Firefox, Zen and Orion. |
@@ -101,7 +102,7 @@ It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc u
 
 - No sync between Macs or to iPhone. Passwords sync through iCloud Keychain; spaces and tabs don't.
 - Space icons don't come over from Arc; pick them again in Zigzag. Space colors come over as the nearest Zigzag color.
-- No Boosts, Easels or Notes, and no AI built into the browser: AI apps can use Zigzag over MCP only if you turn it on.
+- No Easels or Notes, and Boosts are CSS only (Zap Element and Edit Style, no per-site scripts). No AI built into the browser: AI apps can use Zigzag over MCP only if you turn it on.
 - A few Chrome extension APIs aren't there yet: the tab groups API, debugger settings, Chrome's own Google account sign-in (`identity.getAuthToken`), and the old request-blocking webRequest. Proxy extensions can set a fixed HTTP, HTTPS or SOCKS5 proxy but not a PAC script, so FoxyProxy's Proxy by Patterns mode doesn't work.
 - EasyList and the other built-in blocking lists update with Zigzag, not on their own; only uBlock Origin's lists do.
 - macOS 15.4 or later only.

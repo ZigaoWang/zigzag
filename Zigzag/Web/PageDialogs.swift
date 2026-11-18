@@ -134,15 +134,14 @@ enum PageDialogs {
         return now < exception.until && exception.leaf == leaf
     }
 
-    /// Whether the page `webView` shows came with a certificate you chose to trust on the warning page.
+    /// Whether the shown page was loaded through a certificate trusted from the warning page.
     static func isShowingException(in webView: WKWebView?) -> Bool {
         guard let webView, let url = webView.url, url.scheme?.lowercased() == "https", let host = url.host(),
               let trust = webView.serverTrust else { return false }
         return wasTrusted(host, leaf: leaf(of: trust), in: webView.configuration.websiteDataStore)
     }
 
-    /// Whether `leaf` is a certificate you chose to trust for `host`, even if that choice has since run out: a page
-    /// still showing what came with it isn't secure, and goes on saying so.
+    /// Whether you trusted `leaf` for `host`, even if that has since expired: a page still showing it isn't secure.
     static func wasTrusted(_ host: String, leaf: Data?, in store: WKWebsiteDataStore) -> Bool {
         guard let leaf, !leaf.isEmpty, let exception = trusted.object(forKey: store)?[host.lowercased()] as? Exception else { return false }
         return exception.leaf == leaf
@@ -154,8 +153,7 @@ enum PageDialogs {
         return now < exception.until
     }
 
-    /// The choices for `store` go (its site data was cleared): all of them, or one site's (covering its subdomains
-    /// and the domains it's under).
+    /// Clears choices after site data is cleared: all, or one site's (its subdomains and parent domains).
     static func forget(in store: WKWebsiteDataStore, site: String? = nil) {
         guard let site = site?.lowercased() else {
             trusted.removeObject(forKey: store)
@@ -251,16 +249,15 @@ enum AuthenticationPrompt {
                                                    leaf: CertificateExceptions.leaf(of: trust), askedBy: page?.url, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
-        // A site asking for a certificate that identifies you: one from your Keychain, as Safari offers.
+        // Client certificate from the Keychain, as in Safari.
         if method == NSURLAuthenticationMethodClientCertificate {
             return await ClientCertificates.respond(to: challenge, window: window, store: store, page: page)
         }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {
             return (.performDefaultHandling, nil)
         }
-        // Only the site you're on (or going to) signs in over its page. Something from another site inside it (an
-        // image, a frame) neither puts a sign-in sheet over a page that isn't its own nor gets a name and password
-        // saved for its site sent along: it's asked before anything saved is looked at.
+        // Only the page's own site can sign in over it. Cross-site resources (images, frames) get no sheet and no
+        // saved credentials; checked before saved logins are read.
         let pageHost = await MainActor.run { page?.url?.host() }
         guard Self.mayAnswer(pageHost: pageHost, askingHost: challenge.protectionSpace.host) else {
             return (.cancelAuthenticationChallenge, nil)
@@ -302,8 +299,7 @@ enum AuthenticationPrompt {
         return answer
     }
 
-    /// Whether a sign-in asked for by `askingHost` may be answered on the page at `pageHost`, with a saved name and
-    /// password or a sheet: only on its own site. With no page to go by, it may.
+    /// Only on its own site; with no page, allowed.
     nonisolated static func mayAnswer(pageHost: String?, askingHost: String) -> Bool {
         guard let pageHost = pageHost?.lowercased(), !pageHost.isEmpty else { return true }
         return sameSite(pageHost, askingHost.lowercased())

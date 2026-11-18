@@ -51,7 +51,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// Inside a `pageChange`: the steps it's made of (pin, then into a folder) are its own, one ⌘Z and one redo.
     var isInPageChange = false
     lazy var linkStatus = LinkStatusController(overlay: root.overlay)
-    /// With the sidebar hidden, says a link opened in a new tab behind the page (#272).
+    /// With the sidebar hidden, notes a link opened in a background tab (#272).
     lazy var newTabNote = NewTabNote(controller: self)
     lazy var peek = PeekController(controller: self)
     /// A playing video you've left, in a small card over the page.
@@ -140,8 +140,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
-        // The site's pill above the page (#275) is the address there: a click opens the command bar right over it, as
-        // a split pane's pill does; a right-click, a middle-click and a drop do what they do on the sidebar's address.
+        // The site pill above the page (#275) acts as the address: click opens the command bar over it, as in split
+        // panes; right-click, middle-click and drop act as on the sidebar address.
         let pill = root.topBar.pill
         pill.onClick = { [weak self, weak pill] _ in
             guard let self, let pill else { return }
@@ -182,9 +182,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             var items: [MenuPanel.Entry] = [
                 .item(.init(title: String(localized: "Stop Camera and Microphone", comment: "Menu item of the address bar's camera button: stops the page using the camera and microphone."), symbol: "stop.circle") { tab.stopCapture() }),
             ]
-            // An answer to the question holds for this page only (Ask); Always Allow keeps it for the site, and
-            // Ask Every Time takes that back. A private window keeps nothing for a site.
-            // Only what the page is using now: an audio call never grants the camera for good, nor overrides a Block.
+            // Ask holds for this page only; Always Allow saves for the site and Ask Every Time removes that. Private
+            // windows save nothing. Only what's in use now: an audio call never grants the camera permanently or
+            // overrides a Block.
             let inUse = [tab.isUsingCamera ? SitePermission.camera : nil, tab.isUsingMicrophone ? SitePermission.microphone : nil].compactMap { $0 }
             if !tab.isPrivate, !inUse.isEmpty {
                 let allAllowed = inUse.allSatisfy { SitePermissions.choice($0, origin: origin) == .allow }
@@ -204,14 +204,14 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.onNowPlayingToggle = { [weak self] tab in self?.toggleNowPlaying(tab) }
         sidebar.onNowPlayingHide = { [weak self] tab in self?.hideNowPlaying(tab) }
         sidebar.onNowPlayingMenu = { [weak self] tab in self?.nowPlayingMenu(for: tab) }
-        // An update shows in every window's sidebar, private ones too: it's for all of Zigzag, and restarting closes a
-        // private window as quitting does.
+        // Updates show in every window, private too: they're app-wide, and restarting closes private windows like
+        // quitting.
         sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         sidebar.updateCard.onHide = { Updater.shared.dismissCard() }
         sidebar.setUpdateCard(Updater.shared.cardState)
         tokens.append(Updater.changed.observe { [weak self] in
             guard let self else { return }
-            // Closed in this window: it goes as a closed card does; in the others it fades.
+            // Closed in this window: hide like a closed card; fade in others.
             let hiding = Updater.shared.readiness.isDismissed && self.window?.isKeyWindow == true
             self.sidebar.setUpdateCard(Updater.shared.cardState, hiding: hiding)
             self.placeFloatingUpdate(hiding: hiding)
@@ -466,7 +466,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// instead), it lands among the pinned tabs or the tabs right where it was dropped, and this window comes forward.
     func takePinned(_ bookmarkID: UUID, from source: BrowserWindowController, at screenPoint: NSPoint) -> NSView? {
         let ids = Library.shared.pinnedSplit(containing: bookmarkID).map(\.ids) ?? [bookmarkID]
-        // Windows sharing their tabs have the same open pages (#162): nothing to bring over.
+        // Sharing windows have the same pages (#162): nothing to bring over.
         for id in ids where source.tabManager.store !== tabManager.store {
             if tabManager.bookmarkTab(for: id) != nil {
                 if let live = source.tabManager.bookmarkTab(for: id) { source.tabManager.close(live) }
@@ -535,7 +535,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             let entry = SidebarMenus.Item(String(title.prefix(60))) { [weak webView] in
                 if let owner = (webView as? BrowserWebView)?.owner { owner.go(to: item) } else { webView?.go(to: item) }
             }
-            if let icon = FaviconStore.shared.cachedIcon(for: item.url) {
+            if let icon = SiteIcons.shownIcon(for: item.url, privateStore: (webView as? BrowserWebView)?.owner?.privateStore) {
                 let small = icon.copy() as! NSImage
                 small.size = NSSize(width: 16, height: 16)
                 entry.image = small
@@ -650,13 +650,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showPages()
         // Shown in a pane some other way (split beside the page you're on): the mini player lets it go.
         miniPlayer.tabsChanged()
-        // Back on the tab whose video the mini player took as you left Zigzag: it goes back in its page.
+        // Back on the tab whose video went to the mini player: return it to the page.
         AutoPictureInPicture.shared.reconsider()
         sidebar.update(tab: tab)
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         paintTopBar()
-        // A collapsed pinned section shows the pinned page you're on, so it changes with the selection; so does a shut
-        // group of tabs (#209), which shows only the tab you're on.
+        // A collapsed pinned section and a folded tab group (#209) show the current tab, so they update with the
+        // selection.
         let space = tabManager.currentSpaceID
         if SidebarListView.isCollapsed(space) || tabManager.groups(in: space).contains(where: { !$0.isOpen }) {
             sidebar.list.reload(animated: true)
@@ -704,7 +704,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             only.state = listed ? .on : .off
             menu.addItem(.separator())
             menu.addItem(only)
-            // Turned off here from the notice that it used a lot of energy: choosing it turns it back on here.
+            // Turned off from the high energy notice: choosing it turns it back on.
             if installs.offSites(id).contains(site) {
                 let off = SidebarMenus.Item(String(localized: "Off on \(site)", comment: "Site Access choice, checked: the extension is turned off on this site. Choosing it turns it back on there. The site is a domain.")) {
                     installs.setOff(id, on: site, false)
@@ -843,10 +843,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var isReviewing: Bool { if case .reviewing = self { true } else { false } }
     }
 
-    /// Adding from the store: verify the package, show what it can do, install only once confirmed. `progress`
-    /// hears each stage (the store bar shows them); without it, toasts do.
-    /// `also` hears each stage beside the toasts (the store's own button waits on it). `into`: the profile the sheet
-    /// starts on, when it isn't the window's (Settings shows another).
+    /// Installs from the store: verify the package, show its permissions, install once confirmed. `progress` gets each
+    /// stage (the store bar); without it, toasts show them. `also` gets stages alongside toasts (the store button waits
+    /// on it). `into`: the sheet's starting profile when not the window's (from Settings).
     func installExtension(_ id: String, into chosenProfile: Profile? = nil, progress: ((InstallStage) -> Void)? = nil, also: ((InstallStage) -> Void)? = nil) {
         guard #available(macOS 15.4, *) else { also?(.failed("")); return }
         // The profile you were in when you asked: it's added there, wherever you are by the time it's ready.
@@ -935,8 +934,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                    duration: 10, closes: true, in: self)
     }
 
-    /// The iCloud Passwords extension added by hand while Zigzag still saves or fills passwords there: asked once
-    /// whether it should take over (#248), never switched behind your back. Settings › Passwords has the choice too.
+    /// iCloud Passwords extension added while Zigzag still uses iCloud for passwords: ask once whether it takes over
+    /// (#248), never switch silently. Also in Settings › Passwords.
     private func offerICloudPasswords(of id: String, in profile: Profile) {
         let offered = ProfileKey.iCloudPasswordsOffered.name(in: profile.id)
         guard id == ICloudPasswords.id, ICloudPasswords.isOn(in: profile),
@@ -971,7 +970,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Which tabs Now Playing has cards for, and the ones you've hidden them for.
+    /// Tabs with Now Playing cards, and those the user hid.
     private var nowPlayingChoice = NowPlayingChoice()
 
     /// The pane enlarged over the others for a moment, if any (#160).
@@ -1108,7 +1107,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 card.header.setVertical(pair.vertical)
                 card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: first) }
                 card.header.swap.onClick = { [weak self] _ in self?.tabManager.swapSplit(for: first) }
-                // A page another window sharing the tabs has on screen stays there; the card says so (#162).
+                // A page another sharing window shows stays there; the card says so (#162).
                 if tabManager.mayShow(page) {
                     card.show(page.ensureWebView())
                 } else {
@@ -1164,8 +1163,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Show Here, over a page another window has on screen (#162): it comes to this window, still loaded, and the other
-    /// shows it's here now.
+    /// Show Here (#162): moves the loaded page into this window; the other shows a placeholder.
     func showHere(_ tab: Tab) {
         guard !tab.isClosed, tabManager.tab(with: tab.id) === tab else { return }
         tabManager.select(tab)
@@ -1218,9 +1216,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: The update card with the sidebar hidden
 
-    /// With the sidebar hidden, the update card stands in on its own in the sidebar's bottom corner, on a small
-    /// panel, for an update you asked for and once when one is ready (`Updater.cardFloats`). It goes with its close
-    /// button or Restart, and for good once the sidebar's back, where the card lives.
+    /// With the sidebar hidden, the update card floats in the sidebar's corner on a small panel, for a requested update
+    /// and once when one is ready (`Updater.cardFloats`). Closed by its button or Restart, and for good once the
+    /// sidebar returns.
     private lazy var floatingUpdate: (panel: FloatingPanelView, card: UpdateCard) = {
         let panel = FloatingPanelView()
         let card = UpdateCard()
@@ -1231,13 +1229,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         panel.onLayout = { [weak panel, weak card] in
             guard let panel, let card else { return }
             card.frame = panel.bounds
-            // Concentric with the panel, which it fills.
+            // Concentric with the panel it fills.
             card.layer?.cornerRadius = panel.radius
         }
         return (panel, card)
     }()
 
-    /// Shows, moves or puts away the floating update card, as the update, the sidebar and the window are now.
+    /// Shows, moves or hides the floating update card for the current state.
     func placeFloatingUpdate(hiding: Bool = false) {
         let updater = Updater.shared
         let (panel, card) = floatingUpdate
@@ -1248,8 +1246,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return
         }
         card.show(state)
-        // Where the card sits in the sidebar: as wide, as far in from the window's edges as the sidebar's own edge,
-        // above the stand-in Downloads button when that's out.
+        // Same width and insets as in the sidebar, above the stand-in Downloads button if shown.
         let pad = Tokens.Metric.sidebarPadding
         let width = root.sidebarWidth - Tokens.Sidebar.edge * 2
         let height = UpdateCard.height(for: state)
@@ -1357,12 +1354,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return ids[index] == current ? nil : ids[index]
     }
 
-    /// A card for each tab making sound (or paused by its card) that you aren't looking at, unless you've hidden it
-    /// for what that tab is playing (`NowPlayingChoice`). `hiding`: the tab whose card you just hid.
+    /// A card per tab playing audio (or paused from its card) that isn't on screen, unless hidden for that media
+    /// (`NowPlayingChoice`). `hiding`: the tab whose card was just hidden.
     private func updateNowPlaying(hiding: UUID? = nil) {
         let selected = tabManager.selectedTab
-        // While windows share their tabs (#162), the cards of the tabs in this window: one in another window, on screen
-        // there or last there, has its card there.
+        // With shared tabs (#162), only this window's tabs; a tab shown elsewhere has its card there.
         let tabs = tabManager.recentTabs.filter { holds($0) && !tabManager.isShownElsewhere($0) }
         let candidates = tabs.map {
             NowPlayingChoice.Candidate(id: $0.id, page: NowPlayingChoice.page(of: $0.url),
@@ -1374,17 +1370,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.setNowPlaying(shown.map { (tab: $0, paused: isPausedForNowPlaying($0)) }, hiding: hiding)
     }
 
-    /// Paused as Now Playing shows it: by its own button, or a video stopped in the mini player.
+    /// Paused from its card, or a video stopped in the mini player.
     private func isPausedForNowPlaying(_ tab: Tab) -> Bool {
         let playing = NowPlayingChoice.isPlaying(sound: tab.isPlayingAudio, miniPlayerVideo: miniPlayer.holds(tab) ? miniPlayer.isPlaying(tab) : nil)
         return NowPlayingChoice.isPaused(playing: playing, pausedFromCard: tab.isPlaybackPaused, inMiniPlayer: miniPlayer.holds(tab))
     }
 
-    /// The mini player took a video or let it go: Now Playing keeps its card while a video is there, paused or not.
+    /// The mini player took or released a video; Now Playing keeps the card while it holds one.
     func miniPlayerChanged() { updateNowPlaying() }
 
-    /// The mini player let go of the page of a tab still on screen (it took it as you left Zigzag): the card that
-    /// shows that tab takes the page in again.
+    /// The mini player released a tab still on screen (taken when Zigzag went to the background); its card takes the
+    /// page back.
     func miniPlayerGaveBack(_ webView: WKWebView) {
         let cards = root.paneCards.filter { $0.webView === webView }
         guard !cards.isEmpty else { return }
@@ -1392,21 +1388,21 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showPages()
     }
 
-    /// Now Playing's play button and menu item. A video in the mini player plays and pauses there, as its own button
-    /// does, so the two never disagree; anything else, through WebKit's media control.
+    /// Now Playing's play button and menu item. A mini player video toggles there so the two agree; otherwise via
+    /// WebKit media control.
     private func toggleNowPlaying(_ tab: Tab) {
         if !tab.isPlaybackPaused, miniPlayer.togglePlayback(of: tab) { return }
         tab.setPlaybackPaused(!tab.isPlaybackPaused)
     }
 
-    /// Hides a tab's Now Playing card for what it's playing now. The sound plays on; the card comes back when the tab
-    /// goes to another page. The other tabs' cards stay.
+    /// Hides a tab's Now Playing card for its current media. Audio keeps playing; the card returns when the tab
+    /// navigates.
     func hideNowPlaying(_ tab: Tab) {
         nowPlayingChoice.hide(tab.id, page: NowPlayingChoice.page(of: tab.url))
         updateNowPlaying(hiding: tab.id)
     }
 
-    /// Right-click on a Now Playing card: what its buttons do, by name, and Hide.
+    /// Context menu for a Now Playing card: its actions by name, and Hide.
     private func nowPlayingMenu(for tab: Tab) -> NSMenu? {
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -1540,7 +1536,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 updateHandoff()
                 // A pinned tab that moved on shows it right away.
                 if tab.bookmarkID != nil { sidebar.list.refreshRows() }
-                // An offer to translate the page that was here goes with it.
+                // Remove the translation offer for the previous page.
                 withdrawStaleTranslationOffer()
             }
             sidebar.update(tab: tab)
@@ -1584,7 +1580,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         /// "Chinese", or "Chinese and Japanese" for a page with both.
         let name: String
         let site: String?
-        /// The language of most of the page: what the site's next pages are taken to be in.
+        /// The page's main language, assumed for the site's next pages.
         let source: Locale.Language?
         let host = TranslationHost()
         var token: SignalToken?
@@ -1608,8 +1604,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private weak var translationToastTab: Tab?
     /// Sites already offered this session, so browsing a site in another language doesn't ask on every page.
     private var translationOffered: Set<String> = []
-    /// Sites the person translated this session, and the language they were translated from: their other pages
-    /// translate as they open, from that language when they're in it again.
+    /// Sites translated this session and their source language; their other pages auto-translate when in that language.
     private var translatedSites: [String: Locale.Language] = [:]
     /// How long a translation may take before it says so instead of spinning on: Apple's translation can wait on
     /// a prompt that never comes up, or not answer at all.
@@ -1620,11 +1615,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         PageTranslator.isInView(tab, selected: tabManager.selectedTab, peeked: peek.isVisible ? peek.tab : nil)
     }
 
-    /// The page the offer to translate showing is for: it's that tab's, and that page's, and goes once either does.
+    /// The page the visible translation offer is for; removed when the tab or page changes.
     private var translationOfferPage: URL?
 
-    /// Takes down the offer to translate when the page it was made for isn't the one in view any more: another tab
-    /// chosen, the tab gone somewhere else, or its page found to be in your language after all.
+    /// Removes the translation offer when its page is no longer in view: another tab, a navigation, or the page turned
+    /// out to be in your language.
     private func withdrawStaleTranslationOffer() {
         guard let tab = Toast.owner(in: self) as? Tab else { return }
         let inView = peek.isVisible ? peek.tab : tabManager.selectedTab
@@ -1653,10 +1648,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                    }), duration: 6, closes: true, owner: tab, in: self)
     }
 
-    /// Translates the tab you're on, or `chosen` (a tab's menu in the sidebar, a page's menu, the page in Peek), or
-    /// shows it as it was. Each tab translates on its own, so one in the back goes on while you translate another;
-    /// its toasts show only while its page is in view. `asked` is false for a page translating on its own (a site
-    /// you translated, a language you always translate): that never brings up macOS's download sheet (#231).
+    /// Translates the current tab or `chosen` (sidebar tab menu, page menu, Peek), or reverts it. Tabs translate
+    /// independently; toasts show only while the page is in view. `asked` is false for automatic translation, which
+    /// never opens macOS's download sheet (#231).
     func translatePage(tab chosen: Tab? = nil, asked: Bool = true) {
         guard let tab = chosen ?? tabManager.selectedTab, let webView = tab.webView else { return }
         let key = ObjectIdentifier(tab)
@@ -1696,7 +1690,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             for group in planned { status.append(await PageTranslator.status(from: group.source, to: target)) }
             let (groups, unsupported, offer) = PageTranslator.runnable(planned, status: status, asked: asked)
             guard let self, tab.webView === webView, !tab.isClosed else { return }
-            // Its language isn't on this Mac yet: offered, so the download is yours to start.
+            // Language not installed: offer it so the user starts the download.
             if offer {
                 if self.translationInView(tab), let language = planned.first?.source { self.showTranslationOffer(tab, language: language) }
                 return
@@ -1771,8 +1765,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         })
     }
 
-    /// Says a translation failed. When macOS's download sheet was closed without downloading the language, it says
-    /// so and offers Translate again, which brings the sheet back; anything else, to try again in a moment.
+    /// Shows a translation failure. If macOS's download sheet was closed without downloading, offers Translate again to
+    /// reopen it; otherwise suggests retrying.
     private func showTranslationFailed(_ tab: Tab, from sources: [Locale.Language], into target: Locale.Language) {
         Task { @MainActor [weak self, weak tab] in
             let missing = await PageTranslator.notDownloaded(sources, into: target)
@@ -1856,7 +1850,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         return selectedWebView
     }
 
-    /// Reader pressed while the page is still loading: it opens once the load is done (#233).
+    /// Reader requested while loading: opens when the load finishes (#233).
     private var readerWait: SignalToken?
     private var readerWaitLimit: DispatchWorkItem?
     /// The tab Reader is waiting for.
@@ -1864,16 +1858,15 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func toggleReader() {
         if reader != nil { closeReader(); return }
-        // Pressed again while it waits, on the same tab: it doesn't open after all. On another tab, the wait for the
-        // first is over (it's no longer in front) and Reader is for this one.
+        // Pressed again on the same tab: cancel. On another tab: the first wait ends and Reader is for this one.
         if readerWait != nil {
             let same = Self.readerPressCancelsWait(waitingFor: readerWaitTab, selected: tabManager.selectedTab)
             endReaderWait()
             if same { return }
         }
         guard let tab = tabManager.selectedTab, let webView = tab.webView, tab.url != nil else { return }
-        // Mid-load the page may not be there yet to read, or be the one you're leaving: Reader waits for it, and
-        // the page stays as it is meanwhile. A page that never quite finishes (a stalled picture) is read anyway.
+        // Mid-load the content may be missing or the old page: wait. Pages that never finish loading (a stalled image)
+        // are read anyway.
         guard !webView.isLoading else {
             Toast.show(String(localized: "Reader opens once the page loads", comment: "Toast when Reader is pressed while the page is still loading."), symbol: "doc.plaintext", duration: 2, in: self)
             readerWait = tab.changed.observe { [weak self, weak tab] change in
@@ -1894,7 +1887,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         openReader(in: tab)
     }
 
-    /// Reader pressed while it waits for a page: only on that same tab does the press call it off.
+    /// Only a press on the waiting tab cancels the wait.
     static func readerPressCancelsWait(waitingFor: Tab?, selected: Tab?) -> Bool {
         waitingFor != nil && waitingFor === selected
     }
@@ -1908,7 +1901,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func openReader(in tab: Tab) {
-        // Waited for a page you've since left: Reader isn't for the tab you're on now.
+        // The tab changed while waiting: skip.
         guard reader == nil, tabManager.selectedTab === tab, let webView = tab.webView, let url = tab.url else { return }
         Task { [weak self] in
             guard let article = await Reader.article(in: webView), let self else {
@@ -1992,8 +1985,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateWindowTitle() {
         let tab = tabManager.selectedTab
-        // Each title change makes AppKit relay out the title bar; skip the ones that change nothing. So does setting
-        // `representedURL`, even to the nil it already is, so it's never set: the window has no document icon.
+        // Every title change makes AppKit lay out the title bar again, so skip no-op changes. Setting `representedURL`
+        // does too, even to nil, so it's never set: no document icon.
         let title = tab?.displayTitle ?? "Zigzag"
         if window?.title != title { window?.title = title }
         // Lets accessibility clients (1Password, Raycast, Shortcuts) know which page is showing.
@@ -2212,9 +2205,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func windowDidMove(_ notification: Notification) { onStateChange?() }
     func windowDidEndLiveResize(_ notification: Notification) { layoutTrafficLights() }
 
-    /// The bar behind the traffic lights when they come down with the menu bar in full screen. AppKit's own title bar
-    /// draws nothing there for a window whose page runs up under it, so without this the lights floated over the page
-    /// with the sidebar hidden. The title bar's material, blurring the page under it, as Safari's toolbar does.
+    /// Bar behind the traffic lights when they drop down with the menu bar in full screen. AppKit draws nothing there
+    /// when the page runs under the title bar, so with the sidebar hidden the buttons floated over the page. Uses the
+    /// title bar material, like Safari's toolbar.
     private var fullScreenBar: NSVisualEffectView?
 
     private func showFullScreenBar(_ on: Bool) {
@@ -2301,10 +2294,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     // MARK: Opening pages
 
-    /// Opens a URL the way the user asked, switching to an existing tab when the page is already open.
-    /// `sender`: who gave the address. A page's link (⌘-click, a link in Reader) is the page's doing, never yours.
-    /// `httpFallback`: `url` is https chosen for an address given without a scheme, so a tab tries it over http if
-    /// it can't be reached (`CommandRanker.Destination`); Peek and a new window load the address alone.
+    /// Opens a URL as requested, switching to an existing tab if the page is open. `sender`: who gave the address; a
+    /// page's link (⌘-click, Reader) is `.page`. `httpFallback`: `url` is https for a scheme-less address, retried over
+    /// http if unreachable (`CommandRanker.Destination`); Peek and new windows don't fall back.
     func open(_ url: URL, disposition: OpenDisposition = .foregroundTab, opener: Tab? = nil, allowSwitch: Bool = true, by sender: Tab.LoadSender = .zigzag,
               httpFallback: Bool = false) {
         // A page that comes to the front, say a link from Mail, isn't left under the command bar the empty window opened with.
@@ -2315,7 +2307,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         switch disposition {
         case .currentTab:
-            // The tab that asked, never the selected one: in a split they are different panes.
+            // Use the requesting tab, not the selected one: in a split they differ.
             if let tab = opener ?? tabManager.selectedTab {
                 tab.load(url, by: sender, httpFallback: httpFallback)
             } else {
@@ -2325,8 +2317,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             tabManager.newTab(url: url, opener: opener, by: sender, httpFallback: httpFallback)
         case .backgroundTab:
             let tab = tabManager.newTab(url: url, select: false, opener: opener, by: sender, httpFallback: httpFallback)
-            // A link you opened behind the page: with the sidebar hidden, nothing else would say so. Not one Zigzag
-            // opened on its own (the guide's, a restored one).
+            // Background link with the sidebar hidden: show a note. Not for tabs Zigzag opened itself (guide, restore).
             if sender == .page { newTabNote.show(tab) }
         case .peek:
             showPeek(url: url, configuration: nil, by: sender)
@@ -2428,8 +2419,8 @@ extension BrowserWindowController: TabHost {
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
-        // A link to a site you chose a space for opens there (#286), as a page of its own: Open Link in New Tab, or a
-        // link you clicked that opens a new tab. A sized window (a sign-in's pop-up) and a peek stay as they are.
+        // Site routes (#286) apply to Open Link in New Tab and clicked new-tab links. Sized windows (sign-in pop-ups)
+        // and peeks are skipped.
         if let url = action.request.url, Tab.route(forPageLink: url, from: tab.url) == .load,
            features.width == nil, features.height == nil {
             let pending = BrowserWebView.pendingDisposition(for: tab.webView)
@@ -2644,10 +2635,10 @@ extension BrowserWindowController: SidebarDelegate {
         }), duration: Toast.undoDuration, in: self)
     }
 
-    /// Turns a tab into a bookmark, undoably. Half of a split pins the pair.
-    func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID) {
+    /// Bookmarks a tab, undoably. A grouped tab pins its group unless `keepingGroup` is false.
+    func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID, keepingGroup: Bool = true) {
         Tutorial.complete("pin")
-        pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID) }
+        pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: keepingGroup) }
     }
 
     /// Turns a bookmark back into a tab, undoably. Half of a pinned split unpins the pair.
@@ -2741,7 +2732,7 @@ extension BrowserWindowController: SidebarDelegate {
         Library.shared.setFolderOpen(id, open, tucking: tucking)
     }
     func listSetGroupOpen(_ id: UUID, _ open: Bool) {
-        // Opening and closing isn't an edit to undo, as for a folder.
+        // Folding isn't undoable, as for folders.
         tabManager.setGroupOpen(id, open)
     }
     func listRenameGroup(_ id: UUID, to name: String) {
@@ -2763,7 +2754,7 @@ extension BrowserWindowController: SidebarDelegate {
             guard let self else { return }
             pageChange(String(localized: "Add to Group", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
                 for tab in tabs where tab.bookmarkID == nil {
-                    // From another space the drag opened: into the group's first.
+                    // From another space: move it into the group's first spot.
                     if tab.spaceID != space { tabManager.moveTabToSpace(tab, spaceID: space, at: 0) }
                     tabManager.setGroup(of: tab, to: group)
                 }
@@ -2803,7 +2794,7 @@ extension BrowserWindowController: SidebarDelegate {
     func listBookmark(_ tab: Tab, at index: Int, in spaceID: UUID) {
         // Pins are shared by every window: a private one's tabs stay out of them.
         guard !tabManager.isPrivate else { return }
-        confirmProfileCrossing([tab], to: spaceID) { [weak self] in self?.bookmarkWithUndo(tab, at: index, in: spaceID) }
+        confirmProfileCrossing([tab], to: spaceID) { [weak self] in self?.bookmarkWithUndo(tab, at: index, in: spaceID, keepingGroup: false) }
     }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int, under parent: UUID?, group: UUID?) {
         // Pins are shared by every window: a private one doesn't take them away.
@@ -2860,7 +2851,7 @@ extension BrowserWindowController: SidebarDelegate {
     func move(_ tabs: [Tab], to target: BrowserWindowController, at index: Int) {
         let moving = tabs.filter { !$0.isClosed && $0.bookmarkID == nil && tabManager.tab(with: $0.id) === $0 }
         guard target !== self, let first = moving.first else { return }
-        // Windows sharing their tabs (#162): they're in that window's list already. It shows the first.
+        // Sharing windows (#162) already have them; show the first.
         if target.tabManager.store === tabManager.store {
             hand(first, to: target)
             return
@@ -2901,8 +2892,7 @@ extension BrowserWindowController: SidebarDelegate {
         closeIfEmptied()
     }
 
-    /// `tab`'s page goes on screen in `target`, a window sharing these tabs (#162), which comes forward; this window
-    /// moves on from it if it was showing it.
+    /// Shows `tab`'s page in `target`, a sharing window (#162), and brings it forward; this window selects another tab.
     private func hand(_ tab: Tab, to target: BrowserWindowController) {
         guard target !== self, target.tabManager.store === tabManager.store, !tab.isClosed else { return }
         target.tabManager.select(tab)
@@ -3053,7 +3043,7 @@ extension BrowserWindowController: SidebarDelegate {
         panel.show(beside: anchor, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
     }
 
-    /// Choose Image… in the icon grid: an image file as the tab's icon (#303), copied into Zigzag's folder.
+    /// Choose Image… in the icon grid: uses an image file as the tab's icon (#303), copied into Zigzag's folder.
     func chooseImageIcon(for tab: Tab) {
         let id = tab.id
         pickPageImage { [weak self] icon in
@@ -3068,7 +3058,26 @@ extension BrowserWindowController: SidebarDelegate {
         pickPageImage { [weak self] icon in self?.setIconWithUndo(icon, forBookmark: id) }
     }
 
-    private func pickPageImage(_ done: @escaping (String) -> Void) {
+    /// The icon grid for a site, from Site Controls (#310): every tab, pinned page and favorite on the site uses it
+    /// unless it has its own. Use Site Icon reverts. Private windows keep it only for the window.
+    func chooseSiteIcon(for tab: Tab, at point: NSPoint, besideSidebar: Bool) {
+        guard let site = SiteIcons.site(of: tab.url) else { return }
+        closeFloatingPanels()
+        let store = tabManager.privateStore
+        let siteIcon = tab.favicon ?? tab.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
+        let set: (String?) -> Void = { icon in SiteIcons.set(icon, forSite: site, privateStore: store) }
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle,
+                                    selected: SiteIcons.icon(forSite: site, privateStore: store),
+                                    onChooseImage: { [weak self] in self?.pickPageImage(forSite: true, set) }, onPick: set)
+        if besideSidebar {
+            let x = root.besideSidebar(width: panel.preferredWidth)
+            panel.show(at: NSPoint(x: x, y: point.y), in: root.overlay, growsFrom: CGPoint(x: root.sidebarOnRight ? 1 : 0, y: 0.1))
+        } else {
+            panel.show(at: point, in: root.overlay, growsFrom: CGPoint(x: 0.5, y: 0))
+        }
+    }
+
+    private func pickPageImage(forSite: Bool = false, _ done: @escaping (String) -> Void) {
         guard let window else { return }
         closeFloatingPanels()
         let panel = NSOpenPanel()
@@ -3076,14 +3085,16 @@ extension BrowserWindowController: SidebarDelegate {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.")
-        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.")
+        panel.message = forSite
+            ? String(localized: "Choose an image to use as this site’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a whole site's icon, from Choose Image… under the icon choices Site Controls opens.")
+            : String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.")
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.usePageImage(url, done)
         }
     }
 
-    /// Reads the file into an icon, or says why it can't be one.
+    /// Reads the file into an icon, or shows why it can't.
     func usePageImage(_ url: URL, _ done: @escaping (String) -> Void) {
         Task { [weak self] in
             do throws(PageImageIcon.Failure) {
@@ -3179,12 +3190,11 @@ extension BrowserWindowController: SidebarDelegate {
                 self.move(tabs, to: controller, at: index)
                 return
             }
-            // Windows sharing their tabs (#162): they move to that place in the list both show, in the space that
-            // window is in, and it shows the first of them.
+            // Sharing windows (#162): move to the same list position in that window's space and show the first.
             controller.pageChange(String(localized: "Move to Window", comment: "Undo action name, shown in the Edit menu as Undo Move to Window.")) {
-                // Each in at the same place, last first, so they keep their order.
+                // Insert last first at one index to keep their order.
                 for tab in tabs.reversed() where !tab.isClosed && tab.bookmarkID == nil {
-                    // A place counted with the tab still in the list, as the other window draws it; a move counts without.
+                    // Index counted with the tab still in the list, as the other window draws it; moves count without.
                     let at = controller.tabManager.tabs(in: space).firstIndex { $0 === tab } ?? Int.max
                     if tab.spaceID == space { controller.tabManager.move(tab, to: at < index ? index - 1 : index) } else { controller.tabManager.move(tab, to: index, in: space) }
                 }
@@ -3213,7 +3223,7 @@ extension BrowserWindowController: SidebarDelegate {
             case .bookmark(let id): return id
             case .tab(let id):
                 guard let tab = tabManager.tab(with: id), tab.url != nil else { return nil }
-                if tab.bookmarkID == nil { bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }
+                if tab.bookmarkID == nil { bookmarkWithUndo(tab, at: nil, in: tab.spaceID, keepingGroup: false) }
                 return tab.bookmarkID
             default: return nil
             }
@@ -3235,7 +3245,7 @@ extension BrowserWindowController: SidebarDelegate {
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
     func sidebarAddMenu() -> [MenuPanel.Entry] { SidebarMenus.addPanel(controller: self) }
     func sidebarBlankMenu() -> [MenuPanel.Entry] { SidebarMenus.blankPanel(controller: self) }
-    /// As ⌘T: the command bar for a new tab, or the new tab page an extension gives.
+    /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
     func sidebarDoubleClickedBlank() { if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) } }
     func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
@@ -3289,7 +3299,7 @@ extension BrowserWindowController: CommandBarHost {
         // In split view under the bar, the bar's address steps aside: the address of the pane you're in, as ⌘L edits
         // that pane's page.
         if root.stripsInBar { return focusedPaneAddress.isHidden ? nil : focusedPaneAddress }
-        // Above the page, the site's pill opens in place, as a pane's does.
+        // With the top bar, the site pill opens in place, as in panes.
         if root.showsTopBar, root.topBar.holdsAddress { return root.topBar.pill.isHidden ? nil : root.topBar.pill }
         if root.showsTopBar { return sidebar.address }
         return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil

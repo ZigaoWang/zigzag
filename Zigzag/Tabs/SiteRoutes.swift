@@ -39,20 +39,19 @@ enum SiteRoutes {
         }
     }
 
-    /// How a page was asked for. Only what you did yourself is routed; what a page does on its own stays where it is,
-    /// so a sign-in that redirects through a routed site never leaves its tab.
+    /// How a page was opened. Only user actions are routed, so a sign-in redirect never leaves its tab.
     enum Arrival: Equatable, Sendable {
         /// A link from another app: the default-browser path.
         case otherApp
         /// Typed or chosen in the command bar or the address.
         case typed
-        /// A link you clicked in a page, opening where you are.
+        /// A clicked link opening in the same tab.
         case linkClick
-        /// A link you opened in a new tab (⌘-click, a middle click, Open Link in New Tab, a target="_blank" link).
+        /// A link opened in a new tab (⌘-click, middle click, Open Link in New Tab, target="_blank").
         case linkNewTab
         /// Open in Zigzag, from Zigzag Mini.
         case fromMini
-        /// A redirect, a page's script, a frame, a form, a pop-up: never routed.
+        /// Redirect, script, frame, form or pop-up: never routed.
         case pageOnItsOwn
         case backForward
         case reload
@@ -63,11 +62,11 @@ enum SiteRoutes {
         case browser
         /// A private window: nothing is routed into or out of it.
         case privateWindow
-        /// Zigzag Mini, a quick look: kept as it is.
+        /// Zigzag Mini: left as is.
         case mini
         /// A site installed as an app.
         case webApp
-        /// A link peeked at (⇧-click).
+        /// A peeked link (⇧-click).
         case peek
     }
 
@@ -180,24 +179,21 @@ enum SiteRoutes {
 
     // MARK: Deciding
 
-    /// The space a page asked for this way should open in instead of `current`, or nil when it opens as it would
-    /// anyway: nothing covers it, it's already in that space, it's in a private window, Zigzag Mini, a peek or an
-    /// app, the page went there on its own, or it's a sign-in page a link sent you to (which has to stay with the site
-    /// that sent you there to work).
+    /// The space to open `url` in instead of `current`, or nil to open normally: no route, already there, not a browser
+    /// window, not a user action, or a sign-in page (it must stay with the site that sent it).
     static func target(for url: URL, arrival: Arrival, from current: UUID?, place: Place, routes: [Route]) -> UUID? {
         switch arrival {
         case .pageOnItsOwn, .backForward, .reload: return nil
         case .otherApp, .typed, .linkClick, .linkNewTab, .fromMini: break
         }
-        // Open in Zigzag is the one way out of Zigzag Mini that's routed: it's going to a browser window.
+        // Open in Zigzag is the only routed way out of Mini.
         guard place == .browser || (place == .mini && arrival == .fromMini) else { return nil }
         if arrival == .linkClick || arrival == .linkNewTab, isSignIn(url) { return nil }
         guard let route = route(for: url, in: routes), route.spaceID != current else { return nil }
         return route.spaceID
     }
 
-    /// A page that signs you in for another site: a sign-in page by its address (`Tab.isSignIn`), or one that's
-    /// handed where to come back to.
+    /// A sign-in page by address (`Tab.isSignIn`), or one with a return URL.
     static func isSignIn(_ url: URL) -> Bool {
         if Tab.isSignIn(url) { return true }
         let names = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.map { $0.name.lowercased() } ?? []
@@ -219,8 +215,7 @@ extension SiteRoutes.Route {
 // MARK: - Opening a routed page
 
 extension BrowserWindowController {
-    /// The space a page asked for this way opens in instead, when a route sends it elsewhere. `tab`: the page the
-    /// link was in, whose space it's leaving (else the space the window shows).
+    /// The space a route sends `url` to. `tab`: the tab the link came from (else the window's space).
     func routedSpace(for url: URL, arrival: SiteRoutes.Arrival, from tab: Tab? = nil) -> UUID? {
         let place: SiteRoutes.Place = tabManager.isPrivate ? .privateWindow : tab?.isPeek == true ? .peek : .browser
         let target = SiteRoutes.target(for: url, arrival: arrival, from: tab?.spaceID ?? tabManager.currentSpaceID, place: place,
@@ -228,15 +223,15 @@ extension BrowserWindowController {
         return target.flatMap { Library.shared.space($0) != nil ? $0 : nil }
     }
 
-    /// Opens the page in the space a route sends it to, as a new tab there, and shows that space (or, in the
-    /// background, leaves you where you are); a tab already there on the page is gone to instead. A quiet toast says
-    /// where it went. False when no route sends it anywhere else, so it opens as it would have.
+    /// Opens the page as a new tab in its routed space (or switches to an existing tab there) and shows a toast. False
+    /// when no route applies.
     @discardableResult
     func openRouted(_ url: URL, arrival: SiteRoutes.Arrival, from tab: Tab? = nil, inBackground: Bool = false,
                     by sender: Tab.LoadSender, httpFallback: Bool = false) -> Bool {
         guard let space = routedSpace(for: url, arrival: arrival, from: tab) else { return false }
         if commandBar.isVisible { commandBar.dismiss(restoringFocus: false) }
-        if !inBackground, let open = tabManager.tabs(in: space).first(where: { $0.url == url }) {
+        let key = TabManager.normalize(url)
+        if !inBackground, let open = tabManager.tabs(in: space).first(where: { $0.url.map(TabManager.normalize) == key }) {
             tabManager.select(open)
         } else {
             if !inBackground { tabManager.switchToSpace(space) }
@@ -246,7 +241,7 @@ extension BrowserWindowController {
         return true
     }
 
-    /// The quiet word that a page went to the space a route sends it to.
+    /// Toast saying the page opened in `space`.
     func toastRouted(to space: UUID) {
         guard let name = Library.shared.space(space)?.name else { return }
         Toast.show(String(localized: "Opened in \(name)", comment: "Toast after a link to a site that always opens in a space (Settings › Spaces) opened there instead of where it was clicked or typed. The name is the space's."),

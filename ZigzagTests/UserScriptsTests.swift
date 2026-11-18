@@ -263,7 +263,7 @@ struct UserScriptsTests {
             return tries.map((t) => { try { t(); return 'ran'; } catch (e) { return e.name; } }).join();
             """, in: strict) as? String
         #expect(refused == "EvalError,EvalError,EvalError,EvalError,EvalError,EvalError")
-        // A string handed to a timer never runs; a function still does.
+        // Timer strings never run; functions still do.
         let timers = try await run("""
             globalThis.ranFromString = false;
             setTimeout('globalThis.ranFromString = true', 0);
@@ -455,8 +455,7 @@ struct UserScriptsTests {
         #expect(context.evaluateScript("__ownMessages.length").toInt32() == 0)
     }
 
-    /// `browser` with events of its own, and an event whose addListener can't simply be set: the extension's
-    /// listeners still never hear what user scripts send.
+    /// User script messages stay hidden on `browser` and on events whose addListener can't be overwritten.
     @Test func userScriptsStayHiddenOnBrowserAndOnEventsThatResistBeingSet() {
         let context = background(before: """
         globalThis.browser = { runtime: Object.assign({}, chrome.runtime, { onMessage: event(), onConnect: event() }) };
@@ -617,7 +616,7 @@ struct UserScriptsTests {
 }
 
 extension UserScriptsTests {
-    /// A page that says it listens under new names again and again gets only so far, in the page and in all.
+    /// Pages re-registering listeners under new names are capped, per page and in total.
     @Test func listenersAreBounded() {
         #expect(BridgeUserScripts.fits(listeners: 0, all: 0))
         #expect(!BridgeUserScripts.fits(listeners: BridgeUserScripts.maxListenersPerPage, all: BridgeUserScripts.maxListenersPerPage))

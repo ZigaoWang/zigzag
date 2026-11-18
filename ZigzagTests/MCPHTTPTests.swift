@@ -48,7 +48,7 @@ struct MCPHTTPTests {
 }
 
 extension MCPHTTPTests {
-    /// A body cut into one-byte chunks and sent a packet at a time is read once, not again on every packet.
+    /// A body sent one byte per packet is parsed once, not on every packet.
     @Test func chunkedBodiesAreReadAsTheyCome() {
         var reader = HTTPRequestReader()
         reader.append(Data("POST /mcp HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n".utf8))
@@ -62,7 +62,7 @@ extension MCPHTTPTests {
         guard case .request(let request) = reader.next() else { Issue.record("no request"); return }
         #expect(request.body == Data(repeating: UInt8(ascii: "x"), count: count))
         #expect(Date().timeIntervalSince(started) < 10)
-        // What followed stays for the next request.
+        // Trailing bytes stay for the next request.
         #expect(reader.buffer == Data("GET".utf8))
     }
 

@@ -94,7 +94,7 @@ struct PageFullScreenTests {
         let source = PageFullScreen.source(config: config)
         #expect(source.hasPrefix(PageFullScreen.scriptMark))
         #expect(!source.contains("__CONFIG__"))
-        // The page's own script has the setting only: which sites have a choice is never in the page's world.
+        // The page-world script gets only the setting, never the per-site list.
         #expect(source.contains(#"{"fill":"page"}"#))
         #expect(!source.contains("youtube.com") && !source.contains("b.org"))
         let choices = PageFullScreen.choiceSource(config: config)
@@ -130,7 +130,7 @@ struct PageFullScreenTests {
 
     @Test func fillingThePageNeedsAClick() async throws {
         let webView = await load(Self.page, fill: .page)
-        // Asked with no click or key of yours: WebKit's answer, which refuses, and the page isn't filled.
+        // Without a user gesture WebKit refuses and the page isn't filled.
         _ = try? await webView.runOwnScript("try { await document.getElementById('player').requestFullscreen(); } catch (e) {} await new Promise(r => setTimeout(r, 10)); return 0",
                                             asFunction: true, world: .page)
         #expect(try await page("return document.getElementById('player').hasAttribute('data-zigzag-fullscreen')", in: webView) as? Bool == false)

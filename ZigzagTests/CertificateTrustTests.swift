@@ -95,8 +95,7 @@ struct CertificateTrustTests {
         #expect(StrictTransport.isKnown("secure.example", in: store))
     }
 
-    /// The bundled list is searched byte by byte (`StrictTransport.listed`): it must be sorted that way, one name a
-    /// line, with no carriage return a checkout could have added (.gitattributes keeps git from it).
+    /// `StrictTransport.listed` does a byte search: the list must be byte-sorted, one per line, no CR (see .gitattributes).
     @Test func thePreloadListIsSortedByteByByte() throws {
         let url = try #require(Bundle.main.url(forResource: "hsts_preload", withExtension: "txt"))
         let data = try Data(contentsOf: url)
@@ -111,7 +110,7 @@ struct CertificateTrustTests {
 
     @Test func knowsThePreloadList() {
         #expect(StrictTransport.isPreloadLoaded)
-        // Searched in place: every line is found, and nothing between them.
+        // Every line is found, nothing in between.
         let list = Data("=alone.example\nb.example\ncovers.example\nz.example\n".utf8)
         for line in ["=alone.example", "b.example", "covers.example", "z.example"] { #expect(StrictTransport.listed(line, in: list)) }
         for line in ["a.example", "alone.example", "c.example", "covers.exampl", "covers.examplex", "zz.example", "=b.example", ""] {
@@ -119,7 +118,7 @@ struct CertificateTrustTests {
         }
         #expect(StrictTransport.isPreloaded("www.google.com") || StrictTransport.isPreloaded("accounts.google.com"))
         #expect(!StrictTransport.isPreloaded("not-a-real-site-zigzag.example"))
-        // A name that covers its subdomains, and one that covers itself only.
+        // One name includes subdomains, one doesn't.
         #expect(StrictTransport.isKnown("github.com", in: nil))
         #expect(StrictTransport.isKnown("gist.github.com", in: nil))
         #expect(StrictTransport.isKnown("paypal.com", in: nil))
@@ -135,17 +134,17 @@ struct CertificateTrustTests {
         StrictTransport.note("kept.example", policy: .init(maxAge: 600, includesSubdomains: true), in: store)
         StrictTransport.note("gone.example", policy: .init(maxAge: 600, includesSubdomains: false), in: store, now: Date(timeIntervalSinceNow: -700))
         StrictTransport.settle()
-        // Read again, as at the next launch.
+        // Reloaded as on next launch.
         StrictTransport.reload()
         #expect(StrictTransport.isKnown("www.kept.example", in: store))
         #expect(!StrictTransport.isKnown("gone.example", in: store))
-        // A private window's are never written.
+        // Private windows never write.
         let privateStore = WKWebsiteDataStore.nonPersistent()
         StrictTransport.note("private.example", policy: .init(maxAge: 600, includesSubdomains: false), in: privateStore)
         StrictTransport.settle()
         #expect(StrictTransport.isKnown("private.example", in: privateStore))
         #expect(!StrictTransport.isKnown("private.example", in: store))
-        // Clearing the site's data takes it, on disk too.
+        // Clearing site data removes it on disk too.
         WebsiteData.forgetConnections(in: store, site: "kept.example")
         StrictTransport.settle()
         StrictTransport.reload()
@@ -154,7 +153,7 @@ struct CertificateTrustTests {
         #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
-    /// A page's many responses each sending the header (its frames, its pictures) make one write, a moment later.
+    /// Many HSTS headers on one page coalesce into one delayed write.
     @Test func manyHSTSHeadersMakeOneWrite() throws {
         let store = WKWebsiteDataStore.default()
         StrictTransport.forget(in: store)
@@ -164,7 +163,7 @@ struct CertificateTrustTests {
         for index in 0..<20 {
             StrictTransport.note("frame\(index).example", policy: .init(maxAge: 600, includesSubdomains: false), in: store)
         }
-        // Known at once, written only once the moment has passed (or Zigzag quits).
+        // Known immediately, written after the delay (or on quit).
         #expect(StrictTransport.isKnown("frame7.example", in: store))
         StrictTransport.disk.sync {}
         #expect(!FileManager.default.fileExists(atPath: file.path))
@@ -193,7 +192,7 @@ struct CertificateTrustTests {
         let store = WKWebsiteDataStore.nonPersistent()
         let leaf = Data([5, 5, 5])
         CertificateExceptions.allow("nas.local", certificate: leaf, in: store, now: Date(timeIntervalSinceNow: -CertificateExceptions.lifetime - 1))
-        // No longer let through for a new load, but a page that came with it is still marked.
+        // New loads are refused, but an already loaded page stays marked.
         #expect(!CertificateExceptions.allows("nas.local", leaf: leaf, in: store))
         #expect(CertificateExceptions.wasTrusted("NAS.local", leaf: leaf, in: store))
         #expect(!CertificateExceptions.wasTrusted("nas.local", leaf: Data([6]), in: store))
@@ -216,7 +215,7 @@ struct CertificateTrustTests {
     }
 }
 
-/// What a certificate warning says is wrong: WebKit gives one code for most failures, so the certificate is read.
+/// Certificate warning reasons: WebKit uses one code for most failures, so the certificate is inspected.
 @MainActor
 struct CertificateProblemTests {
     private static let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -233,17 +232,17 @@ struct CertificateProblemTests {
     }
 
     @Test func eachProblemIsToldApart() {
-        // expired.badssl.com: the right address, a trusted issuer, past its date.
+        // expired.badssl.com.
         #expect(problem(facts(until: -2)) == .expired(Self.now.addingTimeInterval(-2 * Self.day)))
         #expect(problem(facts(from: 3)) == .notYetValid(Self.now.addingTimeInterval(3 * Self.day)))
-        // wrong.host.badssl.com: made out to *.badssl.com, which covers one part only.
+        // wrong.host.badssl.com: *.badssl.com covers one label only.
         #expect(problem(facts(names: ["*.badssl.com", "badssl.com"]), host: "wrong.host.badssl.com") == .wrongHost("*.badssl.com"))
         // self-signed.badssl.com and untrusted-root.badssl.com.
         #expect(problem(facts(selfSigned: true, trusted: false)) == .selfSigned)
         #expect(problem(facts(trusted: false)) == .untrustedIssuer)
-        // Nothing found wrong in it: it can't be trusted, and that's all that's said.
+        // Nothing specific found: unknown.
         #expect(problem(facts()) == .unknown)
-        // An address it isn't for comes before its dates.
+        // Wrong host takes precedence over dates.
         #expect(problem(facts(names: ["other.example"], until: -2)) == .wrongHost("other.example"))
     }
 
@@ -252,7 +251,7 @@ struct CertificateProblemTests {
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateNotYetValid, facts: nil, host: "a.example") == .notYetValid(nil))
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateHasUnknownRoot, facts: nil, host: "a.example") == .untrustedIssuer)
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: nil, host: "a.example") == .unknown)
-        // Not knowing why, it doesn't blame the address.
+        // Unknown reason doesn't blame the address.
         #expect(!ErrorPage.certificateReason(.unknown).contains("different address"))
     }
 
@@ -265,7 +264,7 @@ struct CertificateProblemTests {
         #expect(!ErrorPage.certificateNames(["example.com"], cover: "example.com.evil.example"))
     }
 
-    /// A made-up self-signed certificate for router.example and *.router.example, valid until 2126.
+    /// Test self-signed certificate for router.example and *.router.example, valid until 2126.
     static let routerCertificate = "MIIBuDCCAV2gAwIBAgIUPrec49i1x+2YGiJypUG4pmJW6OUwCgYIKoZIzj0EAwIwGTEXMBUGA1UEAwwOcm91dGVyLmV4YW1wbGUwIBcNMjYxMTE0MTgwNjI1WhgPMjEyNjEwMjExODA2MjVaMBkxFzAVBgNVBAMMDnJvdXRlci5leGFtcGxlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEbLEEz9qdxFzCf3pJ12sWRzP0f6v/2u/QcNU/eCRJtIDXgxFUEOtNBGf/rknU5mquto4fXMbceSynCsa00DO+4aOBgDB+MB0GA1UdDgQWBBQy4SrtvuTIzFlDDFyArbn0IOG4YzAfBgNVHSMEGDAWgBQy4SrtvuTIzFlDDFyArbn0IOG4YzAPBgNVHRMBAf8EBTADAQH/MCsGA1UdEQQkMCKCDnJvdXRlci5leGFtcGxlghAqLnJvdXRlci5leGFtcGxlMAoGCCqGSM49BAMCA0kAMEYCIQC21V1N7QvFT70kTfiFqnn6wl6HyMbVA7Cl0EsACf0hkwIhALMb256boj0ZFZmSloeA+TuyWQ0++J3FPoA+VdB9ApAV"
 
     @Test func aCertificateIsRead() throws {
@@ -279,12 +278,12 @@ struct CertificateProblemTests {
         #expect(Calendar(identifier: .gregorian).component(.year, from: until) == 2126)
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "nas.router.example", now: now) == .selfSigned)
-        // Signed by itself, it says so for any address: anyone could have made it out to any name.
+        // Self-signed is reported for any host, since anyone can name any host.
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "192.168.1.1", now: now) == .selfSigned)
         var signed = facts
         signed.selfSigned = false
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: signed, host: "192.168.1.1", now: now) == .wrongHost("router.example"))
-        // Its trust, as WebKit hands it over with the error, reads the same, and the warning says so.
+        // The SecTrust from WebKit's error gives the same result.
         var trust: SecTrust?
         SecTrustCreateWithCertificates(certificate, SecPolicyCreateSSL(true, "router.example" as CFString), &trust)
         let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted,
@@ -294,11 +293,10 @@ struct CertificateProblemTests {
         #expect(page.contains(ErrorPage.escape(ErrorPage.certificateReason(.selfSigned))))
     }
 
-    /// A made-up self-signed certificate for router.local, made out to 192.168.1.1 and fd00::1 by address, valid
-    /// until 2126.
+    /// Test self-signed certificate for router.local with IP SANs 192.168.1.1 and fd00::1, valid until 2126.
     static let addressedCertificate = "MIIBpzCCAU6gAwIBAgIUGeZA8ikvkexD6f+4Ht6cLd0Eow0wCgYIKoZIzj0EAwIwFzEVMBMGA1UEAwwMcm91dGVyLmxvY2FsMCAXDTI2MTExNDIyMTMxOFoYDzIxMjYxMDIxMjIxMzE4WjAXMRUwEwYDVQQDDAxyb3V0ZXIubG9jYWwwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAT+FYMBW6/UJfAkaG24/biEBCwlQGdAxhRtg+0df3M/7XxCBgX7aIZ2ODhEjLW5B4nWg0aIUh2/TuIVCOdseZPHo3YwdDAdBgNVHQ4EFgQUKUS89MkUDX2t7B4ef8rdsp1Y8EswHwYDVR0jBBgwFoAUKUS89MkUDX2t7B4ef8rdsp1Y8EswDwYDVR0TAQH/BAUwAwEB/zAhBgNVHREEGjAYhwTAqAEBhxD9AAAAAAAAAAAAAAAAAAABMAoGCCqGSM49BAMCA0cAMEQCIGD6cgWlWoalnZcswYRxrl0p7qFjOWP8LVWC7iolInWYAiADzodBoweOui0Cz50lgk/QBFydDBGn8PoXaJCJR6O9Cw=="
 
-    /// A router's certificate names it by address: reached at that address, it isn't "for a different address".
+    /// An IP SAN covers that address.
     @Test func aCertificateForAnAddressCoversIt() throws {
         let data = try #require(Data(base64Encoded: Self.addressedCertificate))
         let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))
@@ -313,18 +311,17 @@ struct CertificateProblemTests {
         #expect(!ErrorPage.certificate(facts, covers: "nas.local"))
         let now = Date(timeIntervalSince1970: 1_900_000_000)
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: facts, host: "192.168.1.1", now: now) == .selfSigned)
-        // Signed by someone else, the address it names is what counts.
+        // Not self-signed: the named address decides.
         var signed = facts
         signed.selfSigned = false
         signed.issuerTrusted = false
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: signed, host: "192.168.1.1", now: now) == .untrustedIssuer)
         #expect(ErrorPage.certificateProblem(code: NSURLErrorServerCertificateUntrusted, facts: signed, host: "192.168.1.2", now: now) == .wrongHost("router.local"))
-        // Who signed it, asked on its own, off the main thread.
+        // Issuer trust, checked separately off the main thread.
         #expect(ErrorPage.issuerTrusted([certificate], validFrom: facts.validFrom, validUntil: facts.validUntil) == false)
     }
 
-    /// The error page never waits on who signed the certificate: what it shows is filled in after, where that
-    /// changes it.
+    /// The error page renders before the issuer check and updates after.
     @Test func theWarningDoesntWaitOnTheIssuer() throws {
         let data = try #require(Data(base64Encoded: Self.routerCertificate))
         let certificate = try #require(SecCertificateCreateWithData(nil, data as CFData))

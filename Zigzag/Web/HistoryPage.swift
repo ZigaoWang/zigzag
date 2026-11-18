@@ -72,13 +72,14 @@ enum HistoryPage {
         func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {}
     }
 
-    /// A site's icon as the page gets it. Every row asks, and most rows are on sites already shown, so each one's PNG
-    /// is kept while the store hands back the same icon: a new or cleared icon is never served from here.
+    /// A site icon for the page. PNGs are cached while the store returns the same icon, so a new or cleared icon is
+    /// never stale. A Site Controls icon (`SiteIcons`) wins; symbols use the page text color.
     private static func icon(for target: URL, dark: Bool) -> Data? {
-        guard let icon = FaviconStore.shared.cachedIcon(for: target) else { return nil }
-        let key = (FaviconStore.shared.iconKey(for: target) ?? target.absoluteString) + (dark ? " dark" : "")
+        let chosen = SiteIcons.icon(for: target)
+        guard let icon = chosen.map(IconChoice.pageIcon) ?? FaviconStore.shared.cachedIcon(for: target) else { return nil }
+        let key = (chosen.map { "site " + $0 } ?? FaviconStore.shared.iconKey(for: target) ?? target.absoluteString) + (dark ? " dark" : "")
         if let kept = icons[key], kept.image === icon { return kept.png }
-        guard let png = png(FaviconView.isMonochrome(icon) ? inked(icon, dark: dark) : icon) else { return nil }
+        guard let png = png(icon.isTemplate || FaviconView.isMonochrome(icon) ? inked(icon, dark: dark) : icon) else { return nil }
         if icons.count >= 500 { icons.removeAll(keepingCapacity: true) }
         icons[key] = (icon, png)
         return png
@@ -543,8 +544,8 @@ function sessionElement(session) {
   const section = el('section', 'session');
   const items = session.clusters.flatMap((c) => c.items);
   const head = el('div', 'session-head');
-  // The heading names the day and part of it; the times are on the rows under it, so it doesn't repeat them. Its
-  // count only when there's more than one row: one site's row already says how many pages it holds.
+  // The heading names the day and time of day; times are on the rows. Count only for multiple rows, since a single
+  // site row already shows its page count.
   head.append(el('h2', null, session.title),
               el('span', 'count', session.clusters.length > 1 ? pages(items.length) : ''),
               removeButton(words.removeSession, () => forget(items.map((i) => i.url), session)));
