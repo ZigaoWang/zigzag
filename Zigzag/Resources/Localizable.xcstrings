@@ -2648,17 +2648,6 @@
         }
       }
     },
-    "Address bar keyword" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地址栏关键词"
-          }
-        }
-      }
-    },
     "Address copied" : {
       "comment" : "Toast after Copy Address in the Open on Your Phone sheet of the developer tools.",
       "localizations" : {
@@ -2945,17 +2934,6 @@
         }
       }
     },
-    "Always Allow" : {
-      "comment" : "Button in the toast when Zigzag blocks a page's pop-up: allows the site's pop-ups from now on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "始终允许"
-          }
-        }
-      }
-    },
     "Always Allow on This Site" : {
       "comment" : "Menu item of the address bar's camera button: the site may use the camera and microphone from now on without asking.",
       "localizations" : {
@@ -2963,17 +2941,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在此网站上始终允许"
-          }
-        }
-      }
-    },
-    "Always Open" : {
-      "comment" : "Button on a page's question to open an app: opens it, and the site may open this app without asking from now on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "始终打开"
           }
         }
       }
@@ -3649,17 +3616,6 @@
         }
       }
     },
-    "Background audio and clipboard" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后台音频和剪贴板"
-          }
-        }
-      }
-    },
     "Beta updates" : {
       "comment" : "A setting in Settings › General.",
       "localizations" : {
@@ -3770,17 +3726,6 @@
         }
       }
     },
-    "Blocking requests the old way" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用旧方式拦截请求"
-          }
-        }
-      }
-    },
     "Blue" : {
       "comment" : "VoiceOver, in the space editor's color wheel: a color's family.",
       "localizations" : {
@@ -3865,17 +3810,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已隐藏的元素"
-          }
-        }
-      }
-    },
-    "boosted" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: it has CSS of your own (Edit Style… in Site Controls).",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已自定样式"
           }
         }
       }
@@ -6383,17 +6317,6 @@
         }
       }
     },
-    "Debugging pages" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "调试页面"
-          }
-        }
-      }
-    },
     "Default" : {
       "comment" : "The name of the first profile, which holds what Zigzag kept before there were profiles, until it's renamed.",
       "localizations" : {
@@ -7845,17 +7768,6 @@
         }
       }
     },
-    "Display information" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "显示器信息"
-          }
-        }
-      }
-    },
     "Doesn’t work in Zigzag yet." : {
       "comment" : "One line beside an extension's name when WebKit can't run it.",
       "localizations" : {
@@ -7896,17 +7808,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不允许"
-          }
-        }
-      }
-    },
-    "Don’t Open" : {
-      "comment" : "Button on a page's question to open an app.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不打开"
           }
         }
       }
@@ -9050,17 +8951,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跟随 Mac"
-          }
-        }
-      }
-    },
-    "Font settings" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "字体设置"
           }
         }
       }
@@ -10603,17 +10493,6 @@
         }
       }
     },
-    "Keeping your Mac awake" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "让 Mac 保持唤醒"
-          }
-        }
-      }
-    },
     "Kept %lld passwords already in Zigzag instead of the imported ones." : {
       "comment" : "Import window: passwords that stayed as they were because the imported ones weren't known to be newer.",
       "localizations" : {
@@ -10678,17 +10557,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "键盘快捷键"
-          }
-        }
-      }
-    },
-    "Knowing when you’re away" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检测你是否离开"
           }
         }
       }
@@ -11030,17 +10898,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "管理扩展…"
-          }
-        }
-      }
-    },
-    "Managing other extensions" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "管理其他扩展"
           }
         }
       }
@@ -11447,6 +11304,17 @@
         }
       }
     },
+    "Move Zigzag to Applications?" : {
+      "comment" : "Title of the sheet offering to move the app into the Applications folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要将 Zigzag 移到“应用程序”文件夹吗？"
+          }
+        }
+      }
+    },
     "Move and Reload" : {
       "comment" : "Button of the sheet that asks before tabs move to a space on another profile.",
       "localizations" : {
@@ -11498,6 +11366,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "移到“%@”"
+          }
+        }
+      }
+    },
+    "Move to Applications" : {
+      "comment" : "Button of the sheet offering to move the app into the Applications folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到“应用程序”"
           }
         }
       }
@@ -12780,17 +12659,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提示翻译"
-          }
-        }
-      }
-    },
-    "On" : {
-      "comment" : "A download rule's switch, on.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开"
           }
         }
       }
@@ -14448,17 +14316,6 @@
         }
       }
     },
-    "Pop-up blocked" : {
-      "comment" : "Toast when Zigzag blocks a page's pop-up window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已阻止弹出式窗口"
-          }
-        }
-      }
-    },
     "Pop-ups" : {
       "comment" : "Row in the site panel's This Site group.",
       "localizations" : {
@@ -14466,17 +14323,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "弹出式窗口"
-          }
-        }
-      }
-    },
-    "Pop-ups allowed. Click the button again." : {
-      "comment" : "Toast after allowing a site's pop-ups.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已允许弹出式窗口。请再点按一次按钮。"
           }
         }
       }
@@ -14510,17 +14356,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在准备 Zigzag %@…"
-          }
-        }
-      }
-    },
-    "Presets" : {
-      "comment" : "A heading over the ready-made download rules.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "预设"
           }
         }
       }
@@ -14668,17 +14503,6 @@
         }
       }
     },
-    "Privacy settings" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "隐私设置"
-          }
-        }
-      }
-    },
     "Private" : {
       "comment" : "The heading at the top of a private window's sidebar, where a space's name would be.",
       "localizations" : {
@@ -14774,17 +14598,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "协议"
-          }
-        }
-      }
-    },
-    "Proxy scripts (PAC)" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag: proxy auto-config scripts, which choose a proxy for each site.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "代理脚本（PAC）"
           }
         }
       }
@@ -15086,28 +14899,6 @@
         }
       }
     },
-    "Reading aloud" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "朗读"
-          }
-        }
-      }
-    },
-    "Reading what you copy" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "读取你拷贝的内容"
-          }
-        }
-      }
-    },
     "Recently Closed" : {
       "comment" : "History menu item: a submenu of the tabs and windows you closed lately.",
       "localizations" : {
@@ -15126,28 +14917,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "食谱"
-          }
-        }
-      }
-    },
-    "Recording tabs" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "录制标签页"
-          }
-        }
-      }
-    },
-    "Recording your screen" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "录制你的屏幕"
           }
         }
       }
@@ -16522,17 +16291,6 @@
         }
       }
     },
-    "Saving pages" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储页面"
-          }
-        }
-      }
-    },
     "Says no to the cookies a site’s pop-up asks for, or hides a pop-up that only needs hiding. Never says yes." : {
       "comment" : "Explanation under “Cookie banners” in Settings › Privacy.",
       "localizations" : {
@@ -17622,17 +17380,6 @@
         }
       }
     },
-    "Side panel" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏面板"
-          }
-        }
-      }
-    },
     "Sidebar on the right" : {
       "comment" : "A setting in Settings › Appearance: puts the sidebar along the window's right edge.",
       "localizations" : {
@@ -17717,17 +17464,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "登录状态能让你在网站上保持登录，不必重新登录。它们来自这台 Mac，也只留在这台 Mac 上。"
-          }
-        }
-      }
-    },
-    "Signing in with your account" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "用你的账户登录"
           }
         }
       }
@@ -18510,17 +18246,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "标签页 %lld"
-          }
-        }
-      }
-    },
-    "Tab groups" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "标签页组"
           }
         }
       }
@@ -21943,39 +21668,6 @@
         }
       }
     },
-    "Your bookmarks" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的书签"
-          }
-        }
-      }
-    },
-    "Your browsing history" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的浏览历史记录"
-          }
-        }
-      }
-    },
-    "Your location" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的位置"
-          }
-        }
-      }
-    },
     "Your name, email, phone and address, from your own card in Contacts." : {
       "comment" : "Explanation under “Fill forms from My Card” in Settings › Passwords.",
       "localizations" : {
@@ -22060,17 +21752,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "下次打开时，你的标签页和空间都会在这里。"
-          }
-        }
-      }
-    },
-    "Your top sites" : {
-      "comment" : "Feature name in the list of things an extension uses that won’t work in Zigzag.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的常用网站"
           }
         }
       }
@@ -22422,6 +22103,17 @@
         }
       }
     },
+    "Zigzag is running from the disk image or a download, where it can’t update itself. In Applications, updates install on their own." : {
+      "comment" : "Message of the sheet offering to move the app into the Applications folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 正从磁盘映像或下载位置运行，无法自行更新。放进“应用程序”文件夹后，更新会自动安装。"
+          }
+        }
+      }
+    },
     "Zigzag is up to date." : {
       "comment" : "Toast after Check for Updates… finds no newer version.",
       "localizations" : {
@@ -22695,17 +22387,6 @@
         }
       }
     },
-    "ads allowed" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "允许广告"
-          }
-        }
-      }
-    },
     "an extension" : {
       "comment" : "Stands in for an extension's name when it has none, inside a sentence like “an extension is listening to this tab”.",
       "localizations" : {
@@ -22783,17 +22464,6 @@
         }
       }
     },
-    "certificate: %@" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: the certificate from your Keychain it's always sent, by name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "证书：%@"
-          }
-        }
-      }
-    },
     "check for updates" : {
       "comment" : "Words that find the version row with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -22812,28 +22482,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "检查 预览 规则 测试 check preview rule test"
-          }
-        }
-      }
-    },
-    "cookie banners left alone" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are left for you to answer.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不处理 Cookie 弹窗"
-          }
-        }
-      }
-    },
-    "cookie banners rejected" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its cookie consent pop-ups are answered with no, though the setting leaves them alone.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拒绝 Cookie 弹窗"
           }
         }
       }
@@ -22878,39 +22526,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "深色模式 浅色 外观 夜间 暗色 主题 黑色 反色 dark mode appearance"
-          }
-        }
-      }
-    },
-    "dark page forced" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark even though they look dark on their own (Force dark).",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "强制深色网页"
-          }
-        }
-      }
-    },
-    "dark page off" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages are never drawn dark.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭深色网页"
-          }
-        }
-      }
-    },
-    "dark page on" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages are drawn dark.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开深色网页"
           }
         }
       }
@@ -23039,17 +22654,6 @@
         }
       }
     },
-    "extensions off" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭扩展"
-          }
-        }
-      }
-    },
     "featureflags.developer" : {
       "comment" : "A heading in Settings › Developer › Feature Flags, as Safari has it: WebKit's tools for people who build websites.",
       "extractionState" : "extracted_with_value",
@@ -23093,28 +22697,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文件夹 位置 下载 folder location downloads"
-          }
-        }
-      }
-    },
-    "full screen fills the page" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen fills the page's area instead of the whole screen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全屏幕只填满网页"
-          }
-        }
-      }
-    },
-    "full screen fills the screen" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: a video's full screen covers the whole screen, though the setting says the page.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全屏幕填满整个屏幕"
           }
         }
       }
@@ -24044,17 +23626,6 @@
         }
       }
     },
-    "tabs kept awake" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its tabs never go to sleep in the background.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "标签页保持唤醒"
-          }
-        }
-      }
-    },
     "text size font bigger larger smaller scale zoom interface ui" : {
       "comment" : "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -24128,17 +23699,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "与“%@”"
-          }
-        }
-      }
-    },
-    "zoom %lld%%" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its zoom, like “zoom 125%”.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "缩放 %lld%%"
           }
         }
       }
@@ -24233,28 +23793,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "javascript js 脚本 禁用 阻止 关闭 noscript 隐私"
-          }
-        }
-      }
-    },
-    "JavaScript off" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages don't run their scripts.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭 JavaScript"
-          }
-        }
-      }
-    },
-    "JavaScript on" : {
-      "comment" : "A choice made for a site in Settings › Privacy, in a list of them: its pages run their scripts, whatever Settings › Privacy › JavaScript says.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开 JavaScript"
           }
         }
       }
