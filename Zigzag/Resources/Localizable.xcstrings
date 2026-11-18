@@ -3875,35 +3875,35 @@
         }
       }
     },
-    "Every page on github.com itself." : {
+    "Matches pages on the exact hostname you enter (for example, github.com)." : {
       "comment" : "Exact host example in the match types popover.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅匹配 github.com 上的所有页面。"
+            "value" : "匹配所填主机名下的网页（例如 github.com）。"
           }
         }
       }
     },
-    "The page at github.com/org1 and pages beneath it, such as github.com/org1/repo." : {
+    "Matches a path and pages below it on the same host (for example, github.com/org1 and github.com/org1/repo)." : {
       "comment" : "Path example in the match types popover.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "匹配 github.com/org1 页面及其子路径，例如 github.com/org1/repo。"
+            "value" : "匹配同一主机名下的指定路径及其子路径（例如 github.com/org1 和 github.com/org1/repo）。"
           }
         }
       }
     },
-    "Pages on github.com and its subdomains, such as gist.github.com." : {
+    "Matches pages on a domain and its subdomains (for example, github.com and gist.github.com)." : {
       "comment" : "Domain example in the match types popover.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "匹配 github.com 及其子域名（例如 gist.github.com）上的页面。"
+            "value" : "匹配域名及其子域名下的网页（例如 github.com 和 gist.github.com）。"
           }
         }
       }

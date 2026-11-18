@@ -142,9 +142,9 @@ extension SiteRoutes.Coverage {
 extension SiteRoutes.Match {
     fileprivate var example: String {
         switch self {
-        case .host: String(localized: "Every page on github.com itself.", comment: "Exact host example in the match types popover.")
-        case .path: String(localized: "The page at github.com/org1 and pages beneath it, such as github.com/org1/repo.", comment: "Path example in the match types popover.")
-        case .domain: String(localized: "Pages on github.com and its subdomains, such as gist.github.com.", comment: "Domain example in the match types popover.")
+        case .host: String(localized: "Matches pages on the exact hostname you enter (for example, github.com).", comment: "Exact host example in the match types popover.")
+        case .path: String(localized: "Matches a path and pages below it on the same host (for example, github.com/org1 and github.com/org1/repo).", comment: "Path example in the match types popover.")
+        case .domain: String(localized: "Matches pages on a domain and its subdomains (for example, github.com and gist.github.com).", comment: "Domain example in the match types popover.")
         }
     }
 
