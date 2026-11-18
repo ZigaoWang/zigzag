@@ -31,6 +31,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 迷你播放器回到标签页的箭头不会再没反应了：它会在标签页现在所在的窗口里找到它，并把那个窗口带到前面；标签页已经在屏幕上时卡片会收起；标签页已经关掉时卡片会直接关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#333](https://github.com/ZigaoWang/zigzag/issues/333))
 - 扩展的弹出窗口打开时就会获得焦点，和 Chrome 一样，所以按钮的提示文字和悬停效果马上就会显示。以前要先在弹出窗口里点一下才会出现。弹出窗口关闭后，焦点回到你之前所在的网页或输入框。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - 页内查找现在能标出每一个匹配，包括直接写在按钮里、按弹性盒子排版的行里或紧挨着块元素的文字，比如 GitHub 议题列表里的作者名。WebKit 不在这些地方画高亮，所以匹配只闪一下就没了；现在这些匹配会单独标出来。网页重新绘制的匹配会在一秒内重新标出。感谢 [Lakeland97](https://github.com/Lakeland97)。([#329](https://github.com/ZigaoWang/zigzag/issues/329))
+- Proton Pass 的弹出窗口现在以完整大小打开，能看到项目列表，不会再在搜索栏下面被截断。以前在弹出窗口里，Proton 问自己是不是开在标签页里时，Zigzag 回答的是你当前的标签页，于是它按一个并不存在的标签页去调整了大小。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
 
 ## [0.9.2] - 2026-11-18
 

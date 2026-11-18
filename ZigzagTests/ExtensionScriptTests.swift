@@ -782,6 +782,15 @@ struct ExtensionScriptTests {
         context.evaluateScript("__current = { id: 7, url: 'https://a.example/' }; chrome.tabs.getCurrent().then((tab) => { globalThis.__inTab = tab; });")
         context.evaluateScript("__flush()")
         #expect(context.evaluateScript("__inTab.id").toInt32() == 7)
+        // A popup: WebKit gives the tab in front, Chrome undefined; Proton Pass sized its popup to fit a tab (#287).
+        context.evaluateScript("""
+        chrome.extension = { getViews: (filter) => (filter && filter.type === 'popup' ? [globalThis] : []) };
+        chrome.tabs.getCurrent().then((tab) => { globalThis.__inPopup = tab; });
+        chrome.tabs.getCurrent((tab) => { globalThis.__popupCalled = [tab]; });
+        """)
+        context.evaluateScript("__flush()")
+        #expect(context.evaluateScript("__inPopup === undefined && '__inPopup' in globalThis").toBool())
+        #expect(context.evaluateScript("__popupCalled.length === 1 && __popupCalled[0] === undefined").toBool())
     }
 
     @Test func workerMessagingIsLeftAloneUntilAnExtensionUsesIt() {

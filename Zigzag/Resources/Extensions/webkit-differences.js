@@ -1064,7 +1064,14 @@
     // with its icon: Zigzag's, as a data: URL (ExtensionBridge's favicons). A slow or missing answer leaves the tabs
     // as WebKit gave them; a call WebKit refuses is made again as it was, so the callback hears its lastError.
     // getCurrent outside a tab (a side panel, a popup) is undefined in Chrome, where WebKit says null: Claude's side
-    // panel checks for undefined exactly, and refused to open on null.
+    // panel checks for undefined exactly, and refused to open on null. In a popup WebKit gives the tab in front, and
+    // Proton Pass took its popup for its page open in a tab, sized it to fit the page and came up cut short (#287).
+    const inPopup = () => {
+      try {
+        const views = api.extension && typeof api.extension.getViews === 'function' ? api.extension.getViews({ type: 'popup' }) : null;
+        return Array.isArray(views) && views.includes(globalThis);
+      } catch (e) { return false; }
+    };
     const withFavicons = async (value) => {
       const ask = globalThis.__zigzagFavicons;
       const tabs = (Array.isArray(value) ? value : [value]).filter((tab) => tab && typeof tab === 'object' && typeof tab.url === 'string' && !tab.favIconUrl);
@@ -1081,7 +1088,7 @@
       const call = original.bind(api.tabs);
       setMember(['tabs'], name, (...args) => {
         const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
-        const result = Promise.resolve(call(...args)).then((value) => (name === 'getCurrent' && value === null ? undefined : withFavicons(value)));
+        const result = Promise.resolve(call(...args)).then((value) => (name === 'getCurrent' && (value === null || inPopup()) ? undefined : withFavicons(value)));
         if (!callback) return result;
         result.then((value) => callback(value), () => call(...args, callback));
         return undefined;
