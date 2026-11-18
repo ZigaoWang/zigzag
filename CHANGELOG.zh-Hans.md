@@ -19,6 +19,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ### 修复
 - 在 YouTube 上按住 ⌘ 点视频，现在总会在新标签页打开。以前有时会在当前标签页打开，因为 YouTube 自己的脚本把链接接了过去。现在按住 ⌘ 点链接，不管网页怎么处理点按，都会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#317](https://github.com/ZigaoWang/zigzag/issues/317))
+- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
 - 每个 PDF 都在自己单独的辅助进程里打开，这本来是 0.9.2 要做到的：发布的版本里所有 PDF 共用一个，同时打开的 PDF 没能彼此隔开。
 
 ## [0.9.2] - 2026-11-18

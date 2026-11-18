@@ -731,13 +731,17 @@ struct ExtensionScriptTests {
         return context
     }
 
-    @Test func extensionPagesSizeUnsizedIconsAsChromeDoes() {
-        // Sound Booster's mute button: an <svg> with no width in a flex row, which WebKit draws at no size (#45).
+    @Test func extensionPagesGetNoRuleSizingTheirIcons() {
+        // WebKit and Chrome size an <svg> the same way at the same viewport: from its height, or from its viewBox
+        // ratio, or as wide as its container when it has no size at all. Zigzag once added `width: 100%` for the
+        // icons it was thought to lose, which stretched an already sized icon across its row and squeezed the text
+        // beside it to one letter a line (Dashlane's webcard, #340). Nothing is added now.
         let context = Self.workerWorld(worker: false, setup: """
         var __styles = [];
         var document = { createElement: () => ({ textContent: '' }), documentElement: { prepend: (node) => __styles.push(node.textContent) } };
         """)
-        #expect(context.evaluateScript("__styles.join()").toString() == ":where(svg:not([width])) { width: 100%; }")
+        #expect(context.evaluateScript("__styles.length").toInt32() == 0)
+        #expect(context.evaluateScript("__styles.join()").toString() == "")
     }
 
     @Test func tabsComeWithTheirSiteIcons() {

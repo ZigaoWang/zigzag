@@ -12,6 +12,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - ⌘-clicking a video on YouTube always opens it in a new tab. Some ⌘-clicks went to the video in the tab you were on, because YouTube's own script followed the link there. Now a ⌘-click on a link opens it in a new tab whatever the page does with clicks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#317](https://github.com/ZigaoWang/zigzag/issues/317))
+- An extension's popup lays its icons out as it does in Chrome. Zigzag was making every icon with no width of its own as wide as its row, so an icon beside a heading squeezed the heading to one letter a line, as in Dashlane's menu. Icons now keep the size their page gives them. ([#340](https://github.com/ZigaoWang/zigzag/issues/340))
 - Each PDF opens in a helper of its own, as 0.9.2 meant: the build that shipped had all PDFs share one, so a PDF couldn't be kept apart from the others open at the same time.
 
 ## [0.9.2] - 2026-11-18
