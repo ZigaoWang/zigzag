@@ -21,7 +21,7 @@
   35 MB installed. No account, no telemetry.
 </p>
 
-## 🤔 Features
+## 🤔 1. Features
 
 | | |
 |---|---|
@@ -77,7 +77,7 @@
 
 **Popular extensions supported:** 1Password, Bitwarden, Dark Reader, Tampermonkey, and more!
 
-## 🛬 Coming from Arc
+## 🛬 2. Coming from Arc
 
 **Your Arc comes with you.** File › Import from Another Browser…, pick Arc, and your spaces, pinned tabs, pinned folders, Favorites,
 history, passwords, sign-ins and extensions come over. Your open tabs can come too, split views and all, and wait to
@@ -91,7 +91,7 @@ each Arc profile comes over as a Zigzag profile of its own.
 host are the update feed and a short list of ad blocking fixes, and if they went away, Zigzag would keep working.
 [Privacy](#privacy) lists everything Zigzag connects to on its own.
 
-## 👀 See it
+## 👀 3. See it
 
 <p align="center">
   <img src="docs/spaces.gif" width="960" alt="Switching between three spaces in Zigzag, each with its own color and tabs">
@@ -111,7 +111,7 @@ host are the update feed and a short list of ad blocking fixes, and if they went
 <p align="center"><sub>More, in motion, at <a href="https://zigzagbrowser.com">zigzagbrowser.com</a>.</sub></p>
 
 
-## Why I built it
+## 4. Why I built it
 
 I used Arc every day. When The Browser Company said it's shutting
 Arc down on December 22, I really didn't want to go back to tabs along the top, and the alternatives I tried were
@@ -127,10 +127,7 @@ extensions and doesn't feel like a Mac app to me. Orion is closer, but it isn't 
 that works like Arc, feels native, is open source, and runs my Chrome extensions.
 
 
-
-
-
-## What's missing
+## 5. Limitations
 
 It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc users will notice:
 
@@ -141,7 +138,7 @@ It's my everyday browser, but Zigzag is young and you'll find bugs. Things Arc u
 - EasyList and the other built-in blocking lists update with Zigzag, not on their own; only uBlock Origin's lists do.
 - macOS 15.4 or later only.
 
-## 🔨 How it's built
+## 🔨 6. How it's built
 
 Zigzag is about 120,000 lines of Swift 6 and AppKit around `WKWebView`. There's no Chromium and no Electron: the
 engine is the WebKit that ships with macOS, which is why the app is small and why engine security fixes arrive
@@ -168,7 +165,7 @@ The source is organized by feature: `Sidebar`, `Tabs`, `Web`, `Extensions`, `Pas
 `Design` (Zigzag's own drawn controls and design tokens). Over 2,000 tests cover importing, passwords, extensions,
 address handling, history, AI apps and the security fixes.
 
-## Privacy
+## 7. Privacy
 
 No account, no analytics, no telemetry. Nothing about how you browse is sent to me. These are the only
 connections Zigzag makes on its own, apart from the pages you open:
@@ -193,7 +190,7 @@ Translation runs on your Mac, with Apple's on-device Translation. Fraudulent web
 the same as Safari's. Passwords stay in your Mac's Keychain and sync only through your own iCloud Keychain.
 Help › Report a Problem writes a report you can read first, and nothing is sent unless you send it.
 
-## 🛠️ Install
+## 🛠️ 8. Install
 
 Download the DMG from [zigzagbrowser.com](https://zigzagbrowser.com/download), open it, and drag Zigzag to
 Applications. Or, with Homebrew:
@@ -203,13 +200,13 @@ Applications. Or, with Homebrew:
 Updates install by themselves. What changed in each version is in the
 [release notes](https://zigzagbrowser.com/release-notes) and [CHANGELOG.md](CHANGELOG.md).
 
-## 💬 Feedback
+## 💬 9. Feedback
 
 - **Bugs and ideas:** [open an issue](https://github.com/ZigaoWang/zigzag/issues/new/choose), or Help › Send Feedback… in the app. For a bug, Help › Report a Problem… writes a report you can read before you send it.
 - **Email:** a@zigao.wang
 - **Security problems:** see [SECURITY.md](SECURITY.md). Please don't post them in public issues.
 
-## Build from source
+## 10. Build from source
 
 Requirements: macOS 15.4 or later, Xcode 26 or later, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
@@ -237,12 +234,12 @@ Run the tests:
 xcodebuild test -project Zigzag.xcodeproj -scheme Zigzag
 ```
 
-## Contributing
+## 11. Contributing
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for how the project is built, tested and
 styled.
 
-## License
+## 12. License
 
 Zigzag's code is licensed under the [Apache License, Version 2.0](LICENSE). Use it, change it, fork it and ship
 it, commercially or not.
@@ -251,7 +248,7 @@ The name "Zigzag", the app icon and the logo are not covered by the license: the
 reserved. A fork needs its own name and icon. See [TRADEMARKS.md](TRADEMARKS.md) and [NOTICE](NOTICE).
 Third-party work Zigzag uses is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## ❤️Acknowledgments
+## ❤️ 13. Acknowledgments
 
 Thanks to the [LINUX DO](https://linux.do) community for trying Zigzag early and sharing their feedback.
 
