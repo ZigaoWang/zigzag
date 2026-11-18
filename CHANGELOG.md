@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Settings › Privacy › Sites shows each choice made for a site on a row of its own, with the same control as in Site Controls and a × that forgets just that one, instead of one sentence and a single Forget. JavaScript and Extensions now sit on Site Controls' Permissions page beside the camera and the rest, and turning extensions off for a site is kept per profile. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#311](https://github.com/ZigaoWang/zigzag/issues/311), [#312](https://github.com/ZigaoWang/zigzag/issues/312), [#313](https://github.com/ZigaoWang/zigzag/issues/313), [#314](https://github.com/ZigaoWang/zigzag/issues/314))
 
 ### Fixed
+- Pinning a group of tabs keeps the group whole: one pinned folder named after it, with its tabs in their order, instead of one pinned page per tab. Unpinning any of its pages brings the group back. ([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 - ⌘-clicking a video on YouTube always opens it in a new tab. Some ⌘-clicks went to the video in the tab you were on, because YouTube's own script followed the link there. Now a ⌘-click on a link opens it in a new tab whatever the page does with clicks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#317](https://github.com/ZigaoWang/zigzag/issues/317))
 - Each PDF opens in a helper of its own, as 0.9.2 meant: the build that shipped had all PDFs share one, so a PDF couldn't be kept apart from the others open at the same time.
 

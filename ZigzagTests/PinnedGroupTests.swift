@@ -134,6 +134,77 @@ import Testing
         directory.assign(favorite: marks[4].id, to: work.id)
         #expect(Library.tidied(marks, splits: [pinned], directory: directory).1.isEmpty)
     }
+
+    // MARK: Groups of tabs pinned (#325)
+
+    /// A window with tabs `titles` in that order in the first space, for one test, the library put back after.
+    private func withTabs(_ titles: [String], _ body: (TabManager, [Tab], UUID) throws -> Void) rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tabs = titles.enumerated().map { i, title in Tab(url: URL(string: "https://example.com/group/\(i)")!, title: title, spaceID: space) }
+        manager.adopt(tabs, in: space)
+        try body(manager, tabs, space)
+    }
+
+    /// Pinning any tab of a group of tabs keeps the group one thing: a folder named as the group was, holding its
+    /// tabs in their order. Unpinning any page of it brings the group back, named, ordered and folded as it was.
+    @Test func pinningAGroupOfTabsKeepsItWholeAsOneFolder() throws {
+        try withTabs(["0", "1", "2", "3"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
+            manager.bookmarkTab(tabs[0], in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            let folder = try #require(Library.shared.pinnedGroup(containing: page))
+            #expect(folder.name == "Reading")
+            #expect(folder.groupID == groupID)
+            #expect(folder.bookmarkIDs == tabs.compactMap(\.bookmarkID))
+            // One entry: every page is in the one folder, none a pinned split of its own.
+            #expect(Library.shared.pinnedSplit(containing: page) == nil)
+            #expect(Library.shared.bookmarks(in: space).filter { folder.bookmarkIDs.contains($0.id) }.map(\.id) == folder.bookmarkIDs)
+            #expect(manager.tabs(in: space).isEmpty)
+            // Unpinning a page brings the group back whole.
+            manager.unbookmark(folder.bookmarkIDs[2], toIndex: 0)
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(manager.groups(in: space).map(\.id) == [groupID])
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == tabs.map(\.id))
+            #expect(manager.tabs(in: space).map(\.id) == tabs.map(\.id))
+        }
+    }
+
+    /// A group of one tab is a group too: it pins as a folder of one page and comes back as a group.
+    @Test func aGroupOfOneTabPinsAsAGroupToo() throws {
+        try withTabs(["0"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: [tabs[0]], name: "Solo"))
+            manager.bookmarkTab(tabs[0], in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            let folder = try #require(Library.shared.pinnedGroup(containing: page))
+            #expect(folder.bookmarkIDs == [page])
+            manager.unbookmark(page, toIndex: 0)
+            #expect(manager.group(groupID)?.name == "Solo")
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == [tabs[0].id])
+        }
+    }
+
+    /// A tab in no group still pins on its own: one page, in no folder.
+    @Test func aTabOutsideAGroupStillPinsOnItsOwn() throws {
+        try withTabs(["0"]) { manager, tabs, space in
+            manager.bookmarkTab(tabs[0], in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            #expect(Library.shared.pinnedGroup(containing: page) == nil)
+            #expect(Library.shared.bookmarks(in: space).map(\.id).contains(page))
+        }
+    }
+
+    /// A folder saved before groups could be pinned has no group, and keeps its pages: an older store still reads.
+    @Test func anOlderFolderReadsWithNoGroupAndItsPages() throws {
+        let page = UUID()
+        let json = #"{"id":"\#(UUID())","name":"Old","bookmarkIDs":["\#(page)"],"isOpen":true}"#
+        let folder = try JSONDecoder().decode(BookmarkFolder.self, from: Data(json.utf8))
+        #expect(folder.groupID == nil)
+        #expect(folder.name == "Old")
+        #expect(folder.bookmarkIDs == [page])
+    }
 }
 
 /// How a favorite group's tile shows its pages (#203): a small icon for each, placed as the pages share the window, and

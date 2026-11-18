@@ -1175,6 +1175,25 @@ final class TabManager {
             }
             return
         }
+        // A group of tabs (#209) pins whole, as one folder named after it: its tabs in their order, still one thing.
+        if let groupID = tab.groupID, let group = group(groupID) {
+            let members = tabs(inGroup: groupID)
+            let pages = members.compactMap { page in page.url.map { (page: page, url: $0) } }
+            if pages.count == members.count, pages.allSatisfy({ $0.page.bookmarkID == nil }), !pages.isEmpty {
+                let marks = pages.map { page, url in
+                    let mark = Bookmark(url: url, title: Self.bookmarkTitle(page.displayTitle, url: url), icon: page.customIcon)
+                    removeFromList(page)
+                    page.bookmarkID = mark.id
+                    page.settleLandingIfLoading()
+                    page.setSpace(space)
+                    bookmarkTabs[mark.id] = page
+                    return mark
+                }
+                Library.shared.addPinnedGroup(marks, named: group.name, group: groupID, isOpen: group.isOpen, to: space, at: index)
+                structureChanged()
+                return
+            }
+        }
         // A page of a group whose others can't be pinned (one with no page yet) is pinned on its own; the group
         // closes up around its place.
         leaveGroup(tab)
@@ -1220,6 +1239,7 @@ final class TabManager {
         let isFavorite = Library.shared.isFavorite(bookmarkID)
         let space = (isFavorite ? spaceID : nil) ?? Library.shared.spaceID(ofBookmark: bookmarkID) ?? currentSpaceID
         if let pinned = Library.shared.pinnedSplit(containing: bookmarkID) { return unpin(pinned, returning: bookmarkID, toIndex: index, in: space) }
+        if let group = Library.shared.pinnedGroup(containing: bookmarkID) { return unpin(group, returning: bookmarkID, toIndex: index, in: space) }
         if isFavorite {
             bookmarkTabs[bookmarkID]?.setSpace(space)
             bookmarkTabs[bookmarkID]?.isFavorite = false
@@ -1287,6 +1307,46 @@ final class TabManager {
         // A pinned split that was on screen stays there, now as tabs.
         if halves.contains(where: { $0.tab === selectedTab }) { selectionChanged() }
         return halves.first { $0.id == bookmarkID }?.tab
+    }
+
+    /// Any page of a pinned group of tabs unpins all of it, back as the group of tabs (#209) it was, named and
+    /// folded as its folder was. Open pages come along as they are; one that isn't open opens fresh with the rest.
+    private func unpin(_ folder: BookmarkFolder, returning bookmarkID: UUID, toIndex index: Int?, in space: UUID) -> Tab? {
+        let ids = Library.shared.allBookmarkIDs(inFolder: folder.id)
+        var pages: [(id: UUID, tab: Tab)] = []
+        for id in ids {
+            let icon = Library.shared.bookmark(id)?.icon
+            if let tab = bookmarkTabs[id] {
+                bookmarkTabs[id] = nil
+                tab.customIcon = icon
+                tab.bookmarkID = nil
+                tab.isFavorite = false
+                tab.setSpace(space)
+                pages.append((id, tab))
+            } else if let bookmark = Library.shared.bookmark(id) {
+                let tab = Tab(url: bookmark.url, title: bookmark.title, spaceID: space)
+                tab.customIcon = icon
+                tab.host = host
+                watch(tab)
+                pages.append((id, tab))
+            }
+        }
+        let at = min(index ?? 0, tabsBySpace[space]?.count ?? 0)
+        let parent = TabTree.parentForInsertion(at: at, in: treeNodes(in: space))
+        // Back as the group it was pinned from, with the name and fold its folder kept.
+        let groupID = folder.groupID
+        if let groupID { groups[groupID] = TabGroup(id: groupID, name: folder.name, isOpen: folder.isOpen) }
+        pages.forEach {
+            $0.tab.parentID = parent
+            $0.tab.groupID = groupID
+        }
+        tabsBySpace[space, default: []].insert(contentsOf: pages.map(\.tab), at: at)
+        Library.shared.removeBookmarks(ids)
+        Library.shared.removeFolder(folder.id)
+        structureChanged()
+        // A pinned group that was on screen stays there, now as the group of tabs.
+        if pages.contains(where: { $0.tab === selectedTab }) { selectionChanged() }
+        return pages.first { $0.id == bookmarkID }?.tab
     }
 
     /// True when a pinned tab has moved on from its pinned page.
