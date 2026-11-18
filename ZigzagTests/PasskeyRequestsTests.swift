@@ -267,6 +267,25 @@ struct PasskeyRequestsTests {
         #expect(try await webView.callAsyncJavaScript(body, contentWorld: .page).map { String(describing: $0) } == "true true")
     }
 
+    private final class Heard: NSObject, WKScriptMessageHandler {
+        var said: [String] = []
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            said.append(String(describing: message.body))
+        }
+    }
+
+    /// A closed or slept tab's page may not reach WebKit with its abort as it goes, so it's ended before.
+    @Test func aRetiredPageEndsItsWaitingRequestFirst() async throws {
+        let webView = await page()
+        let heard = Heard()
+        webView.configuration.userContentController.add(heard, contentWorld: .page, name: "heard")
+        let body = "waiting(); __calls[0].signal.addEventListener('abort', () => webkit.messageHandlers.heard.postMessage('aborted')); return log()"
+        _ = try await run(body, in: webView)
+        PageRetirement.retire(webView, endingPasskeys: true)
+        try await Task.sleep(for: .seconds(Passkeys.patience * 2))
+        #expect(heard.said == ["aborted"])
+    }
+
     @Test func itGoesInOnceInEveryFrameBeforeThePage() {
         let script = Passkeys.requests
         #expect(Passkeys.isRequests(script))
