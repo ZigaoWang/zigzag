@@ -428,6 +428,76 @@ enum SettingsIcon {
     }
 }
 
+/// Settings › Extensions: where an extension may read and change pages, Chrome's three choices, in rows under its own
+/// (#324). The same answers as Site Access in its menu by the address.
+enum ExtensionSiteAccessRows {
+    static let choices: [ExtensionInstalls.SiteAccess] = [.all, .click, .sites]
+
+    static func title(_ access: ExtensionInstalls.SiteAccess) -> String {
+        switch access {
+        case .all: String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")
+        case .click: String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")
+        case .sites: String(localized: "On Specific Sites", comment: "Site Access choice in Settings › Extensions: the extension works only on the sites listed under it.")
+        }
+    }
+
+    /// The Site access row, then each listed site with its ×. `changed` hears the site that changed, nil for all.
+    static func make(id: String, name: String, installs: ExtensionInstalls, add: @escaping () -> Void, changed: @escaping (String?) -> Void) -> [FormRow] {
+        let access = installs.siteAccess(id)
+        let sites = access == .sites ? installs.accessSites(id) : []
+        let menu = DropdownButton()
+        menu.options = choices.map { DropdownButton.Option(title: title($0)) }
+        menu.selectedIndex = choices.firstIndex(of: access) ?? 0
+        menu.setAccessibilityLabel(String(localized: "Site access for \(name)", comment: "VoiceOver name of the Site access menu in Settings › Extensions. The placeholder is the extension's name."))
+        menu.onSelect = { index in
+            guard choices.indices.contains(index), choices[index] != installs.siteAccess(id) else { return }
+            installs.chooseSiteAccess(id, choices[index])
+            changed(nil)
+        }
+        var controls: [NSView] = [menu]
+        if access == .sites {
+            let addButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use."))
+            addButton.onClick = { _ in add() }
+            controls.insert(addButton, at: 0)
+        }
+        let stack = NSStackView(views: controls)
+        stack.spacing = Tokens.Space.x2
+        let note = access == .sites && sites.isEmpty
+            ? String(localized: "It runs on no site until you add one.", comment: "Under Site access in Settings › Extensions, when On Specific Sites is chosen and no site is listed yet.") : nil
+        let row = FormRow(title: String(localized: "Site access", comment: "A setting under an extension in Settings › Extensions: which sites the extension may read and change."),
+                          detail: note, control: stack)
+        row.isIndented = true
+        row.keywords = name
+        return [row] + sites.map { site in
+            let remove = IconButton(symbol: "xmark", size: .compact,
+                                    toolTip: String(localized: "Remove \(site)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
+            remove.onClick = { _ in
+                installs.removeAccessSite(id, site)
+                changed(site)
+            }
+            let row = FormRow(title: site, control: remove)
+            row.isIndented = true
+            row.keywords = name
+            return row
+        }
+    }
+
+    /// Asks for a site the extension may use, and adds it.
+    @discardableResult
+    static func addSite(id: String, name: String, installs: ExtensionInstalls, in host: NSView, added: @escaping (String) -> Void) -> FormSheet {
+        let field = FilledField(placeholder: "github.com")
+        return FormSheet.show(in: host, title: String(localized: "Add a Site for \(name)", comment: "Title of the sheet that adds a site an extension may use, from Settings › Extensions. The placeholder is the extension's name."), symbol: "globe",
+                              message: String(localized: "It can read and change pages on this site and its subdomains.", comment: "Under the title of the sheet that adds a site an extension may use, from Settings › Extensions."),
+                              rows: [FormSheet.Row(label: nil, view: field)],
+                              confirmTitle: String(localized: "Add", comment: "Button that adds the site, in the sheet that adds a site an extension may use."),
+                              canConfirm: { [weak field] in SiteRoutes.entry(from: field?.stringValue ?? "") != nil }) { confirmed in
+            guard confirmed, let site = SiteRoutes.entry(from: field.stringValue) else { return }
+            installs.addAccessSite(id, site)
+            added(site)
+        }
+    }
+}
+
 // MARK: - A row that can be dragged
 
 /// A draggable group row. `FormRow`s are plain views, so the row sits inside this one, which is the drag surface; its
@@ -2016,7 +2086,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                         detail: String(localized: "Find one in the Chrome Web Store and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions."),
                                         control: get))
         }
-        for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
+        for (id, ext) in installed {
+            extensionsGroup.add(extensionRow(id: id, ext: ext))
+            // Only for one that asks to read and change sites.
+            guard !ext.allRequestedMatchPatterns.isEmpty else { continue }
+            let name = ext.displayName ?? id
+            ExtensionSiteAccessRows.make(id: id, name: name, installs: profile.installs,
+                                         add: { [weak self] in if let self { ExtensionSiteAccessRows.addSite(id: id, name: name, installs: self.profile.installs, in: self) { self.siteAccessChanged($0) } } },
+                                         changed: { [weak self] in self?.siteAccessChanged($0) }).forEach(extensionsGroup.add)
+        }
         // What your other profiles have that this one doesn't, to add without another trip to the store. Read from
         // each package, not from the other profile's running extensions: looking here starts none of them.
         let here = profile, has = Set(here.installs.installedIDs)
@@ -2051,6 +2129,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 if self.pane == .extensions || self.isSearching { self.layoutDocument() }
             }
         }
+    }
+
+    /// An extension's site access changed here: the front page, if it's on a site that changed, loads again, as from
+    /// the address menu. Nil is every site.
+    private func siteAccessChanged(_ site: String?) {
+        if let tabs = browser?.tabManager, tabs.profile === profile, let tab = tabs.selectedTab, let front = SiteRoutes.site(of: tab.url),
+           site.map({ SiteRoutes.covers($0, front) }) ?? true {
+            tab.reload()
+        }
+        reloadExtensions()
     }
 
     /// Looks through the apps in Applications for extensions that come inside them, off the main thread, then lists

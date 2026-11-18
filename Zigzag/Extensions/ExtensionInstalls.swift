@@ -138,6 +138,23 @@ final class ExtensionInstalls {
         profile.extensions.applySiteAccess(id)
     }
 
+    /// Settings' Site access choice: a new choice starts with no sites, as the address menu's do.
+    func chooseSiteAccess(_ id: String, _ access: SiteAccess) {
+        guard siteAccess(id) != access else { return }
+        setSiteAccess(id, access, sites: access == .all ? nil : [])
+    }
+
+    /// Adds a site to an extension's On Specific Sites list.
+    func addAccessSite(_ id: String, _ site: String) {
+        let sites = siteAccess(id) == .sites ? accessSites(id) : []
+        guard !sites.contains(site) else { return }
+        setSiteAccess(id, .sites, sites: sites + [site])
+    }
+
+    func removeAccessSite(_ id: String, _ site: String) {
+        setSiteAccess(id, .sites, sites: accessSites(id).filter { $0 != site })
+    }
+
     func setEnabled(_ id: String, _ enabled: Bool) {
         guard isEnabled(id) != enabled else { return }
         update(id) { $0.enabled = enabled }

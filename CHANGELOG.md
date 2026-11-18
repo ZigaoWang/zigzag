@@ -7,6 +7,8 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - An extension's popup lays its icons out as it does in Chrome. Zigzag was making every icon with no width of its own as wide as its row, so an icon beside a heading squeezed the heading to one letter a line, as in Dashlane's menu. Icons now keep the size their page gives them. ([#340](https://github.com/ZigaoWang/zigzag/issues/340))
+### New
+- Settings › Extensions has each extension's Site access under its row: On All Sites, When You Click It or On Specific Sites, with the sites listed to add and remove. It's the same choice as Site Access in the extension's menu by the address. Thanks to [git-bhanu](https://github.com/git-bhanu). ([#324](https://github.com/ZigaoWang/zigzag/issues/324))
 
 ## [0.9.3] - 2026-11-18
 

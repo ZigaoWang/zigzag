@@ -2247,7 +2247,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
+      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a site an extension may use.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2390,7 +2390,7 @@
       }
     },
     "Add Site…" : {
-      "comment" : "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space.",
+      "comment" : "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use.\nButton beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2429,6 +2429,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加网页尺寸"
+          }
+        }
+      }
+    },
+    "Add a Site for %@" : {
+      "comment" : "Title of the sheet that adds a site an extension may use, from Settings › Extensions. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为“%@”添加网站"
           }
         }
       }
@@ -10119,6 +10130,17 @@
         }
       }
     },
+    "It can read and change pages on this site and its subdomains." : {
+      "comment" : "Under the title of the sheet that adds a site an extension may use, from Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它可以读取和更改此网站及其子域名上的页面。"
+          }
+        }
+      }
+    },
     "It gets its own window and Dock icon, and stays signed in as you are here." : {
       "comment" : "Under the title of the Install as App sheet.",
       "localizations" : {
@@ -10181,6 +10203,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它会在这个页面旁边打开"
+          }
+        }
+      }
+    },
+    "It runs on no site until you add one." : {
+      "comment" : "Under Site access in Settings › Extensions, when On Specific Sites is chosen and no site is listed yet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加网站之前，它不会在任何网站上运行。"
           }
         }
       }
@@ -12681,6 +12714,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在所有网站上"
+          }
+        }
+      }
+    },
+    "On Specific Sites" : {
+      "comment" : "Site Access choice in Settings › Extensions: the extension works only on the sites listed under it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在特定网站上"
           }
         }
       }
@@ -17508,6 +17552,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网站权限"
+          }
+        }
+      }
+    },
+    "Site access" : {
+      "comment" : "A setting under an extension in Settings › Extensions: which sites the extension may read and change.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网站访问权限"
+          }
+        }
+      }
+    },
+    "Site access for %@" : {
+      "comment" : "VoiceOver name of the Site access menu in Settings › Extensions. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”的网站访问权限"
           }
         }
       }
