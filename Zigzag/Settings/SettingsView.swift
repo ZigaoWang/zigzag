@@ -2140,19 +2140,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// What a package's record says about where it came from, beyond its version: a Firefox package says it is one,
-    /// names the gecko ID it has in Firefox and whether Mozilla signed it. A folder read where it is has no signature
-    /// to speak of. A Chrome package adds nothing.
+    /// What a package's record says about where it came from, beyond its version: a Firefox package says it is one.
+    /// Its gecko ID and its signature file tell the person nothing they can act on, and a signature file's presence
+    /// isn't a verification, so neither is said. A Chrome package adds nothing.
     static func packageKindDetail(_ id: String) -> [String] {
-        guard ExtensionStore.kind(of: id) == .firefox, let record = ExtensionStore.package(id) else { return [] }
-        var lines = [String(localized: "Firefox", comment: "Under an extension's name in Settings › Extensions: it is a Firefox extension (.xpi).")]
-        if let geckoID = record.firefoxID, !geckoID.isEmpty { lines.append(geckoID) }
-        if record.unpackedPath == nil {
-            lines.append(record.hasSignature
-                ? String(localized: "Signed by Mozilla", comment: "Under a Firefox extension's name in Settings › Extensions: its package carries Mozilla's signature. Recorded, never trusted as authority.")
-                : String(localized: "Not signed", comment: "Under a Firefox extension's name in Settings › Extensions: its package carries no Mozilla signature."))
-        }
-        return lines
+        guard ExtensionStore.kind(of: id) == .firefox, ExtensionStore.package(id) != nil else { return [] }
+        return [String(localized: "Firefox", comment: "Under an extension's name in Settings › Extensions: it is a Firefox extension (.xpi).")]
     }
 
     @available(macOS 15.4, *)

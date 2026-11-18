@@ -83,23 +83,18 @@ enum ExtensionStore {
         var kind: String = ExtensionKind.chromium.rawValue
         /// A Firefox package's gecko ID (`browser_specific_settings.gecko.id`), which names it to Firefox.
         var firefoxID: String?
-        /// Whether a Firefox package carries Mozilla's signature file. A record without this key — every record
-        /// written before signing was recorded — reads as unsigned. Chrome packages leave it false.
-        var hasSignature: Bool = false
-
-        fileprivate static let keys = ["version", "pendingVersion", "unpackedPath", "kind", "firefoxID", "hasSignature"]
+        fileprivate static let keys = ["version", "pendingVersion", "unpackedPath", "kind", "firefoxID"]
 
         init(version: String, pendingVersion: String? = nil, unpackedPath: String? = nil,
-             kind: String = ExtensionKind.chromium.rawValue, firefoxID: String? = nil, hasSignature: Bool = false) {
+             kind: String = ExtensionKind.chromium.rawValue, firefoxID: String? = nil) {
             self.version = version
             self.pendingVersion = pendingVersion
             self.unpackedPath = unpackedPath
             self.kind = kind
             self.firefoxID = firefoxID
-            self.hasSignature = hasSignature
         }
 
-        private enum CodingKeys: String, CodingKey { case version, pendingVersion, unpackedPath, kind, firefoxID, hasSignature }
+        private enum CodingKeys: String, CodingKey { case version, pendingVersion, unpackedPath, kind, firefoxID }
 
         /// A record that has no `kind` is a Chrome one, as every record written before Firefox packages existed.
         init(from decoder: Decoder) throws {
@@ -109,7 +104,6 @@ enum ExtensionStore {
             unpackedPath = try fields.decodeIfPresent(String.self, forKey: .unpackedPath)
             kind = try fields.decodeIfPresent(String.self, forKey: .kind) ?? ExtensionKind.chromium.rawValue
             firefoxID = try fields.decodeIfPresent(String.self, forKey: .firefoxID)
-            hasSignature = try fields.decodeIfPresent(Bool.self, forKey: .hasSignature) ?? false
         }
     }
 
@@ -398,8 +392,6 @@ enum ExtensionStore {
         let kind: ExtensionKind
         /// A Firefox package's gecko ID, for the record; nil for a Chrome one.
         let firefoxID: String?
-        /// Whether a Firefox package carries Mozilla's signature file; false for a Chrome one.
-        let hasSignature: Bool
         fileprivate let folder: URL
         let extensionInfo: WKWebExtension
         let report: ExtensionReport
@@ -425,7 +417,7 @@ enum ExtensionStore {
         }
         let report = ExtensionReport(extension: ext, manifest: manifest, id: id)
         return .success(PreparedInstall(id: id, version: package.version, kind: .chromium, firefoxID: nil,
-                                        hasSignature: false, folder: package.folder, extensionInfo: ext, report: report))
+                                        folder: package.folder, extensionInfo: ext, report: report))
     }
 
     /// Prepares a Firefox package (.xpi) the person chose: read with the package rules, unpacked to a staging
@@ -469,7 +461,7 @@ enum ExtensionStore {
         }
         let report = ExtensionReport(extension: ext, manifest: normalized, id: id, kind: .firefox)
         return .success(PreparedInstall(id: id, version: version, kind: .firefox, firefoxID: package.firefoxID,
-                                        hasSignature: package.hasSignature, folder: staging, extensionInfo: ext, report: report))
+                                        folder: staging, extensionInfo: ext, report: report))
     }
 
     /// The folder a Firefox package is unpacked into while it's prepared and verified, before it's installed.
@@ -519,8 +511,7 @@ enum ExtensionStore {
         let kind = prepared.kind == .firefox ? ExtensionKind.firefox
             : (existing.flatMap { ExtensionKind(rawValue: $0.kind) } ?? .chromium)
         save(Package(version: prepared.version, kind: kind.rawValue,
-                     firefoxID: prepared.firefoxID ?? existing.flatMap(\.firefoxID),
-                     hasSignature: prepared.hasSignature), for: id)
+                     firefoxID: prepared.firefoxID ?? existing.flatMap(\.firefoxID)), for: id)
         var next = installs.state(id) ?? ExtensionInstalls.State()
         // Approved just now, from what the sheet showed.
         next.grantedPermissions = nil
@@ -607,7 +598,7 @@ enum ExtensionStore {
     }
 
     /// The record a folder's manifest calls for. A folder carrying Firefox's own keys is Firefox with its gecko ID,
-    /// so the record, its sheet and the Promise facade agree; the folder itself is never normalized — it is the
+    /// so the record, its sheet and its polyfill agree; the folder itself is never normalized — it is the
     /// person's, read where it is.
     static func unpackedPackage(for url: URL) -> Package {
         let manifest = manifest(in: url) ?? [:]
@@ -804,17 +795,29 @@ enum ExtensionStore {
 
     // MARK: Updating
 
-    /// Checks every installed extension for a new version, at most once a day.
+    /// Checks every installed extension for a new version, at most once a day. A Firefox package came from a file,
+    /// not from the Chrome Web Store, so the store has nothing to say about it and it isn't asked.
     static func checkForUpdatesIfDue(force: Bool = false) async {
         let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
         guard force || Date().timeIntervalSince(last) > 24 * 3600 else { return }
         UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
-        for id in packageIDs where !isUnpacked(id) { await updateIfNewer(id) }
+        for id in updateCandidates(packageIDs) { await updateIfNewer(id) }
+    }
+
+    /// Which records the store is asked about: packages the store delivered. A Firefox one came from a file, and an
+    /// unpacked one is the person's own folder, read where it is.
+    static func updateCandidates(_ ids: [String]) -> [String] {
+        ids.filter { id in
+            let record = package(id)
+            return record?.unpackedPath == nil && record.flatMap { ExtensionKind(rawValue: $0.kind) } == .chromium
+        }
     }
 
     /// Asks the store for the latest version only; downloads it when it's newer. An update that asks for
-    /// nothing new replaces the running version; one that asks for more waits for approval.
+    /// nothing new replaces the running version; one that asks for more waits for approval. A Firefox package is
+    /// never updated here: its file isn't in the store, and its ID names no store listing.
     static func updateIfNewer(_ id: String) async {
+        guard kind(of: id) == .chromium else { return }
         guard #available(macOS 15.4, *), let current = package(id), let latest = await latestVersion(of: id, current: current.version),
               isVersion(latest, newerThan: current.version), latest != current.pendingVersion else { return }
         guard case .success(let package) = await download(id) else { return }

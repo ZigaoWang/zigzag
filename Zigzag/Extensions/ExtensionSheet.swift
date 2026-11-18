@@ -251,10 +251,9 @@ extension ExtensionSheet {
             icon: info.icon(for: NSSize(width: 40, height: 40)),
             title: info.displayName.map { String(localized: "Add \($0)?", comment: "Title of the sheet that asks before adding an extension. The name is the extension's.") }
                 ?? String(localized: "Add this extension?", comment: "Title of the sheet that asks before adding an extension that has no name."),
-            subtitle: Words.sentences(String(localized: "Firefox extension, version \(prepared.version)",
-                                              comment: "Under the title of the sheet that asks before adding a Firefox extension (.xpi)."),
-                                      String(localized: "Zigzag isn’t Firefox, so an extension that checks for Firefox will see Zigzag.",
-                                             comment: "Under the title of the sheet that asks before adding a Firefox extension: runtime.getBrowserInfo answers Zigzag, so an extension that checks for Firefox takes its other path.")),
+            // One short line: the header gives the subtitle a single line, and two sentences ran past it.
+            subtitle: String(localized: "Firefox extension, version \(prepared.version)",
+                             comment: "Under the title of the sheet that asks before adding a Firefox extension (.xpi)."),
             heading: String(localized: "It will be able to", comment: "Heading over the list of what an extension can do, in the sheet that asks before adding it."),
             report: prepared.report,
             confirm: String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first."),

@@ -196,9 +196,9 @@ struct FirefoxManifestTests {
         #expect(try text(manifest) == before)
     }
 
-    /// The keys the Promise facade gates on survive normalization: a Firefox package the store installed is still
-    /// recognized as Firefox, so the facade is built for its pages.
-    @Test func normalizingKeepsTheKeysTheFacadeGatesOn() {
+    /// The keys firefox-polyfill.js gates on survive normalization: a Firefox package the store installed is still
+    /// recognized as Firefox, so its pages get getBrowserInfo and getPlatformInfo.
+    @Test func normalizingKeepsTheKeysThePolyfillGatesOn() {
         let modern: [String: Any] = [
             "manifest_version": 3,
             "background": ["scripts": ["a.js"]],

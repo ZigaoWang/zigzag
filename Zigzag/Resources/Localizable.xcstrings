@@ -24623,39 +24623,6 @@
         }
       }
     },
-    "Zigzag isn’t Firefox, so an extension that checks for Firefox will see Zigzag." : {
-      "comment" : "Under the title of the sheet that asks before adding a Firefox extension: runtime.getBrowserInfo answers Zigzag, so an extension that checks for Firefox takes its other path.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zigzag 不是 Firefox，因此检查 Firefox 的扩展会看到 Zigzag。"
-          }
-        }
-      }
-    },
-    "Signed by Mozilla" : {
-      "comment" : "Under a Firefox extension's name in Settings › Extensions: its package carries Mozilla's signature. Recorded, never trusted as authority.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已由 Mozilla 签名"
-          }
-        }
-      }
-    },
-    "Not signed" : {
-      "comment" : "Under a Firefox extension's name in Settings › Extensions: its package carries no Mozilla signature.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未签名"
-          }
-        }
-      }
-    },
     "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s and Safari’s come from their own stores." : {
       "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
       "localizations" : {

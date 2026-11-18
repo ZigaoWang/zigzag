@@ -139,9 +139,9 @@ struct FirefoxImportTests {
         #expect(!extensions.contains("crx"))
     }
 
-    /// A Firefox package's row in Settings › Extensions says it is one and names the gecko ID it has in Firefox. A
-    /// Chrome package's row says neither.
-    @Test func aFirefoxRowNamesFirefoxAndItsGeckoIDAndAChromeRowDoesNot() throws {
+    /// A Firefox package's row in Settings › Extensions says it is one, and no more: its gecko ID is Firefox's name
+    /// for it, not something to read at a glance. A Chrome package's row says neither.
+    @Test func aFirefoxRowSaysFirefoxAndAChromeRowSaysNothing() throws {
         let work = try Work()
         defer { work.cleanUp() }
         let firefox = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -149,9 +149,7 @@ struct FirefoxImportTests {
         ExtensionStore.save(ExtensionStore.Package(version: "1.0", kind: "firefox", firefoxID: "one@example.com"), for: firefox)
         ExtensionStore.save(ExtensionStore.Package(version: "1.0"), for: chrome)
 
-        let lines = SettingsView.packageKindDetail(firefox)
-        #expect(lines.contains("Firefox"))
-        #expect(lines.contains("one@example.com"))
+        #expect(SettingsView.packageKindDetail(firefox) == ["Firefox"])
         #expect(SettingsView.packageKindDetail(chrome).isEmpty)
     }
 

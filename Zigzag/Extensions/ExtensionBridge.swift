@@ -262,7 +262,8 @@ enum ExtensionBridgeScript {
         #endif
     }()
 
-    /// Firefox's Promise `browser` API, built over the Chrome surface (firefox-polyfill.js). It gates itself on the
+    /// Firefox's two runtime members that WebKit has no counterpart for (firefox-polyfill.js). WebKit's own `browser`
+    /// stays as it is: what an add-on reads through it is WebKit's, prototypes and all. The script gates itself on the
     /// package's own manifest — a Firefox package carries browser_specific_settings or applications, a Chrome one
     /// neither — since the prelude is injected per profile, not per package. The app's version and architecture are
     /// written in where the polyfill reads them.

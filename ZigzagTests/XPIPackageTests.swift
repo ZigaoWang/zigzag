@@ -17,7 +17,6 @@ struct XPIPackageTests {
         #expect(package.manifest["name"] as? String == "Test")
         #expect(package.manifest["version"] as? String == "1.0")
         #expect(package.firefoxID == nil)
-        #expect(!package.hasSignature)
     }
 
     @Test func readsTheGeckoID() throws {
@@ -55,25 +54,15 @@ struct XPIPackageTests {
         }
     }
 
-    /// Only a file of that exact name and place is Mozilla's signature: not another file, not a folder of that name.
-    @Test func signatureIsOnlyMozillasOwnFileAtTheRoot() throws {
-        let manifest = try Self.json(Self.manifest)
-        let unsigned: [[XPIArchive.Entry]] = [
-            [.init(name: "manifest.json", data: manifest), .init(name: "mozilla.rsa", data: Data("signature".utf8))],
-            [.init(name: "manifest.json", data: manifest), .init(name: "META-INF/manifest.mf", data: Data("manifest".utf8))],
-            [.init(name: "manifest.json", data: manifest), .init(name: "META-INF/mozilla.rsa/", mode: 0o040755)],
-        ]
-        for entries in unsigned {
-            #expect(try !XPIPackage(XPIArchive(entries: entries).data).hasSignature)
-        }
-    }
-
-    @Test func marksASignedPackage() throws {
+    /// A signature file Mozilla added is left alone, and never read as a signature Zigzag stood behind: the package
+    /// is still read by its manifest, as one without it is.
+    @Test func aSignatureFileInThePackageIsNotReadAsOne() throws {
         let package = try XPIPackage(XPIArchive(entries: [
             .init(name: "manifest.json", data: try Self.json(Self.manifest)),
             .init(name: "META-INF/mozilla.rsa", data: Data("signature".utf8)),
         ]).data)
-        #expect(package.hasSignature)
+        #expect(package.manifest["name"] as? String == "Test")
+        #expect(package.firefoxID == nil)
     }
 
     /// An empty object is a manifest with nothing in it, not a damaged package.
@@ -81,7 +70,6 @@ struct XPIPackageTests {
         let package = try XPIPackage(XPIArchive(entries: [.init(name: "manifest.json", data: Data("{}".utf8))]).data)
         #expect(package.manifest.isEmpty)
         #expect(package.firefoxID == nil)
-        #expect(!package.hasSignature)
     }
 
     /// JSON that is not an object at all is not a manifest.

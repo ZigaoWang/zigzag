@@ -345,8 +345,22 @@ struct FirefoxInstallTests {
         #expect(work.record(id)?.firefoxID == nil)
     }
 
-    /// No gecko ID: the package is named by its bytes, so the same file at two paths is one record. Its signature
-    /// (none here) is recorded, and Settings says so.
+    /// Only the store's own packages are asked about updates: a Firefox package came from a file, and an unpacked one
+    /// is the person's folder. Asking Google for either would be a request it can't answer.
+    @Test func onlyTheStoresOwnPackagesAreAskedForUpdates() throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let chrome = "abcdefghijklmnopabcdefghijklmnop"
+        let firefox = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        let unpacked = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0"), for: chrome)
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0", kind: "firefox", firefoxID: "one@example.com"), for: firefox)
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0", unpackedPath: work.folder.path), for: unpacked)
+
+        #expect(ExtensionStore.updateCandidates([chrome, firefox, unpacked]) == [chrome])
+    }
+
+    /// No gecko ID: the package is named by its bytes, so the same file at two paths is one record.
     @Test func anXPIWithNoGeckoIDIsNamedByItsBytesSoTheSameFileAtTwoPathsIsOneRecord() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
@@ -357,13 +371,12 @@ struct FirefoxInstallTests {
         let id = ExtensionStore.xpiID(forGeckoID: nil, data: bytes)
         #expect(ExtensionStore.packageIDs == [id])
         #expect(work.record(id)?.firefoxID == nil)
-        #expect(work.record(id)?.hasSignature == false)
-        #expect(SettingsView.packageKindDetail(id).contains("Not signed"))
+        #expect(SettingsView.packageKindDetail(id) == ["Firefox"])
     }
 
-    /// A package Mozilla signed has that recorded and shown; it is a record of the signature file's presence, never a
-    /// check that the signature is valid.
-    @Test func aSignedXPIHasItsSignatureRecordedAndShown() async throws {
+    /// A signature file in the package changes nothing Zigzag says: its presence isn't a check that the signature is
+    /// valid, so Settings says only that this is a Firefox extension, and records the package the same way.
+    @Test func aSignatureFileChangesNothingZigzagSays() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
         let bytes = XPIArchive(entries: [
@@ -373,13 +386,13 @@ struct FirefoxInstallTests {
         _ = try Self.installed(await Self.install(at: try work.xpiFile(bytes), in: work.profile))
 
         let id = ExtensionStore.xpiID(forGeckoID: "signed@example.com", data: Data())
-        #expect(work.record(id)?.hasSignature == true)
-        #expect(SettingsView.packageKindDetail(id).contains("Signed by Mozilla"))
+        #expect(work.record(id)?.kind == "firefox")
+        #expect(SettingsView.packageKindDetail(id) == ["Firefox"])
     }
 
-    /// The manifest Zigzag stores is the normalized copy, and it still carries the keys the Promise facade gates on:
+    /// The manifest Zigzag stores is the normalized copy, and it still carries the keys firefox-polyfill.js gates on:
     /// a key-pruning step that dropped them would silently darken every Firefox extension.
-    @Test func theInstalledManifestKeepsTheKeysTheFacadeGatesOn() async throws {
+    @Test func theInstalledManifestKeepsTheKeysThePolyfillGatesOn() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
         let url = try work.xpiFile(try Self.xpi(Self.manifest("keys@example.com", "1.0", ["background": ["scripts": ["a.js"]]])))
@@ -393,7 +406,7 @@ struct FirefoxInstallTests {
     }
 
     /// A folder installed from disk that carries Firefox's own keys is recorded as Firefox with its gecko ID, so its
-    /// record, its sheet and the facade agree — and the person's own folder is left exactly as it is, never
+    /// record, its sheet and its polyfill agree — and the person's own folder is left exactly as it is, never
     /// normalized. A folder without those keys stays Chrome's.
     @Test func aFirefoxFolderIsRecordedFirefoxWithItsGeckoIDAndLeftAsItIs() async throws {
         let work = try Workspace()

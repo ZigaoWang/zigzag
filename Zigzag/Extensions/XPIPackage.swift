@@ -1,9 +1,8 @@
 import Foundation
 
-/// A Firefox package (.xpi): a zip whose `manifest.json` is at its root. Mozilla signs some of them, which names the
-/// extension an update belongs to as well as its files, and a gecko ID in the manifest names it to Firefox. The zip
-/// is read with the same package rules a Chrome extension gets, and unpacked the same way, so an entry that climbs
-/// out of the folder is refused before anything is written.
+/// A Firefox package (.xpi): a zip whose `manifest.json` is at its root. A gecko ID in the manifest names it to
+/// Firefox. The zip is read with the same package rules a Chrome extension gets, and unpacked the same way, so an
+/// entry that climbs out of the folder is refused before anything is written.
 nonisolated struct XPIPackage {
     enum Failure: Error, Equatable {
         case missingManifest
@@ -15,9 +14,6 @@ nonisolated struct XPIPackage {
 
     let manifest: [String: Any]
     let firefoxID: String?
-    /// Whether the archive carries Mozilla's signature file, `META-INF/mozilla.rsa`: a record of its presence, never
-    /// a check that the signature is valid or covers these files.
-    let hasSignature: Bool
     private let data: Data
 
     /// Reads the root `manifest.json`, decompressing only that entry: nothing else in the package is unpacked here.
@@ -37,7 +33,6 @@ nonisolated struct XPIPackage {
         }
         self.manifest = manifest
         self.firefoxID = Self.geckoID(of: manifest)
-        self.hasSignature = entries.contains { !$0.isDirectory && $0.path == ["META-INF", "mozilla.rsa"] }
         self.data = data
     }
 

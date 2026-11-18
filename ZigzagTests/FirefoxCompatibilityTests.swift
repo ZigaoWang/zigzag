@@ -98,9 +98,9 @@ struct FirefoxCompatibilityTests {
         }
     }
 
-    // MARK: The facade
+    // MARK: Firefox's own two members
 
-    @Test func theFacadeAnswersBrowserAndPlatformInfo() throws {
+    @Test func firefoxOwnTwoMembersAreEmulated() throws {
         let (overlay, universe) = try Self.shipped(.firefox)
         for member in ["getBrowserInfo", "getPlatformInfo"] {
             let claim = try #require(overlay.claims["runtime"]?.members?[member], "runtime.\(member)")
@@ -122,9 +122,9 @@ struct FirefoxCompatibilityTests {
         }
     }
 
-    /// `sidebarAction` is a stated limit, not a facade: the panel from `sidebar_action` is shown (the manifest is
-    /// normalized to a `side_panel` twin), but nothing answers its toolbar controls at run time. The sheet words one
-    /// line for it, and every member the extension might call is unsupported.
+    /// `sidebarAction` is a stated limit, not something answered at run time: the panel from `sidebar_action` is shown
+    /// (the manifest is normalized to a `side_panel` twin), but none of its toolbar controls does anything. The sheet
+    /// words one line for it, and every member the extension might call is unsupported.
     @Test func sidebarActionIsAStatedLimitAndTheSheetWordsOneLine() throws {
         let (overlay, universe) = try Self.shipped(.firefox)
         let claim = try #require(overlay.claims["sidebarAction"])

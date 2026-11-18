@@ -11,7 +11,7 @@ nonisolated enum FirefoxManifest {
     /// The worker the loaded copy runs where Firefox ran `background.scripts`.
     static let workerFile = "zigzag-firefox-worker.js"
 
-    /// Whether a manifest is a Firefox one: it carries the keys only Firefox writes, which the Promise facade gates
+    /// Whether a manifest is a Firefox one: it carries the keys only Firefox writes, which firefox-polyfill.js gates
     /// on and the store records a package's kind by. The gecko ID itself is read by `XPIPackage`.
     static func isFirefox(_ manifest: [String: Any]) -> Bool {
         manifest["browser_specific_settings"] != nil || manifest["applications"] != nil

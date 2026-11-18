@@ -365,9 +365,8 @@ nonisolated struct CompatibilityImplementations: Sendable {
     }
 
     /// The code one kind's claims may name. `webkit-differences.js` and the compatibility shim answer both kinds;
-    /// `firefox-polyfill.js` answers only Firefox's, where `getBrowserInfo`, `getPlatformInfo` and the Promise facade
-    /// live. Scoping the scan by kind keeps a Chrome claim from validating against a Firefox-only symbol, and the
-    /// other way round.
+    /// `firefox-polyfill.js` answers only Firefox's, where `getBrowserInfo` and `getPlatformInfo` live. Scoping the
+    /// scan by kind keeps a Chrome claim from validating against a Firefox-only symbol, and the other way round.
     @MainActor
     static func shipped(kind: ExtensionKind, bundle: Bundle = .main) -> CompatibilityImplementations {
         let differences = bundle.url(forResource: "webkit-differences", withExtension: "js")

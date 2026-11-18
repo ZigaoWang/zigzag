@@ -136,7 +136,7 @@ struct ExtensionScriptTests {
         #expect(parses(ExtensionBridgeScript.surface) == nil)
         #expect(!ExtensionBridgeScript.differences.isEmpty)
         #expect(parses(ExtensionBridgeScript.differences) == nil)
-        // Firefox's Promise `browser` facade, appended after the surface in afterCompatibility.
+        // Firefox's two runtime members, appended after the surface in afterCompatibility.
         #expect(!ExtensionBridgeScript.firefoxPolyfill.isEmpty)
         #expect(parses(ExtensionBridgeScript.firefoxPolyfill) == nil)
         // Each extension's background prelude, as assembled, including those with fixes of their own.
