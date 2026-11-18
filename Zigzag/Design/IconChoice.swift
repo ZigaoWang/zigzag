@@ -172,7 +172,7 @@ final class IconGrid: NSView, NSTextFieldDelegate {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    private func pick(_ icon: String?) {
+    fileprivate func pick(_ icon: String?) {
         selected = icon
         if let icon, !IconChoice.isSymbol(icon) {
             emojiField.stringValue = icon
@@ -376,16 +376,45 @@ final class IconPickerPanel: FloatingPanelView {
     /// How wide it is: the grid and its padding.
     var preferredWidth: CGFloat { IconGrid.width + pad * 2 }
 
-    init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?, onPick: @escaping (String?) -> Void) {
+    /// A page's Choose Image… and, once it has an icon, Use Site Icon, under the field (#303); a folder's has neither.
+    private let chooseImage: TextButton?
+    private let useSite = TextButton(title: SidebarMenus.useSiteIconTitle)
+    /// The foot's row: as tall as a quiet button, a step from the field and from the panel's edge, its buttons as
+    /// far in from the bottom as from the sides.
+    private var footHeight: CGFloat { chooseImage == nil ? 0 : Tokens.Space.x1 * 2 + Tokens.Space.x7Height - pad }
+    var preferredHeight: CGFloat { IconGrid.height + pad * 2 + footHeight }
+
+    /// `onChooseImage`: a page's picker, which also takes an image file and can go back to the site's icon.
+    init(noneSymbol: String, noneImage: NSImage? = nil, noneToolTip: String? = nil, selected: String?,
+         onChooseImage: (() -> Void)? = nil, onPick: @escaping (String?) -> Void) {
         grid = IconGrid(noneSymbol: noneSymbol, noneImage: noneImage, noneToolTip: noneToolTip, selected: selected)
+        chooseImage = onChooseImage.map { _ in TextButton(title: SidebarMenus.chooseImageTitle) }
         super.init(frame: .zero)
         radius = Tokens.Radius.panel
-        grid.onPick = onPick
-        addSubview(grid)
-        onLayout = { [weak self] in
-            guard let self else { return }
-            self.grid.frame = NSRect(x: self.pad, y: self.pad, width: IconGrid.width, height: IconGrid.height)
+        grid.onPick = { [weak self] icon in
+            onPick(icon)
+            self?.useSite.isHidden = icon == nil
         }
+        addSubview(grid)
+        if let chooseImage, let onChooseImage {
+            chooseImage.onClick = { _ in onChooseImage() }
+            useSite.onClick = { [weak self] _ in self?.grid.pick(nil) }
+            useSite.isHidden = selected == nil
+            addSubview(chooseImage)
+            addSubview(useSite)
+        }
+        onLayout = { [weak self] in self?.layoutParts() }
+    }
+
+    private func layoutParts() {
+        grid.frame = NSRect(x: pad, y: pad, width: IconGrid.width, height: IconGrid.height)
+        guard let chooseImage else { return }
+        // Words line up with the grid's edges; the buttons reach out past them by their padding.
+        let y = pad + IconGrid.height + Tokens.Space.x1, h = Tokens.Space.x7Height
+        let chooseWidth = min(ceil(chooseImage.fittingWidth), IconGrid.width / 2)
+        chooseImage.frame = NSRect(x: pad - chooseImage.textInset, y: y, width: chooseWidth, height: h)
+        let siteWidth = min(ceil(useSite.fittingWidth), IconGrid.width / 2)
+        useSite.frame = NSRect(x: pad + IconGrid.width - siteWidth + useSite.textInset, y: y, width: siteWidth, height: h)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -394,7 +423,7 @@ final class IconPickerPanel: FloatingPanelView {
     func show(beside row: NSView, in overlay: NSView, x: CGFloat) {
         IconPickerPanel.current?.close()
         let rowFrame = row.convert(row.bounds, to: overlay)
-        let size = NSSize(width: preferredWidth, height: IconGrid.height + pad * 2)
+        let size = NSSize(width: preferredWidth, height: preferredHeight)
         let top = max(Tokens.Space.x2, min(rowFrame.minY - Tokens.Space.x2, overlay.bounds.height - size.height - Tokens.Space.x2))
         frame = NSRect(origin: NSPoint(x: x, y: top), size: size)
         overlay.addSubview(self)

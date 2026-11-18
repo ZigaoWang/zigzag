@@ -44,6 +44,15 @@ final class NewTabNote {
 
     var isShowing: Bool { view?.superview != nil && view?.dismissing == false }
 
+    #if DEBUG
+    /// Where it is in the window, from the window's top left, while it's up.
+    var debugFrame: NSRect? {
+        guard isShowing, let view, let window = view.window else { return nil }
+        let r = view.convert(view.bounds, to: nil)
+        return NSRect(x: r.minX, y: window.frame.height - r.maxY, width: r.width, height: r.height)
+    }
+    #endif
+
     /// A tab you opened in the background in this window, from a link.
     func show(_ tab: Tab, site: URL? = nil) {
         guard let controller, Self.shows(sidebarVisible: controller.root.sidebarVisible, sidebarFloating: controller.root.isSidebarFloatingVisible,
@@ -201,6 +210,8 @@ final class NewTabNoteView: ToastView {
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    /// The window keeps presses on a panel's surface from it; this one is a button.
+    override var takesPress: Bool { true }
 
     override func mouseDown(with event: NSEvent) { pressed = true }
 

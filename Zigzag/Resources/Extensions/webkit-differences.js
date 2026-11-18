@@ -513,6 +513,30 @@
       });
     }
 
+    // action.openPopup from the extension's own page in a frame on a site: WebKit takes the call from a site's process
+    // as a forged message and ends that process, so the click did nothing but reload the site. iCloud Passwords' "Enable
+    // Password AutoFill" under a field asks so (#248). Zigzag opens the popup itself, for a click in the frame.
+    const framedOnSite = !isWorker && typeof window !== 'undefined' && window.top !== window && location.ancestorOrigins
+      && Array.from(location.ancestorOrigins).some((origin) => !origin.startsWith('webkit-extension:'));
+    const openPopupHandler = framedOnSite && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zigzagOpenPopup;
+    if (framedOnSite) {
+      for (const name of ['action', 'browserAction']) {
+        if (!api[name] || typeof api[name].openPopup !== 'function') continue;
+        setMember([name], 'openPopup', (...args) => {
+          const callback = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
+          const answer = (async () => {
+            if (!openPopupHandler) throw new Error('openPopup() is not available here.');
+            if (!(navigator.userActivation && navigator.userActivation.isActive)) throw new Error('openPopup() needs a user gesture.');
+            const error = await openPopupHandler.postMessage(null);
+            if (error) throw new Error(error);
+          })();
+          if (!callback) return answer;
+          answer.then(() => callback(), () => callback());
+          return undefined;
+        });
+      }
+    }
+
     // permissions.contains: WebKit refuses the whole question, and throws, when it names a permission WebKit doesn't
     // know ("downloads"), where Chrome answers. Violentmonkey asks about "downloads" on its background's first line,
     // so its background stopped there. Such a permission counts as held when the extension's manifest asks for it

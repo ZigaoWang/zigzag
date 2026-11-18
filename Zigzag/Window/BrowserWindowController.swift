@@ -79,21 +79,25 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.peek.reposition()
             self.miniPlayer.place()
             PermissionPrompt.reposition(in: self)
+            NoticeCard.reposition(in: self)
             Toast.reposition(in: self)
             self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
             if self.floatingDownloads.superview != nil {
                 if self.root.sidebarVisible { self.hideFloatingDownloads() } else { self.showFloatingDownloads() }
             }
+            self.placeFloatingUpdate()
         }
         root.onSidebarWidthChange = { [weak self] _ in self?.onStateChange?() }
         root.onSlide = { [weak self] duration, timing in
             guard let self else { return }
             self.sidebarSliding(duration)
             PermissionPrompt.reposition(in: self, slide: duration, timing: timing)
+            NoticeCard.reposition(in: self, slide: duration, timing: timing)
             Toast.reposition(in: self, slide: duration, timing: timing)
             self.newTabNote.reposition()
             AgentControl.shared.reposition(in: self)
+            self.placeFloatingUpdate()
         }
         // A panel opened from the slid-out sidebar keeps it out until the panel closes, so it's never left floating alone.
         // So does the guide while it points at something in it.
@@ -200,17 +204,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         sidebar.onNowPlayingToggle = { [weak self] tab in self?.toggleNowPlaying(tab) }
         sidebar.onNowPlayingHide = { [weak self] tab in self?.hideNowPlaying(tab) }
         sidebar.onNowPlayingMenu = { [weak self] tab in self?.nowPlayingMenu(for: tab) }
-        // An update that's ready shows in every window's sidebar, private ones too: it's for all of Zigzag, and
-        // restarting closes a private window as quitting does.
+        // An update shows in every window's sidebar, private ones too: it's for all of Zigzag, and restarting closes a
+        // private window as quitting does.
         sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         sidebar.updateCard.onHide = { Updater.shared.dismissCard() }
-        sidebar.setUpdateReady(Updater.shared.readiness.showsCard ? Updater.shared.readiness.staged?.version : nil)
+        sidebar.setUpdateCard(Updater.shared.cardState)
         tokens.append(Updater.changed.observe { [weak self] in
             guard let self else { return }
-            let readiness = Updater.shared.readiness
             // Closed in this window: it goes as a closed card does; in the others it fades.
-            let hiding = readiness.staged != nil && !readiness.showsCard && self.window?.isKeyWindow == true
-            self.sidebar.setUpdateReady(readiness.showsCard ? readiness.staged?.version : nil, hiding: hiding)
+            let hiding = Updater.shared.readiness.isDismissed && self.window?.isKeyWindow == true
+            self.sidebar.setUpdateCard(Updater.shared.cardState, hiding: hiding)
+            self.placeFloatingUpdate(hiding: hiding)
         })
         sidebar.reloadButton.onClick = { [weak self] _ in
             guard let tab = self?.tabManager.selectedTab else { return }
@@ -1210,6 +1214,58 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     func hideFloatingDownloads() {
         guard floatingDownloads.superview != nil, !DownloadsPanel.isOpen(in: window) else { return }
         floatingDownloads.dismiss()
+    }
+
+    // MARK: The update card with the sidebar hidden
+
+    /// With the sidebar hidden, the update card stands in on its own in the sidebar's bottom corner, on a small
+    /// panel, for an update you asked for and once when one is ready (`Updater.cardFloats`). It goes with its close
+    /// button or Restart, and for good once the sidebar's back, where the card lives.
+    private lazy var floatingUpdate: (panel: FloatingPanelView, card: UpdateCard) = {
+        let panel = FloatingPanelView()
+        let card = UpdateCard()
+        card.isFloating = true
+        card.onRestart = { Updater.shared.restartToUpdate() }
+        card.onHide = { Updater.shared.dismissCard() }
+        panel.addSubview(card)
+        panel.onLayout = { [weak panel, weak card] in
+            guard let panel, let card else { return }
+            card.frame = panel.bounds
+            // Concentric with the panel, which it fills.
+            card.layer?.cornerRadius = panel.radius
+        }
+        return (panel, card)
+    }()
+
+    /// Shows, moves or puts away the floating update card, as the update, the sidebar and the window are now.
+    func placeFloatingUpdate(hiding: Bool = false) {
+        let updater = Updater.shared
+        let (panel, card) = floatingUpdate
+        guard let state = updater.cardState, updater.cardFloats, !root.sidebarVisible, !root.isSidebarFloatingVisible else {
+            guard panel.superview != nil, !panel.dismissing else { return }
+            panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
+            panel.dismiss(instantly: hiding && Tokens.Motion.isFromKey)
+            return
+        }
+        card.show(state)
+        // Where the card sits in the sidebar: as wide, as far in from the window's edges as the sidebar's own edge,
+        // above the stand-in Downloads button when that's out.
+        let pad = Tokens.Metric.sidebarPadding
+        let width = root.sidebarWidth - Tokens.Sidebar.edge * 2
+        let height = UpdateCard.height(for: state)
+        var bottom = root.overlay.bounds.height - pad
+        if floatingDownloads.superview != nil { bottom = floatingDownloads.frame.minY - Tokens.Space.x2 }
+        let x = root.sidebarOnRight ? root.overlay.bounds.width - width - pad : pad
+        let frame = NSRect(x: x, y: bottom - height, width: width, height: height)
+        let isNew = panel.superview == nil || panel.dismissing
+        if panel.superview == nil { root.overlay.addSubview(panel) }
+        if isNew {
+            panel.frame = frame
+            panel.growsFrom = CGPoint(x: 0.5, y: 0.5)
+            panel.present(arrival: .pop)
+        } else if panel.frame != frame {
+            Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { panel.animator().frame = frame }
+        }
     }
 
     /// The bar above the page in the shown page's color (`Tab.pageColor`). None over what covers the page (a PDF,
@@ -2974,7 +3030,8 @@ extension BrowserWindowController: SidebarDelegate {
         let id = tab.id
         // The plain choice is the site's own icon, shown as it is.
         let siteIcon = tab.favicon ?? tab.url.flatMap { FaviconStore.shared.cachedIcon(for: $0) }
-        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: tab.customIcon) { [weak self] icon in
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: tab.customIcon,
+                                    onChooseImage: { [weak self] in if let self, let tab = self.tabManager.tab(with: id) { self.chooseImageIcon(for: tab) } }) { [weak self] icon in
             guard let self, let tab = self.tabManager.tab(with: id) else { return }
             self.setIconWithUndo(icon, for: tab)
         }
@@ -2989,13 +3046,14 @@ extension BrowserWindowController: SidebarDelegate {
         guard let anchor else { return }
         closeFloatingPanels()
         let siteIcon = tabManager.bookmarkTab(for: id)?.favicon ?? FaviconStore.shared.cachedIcon(for: bookmark.url)
-        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon) { [weak self] icon in
+        let panel = IconPickerPanel(noneSymbol: "globe", noneImage: siteIcon, noneToolTip: SidebarMenus.useSiteIconTitle, selected: bookmark.icon,
+                                    onChooseImage: { [weak self] in self?.chooseImageIcon(forBookmark: id) }) { [weak self] icon in
             self?.setIconWithUndo(icon, forBookmark: id)
         }
         panel.show(beside: anchor, in: root.overlay, x: root.besideSidebar(width: panel.preferredWidth))
     }
 
-    /// Choose Image…: an image file as the tab's icon (#303), copied into Zigzag's folder.
+    /// Choose Image… in the icon grid: an image file as the tab's icon (#303), copied into Zigzag's folder.
     func chooseImageIcon(for tab: Tab) {
         let id = tab.id
         pickPageImage { [weak self] icon in
@@ -3018,7 +3076,7 @@ extension BrowserWindowController: SidebarDelegate {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.prompt = String(localized: "Choose", comment: "Button of the panel that picks an image file as a tab's, pinned tab's or favorite's icon.")
-        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.")
+        panel.message = String(localized: "Choose an image to use as this page’s icon.", comment: "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.")
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let url = panel.url else { return }
             self?.usePageImage(url, done)

@@ -539,9 +539,16 @@ enum DebugBridge {
         // the menu item's title and what's staged (JSON).
         if name == "updateready" { Updater.shared.debugStage(arg == "off" || arg.isEmpty ? nil : arg); return }
         if name == "updatedismiss" { Updater.shared.dismissCard(); return }
+        // updatesim <version> [share|preparing]: Check for Updates… with a pretend download on the card, held there
+        // when given.
+        if name == "updatesim" {
+            let f = arg.split(separator: " ").map(String.init)
+            Updater.shared.debugSimulate(f.first ?? "0.9.2-beta.1", holdAt: f.count > 1 ? f[1] : nil)
+            return
+        }
         if name == "updatestate" {
             let readiness = Updater.shared.readiness
-            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard,
+            let state: [String: Any] = ["menu": Updater.shared.menuTitle, "staged": readiness.staged?.version ?? "", "card": readiness.showsCard, "state": Updater.shared.cardState.map { "\($0)" } ?? "", "floats": Updater.shared.cardFloats,
                                         "shown": !controller.sidebar.updateCard.isHidden, "frame": NSStringFromRect(controller.sidebar.updateCard.frame)]
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
             return
@@ -619,6 +626,10 @@ enum DebugBridge {
             try? out.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
+        // newtabnote <path>: the new tab note's frame (window points, top left) and the selected tab.
+        case "newtabnote":
+            let frame = controller.newTabNote.debugFrame.map(NSStringFromRect) ?? "none"
+            try? "\(frame)\n\(controller.tabManager.selectedTab?.displayTitle ?? "-")".write(toFile: arg, atomically: true, encoding: .utf8)
         // topbar on|off: Settings › Appearance › Address bar above the page.
         case "topbar": BrowserRootView.addressAbovePage = arg == "on"
         // sidebarside right|left: Settings › Appearance › Sidebar on the right.

@@ -227,6 +227,8 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     @objc func toggleBrowserSidebar(_ sender: Any?) {
         root.setSidebarVisible(!root.sidebarVisible, animated: true)
+        // Back in the sidebar, the update card lives there rather than floating.
+        if root.sidebarVisible { Updater.shared.stopFloating() }
         onStateChange?()
     }
 

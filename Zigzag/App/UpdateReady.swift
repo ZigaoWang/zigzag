@@ -34,6 +34,14 @@ nonisolated struct UpdateReadiness: Equatable, Sendable {
         dismissedBuild = staged?.build
     }
 
+    /// Check for Updates… found the one already staged: the card comes back for it.
+    mutating func undismiss() {
+        dismissedBuild = nil
+    }
+
+    /// You put the card away for the update that's staged.
+    var isDismissed: Bool { staged != nil && staged?.build == dismissedBuild }
+
     /// The staged update is gone: installed, let go for a newer one, or no longer on the feed.
     mutating func clear() {
         staged = nil
@@ -57,6 +65,57 @@ nonisolated struct UpdateReadiness: Equatable, Sendable {
 
     private static func parts(_ version: String) -> [Int] {
         version.split(whereSeparator: { !$0.isNumber }).map { Int($0) ?? 0 }
+    }
+}
+
+/// What the update card shows: an update you asked for coming in and being prepared, then ready to restart into.
+/// The card is the one place an update shows itself; a toast only says a check is under way, or what it found when
+/// that's nothing.
+nonisolated enum UpdateCardState: Equatable, Sendable {
+    /// Coming in: how much of how much, the total 0 until Sparkle knows the size.
+    case downloading(version: String, received: UInt64, total: UInt64)
+    /// Downloaded: Sparkle unpacks it and checks its signature.
+    case preparing(version: String)
+    case ready(version: String)
+
+    /// As written (0.9.2-beta.1).
+    var version: String {
+        switch self {
+        case .downloading(let version, _, _), .preparing(let version), .ready(let version): version
+        }
+    }
+
+    /// How much has come, 0 to 1, while the size is known.
+    var share: Double? {
+        guard case .downloading(_, let received, let total) = self, total > 0 else { return nil }
+        return min(1, Double(received) / Double(total))
+    }
+
+    var isReady: Bool { if case .ready = self { true } else { false } }
+
+    /// Moved on enough from `old` to draw again: another step, or a whole percent more of the download.
+    func differsVisibly(from old: UpdateCardState?) -> Bool {
+        guard let old, let share, let before = old.share, old.version == version else { return self != old }
+        return abs(share - before) >= 0.01 || (share >= 1) != (before >= 1)
+    }
+}
+
+/// Zigzag's version as people read it: 0.9.2-beta.1 is "0.9.2 beta 1", and a stable version stays as it is. Every
+/// place that shows a version to people goes through it; reports and logs keep the version as written.
+nonisolated enum VersionName {
+    /// This copy of Zigzag's version, as written (0.9.2-beta.1).
+    static var running: String { Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "" }
+
+    static func display(_ version: String) -> String {
+        guard let dash = version.firstIndex(of: "-") else { return version }
+        let base = String(version[..<dash])
+        let tag = version[version.index(after: dash)...].split(separator: ".").map(String.init)
+        if tag.count == 2, tag[0].lowercased() == "beta", Int(tag[1]) != nil {
+            let number = tag[1]
+            return String(localized: "\(base) beta \(number)",
+                          comment: "A beta of Zigzag as people read it: 0.9.2 beta 1. The placeholders are the version and the beta's number.")
+        }
+        return ([base] + tag).joined(separator: " ")
     }
 }
 

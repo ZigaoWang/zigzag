@@ -575,6 +575,10 @@ class FloatingPanelView: NSView {
     /// bar is moved this way).
     var onBarePress: ((NSEvent) -> Void)?
 
+    /// A panel that is a button itself (the new tab note): the window hands it the left press on its surface and the
+    /// release, instead of keeping them from it.
+    var takesPress: Bool { false }
+
     private static func handlesPress(_ view: NSView) -> Bool {
         if let field = view as? NSTextField, isLabel(field) { return false }
         if view is NSControl || view is NSText || view is NSScroller || view is WKWebView { return true }

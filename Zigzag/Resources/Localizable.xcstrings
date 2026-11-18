@@ -152,6 +152,23 @@
         }
       }
     },
+    "%@ beta %@" : {
+      "comment" : "A beta of Zigzag as people read it: 0.9.2 beta 1. The placeholders are the version and the beta's number.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ beta %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ Beta %2$@"
+          }
+        }
+      }
+    },
     "%@ can be your search engine" : {
       "comment" : "Toast after adding an extension that gives a search engine. The name is the engine's, like ChatGPT.",
       "localizations" : {
@@ -514,17 +531,6 @@
         }
       }
     },
-    "%@ needs its app" : {
-      "comment" : "Title of the note shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 需要配套的 App"
-          }
-        }
-      }
-    },
     "%@ night" : {
       "comment" : "Name of a History session that began in the last week. The placeholder is the weekday, like “Tuesday”.",
       "localizations" : {
@@ -554,7 +560,7 @@
       }
     },
     "%@ of %@" : {
-      "comment" : "Under a download's name in the downloads panel: how much has come of how much, like 3.7 MB of 9 MB.\nUnder a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.",
+      "comment" : "Under a download's name in the downloads panel: how much has come of how much, like 3.7 MB of 9 MB.\nUnder a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.\nOn the sidebar's update card while an update downloads: how much has come of how much, like 12 of 40 MB.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -732,17 +738,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ 在 Zigzag 里用不了。"
-          }
-        }
-      }
-    },
-    "%@ works together with an app on your Mac, and Zigzag couldn’t find it. Install the app, then reopen Zigzag." : {
-      "comment" : "Shown from an extension's button when its companion app isn't installed. The placeholder is the extension's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 需要配合 Mac 上的一个 App 使用，但 Zigzag 找不到它。请安装该 App，然后重新打开 Zigzag。"
           }
         }
       }
@@ -4603,7 +4598,7 @@
       }
     },
     "Choose Image…" : {
-      "comment" : "Button in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.\nItem in the context menu of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.",
+      "comment" : "Button at the foot of the icon choices of a tab, a pinned tab or a favorite in the sidebar: opens the open panel to pick an image file (SVG, PNG and others) as its icon.\nButton in a space's editor, on the Background row: opens the open panel to pick a picture for the space's empty page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5159,7 +5154,7 @@
       }
     },
     "Close" : {
-      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.",
+      "comment" : "Tooltip of the mini player's close button: stops the video and closes the player.\nTooltip of the × on a notice over the page, like a script's while it runs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8071,7 +8066,7 @@
       }
     },
     "Downloading Zigzag %@…" : {
-      "comment" : "Toast while Check for Updates… downloads a new version. The placeholder is the version.",
+      "comment" : "VoiceOver label of the sidebar's update card while an update downloads. The placeholder is the version.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8088,6 +8083,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在下载扩展…"
+          }
+        }
+      }
+    },
+    "Downloading update" : {
+      "comment" : "Title of the sidebar's update card while an update you asked for downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载更新"
+          }
+        }
+      }
+    },
+    "Downloading version %@…" : {
+      "comment" : "Under Zigzag's name in Settings › General while an update you asked for downloads. The placeholder is the new version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载版本 %@…"
           }
         }
       }
@@ -12746,7 +12763,7 @@
       }
     },
     "OK" : {
-      "comment" : "Button of a sheet that says something didn't work.\nButton that answers a page's JavaScript dialog sheet.\nButton that closes the note about an extension's missing app.",
+      "comment" : "Button of a sheet that says something didn't work.\nButton that answers a page's JavaScript dialog sheet.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14585,6 +14602,39 @@
         }
       }
     },
+    "Preparing update" : {
+      "comment" : "Title of the sidebar's update card once an update has downloaded, while it's unpacked and checked.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备更新"
+          }
+        }
+      }
+    },
+    "Preparing version %@…" : {
+      "comment" : "Under Zigzag's name in Settings › General once an update has downloaded, while it's unpacked and checked. The placeholder is the new version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备版本 %@…"
+          }
+        }
+      }
+    },
+    "Preparing Zigzag %@…" : {
+      "comment" : "VoiceOver label of the sidebar's update card while a downloaded update is unpacked and checked. The placeholder is the version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备 Zigzag %@…"
+          }
+        }
+      }
+    },
     "Presets" : {
       "comment" : "A heading over the ready-made download rules.",
       "localizations" : {
@@ -14966,6 +15016,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要退出 Zigzag 吗？"
+          }
+        }
+      }
+    },
+    "Ran script: %@" : {
+      "comment" : "A notice over the page saying a download rule's script has finished and exited 0. The placeholder is the script's file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本运行完成：%@"
           }
         }
       }
@@ -16268,6 +16329,17 @@
         }
       }
     },
+    "Running script: %@" : {
+      "comment" : "A notice over the page while a download rule's script runs. The placeholder is the script's file name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在运行脚本：%@"
+          }
+        }
+      }
+    },
     "Runs on this site when you click it" : {
       "comment" : "Tooltip line under an extension's name in Site Controls: its site access is When You Click It, and it hasn't been clicked on this site yet.",
       "localizations" : {
@@ -16644,6 +16716,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "脚本"
+          }
+        }
+      }
+    },
+    "Script failed: %@" : {
+      "comment" : "A notice over the page saying a download rule's script has failed. The placeholder is the script's file name, and the script's own last words are under it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "脚本运行失败：%@"
           }
         }
       }
@@ -19571,7 +19654,7 @@
       }
     },
     "This extension" : {
-      "comment" : "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.\nStands in for an extension's name when it has none, at the start of a sentence.",
+      "comment" : "Stands in for an extension's name on the bar over a Chrome Web Store page, before the page has a title.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20972,7 +21055,7 @@
       }
     },
     "Use Site Icon" : {
-      "comment" : "Item in the context menu of a tab, a pinned tab or a favorite that has an icon you chose: puts the site's own icon back. Also the tooltip of that choice among the icons.",
+      "comment" : "Button at the foot of the icon choices of a tab, a pinned tab or a favorite that has an icon you chose: puts the site's own icon back. Also the tooltip of that choice among the icons.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -22245,17 +22328,6 @@
         }
       }
     },
-    "Zigzag %@ is ready." : {
-      "comment" : "Toast after Check for Updates… has downloaded a new version. The placeholder is the version.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zigzag %@ 已就绪。"
-          }
-        }
-      }
-    },
     "Zigzag %@ is ready. Restart to update." : {
       "comment" : "Tooltip and VoiceOver label of the sidebar's update card. The placeholder is the version.",
       "localizations" : {
@@ -23208,6 +23280,17 @@
         }
       }
     },
+    "handed this link to %@" : {
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder is the app's own name, like mpv.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将链接交给 %@"
+          }
+        }
+      }
+    },
     "history" : {
       "comment" : "Item in the short list of what a browser holds, in the Import window: its browsing history.",
       "localizations" : {
@@ -23958,6 +24041,17 @@
         }
       }
     },
+    "sent this link to %@" : {
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将链接发送到 %@"
+          }
+        }
+      }
+    },
     "separate profile per space each own container isolate new space" : {
       "comment" : "Words that find the Give new spaces their own profile setting with Find a setting in Settings. Not shown.",
       "localizations" : {
@@ -24243,7 +24337,7 @@
       }
     },
     "Every site" : {
-      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.",
+      "comment" : "Short, it fits beside a dropdown. Under JavaScript in the site panel's This Site group, set to Not Allowed: that's Settings › Privacy › JavaScript, for every site, and this site has no choice of its own.\nUnder a download rule in Settings › Downloads: the answer beside it was given for every site, not just one.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -24411,7 +24505,7 @@
       }
     },
     "Choose an image to use as this page’s icon." : {
-      "comment" : "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… in its menu.",
+      "comment" : "Message of the panel that picks an image file (SVG, PNG and others) as a tab's, pinned tab's or favorite's icon, from Choose Image… under its icon choices.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
