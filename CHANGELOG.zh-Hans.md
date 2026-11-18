@@ -17,6 +17,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 标签页、固定标签页和收藏的菜单里又只有一个“更改图标…”了，不再是三个图标选项：“选取图像…”和“使用网站图标”移到了它打开的图标选择下方。感谢 [bkonia](https://github.com/bkonia)。([#303](https://github.com/ZigaoWang/zigzag/issues/303))
 - 点击登录框下方 iCloud 密码的“启用密码自动填充”，现在会和点它的按钮一样打开输入验证码的地方，不再没有反应。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
 - Mac App 可装可不装的扩展（比如 Better Passwords）不装 App 也能正常用了：不再显示“Invalid call to runtime.connectNative()”，Zigzag 也不再提示它需要配套的 App。感谢 [bkonia](https://github.com/bkonia)。([#248](https://github.com/ZigaoWang/zigzag/issues/248))
+- 边栏隐藏时，链接在新标签页中打开后出现的提示，点一下又能切到那个标签页了。([#272](https://github.com/ZigaoWang/zigzag/issues/272))
 
 ## [0.9.2] - 2026-11-18
 

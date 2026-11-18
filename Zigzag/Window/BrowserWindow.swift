@@ -210,6 +210,11 @@ final class BrowserWindow: NSWindow {
         guard [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type), let content = contentView,
               let frame = content.superview else { return false }
         guard let panel = FloatingPanelView.bareSurfacePanel(frame.hitTest(frame.convert(event.locationInWindow, from: nil))) else { return false }
+        if event.type == .leftMouseDown, panel.takesPress {
+            pressTarget = panel
+            panel.mouseDown(with: event)
+            return true
+        }
         if event.type == .leftMouseDown { panel.onBarePress?(event) }
         return true
     }
@@ -275,14 +280,15 @@ final class BrowserWindow: NSWindow {
     }
 
     /// Our controls sit where the title bar would be. AppKit sends presses there to the title bar first,
-    /// so presses that land on one of our controls are delivered to it directly.
-    private weak var titlebarTarget: NSView?
+    /// so presses that land on one of our controls are delivered to it directly. A panel that is a button itself
+    /// (`FloatingPanelView.takesPress`) has its press and release delivered the same way.
+    private weak var pressTarget: NSView?
 
     private func routeTitlebarEvent(_ event: NSEvent) -> Bool {
         switch event.type {
         case .leftMouseDown, .rightMouseDown:
             guard let target = control(at: event.locationInWindow) else { return false }
-            titlebarTarget = target
+            pressTarget = target
             if event.type == .leftMouseDown {
                 makeKeyAndOrderFront(nil)
                 target.mouseDown(with: event)
@@ -291,12 +297,12 @@ final class BrowserWindow: NSWindow {
             }
             return true
         case .leftMouseDragged:
-            guard let target = titlebarTarget else { return false }
+            guard let target = pressTarget else { return false }
             target.mouseDragged(with: event)
             return true
         case .leftMouseUp:
-            guard let target = titlebarTarget else { return false }
-            titlebarTarget = nil
+            guard let target = pressTarget else { return false }
+            pressTarget = nil
             target.mouseUp(with: event)
             return true
         default:
