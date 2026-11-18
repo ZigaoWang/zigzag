@@ -3722,11 +3722,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
             && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
+            && SiteIcons.sites.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements and site styles are removed.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements, site styles and site icons are removed.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -3741,6 +3742,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetAll()
                 ClientCertificates.forgetAllSessions()
                 SiteBoosts.forgetAll()
+                SiteIcons.forgetAll()
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -3759,6 +3761,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
             .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
+            .union(SiteIcons.sites)
         var listed = 0, more = 0
         for site in sites.sorted() {
             var said: [String] = []
@@ -3812,6 +3815,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if SiteBoosts.all[site]?.hasStyle == true {
                 said.append(String(localized: "boosted", comment: "A choice made for a site in Settings › Privacy, in a list of them: it has CSS of your own (Edit Style… in Site Controls)."))
             }
+            if SiteIcons.all[site] != nil {
+                said.append(String(localized: "custom icon", comment: "A choice made for a site in Settings › Privacy, in a list of them: it has an icon you set in Site Controls (Change Site Icon…), shown for its tabs, pinned tabs and favorites."))
+            }
             if let certificate = ClientCertificates.kept(host: site) {
                 said.append(String(localized: "certificate: \(certificate.name)", comment: "A choice made for a site in Settings › Privacy, in a list of them: the certificate from your Keychain it's always sent, by name."))
             }
@@ -3843,13 +3849,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forget(site: site)
                 ClientCertificates.forgetSessions(site: site)
                 SiteBoosts.forget(site: site)
+                SiteIcons.forget(site: site)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
             let line = said.joined(separator: String(localized: "site-choices.separator", defaultValue: ", ",
                                                      comment: "Between the choices made for a site in Settings › Privacy › Sites, like “camera allowed, zoom 125%”."))
             let siteURL = URL(string: origin ?? "https://\(site)")
-            let favicon = siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            let favicon = SiteIcons.all[site].map(IconChoice.pageIcon) ?? siteURL.flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             let sentence = line.prefix(1).localizedUppercase + line.dropFirst()
             sitesGroup.add(FormRow(title: site,
                                    detail: said.isEmpty ? nil : String(localized: "site-choices.sentence", defaultValue: "\(sentence).",
