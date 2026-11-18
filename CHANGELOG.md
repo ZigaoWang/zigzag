@@ -7,7 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### New
 - Keep cookies for the sites you choose. Clear Cookies… signs you out of every other site and leaves these alone, and Clear cookies when Zigzag quits in Settings › Privacy clears the rest each time you quit. Turn on Keep cookies in a site's controls, or add a site in Settings › Privacy; one entry covers http, https and every subdomain. Thanks to [mrfragger](https://github.com/mrfragger). ([#334](https://github.com/ZigaoWang/zigzag/issues/334))
-- Shortcuts using the Hyper key (⌃⌥⇧⌘ held together) now show a single ✦ keycap instead of all four modifiers in Settings › Shortcuts, the Command Bar and while recording a shortcut, and can be found in Settings by typing "hyper".
+- A shortcut with the Hyper key (⌃⌥⇧⌘ together) shows one ✦ keycap instead of all four, in Settings › Shortcuts, the command bar and while you record one. Searching Settings for "hyper" finds them. Thanks to [JonasNowak](https://github.com/JonasNowak). ([#352](https://github.com/ZigaoWang/zigzag/pull/352))
 
 ### Fixed
 - Settings you change in an extension's popup stick. Strongbox's Fill switches showed the setting from before each click and came back the other way when you reopened them, because WebKit could read an extension's storage before an earlier save had finished. Now each extension's saves and reads finish in the order it made them, as in Chrome. Thanks to [bkonia](https://github.com/bkonia). ([#350](https://github.com/ZigaoWang/zigzag/issues/350))
