@@ -904,4 +904,14 @@ extension ExtensionBridgeTests {
         #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: 0))
         #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: .infinity))
     }
+
+    /// A side panel turned on for one tab shows there although it's off for every other tab (ChatGPT's).
+    @Test func sidePanelTabOptionWinsOverEveryTab() {
+        if #available(macOS 15.4, *) {
+            #expect(BridgeSidePanel.isEnabled(everywhere: false, forTab: true))
+            #expect(!BridgeSidePanel.isEnabled(everywhere: true, forTab: false))
+            #expect(!BridgeSidePanel.isEnabled(everywhere: false, forTab: nil))
+            #expect(BridgeSidePanel.isEnabled(everywhere: true, forTab: nil))
+        }
+    }
 }
