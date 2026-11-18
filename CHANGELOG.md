@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- AI apps can see a page the way a screen reader reads it, with `snapshot`, and act on what they find by ref: each link, button, field and menu has a short ref like `e12` that `click`, `type`, `scroll` and `press_key` take, rather than a guessed CSS selector. A ref stands for one element as it was, so when the page changes it or loads again, the app is told to look again instead of clicking something else. Snapshots only have what shows on the page: text a page hides from you is left out, a button is named by what it shows (or by its label, when all it shows is a sign like ×), links to other sites and words mixing alphabets are marked, and the page's words are quoted so they can't pass for Zigzag's. A click is refused when something covers what it's aimed at, as a cookie banner would for you, and `type` and `press_key` no longer use a field that's disabled or that the keyboard can't reach. No tool gives a card's details, a one-time code or the like any more, by the same rules Zigzag uses to never keep them for a sleeping tab, and what your saved details filled in is given only as filled until the app types it itself. ([#214](https://github.com/ZigaoWang/zigzag/issues/214))
+
 ### Fixed
 - Passkeys keep working after a sign-in page offered one in its username field, as GitHub's does. Reloading such a page, or asking for a passkey a second time, could get the request refused, and then every passkey on every site failed with no prompt until you restarted your Mac. If yours are failing now, restart once after updating. Thanks to [vandenbulckjean](https://github.com/vandenbulckjean). ([#348](https://github.com/ZigaoWang/zigzag/issues/348))
 

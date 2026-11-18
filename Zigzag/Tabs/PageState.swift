@@ -51,16 +51,23 @@ nonisolated struct PageState: Equatable, Sendable {
         ["x": Double(scroll.x), "y": Double(scroll.y), "waits": placesItself, "fields": fields.map { [$0.selector, $0.value] }]
     }
 
+    /// A field that was a password while typed stays secret once "Show password" makes it plain text. `fieldRules`
+    /// reads the fields noted, also in the world AI apps read pages in (MCPPageScript.watch).
+    static let secretWatch = """
+      const secret = window.__zigzagSecret = new WeakSet();
+      addEventListener('input', (e) => {
+        if (e.isTrusted && e.target instanceof HTMLInputElement && e.target.type === 'password') secret.add(e.target);
+      }, true);
+    """
+
     /// Notes which fields you typed into (the page's own script filling one in doesn't count). In Zigzag's own
     /// world, so the page can't see it.
     @MainActor static let script = WKUserScript(source: """
     (() => {
+    \(secretWatch)
       const typed = window.__zigzagTyped = new Set();
-      // A field that was a password while you typed stays secret once "Show password" makes it plain text.
-      const secret = window.__zigzagSecret = new WeakSet();
       addEventListener('input', (e) => {
         if (!e.isTrusted || !(e.target instanceof Element)) return;
-        if (e.target instanceof HTMLInputElement && e.target.type === 'password') secret.add(e.target);
         typed.add(e.target);
       }, true);
     })();
@@ -72,11 +79,13 @@ nonisolated struct PageState: Equatable, Sendable {
     static let fieldRules = """
       const kinds = new Set(['text', 'search', 'email', 'url', 'tel', 'number']);
       const secretWords = /pass|pwd|cc-|card|cvc|cvv|csc|security.?code|one.?time|otp|totp|2fa|mfa|verif|pin(?![a-z])|ssn|social.?security|iban|routing|account.?num|secret|token/i;
+      // What a field says it holds, by its autocomplete, name, id, label or placeholder, is a secret.
+      const secretSaid = (el) => secretWords.test([el.autocomplete, el.name, el.id, el.getAttribute('aria-label'), el.placeholder]
+        .filter((part) => typeof part === 'string').join(' '));
       const keepable = (el) => {
         const plain = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && kinds.has(el.type));
         if (!plain || window.__zigzagSecret?.has(el)) return false;
-        const said = [el.autocomplete, el.name, el.id, el.getAttribute('aria-label'), el.placeholder].join(' ');
-        if (secretWords.test(said)) return false;
+        if (secretSaid(el)) return false;
         const hidden = getComputedStyle(el).getPropertyValue('-webkit-text-security');
         return !hidden || hidden === 'none';
       };

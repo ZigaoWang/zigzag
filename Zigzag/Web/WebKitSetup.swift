@@ -98,6 +98,8 @@ enum WebKitSetup {
             configuration.userContentController.add(PageVideos.shared, contentWorld: .defaultClient, name: PageVideos.messageName)
             configuration.userContentController.addUserScript(SwipeAnswers.script)
             configuration.userContentController.addUserScript(PageState.script)
+            // The same note of what was a password, in the world AI apps read pages in (#214).
+            configuration.userContentController.addUserScript(MCPPageScript.watch)
             configuration.userContentController.add(SwipeAnswers.shared, contentWorld: .defaultClient, name: SwipeAnswers.messageName)
             ContentBlocker.attach(to: configuration)
             // Cookie consent pop-ups answered with no (#175), in Zigzag's own world, apart from ad blocking.

@@ -59,8 +59,8 @@ struct MCPWaitAndKeysTests {
             #expect((try? MCPKeyPress.parse(bad, modifiers: []).get()) == nil, "\(bad)")
         }
         #expect((try? MCPKeyPress.parse("a", modifiers: ["super"]).get()) == nil)
-        #expect(try parse("press_key", ["key": "Enter", "selector": "#q"]).get() == .pressKey(nil, enter, selector: "#q"))
-        #expect(try parse("press_key", ["id": 2, "key": "Tab", "modifiers": ["shift"]]).get() == .pressKey(2, back, selector: nil))
+        #expect(try parse("press_key", ["key": "Enter", "selector": "#q"]).get() == .pressKey(nil, enter, .selector("#q")))
+        #expect(try parse("press_key", ["id": 2, "key": "Tab", "modifiers": ["shift"]]).get() == .pressKey(2, back, nil))
         #expect(error("press_key") != nil)
         #expect(error("press_key", ["key": "Enter", "modifiers": "shift"]) != nil)
         #expect(error("press_key", ["key": "Enter", "modifiers": [1]]) != nil)
