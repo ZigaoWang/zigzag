@@ -877,6 +877,8 @@ final class SitePanel: FloatingPanelView {
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
         // Translating is a browser window's (`translatePage`).
         context.foreignLanguage = controller != nil && tab.foreignLanguage != nil
+        // This site's own scripts may reach a program listening on this Mac, once Settings allows it at all.
+        context.localApps = context.isWeb && !isPrivate && origin != nil && LocalReceivers.isEnabled
         context.coveredPage = controller?.isShowingReader == true || tab.pdfViewer != nil || tab.webView == nil
         context.manySpaces = Library.shared.spaces.count > 1 && SiteRoutes.site(of: url) != nil
         return context
@@ -980,6 +982,15 @@ final class SitePanel: FloatingPanelView {
                 })
             case .openIn:
                 rows.append(openInRow())
+            case .localApps:
+                // This site's own scripts may reach a program listening on this Mac (LocalReceivers): a switch, never
+                // a question the page can raise. Off until it is turned on here.
+                guard let origin else { break }
+                rows.append(.toggle(String(localized: "Apps on this Mac", comment: "Row in the site panel's This Site group: lets this site's own scripts talk to a program listening on this Mac."),
+                                    on: SitePermissions.localReceivers(origin: origin),
+                                    status: { $0 ? Self.onHere : Self.offHere }) { on in
+                    SitePermissions.setLocalReceivers(on, origin: origin)
+                })
             case .alwaysTranslate:
                 guard let language = tab.foreignLanguage else { break }
                 let name = PageTranslator.name(of: language)
@@ -2008,7 +2019,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, javaScript, darkPage, keepAwake, fullScreenFills, alwaysTranslate, extensions, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, javaScript, darkPage, keepAwake, fullScreenFills, alwaysTranslate, localApps, extensions, openIn }
     /// The rows into the panel's other pages. Extensions are on the first page itself (#215), and the connection is a
     /// small line under the site's name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2041,6 +2052,8 @@ enum SitePanelRows {
         var zapped = 0
         /// The site has CSS of your own.
         var styled = false
+        /// The master setting for reaching apps on this Mac is on, so this site can be switched on for it.
+        var localApps = false
     }
 
     static func rows(_ c: Context) -> [Row] {
@@ -2056,6 +2069,9 @@ enum SitePanelRows {
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
+        // Only while Settings allows websites to reach apps on this Mac: before that there is nothing the switch could
+        // do, and the place to turn it on is named there.
+        if c.localApps { rows.append(.localApps) }
         // Whether extensions run here: on a web site, once there are extensions to run.
         if c.isWeb, !c.isPrivate, c.extensionHost, c.hasExtensions { rows.append(.extensions) }
         // The space the site always opens in: never chosen from a private window, which keeps nothing of its sites.

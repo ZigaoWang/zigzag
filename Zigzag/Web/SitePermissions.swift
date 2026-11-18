@@ -392,6 +392,18 @@ enum SitePermissions {
             ?? tab?.permissionAnswers.answer(key: origin, kind: PermissionSubject.downloads)
     }
 
+    /// Whether a site's own scripts may talk to a program listening on this Mac. There is no question to ask: the
+    /// answer is the switch in Site Controls, and it counts only while the master setting is on (`LocalReceivers`).
+    static func localReceivers(origin: String) -> Bool {
+        action(PermissionSubject.localReceivers, origin: origin) == "allow"
+    }
+
+    /// Turns that on or off for one origin. Off forgets the answer, so the site is back where it started rather than
+    /// carrying a block.
+    static func setLocalReceivers(_ allowed: Bool, origin: String) {
+        remember(allowed ? "allow" : nil, subject: PermissionSubject.localReceivers, origin: origin)
+    }
+
     /// Allows the one download a blocked notice offered to let through: kept for the page, never for the site, the
     /// same as "This time" on the question. A site blocked outright stays blocked — `downloads` reads the site's own
     /// answer first — so every further file from it needs its own click, which is what "once" means.

@@ -96,6 +96,23 @@ nonisolated enum LocalReceivers {
         case tooLarge
     }
 
+    /// The master switch: Settings › Privacy, off until the person reads the briefing and turns it on. The per-site
+    /// switch is offered only while this is on, and a call is refused without it however the site answered.
+    private static let enabledKey = "AllowWebsitesToReachLocalApps"
+
+    @MainActor
+    static var isEnabled: Bool {
+        get { SitePermissions.defaults.bool(forKey: enabledKey) }
+        set { SitePermissions.defaults.set(newValue, forKey: enabledKey) }
+    }
+
+    /// Whether a page at `origin` may use this door now: the person allowed websites in Settings, and allowed this
+    /// one in Site Controls. A private tab is refused by the caller before this is read.
+    @MainActor
+    static func allowsSite(origin: String) -> Bool {
+        isEnabled && SitePermissions.localReceivers(origin: origin)
+    }
+
     /// The one thing a caller may replace, so the policy can be tested without a helper running.
     typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
 

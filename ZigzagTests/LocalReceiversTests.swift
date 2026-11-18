@@ -192,6 +192,45 @@ struct LocalReceiversTests {
         #expect(await recorder.all().isEmpty)
     }
 
+    @Test func theSiteDoorNeedsBothSwitches() {
+        let name = "LocalReceiversTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        let master = LocalReceivers.isEnabled
+        defer {
+            SitePermissions.defaults = before
+            LocalReceivers.isEnabled = master
+            defaults.removePersistentDomain(forName: name)
+        }
+        let origin = "https://creator.zerowork.io"
+
+        LocalReceivers.isEnabled = false
+        SitePermissions.setLocalReceivers(true, origin: origin)
+        #expect(!LocalReceivers.allowsSite(origin: origin), "off for every site, even where the site said yes")
+
+        LocalReceivers.isEnabled = true
+        #expect(LocalReceivers.allowsSite(origin: origin))
+
+        SitePermissions.setLocalReceivers(false, origin: origin)
+        #expect(!LocalReceivers.allowsSite(origin: origin))
+    }
+
+    @Test func theSiteDoorIsOffUntilItIsTurnedOn() {
+        let name = "LocalReceiversTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        #expect(!LocalReceivers.isEnabled)
+        LocalReceivers.isEnabled = true
+        #expect(LocalReceivers.isEnabled)
+        LocalReceivers.isEnabled = false
+    }
+
     private func expect(_ failure: LocalReceivers.Failure, _ body: () async throws -> Void) async {
         do {
             try await body()

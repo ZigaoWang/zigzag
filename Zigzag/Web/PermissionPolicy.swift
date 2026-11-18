@@ -55,6 +55,9 @@ nonisolated enum PermissionSubject {
     /// Whether a site may save files at all. The destination an allowed file goes to is a separate decision, made per
     /// file type by the download rules.
     static let downloads = "downloads"
+    /// Whether a site's own scripts may reach a program listening on this Mac (`LocalReceivers`). A switch in Site
+    /// Controls, never a question: a page cannot ask for it.
+    static let localReceivers = "localReceivers"
 
     static func media(_ type: WKMediaCaptureType) -> String {
         switch type {
