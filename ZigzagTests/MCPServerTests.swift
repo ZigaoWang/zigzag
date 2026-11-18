@@ -273,9 +273,9 @@ struct MCPServerTests {
         #expect(endpoint.sessionCount == 0)
     }
 
-    /// Whichever way an app talks, a request that's taken up counts as an app at work (what Zigzag, running for AI
-    /// apps alone, stays for). One without the key, from a web page, for a session that's gone, with headers that
-    /// don't match, or a goodbye never does.
+    /// An accepted request, whichever way an app talks, counts as an app at work (what keeps Zigzag running for AI apps
+    /// alone). One without the key, from a web page, for a gone session or with mismatched headers never does, nor a
+    /// goodbye.
     @Test func everyRequestTakenUpCounts() async throws {
         let refused = endpoint()
         _ = await refused.handle(post(Self.initialize, auth: false))

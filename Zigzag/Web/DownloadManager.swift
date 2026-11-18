@@ -179,7 +179,7 @@ final class DownloadManager: NSObject {
     private var ruleOpenedDownloads: Set<ObjectIdentifier> = []
     /// Downloads whose handoff question was put off; don't ask the same rule again.
     private var ruleDeclinedDownloads: Set<ObjectIdentifier> = []
-    /// Downloads begun by a page with no one there to ask (`Tab.isUnattended`): never asked where to save.
+    /// Downloads from a page with no one there (`Tab.isUnattended`): never asked where to save.
     private var unattended: Set<ObjectIdentifier> = []
 
     /// A Firefox package coming in from a page (the store's Add to Firefox): it is installed, not kept. The file is

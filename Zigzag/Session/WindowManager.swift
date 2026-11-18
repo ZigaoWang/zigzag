@@ -274,18 +274,17 @@ final class WindowManager {
         return controller
     }
 
-    /// Every browser window with tabs in it: yours, and the one AI apps work in when they run in the background, which
-    /// `controllers` leaves out. For what's about tabs wherever they are (the bar over one an AI app uses, which may
-    /// sleep), never for what's about your windows.
+    /// Every browser window with tabs: yours, plus the AI apps' background window, which `controllers` leaves out. For
+    /// what concerns tabs wherever they are (the AI app bar, sleep), never for what concerns your windows.
     var everyController: [BrowserWindowController] { controllers + [Headless.window].compactMap { $0 } }
 
     /// Each open tab once, yours (`openTabs`) and those of the window AI apps work in: for whatever reaches every
     /// running page.
     var everyOpenTab: [Tab] { openTabs + (Headless.window?.tabManager.allTabs ?? []) }
 
-    /// The window AI apps work in when they run in the background (Headless): made as any browser window is, but
-    /// never shown, and kept out of `controllers`. It isn't one of your windows, so it's never saved or restored,
-    /// scripted, asked about when quitting, given extensions' tabs, or taken for the one in front.
+    /// The AI apps' background window (Headless): made like any browser window but never shown, and kept out of
+    /// `controllers`. Not one of your windows, so never saved or restored, scripted, asked about when quitting, given
+    /// extensions' tabs, or taken for the front one.
     func makeHeadless(spaceID: UUID) -> BrowserWindowController {
         BrowserWindowController(tabManager: TabManager(spaceID: spaceID, isPrivate: false, keepsToProfile: Library.shared.profileID(ofSpace: spaceID)),
                                 frame: NSRect(origin: Headless.parkedOrigin, size: Headless.parkedSize))

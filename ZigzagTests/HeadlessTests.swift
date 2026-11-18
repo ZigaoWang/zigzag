@@ -3,8 +3,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// AI apps working in the background (#214): when it's on, how Zigzag opens for it, and their window, which no one
-/// sees and which isn't one of yours.
+/// Headless mode (#214): when it's on, how Zigzag opens for it, and the AI apps' window, unseen and not one of yours.
 @MainActor
 struct HeadlessTests {
     @Test func openedForItByTheArgumentOnly() {
@@ -16,7 +15,7 @@ struct HeadlessTests {
         #expect(!Headless.isAsked(by: ["Zigzag", "--headless-not"]))
     }
 
-    /// Only while AI apps may use Zigzag at all: the setting or the argument never turn that on.
+    /// Needs AI apps allowed: neither the setting nor the argument turns that on.
     @Test func onlyWhileAIAppsMayUseZigzag() {
         for isOn in [false, true] {
             for forThisRun in [false, true] {
@@ -36,8 +35,7 @@ struct HeadlessTests {
         #expect(Headless.idleQuitAfter == 30 * 60)
     }
 
-    /// A copy opened with --headless asks the one running; with AI apps not allowed, that's not taken up, to wait
-    /// unseen for the day they are.
+    /// A --headless request from another copy is ignored while AI apps aren't allowed, not kept for the day they are.
     @Test func notAskedForWhileAIAppsArentAllowed() {
         let waiting = Headless.waitingSince
         Headless.askedByAnotherCopy(accessOn: false, now: Date.distantFuture)
@@ -45,7 +43,7 @@ struct HeadlessTests {
         #expect(Headless.waitingSince == waiting)
     }
 
-    /// Being asked for again is a reason to stay, as an app's request is: it waits from whichever came last.
+    /// The idle wait counts from a new --headless request or an app's request, whichever came last.
     @Test func waitsFromWhenItWasLastNeeded() {
         let opened = Date(timeIntervalSinceReferenceDate: 1_000)
         let asked = opened.addingTimeInterval(29 * 60), request = opened.addingTimeInterval(10 * 60)
@@ -79,8 +77,8 @@ struct HeadlessTests {
         #expect(!control.isUsing(tab.id))
     }
 
-    /// Their window: on the Headless profile's space, parked out of sight, none of your windows', its profile held
-    /// while it's open; closed, the profile can go.
+    /// Their window is on the AI Apps profile's space, parked out of sight and not among your windows. Its profile is
+    /// held while it's open and removable once closed.
     @Test func theirWindow() throws {
         let opened = Headless.openWindow()
         defer { Headless.closeWindow() }
@@ -91,7 +89,7 @@ struct HeadlessTests {
         #expect(window.isParked && !window.canBecomeKey && window.alphaValue == 0)
         #expect(window.frame.origin == Headless.parkedOrigin)
         #expect(!WindowManager.shared.controllers.contains { $0 === opened })
-        // But it's among the windows with tabs in them: the bar over a tab an AI app uses, and sleep, look there.
+        // But it counts among windows with tabs, where the AI app bar and tab sleep look.
         #expect(WindowManager.shared.everyController.contains { $0 === opened })
         #expect(!Scripting.windows.contains { $0 === opened })
         #expect(Profiles.shared.removalBlock(profile.id) == .inUse)
@@ -106,8 +104,8 @@ struct HeadlessTests {
     }
 }
 
-/// Show Headless Window: their window on screen and back out of sight, with the same tabs, so what AI apps were doing
-/// goes on. Never shown for real here: that would bring the test run forward.
+/// Show AI Apps Window: their window goes on screen and back out of sight with the same tabs, so AI apps' work
+/// continues. Never actually shown here: that would bring the test run forward.
 @MainActor
 struct ShowHeadlessWindowTests {
     @Test func outAndBackWithTheSameTabs() throws {
@@ -118,12 +116,12 @@ struct ShowHeadlessWindowTests {
         let window = try #require(opened.window as? BrowserWindow)
         Headless.unpark(opened)
         #expect(!window.isParked && window.canBecomeKey && window.alphaValue == 1 && !window.ignoresMouseEvents)
-        // On screen, the tab that's up is seen like any window's: it's no longer one that may sleep unseen.
+        // On screen, the selected tab is seen like any window's, so it may no longer sleep.
         #expect(!opened.isOutOfSight)
         #expect(window.frame.origin != Headless.parkedOrigin)
         // Never one of your windows, even on screen.
         #expect(WindowManager.shared.keyController !== opened)
-        // To watch, not to keep: no full screen, no minimizing (it would stop counting as on screen).
+        // For watching only: no full screen, no minimizing (it would stop counting as on screen).
         #expect(window.collectionBehavior.contains(.fullScreenNone) && !window.styleMask.contains(.miniaturizable))
         Headless.park(opened)
         #expect(window.isParked && window.frame.origin == Headless.parkedOrigin && opened.isOutOfSight)
@@ -137,7 +135,7 @@ struct ShowHeadlessWindowTests {
         Library.shared.finishedRemovingProfile(profile.id)
     }
 
-    /// You've come to look: the tab in front wakes if it slept there, as coming to any window's tab wakes it.
+    /// Showing the window wakes the front tab if it slept, as selecting a tab in any window does.
     @Test func showingItWakesTheTabInFront() async throws {
         let opened = Headless.openWindow()
         defer { Headless.closeWindow() }
@@ -164,8 +162,8 @@ struct ShowHeadlessWindowTests {
     }
 }
 
-/// What a page asks of a person in the window AI apps work in, where no one is there: answered no, and the AI app
-/// is told with its next answer.
+/// A page's prompts in the AI apps' window have no one to answer them: they are answered no, and the AI app is told
+/// with its next answer.
 @MainActor
 struct UnattendedPageTests {
     /// A tab an AI app is using is in use, as one in a call is, asleep or awake: sleep, the Archive, energy and Clear
@@ -255,7 +253,7 @@ struct UnattendedPageTests {
         Library.shared.finishedRemovingProfile(profile.id)
     }
 
-    /// A permission a page asks for in their window is refused, and the app is told, as for a dialog.
+    /// A permission request in their window is refused and the app is told, as for a dialog.
     @Test func aPermissionAskedThereIsRefusedAndTold() async throws {
         let opened = Headless.openWindow()
         defer { Headless.closeWindow() }
@@ -295,8 +293,8 @@ struct UnattendedPageTests {
         Library.shared.finishedRemovingProfile(profile.id)
     }
 
-    /// Their window shows no one its tab, so the tab that's up may sleep like any other, and macOS is kept from
-    /// napping Zigzag only while an app is using one of its tabs.
+    /// Their window shows its tab to no one, so the selected tab may sleep like any other. macOS is kept from napping
+    /// Zigzag only while an app uses one of its tabs.
     @Test func leftAloneItCostsWhatSleepingTabsDo() throws {
         let opened = Headless.openWindow()
         defer { Headless.closeWindow() }
@@ -316,8 +314,8 @@ struct UnattendedPageTests {
         Library.shared.finishedRemovingProfile(profile.id)
     }
 
-    /// A run opened with --headless goes on over a restart Zigzag makes itself: it passes itself an argument that
-    /// keeps AI apps to the background, without making the new run one with no Dock icon.
+    /// A --headless run continues over Zigzag's own restart: it passes itself an argument that keeps AI apps in the
+    /// background without making the new run one with no Dock icon.
     @Test func aRestartOfItsOwnKeepsTheRun() {
         #expect(Headless.isContinued(by: ["/Applications/Zigzag.app/Contents/MacOS/Zigzag", Headless.continuesArgument]))
         #expect(!Headless.isContinued(by: [Headless.continuesArgument]) && !Headless.isContinued(by: ["Zigzag", "--headless"]))
@@ -326,8 +324,8 @@ struct UnattendedPageTests {
         #expect(!Headless.forThisRun && Headless.restartArguments.isEmpty)
     }
 
-    /// In their window, out of sight, the tab in front may sleep, and showing its pages doesn't wake it: it sleeps
-    /// until a tool wakes it, when its page is put back in the window. In a window that shows it, it never may.
+    /// In their unseen window the front tab may sleep, and showing its pages doesn't wake it: only a tool does, which
+    /// puts its page back in the window. In a window that shows it, it never may.
     @Test func theTabInFrontMaySleepOutOfSight() async throws {
         let opened = Headless.openWindow()
         defer { Headless.closeWindow() }
@@ -356,8 +354,8 @@ struct UnattendedPageTests {
         Library.shared.finishedRemovingProfile(profile.id)
     }
 
-    /// A page held out of sight for a picture is let go by the last one holding it, and a hold from before it was
-    /// taken away (its tab was gone to and left) lets go of nothing set there since.
+    /// A page held out of sight for a picture is released by its last holder. A hold from before the page was taken
+    /// away (its tab was selected and left) releases nothing set since.
     @Test func aPageHeldForAPictureIsLetGoOnce() async throws {
         let opened = Headless.openWindow()
         defer { Headless.closeWindow() }
@@ -376,7 +374,7 @@ struct UnattendedPageTests {
         #expect(tab.pageHolder?.superview === host)
         second()
         #expect(tab.pageHolder?.superview == nil)
-        // Taken away while one hold is out, then held again: the old hold's letting go leaves the new one be.
+        // Taken away during a hold, then held again: releasing the old hold leaves the new one.
         let old = try #require(tab.holdOutOfSight(in: host, size: size))
         tab.pageHolder?.removeFromSuperview()
         let new = try #require(tab.holdOutOfSight(in: host, size: size))
@@ -413,8 +411,8 @@ struct UnattendedPageTests {
     }
 }
 
-/// Their window keeps to the Headless profile's spaces, as a private window keeps to its one: nothing of yours is
-/// opened where no one sees it, and it closes when its space is no longer theirs.
+/// Their window keeps to the AI Apps profile's spaces, as a private window keeps to its one: nothing of yours
+/// opens unseen, and it closes when its space is no longer theirs.
 @MainActor
 struct HeadlessWindowSpacesTests {
     @Test func itKeepsToItsProfilesSpaces() throws {

@@ -2,8 +2,7 @@ import AppKit
 import WebKit
 
 /// The tools, run on your windows and tabs: the same windows and tab ids AppleScript sees (never a private window,
-/// nor Zigzag Mini), and only websites in them. While AI apps work in the background (Headless), only in their own
-/// window, never yours.
+/// nor Zigzag Mini), and only websites in them. In the background (Headless), only AI apps' own window, never yours.
 nonisolated struct MCPBrowserRunner: MCPToolRunner {
     var tools: [JSON] { MCPTools.definitions }
 
@@ -52,8 +51,8 @@ enum MCPBrowser {
         return told(await act(command, on: found, since: generation), about: tab)
     }
 
-    /// What the tab's page asked with no one there (AI apps in the background) goes with the answer, once: whichever
-    /// tool it is and however it went, so it's told while the app still knows what it did.
+    /// What the tab's page asked with no one there (AI apps in the background) is reported once with the answer,
+    /// whatever the tool or outcome, while the app still knows what it did.
     private static func told(_ result: MCPToolResult, about tab: Tab) -> MCPToolResult {
         telling(result, of: tab.takeUnanswered().map { ($0.kind.rawValue, $0.message, $0.page) })
     }
@@ -65,7 +64,7 @@ enum MCPBrowser {
         case .activate:
             found.controller.tabManager.select(tab)
             // In front of Zigzag's other windows, without taking the keyboard from the app you're in. AI apps' own
-            // window in the background stays out of sight.
+            // background window stays out of sight.
             if found.controller !== Headless.window { found.controller.window?.orderFront(nil) }
             return .data(info(tab, in: found.controller))
         case .close:
@@ -124,8 +123,8 @@ enum MCPBrowser {
             }
         case .screenshot:
             return await page(tab, since: generation) { webView in
-                // In a window (the tab in front): as it's drawn there. A tab of AI apps' own window that isn't in
-                // front is in none, and no one can bring it up to look: its page is held there out of sight.
+                // The front tab is pictured as drawn in its window. A background tab of AI apps' own window is in none
+                // and no one can bring it up, so its page is held there out of sight.
                 guard webView.window == nil, found.controller === Headless.window else {
                     return await screenshot(webView, tab: tab, in: found.controller)
                 }
@@ -230,8 +229,8 @@ enum MCPBrowser {
         let controller: BrowserWindowController
     }
 
-    /// The windows apps may use, front first: your everyday ones, never a private one. While AI apps work in the
-    /// background (Headless), only theirs, once it's open.
+    /// The windows apps may use, front first: everyday ones, never private. In the background (Headless), only AI apps'
+    /// own, once it's open.
     private static var windows: [BrowserWindowController] {
         guard Headless.isActive else { return Scripting.windows }
         return Headless.window.map { [$0] } ?? []
@@ -313,7 +312,7 @@ enum MCPBrowser {
         return told(.data(info(tab, in: controller)), about: tab)
     }
 
-    /// Where pages are held to be pictured out of sight, one per window: under everything, where the page is.
+    /// Holds pages pictured out of sight, one per window, under everything where the page is.
     private static let pictureHostID = NSUserInterfaceItemIdentifier("zigzag.mcp.picture-host")
 
     private static func pictureHost(in controller: BrowserWindowController) -> NSView {
@@ -328,14 +327,14 @@ enum MCPBrowser {
         return host
     }
 
-    /// A picture of a tab that isn't the one in front, without bringing it up: which tab is in front is what a tool
-    /// given no id acts on, and a picture changes nothing. Its page is held in the window for a moment, as the tab
-    /// overview pictures pages that have never been shown (`Tab.holdOutOfSight`).
+    /// Pictures a tab that isn't in front without bringing it up, since the front tab is what a tool given no id acts
+    /// on. Its page is held in the window for a moment, as the tab overview does for pages never shown
+    /// (`Tab.holdOutOfSight`).
     private static func screenshotOutOfSight(_ webView: WKWebView, tab: Tab, in controller: BrowserWindowController) async -> MCPToolResult {
         let host = pictureHost(in: controller)
         guard let letGo = tab.holdOutOfSight(in: host, size: host.bounds.size) else {
-            // Taken into the window meanwhile (it's the tab in front now): as any tab there. Otherwise there's no
-            // page of it to hold yet, and bringing the tab up wouldn't help: said as it is.
+            // Taken into the window meanwhile (now the front tab): pictured as any tab there. Otherwise there's no page
+            // to hold yet, and bringing the tab up wouldn't help.
             guard webView.window != nil else { return .error("That tab's page hasn't loaded enough to take a picture of yet. Wait for it (wait_for), then try again.") }
             return await screenshot(webView, tab: tab, in: controller)
         }
@@ -349,7 +348,7 @@ enum MCPBrowser {
 
     /// Runs `body` on the tab's page once it's awake and loaded, if it's still a page a tool may use by then.
     private static func page(_ tab: Tab, since generation: Int, _ body: @MainActor (WKWebView) async -> MCPToolResult) async -> MCPToolResult {
-        // A page that stopped (its process ended) while out of sight loads again now, not when someone looks.
+        // A page whose process ended while out of sight reloads now, not when someone looks.
         tab.reloadIfItStopped()
         let webView = await awake(tab)
         // Woken or done loading, it may be on another page now, or AI apps turned off meanwhile: checked again.
@@ -359,9 +358,9 @@ enum MCPBrowser {
         return await body(webView)
     }
 
-    /// `result`, with what the page asked while no one was there to answer and how it was answered: a dialog
-    /// dismissed, a file picker cancelled, on the page that asked (the tab may be on another by now). The page's own
-    /// words, so they go with the rest of what pages wrote.
+    /// `result`, plus what the page asked with no one there and how it was answered (a dialog dismissed, a file picker
+    /// cancelled), on the page that asked (the tab may be on another by now). The page's own words, so they go with the
+    /// rest of what pages wrote: fenced, in an error of Zigzag's too, as `pageError` is.
     nonisolated static func telling(_ result: MCPToolResult, of asked: [(kind: String, message: String, page: String)]) -> MCPToolResult {
         guard !asked.isEmpty else { return result }
         var told = result
@@ -380,8 +379,8 @@ enum MCPBrowser {
         return told
     }
 
-    /// A page's words for a line of an answer: nothing that doesn't show (control and format characters, as the page
-    /// script strips them), on one line, at most 200 characters.
+    /// A page's words for one line of an answer: no control or format characters (as the page script strips them),
+    /// at most 200 characters.
     nonisolated static func plain(_ text: String) -> String {
         let seen = String(String.UnicodeScalarView(text.unicodeScalars.map { scalar in
             scalar.properties.generalCategory == .control || scalar.properties.generalCategory == .lineSeparator

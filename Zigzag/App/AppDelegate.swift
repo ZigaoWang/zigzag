@@ -27,13 +27,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         PageTextChecking.shared.start()
         // A second copy (one opened from the disk image while the installed one runs) would load the same data
         // and save over it: it hands over to the one already running and goes, before reading anything.
-        // Opened with --headless, it asks the one running to keep AI apps to the background instead, and never
-        // brings it forward. Otherwise it says you opened it: one running for AI apps alone becomes yours.
+        // With --headless, it asks the running one to keep AI apps in the background instead, without bringing it
+        // forward. Otherwise it says you opened it, so one running for AI apps alone becomes yours.
         if !Self.isHostingTests, !SingleCopy.claim() {
             if Headless.isAsked(by: CommandLine.arguments) { Headless.askRunningCopy() } else { Headless.tellRunningCopyYouOpened(); SingleCopy.showRunningCopy() }
             exit(0)
         }
-        // Opened with --headless: for AI apps alone, with no Dock icon or window, set before anything shows.
+        // With --headless: runs for AI apps alone, with no Dock icon or window. Set before anything shows.
         if !Self.isHostingTests { Headless.willLaunch() }
         if !Self.isHostingTests {
             // A new version backs up the data the last one left, and a restore asked for before restarting puts
@@ -148,13 +148,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Opened by a site installed as an app: only its window comes up, as Chrome's apps do; the browser windows
         // wait until you ask for them.
         let webAppOnly = pendingURLs.isEmpty && !pendingWebApps.isEmpty && !WindowManager.needsOnboarding
-        // Opened with --headless and nothing else: for AI apps alone, your windows waiting until you open Zigzag. A link
-        // or an installed site it was opened for too means you're here: it's the Zigzag you know.
+        // With --headless and nothing else: runs for AI apps alone, your windows waiting until you open Zigzag. Opened
+        // for a link or an installed site too, you're here: it's the regular app.
         if Headless.isBackgroundOnly, !pendingURLs.isEmpty || !pendingWebApps.isEmpty { Headless.becomeRegular() }
         let backgroundOnly = Headless.isBackgroundOnly
         // Restarted for an update: exactly what was open comes back, Zigzag Mini windows too.
         let relaunch = backgroundOnly ? nil : UpdateRelaunch.take()
-        // Restarted for an update in the middle of a run opened with --headless: AI apps stay in the background.
+        // Restarted for an update during a --headless run: AI apps stay in the background.
         if let relaunch, UpdateRelaunch.isFresh(relaunch, now: Date()), relaunch.keepsAIAppsToBackground == true { Headless.goOn() }
         let plan = UpdateRelaunch.plan(relaunch: relaunch, now: Date(), needsOnboarding: WindowManager.needsOnboarding,
                                        miniOnly: miniOnly, webAppOnly: webAppOnly, backgroundOnly: backgroundOnly)
@@ -176,7 +176,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         pendingWebApps.forEach { WebAppStore.handle($0) }
         pendingWebApps = []
-        // What's for you, not for AI apps: running for them alone, it waits until you open Zigzag.
+        // For you, not AI apps: running for them alone, this waits until you open Zigzag.
         let forYou = { [weak self] in
             Updater.shared.start()
             // Just updated: what's new comes first, and the default browser offer waits for another launch. Profiles
@@ -476,7 +476,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showAbout(_ sender: Any?) { AboutWindowController.show() }
 
-    /// Window › Show Headless Window: the window AI apps use in the background, on screen (Headless).
+    /// Window › Show AI Apps Window: brings the AI apps' background window on screen (Headless).
     @objc func showHeadlessWindow(_ sender: Any?) { Headless.showWindow() }
 
     /// Settings opens as a tab in the front window, as History does.

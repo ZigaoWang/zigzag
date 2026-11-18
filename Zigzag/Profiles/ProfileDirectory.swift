@@ -8,12 +8,12 @@ nonisolated struct ProfileInfo: Codable, Identifiable, Equatable {
     /// The color of its tile. Nil: the one its place in the list gives it.
     var color: SpaceColor?
     var created: Date?
-    /// What Zigzag made it for, when Zigzag made it itself: `headlessRole` for the Headless profile. Nil for one you
-    /// made. Kept as text, so a role a later Zigzag adds still reads (as none).
+    /// What Zigzag made it for: `headlessRole` for the AI Apps profile, nil for one you made. Kept as text, so a role
+    /// a later Zigzag adds still reads (as none).
     var role: String?
 
     var isDefault: Bool { id == Profile.defaultID }
-    /// The profile AI apps work in when they run in the background (Headless). Its name is Zigzag's.
+    /// The profile for AI apps in the background (Headless). Its name is Zigzag's.
     var isHeadless: Bool { role == Self.headlessRole }
 
     static let headlessRole = "headless"
@@ -62,8 +62,8 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
     /// The AI Apps profile, if there's one.
     var headless: ProfileInfo? { others.first { $0.isHeadless } }
 
-    /// The Headless profile: the one there is, or a new one, with an ID of its own (a removed one's may still be
-    /// waiting for its data to be erased).
+    /// The AI Apps profile: the existing one, or a new one with its own ID (a removed one's data may still be
+    /// waiting to be erased).
     @discardableResult
     mutating func addHeadless(name: String, color: SpaceColor? = nil) -> ProfileInfo {
         if let headless { return headless }

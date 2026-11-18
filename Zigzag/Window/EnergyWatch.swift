@@ -71,7 +71,7 @@ final class EnergyWatch {
         // Pages share processes: one that also runs a page on screen, or one playing or in a call, may be busy with that
         // page, so none of its tabs is blamed.
         var excused: Set<Int32> = []
-        // AI apps' own window too, when they work in the background: a page left busy there is as costly as any.
+        // Includes the AI apps' background window: a page left busy there costs as much as any.
         for controller in WindowManager.shared.everyController {
             for tab in controller.tabManager.allTabs {
                 guard let webView = tab.webView, let pid = Self.processID(of: webView) else { continue }
@@ -184,7 +184,7 @@ final class EnergyWatch {
         var sleepers: [Tab] = [], awake: [Tab] = [], soon = false
         // Each window's selected page (and split partner) never sleeps, even when covered or minimized: it would just
         // reload. Sharing windows (#162) list the same tabs; each is checked once and any window's selection is kept.
-        // AI apps' own window too; out of sight it shows none (`TabManager.shownTabs`), so only use spares a tab there.
+        // AI apps' own window too: out of sight it shows none (`TabManager.shownTabs`), so only use spares a tab there.
         let kept = WindowManager.shared.everyController.flatMap(\.tabManager.shownTabs)
         do {
             for tab in WindowManager.shared.everyOpenTab where tab.webView.flatMap(Self.processID) == pid && !kept.contains(where: { $0 === tab }) {

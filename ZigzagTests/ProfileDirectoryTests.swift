@@ -358,8 +358,8 @@ struct ListedProfileTests {
     }
 }
 
-/// The Headless profile, where AI apps work in the background: Zigzag makes it when it's needed, never twice, keeps
-/// its name, and makes a new one after it's removed.
+/// The AI Apps profile, where AI apps work in the background: made when needed, never twice, with a fixed name,
+/// and made anew after removal.
 @MainActor
 struct HeadlessProfileTests {
     @Test func itsMadeOnceAndKnownByWhatItsFor() {
@@ -396,7 +396,7 @@ struct HeadlessProfileTests {
         let made = directory.addHeadless(name: "AI Apps")
         let read = try JSONDecoder().decode(ProfileDirectory.self, from: JSONEncoder().encode(directory))
         #expect(read.headless == made)
-        // A file from before it knew about it, or with a role from a later Zigzag, reads: neither is Headless.
+        // A file from before roles, or with a role from a later Zigzag, still reads: neither is Headless.
         let id = UUID(), later = UUID()
         let json = #"{"others":[{"id":"\#(id.uuidString)","name":"Crypto"},{"id":"\#(later.uuidString)","name":"Other","role":"somethingNew"}]}"#
         let old = try JSONDecoder().decode(ProfileDirectory.self, from: Data(json.utf8))
@@ -411,8 +411,8 @@ struct HeadlessProfileTests {
     }
 }
 
-/// The Headless profile's space, through the library: made with it, once; its name can't follow a space's; removed,
-/// its space goes with it instead of onto your first profile.
+/// The AI Apps profile's space, through the library: made once with it, its name can't follow a space's, and
+/// removed with it instead of moving to your first profile.
 @MainActor
 struct HeadlessSpaceTests {
     @Test func madeOnceAndGoneWithItsProfile() throws {

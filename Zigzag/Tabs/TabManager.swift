@@ -108,8 +108,8 @@ final class TabManager {
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
     var privateStore: WKWebsiteDataStore? { store.privateStore }
     var isPrivate: Bool { privateStore != nil }
-    /// The one profile whose spaces this window shows, when it keeps to one: the window AI apps work in keeps to the
-    /// Headless profile's (Headless), so nothing of yours is ever opened where no one sees it and nothing is saved.
+    /// The one profile whose spaces this window shows, if it keeps to one. The AI apps' window keeps to the Headless
+    /// profile (Headless), so nothing of yours opens unseen and nothing is saved.
     let keepsToProfile: UUID?
 
     /// Whether the window may show a space: a private window only its own, a window that keeps to a profile only
@@ -2564,7 +2564,7 @@ final class TabManager {
         guard windows.first === self else { return }
         var selectedIDs = Set<UUID>()
         for window in windows {
-            // (`shownTabs`: none in a window kept out of sight, AI apps' own, where only use keeps a tab awake.)
+            // `shownTabs` is empty for the AI apps' unseen window, where only use keeps a tab awake.
             selectedIDs.formUnion(window.shownTabs.map(\.id))
         }
         let live = allTabs.filter { !$0.isSuspended }
@@ -2682,9 +2682,8 @@ final class TabManager {
         return !WindowManager.shared.everyController.contains { $0.tabManager.shows(tab) }
     }
 
-    /// Whether this window shows the tab to someone: it's the one in front, or beside it in a split. Never in a
-    /// window kept out of sight (AI apps' own, until it's shown): nothing there is on anyone's screen, so only use
-    /// keeps a tab awake. What sleep asks, wherever it's decided.
+    /// Whether this window shows the tab to someone: selected, or beside it in a split. Never in a window kept out of
+    /// sight (AI apps' own, until shown), where only use keeps a tab awake. Used wherever sleep is decided.
     func shows(_ tab: Tab) -> Bool { shownTabs.contains { $0 === tab } }
 
     /// The tabs this window shows to someone, for a pass over many tabs to work out once.

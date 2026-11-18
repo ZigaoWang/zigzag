@@ -16,8 +16,8 @@ final class ZigzagApplication: NSApplication {
     static let staysBehind = false
     #endif
 
-    /// Running for AI apps alone (Headless), Zigzag never comes forward, whatever asks it to: a page, a link, a
-    /// window. It does once you open it yourself.
+    /// Running for AI apps alone (Headless), Zigzag never comes forward, whatever asks (a page, a link, a window),
+    /// until you open it yourself.
     override func activate() {
         guard !Self.staysBehind, !Headless.isBackgroundOnly else { return }
         super.activate()

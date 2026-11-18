@@ -124,7 +124,7 @@ final class AgentControl {
 
     func refresh() {
         changed.send()
-        // Their own window too, when they work in the background: shown, it has the bar like any other.
+        // Their own background window too: when shown, it has the bar like any other.
         let controllers = WindowManager.shared.everyController
         let live = Set(controllers.map(ObjectIdentifier.init))
         for (key, banner) in banners where !live.contains(key) {

@@ -15,8 +15,8 @@ struct UpdateRelaunchTests {
         UpdateRelaunch.Saved(at: now.addingTimeInterval(-ago), browserWindowsOpen: browsers, minis: minis)
     }
 
-    /// A run opened with --headless is the same run after an update's restart: the note says so, and only a note
-    /// from the restart that's launching now is believed. Notes written before it could say so still read.
+    /// A --headless run stays one after an update's restart: the note says so, and only a note from the restart
+    /// launching now is believed. Notes from before it could say so still read.
     @Test func theNoteCarriesAIAppsInTheBackground() throws {
         var note = saved(browsers: true, minis: [])
         #expect(note.keepsAIAppsToBackground == nil)

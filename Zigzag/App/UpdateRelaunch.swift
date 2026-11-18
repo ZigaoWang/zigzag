@@ -20,8 +20,8 @@ enum UpdateRelaunch {
         /// Browser windows were showing; false when only Zigzag Mini was (opened for a link), or no window at all.
         var browserWindowsOpen: Bool
         var minis: [Mini]
-        /// AI apps were kept to the background for that run (it was opened with `--headless`): they still are after
-        /// the restart, which is the same run to you. Not in notes written before this was.
+        /// Whether that run kept AI apps in the background (opened with `--headless`): they stay there after the
+        /// restart, the same run to you. Nil in notes written before this existed.
         var keepsAIAppsToBackground: Bool?
     }
 

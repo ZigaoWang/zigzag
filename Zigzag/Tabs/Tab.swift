@@ -16,11 +16,11 @@ protocol TabHost: AnyObject {
     func tabWantsFocus(_ tab: Tab)
     /// True when a route (#286) opened the link in another space. Only browser windows route.
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool
-    /// No one is there to answer for its pages: the window AI apps work in when they run in the background
-    /// (Headless). What a page asks of a person there (a dialog, a file, where to save) gets the quiet answer.
+    /// Whether no one is there to answer its pages: true for the AI apps' background window (Headless), where what a
+    /// page asks of a person (a dialog, a file, where to save) gets the quiet answer.
     var isUnattended: Bool { get }
-    /// Its window is kept where no one sees it (their window, until it's shown): the tab that's up in it isn't on
-    /// screen, and sleeps like any other once it's idle.
+    /// Whether its window is kept unseen (the AI apps' window until shown): its selected tab isn't on screen and
+    /// sleeps like any other once idle.
     var isOutOfSight: Bool { get }
 }
 
@@ -284,8 +284,8 @@ final class Tab: NSObject {
 
     /// No one is there to answer what its page asks (`TabHost.isUnattended`).
     var isUnattended: Bool { host?.isUnattended ?? false }
-    /// The window its page's questions are asked in. None when no one is there to answer: each question then takes
-    /// the path it has always had for a page in no window, and is answered no.
+    /// The window its page's prompts show in. Nil when no one is there to answer: each prompt then takes the path of
+    /// a page in no window, and is answered no.
     private var promptWindow: NSWindow? { isUnattended ? nil : host?.hostWindow }
 
     /// Something a page asked with no one there, answered no for it.
@@ -298,8 +298,7 @@ final class Tab: NSObject {
         var page = ""
     }
 
-    /// What its page asked with no one there, the latest few, for the AI app that's using it to be told
-    /// (`takeUnanswered`).
+    /// The latest few things its page asked with no one there, for the AI app using it (`takeUnanswered`).
     private(set) var unanswered: [Unanswered] = []
 
     /// Kept only where no one was there: anywhere else the person was asked, or will be.
@@ -1384,16 +1383,16 @@ final class Tab: NSObject {
         }
     }
 
-    /// How many are holding its page out of sight (`holdOutOfSight`), which time it was set there (it may be taken
-    /// away and set there again while an earlier hold is still out), and how its holder resized before.
+    /// The number of holds on its page out of sight (`holdOutOfSight`), which placement this is (it may be taken away
+    /// and placed again during an earlier hold), and its holder's resizing mask before.
     private var outOfSightHolds = 0
     private var outOfSightSetting = 0
     private var resizingBeforeHold: NSView.AutoresizingMask = []
 
-    /// Sets its page in `host` at `size`, where it's drawn though no one sees it: a page in no window isn't drawn at
-    /// all. Returns what lets it go again, or nil when there's no page to hold or it's in a window already. Held by
-    /// several at once (two pictures of it), it's let go by the last; and never if something else took it meanwhile
-    /// (you went to its tab): a hold from before that lets go of nothing set there since.
+    /// Places its page in `host` at `size`, where it's drawn unseen: a page in no window isn't drawn at all. Returns
+    /// the release, or nil when there's no page to hold or it's already in a window. With several holds (two
+    /// pictures), the last release frees it. A hold from before something else took the page (you selected its tab)
+    /// releases nothing placed since.
     func holdOutOfSight(in host: NSView, size: NSSize) -> (() -> Void)? {
         guard let webView, let holder = pageHolder, webView.superview === holder, hasLoadedOnce,
               host.window != nil, size.width > 0, size.height > 0 else { return nil }
@@ -2456,8 +2455,8 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let answer = await AuthenticationPrompt.respond(to: challenge, window: promptWindow, store: webView.configuration.websiteDataStore, page: webView,
                                                         tab: isPrivate ? nil : self)
-        // With no one there, a site's question for a name and password is cancelled, and a site asking for a
-        // certificate goes on without one (AI apps' profile is given none of yours): the app is told.
+        // With no one there, a site's name and password prompt is cancelled, and a site asking for a certificate goes
+        // on without one (AI apps' profile is given none of yours): the app is told.
         let method = challenge.protectionSpace.authenticationMethod
         if isUnattended, answer.0 == .cancelAuthenticationChallenge,
            [NSURLAuthenticationMethodHTTPBasic, NSURLAuthenticationMethodHTTPDigest, NSURLAuthenticationMethodNTLM].contains(method) {
@@ -2653,7 +2652,7 @@ extension Tab: WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters, initiatedByFrame frame: WKFrameInfo) async -> [URL]? {
-        // With no window, the panel would come up on its own in the middle of the screen: no one there, no file.
+        // With no window, the panel would open alone mid-screen: no one there, no file.
         guard !isUnattended else { noteUnanswered(.filePicker); return nil }
         return await PageDialogs.openPanel(parameters: parameters, window: host?.hostWindow)
     }

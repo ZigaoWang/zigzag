@@ -1746,12 +1746,12 @@ final class Library {
         return info
     }
 
-    /// The space AI apps work in when they run in the background: the Headless profile's, both made the first time
-    /// they're needed (and again after you've removed them), never twice.
+    /// The space AI apps work in in the background: the AI Apps profile's. Both are made on first need (and again
+    /// after you remove them), never twice.
     func headlessSpace() -> SpaceInfo {
         let used = profiles.map { color(of: $0) }
         let profile = directory.headless ?? directory.addHeadless(name: "AI Apps", color: SpaceColor.next(unused: used))
-        // Nothing new: nothing to save or tell. A profile just made has no space yet, and making its space saves both.
+        // An existing space needs no save or signal. A new profile has no space yet, and making its space saves both.
         if let space = spaces(in: profile.id).first { return space }
         return addSpace(name: profile.displayName, color: profile.color, profile: profile.id)
     }
@@ -1799,7 +1799,8 @@ final class Library {
     }
 
     /// Takes a profile out of the list, leaving its data to be erased (Profiles). Its spaces move to the first
-    /// profile (the Headless profile's go with it); its favorites go with it. Written at once: from here on, a removal that's interrupted is finished
+    /// profile (the AI Apps profile's go with it); its favorites go with it. Written at once: from here on, a
+    /// removal that's interrupted is finished
     /// at the next start.
     ///
     /// False, with nothing changed, when that couldn't be written (a full disk): erasing its data then would leave
@@ -1811,8 +1812,8 @@ final class Library {
         let gone = Set(favorites(in: id).map(\.id))
         favorites.removeAll { gone.contains($0.id) }
         tidyFavorites()
-        // The Headless profile's spaces were made for AI apps, not by you: they go with it rather than onto your first
-        // profile, and come back with it the next time AI apps run in the background. One space is always left.
+        // The AI Apps profile's spaces were made for AI apps, not by you: they go with it instead of moving to your
+        // first profile, and come back with it when AI apps next run in the background. One space is always left.
         if profile.isHeadless {
             let own = Set(spaces(in: id).map(\.id))
             if spaces.count > own.count { spaces.removeAll { own.contains($0.id) } }

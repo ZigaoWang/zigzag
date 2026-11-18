@@ -3895,7 +3895,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Turned on or off elsewhere (another Settings tab): the switch follows.
         if aiAppsToggle.isOn != shown { aiAppsToggle.isOn = shown }
         // Only for AI apps that may use Zigzag at all.
-        // On too while this run was asked to with --headless: turning it off here ends that as well.
+        // Also on for a --headless run: turning it off here ends that too.
         if backgroundToggle.isOn != Headless.isWanted { backgroundToggle.isOn = Headless.isWanted }
         backgroundToggle.isEnabled = shown
         let detail = MCPService.problem == nil ? MCPService.address

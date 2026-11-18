@@ -848,7 +848,7 @@ final class SidebarView: NSView {
     }
     /// Whether the space keys are there to show numbers on: more than one space, in a window that switches them.
     var hasSpaceKeys: Bool { !isPrivate && dots.count > 1 }
-    /// The spaces its window lists (`TabManager.listedSpaces`): all of them, unless it keeps to one profile's.
+    /// The spaces its window lists (`TabManager.listedSpaces`): all, unless it keeps to one profile.
     var listedSpaces: () -> [SpaceInfo] = { Library.shared.spaces }
     /// A private window keeps to one space and makes none: no dots to switch, no button to add one.
     var isPrivate = false {

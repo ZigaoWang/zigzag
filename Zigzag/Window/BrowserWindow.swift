@@ -38,8 +38,8 @@ final class BrowserWindow: NSWindow {
         didSet { if title != oldValue { layoutTrafficLights() } }
     }
 
-    /// Out of sight, for AI apps working in the background (Headless.park): it stays where it was put, off every
-    /// screen, and never takes the keyboard or becomes the main window.
+    /// Out of sight for AI apps in the background (Headless.park): stays off every screen where it was put, and
+    /// never becomes key or main.
     var isParked = false
 
     override var canBecomeKey: Bool { !isParked }
