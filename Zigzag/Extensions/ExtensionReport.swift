@@ -4,9 +4,8 @@ import WebKit
 /// What an extension will be able to do, and what it asks for that Zigzag can't give it, in plain words.
 /// Shown before installing and in Settings.
 ///
-/// The limits come from the compatibility claims over `chrome-api.json`: each permission and manifest key is
-/// answered by the overlay, and the sheet shows the lines those answers name. A permission no claim covers and
-/// WebKit drops is still named, by the permission itself.
+/// Limits come from the compatibility claims over `chrome-api.json`; the sheet shows the lines they name. A permission
+/// WebKit drops that no claim covers is listed by name.
 @available(macOS 15.4, *)
 struct ExtensionReport {
     struct Line: Hashable {
@@ -16,7 +15,7 @@ struct ExtensionReport {
 
     /// What it can do once added, most important first. Empty for an extension that asks for nothing notable.
     let abilities: [Line]
-    /// Features it asks for that won't work in Zigzag, as the claims word them.
+    /// Requested features that won't work in Zigzag, worded by the claims.
     let limits: [CompatibilityLimit]
     /// What the lines were worded from, so several extensions' can be put together.
     private var asked = Asked()
@@ -42,24 +41,23 @@ struct ExtensionReport {
         limits = Self.lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
     }
 
-    /// The lines Settings shows for an extension, without building its whole report. The overlay behind them is
-    /// decoded once, by `ExtensionCompatibility.shared`.
+    /// Settings' lines for an extension, without building the whole report. The overlay is decoded once
+    /// (`ExtensionCompatibility.shared`).
     static func limits(for ext: WKWebExtension, manifest: [String: Any], id: String) -> [CompatibilityLimit] {
         let requested = strings(manifest, ["permissions", "optional_permissions"])
         let recognized = Set(ext.requestedPermissions.map(\.rawValue)).union(ext.optionalPermissions.map(\.rawValue))
         return lines(for: manifest, requested: requested, recognized: recognized, id: id, log: true)
     }
 
-    /// The claims' lines for the permissions and manifest keys a manifest asks for, less what a shim's prelude
-    /// stands in for, plus a line named by the permission itself where neither WebKit nor the claims know it. Only
-    /// wording and suppression happen here: nothing grants, widens or drops a permission.
+    /// Claim lines for a manifest's permissions and keys, minus what a shim prelude covers, plus a line by name for
+    /// permissions neither WebKit nor the claims know. Wording only; nothing grants or drops permissions.
     private static func lines(for manifest: [String: Any], requested: Set<String>, recognized: Set<String>,
                               id: String, log: Bool) -> [CompatibilityLimit] {
         var limits = claimedLines(for: requested, manifestKeys: manifestKeys(in: manifest), id: id, log: log)
         let covered = ExtensionShims.shim(for: id)?.coveredPermissions ?? []
         let claimed = ExtensionCompatibility.shared.overlay.map { Set($0.permissions.keys) } ?? []
-        // WebKit dropping it is what makes it a limit; a permission it supplies but no claim mentions still works.
-        // MV2 allows host patterns beside permissions; a pattern is not a permission missing a claim.
+        // A permission is a limit only if WebKit drops it; one WebKit supports with no claim still works. MV2 host patterns in
+        // permissions aren't missing claims.
         let names = Set(requested.filter(Self.isPermissionName))
         for name in names.subtracting(recognized).subtracting(claimed).subtracting(covered).sorted() {
             limits.append(CompatibilityLimit(catalogKey: nil, group: name, reason: .webkitMissing,
@@ -69,8 +67,7 @@ struct ExtensionReport {
         return limits
     }
 
-    /// The lines the overlay has for these permissions and manifest keys, with a shim's covered permissions left
-    /// out: the prelude answers those well enough that the person won't miss them.
+    /// Overlay lines for these permissions and keys, minus those a shim prelude covers well enough.
     private static func claimedLines(for requested: Set<String>, manifestKeys: Set<String>, id: String,
                                      log: Bool) -> [CompatibilityLimit] {
         let shim = ExtensionShims.shim(for: id)
@@ -89,19 +86,19 @@ struct ExtensionReport {
         return limits
     }
 
-    /// The manifest keys the claims have lines for, as this manifest asks for them.
+    /// Manifest keys with claim lines that this manifest uses.
     private static func manifestKeys(in manifest: [String: Any]) -> Set<String> {
         guard let overlay = ExtensionCompatibility.shared.overlay else { return [] }
         return Set(overlay.manifest.keys.filter { manifest[$0] != nil })
     }
 
-    /// The manifest permission a line belongs to: its source's first component. A whole-permission line's source is
-    /// the permission itself; a member line's is the claim's path (`management.getSelf`).
+    /// The permission a line belongs to: first component of its source (the permission itself, or a claim path such as
+    /// `management.getSelf`).
     private static func permission(of limit: CompatibilityLimit) -> String {
         String(limit.source.prefix { $0 != "." })
     }
 
-    /// Whether a manifest string is a permission's name rather than a host match pattern MV2 allows beside it.
+    /// Whether a manifest string is a permission name, not an MV2 host pattern.
     private static func isPermissionName(_ name: String) -> Bool {
         !name.contains("://") && name != "<all_urls>" && !name.hasPrefix("*")
     }
@@ -142,9 +139,8 @@ struct ExtensionReport {
                                           replacesNewTab: (old["chrome_url_overrides"] as? [String: Any])?["newtab"] != nil,
                                           searchEngine: ExtensionSearchProvider(manifest: old, extensionID: id)?.name))
         abilities = full.abilities.filter { !oldLines.contains($0) }
-        // The delta is by catalog key: a line the old version already had is not news. An unclaimed permission has
-        // no key, so its own name stands in; every permission the old manifest doesn't claim counts, so one it
-        // already asked for is not shown again.
+        // Diff by catalog key: lines the old version had aren't new. Unclaimed permissions use their name as key, so only
+        // newly requested ones show.
         let oldLimits = Set(Self.lines(for: old, requested: oldPermissions, recognized: [], id: id, log: false)
             .map(\.identity))
         limits = full.limits.filter { !oldLimits.contains($0.identity) }
@@ -278,7 +274,6 @@ struct ExtensionReport {
 }
 
 private extension CompatibilityLimit {
-    /// What makes two lines the same feature across versions: the catalog key that words it, or the raw permission
-    /// when no claim covers it.
+    /// Identity of a line across versions: its catalog key, or the raw permission when unclaimed.
     var identity: String { catalogKey ?? "permission:\(source)" }
 }

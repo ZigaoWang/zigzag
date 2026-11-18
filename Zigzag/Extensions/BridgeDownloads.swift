@@ -74,11 +74,11 @@ final class BridgeDownloads: BridgeNamespace {
 
     // MARK: Starting
 
-    /// The files each extension saved this session, by the name it chose: the only ones its "overwrite" may replace.
+    /// Files each extension saved this session, by name; the only ones its "overwrite" may replace.
     private var savedByExtension: [String: Set<String>] = [:]
 
-    /// Whether an extension's "overwrite" may take `target`: nothing is there, or it's a file the extension saved
-    /// there itself this session (`savedBefore`, standardized paths). Anything else there is yours.
+    /// Whether "overwrite" may replace `target`: nothing there, or a file this extension saved this session (`savedBefore`,
+    /// standardized paths).
     nonisolated static func mayOverwrite(_ target: URL, savedBefore: Set<String>) -> Bool {
         !FileManager.default.fileExists(atPath: target.path) || savedBefore.contains(target.standardizedFileURL.path)
     }
@@ -95,8 +95,7 @@ final class BridgeDownloads: BridgeNamespace {
             request.setValue(value, forHTTPHeaderField: name)
         }
         // A name the extension gave: only a file name, inside Downloads (its folders, if it names some, are flattened).
-        // "overwrite" replaces only a file this extension saved there itself; any other file of that name is yours,
-        // so the download takes a new name beside it, as with "uniquify".
+        // "overwrite" only replaces this extension's own files; otherwise uniquify, so your files are kept.
         var destination: URL?
         if let name = options.string("filename").map(Self.safeName), !name.isEmpty {
             let target = DownloadManager.folder.appendingPathComponent(name)
@@ -157,7 +156,7 @@ final class BridgeDownloads: BridgeNamespace {
             found = found.filter { item in words.allSatisfy { item.filename.lowercased().contains($0) || (item.sourceURL?.absoluteString.lowercased().contains($0) ?? false) } }
         }
         if let pattern = query.string("filenameRegex") {
-            // As Chrome: a pattern that isn't one is an error, not an empty list.
+            // Like Chrome, an invalid pattern is an error, not an empty list.
             guard Self.isValidPattern(pattern) else { throw BridgeError("Invalid filenameRegex") }
             guard let matched = await Self.matching(pattern, in: found.map { $0.destination?.path ?? $0.filename }) else {
                 throw BridgeError("filenameRegex took too long")
@@ -169,12 +168,11 @@ final class BridgeDownloads: BridgeNamespace {
         return found
     }
 
-    /// Whether `filenameRegex` is a pattern at all.
+    /// Whether `filenameRegex` compiles.
     nonisolated static func isValidPattern(_ pattern: String) -> Bool { (try? NSRegularExpression(pattern: pattern)) != nil }
 
-    /// The extension's pattern is its own, and one can take for ever on the right name: it runs away from the main
-    /// thread, and gives up after `timeout`. Which names match, by index; nil if it gave up. A pattern that isn't
-    /// one matches nothing.
+    /// Extension patterns can be catastrophic, so matching runs off the main thread and gives up after `timeout`. Returns
+    /// matching indexes, or nil on timeout. Invalid patterns match nothing.
     nonisolated static func matching(_ pattern: String, in names: [String], timeout: TimeInterval = 1) async -> Set<Int>? {
         guard pattern.utf16.count <= 1_000 else { return [] }
         return await Task.detached(priority: .utility) { () -> Set<Int>? in
@@ -183,7 +181,7 @@ final class BridgeDownloads: BridgeNamespace {
             var found = Set<Int>()
             for (index, name) in names.enumerated() {
                 var matched = false, late = false
-                // Progress reports come while it works, so a slow match can be stopped partway.
+                // Progress callbacks let a slow match stop partway.
                 regex.enumerateMatches(in: name, options: [.reportProgress], range: NSRange(location: 0, length: name.utf16.count)) { result, _, stop in
                     if result != nil { matched = true; stop.pointee = true } else if Date() > deadline { late = true; stop.pointee = true }
                 }

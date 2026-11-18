@@ -92,7 +92,7 @@ enum SidebarMenus {
         }
         if !rows.isEmpty {
             if !menu.items.isEmpty { menu.addItem(.separator()) }
-            // A group of the picked tabs (#209), in the Tabs part, where the first of them is.
+            // New tab group from the selection (#209), placed at the first tab.
             menu.addItem(Item(rows.count == 1 ? String(localized: "New Group with Tab", comment: "Item in a tab's context menu in the sidebar: puts the tab in a new group of tabs, a folder among the tabs.")
                               : String(localized: "Group \(rows.count) Tabs", comment: "Menu item for several picked tabs: puts them in a new group of tabs, a folder among the tabs.")) {
                 controller.groupWithUndo(rows)
@@ -331,7 +331,7 @@ enum SidebarMenus {
         return menu
     }
 
-    /// A tab's way into a group of tabs (#209): a new one, or one of the space's others; in one, its way out.
+    /// Add to a new or existing tab group (#209), or remove from one.
     private static func addGroupItems(to menu: NSMenu, for tab: Tab, controller: BrowserWindowController) {
         let manager = controller.tabManager
         menu.addItem(.separator())
@@ -350,7 +350,7 @@ enum SidebarMenus {
         }
     }
 
-    /// A group of tabs' menu (#209): as a folder's, with what it does to its tabs.
+    /// Tab group menu (#209): like a folder's, plus tab actions.
     static func groupMenu(for group: TabGroup, controller: BrowserWindowController) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
@@ -398,7 +398,7 @@ enum SidebarMenus {
         }
         // A split favorite: its two pages go and come as one, and can be parted into two favorites.
         if let pair = Library.shared.pinnedSplit(containing: favorite.id) {
-            // A page of it that moved on goes back, as a favorite of one page does.
+            // An away page goes back, like a single-page favorite.
             let away = pair.ids.filter(manager.isAway)
             if !away.isEmpty {
                 menu.addItem(Item(String(localized: "Back to Favorite’s Page", comment: "Item in a favorite's context menu. Goes back to the page the favorite was saved with.")) { away.forEach(manager.resetBookmarkTab) })
@@ -786,7 +786,7 @@ extension BrowserWindowController {
 
     // MARK: Groups of tabs (#209)
 
-    /// A new group of these tabs (rows: a split's row brings its other pages), named right away in its row.
+    /// New group from these tabs (a split's row brings its other pages), renamed in place.
     func groupWithUndo(_ tabs: [Tab]) {
         var made: UUID?
         pageChange(String(localized: "New Group", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
@@ -798,7 +798,7 @@ extension BrowserWindowController {
         DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameGroup(made) }
     }
 
-    /// Into a group (nil: out of the one they're in), each after its last tab.
+    /// Into a group (nil: out of theirs), after its last tab.
     func setGroupWithUndo(of tabs: [Tab], to group: UUID?) {
         pageChange(group == nil ? String(localized: "Remove from Group", comment: "Undo action name, shown in Edit › Undo.")
                    : String(localized: "Add to Group", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
@@ -806,12 +806,12 @@ extension BrowserWindowController {
         }
     }
 
-    /// The group goes, its tabs stay where they are.
+    /// Ungroup: the group goes, tabs stay.
     func ungroupWithUndo(_ id: UUID) {
         pageChange(String(localized: "Ungroup", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in tabManager.ungroup(id) }
     }
 
-    /// Closes every tab in the group, all of each split; ⌘Z (or the toast's Undo) brings them back, group and all.
+    /// Closes every tab in the group, whole splits; ⌘Z (or the toast's Undo) restores them with the group.
     func closeGroupWithUndo(_ id: UUID) {
         closeManyWithUndoToast(tabManager.tabs(inGroup: id).flatMap(tabManager.panes(of:)).reduce(into: [Tab]()) { all, tab in
             if !all.contains(where: { $0 === tab }) { all.append(tab) }

@@ -146,8 +146,7 @@ final class AddressView: InteractiveView {
 
     /// How many of `count` pins can show when `otherButtons` share the end of a field with `room` for text and
     /// buttons: the site's name keeps its minimum, and every button takes its width and a gap.
-    /// `text`: the width of the site's name, or the prompt, in full: pins give way before it's cut short. Nil for
-    /// buttons with no site beside them (`buttonsOnly`).
+    /// `text`: full width of the site name or prompt; pins hide before it truncates. Nil for buttons alone (`buttonsOnly`).
     static func pinsThatFit(count: Int, otherButtons: Int, room: CGFloat, text: CGFloat? = 0) -> Int {
         let site = text.map { max(Tokens.Sidebar.addressMinText, ceil($0)) } ?? 0
         let spare = room - site - CGFloat(otherButtons) * pinStep
@@ -377,7 +376,7 @@ final class AddressView: InteractiveView {
         _ = drop
         setAccessibilityRole(.button)
         setAccessibilityHelp(String(localized: "Opens the command bar", comment: "Accessibility help of the address in the sidebar."))
-        // Named before its first page: what it says on a new tab.
+        // Named before its first page loads: the new tab title.
         setAccessibilityLabel(String(localized: "Search or enter address", comment: "Placeholder of the address in the sidebar, on a new tab."))
     }
 
@@ -439,8 +438,8 @@ final class AddressView: InteractiveView {
     /// How a site's name too long for its room is shortened. Its subdomains go first, from the start, so the domain
     /// that says whose site it is stays whole ("…mail.google.com"). A domain that alone is too long keeps its start and
     /// its end ("physicsandm…tutor.com"), so it reads as itself and its ending still shows.
-    /// A host whose domain can't be told (a port, an "xn--" label the list doesn't spell) still loses its start, never
-    /// its end: "accounts.google.com.…evil.example" must never read as "accounts.google.com…".
+    /// Hosts with no known domain (a port, an unlisted "xn--" label) still truncate at the start, never the end:
+    /// "accounts.google.com.…evil.example" must not read as "accounts.google.com…".
     static func lineBreak(forName name: String) -> NSLineBreakMode {
         guard name.contains("."), !name.contains(" ") else { return .byTruncatingTail }
         let parts = HostText.parts(of: name.lowercased())
@@ -448,9 +447,8 @@ final class AddressView: InteractiveView {
         return .byTruncatingMiddle
     }
 
-    /// In the bar above the page (#275) the site is in the pill in the bar's middle (`TopBarView.pill`), as a split
-    /// pane's is, and the field keeps only its buttons, side by side at the bar's end with no field around them:
-    /// Reader, the camera, the pinned extensions and Site Controls, each as it is in the sidebar.
+    /// In the top bar (#275) the site shows in the bar's center pill (`TopBarView.pill`), and the field keeps only its
+    /// buttons at the bar's end, unframed: Reader, camera, pinned extensions and Site Controls.
     var buttonsOnly = false {
         didSet {
             guard buttonsOnly != oldValue else { return }
@@ -462,7 +460,7 @@ final class AddressView: InteractiveView {
         }
     }
 
-    /// The width the buttons take side by side with nothing around them (`buttonsOnly`), every pin showing.
+    /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
         let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + 1
         return CGFloat(count) * Self.pinStep - 2
@@ -499,13 +497,13 @@ final class AddressView: InteractiveView {
     /// Works out what fits and puts everything in its place. The one place the field is laid out, so a button and the
     /// text beside it never disagree; when nothing changed it does nothing, as it runs throughout a page load.
     private func reflow(animated requested: Bool) {
-        // Buttons alone at the bar's end: a button coming or going changes how wide they are, which the bar sets.
+        // Buttons alone: the bar sets their width, which changes as buttons come and go.
         if buttonsOnly, abs(buttonsWidth - bounds.width) > 0.5 { superview?.needsLayout = true }
         // While a pin is carried the places are held still; the drop catches up.
         guard bounds.width > 0, pinDrag == nil else { return }
         let animated = requested && window != nil && !Tokens.Motion.isFromKey
         let side = AddressView.buttonSide, inset = (bounds.height - side) / 2
-        // With no field around them, the buttons reach its ends, as the bar's other buttons reach theirs.
+        // Unframed, the buttons reach the ends, like the bar's other buttons.
         let end = buttonsOnly ? 0 : inset
         // The host sits clear of the field's rounded edge, as far in as the buttons are from its right end, so the
         // text has room to breathe. After the not-secure mark when there is one.
@@ -517,9 +515,9 @@ final class AddressView: InteractiveView {
         for (button, wanted) in [(readerButton, wantsReader), (captureButton, wantsCapture)] {
             if wanted { others.append(button) } else { takeAway(button, animated: animated, removing: false) }
         }
-        // Without the site beside them, the buttons have the whole width, a gap's worth past the last one included.
+        // Without the site, buttons get the whole width, including a gap after the last.
         let room = buttonsOnly ? bounds.width + 2 : bounds.width - x - inset - Tokens.Space.x1
-        // The pins make room for the site.
+        // Pins make room for the site.
         let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
         let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 1, room: room, text: buttonsOnly ? nil : text)
         // The one furthest from Site Controls gives way first.
@@ -534,7 +532,7 @@ final class AddressView: InteractiveView {
         var right = bounds.width - end
         for (index, button) in trailing.enumerated().reversed() {
             let frame = NSRect(x: right - side, y: inset, width: side, height: side)
-            // Concentric with the field's corners; with no field, a button's own, as the bar's others.
+            // Concentric with the field's corners; unframed, the button's own radius.
             button.radius = buttonsOnly ? Tokens.Radius.control : Tokens.Sidebar.addressRadius - inset
             // The field's rim around it presses it too: top to bottom, out to the field's end, half the gap to a
             // neighbor.
@@ -603,13 +601,13 @@ final class AddressView: InteractiveView {
         for button in [readerButton, captureButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
-        // Buttons alone in the bar: between them is the bar's, which moves the window.
+        // Buttons alone: the gaps belong to the bar and drag the window.
         return buttonsOnly ? nil : super.hitTest(point)
     }
 
     override func stateDidChange(animated: Bool) {
-        // A soft field of the space's own color, a step lighter under the pointer and pressed. On a page's own color
-        // (the bar above the page), a page's neutral field instead, which shows on white too. Buttons alone, none.
+        // The space's tinted field, lighter on hover and press. In the top bar, a neutral field that also shows on white.
+        // None for buttons alone.
         let fill = buttonsOnly ? NSColor.clear : isOnPage ? (isPressed ? Tokens.Color.pressedFill : isHovered ? Tokens.Color.highlight : Tokens.Color.fieldFill)
             : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         layer?.set(backgroundColor: cgColor(fill), animated: animated && !isHovered)
@@ -792,16 +790,15 @@ final class SidebarView: NSView {
     /// The dots, between Downloads and +. Too many to fit at a size you can click, they scroll sideways, keeping
     /// the space you're in in view, with their ends faded.
     private let dotStrip = DotStrip()
-    /// Now Playing's cards, top to bottom, one for each tab playing in the background (`NowPlayingChoice`), those
-    /// fading away included, where they were.
+    /// Now Playing cards top to bottom, one per background tab playing (`NowPlayingChoice`), including fading ones.
     private(set) var nowPlayingCards: [NowPlayingView] = []
-    /// A card's title clicked, its play button or Play, and its close or Hide; the tab it's for.
+    /// Card title, play button or Play, and close or Hide; with the card's tab.
     var onNowPlayingShow: ((Tab) -> Void)?
     var onNowPlayingToggle: ((Tab) -> Void)?
     var onNowPlayingHide: ((Tab) -> Void)?
     /// A card's right-click menu.
     var onNowPlayingMenu: ((Tab) -> NSMenu?)?
-    /// An update that's ready, right above the dots: Restart restarts into it.
+    /// Ready update above the dots; Restart installs it.
     let updateCard = UpdateCard()
 
     /// A circle with an arrow, drawn in code so the progress ring lies exactly on the circle: one center, one size.
@@ -857,7 +854,7 @@ final class SidebarView: NSView {
             dots.forEach { $0.isHidden = isPrivate }
         }
     }
-    /// A hairline under the space's name, only while the list is scrolled under it, as a scroll edge does on the Mac.
+    /// Hairline under the space name while the list is scrolled, like a Mac scroll edge.
     private let topSeparator = ColorView(color: Tokens.Color.separator)
     /// Width reserved on the left of the top row for the traffic lights.
     var trafficLightsWidth: CGFloat = 52 { didSet { needsLayout = true } }
@@ -875,7 +872,7 @@ final class SidebarView: NSView {
     var holdsAddress = true {
         didSet {
             guard holdsAddress != oldValue else { return }
-            // Back from the bar above the page: the field again, the site in it.
+            // Leaving the top bar: back to the field with the site.
             if holdsAddress { address.buttonsOnly = false; addressViews.forEach(addSubview) }
             needsLayout = true
         }
@@ -988,9 +985,8 @@ final class SidebarView: NSView {
         if !showBlankMenu(for: event) { super.rightMouseDown(with: event) }
     }
 
-    /// The sidebar is the window's title bar: drag it to move the window, and double-click it to zoom (or
-    /// whatever the Mac's title bar double-click is set to do). A Control-click is a right-click. A double-click in
-    /// the empty space among and below the tabs opens a new tab instead, as in Arc (#262), unless that's turned off.
+    /// The sidebar acts as the title bar: drag to move, double-click to zoom (or the system setting). Control-click is a
+    /// right-click. Double-click in empty tab space opens a new tab, as in Arc (#262), unless turned off.
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control), showBlankMenu(for: event) { return }
         if event.clickCount == 2, Self.doubleClickOpensNewTab, isInList(event) {
@@ -1000,14 +996,14 @@ final class SidebarView: NSView {
         window?.titleBarMouseDown(event)
     }
 
-    /// Settings › Appearance › Double-click the sidebar for a new tab. On unless turned off.
+    /// Settings › Appearance › Double-click the sidebar for a new tab. On by default.
     static var doubleClickOpensNewTab: Bool {
         get { UserDefaults.standard.object(forKey: "sidebarDoubleClickNewTab") as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: "sidebarDoubleClickNewTab") }
     }
 
-    /// A press in the tab list's own area: a row would have taken it, so it's the empty space there. Not the top row
-    /// with the traffic lights, the address or the bar at the bottom, which stay the title bar.
+    /// A press in empty tab list space (rows would have taken it). Not the top row, address or bottom bar, which stay
+    /// title bar.
     private func isInList(_ event: NSEvent) -> Bool {
         !scrollView.isHidden && scrollView.frame.contains(convert(event.locationInWindow, from: nil))
     }
@@ -1019,7 +1015,7 @@ final class SidebarView: NSView {
     }
 
     private func updateTopSeparator() {
-        // Under the space's name, which stays at the top while the list scrolls under it.
+        // Below the pinned space name.
         let pad = Tokens.Sidebar.edge
         let y = scrollView.frame.minY + list.headerHeight
         if topSeparator.frame.minY != y || topSeparator.frame.width != bounds.width - pad * 4 {
@@ -1112,8 +1108,7 @@ final class SidebarView: NSView {
         Self.fade(bottomFade, for: scrollView, list: list)
     }
 
-    /// Tabs running on below the bottom of a list fade out there. Only the bottom: the top holds the space's name,
-    /// pinned while you scroll, and the hairline under it already says there's more above.
+    /// Fade tabs at the bottom of a list only; the top has the pinned space name and its hairline.
     private static func fade(_ mask: CAGradientLayer, for scrollView: NSScrollView, list: NSView) {
         let bounds = scrollView.bounds
         let clip = scrollView.contentView.bounds
@@ -1402,8 +1397,7 @@ final class SidebarView: NSView {
     var newSpaceAnchor: NSView { newSpaceButton }
     var onEditSpace: ((UUID) -> Void)?
 
-    /// The bottom stack: the update card sits right above the dots, where it stays put, and the now-playing
-    /// cards, which come and go more often, above that, the last of them nearest the dots.
+    /// Bottom stack: the update card right above the dots, then Now Playing cards above it, newest nearest the dots.
     private func bottomFrames() -> (nowPlaying: [NSRect], update: NSRect, listBottom: CGFloat) {
         let pad = Tokens.Sidebar.edge
         var bottom = bottomBar.frame.minY
@@ -1420,8 +1414,8 @@ final class SidebarView: NSView {
         return (playing, update, bottom)
     }
 
-    /// Shows the update card in its state, or puts it away (nil); `hiding`: you closed it, so it goes as a closed Now
-    /// Playing card does. Shown already, it moves to the new state in place, growing or shrinking to fit it.
+    /// Shows the update card or hides it (nil); `hiding`: closed by you, so it animates out like a Now Playing card.
+    /// Already shown, it resizes in place for the new state.
     func setUpdateCard(_ state: UpdateCardState?, hiding: Bool = false) {
         let oldHeight = UpdateCard.height(for: updateCard.state)
         if let state { updateCard.show(state) }
@@ -1438,7 +1432,7 @@ final class SidebarView: NSView {
             updateCard.isHidden = false
             needsLayout = true
             layoutSubtreeIfNeeded()
-            // In from a touch smaller as it fades in, as a closed one goes out (only the fade with Reduce Motion).
+            // Scale up slightly while fading in (fade only with Reduce Motion).
             Tokens.Motion.present(updateCard, from: .point(CGPoint(x: 0.5, y: 0.5)), entering: true)
             return
         }
@@ -1462,9 +1456,8 @@ final class SidebarView: NSView {
 
     private var updateCardFadingOut = false
 
-    /// Shows a now-playing card for each tab, top to bottom, with whether it's paused, making room above the dots;
-    /// the cards of tabs no longer there go. `hiding`: you hid that tab's card, so it's put away, a touch smaller as
-    /// it fades (the present role going; with Reduce Motion only the fade, from a key at once).
+    /// Shows a Now Playing card per tab, with paused state, above the dots; removes cards for gone tabs. `hiding`: you hid
+    /// it, so it shrinks slightly while fading (fade only with Reduce Motion, instant from a key).
     func setNowPlaying(_ playing: [(tab: Tab, paused: Bool)], hiding: UUID? = nil) {
         var live: [NowPlayingView] = []
         for (tab, paused) in playing {
@@ -1474,14 +1467,13 @@ final class SidebarView: NSView {
             card.show(tab)
             live.append(card)
             guard existing == nil || card.isLeaving else { continue }
-            // New, or playing again before its fade finished: whatever a hide left on its layer goes, and it fades in.
+            // New, or playing again mid-fade: clear leftover hide state and fade in.
             card.isLeaving = false
             Tokens.Motion.settle(card)
             card.alphaValue = 0
             Tokens.Motion.animate(Tokens.Motion.change) { card.animator().alphaValue = 1 }
         }
-        // The ones going fade out where they are first; only then does the list take back their room, so nothing
-        // vanishes at once.
+        // Fade out in place first, then reclaim the room, so nothing vanishes abruptly.
         var cards = live
         for (index, card) in nowPlayingCards.enumerated() where !live.contains(where: { $0 === card }) {
             cards.insert(card, at: min(index, cards.count))
@@ -1513,13 +1505,13 @@ final class SidebarView: NSView {
         return card
     }
 
-    /// Fades a card out where it is, then takes it away and gives its room back to the list.
+    /// Fades a card out, removes it, and gives its room back.
     private func dismissNowPlaying(_ card: NowPlayingView, hiding: Bool) {
         card.isLeaving = true
         card.leaves += 1
         let leave = card.leaves
         let done: @MainActor () -> Void = { [weak self, weak card] in
-            // Playing again before the fade finished: it stays.
+            // Playing again mid-fade: keep it.
             guard let self, let card, card.isLeaving, card.leaves == leave else { return }
             card.removeFromSuperview()
             self.nowPlayingCards.removeAll { $0 === card }

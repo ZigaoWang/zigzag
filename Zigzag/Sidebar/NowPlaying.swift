@@ -1,9 +1,8 @@
 import AppKit
 
-/// When a tab you're not looking at plays sound, a small control sits above the space dots, one for each such tab:
-/// the site, play/pause and mute. Click the title to go there. It's laid out as a tab's row is: the same height,
-/// icon and text columns, and the same small buttons at its end, with a close button last, always
-/// there, that hides the card for what that tab is playing now; the sound plays on.
+/// Card above the space dots for each background tab playing sound: site, play/pause and mute; click the title to go
+/// there. Laid out like a tab row, with an always-visible close button that hides the card for the current media
+/// (sound keeps playing).
 final class NowPlayingView: InteractiveView {
     private let icon = FaviconView()
     private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
@@ -17,16 +16,16 @@ final class NowPlayingView: InteractiveView {
     private(set) weak var tab: Tab?
     private var sizeObserver: NSObjectProtocol?
     var isPaused = false { didSet { refresh() } }
-    /// Fading away, its tab quiet or hidden; it keeps its place until it's gone (`SidebarView.setNowPlaying`).
+    /// Fading out (tab quiet or hidden); keeps its slot until gone (`SidebarView.setNowPlaying`).
     var isLeaving = false
-    /// Counts its leavings, so a fade that was turned around doesn't take it away when it ends.
+    /// Hide counter, so a reversed fade doesn't remove it when it ends.
     var leaves = 0
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         layer?.cornerRadius = Tokens.Sidebar.rowRadius
         layer?.cornerCurve = .continuous
-        // A long title fades out at its end, as a tab row's does.
+        // Long titles fade at the end, like tab rows.
         title.fadesTail = true
         [icon, title, playButton, muteButton, hideButton].forEach { addSubview($0) }
         hideButton.onClick = { [weak self] _ in self?.onHide?() }
@@ -119,49 +118,44 @@ final class NowPlayingView: InteractiveView {
     }
 }
 
-/// Which tabs the sidebar's Now Playing cards are for, and the ones they've been hidden for.
+/// Which tabs get Now Playing cards, and which are hidden.
 ///
-/// A card for each tab you aren't looking at that makes sound, that Zigzag paused, or whose video is in the mini
-/// player, paused there or not, so a few that start at once can each be paused or muted (#274). They keep the order
-/// they started in, the first by the dots and each new one on top, so a card never moves when another comes; only the
-/// `limit` most recent show. Hiding one is for what that tab is playing now, never a pause: its card stays away while
-/// the tab plays on, pauses and plays again on the same page, and comes back once the tab goes to another page (the
-/// next video, another track's page). A closed tab is forgotten.
+/// A card for each background tab that plays sound, was paused from its card, or has video in the mini player, so
+/// several can be paused or muted (#274). Cards keep start order (first by the dots, newest on top) so none move;
+/// only the `limit` newest show. Hiding applies to the current page: the card stays hidden through pause and play and
+/// returns when the tab navigates. Closed tabs are dropped.
 struct NowPlayingChoice {
     /// A tab of the window, in most-recent order.
     struct Candidate: Equatable {
         let id: UUID
         /// The page it's on (`page(of:)`).
         let page: String
-        /// Playing sound, paused from the card, or in the mini player, playing or paused there.
+        /// Playing sound, paused from the card, or in the mini player.
         let sounding: Bool
         let isSelected: Bool
     }
 
-    /// Whether a tab has the card's attention: playing sound, paused from the card, or its video in the mini player,
-    /// paused there or not (the card stays until the mini player lets it go).
+    /// Whether a tab gets a card: playing sound, paused from the card, or in the mini player (until it releases it).
     static func isSounding(playing: Bool, pausedFromCard: Bool, inMiniPlayer: Bool) -> Bool {
         playing || pausedFromCard || inMiniPlayer
     }
 
-    /// Whether a tab is playing, for the card's button: a video in the mini player by its own state (a muted or silent
-    /// video plays without a sound); anything else by its sound.
+    /// Playing state for the button: mini player videos by their own state (muted video still plays), others by sound.
     static func isPlaying(sound: Bool, miniPlayerVideo: Bool?) -> Bool {
         miniPlayerVideo ?? sound
     }
 
-    /// Whether the card shows it paused, with Play: paused from the card, or stopped in the mini player.
+    /// Shows paused with Play: paused from the card, or stopped in the mini player.
     static func isPaused(playing: Bool, pausedFromCard: Bool, inMiniPlayer: Bool) -> Bool {
         pausedFromCard || (inMiniPlayer && !playing)
     }
 
-    /// The most cards at once, so the sidebar's list keeps its room.
+    /// Max cards, so the tab list keeps its room.
     static let limit = 3
 
     /// Each hidden tab, with the page it was hidden on.
     private(set) var hidden: [UUID: String] = [:]
-    /// The tabs with the cards' attention, in the order they started, the first first. A tab keeps its place while
-    /// it's paused, selected or hidden, and goes once it's quiet.
+    /// Tabs with cards in start order. A tab keeps its slot while paused, selected or hidden; removed once quiet.
     private(set) var order: [UUID] = []
 
     /// A page by its address without the part after #: a jump within the page isn't something new.
@@ -176,14 +170,12 @@ struct NowPlayingChoice {
         hidden[id] = page
     }
 
-    /// The tabs to show from all of the window's, most recent first, as the cards go from top to bottom: the newest
-    /// on top, the first to start by the dots; none for no card. Drops what was hidden on a page the tab has since
-    /// left, and tabs that are gone.
+    /// Tabs to show, newest first (top to bottom); empty for none. Clears hides for pages the tab has left, and gone tabs.
     mutating func pick(from candidates: [Candidate]) -> [UUID] {
         let byID = Dictionary(candidates.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         hidden = hidden.filter { id, page in byID[id]?.page == page }
         order.removeAll { byID[$0]?.sounding != true }
-        // Several starting at once: the one you used last counts as the newest.
+        // Several starting together: the last used counts as newest.
         var known = Set(order)
         for candidate in candidates.reversed() where candidate.sounding && known.insert(candidate.id).inserted {
             order.append(candidate.id)

@@ -1,11 +1,7 @@
 import Foundation
 
-/// What Zigzag promises about one path in Chrome's API: a namespace (`storage`), a member (`storage.local.get`), an
-/// event, a constant or an enum value.
-///
-/// `chrome-api.json` is the universe of paths; `compatibility.json` claims the ones whose answer is not the default.
-/// Anything the universe lists and the overlay does not claim is unsupported, so the overlay only records what
-/// Zigzag reaches.
+/// Zigzag's support status for one Chrome API path (namespace, member, event, constant or enum value).
+/// `chrome-api.json` lists every path; `compatibility.json` claims the non-default ones. Unclaimed paths are unsupported.
 nonisolated enum CompatibilityStatus: String, Codable, CaseIterable, Hashable, Sendable {
     /// WebKit supplies it and matches Chrome's observable contract.
     case native
@@ -15,13 +11,12 @@ nonisolated enum CompatibilityStatus: String, Codable, CaseIterable, Hashable, S
     case bridged
     /// Zigzag reproduces the observable behavior without the Chrome service; the claim names it.
     case emulated
-    /// Zigzag cannot answer it: a loud, Chrome-shaped failure and a line in the install sheet.
+    /// Not available: fails the way Chrome does and gets a line in the install sheet.
     case unsupported
     /// Chrome has removed it; answered only where old extensions still call it.
     case deprecated
 
-    /// How much of Chrome's contract the status keeps, best first. Used only to summarize a namespace for a person;
-    /// a claim never inherits through this.
+    /// Ranking, best first. Only for namespace summaries; claims never inherit through it.
     var strength: Int {
         switch self {
         case .native: return 0
@@ -39,33 +34,32 @@ nonisolated enum CompatibilityStatus: String, Codable, CaseIterable, Hashable, S
     }
 }
 
-/// What the install sheet says about a manifest permission or key. This is not an API path's status: a permission can
-/// be supported while one member it turns on is not, so its answer is the sheet's own four-value axis.
+/// Install sheet status for a manifest permission or key. Separate from API path status: a supported permission can
+/// turn on an unsupported member.
 nonisolated enum CompatibilityPermissionStatus: String, Codable, CaseIterable, Hashable, Sendable {
     /// Everything the permission turns on works; the sheet has no line for it.
     case supported
-    /// Some of it works; the sheet has one line per distinct limit the claims name.
+    /// Partly works; one sheet line per distinct limit.
     case partial
-    /// Nothing it turns on works; the sheet has one line with the reason and group.
+    /// Nothing works; one sheet line with the reason and group.
     case unsupported
-    /// Chrome still answers it for old extensions; the sheet says so in one line.
+    /// Kept for old extensions; one sheet line.
     case deprecated
 }
 
-/// Why a path is not what an extension would have in Chrome. The install sheet groups its words by these, so the
-/// overlay never carries English prose itself.
+/// Why a path differs from Chrome. The install sheet groups its text by these; the overlay holds no English.
 nonisolated enum CompatibilityReason: String, Codable, Hashable, Sendable {
     /// WebKit has no such API, and Zigzag has not reproduced it.
     case webkitMissing
     /// The API is not implemented yet.
     case notImplemented
-    /// The feature is a Chrome service, and Zigzag does not pretend to be Chrome.
+    /// A Chrome service; Zigzag doesn't pretend to be Chrome.
     case chromeService
-    /// The platform (macOS, its notifications, its capture surfaces) cannot show or do it.
+    /// macOS can't do it (notifications, capture surfaces).
     case platform
-    /// Zigzag's own policy says no, as with private windows.
+    /// Zigzag policy, e.g. private windows.
     case policy
-    /// A security gate, such as a developer-only signature, that compatibility does not lift.
+    /// Security gate (e.g. developer-only signature) that compatibility doesn't lift.
     case securityGate
     /// A Google channel Chrome has deprecated.
     case deprecatedChannel
@@ -75,42 +69,40 @@ nonisolated enum CompatibilityReason: String, Codable, Hashable, Sendable {
     case removed
 }
 
-/// One claim: a status, and whatever that status needs to say why and how.
+/// One claim: a status and the details it needs.
 nonisolated struct CompatibilityClaim: Codable, Sendable {
     var status: CompatibilityStatus
-    /// Required for patched, bridged and emulated: `swift:` names an `ExtensionBridge` handler by its namespace
-    /// (`contexts`) or its class (`BridgeContexts`), `js:` a symbol in `webkit-differences.js` or the compatibility
-    /// shim (`ExtensionShims.compatibility`).
+    /// Required for patched, bridged and emulated. `swift:` names an `ExtensionBridge` handler by namespace (`contexts`)
+    /// or class (`BridgeContexts`); `js:` names a symbol in `webkit-differences.js` or `ExtensionShims.compatibility`.
     var implementation: String?
     /// Required for unsupported and deprecated.
     var reason: CompatibilityReason?
-    /// Required for unsupported and deprecated: the install sheet's group, and through it its catalog key.
+    /// Required for unsupported and deprecated: the install sheet group, which gives the catalog key.
     var group: String?
-    /// Claims for members beneath this path, as `storage.local` beneath `storage`; each replaces the namespace's
-    /// answer for that member alone.
+    /// Member claims under this path (`storage.local` under `storage`); each overrides the namespace for that member only.
     var members: [String: CompatibilityClaim]?
 }
 
-/// What the install sheet says about a manifest permission or key, separate from the API paths it turns on.
+/// Install sheet entry for a manifest permission or key, separate from the API paths it turns on.
 nonisolated struct CompatibilityPermission: Codable, Sendable {
     var status: CompatibilityPermissionStatus
-    /// The claimed API paths this permission is about, so a partial permission shows one line per distinct limit.
+    /// Claimed API paths this permission covers; a partial permission gets one line per distinct limit.
     var claims: [String]?
     var reason: CompatibilityReason?
-    /// The catalog key of the limit that covers the whole permission, where one line does.
+    /// Catalog key for a limit that covers the whole permission.
     var catalog: String?
     var group: String?
-    /// Where the line goes in the sheet.
+    /// Sort order in the sheet.
     var order: Int?
 }
 
-/// A group of install-sheet lines, and the catalog key they are written under.
+/// A group of install sheet lines and their catalog key.
 nonisolated struct CompatibilityGroup: Codable, Sendable {
     var catalog: String
     var order: Int?
 }
 
-/// The hand-maintained claims over the generated universe: only the paths whose status is not the default.
+/// Hand-written claims over the generated API list; only non-default paths.
 nonisolated struct CompatibilityOverlay: Codable, Sendable {
     var schemaVersion: Int
     var chromeTypes: String
@@ -133,7 +125,7 @@ nonisolated struct CompatibilityOverlay: Codable, Sendable {
         }
     }
 
-    /// The overlay as the app ships it. `bundle` is the app's, or a test's, own bundle.
+    /// The shipped overlay. `bundle` is the app's or a test's.
     static func load(bundle: Bundle = .main) throws -> CompatibilityOverlay {
         guard let url = bundle.url(forResource: "compatibility", withExtension: "json") else {
             throw LoadError.missingResource
@@ -146,22 +138,20 @@ nonisolated struct CompatibilityOverlay: Codable, Sendable {
     }
 }
 
-/// One line in the install sheet: a limit, the group it belongs to and the catalog key its words live under.
+/// One install sheet line: a limit, its group and its catalog key.
 nonisolated struct CompatibilityLimit: Hashable, Sendable {
     let catalogKey: String?
     let group: String
     let reason: CompatibilityReason
-    /// The permission answer the line shows: the permission's own status for a whole-permission line, or partial for
-    /// the limit a partial row names.
+    /// Status the line shows: the permission's own, or partial for a limit inside a partial permission.
     let status: CompatibilityPermissionStatus
-    /// What the line falls back to until the catalog has text for its key: the permission or manifest key.
+    /// Fallback text until the catalog has the key: the permission or manifest key name.
     let source: String
 
     var text: String { CompatibilityText.text(for: catalogKey, fallback: source) }
 }
 
-/// The install sheet's words, by catalog key. The keys are semantic, so a later key's text does not live in the
-/// overlay; until a key has a localized string its fallback is shown.
+/// Install sheet text by catalog key. Keys without a localized string show their fallback.
 nonisolated enum CompatibilityText {
     static func text(for key: String?, fallback: String) -> String {
         guard let key else { return fallback }
@@ -313,16 +303,15 @@ nonisolated enum CompatibilityText {
     }
 }
 
-/// What an implementation may name: a handler the bridge answers (`swift:history`), or a name the corrections
-/// scripts write (`js:setMember`, `js:cookies.onChanged`). Both are read from the code that would do the work, never
-/// listed a second time here. `emulated` claims name the compatibility shim's members (`js:getSelf`,
-/// `js:managed`), which is where an emulation with no Chrome service lives.
+/// A name an implementation may reference: a bridge handler (`swift:history`) or a name the correction scripts define
+/// (`js:setMember`, `js:cookies.onChanged`). Both are read from the code. `emulated` claims name compatibility shim
+/// members (`js:getSelf`, `js:managed`).
 nonisolated struct CompatibilityImplementations: Sendable {
-    /// The bridge's handler names: each namespace an extension calls, and each handler class's own name.
+    /// Bridge handler names: each namespace and each handler class name.
     let handlers: Set<String>
-    /// The corrections scripts' own source: `webkit-differences.js` and the compatibility shim.
+    /// Source of `webkit-differences.js` and the compatibility shim.
     let script: String
-    /// Every identifier the script writes, so a `js:` name is checked against what is there.
+    /// Identifiers the scripts define, to check `js:` names against.
     private let symbols: Set<String>
 
     init(handlers: Set<String>, script: String) {
@@ -331,9 +320,8 @@ nonisolated struct CompatibilityImplementations: Sendable {
         symbols = Self.identifiers(in: script)
     }
 
-    /// The app's own: the bridge's handlers, `webkit-differences.js` and the compatibility shim as they ship. The
-    /// shim answers the few members WebKit has no counterpart for but Chrome still describes (`management.getSelf`,
-    /// `storage.managed`), so an `emulated` claim names it rather than a correction it never wrote.
+    /// The shipped handlers, `webkit-differences.js` and compatibility shim. The shim covers members WebKit lacks but
+    /// Chrome still lists (`management.getSelf`, `storage.managed`), so `emulated` claims name it.
     @MainActor
     static func shipped(bundle: Bundle = .main) -> CompatibilityImplementations {
         let differences = bundle.url(forResource: "webkit-differences", withExtension: "js")
@@ -343,8 +331,7 @@ nonisolated struct CompatibilityImplementations: Sendable {
                                             script: differences + "\n" + ExtensionShims.compatibility)
     }
 
-    /// Whether an implementation names something that exists. A dotted `js:` name is checked part by part, as in
-    /// `cookies.onChanged`, because the corrections script names the namespace and the member separately.
+    /// Whether an implementation name exists. Dotted `js:` names are checked part by part (`cookies.onChanged`).
     func implements(_ implementation: String) -> Bool {
         if implementation.hasPrefix("swift:") {
             return handlers.contains(String(implementation.dropFirst("swift:".count)))
@@ -356,8 +343,7 @@ nonisolated struct CompatibilityImplementations: Sendable {
         return false
     }
 
-    /// Every identifier the script's code writes. Comments, strings and regular expressions are left out: a name a
-    /// comment mentions is not a correction, and a renamed one would otherwise keep passing through a stale line.
+    /// Identifiers in the script's code. Comments, strings and regexes are skipped so stale mentions don't pass the check.
     private static func identifiers(in script: String) -> Set<String> {
         let separators = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_$")).inverted
         let names = code(in: script).components(separatedBy: separators).filter { name in
@@ -367,7 +353,7 @@ nonisolated struct CompatibilityImplementations: Sendable {
         return Set(names)
     }
 
-    /// The script with its comments, string literals and regular-expression bodies blanked out, so only code is read.
+    /// The script with comments, strings and regex bodies blanked out.
     private static func code(in script: String) -> String {
         let characters = Array(script)
         var code: [Character] = []
@@ -400,7 +386,7 @@ nonisolated struct CompatibilityImplementations: Sendable {
                         continue
                     }
                     if current == character { break }
-                    // A quote that never closes on its line is a division or a regex seen wrong; stop there.
+                    // Unclosed quote on its line: probably a misread division or regex; stop.
                     if character != "`", current == "\n" { break }
                 }
                 code.append(" ")
@@ -430,19 +416,17 @@ nonisolated struct CompatibilityImplementations: Sendable {
         return String(code)
     }
 
-    /// Whether a `/` here starts a regular expression rather than a division. After a name, a number or a closing
-    /// bracket it divides; after an operator or punctuation it opens a regular expression.
+    /// Whether `/` starts a regex: after a name, number or closing bracket it's division.
     private static func startsRegex(after previous: Character?) -> Bool {
         guard let previous else { return true }
         return "([{=,:;!&|?+-*%^~<>".contains(previous)
     }
 }
 
-/// Everything wrong with an overlay against the universe and the code it names: a claim on a member Chrome does not
-/// have, the same path claimed twice, a status missing what it needs, an implementation nobody wrote, or a group with
-/// no catalog.
+/// Overlay problems: claims on paths Chrome lacks, duplicate claims, missing required fields, implementations that
+/// don't exist, groups with no catalog.
 nonisolated enum CompatibilityValidator {
-    /// The problems, in a stable order; empty when the overlay can be believed.
+    /// Problems in stable order; empty when the overlay is valid.
     static func diagnostics(overlay: CompatibilityOverlay, universe: ChromeUniverse,
                             implementations: CompatibilityImplementations) -> [String] {
         var diagnostics: [String] = []
@@ -505,11 +489,9 @@ nonisolated enum CompatibilityValidator {
         }
     }
 
-    /// A permission or manifest key's four-value answer, and what each value needs: a partial one either names the
-    /// claims it turns into lines or carries its own resolving catalog, and an unsupported or deprecated one says why
-    /// and where its line belongs. A named claim is read the way the install sheet reads it, through the registry, so
-    /// a member covered by its namespace is enough, and a member's own limit is named directly even when the member
-    /// answers unsupported: that is the gap the row exists to state.
+    /// Checks a permission or key entry. Partial needs claims or its own catalog; unsupported and deprecated need a reason
+    /// and group. Claims resolve through the registry like the sheet, so a namespace claim covers its members, and a
+    /// member's own limit counts even if the member is unsupported.
     private static func check(_ rows: [String: CompatibilityPermission], at section: String,
                               in overlay: CompatibilityOverlay, universe: ChromeUniverse,
                               registry: CompatibilityRegistry, diagnostics: inout [String]) {
@@ -552,10 +534,9 @@ nonisolated enum CompatibilityValidator {
     }
 }
 
-/// The claims as they apply to one path: the deepest claim on it or above it, with any member override on the way.
-/// A namespace claim is the default for the members it does not override; a member override wins for itself alone.
+/// Claims resolved per path: the deepest claim on or above it, with member overrides winning for themselves only.
 nonisolated struct CompatibilityRegistry: Sendable {
-    /// Every claim the overlay makes, by canonical path, with the nested members flattened away.
+    /// All claims by canonical path, nested members flattened.
     private let claims: [String: CompatibilityClaim]
 
     init(overlay: CompatibilityOverlay) {
@@ -567,9 +548,7 @@ nonisolated struct CompatibilityRegistry: Sendable {
     /// Every path the overlay claims.
     var claimedPaths: Set<String> { Set(claims.keys) }
 
-    /// The claim that applies to `path`: the deepest claim on it or above it, with any member overrides on the way
-    /// taking precedence. A namespace keeps its declared answer for members it does not override. Nil where no
-    /// claim covers the path, when the universe's default of unsupported stands.
+    /// The claim for `path`: the deepest one on or above it, member overrides first. Nil when none covers it (unsupported).
     func claim(for path: String) -> CompatibilityClaim? {
         let above = claims.keys.filter { $0 == path || path.hasPrefix($0 + ".") }.sorted { $0.count < $1.count }
         guard !above.isEmpty else { return nil }
@@ -584,8 +563,7 @@ nonisolated struct CompatibilityRegistry: Sendable {
         return resolved
     }
 
-    /// A presentation summary, not the claim anything inherits: the weakest declared status on or under `path`.
-    /// The install sheet reads `claim(for:)`, and no member takes its answer from here.
+    /// Weakest status on or under `path`, for display only. Nothing inherits from it.
     func status(of path: String) -> CompatibilityStatus {
         if let own = claims[path] {
             let below = claims.keys.filter { $0.hasPrefix(path + ".") }
@@ -608,18 +586,16 @@ nonisolated struct CompatibilityRegistry: Sendable {
     }
 }
 
-/// The app's claims over the generated universe, read once, and the install sheet's lines that follow from them.
-///
-/// The overlay is report-only: nothing here grants, widens or drops a permission, and nothing else reads it to decide
-/// what an extension may do.
+/// The shipped claims, read once, and the install sheet lines they produce.
+/// Report-only: nothing reads it to grant or drop permissions.
 nonisolated struct ExtensionCompatibility {
-    /// The overlay the app ships. Nil where there is none yet, as in a test or a build before the claims land.
+    /// Nil when there is none, as in tests.
     static let shared = ExtensionCompatibility(overlay: try? CompatibilityOverlay.load(),
                                                universe: try? ChromeUniverse.load())
 
     let overlay: CompatibilityOverlay?
     let universe: ChromeUniverse?
-    /// The claims as they apply to a path, when there is an overlay.
+    /// The resolved claims for a path, if there is an overlay.
     let registry: CompatibilityRegistry?
 
     init(overlay: CompatibilityOverlay?, universe: ChromeUniverse? = nil) {
@@ -628,9 +604,8 @@ nonisolated struct ExtensionCompatibility {
         registry = overlay.map { CompatibilityRegistry(overlay: $0) }
     }
 
-    /// The install sheet's lines for an extension asking for these permissions and manifest keys, one per distinct
-    /// catalog key in the overlay's order. A supported or partial permission or key has no line, and one the overlay
-    /// does not mention has none either.
+    /// Install sheet lines for these permissions and manifest keys, one per catalog key, in overlay order. Supported,
+    /// partial and unclaimed entries get no line.
     func limits(forPermissions permissions: Set<String>, manifestKeys: Set<String>) -> [CompatibilityLimit] {
         guard let overlay else { return [] }
         var lines: [(order: Int, source: String, limit: CompatibilityLimit)] = []
@@ -638,9 +613,7 @@ nonisolated struct ExtensionCompatibility {
         func add(_ row: CompatibilityPermission, named name: String) {
             switch row.status {
             case .supported, .partial:
-                // Main's noise level: a permission that partly works gets no line here. The claims that word its
-                // narrower gaps are still recorded, and PR B's sheet can name them once the errors they describe are
-                // real in WebKit pages.
+                // Partial permissions get no line for now; their narrower claims are kept for a later, finer sheet.
                 return
             case .unsupported, .deprecated:
                 let group = row.group ?? name
@@ -660,7 +633,7 @@ nonisolated struct ExtensionCompatibility {
             guard let row = overlay.manifest[name] else { continue }
             add(row, named: name)
         }
-        // One line per catalog key: two permissions, or a permission and a claim, may name the same text.
+        // One line per catalog key; several entries can share the same text.
         var seen: Set<String> = []
         return lines.sorted { ($0.order, $0.source) < ($1.order, $1.source) }
             .map(\.limit)

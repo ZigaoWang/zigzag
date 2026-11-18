@@ -1010,7 +1010,7 @@ final class RemoveBadge {
         cross.frame = layer.bounds
     }
 
-    /// Whether `point`, in the coordinates of the view it's on, is on it or just around it.
+    /// Whether `point` (in the superview's coordinates) is on it or close by.
     func hits(_ point: CGPoint) -> Bool { !layer.isHidden && layer.frame.insetBy(dx: -2, dy: -2).contains(point) }
 }
 
@@ -1057,7 +1057,7 @@ final class BackgroundSwatch: InteractiveView {
     /// Whether a click landed on the ×.
     func hitsBadge(_ event: NSEvent) -> Bool { badge.hits(convert(event.locationInWindow, from: nil)) }
 
-    /// Delete, with keyboard focus here, does what the × does.
+    /// Delete with keyboard focus here acts like the ×.
     override func keyDown(with event: NSEvent) {
         if hasKeyboardFocus, image != nil, [51, 117].contains(event.keyCode) { onRemove?(); return }
         super.keyDown(with: event)
@@ -1211,7 +1211,7 @@ final class SpaceLookEditor: NSView {
     private let swatches = SpaceLook.presets.map { LookSwatch(look: $0) }
     /// The picture the space's empty page shows; the panel picks and removes it.
     let backgroundSwatch = BackgroundSwatch()
-    /// Ringed when the colors are none of the others; a click shows or hides the wheel and Shade.
+    /// Ringed when the colors match no other swatch; click toggles the wheel and Shade.
     private let customSwatch = LookSwatch(look: nil, name: String(localized: "Custom", comment: "Tooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own."))
     private var showsCustom = false
     /// In the row's order, for the arrow keys.
@@ -1382,7 +1382,7 @@ final class SpaceLookEditor: NSView {
         let follows = Self.startingDepth(draft, dark: isDark)
         return index == 0 ? draft.brightness ?? follows : draft.brightness2 ?? draft.brightness ?? follows
     }
-    /// Whether the window looks dark, for where a space that follows the Mac sits on Shade.
+    /// Whether the window is dark, for placing a system-following space on Shade.
     private var isDark: Bool
     /// Where Shade shows the selected color, from 0 (lightest) to 1 (darkest).
     var shownDepth: Double { depth(selected) }
@@ -1392,8 +1392,7 @@ final class SpaceLookEditor: NSView {
         follow(dark: effectiveAppearance.isDark)
     }
 
-    /// Light or dark changed while the editor is open. A space that follows the Mac changed with it, as the sidebar
-    /// shows: its wheel and Shade move to where it is now, so they show the color the space has.
+    /// Appearance changed with the editor open: move a system-following space's wheel and Shade to its current color.
     func follow(dark: Bool) {
         guard dark != isDark else { return }
         isDark = dark
@@ -1526,7 +1525,7 @@ final class SpaceLookEditor: NSView {
             changing.forEach { $0.animator().alphaValue = target }
         } completionHandler: {
             MainActor.assumeIsolated {
-                // Unless shown again since.
+                // Unless shown again meanwhile.
                 for view in changing where view.alphaValue == 0 { view.isHidden = true }
             }
         }
@@ -1557,7 +1556,7 @@ final class SpaceLookEditor: NSView {
         return max(72, widest + Tokens.Space.x3)
     }
 
-    /// The room under Effects' words when it's folded, which the panel counts in its margin.
+    /// Height under the folded Effects label, counted in the panel's margin.
     var trailingAir: CGFloat { showsEffects ? 0 : floor((disclosureHeight - effects.capHeight) / 2) }
 
     /// The wheel and Shade under the swatches.
@@ -1573,7 +1572,7 @@ final class SpaceLookEditor: NSView {
             tile.frame = NSRect(x: round(CGFloat(i) * (swatchSize + gap)), y: y, width: swatchSize, height: swatchSize)
         }
         y += swatchSize
-        // Laid out folded too, so they fade where they'd be.
+        // Laid out while folded too, so they fade in place.
         wheel.frame = NSRect(x: 0, y: y + Tokens.Space.x3, width: width, height: wheelHeight)
         row(shadeLabel, shadeSlider, y: wheel.frame.maxY + Tokens.Space.x3, height: sliderHeight)
         if showsCustom { y += customHeight }
@@ -1652,7 +1651,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         nameBackground.layer?.cornerCurve = .continuous
         nameBackground.layer?.cornerRadius = Tokens.Radius.row
         [nameBackground, nameField, editor, iconButton, profileLine, profileLabel, profileButton].forEach { addSubview($0) }
-        // What a profile is, without a trip to Settings (#201).
+        // Explains profiles inline (#201).
         profileLabel.toolTip = ProfileChoice.spaceNote
         profileButton.toolTip = ProfileChoice.spaceNote
         profileButton.setAccessibilityLabel(profileLabel.stringValue)
@@ -1921,13 +1920,13 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
 
     // MARK: Background
 
-    /// The swatch shows the picture while the space has one that's still kept.
+    /// Shows the picture while the space still has one.
     private func refreshBackground() {
         let name = Library.shared.space(spaceID)?.backgroundImage.flatMap { SpaceBackground.isKept($0) ? $0 : nil }
         editor.backgroundSwatch.image = name.flatMap { SpaceBackground.thumbnail($0, side: 96) }
     }
 
-    /// A picture from anywhere, copied into Zigzag's folder at the size the screen needs.
+    /// Any picture, copied into Zigzag's folder at screen size.
     private func pickBackground() {
         guard let host = controller?.window ?? window else { return }
         let panel = NSOpenPanel()
@@ -1962,7 +1961,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
-    /// Remove: the soft wash again, and Zigzag's copy of the picture deleted.
+    /// Remove: back to the default wash and delete Zigzag's copy.
     private func clearBackground() {
         Library.shared.setBackgroundImage(nil, forSpace: spaceID)
         edited = true
@@ -1970,7 +1969,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     }
 
     #if DEBUG
-    /// For the debug bridge: the Background swatch with a file already picked.
+    /// Debug bridge: the Background swatch with a file already picked.
     func debugSetBackground(_ url: URL) {
         guard let name = SpaceBackground.store(url, for: spaceID, screen: SpaceBackground.screenPixels) else { return }
         Library.shared.setBackgroundImage(name, forSpace: spaceID)
@@ -1981,8 +1980,8 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
     func debugToggleCustom() { editor.toggleCustom() }
     #endif
 
-    /// A profile made with the space (Settings › Spaces › Give new spaces their own profile, #291): it takes the
-    /// space's name as you type it, as one New Profile made here does.
+    /// A profile created with the space (Settings › Spaces › Give new spaces their own profile, #291); takes the space name
+    /// as you type, like New Profile here.
     func follow(madeProfile id: UUID) {
         namedProfile = id
         refreshProfiles()
@@ -2034,7 +2033,7 @@ final class SpaceEditorPanel: FloatingPanelView, NSTextFieldDelegate {
         }
     }
 
-    /// Use Default Colors, as its swatch does (the debug bridge).
+    /// Use Default Colors, like its swatch (debug bridge).
     func useDefaultColors() { editor.useDefaultColors() }
 
     #if DEBUG

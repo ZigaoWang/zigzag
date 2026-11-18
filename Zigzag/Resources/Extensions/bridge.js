@@ -70,7 +70,7 @@
   // The icons of open tabs, by address, for the favIconUrl WebKit's tabs leave out (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagFavicons', { value: (urls) => send('favicons', 'forPages', [urls]), configurable: true });
 
-  // The extension's right-click menu items, kept across relaunches as Chrome keeps them (webkit-differences.js).
+  // Context menu items persisted across relaunches, like Chrome (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagContextMenus', {
     value: { change: (op, args) => send('contextMenusKept', 'change', [op, ...args]), restore: () => send('contextMenusKept', 'restore', []) },
     configurable: true,
@@ -361,10 +361,9 @@
     onSignInChanged: event('identity.onSignInChanged'),
   });
 
-  // Chrome lets a click in a page open the panel when the extension's content script there passes it on to the
-  // background. The last message from one of its content scripts, and the page it came from, go with open(); Zigzag
-  // checks that you clicked or typed in that page a moment before (BridgeSidePanel). Listened to before the
-  // extension's own listeners, so it's known by the time they call open().
+  // Chrome lets a page click open the panel when the content script relays it. open() carries the last content script
+  // message and its page; Zigzag checks for a recent click or key there (BridgeSidePanel). Registered before the
+  // extension's listeners so it's set before they call open().
   let contentMessage = null;
   if (asked.has('sidePanel')) {
     const ownOrigin = globalThis.location ? String(globalThis.location.origin) : '';
@@ -705,8 +704,8 @@
     onStatusChanged: event('tabCapture.onStatusChanged'),
   });
 
-  // runtime.getContexts: MV3 only, as in Chrome. Zigzag knows which of the extension's pages are open (its offscreen
-  // page, popup, side panel).
+  // runtime.getContexts: MV3 only, as in Chrome. Zigzag knows which extension pages are open (offscreen, popup, side
+  // panel).
   if (manifest.manifest_version === 3 && typeof api.runtime.getContexts !== 'function') {
     try { api.runtime.getContexts = method('contexts', 'getContexts'); } catch (e) {}
   }
@@ -822,7 +821,7 @@
       const remove = event.removeListener && event.removeListener.bind(event);
       const has = event.hasListener && event.hasListener.bind(event);
       const wrapped = new WeakMap();
-      // Set plainly, or defined when it can't be: either way it has to have taken, or nothing is hidden.
+      // Assigned, or defined when assignment fails; either way it must stick or nothing is hidden.
       const put = (name, value) => {
         try { event[name] = value; } catch (e) {}
         if (event[name] !== value) { try { Object.defineProperty(event, name, { value, configurable: true, writable: true }); } catch (e) {} }
@@ -839,7 +838,7 @@
       if (has) put('hasListener', (listener) => has(wrapped.get(listener) || listener));
       return add;
     };
-    // On chrome and on browser both, should WebKit give each its own events.
+    // On both chrome and browser, in case WebKit gives each its own events.
     const runtimes = [...new Set([globalThis.chrome, globalThis.browser].map((target) => target && target.runtime).filter(Boolean))];
     held.push(...runtimes);
     const hideAll = (name, test) => [...new Set(runtimes.map((runtime) => runtime[name]))].map((event) => hide(event, test)).find(Boolean);
