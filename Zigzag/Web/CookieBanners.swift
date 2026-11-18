@@ -283,7 +283,8 @@ enum CookieBanners {
                 guard let id = body["id"] as? String, let code = body["code"] as? String, CookieBanners.isSnippet(body["snippetId"] as? String) else {
                     replyHandler(nil, nil); return
                 }
-                // In the page's own world of the same frame, where the consent platform's script is, and with no click to it.
+                // In the page world of the same frame, where the consent platform's script runs, without a user
+                // gesture.
                 webView.runOwnScript("try { return !!(\(code)); } catch (e) { return false; }", asFunction: true, in: frame, world: .page) { result in
                     let yes = (try? result.get()) as? Bool ?? false
                     replyHandler(CookieBanners.evalResponse(id: id, result: yes), nil)

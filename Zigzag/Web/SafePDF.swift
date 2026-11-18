@@ -1,23 +1,16 @@
 import AppKit
 import CryptoKit
 
-/// A PDF read by the sandboxed PDF helper (ZigzagPDFRenderer), never in Zigzag: the PDF viewer draws everything from
-/// what this hands back. Zigzag holds the PDF's bytes only to send them there and to save them as they came.
-///
-/// Each PDF has its own connection, and its own helper process behind it (`XPCPDFLink`), which keeps the PDF open
-/// and ends when the connection does: a PDF that takes its helper over reaches no other PDF, from another tab,
-/// profile or private window. When a helper goes (it crashed, or ended itself over a request stuck in it), the PDF
-/// in it is what brought it down, and fails. Should the system not give each PDF its own helper, they share one,
-/// and a PDF whose request had that helper to itself then fails; one that shared it with another PDF's request is a
-/// suspect: its next requests go alone, with nothing else in the helper, and if the helper goes again while one of
-/// them is in it, that PDF fails. A request past its time limit fails its PDF at once. A PDF that fails
-/// asks nothing more; its viewer gives way to WebKit's (`onFail`). One that crashed the helper, or stalled it, is
-/// remembered for the rest of the session, by its bytes and by where it came from: opened again (a page reloading
-/// it), it fails at once instead of bringing the helper down again.
-///
-/// The helper answers one request at a time for each PDF, so each PDF has one request there at a time too, the rest
-/// waiting here (`Gate`): a request's clock then runs only while the helper works on it, never while it waits behind
-/// a long find. Pictures go before a page's text, and that before every page's text for find.
+/// Parses PDFs in the sandboxed helper (ZigzagPDFRenderer), never in Zigzag; the viewer draws only what this returns.
+/// Zigzag holds the bytes only to send and save them. Each PDF gets its own connection and helper process
+/// (`XPCPDFLink`), so a PDF that compromises its helper can't reach any other. When a helper dies (crash, or
+/// self-termination over a stuck request), its PDF fails. If the system can't give each PDF its own helper they share
+/// one: a PDF whose request was alone in it fails; one that shared becomes a suspect whose later requests run alone,
+/// and fails if the helper dies again during one. A request past its time limit fails its PDF. A failed PDF hands
+/// over to WebKit's viewer (`onFail`). PDFs that crashed or stalled a helper are remembered for the session by bytes
+/// and source, and fail at once if opened again. The helper serves one request per PDF at a time, so the rest queue
+/// here (`Gate`) and a request's timeout only runs while the helper works on it. Images go before page text, and that
+/// before find's full-text requests.
 @MainActor
 final class SafePDF {
     nonisolated struct Info: @unchecked Sendable {
@@ -70,8 +63,7 @@ final class SafePDF {
     private var isSuspect = false
     private let gate = Gate()
 
-    /// Turns in the helpers, shared by every PDF: a request takes one, a suspect's all of them. Each PDF has one
-    /// request in its helper at a time, so this is how many PDFs' helpers work at once.
+    /// Shared across PDFs: a request takes one turn, a suspect all of them. Caps how many helpers work at once.
     nonisolated static let turns = 6
     nonisolated private static let slots = Slots(turns)
 
@@ -108,7 +100,7 @@ final class SafePDF {
         link = nil
     }
 
-    /// Its helper process's ID, once a request reached it; nil with none. For tests.
+    /// Nil until a request reaches it. For tests.
     var helperProcess: pid_t? {
         guard let pid = (link as? XPCPDFLink)?.processIdentifier, pid > 0 else { return nil }
         return pid
@@ -271,13 +263,12 @@ final class SafePDF {
                 isOpen = false
                 // No helper to be had: nothing this PDF did.
                 guard interrupted else { fail(harmful: false); return nil }
-                // The helper went while this PDF was in it alone (in a helper of its own, it always is): it's what
-                // brings it down. Failing it at once also spares a second start soon after the first, which the
-                // system holds back for seconds.
+                // Alone in the helper (always true with its own helper), so it's the cause. Failing now also avoids a
+                // quick restart, which the system delays for seconds.
                 if alone || !turn.sharedTheHelper { fail(harmful: true); return nil }
                 isSuspect = true
             case .timedOut:
-                // The helper ends itself over it (a shared one taking every other PDF's requests with it).
+                // The helper terminates itself over it (taking a shared helper's other requests with it).
                 fail(harmful: true)
                 return nil
             case .wrongClass:
@@ -390,8 +381,8 @@ private final class Gate {
     }
 }
 
-/// A request in a helper, and whether another PDF had one in the same helper at any time while it was: when the
-/// helper goes, one that had it to itself is what brought it down. `helper` nil: the one shared helper.
+/// A request in a helper, and whether another PDF's request shared the helper while it ran; a request that was alone
+/// caused a crash. `helper` nil: the shared helper.
 @MainActor
 private final class Turn {
     private static var open: [Turn] = []
@@ -417,7 +408,7 @@ private final class Turn {
 nonisolated protocol PDFLink: AnyObject, Sendable {
     func send(_ request: @escaping @Sendable (PDFRendering) -> Void, failed: @escaping @Sendable (Bool) -> Void)
     func invalidate()
-    /// The helper process this connection has to itself, or nil when it shares one with every other PDF.
+    /// Nil when sharing the one helper.
     var helper: UUID? { get }
 }
 
@@ -425,14 +416,14 @@ extension PDFLink {
     nonisolated var helper: UUID? { nil }
 }
 
-/// The helper over XPC. Reached by name, each connection starts a helper process of its own: the service may run
-/// many at once (`_MultipleInstances` in its Info.plist), each picked by a UUID set on the connection before it
-/// starts, as WebKit does for its own XPC services. The process ends with the connection.
+/// The helper over XPC. Each connection gets its own process: the service allows multiple instances
+/// (`_MultipleInstances` in Info.plist), each picked by a UUID set before the connection starts, as WebKit does for
+/// its XPC services. The process ends with the connection.
 nonisolated final class XPCPDFLink: PDFLink, @unchecked Sendable {
     private let connection: NSXPCConnection
     let helper: UUID?
 
-    /// `ownHelper` false: the one helper every such connection shares (tests compare the two).
+    /// `ownHelper` false uses the shared helper (tests compare the two).
     convenience init(serviceName: String, ownHelper: Bool = true) {
         let connection = NSXPCConnection(serviceName: serviceName)
         self.init(connection, helper: ownHelper ? Self.ownInstance(for: connection) : nil)
@@ -448,15 +439,15 @@ nonisolated final class XPCPDFLink: PDFLink, @unchecked Sendable {
         self.helper = helper
         connection.remoteObjectInterface = PDFService.interface()
         connection.resume()
-        // A helper of its own ends with this connection; told before anything else (XPC keeps a connection's
-        // messages in order). Not sent to the shared helper, which stays on for the next PDF.
+        // An own helper ends with the connection; sent first since XPC keeps message order. Not sent to the shared
+        // helper, which serves the next PDF.
         if helper != nil {
             (connection.remoteObjectProxyWithErrorHandler { _ in } as? PDFRendering)?.ownInstance()
         }
     }
 
-    /// Asks for an instance of the service of the connection's own, by a fresh UUID (Foundation's unpublished
-    /// `_setUUID:`, set before the connection starts). Nil when it can't be asked: the PDFs share one helper.
+    /// Requests a dedicated instance with a fresh UUID (Foundation's private `_setUUID:`, before the connection
+    /// starts). Nil when unavailable, so PDFs share one helper.
     private static func ownInstance(for connection: NSXPCConnection) -> UUID? {
         let selector = NSSelectorFromString("_setUUID:")
         guard connection.responds(to: selector) else { return nil }
@@ -466,7 +457,7 @@ nonisolated final class XPCPDFLink: PDFLink, @unchecked Sendable {
         return uuid
     }
 
-    /// The helper process's ID, once a message reached it (0 before).
+    /// 0 until a message reaches it.
     var processIdentifier: pid_t { connection.processIdentifier }
 
     /// The helper keeps each connection's PDF (up to `PDFLimits.maxInputBytes`) until the connection goes.

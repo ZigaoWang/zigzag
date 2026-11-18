@@ -19,8 +19,7 @@ final class DownloadItem {
     /// The file this download replaces once it's done; until then it goes to a hidden file beside it, so a failed
     /// or canceled download never costs you the one you had.
     fileprivate var replaces: URL?
-    /// A rule's "Open" chose this download: once the file is here, it goes to the Mac's own app for its type. Never
-    /// saved with the item — it is about this download, not about the file.
+    /// Set by a rule's Open: hand the finished file to its default app. Not saved with the item.
     fileprivate var opensWhenFinished = false
     let sourceURL: URL?
     /// Bytes a second, smoothed over the last few seconds, for "time left".
@@ -168,20 +167,19 @@ final class DownloadManager: NSObject {
     /// A download got its file and is under way: the window it came from shows it leaving for Downloads.
     let started = Signal<(DownloadItem, NSWindow?)>()
     private var windows: [ObjectIdentifier: NSWindow] = [:]
-    /// The page a download started from, taken when it started: the tab may have gone elsewhere by the time the
-    /// destination is decided, and the answer decides whether the site's cookies may go with it.
+    /// The origin at download start; the tab may have navigated by the time the destination is decided, and it
+    /// decides whether cookies may go along.
     private var origins: [ObjectIdentifier: String] = [:]
     /// The folder the last save sheet was pointed at, to start there next time.
     private var lastFolder: URL?
 
     /// Where a download was already told to go (Save Page As picked the place), so it isn't asked again.
     private var chosenDestinations: [ObjectIdentifier: URL] = [:]
-    /// Downloads a rule opened the page for: the rule that took the address must not take the file it became.
+    /// Downloads from a page a rule opened; that rule mustn't take the file too.
     private var ruleOpenedDownloads: Set<ObjectIdentifier> = []
-    /// Downloads whose handoff question was put off: the download manager must not ask the same rule again.
+    /// Downloads whose handoff question was put off; don't ask the same rule again.
     private var ruleDeclinedDownloads: Set<ObjectIdentifier> = []
 
-    /// Whether this download came from a private window, as its data store tells it.
     private static func isPrivate(_ download: WKDownload) -> Bool {
         !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)
     }
@@ -474,9 +472,9 @@ final class DownloadManager: NSObject {
         changed.send(nil)
     }
 
-    /// A site's name for a file, made safe to save and to read: no "/" or ":", no control characters, and none of the
-    /// invisible ones that reorder or hide text (a right-to-left override makes "invoice\u{202E}fdp.exe" read as
-    /// "invoiceexe.pdf"; a zero-width space hides between letters). Never hidden by a leading dot, never empty.
+    /// Makes a site's filename safe: no "/" or ":", no control characters, and no invisible characters that reorder
+    /// or hide text (a right-to-left override makes "invoice\u{202E}fdp.exe" read as "invoiceexe.pdf"; zero-width
+    /// spaces hide between letters). Never a leading dot, never empty.
     nonisolated static func safeFilename(_ filename: String) -> String {
         let name = DownloadTokens.safeName(filename)
         return name.isEmpty ? "Download" : name
@@ -488,7 +486,7 @@ final class DownloadManager: NSObject {
         uniqueDestination(for: filename, in: Self.folder, avoiding: taken)
     }
 
-    /// The same, in a folder of the rule's own.
+    /// Same, in the rule's folder.
     static func uniqueDestination(for filename: String, in folder: URL, avoiding taken: Set<String> = []) -> URL {
         let safe = safeFilename(filename)
         let base = (safe as NSString).deletingPathExtension
@@ -503,11 +501,9 @@ final class DownloadManager: NSObject {
         return candidate
     }
 
-    /// Where a rule that *is* a destination sends the file: the folder it names, made free of collisions, or the
-    /// ordinary place for a rule that opens the file, which saves first and opens once the file is here. Nil when the
-    /// rule names no folder, or the folder it names has gone — the setting decides then, exactly as if no rule
-    /// matched. `canOpen` is false in a private window for a rule that was not let into one: the file is still saved,
-    /// but the Mac's app is never handed it.
+    /// A destination rule's save location: its folder, de-duplicated, or the normal location for an Open rule (saved,
+    /// then opened). Nil when no folder is named or it's gone, so the setting decides as if no rule matched.
+    /// `canOpen` is false in a private window for a rule not allowed there: still saved, never opened.
     static func place(for destination: DownloadDestination, folder: String, filename: String,
                       avoiding taken: Set<String> = [], canOpen: Bool = true) -> (destination: URL, openWhenFinished: Bool)? {
         switch destination {
@@ -518,14 +514,14 @@ final class DownloadManager: NSObject {
             guard FileManager.default.fileExists(atPath: path, isDirectory: &isFolder), isFolder.boolValue else { return nil }
             return (uniqueDestination(for: filename, in: URL(fileURLWithPath: path, isDirectory: true), avoiding: taken), false)
         case .open:
-            // The last word on Open: an app, a script, an installer or an archive is saved, never handed to an app.
+            // Final check: apps, scripts, installers and archives are saved, never opened.
             let mayOpen = canOpen && !DownloadOpening.isRefused((filename as NSString).pathExtension)
             return (uniqueDestination(for: filename, avoiding: taken), mayOpen)
         }
     }
 
-    /// The first rule whose destination is this file's, read as a place to save. `place` does the deciding, so the
-    /// tokens a rule's folder may use are filled in from this very download first.
+    /// The first destination rule for this file. Tokens in its folder are filled from this download before `place`
+    /// decides.
     private static func rulePlace(url: URL, filename: String, response: URLResponse, download: WKDownload,
                                   avoiding taken: Set<String>) -> (destination: URL, openWhenFinished: Bool)? {
         guard let (rule, wanted) = DownloadRulesStore.shared.destination(for: url, filename: filename) else { return nil }
@@ -538,8 +534,7 @@ final class DownloadManager: NSObject {
                      avoiding: taken, canOpen: !isPrivate(download) || rule.runsInPrivateWindows)
     }
 
-    /// A rule said to open the file: once it is here it goes to the Mac's own app for its type, the one a double-click
-    /// in Finder would use. A file the Mac has no app for stays in the downloads list, which is where it was going.
+    /// Opens in the default app, as a Finder double-click would. Without one, the file stays in the downloads list.
     private func openWhenFinished(_ item: DownloadItem) {
         item.opensWhenFinished = false
         guard let url = item.destination, !DownloadOpening.isRefused(url.pathExtension) else { return }
@@ -559,13 +554,11 @@ extension DownloadManager: WKDownloadDelegate {
             try? FileManager.default.removeItem(at: earlier)
             return earlier
         }
-        // A rule for downloads that the navigation never got to see: a context-menu Download Linked File, or a page's
-        // own startDownload. A Save Page As chose its file already and is left alone. Handing it off cancels WebKit's
-        // copy and takes its row out of the list.
-        // Only a download WebKit made for a page can be handed off: a pop-up and an extension have no page of their
-        // own to answer the question, so their downloads stay Zigzag's, as they did before rules existed.
-        // A rule-opened page's own download, and one whose question was just put off, are not offered to a rule
-        // again: that is how a rule that opened a file it also matches would otherwise run for ever.
+        // Download rules for downloads the navigation never saw: context-menu Download Linked File, or a page's
+        // startDownload. Save Page As already chose its file. Handing off cancels WebKit's copy and removes its row.
+        // Only page downloads can be handed off; pop-ups and extensions have no page to answer, so theirs stay in
+        // Zigzag. A rule-opened page's download and a just-put-off one aren't offered again, or a rule that matches
+        // its own file would loop.
         let identifier = ObjectIdentifier(download)
         defer {
             ruleOpenedDownloads.remove(identifier)
@@ -596,12 +589,11 @@ extension DownloadManager: WKDownloadDelegate {
                     return nil
                 }
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-                // A rule that was matched but didn't take it leaves the download to Zigzag, which saves it as usual.
+                // Matched but not taken: saved as usual.
             case .browser:
-                // Left to Zigzag: WebKit's download goes on and is saved as usual.
                 break
             case .cancel:
-                // Don't Allow: nothing is saved, and the row goes with it.
+                // Don't Allow: nothing saved, row removed.
                 items.removeAll { $0.download === download }
                 changed.send(nil)
                 download.cancel { _ in }
@@ -621,9 +613,8 @@ extension DownloadManager: WKDownloadDelegate {
             }
         } else if let url = download.originalRequest?.url,
                   let place = Self.rulePlace(url: url, filename: name, response: response, download: download, avoiding: inProgress) {
-            // A rule for this file's own type decides where it lands: the folder it names, or the ordinary place for
-            // one the Mac's own app opens. A destination is a decision, never an action, so the download runs either
-            // way.
+            // A file-type rule decides the location: its folder, or the normal one for an Open rule. Destinations
+            // never stop the download.
             destination = place.destination
             opensWhenFinished = place.openWhenFinished
         } else if Self.asksWhereToSave {
@@ -706,9 +697,8 @@ extension DownloadManager: WKDownloadDelegate {
         helpers[item.id] = nil
         // Done: now it takes the place of the file it replaces.
         if let target = item.replaces, let temporary = item.destination {
-            // Checked again: what's there now may have changed while the download ran.
-            // The file it replaces goes to the Trash, so it can still be put back. Anything in the way, and the
-            // download takes a name of its own beside it rather than staying under its hidden one.
+            // Rechecked, since the folder may have changed during the download. A replaced file goes to the Trash;
+            // anything else in the way gets a unique name beside it instead of keeping the hidden temp name.
             let fileManager = FileManager.default
             if Self.isPlainFile(target), (try? fileManager.trashItem(at: target, resultingItemURL: nil)) != nil,
                (try? fileManager.moveItem(at: temporary, to: target)) != nil {
@@ -733,7 +723,6 @@ extension DownloadManager: WKDownloadDelegate {
             DistributedNotificationCenter.default().post(name: .init("com.apple.DownloadFileFinished"), object: destination.path)
         }
         changed.send(item)
-        // A rule asked for this one to be shown, and now there is a file to show.
         if item.opensWhenFinished { openWhenFinished(item) }
 }
 
@@ -766,7 +755,7 @@ extension DownloadManager: WKDownloadDelegate {
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        // The destination decision never runs for a download that fails or is cancelled first; its state goes now.
+        // A failed or cancelled download never reaches the destination decision; clear its state here.
         origins.removeValue(forKey: ObjectIdentifier(download))
         windows.removeValue(forKey: ObjectIdentifier(download))
         chosenDestinations.removeValue(forKey: ObjectIdentifier(download))
