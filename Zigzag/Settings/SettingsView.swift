@@ -2006,7 +2006,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                         detail: String(localized: "Find one in the Chrome Web Store and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions."),
                                         control: get))
         }
-        for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
+        for (id, ext) in installed {
+            extensionsGroup.add(extensionRow(id: id, ext: ext))
+            extensionsGroup.add(localReceiversRow(id: id))
+        }
         // What your other profiles have that this one doesn't, to add without another trip to the store. Read from
         // each package, not from the other profile's running extensions: looking here starts none of them.
         let here = profile, has = Set(here.installs.installedIDs)
@@ -2185,6 +2188,23 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let row = FormRow(title: ext.displayName ?? id, detail: summary, icon: ext.icon(for: NSSize(width: 24, height: 24)), control: stack)
         row.revealsOnHover(remove)
+        return row
+    }
+
+    /// Its own switch, indented under it: a grant the person gives one extension, with the reason in plain words.
+    private func localReceiversRow(id: String) -> FormRow {
+        let installs = profile.installs
+        let toggle = Toggle(isOn: installs.localReceivers(id))
+        toggle.setAccessibilityLabel(String(localized: "Let this extension reach apps on this Mac",
+                                            comment: "Accessibility label of the apps-on-this-Mac switch under an extension in Settings › Extensions."))
+        // Read where each call is made, so the switch takes effect at once: nothing to reload.
+        toggle.onChange = { on in installs.setLocalReceivers(on, for: id) }
+        let row = FormRow(title: String(localized: "Apps on This Mac",
+                                        comment: "A switch under an extension in Settings › Extensions: its own code may reach a program listening on this Mac."),
+                          detail: String(localized: "Lets this extension’s own code reach a program listening on this Mac, over loopback only. Off until you turn it on.",
+                                         comment: "Explanation under the apps-on-this-Mac switch on an extension’s row in Settings › Extensions."),
+                          control: toggle)
+        row.isIndented = true
         return row
     }
 

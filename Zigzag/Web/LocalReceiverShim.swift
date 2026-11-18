@@ -453,7 +453,7 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
         guard let tab, message.frameInfo.isMainFrame,
               let origin = SiteOrigin.of(message.frameInfo.securityOrigin),
               !tab.isPrivate,
-              LocalReceivers.allowsSite(origin: origin) else {
+              SitePermissions.localReceivers(origin: origin) else {
             replyHandler(["error": "denied"], nil)
             return
         }
@@ -517,12 +517,15 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
                                              body: (body["body"] as? String).flatMap { Data(base64Encoded: $0) },
                                              credentials: credentials)
         Task { @MainActor in
-            if credentials.sendsCookies, let cookie = await Self.cookies(for: url, in: webView) {
+            // The same store the page's own WebKit requests use, so a helper sees one set of cookies however it is
+            // reached, and what it sets is kept for the page and the next call.
+            let store = webView?.configuration.websiteDataStore
+            if credentials.sendsCookies, let cookie = await LocalReceivers.cookies(for: url, in: store) {
                 request.headers["Cookie"] = cookie
             }
             do {
                 let answer = try await LocalReceivers.send(request, as: .site(origin: origin))
-                if credentials.sendsCookies { await Self.store(answer, for: url, in: webView) }
+                if credentials.sendsCookies { await LocalReceivers.store(answer, for: url, in: store) }
                 reply(Self.reply(answer, to: request), nil)
             } catch {
                 reply(["error": "failed"], nil)
@@ -573,34 +576,6 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
             "url": answer.url.absoluteString,
             "redirected": answer.url != request.url,
         ]
-    }
-
-    /// The cookies WebKit would have sent to the helper from this profile, for the moment the call is made.
-    private static func cookies(for url: URL, in webView: WKWebView?) async -> String? {
-        guard let store = webView?.configuration.websiteDataStore.httpCookieStore else { return nil }
-        let all: [HTTPCookie] = await withCheckedContinuation { continuation in
-            store.getAllCookies { continuation.resume(returning: $0) }
-        }
-        let host = url.host()?.lowercased() ?? ""
-        let path = url.path.isEmpty ? "/" : url.path
-        let now = Date()
-        let matching = all.filter { cookie in
-            if let expires = cookie.expiresDate, expires <= now { return false }
-            if cookie.isSecure, url.scheme?.lowercased() != "https" { return false }
-            let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
-            guard !domain.isEmpty, host == domain || host.hasSuffix("." + domain) else { return false }
-            return path.hasPrefix(cookie.path.isEmpty ? "/" : cookie.path)
-        }
-        return matching.isEmpty ? nil : HTTPCookie.requestHeaderFields(with: matching)["Cookie"]
-    }
-
-    /// Cookies the helper set, kept where WebKit keeps the profile's, so the next call sends them back.
-    private static func store(_ answer: LocalReceivers.Response, for url: URL, in webView: WKWebView?) async {
-        guard let value = answer.header("set-cookie"),
-              let store = webView?.configuration.websiteDataStore.httpCookieStore else { return }
-        for cookie in HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": value], for: url) {
-            await store.setCookie(cookie)
-        }
     }
 }
 

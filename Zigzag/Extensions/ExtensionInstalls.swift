@@ -27,8 +27,11 @@ final class ExtensionInstalls {
         /// Sites where it's off, whatever its site access: turned off there from the notice that it was using a lot of
         /// energy (EnergyWatch).
         var offSites: [String]?
+        /// Whether the person turned on Apps on This Mac for it: its own code may reach a program listening on this
+        /// Mac over loopback. Off when nil, and carried with the other approvals to another profile.
+        var localReceivers: Bool?
 
-        fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites"]
+        fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites", "localReceivers"]
 
         /// What another profile starts with when it gets this extension too: what was approved here and where it
         /// may run, so it gets nothing it wasn't allowed without the install sheet. Sites it was clicked on stay
@@ -119,6 +122,14 @@ final class ExtensionInstalls {
     func siteAccess(_ id: String) -> SiteAccess { state(id)?.siteAccess ?? .all }
     func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
     func offSites(_ id: String) -> [String] { state(id)?.offSites ?? [] }
+
+    /// Whether this extension may reach a program listening on this Mac. The person's switch, never a manifest
+    /// permission: a Chrome Web Store extension cannot declare one Chrome doesn't have.
+    func localReceivers(_ id: String) -> Bool { state(id)?.localReceivers == true }
+
+    func setLocalReceivers(_ allowed: Bool, for id: String) {
+        update(id) { $0.localReceivers = allowed }
+    }
 
     /// Turns the extension off on one site (and its subdomains), or back on there.
     func setOff(_ id: String, on site: String, _ off: Bool) {

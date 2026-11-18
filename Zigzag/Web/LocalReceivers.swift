@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 
 /// Reaching a program listening on this Mac for a page or an extension whose own networking WebKit refuses.
 ///
@@ -286,5 +287,34 @@ nonisolated enum LocalReceivers {
 
     private static func response(_ pair: (Data, URLResponse), for url: URL) throws -> Response {
         try response(pair.0, pair.1, for: url)
+    }
+
+    /// The cookies WebKit would have sent to the helper from this store, for the moment the call is made.
+    @MainActor
+    static func cookies(for url: URL, in store: WKWebsiteDataStore?) async -> String? {
+        guard let store = store?.httpCookieStore else { return nil }
+        let all: [HTTPCookie] = await withCheckedContinuation { continuation in
+            store.getAllCookies { continuation.resume(returning: $0) }
+        }
+        let host = url.host()?.lowercased() ?? ""
+        let path = url.path.isEmpty ? "/" : url.path
+        let now = Date()
+        let matching = all.filter { cookie in
+            if let expires = cookie.expiresDate, expires <= now { return false }
+            if cookie.isSecure, url.scheme?.lowercased() != "https" { return false }
+            let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            guard !domain.isEmpty, host == domain || host.hasSuffix("." + domain) else { return false }
+            return path.hasPrefix(cookie.path.isEmpty ? "/" : cookie.path)
+        }
+        return matching.isEmpty ? nil : HTTPCookie.requestHeaderFields(with: matching)["Cookie"]
+    }
+
+    /// Cookies the helper set, kept where WebKit keeps the profile's, so the next call sends them back.
+    @MainActor
+    static func store(_ answer: Response, for url: URL, in store: WKWebsiteDataStore?) async {
+        guard let value = answer.header("set-cookie"), let store = store?.httpCookieStore else { return }
+        for cookie in HTTPCookie.cookies(withResponseHeaderFields: ["Set-Cookie": value], for: url) {
+            await store.setCookie(cookie)
+        }
     }
 }
