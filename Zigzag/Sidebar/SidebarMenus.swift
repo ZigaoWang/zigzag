@@ -302,9 +302,24 @@ enum SidebarMenus {
     static func folderMenu(for folder: BookmarkFolder, controller: BrowserWindowController) -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
+        // First item, as in Safari's bookmark folders.
+        if !Library.shared.allBookmarkIDs(inFolder: folder.id).isEmpty {
+            menu.addItem(Item(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { controller.openAllInTabs(folder.id) })
+            menu.addItem(.separator())
+        }
         menu.addItem(Item(String(localized: "Rename", comment: "Item in a folder's context menu in the sidebar.")) { controller.sidebar.list.renameFolder(folder.id) })
         menu.addItem(Item(changeIconTitle) { controller.chooseFolderIcon(folder.id) })
         menu.addItem(Item(folder.isOpen ? String(localized: "Close Folder", comment: "Item in a folder's context menu in the sidebar.") : String(localized: "Open Folder", comment: "Item in a folder's context menu in the sidebar.")) { controller.listSetFolderOpen(folder.id, !folder.isOpen) })
+        // Only with subfolders, and only when it would change something.
+        let folders = Library.shared.spaces.first { $0.folders?.contains { $0.id == folder.id } == true }?.folders ?? []
+        if !folders.descendants(of: folder.id).isEmpty {
+            if folders.anyInTree(of: folder.id, isOpen: false) {
+                menu.addItem(Item(String(localized: "Expand All", comment: "Item in a folder's context menu in the sidebar: opens the folder and every folder inside it.")) { controller.setFolderTreeOpen(folder.id, true) })
+            }
+            if folders.anyInTree(of: folder.id, isOpen: true) {
+                menu.addItem(Item(String(localized: "Collapse All", comment: "Item in a folder's context menu in the sidebar: shuts the folder and every folder inside it.")) { controller.setFolderTreeOpen(folder.id, false) })
+            }
+        }
         menu.addItem(Item(String(localized: "New Folder Inside", comment: "Item in a folder's context menu in the sidebar.")) { controller.newFolder(inside: folder.id) })
         // Out of the folder it's in, to the level above.
         if let parent = folder.parentID {

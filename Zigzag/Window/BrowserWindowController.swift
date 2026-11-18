@@ -2751,6 +2751,38 @@ extension BrowserWindowController: SidebarDelegate {
         let tucking = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
         Library.shared.setFolderOpen(id, open, tucking: tucking)
     }
+    /// Expand All / Collapse All for a folder and its subfolders (#343).
+    func setFolderTreeOpen(_ id: UUID, _ open: Bool) {
+        let pages = open ? [] : Library.shared.allBookmarkIDs(inFolder: id)
+        let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        Library.shared.setFolderTreeOpen(id, open, shown: Set(shown))
+    }
+    /// Open All in Tabs confirms above this many pages.
+    static let openAllAsksPast = 10
+    /// Opens every page in the folder and its subfolders, showing the first (#343).
+    /// ⌘Z closes them again.
+    func openAllInTabs(_ folderID: UUID) {
+        guard let folder = Library.shared.folder(folderID) else { return }
+        let pages = Library.shared.allBookmarkIDs(inFolder: folderID).compactMap { Library.shared.bookmark($0) }
+        guard let first = pages.first else { return }
+        let open = { [weak self] in
+            guard let self else { return }
+            self.pageChange(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { [tabManager] in
+                tabManager.together { for page in pages { _ = tabManager.pageTab(for: page) } }
+                tabManager.openBookmark(first)
+            }
+        }
+        let opening = pages.filter { tabManager.bookmarkTab(for: $0.id) == nil }.count
+        guard opening > Self.openAllAsksPast else { open(); return }
+        let message = Library.shared.subfolderIDs(of: folderID).isEmpty
+            ? String(localized: "Every pinned tab in “\(folder.name)” opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once, from a folder with no folders inside. The folder's name.")
+            : String(localized: "Every pinned tab in “\(folder.name)” and the folders inside it opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once. The folder's name.")
+        ConfirmSheet.show(in: root.overlay, title: String(localized: "Open \(opening) tabs?", comment: "Title of the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once (more than 10)."),
+                          message: message,
+                          confirmTitle: String(localized: "Open All", comment: "Button in the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once.")) { confirmed in
+            if confirmed { open() }
+        }
+    }
     func listSetGroupOpen(_ id: UUID, _ open: Bool) {
         // Folding isn't undoable, as for folders.
         tabManager.setGroupOpen(id, open)

@@ -1626,6 +1626,27 @@ enum DebugBridge {
                                     shown, (CACurrentMediaTime() - start) * 1000, controller.sidebar.list.debugRows().count))
                 }
             }
+        case "pintree":
+            // pintree <base url>: pinned pages in nested folders, Work › Docs › Old, and Reading with 12 (#343).
+            guard let base = URL(string: arg) else { break }
+            let pages: [(String, [String])] = [("a", ["Work"]), ("b", ["Work", "Docs"]), ("c", ["Work", "Docs"]), ("d", ["Work", "Docs", "Old"]), ("e", ["Work"]), ("f", [])]
+                + (1...12).map { ("r\($0)", ["Reading"]) }
+            _ = Library.shared.appendBookmarks(pages.map { (base.appendingPathComponent("\($0.0).html"), $0.0.uppercased()) }, to: controller.tabManager.currentSpaceID, folders: pages.map(\.1))
+        case "foldermenu":
+            // foldermenu <folder>[>item]: that item of the folder's menu, as choosing it does; no item, the menu at its
+            // row, which closes by itself after 4 s.
+            let path = arg.split(separator: ">", maxSplits: 1).map(String.init)
+            guard let folder = Library.shared.folders(in: controller.tabManager.currentSpaceID).first(where: { $0.name == path.first }) else { break }
+            let menu = SidebarMenus.folderMenu(for: folder, controller: controller)
+            debugLog("foldermenu \(folder.name) => \(menu.items.map { $0.isSeparatorItem ? "-" : $0.title })")
+            if path.count == 2 {
+                if case let index = menu.indexOfItem(withTitle: path[1]), index >= 0 { menu.performActionForItem(at: index) }
+            } else if let row = controller.sidebar.list.row(forFolder: folder.id) {
+                closeNextMenu(after: 4)
+                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: row.bounds.midY), in: row) }
+            }
+        case "folderstate":
+            debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)
         case "scrolllist":
             // scrolllist <y>: scrolls the sidebar's list to that many points from its top, or as far as it goes.

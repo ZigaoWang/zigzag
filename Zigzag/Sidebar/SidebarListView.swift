@@ -1570,6 +1570,9 @@ final class SidebarListView: NSView {
     /// The row showing a pinned page (a pinned split's row for either of its pages).
     func row(forBookmark id: UUID) -> NSView? { madeRow(.bookmark(Self.rowID(id))) }
 
+    /// The folder's row, if visible.
+    func row(forFolder id: UUID) -> NSView? { madeRow(.folder(id)) }
+
     private func observeHover(_ row: TabRowView) {
         row.hoverChanged = { [weak self, weak row] hovering in
             guard let self, let row, self.drag == nil else { return }
