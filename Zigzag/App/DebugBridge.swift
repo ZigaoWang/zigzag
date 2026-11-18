@@ -345,6 +345,57 @@ enum DebugBridge {
         }
     }
 
+    /// One event of a trackpad flick: when, its gesture and momentum phases (CGEvent's values), and how far it moves.
+    struct FlickStep { var time: Double; var phase: Int64; var momentum: Int64; var dx: Double }
+
+    /// A two-finger flick as a trackpad reports it, at 120 events a second: the fingers speed up over 60% of
+    /// `seconds` and travel 42% of `width`, lift, and momentum dies away over the rest. Positive dx moves right.
+    static func flick(width: Double, seconds: Double, rate: Double = 120) -> [FlickStep] {
+        let dt = 1 / rate, fingers = seconds * 0.6, coast = seconds - fingers, distance = width * 0.42
+        let n = max(3, Int((fingers / dt).rounded()))
+        // Ease-in: still at the start, fastest as the fingers lift.
+        let travel = { (u: Double) in distance * (1 - cos(u * .pi / 2)) }
+        var steps = [FlickStep(time: 0, phase: 1, momentum: 0, dx: 0)]
+        for k in 1...n { steps.append(FlickStep(time: Double(k) * dt, phase: 2, momentum: 0, dx: travel(Double(k) / Double(n)) - travel(Double(k - 1) / Double(n)))) }
+        let lift = Double(n + 1) * dt
+        steps.append(FlickStep(time: lift, phase: 4, momentum: 0, dx: 0))
+        // The fingers' speed as they lift, points a second, which momentum carries on from.
+        let speed = distance * .pi / 2 / fingers
+        let m = max(2, Int((coast / dt).rounded()))
+        for j in 1...m {
+            let last = j == m
+            steps.append(FlickStep(time: lift + Double(j) * dt, phase: 0, momentum: j == 1 ? 1 : last ? 3 : 2,
+                                   dx: last ? 0 : speed * dt * exp(-Double(j) * dt / (coast / 3))))
+        }
+        return steps
+    }
+
+    /// Sends `flick` to the window's own event handling, each event made as it's due, so the sidebar sees the times
+    /// and speeds a trackpad gives. Nothing goes to the system.
+    private static func sendFlick(toNext: Bool, seconds: Double, width: CGFloat, to window: NSWindow, at point: NSPoint) {
+        let screenPoint = window.convertPoint(toScreen: point)
+        let flipped = CGPoint(x: screenPoint.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screenPoint.y)
+        // Fingers moving left bring in the next space.
+        let sign: Double = toNext ? -1 : 1
+        let start = DispatchTime.now()
+        // The event carries whole points: what's rounded off goes into the next one, so a slow flick still gets there.
+        var carried = 0.0
+        for step in flick(width: Double(max(width, 1)), seconds: max(seconds, 0.1)) {
+            let dx = (step.dx * sign + carried).rounded()
+            carried += step.dx * sign - dx
+            DispatchQueue.main.asyncAfter(deadline: start + step.time) {
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: Int32(dx.rounded()), wheel3: 0) else { return }
+                cg.location = flipped
+                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: step.phase)
+                cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: step.momentum)
+                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: dx)
+                cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds)
+                if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
+            }
+        }
+    }
+
     /// windowsdump <path>: every window's views, without bringing any forward (that would exit page full screen). Popup
     /// commands, which never bring the browser forward (that closes the popup): popupwinstate <path> (JSON),
     /// popupwinclick <x> <y> (points from top left), popupwintype <text> (to the key window), popupwinjs <path>
@@ -2153,6 +2204,14 @@ enum DebugBridge {
             guard let window = controller.window else { break }
             // "page": over the middle of the page instead.
             sendSwipe(arg, to: window, at: arg.split(separator: " ").contains("page") ? NSPoint(x: window.frame.width * 0.6, y: window.frame.height / 2) : NSPoint(x: 100, y: window.frame.height - 300))
+        case "swipespace":
+            // swipespace next|prev [seconds]: a trackpad flick between spaces over the sidebar, 0.4 s by default.
+            guard let window = controller.window else { break }
+            let f = arg.split(separator: " ")
+            let seconds = f.dropFirst().first.flatMap { Double($0) } ?? 0.4
+            let sidebar = controller.sidebar
+            sendFlick(toNext: f.first != "prev", seconds: seconds, width: sidebar.bounds.width, to: window,
+                      at: sidebar.convert(NSPoint(x: sidebar.bounds.midX, y: sidebar.bounds.midY), to: nil))
         case "copylink": controller.copyPageURL(nil)
         case "zoomout": controller.zoomOut(nil)
         case "scrolllog": try? scrollLog.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
