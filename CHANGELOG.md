@@ -8,6 +8,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### New
 - Keep cookies for the sites you choose. Clear Cookies… signs you out of every other site and leaves these alone, and Clear cookies when Zigzag quits in Settings › Privacy clears the rest each time you quit. Turn on Keep cookies in a site's controls, or add a site in Settings › Privacy; one entry covers http, https and every subdomain. Thanks to [mrfragger](https://github.com/mrfragger). ([#334](https://github.com/ZigaoWang/zigzag/issues/334))
 
+### Fixed
+- Settings you change in an extension's popup stick. Strongbox's Fill switches showed the setting from before each click and came back the other way when you reopened them, because WebKit could read an extension's storage before an earlier save had finished. Now each extension's saves and reads finish in the order it made them, as in Chrome. Thanks to [bkonia](https://github.com/bkonia). ([#350](https://github.com/ZigaoWang/zigzag/issues/350))
+
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, and fixes for passkeys, Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.

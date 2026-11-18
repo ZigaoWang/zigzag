@@ -528,6 +528,49 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("chrome.storage.sync.MAX_ITEMS").toInt32() == 512)
     }
 
+    @Test func storageCallsAnswerInTheOrderMade() {
+        // WebKit answers a get before an earlier set; Strongbox reads its settings back right after saving them (#350).
+        #expect(ExtensionBridgeScript.differences.contains(ExtensionBridgeScript.storageInOrder))
+        #expect(ExtensionStore.contentScriptsFirst.contains(ExtensionBridgeScript.storageInOrder))
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var __flush = () => { const t = __timers.splice(0); t.forEach((f) => f()); };
+        var __store = {}, __reads = 0;
+        var chrome = { runtime: { id: 'x' }, storage: { sync: {
+          set(items, callback) {
+            const saved = new Promise((resolve) => setTimeout(() => { Object.assign(__store, items); resolve(); }));
+            if (!callback) return saved;
+            saved.then(() => callback());
+          },
+          get(keys, callback) {
+            __reads++;
+            const values = JSON.parse(JSON.stringify(__store));
+            if (!callback) return Promise.resolve(values);
+            Promise.resolve().then(() => callback(values));
+          },
+        } } };
+        """)
+        context.evaluateScript(ExtensionBridgeScript.storageInOrder)
+        context.evaluateScript("""
+        var __seen = [];
+        chrome.storage.sync.get(null); chrome.storage.sync.get(null);
+        var __readsAtOnce = __reads;
+        chrome.storage.sync.set({ on: true });
+        chrome.storage.sync.get(['on']).then((v) => __seen.push('promise ' + v.on));
+        chrome.storage.sync.set({ off: true }, () => __seen.push('saved'));
+        chrome.storage.sync.get(null, (v) => __seen.push('callback ' + v.off));
+        """)
+        for _ in 0..<6 { context.evaluateScript("__flush()") }
+        #expect(context.evaluateScript("__readsAtOnce").toInt32() == 2)
+        #expect(context.evaluateScript("__seen.join()").toString() == "promise true,saved,callback true")
+        // Idle again: a read goes straight to WebKit.
+        context.evaluateScript("var __before = __reads; chrome.storage.sync.get(null); var __after = __reads;")
+        #expect(context.evaluateScript("__after - __before").toInt32() == 1)
+    }
+
     /// A fake extension world for webkit-differences.js: the background or one of its pages in a tab, with ports
     /// that the test carries between the two.
     private static let fakeWorld = """
