@@ -571,7 +571,7 @@
       }
     },
     "%@ of %@" : {
-      "comment" : "Under a download's name in the downloads panel: how much has come of how much, like 3.7 MB of 9 MB.\nUnder a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.",
+      "comment" : "Under a download's name in the downloads panel: how much has come of how much, like 3.7 MB of 9 MB.\nUnder a download's name in the downloads panel: how much has come of how much, the unit said once, like 3.7 of 9 MB.\nOn the sidebar's update card while an update downloads: how much has come of how much, like 12 of 40 MB.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7978,7 +7978,7 @@
       }
     },
     "Downloading Zigzag %@…" : {
-      "comment" : "Toast while Check for Updates… downloads a new version. The placeholder is the version.",
+      "comment" : "VoiceOver label of the sidebar's update card while an update downloads. The placeholder is the version.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7995,6 +7995,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在下载扩展…"
+          }
+        }
+      }
+    },
+    "Downloading update" : {
+      "comment" : "Title of the sidebar's update card while an update you asked for downloads.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载更新"
+          }
+        }
+      }
+    },
+    "Downloading version %@…" : {
+      "comment" : "Under Zigzag's name in Settings › General while an update you asked for downloads. The placeholder is the new version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载版本 %@…"
           }
         }
       }
@@ -14488,6 +14510,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已允许弹出式窗口。请再点按一次按钮。"
+          }
+        }
+      }
+    },
+    "Preparing update" : {
+      "comment" : "Title of the sidebar's update card once an update has downloaded, while it's unpacked and checked.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备更新"
+          }
+        }
+      }
+    },
+    "Preparing version %@…" : {
+      "comment" : "Under Zigzag's name in Settings › General once an update has downloaded, while it's unpacked and checked. The placeholder is the new version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备版本 %@…"
+          }
+        }
+      }
+    },
+    "Preparing Zigzag %@…" : {
+      "comment" : "VoiceOver label of the sidebar's update card while a downloaded update is unpacked and checked. The placeholder is the version.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备 Zigzag %@…"
           }
         }
       }
@@ -22148,17 +22203,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigao，Zigzag 的作者"
-          }
-        }
-      }
-    },
-    "Zigzag %@ is ready." : {
-      "comment" : "Toast after Check for Updates… has downloaded a new version. The placeholder is the version.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zigzag %@ 已就绪。"
           }
         }
       }

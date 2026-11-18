@@ -76,6 +76,39 @@ struct UpdateReadyTests {
         #expect(!UpdateReadiness.isNewer("117", than: "117"))
     }
 
+    @Test func theCardCountsTheDownloadAPercentAtATime() {
+        let start = UpdateCardState.downloading(version: "0.9.2", received: 0, total: 0)
+        #expect(start.share == nil)
+        let sized = UpdateCardState.downloading(version: "0.9.2", received: 0, total: 1000)
+        #expect(sized.share == 0)
+        #expect(sized.differsVisibly(from: start))
+        // Less than a percent more: not worth drawing again.
+        #expect(!UpdateCardState.downloading(version: "0.9.2", received: 5, total: 1000).differsVisibly(from: sized))
+        #expect(UpdateCardState.downloading(version: "0.9.2", received: 10, total: 1000).differsVisibly(from: sized))
+        // Every step is.
+        #expect(UpdateCardState.preparing(version: "0.9.2").differsVisibly(from: sized))
+        #expect(UpdateCardState.ready(version: "0.9.2").isReady)
+        #expect(UpdateCardState.preparing(version: "0.9.2-beta.1").version == "0.9.2-beta.1")
+    }
+
+    @MainActor @Test func theCardSaysHowMuchHasComeInWholeMegabytes() {
+        #expect(UpdateCard.amount(12_400_000, of: 40_000_000) == "12 of 40 MB")
+        #expect(UpdateCard.amount(50_000_000, of: 40_000_000) == "40 of 40 MB")
+    }
+
+    @MainActor @Test func aCheckYouAskedForShowsOnTheCard() {
+        #if DEBUG
+        let updater = Updater.shared
+        updater.debugStage("0.9.2-beta.1")
+        #expect(updater.cardState == .ready(version: "0.9.2-beta.1"))
+        updater.dismissCard()
+        #expect(updater.cardState == nil)
+        #expect(!updater.cardFloats)
+        updater.debugStage(nil)
+        #expect(updater.cardState == nil)
+        #endif
+    }
+
     @Test func versionsReadAsPeopleSayThem() {
         #expect(VersionName.display("0.9.2-beta.1") == "0.9.2 beta 1")
         #expect(VersionName.display("1.0.0-beta.12") == "1.0.0 beta 12")

@@ -344,7 +344,7 @@ enum SettingsVersionRow {
         let refresh = { [weak row, weak update] in
             guard let row, let update else { return }
             let ready = Updater.shared.readiness.staged?.version
-            row.detailText = detail(ready: ready)
+            row.detailText = detail(ready: ready, coming: Updater.shared.activity)
             update.title = ready == nil ? checkTitle
                 : String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General.")
         }
@@ -354,9 +354,19 @@ enum SettingsVersionRow {
         return row
     }
 
-    /// What's under Zigzag's name: its version, and the one that's ready when there is one.
-    static func detail(ready: String?) -> String {
+    /// What's under Zigzag's name: its version, and the one that's ready when there is one, or coming in, as the
+    /// sidebar's update card says it.
+    static func detail(ready: String?, coming: UpdateCardState? = nil) -> String {
         let version = VersionName.display(VersionName.running)
+        switch coming {
+        case .downloading(let new, _, _):
+            return String(localized: "Downloading version \(VersionName.display(new))…",
+                          comment: "Under Zigzag's name in Settings › General while an update you asked for downloads. The placeholder is the new version.")
+        case .preparing(let new):
+            return String(localized: "Preparing version \(VersionName.display(new))…",
+                          comment: "Under Zigzag's name in Settings › General once an update has downloaded, while it's unpacked and checked. The placeholder is the new version.")
+        default: break
+        }
         guard let ready = ready.map(VersionName.display) else { return String(localized: "Version \(version)", comment: "Zigzag's version, in Settings › General.") }
         return String(localized: "Version \(ready) is ready to install. You have \(version).",
                       comment: "Under Zigzag's name in Settings › General while an update is ready, beside Restart. The placeholders are the new version and the one running.")

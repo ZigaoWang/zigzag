@@ -314,6 +314,8 @@ enum Tokens {
         static var nowPlayingHeight: CGFloat { rowHeight }
         /// The update card: two lines, "Update ready" over the version, with a row's room above and below them.
         static var updateCardHeight: CGFloat { scaledEven(44) }
+        /// The same while an update comes in, with its progress bar under the two lines.
+        static var updateCardBusyHeight: CGFloat { scaledEven(56) }
     }
 
     /// The strip on top of each pane in split view: 30 tall, 24pt buttons with 13pt glyphs, the address in a 22pt

@@ -1402,12 +1402,12 @@ final class SidebarView: NSView {
     var newSpaceAnchor: NSView { newSpaceButton }
     var onEditSpace: ((UUID) -> Void)?
 
-    /// The bottom stack: an update that's ready sits right above the dots, where it stays put, and the now-playing
+    /// The bottom stack: the update card sits right above the dots, where it stays put, and the now-playing
     /// cards, which come and go more often, above that, the last of them nearest the dots.
     private func bottomFrames() -> (nowPlaying: [NSRect], update: NSRect, listBottom: CGFloat) {
         let pad = Tokens.Sidebar.edge
         var bottom = bottomBar.frame.minY
-        let updateHeight = Tokens.Sidebar.updateCardHeight
+        let updateHeight = UpdateCard.height(for: updateCard.state)
         let update = NSRect(x: pad, y: bottom - (updateCard.isHidden ? 0 : updateHeight), width: bounds.width - pad * 2, height: updateHeight)
         if !updateCard.isHidden { bottom = update.minY - Tokens.Space.x1 }
         let playingHeight = Tokens.Sidebar.nowPlayingHeight
@@ -1420,11 +1420,17 @@ final class SidebarView: NSView {
         return (playing, update, bottom)
     }
 
-    /// Shows the update card for the version that's ready, or puts it away (nil); `hiding`: you closed it, so it goes
-    /// as a closed Now Playing card does.
-    func setUpdateReady(_ version: String?, hiding: Bool = false) {
-        if let version { updateCard.show(version: version) }
-        let show = version != nil
+    /// Shows the update card in its state, or puts it away (nil); `hiding`: you closed it, so it goes as a closed Now
+    /// Playing card does. Shown already, it moves to the new state in place, growing or shrinking to fit it.
+    func setUpdateCard(_ state: UpdateCardState?, hiding: Bool = false) {
+        let oldHeight = UpdateCard.height(for: updateCard.state)
+        if let state { updateCard.show(state) }
+        let show = state != nil
+        if show, !updateCard.isHidden, !updateCardFadingOut, UpdateCard.height(for: state) != oldHeight {
+            needsLayout = true
+            let target = bottomFrames().update
+            Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { self.updateCard.animator().frame = target }
+        }
         guard show == (updateCard.isHidden || updateCardFadingOut) else { return }
         updateCardFadingOut = false
         if show {
