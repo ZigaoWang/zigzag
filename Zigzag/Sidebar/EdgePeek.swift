@@ -4,10 +4,22 @@ import WebKit
 /// Where the edge Peek's card sits on a screen: the window Peek's proportions, on the screen's visible frame instead
 /// of a browser card.
 enum EdgePeekLayout {
+    /// The smallest the card may be dragged to: the header and a page worth reading.
+    static let minimumSize = NSSize(width: 420, height: 320)
+
     static func frame(in screen: NSRect) -> NSRect {
         let dx = max(Tokens.Space.x8, Tokens.Space.snap(screen.width * Tokens.Metric.peekInsetRatio))
         let dy = max(Tokens.Space.x6, Tokens.Space.snap(screen.height * Tokens.Metric.peekInsetRatio * 0.6))
         return screen.insetBy(dx: dx, dy: dy)
+    }
+
+    /// A frame the person moved or resized, kept whole on the screen the card opens on.
+    static func fit(_ frame: NSRect, in screen: NSRect) -> NSRect {
+        let width = min(max(frame.width, minimumSize.width), screen.width)
+        let height = min(max(frame.height, minimumSize.height), screen.height)
+        let x = min(max(frame.minX, screen.minX), screen.maxX - width)
+        let y = min(max(frame.minY, screen.minY), screen.maxY - height)
+        return NSRect(x: x, y: y, width: width, height: height)
     }
 }
 
@@ -33,6 +45,13 @@ final class EdgePeek {
     private var escMonitor: Any?
     private var keyObserver: NSObjectProtocol?
     private var closeObserver: NSObjectProtocol?
+    private var outsideMonitor: Any?
+    private var outsideLocal: Any?
+    private var spaceObserver: NSObjectProtocol?
+    private var appObserver: NSObjectProtocol?
+    private var activationObserver: NSObjectProtocol?
+    /// Where the card was left last time: a move or resize sticks for the next Peek.
+    private var preferredFrame: NSRect?
 
     private var headerHeight: CGFloat { Tokens.Metric.peekHeaderHeight }
     private static let inset = Tokens.Metric.peekInset
@@ -69,7 +88,8 @@ final class EdgePeek {
         token = tab.changed.observe { [weak self] _ in self?.refreshHeader() }
 
         let screen = NSScreen.screens.first { $0.visibleFrame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
-        panel.setFrame(EdgePeekLayout.frame(in: screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)),
+        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        panel.setFrame(preferredFrame.map { EdgePeekLayout.fit($0, in: visible) } ?? EdgePeekLayout.frame(in: visible),
                        display: false)
         card.layoutSubtreeIfNeeded()
         layout()
@@ -96,11 +116,43 @@ final class EdgePeek {
             }
             return event
         }
+        // A click outside, in this app or another, puts it away as Esc does.
+        outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isVisible, MenuPanel.current == nil else { return }
+                if self.panel?.frame.contains(NSEvent.mouseLocation) != true { self.close() }
+            }
+        }
+        outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self, self.isVisible else { return event }
+            if MenuPanel.current != nil { return event }
+            if event.window !== self.panel { self.close() }
+            return event
+        }
+        // Moving to another app or desktop is moving away: the page goes back rather than following the focus.
+        activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
+                                                                  object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close() }
+        }
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
+                                                                          object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.close() }
+        }
+        appObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+                                                                        object: nil, queue: .main) { [weak self] note in
+            // The pid, not the application: the note is not sendable, and the main actor only needs to know whose it was.
+            let pid = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
+            MainActor.assumeIsolated {
+                guard let self, self.isVisible,
+                      pid != NSRunningApplication.current.processIdentifier else { return }
+                self.close()
+            }
+        }
     }
 
     private func makePanel() {
         guard panel == nil else { return }
-        let panel = EdgeSidebarPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+        let panel = EdgeSidebarPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel, .resizable],
                                      backing: .buffered, defer: false)
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
@@ -108,7 +160,9 @@ final class EdgePeek {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
-        panel.isMovable = false
+        panel.isMovable = true
+        panel.isMovableByWindowBackground = true
+        panel.minSize = EdgePeekLayout.minimumSize
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
         let card = FloatingPanelView()
@@ -196,6 +250,17 @@ final class EdgePeek {
         keyObserver = nil
         if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
         closeObserver = nil
+        if let outsideMonitor { NSEvent.removeMonitor(outsideMonitor) }
+        outsideMonitor = nil
+        if let outsideLocal { NSEvent.removeMonitor(outsideLocal) }
+        outsideLocal = nil
+        if let activationObserver { NotificationCenter.default.removeObserver(activationObserver) }
+        activationObserver = nil
+        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
+        spaceObserver = nil
+        if let appObserver { NSWorkspace.shared.notificationCenter.removeObserver(appObserver) }
+        appObserver = nil
+        if let panel { preferredFrame = panel.frame }
         panel?.orderOut(nil)
     }
 

@@ -30,4 +30,28 @@ struct EdgePeekTests {
         let card = EdgePeekLayout.frame(in: screen)
         #expect(screen.contains(card))
     }
+
+    @Test func aRememberedFrameStaysWholeOnTheScreen() {
+        let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let offEdge = NSRect(x: 1300, y: 850, width: 600, height: 400)
+        let fitted = EdgePeekLayout.fit(offEdge, in: screen)
+        #expect(screen.contains(fitted))
+        #expect(fitted.width == 600)
+        #expect(fitted.height == 400)
+    }
+
+    @Test func aTinyRememberedFrameGrowsToTheMinimum() {
+        let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let tiny = NSRect(x: 100, y: 100, width: 50, height: 40)
+        let fitted = EdgePeekLayout.fit(tiny, in: screen)
+        #expect(fitted.width == EdgePeekLayout.minimumSize.width)
+        #expect(fitted.height == EdgePeekLayout.minimumSize.height)
+    }
+
+    @Test func aFrameLargerThanTheScreenIsCutToIt() {
+        let screen = NSRect(x: 0, y: 0, width: 800, height: 600)
+        let large = NSRect(x: -100, y: -50, width: 1200, height: 1000)
+        let fitted = EdgePeekLayout.fit(large, in: screen)
+        #expect(fitted == screen)
+    }
 }
