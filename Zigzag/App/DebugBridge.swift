@@ -1732,6 +1732,18 @@ enum DebugBridge {
                 closeNextMenu(after: 4)
                 DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: row.bounds.midY), in: row) }
             }
+        case "spacemenu":
+            // spacemenu [item]: that item of the right-click menu above the pinned tabs, as choosing it does; no item,
+            // the menu at the space's name, which closes by itself after 4 s.
+            guard let header = controller.sidebar.list.headerView as? SpaceHeaderView, let event = NSApp.currentEvent ?? NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0),
+                  let menu = header.onRightClick?(event) else { break }
+            debugLog("spacemenu => \(menu.items.map { $0.isSeparatorItem ? "-" : $0.title })")
+            if !arg.isEmpty {
+                if case let index = menu.indexOfItem(withTitle: arg), index >= 0 { menu.performActionForItem(at: index) }
+            } else {
+                closeNextMenu(after: 4)
+                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 40, y: header.bounds.midY), in: header) }
+            }
         case "folderstate":
             debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
         case "seedfolders": seedFolders(Int(arg) ?? 2000, in: controller)

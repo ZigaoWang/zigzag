@@ -2788,6 +2788,16 @@ extension BrowserWindowController: SidebarDelegate {
         let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
         Library.shared.setFolderTreeOpen(id, open, shown: Set(shown))
     }
+    /// Collapse All Folders / Expand All Folders for a space's pinned folders (#343).
+    func setAllFoldersOpen(in spaceID: UUID, _ open: Bool) {
+        let pages = open ? [] : Library.shared.bookmarks(in: spaceID).map(\.id)
+        let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        Library.shared.setAllFoldersOpen(in: spaceID, open, shown: Set(shown))
+    }
+    /// Whether any of the space's pinned folders is open (or shut, for `open` false).
+    static func hasFolders(in spaceID: UUID, isOpen open: Bool) -> Bool {
+        Library.shared.folders(in: spaceID).contains { $0.isOpen == open }
+    }
     /// Open All in Tabs confirms above this many pages.
     static let openAllAsksPast = 10
     /// Opens every page in the folder and its subfolders, showing the first (#343).

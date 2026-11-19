@@ -3903,6 +3903,17 @@
         }
       }
     },
+    "Collapse All Folders" : {
+      "comment" : "Item in the View menu and in a space's context menu in the sidebar: shuts every pinned folder in the space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折叠所有文件夹"
+          }
+        }
+      }
+    },
     "Cookies cleared, except for the sites you keep" : {
       "comment" : "Toast after every site's cookies are cleared but those of the sites that keep theirs (Settings › Privacy).",
       "localizations" : {
@@ -3910,6 +3921,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已清除 Cookie，保留的网站除外"
+          }
+        }
+      }
+    },
+    "Expand All Folders" : {
+      "comment" : "Item in the View menu and in a space's context menu in the sidebar: opens every pinned folder in the space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开所有文件夹"
           }
         }
       }
