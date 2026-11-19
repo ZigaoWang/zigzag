@@ -6,9 +6,11 @@ import WebKit
 /// answer: Zigzag asks the listeners itself (bridge.js), with Chrome's details, and signs in with what they give.
 ///
 /// Only extensions that could answer in Chrome are asked: those with webRequest and webRequestAuthProvider (Manifest
-/// V3) or webRequestBlocking (V2), and access to the address asking. Private tabs are never offered, as extensions
-/// never see them. The first extension to give a name and password signs in, one that cancels cancels the sign-in,
-/// and with no answer within a few seconds the sheet asks. What they give is never written down or logged.
+/// V3) or webRequestBlocking (V2), and access to the address asking. A private tab's go only to extensions allowed in
+/// private windows. The first extension to give a name and password signs in, one that cancels cancels the sign-in,
+/// and with no answer within a few seconds the sheet asks. While it asks, a name and password an extension gives later
+/// (1Password's, once you pick a login in its popup) still signs in, as it fills Chrome's dialog. What they give is
+/// never written down or logged.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeWebRequest: BridgeNamespace {
@@ -28,12 +30,26 @@ final class BridgeWebRequest: BridgeNamespace {
         case none
     }
 
-    /// One sign-in put to extensions, until one answers, all have said nothing, or time runs out.
+    /// A sign-in the sheet is asking (#387): a name and password an extension gives later goes to `fill`, until `end()`.
+    @MainActor final class LateAnswer {
+        let fill: (String, String) -> Void
+        fileprivate var ended: () -> Void = {}
+        init(fill: @escaping (String, String) -> Void) { self.fill = fill }
+        func end() {
+            ended()
+            ended = {}
+        }
+    }
+
+    /// One sign-in put to extensions, until one answers, all have said nothing, or time runs out; with `late`, until
+    /// the sheet asking it is answered.
     private final class Question {
         let details: [String: Any]
         var waiting: Set<String>
         /// Those it went to: one whose background was asleep gets it once it listens again.
         var sent: Set<String> = []
+        var late: LateAnswer?
+        var timedOut = false
         let continuation: CheckedContinuation<Answer, Never>
         init(details: [String: Any], waiting: Set<String>, continuation: CheckedContinuation<Answer, Never>) {
             self.details = details
@@ -65,8 +81,9 @@ final class BridgeWebRequest: BridgeNamespace {
     // MARK: Asking
 
     /// Asks the extensions that may answer this sign-in, and says what the first of them answered.
-    func askForSignIn(_ challenge: SiteChallenge, tab: (any WKWebExtensionTab)?) async -> Answer {
+    func askForSignIn(_ challenge: SiteChallenge, tab: (any WKWebExtensionTab)?, isPrivate: Bool = false, late: LateAnswer? = nil) async -> Answer {
         let contexts = host.contexts.filter { context in
+            PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData) &&
             Self.mayAnswer(allows: { ExtensionBridge.allows($0, for: context) }, manifestVersion: context.webExtension.manifestVersion,
                            hasAccess: context.hasAccess(to: challenge.url))
         }
@@ -77,18 +94,32 @@ final class BridgeWebRequest: BridgeNamespace {
             Task { try? await context.loadBackgroundContent() }
         }
         let hint = contexts.first.flatMap { context in tab.map { Self.tabHint($0, for: context) } }
-        let answer = await ask(Self.details(challenge, tabHint: hint), of: ids)
         let names = ids.map { host.displayName(for: $0) }.joined(separator: ", ")
-        switch answer {
-        case .credentials: ExtensionLog.write("site sign-in for \(challenge.host): an extension answered (asked \(names))")
-        case .cancel: ExtensionLog.write("site sign-in for \(challenge.host): an extension cancelled it (asked \(names))")
-        case .none: ExtensionLog.write("site sign-in for \(challenge.host): no extension answered (asked \(names))")
+        let logged = late.map { late in
+            LateAnswer { username, password in
+                ExtensionLog.write(Self.logLine(.credentials(username: username, password: password), host: challenge.host, isPrivate: isPrivate, asked: names) + " after the sheet asked")
+                late.fill(username, password)
+            }
         }
+        if let late, let logged { late.ended = { logged.end() } }
+        let answer = await ask(Self.details(challenge, tabHint: hint), of: ids, late: logged)
+        ExtensionLog.write(Self.logLine(answer, host: challenge.host, isPrivate: isPrivate, asked: names))
         return answer
     }
 
+    /// The extensions log's line for a sign-in; a private tab's site is left out.
+    static func logLine(_ answer: Answer, host: String, isPrivate: Bool, asked names: String) -> String {
+        let site = isPrivate ? "a private page" : host
+        switch answer {
+        case .credentials: return "site sign-in for \(site): an extension answered (asked \(names))"
+        case .cancel: return "site sign-in for \(site): an extension cancelled it (asked \(names))"
+        case .none: return "site sign-in for \(site): no extension answered (asked \(names))"
+        }
+    }
+
     /// Puts `details` to each extension, and waits for the first that answers, all of them saying nothing, or `timeout`.
-    func ask(_ details: [String: Any], of extensionIDs: [String], timeout: Duration = BridgeWebRequest.timeout) async -> Answer {
+    /// With `late`, a name and password given after `timeout` still goes to it, until it ends.
+    func ask(_ details: [String: Any], of extensionIDs: [String], timeout: Duration = BridgeWebRequest.timeout, late: LateAnswer? = nil) async -> Answer {
         guard !extensionIDs.isEmpty else { return .none }
         asked += 1
         let id = "zigzag-auth-\(asked)"
@@ -96,25 +127,46 @@ final class BridgeWebRequest: BridgeNamespace {
         details["requestId"] = id
         return await withCheckedContinuation { continuation in
             let question = Question(details: details, waiting: Set(extensionIDs), continuation: continuation)
+            question.late = late
             questions[id] = question
+            late?.ended = { [weak self] in self?.questions[id] = nil }
             for extensionID in extensionIDs where isListening(extensionID) {
                 question.sent.insert(extensionID)
                 send(extensionID, details)
             }
             Task { [weak self] in
                 try? await Task.sleep(for: timeout)
-                self?.finish(id, with: .none)
+                self?.timeUp(id)
             }
         }
     }
 
     private func receive(_ answer: Answer, from extensionID: String, for id: String) {
         guard let question = questions[id], question.waiting.remove(extensionID) != nil else { return }
-        if answer != .none || question.waiting.isEmpty { finish(id, with: answer) }
+        guard question.timedOut else {
+            if answer != .none || question.waiting.isEmpty { finish(id, with: answer) }
+            return
+        }
+        // The sheet is asking: only a name and password answers it now; you cancel it yourself.
+        if case .credentials(let username, let password) = answer {
+            questions[id] = nil
+            question.late?.fill(username, password)
+        } else if question.waiting.isEmpty {
+            questions[id] = nil
+        }
+    }
+
+    /// No answer in time: the sheet asks, and with `late` the question stays open to the extensions still thinking.
+    private func timeUp(_ id: String) {
+        guard let question = questions[id], !question.timedOut else { return }
+        guard question.late != nil else { finish(id, with: .none); return }
+        question.timedOut = true
+        question.continuation.resume(returning: .none)
     }
 
     private func finish(_ id: String, with answer: Answer) {
-        questions.removeValue(forKey: id)?.continuation.resume(returning: answer)
+        guard let question = questions.removeValue(forKey: id), !question.timedOut else { return }
+        question.continuation.resume(returning: answer)
     }
 
     /// Something listens again: a background that slept, now awake, gets the questions it's still owed.

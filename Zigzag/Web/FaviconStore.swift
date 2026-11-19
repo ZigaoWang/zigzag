@@ -86,11 +86,32 @@ final class FaviconStore {
             try? FileManager.default.createDirectory(at: Paths.favicons, withIntermediateDirectories: true)
             UserDefaults.standard.set(true, forKey: "faviconNativeSize2")
         }
+        // A home-screen icon could be kept as a site's own; icons kept before the two were told apart are fetched
+        // again (#386). Marked in the folder itself, so it goes with the icons it describes.
+        let ownFirst = Paths.favicons.appendingPathComponent(".own-first")
+        if !FileManager.default.fileExists(atPath: ownFirst.path) {
+            try? FileManager.default.removeItem(at: Paths.favicons)
+            try? FileManager.default.createDirectory(at: Paths.favicons, withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: ownFirst.path, contents: Data())
+        }
     }
 
     private func file(for key: String) -> URL {
         Paths.favicons.appendingPathComponent(key.replacingOccurrences(of: "/", with: "_") + ".png")
     }
+
+    /// A site's home-screen icon, kept only while it has no icon of its own: the first own icon found replaces it (#386).
+    private func standInFile(for key: String) -> URL {
+        Paths.favicons.appendingPathComponent(key.replacingOccurrences(of: "/", with: "_") + ".touch.png")
+    }
+
+    /// Whether the site's kept icon is one of its own, not a home-screen stand-in.
+    private func hasOwnIcon(_ key: String) -> Bool {
+        (memory[key] != nil && !standIns.contains(key)) || FileManager.default.fileExists(atPath: file(for: key).path)
+    }
+
+    /// Sites whose icon in memory is a home-screen stand-in.
+    private var standIns: Set<String> = []
 
     func cachedIcon(for url: URL) -> NSImage? {
         // An extension's own pages wear the extension's icon.
@@ -108,6 +129,12 @@ final class FaviconStore {
         // the picture helper again.
         if let image = NSImage(contentsOf: file(for: key)) {
             keep(image, for: key)
+            standIns.remove(key)
+            return image
+        }
+        if let image = NSImage(contentsOf: standInFile(for: key)) {
+            keep(image, for: key)
+            standIns.insert(key)
             return image
         }
         missing.insert(key)
@@ -122,17 +149,25 @@ final class FaviconStore {
         if let image = memory[key] { return image }
         guard !missing.contains(key) else { return nil }
         let file = file(for: key)
-        let data = await Task.detached(priority: .userInitiated) { try? Data(contentsOf: file) }.value
+        let standIn = standInFile(for: key)
+        let data = await Task.detached(priority: .userInitiated) { (try? Data(contentsOf: file)) ?? (try? Data(contentsOf: standIn)) }.value
         guard let data, let image = NSImage(data: data) else { return nil }
         return image
     }
 
-    /// Picks the best declared icon (falling back to /favicon.ico), downloads, caches, and returns it.
+    /// Picks the best declared icon (falling back to /favicon.ico), downloads, caches, and returns it. The same page
+    /// gets the same icon in every tab: a page that declares none (or none yet, early in its load) wears its site's
+    /// own, and a home-screen icon stands in only while the site has none of its own (#386).
     func resolve(pageURL: URL, links: [[String: String]], completion: @escaping (NSImage?) -> Void) {
         guard let key = key(for: pageURL) else { completion(nil); return }
+        let hasOwn = hasOwnIcon(key)
+        if links.isEmpty, hasOwn, let own = cachedIcon(for: pageURL) { completion(own); return }
         let (icons, touch) = Self.rank(links: links, pageURL: pageURL)
-        let hasIcon = memory[key] != nil || FileManager.default.fileExists(atPath: file(for: key).path)
-        fetchFirst(icons, touch: touch, page: pageURL, key: key, save: Self.speaksForSite(pageURL, hasIcon: hasIcon), completion: completion)
+        fetchFirst(icons, touch: touch, page: pageURL, key: key, save: Self.speaksForSite(pageURL, hasIcon: hasOwn)) { [weak self] image, fromTouch in
+            // Only home-screen icons loaded this time, yet the site has its own: that one.
+            if fromTouch, let self, self.hasOwnIcon(key), let own = self.cachedIcon(for: pageURL) { completion(own); return }
+            completion(image)
+        }
     }
 
     /// Whether a page's icon becomes its whole site's. A page deep in a site can wear its own (each claude.ai artifact
@@ -160,7 +195,8 @@ final class FaviconStore {
     /// first, then the icons its page lists, then the ones its front page lists. One fetch per site at a time.
     func prefetch(for url: URL) {
         guard let key = key(for: url), memory[key] == nil, !inFlight.contains(key),
-              !FileManager.default.fileExists(atPath: file(for: key).path) else { return }
+              !FileManager.default.fileExists(atPath: file(for: key).path),
+              !FileManager.default.fileExists(atPath: standInFile(for: key).path) else { return }
         if let failure = failures[key], failure.next > Date() { return }
         inFlight.insert(key)
         let done: (Bool) -> Void = { [weak self] found in
@@ -185,7 +221,7 @@ final class FaviconStore {
         var pages = [url]
         if let home = URL(string: "/", relativeTo: url)?.absoluteURL, home.path() != url.path() { pages.append(home) }
         let (icons, touch) = Self.rank(links: [], pageURL: url)
-        fetchFirst(icons, touch: touch, page: url, key: key) { [weak self] image in
+        fetchFirst(icons, touch: touch, page: url, key: key) { [weak self] image, _ in
             guard image == nil else { done(true); return }
             // Nothing at the usual addresses (Brave Search keeps its icons on a CDN): the icons the pages list.
             self?.fetchListed(on: pages, key: key, done: done)
@@ -200,7 +236,7 @@ final class FaviconStore {
             guard let self else { return }
             guard !links.isEmpty else { self.fetchListed(on: rest, key: key, done: done); return }
             let (icons, touch) = Self.rank(links: links, pageURL: page)
-            self.fetchFirst(icons, touch: touch, page: page, key: key) { [weak self] image in
+            self.fetchFirst(icons, touch: touch, page: page, key: key) { [weak self] image, _ in
                 if image == nil { self?.fetchListed(on: rest, key: key, done: done) } else { done(true) }
             }
         }
@@ -301,19 +337,31 @@ final class FaviconStore {
     /// A 16px icon (too small to stay sharp anywhere bigger than a tab) is kept only until a larger one of the site's
     /// own turns up further down the list. The home-screen icons in `touch` are tried only when the site has none
     /// of its own at all: a small icon of its own still wins over a home-screen tile.
-    private func fetchFirst(_ candidates: [URL], touch: [URL] = [], page: URL, key: String, save: Bool = true, small: NSImage? = nil, completion: @escaping (NSImage?) -> Void) {
+    /// `isTouch`: these are home-screen icons, kept only as a stand-in (`standInFile`) for a site with none of its own,
+    /// and the completion says so.
+    private func fetchFirst(_ candidates: [URL], touch: [URL] = [], page: URL, key: String, save: Bool = true, small: NSImage? = nil,
+                            isTouch: Bool = false, completion: @escaping (NSImage?, Bool) -> Void) {
         func finish(_ image: NSImage, normalized: NSImage? = nil) {
-            if save { store(image, key: key, normalized: normalized); completion(memory[key]) } else { completion(normalized ?? Self.normalize(image)) }
+            if isTouch {
+                if hasOwnIcon(key) { completion(normalized ?? Self.normalize(image), true); return }
+                store(image, key: key, normalized: normalized, standIn: true)
+                completion(memory[key], true)
+            } else if save {
+                store(image, key: key, normalized: normalized)
+                completion(memory[key], false)
+            } else {
+                completion(normalized ?? Self.normalize(image), false)
+            }
         }
         func found(_ image: NSImage, rest: [URL], read: Decoded? = nil) {
             // An icon that draws nothing (an SVG styled by the page, which AppKit can't follow) is passed over.
             if read?.blank ?? Self.isBlank(image) {
-                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small, completion: completion)
+                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small, isTouch: isTouch, completion: completion)
                 return
             }
             let pixels = image.representations.map(\.pixelsWide).max() ?? 0
             if pixels > 0, pixels < 32, !rest.isEmpty {
-                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small ?? image, completion: completion)
+                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small ?? image, isTouch: isTouch, completion: completion)
             } else if pixels > 0, pixels < 32, let small, (small.representations.map(\.pixelsWide).max() ?? 0) >= pixels {
                 finish(small)
             } else {
@@ -324,9 +372,9 @@ final class FaviconStore {
             if let small {
                 finish(small)
             } else if !touch.isEmpty {
-                fetchFirst(touch, page: page, key: key, save: save, completion: completion)
+                fetchFirst(touch, page: page, key: key, save: save, isTouch: true, completion: completion)
             } else {
-                completion(nil)
+                completion(nil, isTouch)
             }
             return
         }
@@ -348,7 +396,7 @@ final class FaviconStore {
                 found(read.image, rest: rest, read: read)
             } else {
                 if unavailable { unread.insert(key) }
-                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small, completion: completion)
+                fetchFirst(rest, touch: touch, page: page, key: key, save: save, small: small, isTouch: isTouch, completion: completion)
             }
         }
     }
@@ -395,8 +443,10 @@ final class FaviconStore {
     func setAsideVisited(since date: Date? = nil) -> URL? {
         // An icon still on its way to disk is set aside with the rest, not written after.
         Self.finishWriting()
-        let kept = Set((Library.shared.favorites + Library.shared.allBookmarks.map(\.0)).compactMap { key(for: $0.url) }.map { file(for: $0).lastPathComponent })
-        let files = (try? FileManager.default.contentsOfDirectory(at: Paths.favicons, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let kept = Set((Library.shared.favorites + Library.shared.allBookmarks.map(\.0)).compactMap { key(for: $0.url) }
+            .flatMap { [file(for: $0).lastPathComponent, standInFile(for: $0).lastPathComponent] })
+        let files = (try? FileManager.default.contentsOfDirectory(at: Paths.favicons, includingPropertiesForKeys: [.contentModificationDateKey],
+                                                                   options: .skipsHiddenFiles)) ?? []
         let aside = Paths.setAsideIcons.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: aside, withIntermediateDirectories: true)
         for file in files where !kept.contains(file.lastPathComponent) {
@@ -405,6 +455,7 @@ final class FaviconStore {
         }
         // Read again from disk as needed: what's left is what you kept.
         memory.removeAll()
+        standIns.removeAll()
         missing.removeAll()
         return aside
     }
@@ -424,15 +475,19 @@ final class FaviconStore {
         store(image, key: key)
     }
 
-    private func store(_ image: NSImage, key: String, normalized: NSImage? = nil) {
+    private func store(_ image: NSImage, key: String, normalized: NSImage? = nil, standIn: Bool = false) {
         let normalized = normalized ?? Self.normalize(image)
         keep(normalized, for: key)
+        if standIn { standIns.insert(key) } else { standIns.remove(key) }
         missing.remove(key)
         unread.remove(key)
         failures[key] = nil
         // Encoded and written off the main thread, in order; clearing history waits for what's still being written.
-        let url = file(for: key)
+        let url = standIn ? standInFile(for: key) : file(for: key)
+        // An icon of the site's own retires its stand-in.
+        let retired = standIn ? nil : standInFile(for: key)
         Self.writer.async {
+            if let retired { try? FileManager.default.removeItem(at: retired) }
             if let tiff = normalized.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
                let png = rep.representation(using: .png, properties: [:]) {
                 try? png.write(to: url, options: .atomic)

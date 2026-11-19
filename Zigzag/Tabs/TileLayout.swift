@@ -113,8 +113,10 @@ nonisolated struct TileShape: Equatable, Sendable {
     }
 
     /// The strips between pages you drag to resize them: the gap between the columns where it divides pages, and the
-    /// gap between the rows, each `slop` wider on both sides so it's easy to catch.
-    func dividers(in area: CGRect, gap: CGFloat, slop: CGFloat) -> (column: CGRect?, row: CGRect?) {
+    /// gap between the rows, each `slop` wider on both sides so it's easy to catch; the column line `leading` (when
+    /// given) on its left instead.
+    func dividers(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> (column: CGRect?, row: CGRect?) {
+        let left = leading ?? slop
         let x = area.minX + floor(max(0, area.width - gap) * column)
         let y = area.minY + floor(max(0, area.height - gap) * row)
         func extent(_ range: ClosedRange<Int>, start: CGFloat, end: CGFloat, split: CGFloat) -> (CGFloat, CGFloat) {
@@ -126,7 +128,7 @@ nonisolated struct TileShape: Equatable, Sendable {
         }
         let columnLine = columnLineRows.map { rows -> CGRect in
             let (top, bottom) = extent(rows, start: area.minY, end: area.maxY, split: y)
-            return CGRect(x: x - slop, y: top, width: gap + slop * 2, height: max(0, bottom - top))
+            return CGRect(x: x - left, y: top, width: gap + left + slop, height: max(0, bottom - top))
         }
         let rowLine = rowLineColumns.map { columns -> CGRect in
             let (left, right) = extent(columns, start: area.minX, end: area.maxX, split: x)

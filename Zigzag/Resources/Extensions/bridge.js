@@ -99,7 +99,9 @@
       const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
       const method = String(option('method', 'GET')).toUpperCase();
       const body = init && init.body != null ? init.body : isRequest ? input.body : null;
-      if (!['http:', 'https:'].includes(url.protocol) || option('credentials', 'same-origin') !== 'include'
+      // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
+      const credentials = option('credentials', 'same-origin');
+      if (!['http:', 'https:'].includes(url.protocol) || !['include', 'same-origin'].includes(credentials)
           || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
@@ -119,7 +121,7 @@
       }; });
       signal.addEventListener('abort', abort, { once: true });
       try {
-        const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method,
+        const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method, credentials,
           headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect, userAgent: sentUserAgent }]), aborted]);
         signal.throwIfAborted();
         if (answer.fallback) return nativeFetch(input, init);
@@ -436,8 +438,8 @@
       return !Array.isArray(filter.urls) || filter.urls.some((pattern) => matchesPattern(pattern, details.url));
     };
     // Every listener whose filter wants it, at once; the first that answers decides, and one that's said nothing in
-    // ten seconds counts as nothing. Resolves { authCredentials }, { cancel: true } or {}.
-    const ask = (details) => new Promise((resolve) => {
+    // `wait` ms counts as nothing. Resolves { authCredentials }, { cancel: true } or {}.
+    const ask = (details, wait = 10000) => new Promise((resolve) => {
       const listening = [...signIn].filter(([, entry]) => wants(entry.filter, details));
       let left = listening.length;
       let done = false;
@@ -462,7 +464,7 @@
           const returned = listener(given, entry.callsBack ? say : undefined);
           if (!entry.callsBack) Promise.resolve(returned).then(say, () => say(undefined));
         } catch (e) { say(undefined); }
-        setTimeout(() => say(undefined), 10000);
+        setTimeout(() => say(undefined), wait);
       }
     });
     // A site's sign-in names the tab asking by WebKit's ID, which only this extension's tabs.query knows: Zigzag
@@ -480,7 +482,8 @@
       const hint = details.__zigzagTab;
       delete details.__zigzagTab;
       details.tabId = await tabFor(hint);
-      const answer = await ask(details);
+      // A site's can be answered while Zigzag's sheet asks, as 1Password does once you pick a login in its popup (#387).
+      const answer = await ask(details, 10 * 60 * 1000);
       send('webRequest', 'authAnswer', [details.requestId, answer]).catch(() => {});
     };
     const askForProxy = async (details) => {

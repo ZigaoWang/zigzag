@@ -11,7 +11,7 @@ import WebKit
 /// Every call is checked against what the person approved for the extension: one that wasn't allowed "history" can't
 /// read history through the bridge, whatever its scripts send, and one whose files now ask for more (an extension read
 /// from a folder can change them) gets it only once the person allows it (ExtensionHost.restoreGrants). Private
-/// windows never show through.
+/// windows show through only to an extension allowed in them.
 @available(macOS 15.4, *)
 @MainActor
 final class ExtensionBridge {
@@ -150,10 +150,12 @@ final class ExtensionBridge {
         ports.values.contains { $0.events.contains(event) && (extensionID == nil || $0.id == extensionID) }
     }
 
-    /// Tells every extension listening to `event` (all of them, or only `extensionID`).
-    func emit(_ event: String, _ args: [Any], to extensionID: String? = nil) {
+    /// Tells every extension listening to `event` (all of them, or only `extensionID`). About a private window
+    /// (`isPrivate`), only those allowed in private windows.
+    func emit(_ event: String, _ args: [Any], to extensionID: String? = nil, isPrivate: Bool = false) {
         let payload: [String: Any] = ["event": event, "args": Self.plain(args) ?? []]
-        for entry in ports.values where entry.events.contains(event) && (extensionID == nil || entry.id == extensionID) {
+        for entry in ports.values where entry.events.contains(event) && (extensionID == nil || entry.id == extensionID)
+            && PrivateAccess.sees(isPrivate: isPrivate, allowed: host.seesPrivate(entry.id)) {
             entry.port.sendMessage(payload, completionHandler: nil)
         }
     }

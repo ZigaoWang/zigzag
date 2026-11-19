@@ -179,7 +179,25 @@ final class BrowserWindow: NSWindow {
         super.noResponder(for: eventSelector)
     }
 
+    /// Set when Delete closes picked sidebar rows: the rest of that press, held down, goes nowhere (#375).
+    var holdsBackDeleteRepeats = false
+
+    /// Whether a key is the rest of a Delete press that closed picked rows, and whether to keep holding them back.
+    nonisolated static func holdsBack(_ type: NSEvent.EventType, keyCode: UInt16, isRepeat: Bool, holding: Bool) -> (drop: Bool, keep: Bool) {
+        guard holding else { return (false, false) }
+        switch type {
+        case .keyDown: return isRepeat && SidebarListView.isDeleteKey(keyCode) ? (true, true) : (false, false)
+        case .keyUp: return SidebarListView.isDeleteKey(keyCode) ? (true, false) : (false, true)
+        default: return (false, true)
+        }
+    }
+
     override func sendEvent(_ event: NSEvent) {
+        if holdsBackDeleteRepeats, event.type == .keyDown || event.type == .keyUp {
+            let (drop, keep) = Self.holdsBack(event.type, keyCode: event.keyCode, isRepeat: event.isARepeat, holding: true)
+            holdsBackDeleteRepeats = keep
+            if drop { return }
+        }
         if event.type == .keyDown, !event.modifierFlags.contains(.command), firstResponder is WKWebView {
             UndoClock.lastPageEdit = Date()
             UndoClock.lastPageInput = Date()
@@ -232,11 +250,6 @@ final class BrowserWindow: NSWindow {
         guard [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type), let content = contentView,
               let frame = content.superview else { return false }
         guard let panel = FloatingPanelView.bareSurfacePanel(frame.hitTest(frame.convert(event.locationInWindow, from: nil))) else { return false }
-        if event.type == .leftMouseDown, panel.takesPress {
-            pressTarget = panel
-            panel.mouseDown(with: event)
-            return true
-        }
         if event.type == .leftMouseDown { panel.onBarePress?(event) }
         return true
     }
@@ -302,8 +315,7 @@ final class BrowserWindow: NSWindow {
     }
 
     /// Our controls sit in the title bar area, where AppKit sends presses to the title bar first, so presses on them
-    /// are delivered directly. Panels that act as buttons (`FloatingPanelView.takesPress`) get press and release the
-    /// same way.
+    /// are delivered directly.
     private weak var pressTarget: NSView?
 
     private func routeTitlebarEvent(_ event: NSEvent) -> Bool {

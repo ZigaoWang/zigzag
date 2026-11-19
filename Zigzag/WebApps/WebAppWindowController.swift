@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// A site installed as an app, in a window of its own, as a web app is in Chrome or Safari: a slim toolbar in the
-/// page's own color (`PageBar`) with back, forward and reload and the app's name, the page under it edge to edge, no
+/// page's own color (`PageBar`) with back, forward and reload, the app's name and Site Controls, the page under it edge to edge, no
 /// sidebar; or, with the toolbar off, just the page with the traffic lights over it. Its page is a real tab on
 /// the app's profile, so you stay signed in and extensions, blocking and passwords work as anywhere. A link you click to
 /// another site opens in the browser window. Its frame is remembered for the next time. Opened only by the app's small
@@ -89,7 +89,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         window.setAccessibilityTitle(app.name)
         // Where you left it last time, and remembered from now on.
         window.setFrameUsingName(Self.frameName(app.id))
-        window.setFrameAutosaveName(Self.frameName(app.id))
+        if !AppDelegate.isHostingTests { window.setFrameAutosaveName(Self.frameName(app.id)) }
 
         strip.title.stringValue = app.name
         strip.back.onClick = { [weak self] _ in self?.tab.goBack() }
@@ -98,6 +98,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
             guard let tab = self?.tab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()
         }
+        strip.site.onClick = { [weak self] _ in self?.showSiteControls() }
         root.card.showLoading(of: tab)
         tab.host = self
         tokens.append(tab.changed.observe { [weak self] change in self?.tabChanged(change) })
@@ -127,6 +128,8 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     private func applyToolbar() {
         guard let window = window as? BrowserWindow else { return }
         let shows = current.showsToolbar
+        // Its button goes with the toolbar.
+        if !shows, SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         root.showsToolbar = shows
         // Centered in the toolbar; without it, where a window's title bar would hold them.
         let top = shows ? Tokens.Metric.miniStripHeight : Tokens.Metric.webAppTitleBarHeight
@@ -206,7 +209,22 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         strip.back.isEnabled = tab.canGoBack
         strip.forward.isEnabled = tab.canGoForward
         strip.reload.symbol = tab.isLoading ? "xmark" : "arrow.clockwise"
+        strip.site.isEnabled = tab.url != nil
         strip.needsLayout = true
+    }
+
+    /// The toolbar's Site Controls: the site panel for this page, as in Zigzag Mini (#356).
+    func showSiteControls() {
+        guard !isClosing, root.showsToolbar else { return }
+        SitePanel.toggle(in: self, from: strip.site)
+    }
+
+    /// The site panel's Clear Cookies and Clear Cache, asking first over the page as a browser window does.
+    func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab) {
+        BrowserWindowController.confirmClear(kind, of: tab, over: overlay) { [weak self] text in
+            guard let self else { return }
+            Toast.show(text, symbol: "checkmark.circle", over: self.overlay, area: self.overlay.bounds)
+        }
     }
 
     // MARK: Menu commands while it's in front
@@ -217,6 +235,10 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     @objc func reloadPage(_ sender: Any?) { tab.reload() }
     @objc func reloadPageFromOrigin(_ sender: Any?) { tab.reloadFromOrigin() }
     @objc func stopLoading(_ sender: Any?) { tab.stopLoading() }
+    @objc func printPage(_ sender: Any?) {
+        guard let webView = tab.webView else { return }
+        PagePrinting.print(webView, in: window, completion: {})
+    }
 
     @objc func copyPageURL(_ sender: Any?) {
         guard let url = tab.url else { return }
@@ -274,6 +296,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         isClosing = true
+        if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         Self.closedAt[app.id] = Date()
         Self.closedLaunchers[app.id] = Set(WebAppStore.runningLauncher(of: app.id).map(\.processIdentifier))
         pageGone.send()
@@ -294,7 +317,11 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
          "store": tab.webView?.configuration.websiteDataStore.identifier?.uuidString ?? "default",
          "frame": window.map { NSStringFromRect($0.frame) } ?? "", "key": window?.isKeyWindow == true,
          "canGoBack": tab.canGoBack, "loading": tab.isLoading, "showsToolbar": root.showsToolbar, "visible": window?.isVisible == true,
-         "bar": root.bar.color.flatMap { $0.usingColorSpace(.sRGB) }.map(DarkPages.hex) ?? ""]
+         "occluded": window?.occlusionState.contains(.visible) == false, "playing": tab.isPlayingAudio,
+         "watchesCover": tab.webView?.value(forKey: "_windowOcclusionDetectionEnabled") as? Bool ?? false,
+         "bar": root.bar.color.flatMap { $0.usingColorSpace(.sRGB) }.map(DarkPages.hex) ?? "",
+         "strip": strip.debugFrames, "siteEnabled": strip.site.isEnabled, "siteTip": strip.site.toolTip ?? "",
+         "sitePanel": SitePanel.isOpen(in: window), "sitePanelFrame": SitePanel.isOpen(in: window) ? SitePanel.shown.map { NSStringFromRect($0.frame) } ?? "" : ""]
     }
     #endif
 }
@@ -305,6 +332,7 @@ extension WebAppWindowController: NSMenuItemValidation {
         case #selector(goBack(_:)): return tab.canGoBack
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
+        case #selector(printPage(_:)): return tab.webView != nil
         case #selector(copyPageURL(_:)), #selector(openInBrowser(_:)): return tab.url != nil
         case #selector(toggleToolbar(_:)):
             item.title = Self.toolbarTitle(showing: current.showsToolbar)
@@ -312,6 +340,10 @@ extension WebAppWindowController: NSMenuItemValidation {
         default: return true
         }
     }
+}
+
+extension WebAppWindowController: SitePanelPageHost {
+    var listsExtensions: Bool { true }
 }
 
 extension WebAppWindowController: SpaceTinted {
@@ -520,13 +552,16 @@ final class WebAppDragStrip: NSView {
     }
 }
 
-/// The traffic lights, back, forward and reload after them on the lights' center line, and the app's name in the
-/// middle in a window title's type. Its ink comes from the bar's color (its appearance, set by the window). Dragging
-/// it moves the window, a double-click zooms it, and a right-click offers to hide it.
+/// The traffic lights, back, forward and reload after them on the lights' center line, the app's name in the middle
+/// in a window title's type, and Site Controls at the right end, as in Zigzag Mini's strip. Its ink comes from the
+/// bar's color (its appearance, set by the window). Dragging it moves the window, a double-click zooms it, and a
+/// right-click offers to hide it.
 final class WebAppStripView: NSView {
     let back = WebAppStripView.button("chevron.left", toolTip: String(localized: "Back", comment: "Tooltip of a button in the strip on top of each page of a split view: goes back."))
     let forward = WebAppStripView.button("chevron.right", toolTip: String(localized: "Forward", comment: "Tooltip of a button in the strip on top of each page of a split view: goes forward."))
     let reload = WebAppStripView.button("arrow.clockwise", toolTip: String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page."))
+    /// Site Controls, as at the end of Zigzag Mini's strip (#356).
+    let site = WebAppStripView.button("slider.horizontal.3", toolTip: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."))
     let title = Label("", font: .titleBarFont(ofSize: 0), color: .labelColor)
     private let mark = NSImageView()
     var notSecure = false { didSet { mark.isHidden = !notSecure } }
@@ -535,7 +570,7 @@ final class WebAppStripView: NSView {
     private var keyTokens: [NSObjectProtocol] = []
 
     static func button(_ symbol: String, toolTip: String) -> IconButton {
-        let button = IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
+        let button = IconButton(symbol: symbol, size: Tokens.Pane.stripButton, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
         // On the page's color, not the frame's: the neutral fills, which show on any color.
         button.isOnPage = true
         return button
@@ -550,7 +585,7 @@ final class WebAppStripView: NSView {
         mark.toolTip = SitePanel.notSecure
         mark.contentTintColor = .secondaryLabelColor
         mark.isHidden = true
-        [back, forward, reload, mark, title].forEach(addSubview)
+        [back, forward, reload, mark, title, site].forEach(addSubview)
         setAccessibilityRole(.toolbar)
     }
 
@@ -561,6 +596,13 @@ final class WebAppStripView: NSView {
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
     override func mouseDown(with event: NSEvent) { window?.titleBarMouseDown(event) }
+
+    #if DEBUG
+    var debugFrames: [String: [CGFloat]] {
+        let views: [(String, NSView)] = [("back", back), ("forward", forward), ("reload", reload), ("title", title), ("site", site)]
+        return Dictionary(uniqueKeysWithValues: views.map { ($0.0, [$0.1.frame.minX, $0.1.frame.width]) })
+    }
+    #endif
 
     override func rightMouseDown(with event: NSEvent) {
         guard let entries = menuEntries?(), !entries.isEmpty else { return }
@@ -587,14 +629,19 @@ final class WebAppStripView: NSView {
 
     override func layout() {
         super.layout()
-        let mid = bounds.height / 2, b = Tokens.Pane.button
+        let mid = bounds.height / 2, b = Tokens.Pane.stripButton
         var x = Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Space.x2
+        // Room between the buttons' hover boxes, as in Zigzag Mini's strip.
         for button in [back, forward, reload] {
             button.frame = NSRect(x: x, y: round(mid - b / 2), width: b, height: b)
-            x += b
+            x += b + Tokens.Pane.stripGap
         }
+        x -= Tokens.Pane.stripGap
+        // Site Controls at the right end, as far in from the edge as from the top, as Zigzag Mini's strip ends.
+        let y = round(mid - b / 2)
+        site.frame = NSRect(x: bounds.width - y - b, y: y, width: b, height: b)
         // The name stays in the middle of the window, as wide as the room beside the buttons allows.
-        let half = max(0, bounds.midX - x - Tokens.Space.x2)
+        let half = max(0, min(bounds.midX - x, site.frame.minX - bounds.midX) - Tokens.Space.x2)
         let markRoom: CGFloat = mark.isHidden ? 0 : Tokens.Space.x4
         let width = min(title.inkWidth + 4 + markRoom, half * 2)
         let h = title.lineHeight
