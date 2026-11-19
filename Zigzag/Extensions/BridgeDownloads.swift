@@ -3,7 +3,7 @@ import WebKit
 
 /// `chrome.downloads`, over Zigzag's own Downloads. What an extension starts shows in Downloads like any other file,
 /// is fetched with your cookies as a page's would be, and lands in your Downloads folder (or where you choose, when
-/// it asks to). An extension sees only its own profile's downloads, and private windows' never.
+/// it asks to). An extension sees only its own profile's downloads, and private windows' only when allowed in them.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeDownloads: BridgeNamespace {
@@ -27,9 +27,9 @@ final class BridgeDownloads: BridgeNamespace {
         case "download":
             return try await start(args.object(0), extensionID: extensionID)
         case "search":
-            return try await search(args.object(0)).map(describe)
+            return try await search(args.object(0), for: extensionID).map(describe)
         case "pause", "resume", "cancel":
-            guard let item = item(Int(saturating: args.number(0) ?? -1)) else { throw BridgeError("Invalid download id") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1), for: extensionID) else { throw BridgeError("Invalid download id") }
             switch fn {
             case "pause": guard manager.canPause(item) else { throw BridgeError("Download can't be paused") }; manager.pause(item)
             case "resume": manager.resume(item)
@@ -37,29 +37,29 @@ final class BridgeDownloads: BridgeNamespace {
             }
             return nil
         case "erase":
-            let gone = try await search(args.object(0)).filter { $0.state != .downloading }
+            let gone = try await search(args.object(0), for: extensionID).filter { $0.state != .downloading }
             for item in gone { manager.remove(item) }
             return gone.compactMap { numbers[$0.id] }
         case "removeFile":
-            guard let item = item(Int(saturating: args.number(0) ?? -1)), item.state == .finished, let file = item.destination else { throw BridgeError("Download must be complete") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1), for: extensionID), item.state == .finished, let file = item.destination else { throw BridgeError("Download must be complete") }
             try FileManager.default.trashItem(at: file, resultingItemURL: nil)
             return nil
         case "open":
             guard host.bridge.allows("downloads.open", for: extensionID) else { throw BridgeError("Opening downloads needs the “downloads.open” permission") }
             // As in Chrome, only in answer to you: a click on the extension, or in its popup or pages, a moment ago.
             guard host.hasRecentGesture(extensionID) else { throw BridgeError("downloads.open() may only be called in response to a user gesture.") }
-            guard let item = item(Int(saturating: args.number(0) ?? -1)), item.state == .finished else { throw BridgeError("Download must be complete") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1), for: extensionID), item.state == .finished else { throw BridgeError("Download must be complete") }
             manager.open(item)
             return nil
         case "show":
-            guard let item = item(Int(saturating: args.number(0) ?? -1)) else { throw BridgeError("Invalid download id") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1), for: extensionID) else { throw BridgeError("Invalid download id") }
             manager.reveal(item)
             return true
         case "showDefaultFolder":
             NSWorkspace.shared.open(DownloadManager.folder)
             return nil
         case "getFileIcon":
-            guard let item = item(Int(saturating: args.number(0) ?? -1)), let file = item.destination else { throw BridgeError("Invalid download id") }
+            guard let item = item(Int(saturating: args.number(0) ?? -1), for: extensionID), let file = item.destination else { throw BridgeError("Invalid download id") }
             let size = min(max(Int(saturating: args.object(1).number("size") ?? 32), 1), 256)
             let icon = NSWorkspace.shared.icon(forFile: file.path)
             icon.size = NSSize(width: size, height: size)
@@ -135,19 +135,28 @@ final class BridgeDownloads: BridgeNamespace {
         return numbers[item.id]!
     }
 
-    /// Whether an extension in this profile may see a download: one made in the same profile, outside private windows.
-    static func sees(_ item: DownloadItem, in profile: UUID) -> Bool { !item.isPrivate && item.profile == profile }
-
-    /// The downloads this profile's extensions see, newest first.
-    private var visible: [DownloadItem] { manager.items.filter { Self.sees($0, in: host.profile.id) } }
-
-    private func item(_ number: Int) -> DownloadItem? {
-        guard let id = numbers.first(where: { $0.value == number })?.key else { return nil }
-        return visible.first { $0.id == id }
+    /// Whether an extension in this profile may see a download: one made in the same profile, and a private window's
+    /// only when it's allowed in private windows (`seesPrivate`).
+    static func sees(_ item: DownloadItem, in profile: UUID, seesPrivate: Bool = false) -> Bool {
+        PrivateAccess.sees(isPrivate: item.isPrivate, allowed: seesPrivate) && item.profile == profile
     }
 
-    private func search(_ query: [String: Any]) async throws -> [DownloadItem] {
-        var found = visible
+    /// The downloads this profile's extensions could see, newest first: private ones too, which only some may.
+    private var visible: [DownloadItem] { manager.items.filter { Self.sees($0, in: host.profile.id, seesPrivate: true) } }
+
+    /// The downloads this extension sees, newest first.
+    private func visible(to extensionID: String) -> [DownloadItem] {
+        let seesPrivate = host.seesPrivate(extensionID)
+        return manager.items.filter { Self.sees($0, in: host.profile.id, seesPrivate: seesPrivate) }
+    }
+
+    private func item(_ number: Int, for extensionID: String) -> DownloadItem? {
+        guard let id = numbers.first(where: { $0.value == number })?.key else { return nil }
+        return visible(to: extensionID).first { $0.id == id }
+    }
+
+    private func search(_ query: [String: Any], for extensionID: String) async throws -> [DownloadItem] {
+        var found = visible(to: extensionID)
         if let id = query.number("id").map(Int.init(saturating:)) { found = found.filter { number(for: $0) == id } }
         if let state = query.string("state") { found = found.filter { Self.state($0) == state } }
         if let url = query.string("url") { found = found.filter { $0.sourceURL?.absoluteString == url } }
@@ -215,7 +224,7 @@ final class BridgeDownloads: BridgeNamespace {
             "exists": !item.fileIsMissing,
             "danger": "safe",
             "mime": "",
-            "incognito": false,
+            "incognito": item.isPrivate,
             // Chrome gives these as ISO 8601 text, not milliseconds.
             "startTime": ISO8601DateFormatter().string(from: item.started),
         ]
@@ -240,7 +249,7 @@ final class BridgeDownloads: BridgeNamespace {
             let now = describe(item)
             guard let was = lastSeen[item.id] else {
                 lastSeen[item.id] = now
-                bridge.emit("downloads.onCreated", [now])
+                bridge.emit("downloads.onCreated", [now], isPrivate: item.isPrivate)
                 continue
             }
             lastSeen[item.id] = now
@@ -249,11 +258,11 @@ final class BridgeDownloads: BridgeNamespace {
                 let before = was[key].map { "\($0)" }, after = now[key].map { "\($0)" }
                 if before != after { delta[key] = ["previous": was[key] ?? NSNull(), "current": now[key] ?? NSNull()] }
             }
-            if delta.count > 1 { bridge.emit("downloads.onChanged", [delta]) }
+            if delta.count > 1 { bridge.emit("downloads.onChanged", [delta], isPrivate: item.isPrivate) }
         }
         for (id, was) in lastSeen where !ids.contains(id) {
             lastSeen[id] = nil
-            bridge.emit("downloads.onErased", [was["id"] ?? 0])
+            bridge.emit("downloads.onErased", [was["id"] ?? 0], isPrivate: was["incognito"] as? Bool == true)
         }
     }
 }

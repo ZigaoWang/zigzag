@@ -215,9 +215,9 @@ final class Tab: NSObject {
     private(set) var profile: Profile
     /// The extensions that have been told this tab is open (ExtensionCenter).
     weak var toldTo: ExtensionHost?
-    /// Its profile's extensions. None for a private tab: as in Chrome, extensions stay out of private browsing.
+    /// Its profile's extensions. In a private tab, only those allowed in private windows run (ExtensionHost).
     @available(macOS 15.4, *)
-    var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
+    var extensionHost: ExtensionHost? { profile.extensions }
     /// In a call (camera or microphone on, even muted), floating in Picture in Picture, or playing in the mini
     /// player: not to be put to sleep.
     var isInUse: Bool {
@@ -521,17 +521,14 @@ final class Tab: NSObject {
             Passkeys.attach(to: configuration, isPrivate: privateStore != nil, profile: profile)
             HistoryPage.attach(to: configuration)
             WebRTCProtection.attach(to: configuration)
-            if let privateStore {
-                configuration.websiteDataStore = privateStore
-                // Extensions stay out of private browsing, as in Chrome: they can't read or change these pages.
-                if #available(macOS 15.4, *) { configuration.webExtensionController = nil }
-            }
+            // The data store is what makes the page private to WebKit: only extensions allowed in private windows reach it.
+            if let privateStore { configuration.websiteDataStore = privateStore }
         }
-        // Extensions' user scripts (BridgeUserScripts), in a page WebKit opened for another too. Private pages, and
-        // extensions' own pages, run none.
-        if #available(macOS 15.4, *), extensionConfiguration == nil, privateStore == nil,
+        // Extensions' user scripts (BridgeUserScripts), in a page WebKit opened for another too. Extensions' own
+        // pages run none, and private pages only allowed extensions'.
+        if #available(macOS 15.4, *), extensionConfiguration == nil,
            configuration.webExtensionController === profile.extensions.controller {
-            profile.extensions.bridge.userScripts.attach(configuration.userContentController)
+            profile.extensions.bridge.userScripts.attach(configuration.userContentController, isPrivate: privateStore != nil)
         }
         showsExtensionPage = extensionConfiguration != nil
         openedByPage = fromWebKit

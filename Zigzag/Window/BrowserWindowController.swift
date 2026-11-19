@@ -708,7 +708,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let installs = installs
         let access = installs.siteAccess(id)
         let tab = tabManager.selectedTab
-        let site = ContentBlocker.site(of: tab?.url)
+        // A private window's site isn't offered: choosing it would keep it.
+        let site = tabManager.isPrivate ? nil : ContentBlocker.site(of: tab?.url)
         let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all && !tabManager.profile.extensions.asksForSitesOnlyOptionally(id) ? .on : .off
         let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
@@ -1470,7 +1471,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var attention = false
         var pins: [AddressView.Pin] = []
         var animated = false
-        // Extensions don't run in a private window: no host, so nothing to show.
+        // In a private window, only extensions allowed there (ExtensionHost.pinnedActions).
         if #available(macOS 15.4, *), let host = tab?.extensionHost ?? tabManager.extensionHost {
             attention = host.needsAttention(for: tab)
             pins = host.pinnedActions(for: tab).map { addressPin(for: $0, host: host) }
@@ -1538,7 +1539,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         menu.addItem(title)
         if let options = context.optionsPageURL {
             menu.addItem(SidebarMenus.Item(String(localized: "Settings", comment: "Item in an extension's menu: opens the extension's own settings page."), symbol: "gearshape") { [weak self] in
-                self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
+                guard let self else { return }
+                // From a private window, in an everyday one: the page keeps the extension's own data.
+                guard self.tabManager.isPrivate else { self.tabManager.newTab(url: options, title: context.webExtension.displayName); return }
+                let everyday = WindowManager.shared.controllers.first { !$0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false)
+                everyday.tabManager.newTab(url: options, spaceID: everyday.tabManager.space(for: profile), title: context.webExtension.displayName)
+                everyday.window?.makeKeyAndOrderFront(nil)
             })
         }
         menu.addItem(siteAccessItem(for: id))

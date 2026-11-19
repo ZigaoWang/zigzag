@@ -2609,6 +2609,10 @@ enum DebugBridge {
         case "extapprove": Task { await ExtensionStore.approvePendingUpdate(arg) }
         case "extoff": controller.tabManager.profile.installs.setEnabled(arg, false)
         case "exton": controller.tabManager.profile.installs.setEnabled(arg, true)
+        case "extprivate":
+            // extprivate <id> on|off: Settings › Extensions › Allow in private windows.
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count == 2 { controller.tabManager.profile.installs.setAllowsPrivate(f[0], f[1] == "on") }
         case "settingsid":
             // Settings is a tab now: its window is the browser window it's in.
             if let w = controller.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }

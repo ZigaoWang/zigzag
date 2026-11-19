@@ -2852,6 +2852,17 @@
         }
       }
     },
+    "Allow %@ in private windows" : {
+      "comment" : "VoiceOver name of the switch that lets an extension run in private windows, in Settings › Extensions. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许“%@”在无痕浏览窗口中使用"
+          }
+        }
+      }
+    },
     "Allow Access" : {
       "comment" : "Button under a problem in the welcome window: let Zigzag read a browser’s data.",
       "localizations" : {
@@ -2936,6 +2947,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为此网站允许"
+          }
+        }
+      }
+    },
+    "Allow in private windows" : {
+      "comment" : "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许在无痕浏览窗口中使用"
           }
         }
       }
@@ -10402,6 +10424,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它可以读取和更改此网站及其子域名上的页面。"
+          }
+        }
+      }
+    },
+    "It can see and change your pages in private windows." : {
+      "comment" : "Under “Allow in private windows” in Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它可以读取和更改你在无痕浏览窗口里打开的网页。"
           }
         }
       }
@@ -23490,6 +23523,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@、%2$@"
+          }
+        }
+      }
+    },
+    "incognito private browsing" : {
+      "comment" : "Words that find an extension's Allow in private windows setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无痕 无痕浏览 隐私 incognito private browsing"
           }
         }
       }

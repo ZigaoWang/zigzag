@@ -6,8 +6,8 @@ import WebKit
 /// answer: Zigzag asks the listeners itself (bridge.js), with Chrome's details, and signs in with what they give.
 ///
 /// Only extensions that could answer in Chrome are asked: those with webRequest and webRequestAuthProvider (Manifest
-/// V3) or webRequestBlocking (V2), and access to the address asking. Private tabs are never offered, as extensions
-/// never see them. The first extension to give a name and password signs in, one that cancels cancels the sign-in,
+/// V3) or webRequestBlocking (V2), and access to the address asking. A private tab's go only to extensions allowed in
+/// private windows. The first extension to give a name and password signs in, one that cancels cancels the sign-in,
 /// and with no answer within a few seconds the sheet asks. What they give is never written down or logged.
 @available(macOS 15.4, *)
 @MainActor
@@ -65,8 +65,9 @@ final class BridgeWebRequest: BridgeNamespace {
     // MARK: Asking
 
     /// Asks the extensions that may answer this sign-in, and says what the first of them answered.
-    func askForSignIn(_ challenge: SiteChallenge, tab: (any WKWebExtensionTab)?) async -> Answer {
+    func askForSignIn(_ challenge: SiteChallenge, tab: (any WKWebExtensionTab)?, isPrivate: Bool = false) async -> Answer {
         let contexts = host.contexts.filter { context in
+            PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData) &&
             Self.mayAnswer(allows: { ExtensionBridge.allows($0, for: context) }, manifestVersion: context.webExtension.manifestVersion,
                            hasAccess: context.hasAccess(to: challenge.url))
         }

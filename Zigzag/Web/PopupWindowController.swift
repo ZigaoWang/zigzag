@@ -802,7 +802,7 @@ extension PopupWindowController: WKWebExtensionWindow {
     func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { tab }
     func windowType(for context: WKWebExtensionContext) -> WKWebExtension.WindowType { .popup }
     func windowState(for context: WKWebExtensionContext) -> WKWebExtension.WindowState { window?.isMiniaturized == true ? .minimized : .normal }
-    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { isPrivate }
     func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
     func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
 

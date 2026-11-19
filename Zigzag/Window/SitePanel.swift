@@ -744,10 +744,12 @@ final class SitePanel: FloatingPanelView {
 
     /// Your extensions, as their toolbar buttons are: the icon, the badge, and whether each works on this site.
     private func buildExtensions() {
-        // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
+        // In a private window, only those allowed there, as in Chrome's incognito (ExtensionHost.actions).
         // In Zigzag Mini, none: an extension's popup opens from a browser window's address.
         guard #available(macOS 15.4, *), controller != nil, let host = tab.extensionHost else { return }
-        let actions = host.actions(for: tab)
+        // A blank private window's stand-in tab isn't private itself: the window says it.
+        let actions = host.actions(for: tab).filter { PrivateAccess.sees(isPrivate: isPrivate, allowed: $0.context.hasAccessToPrivateData) }
+        if isPrivate, actions.isEmpty { return }
         let installs = tab.profile.installs
         let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
         let web = ["http", "https"].contains(url.scheme ?? "")
