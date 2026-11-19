@@ -220,7 +220,9 @@ enum Tokens {
         /// A custom percentage as kept: 100 if none was kept, and within 75 to 150.
         static func keptCustomPercent(_ stored: Int?) -> Int { min(max(stored ?? 100, 75), 150) }
         /// Custom's percentage, read once and written as it changes.
-        private static var customPercent = keptCustomPercent(UserDefaults.standard.object(forKey: "SidebarSizePercent") as? Int)
+        /// `integer(forKey:)` also reads it when it was set as text, like `-SidebarSizePercent 120` at launch.
+        private static var customPercent = keptCustomPercent(UserDefaults.standard.object(forKey: "SidebarSizePercent") == nil ? nil
+            : UserDefaults.standard.integer(forKey: "SidebarSizePercent"))
 
         /// A Medium size at the size chosen, in whole points.
         static func scaled(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size?.scale ?? scale)).rounded() }
