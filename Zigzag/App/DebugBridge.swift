@@ -695,6 +695,11 @@ enum DebugBridge {
             let levels = TabTree.levels(m.treeNodes(in: m.currentSpaceID))
             let out = m.currentTabs.map { "\(String(repeating: "  ", count: levels[$0.id] ?? 0))\($0.displayTitle)\($0.isCollapsed ? " (folded)" : "")" }
             try? out.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        // pinfold on|off: folds or opens the current space's pinned section, kept in memory only.
+        case "pinfold":
+            if SidebarListView.debugCollapsed == nil { SidebarListView.debugCollapsed = [] }
+            SidebarListView.setCollapsed(controller.tabManager.currentSpaceID, arg == "on")
+            controller.sidebar.list.reload(animated: false)
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
         // newtabnote <path>: the new tab note's frame (window points, top left) and the selected tab.
@@ -1555,6 +1560,20 @@ enum DebugBridge {
             let screen = window.convertPoint(toScreen: NSPoint(x: f[0], y: window.frame.height - f[1]))
             cg.location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
             if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
+        case "dragpath":
+            // dragpath x y1 y2: an in-app press at y1 dragged to y2 and let go (window points, top left).
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            guard n.count == 3, let window = controller.window else { break }
+            func event(_ type: NSEvent.EventType, _ y: Double) -> NSEvent? {
+                NSEvent.mouseEvent(with: type, location: NSPoint(x: n[0], y: window.frame.height - y), modifierFlags: [],
+                                   timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                   context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)
+            }
+            event(.leftMouseDown, n[1]).map(window.sendEvent)
+            for step in 2...8 { event(.leftMouseDragged, n[1] + (n[2] - n[1]) * Double(step) / 8).map { NSApp.postEvent($0, atStart: false) } }
+            event(.leftMouseUp, n[2]).map { NSApp.postEvent($0, atStart: false) }
+            event(.leftMouseDragged, n[1] + (n[2] - n[1]) / 8).map(window.sendEvent)
+            debugLog("dragpath \(arg) done")
         case "mouse":
             // mouse <down|drag|up|move|click|rclick> x y [shift|cmd|opt]  (window points, top-left origin)
             let f = arg.split(separator: " ").map(String.init)

@@ -1431,6 +1431,9 @@ final class SidebarListView: NSView {
     var headerView: NSView? { rows[.header] }
 
     #if DEBUG
+    /// The rows the list holds, top to bottom, laid out or not.
+    var debugItems: [SidebarItem] { items }
+
     /// Every row as it's laid out: a name a test can find it by, and where it is in the window.
     func debugRows() -> [(String, NSRect)] {
         guard let manager else { return [] }
@@ -1551,23 +1554,36 @@ final class SidebarListView: NSView {
 
     private static let collapsedKey = "CollapsedBookmarkSpaces"
 
-    static func isCollapsed(_ spaceID: UUID) -> Bool {
-        (UserDefaults.standard.stringArray(forKey: collapsedKey) ?? []).contains(spaceID.uuidString)
+    #if DEBUG
+    /// Folded sections kept in memory instead of the defaults, for tests and the debug bridge.
+    static var debugCollapsed: Set<String>?
+    #endif
+
+    private static var collapsedSpaces: Set<String> {
+        get {
+            #if DEBUG
+            if let debugCollapsed { return debugCollapsed }
+            #endif
+            return Set(UserDefaults.standard.stringArray(forKey: collapsedKey) ?? [])
+        }
+        set {
+            #if DEBUG
+            if debugCollapsed != nil { debugCollapsed = newValue; return }
+            #endif
+            UserDefaults.standard.set(Array(newValue), forKey: collapsedKey)
+        }
     }
+
+    static func isCollapsed(_ spaceID: UUID) -> Bool { collapsedSpaces.contains(spaceID.uuidString) }
 
     /// Opens or folds a space's pinned section (opened again for a new folder, so it shows).
     static func setCollapsed(_ spaceID: UUID, _ collapsed: Bool) {
-        var set = Set(UserDefaults.standard.stringArray(forKey: collapsedKey) ?? [])
-        if collapsed { set.insert(spaceID.uuidString) } else { set.remove(spaceID.uuidString) }
-        UserDefaults.standard.set(Array(set), forKey: collapsedKey)
+        if collapsed { collapsedSpaces.insert(spaceID.uuidString) } else { collapsedSpaces.remove(spaceID.uuidString) }
     }
 
     private func toggleCollapsed() {
         guard let manager, !Library.shared.bookmarks(in: manager.currentSpaceID).isEmpty else { return }
-        var set = Set(UserDefaults.standard.stringArray(forKey: Self.collapsedKey) ?? [])
-        let id = manager.currentSpaceID.uuidString
-        if set.contains(id) { set.remove(id) } else { set.insert(id) }
-        UserDefaults.standard.set(Array(set), forKey: Self.collapsedKey)
+        Self.setCollapsed(manager.currentSpaceID, !Self.isCollapsed(manager.currentSpaceID))
         reload(animated: true)
     }
 
