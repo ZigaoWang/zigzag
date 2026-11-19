@@ -56,7 +56,7 @@ struct SiteRoutesTests {
                          "exa_mple.com", "two..dots", "%67ithub.com", "999.1.2.3", String(repeating: "x", count: 64) + ".com"] {
                 #expect(SiteRoutes.entry(from: text, match: mode) == nil)
             }
-            #expect(SiteRoutes.entry(from: "WWW.Example.COM", match: mode) == "www.example.com")
+            #expect(SiteRoutes.entry(from: "WWW.Example.COM", match: mode) == (mode == .domain ? "example.com" : "www.example.com"))
             #expect(SiteRoutes.entry(from: "bücher.example", match: mode) == "xn--bcher-kva.example")
             #expect(SiteRoutes.entry(from: "http://[::1]/", match: mode) == "[::1]")
             #expect(SiteRoutes.entry(from: "localhost", match: mode) == "localhost")
@@ -217,6 +217,11 @@ struct SiteRoutesTests {
         #expect(SiteRoutes.route(for: url("https://example.com"), in: rules)?.spaceID == media)
         #expect(SiteRoutes.coverage(in: rules).allSatisfy { $0.blockedBy == nil })
         #expect(try JSONDecoder().decode([SiteRoutes.Route].self, from: JSONEncoder().encode(rules)) == rules)
+    }
+
+    @Test func domainRulesDropWWW() {
+        #expect(SiteRoutes.entry(from: "https://www.youtube.com/", match: .domain) == "youtube.com")
+        #expect(SiteRoutes.entry(from: "www.youtube.com", match: .host) == "www.youtube.com")
     }
 
     @Test func matchesPathsOnSegmentBoundariesAndPreservesHostScope() {

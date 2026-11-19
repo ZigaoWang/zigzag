@@ -130,7 +130,8 @@ enum SiteRoutes {
         case .host, .domain:
             let path = url.path(percentEncoded: true)
             guard (path.isEmpty || path == "/"), url.query() == nil, url.fragment() == nil else { return nil }
-            return host
+            // www.github.com would leave github.com and its other subdomains out.
+            return match == .domain ? host.withoutWWW : host
         case .path:
             let path = path(of: url)
             return path.isEmpty ? nil : host + path
