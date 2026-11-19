@@ -191,9 +191,9 @@ One look for each state, everywhere:
   primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
-  rest. Things that read as objects (space dots, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
+  rest. Things that read as objects (pill buttons, favorites) sink (`pressSinks`, `showSink`): down
   `Motion.pressSink` (1pt) in `pressIn` (100ms), eased out, and back over `pressSettle` (120ms), eased out, with
-  no bounce. Rows and small icon buttons give instead (`pressScales`, `showPress`): to
+  no bounce. Rows and small icon buttons, the space keys among them, give instead (`pressScales`, `showPress`): to
   `Motion.pressScale` (0.97) and back the same way. Both start from wherever they are, and the action
   never waits on them. Not from the keyboard, not with Reduce Motion. The switch's knob travels its short way in
   `Motion.state`, eased out, with its track's color.

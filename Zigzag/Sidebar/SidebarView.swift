@@ -652,7 +652,8 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button))
-        pressSinks = true
+        // Pressed as the toolbar's buttons are: around its middle, so the icon never moves off its line.
+        pressScales = true
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
         // Every icon fit to the same square and centered in it, whatever its drawing's own width (a book is wider
@@ -746,8 +747,8 @@ final class SpaceDotView: InteractiveView {
         } else {
             Tokens.Motion.withoutAnimation(apply)
         }
-        // The key itself is what answers the pointer; a drop over it lights it as the drop target.
-        let fill: NSColor? = isDropTarget ? Tokens.Chrome.pressed : nil
+        // The key answers the pointer as the toolbar's buttons do; a drop over it lights it as the drop target.
+        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }

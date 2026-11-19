@@ -33,6 +33,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Site Controls shows Keep cookies only while Clear cookies when Zigzag quits is on in Settings › Privacy. Without it, nothing clears unless you press Clear Cookies…, so the switch looked like it did nothing; the Keep cookies for these sites list in Settings is still there for that. Turning the setting on or off updates Site Controls while it's open. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#383](https://github.com/ZigaoWang/zigzag/issues/383))
 - With dark pages on, the bar above a page Zigzag draws dark, like Shopify's checkout, is dark too instead of white. When part of a page's style couldn't be darkened, its white background underneath gave the bar its color though the page showed dark. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#250](https://github.com/ZigaoWang/zigzag/issues/250))
 - Hovering or pressing the sidebar's buttons and rows shows in a white or very light space too. Their highlight was a wash of white, which can't show on white; by day it's a light shade of the space's color now, about as clear on every space, and a little clearer at night.
+- Space icons at the bottom of the sidebar no longer move down when you click them. They show hover and press like the buttons beside them, and give a little around their middle as those do.
 
 ## [0.9.3] - 2026-11-18
 
