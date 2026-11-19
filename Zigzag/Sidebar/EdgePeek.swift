@@ -39,7 +39,7 @@ enum EdgePeekLayout {
 /// The sidebar stays as it was, so another tab can be picked in place.
 ///
 /// The page is the tab's own `pageHolder`, moved out of its pane and put back on close, so its state carries: the
-/// same page, not a second load. Close gives it back; Open as Tab gives it back and brings the browser forward.
+/// same page, not a second load. Close gives it back; Expand gives it back and brings the browser window over.
 final class EdgePeek {
     static let shared = EdgePeek()
 
@@ -293,7 +293,7 @@ final class EdgePeek {
         }
         toolbar.onAddress = { [weak self] text in self?.navigate(to: text) }
         toolbar.onExtensions = { [weak self] button in self?.showExtensions(from: button) }
-        toolbar.onExpand = { [weak self] in self?.openAsTab() }
+        toolbar.onExpand = { [weak self] in self?.expand() }
     }
 
     private func refreshToolbar() {
@@ -421,11 +421,21 @@ final class EdgePeek {
         panel?.orderOut(nil)
     }
 
-    /// Opens the page as the browser's tab: same holder, same page, now in its pane and the window in front.
-    func openAsTab() {
-        guard let tab, let controller else { return }
+    /// Hands the page to its tab and brings that browser window to this space, filled to the frame: the peek
+    /// becomes the app. This is the only path that moves the browser window; the sidebar and page hide into it.
+    func expand() {
+        guard let tab, let controller, let window = controller.window else { return }
+        let screen = NSScreen.screens.first { $0.visibleFrame.contains(NSEvent.mouseLocation) } ?? window.screen ?? NSScreen.main
+        let visible = screen?.visibleFrame ?? window.frame
+        let frame = EdgePeekLayout.expandedFrame(in: visible, onRight: EdgeSidebar.shared.panelOnRight)
         close(duration: 0)
         controller.tabManager.select(tab)
-        controller.bringForwardForEdge(keepingPanel: true)
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        if !window.styleMask.contains(.fullScreen) { window.setFrame(frame, display: true) }
+        window.collectionBehavior.insert(.moveToActiveSpace)
+        window.makeKeyAndOrderFront(nil)
+        window.collectionBehavior.remove(.moveToActiveSpace)
+        NSApp.activate()
+        EdgeSidebar.shared.hide(animated: false)
     }
 }
