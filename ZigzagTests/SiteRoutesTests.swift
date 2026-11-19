@@ -203,18 +203,19 @@ struct SiteRoutesTests {
 
     // MARK: Keeping them
 
-    @Test func legacyDomainsMigrateInStoredSpaceAndSiteOrder() throws {
+    @Test func legacyDomainsMigrateInStoredOrderWithSubdomainsFirst() throws {
         var general = SpaceInfo(id: media, name: "General", color: .sky)
-        general.routedSites = ["example.com", "another.test"]
+        general.routedSites = ["another.test", "example.com"]
         var specific = SpaceInfo(id: work, name: "Work", color: .sky)
         specific.routedSites = ["code.example.com"]
         let rules = SiteRoutes.migrated(from: [general, specific])
-        #expect(rules.map(\.site) == ["example.com", "another.test", "code.example.com"])
-        #expect(rules.map(\.spaceID) == [media, media, work])
+        // The old lists let the most specific site win, so the subdomain moves above its parent.
+        #expect(rules.map(\.site) == ["another.test", "code.example.com", "example.com"])
+        #expect(rules.map(\.spaceID) == [media, work, media])
         #expect(rules.allSatisfy { $0.match == .domain && $0.isEnabled })
-        #expect(SiteRoutes.route(for: url("https://www.code.example.com"), in: rules)?.spaceID == media)
-        #expect(SiteRoutes.coverage(in: rules) == [.init(blocks: [2]), .init(), .init(blockedBy: 0)])
+        #expect(SiteRoutes.route(for: url("https://www.code.example.com"), in: rules)?.spaceID == work)
         #expect(SiteRoutes.route(for: url("https://example.com"), in: rules)?.spaceID == media)
+        #expect(SiteRoutes.coverage(in: rules).allSatisfy { $0.blockedBy == nil })
         #expect(try JSONDecoder().decode([SiteRoutes.Route].self, from: JSONEncoder().encode(rules)) == rules)
     }
 

@@ -137,11 +137,16 @@ enum SiteRoutes {
         }
     }
 
-    /// Read each space's legacy sites in their saved order.
+    /// Each space's old sites in saved order, with a subdomain moved above its parent so it still wins as before.
     static func migrated(from spaces: [SpaceInfo]) -> [Route] {
-        spaces.flatMap { space in
-            (space.routedSites ?? []).map { Route(match: .domain, site: $0, spaceID: space.id) }
+        var rules: [Route] = []
+        for space in spaces {
+            for site in space.routedSites ?? [] where !rules.contains(where: { $0.site == site }) {
+                let rule = Route(match: .domain, site: site, spaceID: space.id)
+                rules.insert(rule, at: rules.firstIndex { covers($0.site, site) } ?? rules.endIndex)
+            }
         }
+        return rules
     }
 
     static func route(for url: URL?, in routes: [Route]) -> Route? {
