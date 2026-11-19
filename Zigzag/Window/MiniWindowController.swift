@@ -1061,6 +1061,10 @@ extension MiniWindowController {
     }
 }
 
+extension MiniWindowController: SitePanelPageHost {
+    var listsExtensions: Bool { false }
+}
+
 // MARK: - Its menu items
 
 extension MiniWindowController: NSMenuItemValidation {

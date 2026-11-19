@@ -282,14 +282,22 @@ enum AuthenticationPrompt {
         }
         let attempt = SigningIn()
         signingIn[key] = attempt
+        // While the sheet asks, an extension's late name and password signs in with it (#387).
+        let late = BridgeWebRequest.LateAnswer { username, password in
+            if !PageDialogSheet.answer(tag: key, with: [username, password]) { attempt.early = [username, password] }
+        }
         let task = Task { @MainActor () -> (URLSession.AuthChallengeDisposition, URLCredential?) in
-            switch await askExtensions(challenge, page: page, tab: asker) {
+            defer { late.end() }
+            switch await askExtensions(challenge, page: page, tab: asker, late: late) {
             case .credentials(let username, let password):
                 return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
             case .cancel:
                 return (.cancelAuthenticationChallenge, nil)
             case .none:
-                return await ask(challenge, window: window, page: page, tag: key) { attempt.sheetShown = true }
+                return await ask(challenge, window: window, page: page, tag: key) {
+                    attempt.sheetShown = true
+                    return attempt.early
+                }
             }
         }
         attempt.task = task
@@ -312,6 +320,8 @@ enum AuthenticationPrompt {
     @MainActor private final class SigningIn {
         var task: Task<(URLSession.AuthChallengeDisposition, URLCredential?), Never>?
         var sheetShown = false
+        /// An extension's name and password that came before the sheet showed.
+        var early: [String]?
     }
 
     @MainActor private static var signingIn: [String: SigningIn] = [:]
@@ -319,16 +329,17 @@ enum AuthenticationPrompt {
     /// Extensions' onAuthRequired listeners, asked as Chrome asks them before its own dialog. After a wrong password
     /// they're asked once more, as in Chrome; after that only the sheet asks, so a wrong answer can't go round and round.
     @MainActor
-    private static func askExtensions(_ challenge: URLAuthenticationChallenge, page: WKWebView?, tab: (any WKWebExtensionTab)?) async -> BridgeWebRequest.Answer {
+    private static func askExtensions(_ challenge: URLAuthenticationChallenge, page: WKWebView?, tab: (any WKWebExtensionTab)?,
+                                      late: BridgeWebRequest.LateAnswer? = nil) async -> BridgeWebRequest.Answer {
         // The extensions of the profile the page is in: another profile's never hear of its sign-ins.
         guard challenge.previousFailureCount < 2, let page, let site = SiteChallenge(challenge, pageURL: page.url),
               let host = (page as? BrowserWebView)?.owner?.extensionHost ?? Profiles.shared.profile(of: page)?.extensions else { return .none }
-        return await host.bridge.webRequest.askForSignIn(site, tab: tab, isPrivate: !page.configuration.websiteDataStore.isPersistent)
+        return await host.bridge.webRequest.askForSignIn(site, tab: tab, isPrivate: !page.configuration.websiteDataStore.isPersistent, late: late)
     }
 
     @MainActor
     private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
-                            page: WKWebView?, tag: String, shown: () -> Void) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+                            page: WKWebView?, tag: String, shown: () -> [String]?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let isPrivate = page?.configuration.websiteDataStore.isPersistent != true
         Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
                          isPrivate: isPrivate)
@@ -349,7 +360,8 @@ enum AuthenticationPrompt {
         // The tab or window may have gone while extensions and saved passwords were asked: nothing to put a sheet on,
         // and a sheet on nothing would never be answered, leaving the site's next sign-in waiting on it.
         guard window.isVisible, page.map({ $0.window === window }) ?? true else { return (.cancelAuthenticationChallenge, nil) }
-        shown()
+        // An extension answered while saved passwords were read: no sheet.
+        if let early = shown(), early.count == 2 { return (.useCredential, URLCredential(user: early[0], password: early[1], persistence: .forSession)) }
         let result = await PageDialogSheet.ask(in: window, title: String(localized: "Sign in to \(challenge.protectionSpace.host)", comment: "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."), message: message,
                                                fields: fields, confirmTitle: String(localized: "Sign In", comment: "Button in a site's HTTP sign-in sheet."), showsCancel: true, offersBlock: false, page: page,
                                                savedLogins: offered, tag: tag)

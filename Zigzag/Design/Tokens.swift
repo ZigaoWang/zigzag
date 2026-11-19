@@ -87,6 +87,11 @@ enum Tokens {
         /// the other screen leaves the sidebar be.
         static let edgeRevealReach: CGFloat = Space.x16 + Space.x4
         static let resizeHandleWidth: CGFloat = Space.x2
+        /// How far past a drawn edge you drag (the sidebar's, a split's line) the pointer still takes it, into a page;
+        /// half that on a page's scroll bar side, so the scroll bar stays the page's (#362).
+        static let dragReach: CGFloat = Space.x1
+        /// How far into the sidebar its edge takes the pointer: the empty strip beside its rows, and a little of them.
+        static var sidebarDragReach: CGFloat { Sidebar.edge + Space.x1 }
         static let hairline: CGFloat = 1
         /// Keyboard focus: the ring's width, and its gap outside the control.
         static let focusRing: CGFloat = 2

@@ -67,6 +67,8 @@ final class PeekController {
     private let header = PeekHeaderView()
     private let content = NSView()
     private(set) var tab: Tab?
+    /// The tab the Peek opened over, for extensions: active again when the Peek goes, unless you've moved on.
+    private weak var under: Tab?
     private var token: SignalToken?
     private(set) var isVisible = false {
         didSet {
@@ -150,7 +152,11 @@ final class PeekController {
     func show(url: URL?, configuration: WKWebViewConfiguration?, opener: Tab?, by sender: Tab.LoadSender = .zigzag) -> WKWebView? {
         guard let controller else { return nil }
         // A new peek replaces the old one rather than stacking.
-        if let existing = tab { existing.close() }
+        let replaced = tab
+        if let existing = replaced {
+            if #available(macOS 15.4, *) { ExtensionCenter.peekClosed(existing, backTo: nil) }
+            existing.close()
+        }
         // With a configuration from the page that opened it, it's in that page's profile, so in its space.
         let spaceID = (configuration != nil ? opener?.spaceID : nil) ?? controller.tabManager.currentSpaceID
         let tab = Tab(url: url, spaceID: spaceID, configuration: configuration)
@@ -162,6 +168,9 @@ final class PeekController {
         tab.firstLoad.sender = sender
         self.tab = tab
         token = tab.changed.observe { [weak self] change in self?.tabChanged(change) }
+        // Told before its page starts, as a new tab is, so its content scripts' first messages come from a known tab.
+        under = controller.tabManager.selectedTab
+        if #available(macOS 15.4, *) { ExtensionCenter.peekOpened(tab, over: replaced == nil ? under : nil) }
         let webView = tab.ensureWebView()
         // Until the new page paints, show the colour of the page you came from, not a flash of white.
         let behind = opener?.webView.flatMap { $0.themeColor ?? $0.underPageBackgroundColor }
@@ -336,6 +345,11 @@ final class PeekController {
         scrim.hide(evenFromKeyboard: true)
         let closing = tab
         tab = nil
+        if #available(macOS 15.4, *), let closing {
+            // Another tab selected already told extensions it's the active one.
+            let back = under.flatMap { $0 === controller?.tabManager.selectedTab ? $0 : nil }
+            ExtensionCenter.peekClosed(closing, backTo: back)
+        }
         uncoverPages()
         shrink { closing?.close() }
         if let controller, let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
@@ -344,6 +358,8 @@ final class PeekController {
     /// Promotes the peeked page to a real tab, without reloading it.
     func openAsTab() {
         guard isVisible, let controller, let tab else { return }
+        // Extensions saw it last, after the window's tabs.
+        let place = controller.tabManager.navigableTabs.count
         isVisible = false
         token = nil
         self.tab = nil
@@ -366,8 +382,14 @@ final class PeekController {
             if !self.isVisible { self.panel.removeFromSuperview() }
             self.panel.alphaValue = 1
             // The window closed while it grew: the page goes with it, rather than living on with no window.
-            guard WindowManager.shared.controllers.contains(where: { $0 === controller }) else { tab.close(); return }
+            guard WindowManager.shared.controllers.contains(where: { $0 === controller }) else {
+                if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
+                tab.close()
+                return
+            }
             controller.tabManager.insert(tab)
+            // The same tab to extensions, from the Peek's place to its own in the list.
+            if #available(macOS 15.4, *) { ExtensionCenter.tabMoved(tab, from: place, in: controller) }
         })
     }
 

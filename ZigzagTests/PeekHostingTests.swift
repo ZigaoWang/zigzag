@@ -98,4 +98,49 @@ import WebKit
             controller.peek.close()
         }
     }
+
+    /// Extensions see a peeked page as a tab of its window, the active one, told as it opens and as it closes.
+    @available(macOS 15.4, *)
+    @Test func extensionsSeeThePeekAsTheWindowsActiveTab() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0"}"#.utf8).write(to: folder.appendingPathComponent("manifest.json"))
+        let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+        try inWindow { controller, under in
+            _ = try #require(controller.peek.show(url: nil, configuration: nil, opener: under))
+            let peeked = try #require(controller.peek.tab)
+            #expect(peeked.toldTo != nil)
+            #expect(peeked.toldTo === peeked.extensionHost)
+            #expect(peeked.window(for: context) === controller)
+            #expect(peeked.isSelected(for: context))
+            controller.peek.close()
+            #expect(peeked.toldTo == nil)
+            #expect(peeked.window(for: context) == nil)
+            #expect(under.isSelected(for: context))
+        }
+    }
+
+    /// Opened as a tab, the peeked page stays the same tab to extensions while it grows; its window gone meanwhile
+    /// (this one was never a managed window), it closes for them too.
+    @available(macOS 15.4, *)
+    @Test func openAsTabKeepsTheExtensionsTabUntilItsWindowGoes() async throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let under = Tab(url: nil, title: "Under", spaceID: space)
+        manager.adopt([under], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(under)
+        _ = try #require(controller.peek.show(url: nil, configuration: nil, opener: under))
+        let peeked = try #require(controller.peek.tab)
+        let host = try #require(peeked.toldTo)
+        controller.peek.openAsTab()
+        #expect(peeked.toldTo === host)
+        for _ in 0..<100 where !peeked.isClosed { try await Task.sleep(for: .milliseconds(20)) }
+        #expect(peeked.isClosed)
+        #expect(peeked.toldTo == nil)
+    }
 }

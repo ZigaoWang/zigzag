@@ -97,7 +97,8 @@ enum DebugBridge {
     /// webapp eval <path> <script>, webapp hide|minimize|offscreen (the first app's window), webapp state <path> (JSON: the list,
     /// the open windows), webapp settings (Settings › General), webapp toolbar on|off (the first app's), webapp front |
     /// browserfront (the menu bar for that window in front), webapp menukey <char> (⌘<char>'s item, run), webapp menu
-    /// <path> (the menu bar's items), webapp sidebutton <back|forward> x y (in the first app's window).
+    /// <path> (the menu bar's items), webapp sidebutton <back|forward> x y (in the first app's window), webapp site (its
+    /// Site Controls, opened or closed).
     private static func runWebApp(_ arg: String) {
         let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
         let rest = f.count > 1 ? f[1] : ""
@@ -111,6 +112,7 @@ enum DebugBridge {
         case "remove": WebAppStore.shared.remove(rest)
         case "closeall": WebAppWindowController.all.forEach { $0.window?.close() }
         case "sidebutton": if let window = WebAppWindowController.all.first?.window { sendSideButton(rest, to: window) }
+        case "site": WebAppWindowController.all.first?.showSiteControls()
         case "removeall": WebAppStore.shared.apps.forEach { WebAppStore.shared.remove($0.id) }
         case "eval":
             // eval <path> <script>: the first app's page runs the script; its result goes to the file.
