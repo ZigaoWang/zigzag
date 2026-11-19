@@ -1061,7 +1061,7 @@ final class Tab: NSObject {
     /// Takes the web view's address as the tab's: the page shown now, or one Zigzag itself is loading.
     private func followAddress(of wv: WKWebView) {
         guard let url = wv.url else { return }
-        let hostChanged = url.host() != self.url?.host()
+        let siteChanged = FaviconStore.siteKey(for: url) != self.url.flatMap { FaviconStore.siteKey(for: $0) }
         if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
         leavePage(for: url)
         let changedPage = url != self.url
@@ -1073,7 +1073,7 @@ final class Tab: NSObject {
         // Its language too, once the new page has drawn: it never finishes loading to be read then (#218).
         if changedPage, !wv.isLoading { self.checkLanguage(of: wv, after: 1.5) }
         // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
-        if hostChanged {
+        if siteChanged {
             self.favicon = FaviconStore.shared.cachedIcon(for: url)
             self.changed.send(.favicon)
             if self.favicon == nil { self.refreshFavicon() }
@@ -1502,15 +1502,11 @@ final class Tab: NSObject {
         errorPage ? errorPageIcon : FaviconStore.shared.cachedIcon(for: url)
     }
 
-    /// Whether the icon stays as a new page commits: only on the same site (www. or not). The first page committed
-    /// in a tab keeps the icon it was restored with.
+    /// Whether the icon stays as a new page commits: only on the same site (www. or not, on its own port). The first
+    /// page committed in a tab keeps the icon it was restored with.
     nonisolated static func keepsIcon(from previous: URL?, to committed: URL) -> Bool {
         guard let previous else { return true }
-        func site(_ url: URL) -> String {
-            let host = url.host()?.lowercased() ?? url.scheme ?? ""
-            return host.withoutWWW
-        }
-        return site(previous) == site(committed)
+        return FaviconStore.siteKey(for: previous) == FaviconStore.siteKey(for: committed)
     }
     /// The title waiting to go into History, a moment after the page last changed it.
     private var titleWrite: DispatchWorkItem?
@@ -1537,7 +1533,8 @@ final class Tab: NSObject {
                 let links = ((try? answer.get()) as? [[String: String]]) ?? []
                 if let self, self.favicon != nil, let source = self.iconSource, source.page == pageURL, source.links == links { return }
                 FaviconStore.shared.resolve(pageURL: pageURL, links: links) { image in
-                    guard let self, let image, self.url?.host() == pageURL.host(), !self.showsErrorPage else { return }
+                    guard let self, let image, let shown = self.url,
+                          FaviconStore.siteKey(for: shown) == FaviconStore.siteKey(for: pageURL), !self.showsErrorPage else { return }
                     self.iconSource = (pageURL, links)
                     self.favicon = image
                     self.changed.send(.favicon)
