@@ -2292,7 +2292,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a site an extension may use.\nButton that adds the size, in the sheet that adds a page size.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
+      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a site an extension may use.\nButton that adds the site, in the sheet that adds a site whose cookies are kept.\nButton that adds the size, in the sheet that adds a page size.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2435,7 +2435,7 @@
       }
     },
     "Add Site…" : {
-      "comment" : "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use.\nButton beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.",
+      "comment" : "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use.\nButton beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside “Keep cookies for these sites” in Settings › Privacy: opens the sheet that adds a site whose cookies are kept.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
