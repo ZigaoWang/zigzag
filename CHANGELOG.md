@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- ⇧-clicking a file on GitHub opens it in Peek instead of moving the tab, and ⌥-clicking a link a page follows itself downloads it. A page that uses ⇧- or ⌥-click itself, like selecting a range of rows, still gets the click. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#322](https://github.com/ZigaoWang/zigzag/issues/322))
+
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, cookies you can keep when clearing, and fixes for passkeys, Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
@@ -24,7 +27,6 @@ Links from other apps open in Zigzag Mini, a site can have an icon of its own, a
 ### Fixed
 - Pinning a group of tabs keeps the group whole: one pinned folder named after it, with its tabs in their order, instead of one pinned page per tab. Unpinning any of its pages brings the group back. ([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 - ⌘-clicking a video on YouTube always opens it in a new tab. Some ⌘-clicks went to the video in the tab you were on, because YouTube's own script followed the link there. Now a ⌘-click on a link opens it in a new tab whatever the page does with clicks. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#317](https://github.com/ZigaoWang/zigzag/issues/317))
-- A ⇧-click on a link still reaches the page, so selecting a range of rows that are links works as it always did, but when the page then sends the tab to that link, as GitHub's file list does, it opens in Peek instead of moving the tab. The same holds for ⌥: a click it would otherwise follow downloads instead. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#322](https://github.com/ZigaoWang/zigzag/issues/322))
 - Each PDF opens in a helper of its own, as 0.9.2 meant: the build that shipped had all PDFs share one, so a PDF couldn't be kept apart from the others open at the same time.
 - An extension's right-click menu shows its emoji and symbols, like 📋 and ⌘, instead of garbled letters like "ðŸ“‹". An extension with background scripts, as most Firefox add-ons have, had its text read in the wrong encoding. Thanks to [mrfragger](https://github.com/mrfragger). ([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - An extension that turns its side panel on only for the tab you click it on, like ChatGPT's, opens the panel when you click its button, instead of the click doing nothing.
