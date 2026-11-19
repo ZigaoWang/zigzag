@@ -43,7 +43,7 @@ struct CRXPackageTests {
 
     // MARK: The store's own signature
 
-    /// A package signed by its developer and, when given, by a key standing in for the store's.
+    /// A package signed by the developer and optionally a stand-in store key.
     private static func signed(by developer: P256.Signing.PrivateKey, publisher: P256.Signing.PrivateKey?, publisherSignsSomethingElse: Bool = false) throws -> (data: Data, id: String) {
         func varint(_ value: Int) -> [UInt8] {
             var value = UInt64(value), out: [UInt8] = []
@@ -77,16 +77,16 @@ struct CRXPackageTests {
         let storeHash = Array(SHA256.hash(data: store.publicKey.derRepresentation))
         let both = try Self.signed(by: developer, publisher: store)
         #expect(try CRXPackage(both.data, expectedID: both.id, publisherKeyHash: storeHash).id == both.id)
-        // Signed by its developer alone, as anyone can sign a package of their own.
+        // Developer signature only.
         let alone = try Self.signed(by: developer, publisher: nil)
         #expect(throws: CRXPackage.Failure.notFromStore) { try CRXPackage(alone.data, expectedID: alone.id, publisherKeyHash: storeHash) }
-        // The store's key, but its signature isn't over this package.
+        // Store key, but the signature covers something else.
         let wrong = try Self.signed(by: developer, publisher: store, publisherSignsSomethingElse: true)
         #expect(throws: CRXPackage.Failure.notFromStore) { try CRXPackage(wrong.data, expectedID: wrong.id, publisherKeyHash: storeHash) }
-        // Another key than the store's, however well it signs.
+        // A key other than the store's.
         let other = try Self.signed(by: developer, publisher: P256.Signing.PrivateKey())
         #expect(throws: CRXPackage.Failure.notFromStore) { try CRXPackage(other.data, expectedID: other.id, publisherKeyHash: storeHash) }
-        // By default, it's the Chrome Web Store's key, as Chrome has it.
+        // Defaults to the Chrome Web Store key.
         #expect(throws: CRXPackage.Failure.notFromStore) { try CRXPackage(both.data, expectedID: both.id) }
         #expect(CRXPackage.webStoreKeyHash.map { String(format: "%02x", $0) }.joined() == "61f7f2a6bfcf74cd0bc1fe2497cc9b04254c658f79f2145392867ea8366367cf")
     }

@@ -514,12 +514,14 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Panel radius, a crisp hairline edge, one soft small shadow, 12pt padding, `CardRow`-style rows inset 4pt. It grows
   out of what opened it. Command bar, space editor, icon picker, site panel, find, downloads, previews, Peek, and the
   Control-Tab switcher, which centers on the page beside the sidebar.
-- **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of curated colors (one tap
-  each, a live preview on hover), the wheel and Shade for a color of your own, and Effects folded under a disclosure
-  (`DisclosureRow`): a second color and its direction, See-through, Grain. Effects opens by itself when the space
-  uses any of them. Between the name and the colors, Profile: a dropdown of the profiles, with New Profile at its end
-  (a profile of the space's own, named after it and following its name while you type it, in one step with no
-  sheet), and one `detail` line under it: spaces on the same profile share sign-ins, history and extensions. The
+- **Space editor** (`SpaceEditorPanel`, `SpaceLookEditor`): the space's name, then one row of swatches: Default (the
+  colors it was made with), six presets in light and deep pairs, Background (the empty page's picture, a dashed slot
+  until there is one, then its thumbnail with a × on hover) and Custom, ringed when the colors are none of the
+  others, which unfolds the wheel and Shade. Under them Effects, folded under a disclosure (`DisclosureRow`): a
+  second color and its direction, See-through, Grain. Effects opens by itself when the space uses any of them. Last,
+  under a hairline, Profile: a dropdown of the profiles, with New Profile at its end (a profile of the space's own,
+  named after it and following its name while you type it, in one step with no sheet); its tooltip says spaces on
+  the same profile share sign-ins, history and extensions. The
   same editor opens for a new space, wherever it's made (the sidebar, the menus, the command bar, Settings ›
   Spaces), so the choice is there from the start. With one profile nothing else names profiles; with more, the
   space's header, the space switcher's rows and the top of a space's menu show its profile's name, quiet, unless

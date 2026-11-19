@@ -1,40 +1,36 @@
 import AppKit
 
-/// The measure a card over the page keeps. A site's permission question and a notice are the same kind of thing in the
-/// same place — read the same way, over the pane the page is in — so they are the same size, and there is one rule for
-/// how wide they may get.
+/// Shared sizing for cards over the page. Permission questions and notices sit in the same place, so they share one
+/// width rule.
 enum CardOverThePage {
     static let width: CGFloat = 420
-    /// The widest either is allowed to get.
     static let maxWidth: CGFloat = 720
     static let pad: CGFloat = 16
     static let iconSide = Tokens.Dialog.iconSide
 
-    /// How wide a card is: wide enough for what it holds, and never past the pane it is on.
+    /// Fits its content, capped by the pane.
     static func width(measured: CGFloat, in area: NSRect) -> CGFloat {
         min(max(width, measured), min(maxWidth, area.width - Tokens.Space.x6))
     }
 }
 
-/// How a notice reads: an ordinary one, one that worked, one that didn't.
 nonisolated enum NoticeTone: Equatable {
     case plain
     case good
     case bad
 }
 
-/// What a script rule's notice says, in each state it can be in. Kept apart from the card that draws it, so the words
-/// can be checked without a window.
+/// A script rule notice's text per state, separate from the card so it can be tested without a window.
 nonisolated struct ScriptNotice: Equatable {
     enum State: Equatable {
         case running
-        /// It exited 0.
+        /// Exited 0.
         case ran
-        /// It exited with an error, and printed this (its own last words, usually on stderr).
+        /// Exited with an error; holds its last output (usually stderr).
         case failed(String)
     }
 
-    /// The script's own file name: what the rule named, not the rule's name.
+    /// The script's file name, not the rule's name.
     var script: String
     var state: State
 
@@ -46,7 +42,7 @@ nonisolated struct ScriptNotice: Equatable {
         }
     }
 
-    /// The script's own words, on the line under the title — where it failed, and only where it said something.
+    /// The script's own output under the title, only on failure and only if it printed something.
     var detail: String? {
         guard case .failed(let said) = state else { return nil }
         let trimmed = said.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -69,14 +65,12 @@ nonisolated struct ScriptNotice: Equatable {
         }
     }
 
-    /// Whether it is over: the states a card stays up for, and then goes on its own.
+    /// Finished: the card stays briefly, then goes.
     var isOver: Bool { state != .running }
 }
 
-/// A notice over the page that isn't a question: something a rule is doing, or has done. It sits where a site's
-/// permission question does — over the pane the page is in, following its tab and the sidebar — with an icon, a title,
-/// a line under it for its own words, and an × to put it away. Nothing is answered and nothing waits: it goes on its
-/// own once it has been read.
+/// A non-question notice over the page about a rule's progress or result. Sits where permission questions do, follows
+/// its tab and the sidebar, and has an icon, title, detail line and ×. Dismisses itself.
 @MainActor
 final class NoticeCard: FloatingPanelView {
     private let picture = NSImageView()
@@ -86,7 +80,7 @@ final class NoticeCard: FloatingPanelView {
     private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Close", comment: "Tooltip of the × on a notice over the page, like a script's while it runs."))
 
     private var notice: ScriptNotice
-    /// The tab whose page it belongs to: it shows while that tab is in front, and goes with it.
+    /// Shown while this tab is in front; goes with it.
     private weak var tab: Tab?
     private weak var controller: PromptHost?
     private var tabsToken: SignalToken?
@@ -94,16 +88,14 @@ final class NoticeCard: FloatingPanelView {
     private var appearWork: DispatchWorkItem?
     private var hideWork: DispatchWorkItem?
     private var isUp = false
-    /// The pointer put it away: nothing more is said for this notice, and its outcome is said somewhere else.
+    /// Dismissed with ×; the outcome is reported elsewhere.
     private var wasPutAway = false
 
-    /// How long something has to take before a card appears for it while it runs. A script over in a moment never
-    /// flashes "running": its ending is the first thing seen.
+    /// Delay before showing a running card, so quick scripts show only the result.
     private static let grace: TimeInterval = 0.25
-    /// How long it stays once it is over, by how it went: a failure is worth reading.
+    /// Failures stay longer.
     private static func stay(_ tone: NoticeTone) -> TimeInterval { tone == .bad ? 8 : 4 }
-    /// The notice on screen in each window, so it can follow the sidebar as a question does, and so a second one
-    /// takes the place of the first rather than stacking over it.
+    /// One per window, so it follows the sidebar and a new one replaces the old.
     private static var shown: [ObjectIdentifier: NoticeCard] = [:]
 
     private init(_ notice: ScriptNotice) {
@@ -123,16 +115,16 @@ final class NoticeCard: FloatingPanelView {
 
     // MARK: Showing
 
-    /// Shows a notice in the window its tab is in, and gives the card back so whatever it is about can say how it
-    /// ended. Nothing is kept if the window can't be found: a caller with no card says its own ending itself.
+    /// Shows a notice in its tab's window and returns the card for later updates. Callers without a card report the
+    /// outcome themselves.
     static func show(_ notice: ScriptNotice, tab: Tab?, in host: PromptHost) -> NoticeCard {
-        // The one already up in this window steps aside: a notice is the last thing that happened, not a list.
+        // Replace, don't stack.
         if let existing = shown[ObjectIdentifier(host)] { existing.takeDown() }
         let card = NoticeCard(notice)
         card.tab = tab
         card.controller = host
         card.tabsToken = host.observePromptTabs { [weak card] in card?.followTab() }
-        // A question takes the same place, so the notice steps aside while one is up and comes back after it.
+        // Steps aside while a question is up, then comes back.
         card.questionsToken = PermissionPrompt.waitingChanged.observe { [weak card] in card?.followTab() }
         host.promptOverlay.addSubview(card)
         card.isHidden = true
@@ -142,18 +134,17 @@ final class NoticeCard: FloatingPanelView {
         return card
     }
 
-    /// Says how it is going, or how it went. False means this card is no longer the one that says it — it was put
-    /// away, another notice took its place, or its window has gone — so the caller has to say it some other way.
+    /// Updates the notice. False when the card no longer owns it (dismissed, replaced, or its window closed), so the
+    /// caller must report another way.
     @discardableResult
     func say(_ notice: ScriptNotice) -> Bool {
         guard !wasPutAway, let controller, Self.shown[ObjectIdentifier(controller)] === self else { return false }
         self.notice = notice
         render()
         appearWork?.cancel()
-        // Over its own tab only, as while it ran: an ending in a background tab waits there for you, and its time
-        // to go starts once it has been seen.
+        // Only over its own tab: a background tab's result waits there, and its timeout starts once seen.
         if notice.isOver {
-            // Up already, it grows to its new words where it is: a failure has a line under its title.
+            // Resizes in place; a failure adds a detail line.
             if isUp { rePlace { place(in: controller) } }
             followTab()
             if isUp, hideWork == nil { hideAfterWhile() }
@@ -190,7 +181,7 @@ final class NoticeCard: FloatingPanelView {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.stay(notice.tone), execute: work)
     }
 
-    /// Put away by the pointer: it goes, and the outcome is not said here again.
+    /// Dismissed with ×: the outcome isn't reported again here.
     private func putAway() {
         wasPutAway = true
         takeDown()
@@ -211,8 +202,8 @@ final class NoticeCard: FloatingPanelView {
         if let controller, Self.shown[ObjectIdentifier(controller)] === self { Self.shown[ObjectIdentifier(controller)] = nil }
     }
 
-    /// Shown while its tab is in front (either side of a split counts), set aside while another tab is, and gone once
-    /// that tab is closed or has moved to another window.
+    /// Shown while its tab is in front (either split side), hidden otherwise, removed when the tab closes or moves
+    /// window.
     private func followTab() {
         guard let controller else { return }
         guard let tab, !tab.isClosed, controller.promptHolds(tab) else { takeDown(); return }
@@ -245,8 +236,8 @@ final class NoticeCard: FloatingPanelView {
         needsLayout = true
     }
 
-    /// The color of the icon: the ink of the text while it runs, green when it worked, and the app's own
-    /// something-to-fix color when it didn't (its red is kept for what can't be undone).
+    /// Text color while running, green on success, the app's warning color on failure (red is for destructive
+    /// things).
     private func ink(for tone: NoticeTone) -> NSColor {
         switch tone {
         case .plain: Tokens.Color.textPrimary
@@ -257,7 +248,7 @@ final class NoticeCard: FloatingPanelView {
 
     private var textX: CGFloat { CardOverThePage.pad + CardOverThePage.iconSide + Tokens.Space.x3 }
 
-    /// Room kept at the right of the text for the ×.
+    /// Space for the ×.
     private var closeRoom: CGFloat { Tokens.Metric.iconButton }
 
     private var measuredWidth: CGFloat {
@@ -278,8 +269,7 @@ final class NoticeCard: FloatingPanelView {
         return CardOverThePage.pad + max(CardOverThePage.iconSide, textHeight(for: textWidth)) + CardOverThePage.pad
     }
 
-    /// At the top of the pane the page is in, centered: the same place a site's question comes up, so the two are read
-    /// from the same spot.
+    /// Centered at the top of the page's pane, where permission questions appear.
     private func place(in controller: PromptHost) {
         surfaceTint = nil
         tintStrength = nil
@@ -308,7 +298,7 @@ final class NoticeCard: FloatingPanelView {
 
     // MARK: Following the window
 
-    /// Puts the notice back where it belongs after the sidebar or the window changed.
+    /// After the sidebar or window changed.
     static func reposition(in controller: PromptHost, slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.drawer) {
         guard let card = shown[ObjectIdentifier(controller)], card.superview != nil, !card.isHidden else { return }
         card.rePlace(slide: slide, timing: timing) { card.place(in: controller) }
@@ -316,14 +306,12 @@ final class NoticeCard: FloatingPanelView {
 }
 
 extension FloatingPanelView {
-    /// Moves a card over the page from where it was to where it belongs now, after the sidebar or the window changed.
-    /// It never jumps: riding a sidebar slide it moves with the sidebar on the same curve, and between two places it
-    /// glides there.
+    /// Animates to the new position: in step with a sidebar slide, or a glide otherwise.
     func rePlace(slide: TimeInterval? = nil, timing: CAMediaTimingFunction = Tokens.Motion.drawer, _ place: () -> Void) {
         let old = frame
         place()
         let dx = old.minX - frame.minX, dy = old.minY - frame.minY
-        // Dragging the window's edge, it simply stays with the page; gliding there would trail behind.
+        // No glide during live resize; it would lag behind.
         guard abs(dx) > 0.5 || abs(dy) > 0.5, !Tokens.Motion.reduceMotion, window?.inLiveResize != true, let layer else { return }
         let move = CABasicAnimation(keyPath: "transform")
         move.fromValue = NSValue(caTransform3D: CATransform3DMakeTranslation(dx, dy, 0))

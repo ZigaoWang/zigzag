@@ -32,7 +32,7 @@ final class BrowserWebView: WKWebView {
     /// otherwise only bring the window forward.
     nonisolated(unsafe) static var takesFirstMouse = false
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { Self.takesFirstMouse || super.acceptsFirstMouse(for: event) }
-    /// Holds a swipe part of the way (`SwipeNavigator.debugHold`).
+    /// Holds a swipe partway (`SwipeNavigator.debugHold`).
     func debugHoldSwipe(direction: Int, progress: CGFloat?) { swipe.debugHold(direction: direction, progress: progress) }
     #endif
 
@@ -107,8 +107,8 @@ final class BrowserWebView: WKWebView {
         super.rightMouseDown(with: event)
     }
 
-    /// The text selected as a right-click starts, for its menu (#234). Asked of the page before the click reaches
-    /// it, so the answer comes back ahead of the menu, which the page sends after handling the click.
+    /// Selected text at right-click, for the menu (#234). Read before the page gets the click, so it arrives before
+    /// the menu the page sends after handling it.
     private var menuSelection: String?
 
     private func readSelectionForMenu() {
@@ -120,8 +120,8 @@ final class BrowserWebView: WKWebView {
         }
     }
 
-    /// The page's selection, read in Zigzag's own world (the page can't stand in its own answer), or the selection
-    /// in the frame you're in when the page has none and that frame is the page's own site.
+    /// Read in Zigzag's world so the page can't fake it; falls back to the focused frame's selection when that frame
+    /// is same-site.
     static let selectionScript = """
     (() => {
       let text = getSelection().toString();
@@ -230,8 +230,8 @@ final class BrowserWebView: WKWebView {
 
     static let openSelectionIdentifier = "ZigzagOpenSelection"
 
-    /// Selected text that's a web address but not a link ("example.com" in a post) gets Open and Open in New Tab at
-    /// the top of its menu, as Chrome's Go to does (#234). Only in a browser window's page.
+    /// A selected web address that isn't a link ("example.com" in a post) gets Open and Open in New Tab at the top,
+    /// like Chrome's Go to (#234). Browser windows only.
     private func addOpenSelection(to menu: NSMenu) {
         guard menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierSearchWeb" }),
               !menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }),
@@ -252,8 +252,8 @@ final class BrowserWebView: WKWebView {
         return item
     }
 
-    /// The text the menu is for: the selection read as the click started, when it's still what WebKit's Look Up item
-    /// names (shortened with … when long). A click that selected a word instead has no Open.
+    /// The selection read at click start, if it still matches WebKit's Look Up item (which truncates with …). A click
+    /// that selected a word instead gets no Open.
     private func selectedText(in menu: NSMenu) -> String? {
         defer { menuSelection = nil }
         guard let text = menuSelection?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
@@ -261,7 +261,7 @@ final class BrowserWebView: WKWebView {
         return Self.lookUpTitle(lookUp.title, names: text) ? text : nil
     }
 
-    /// Whether a Look Up item's title (Look Up “example.com”, or “A long sel…” cut short) is for this text.
+    /// Matches Look Up “example.com” or a truncated “A long sel…”.
     nonisolated static func lookUpTitle(_ title: String, names text: String) -> Bool {
         guard let open = title.firstIndex(of: "“"), let close = title.lastIndex(of: "”"), open < close else { return false }
         let named = String(title[title.index(after: open)..<close]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -462,15 +462,21 @@ enum PictureInPicture {
     }
 }
 
-/// A page's web view Zigzag is done with (its tab closed, slept or rebuilt): kept until the next turn of the main
-/// loop, closed, then let go. Never freed inside a WebKit callback: WebKit in macOS 26.5 can be in the middle of
-/// putting the page's next site in a new process when its view goes, and then crashes without it (#305,
-/// https://bugs.webkit.org/show_bug.cgi?id=316686). Closed first, so a page something else still holds stops there.
+/// Retires a web view (tab closed, slept or rebuilt): closes it on the next main-loop turn, then releases it. Never
+/// freed inside a WebKit callback: on macOS 26.5 WebKit may be swapping the page into a new process and crashes if
+/// the view is gone (#305, https://bugs.webkit.org/show_bug.cgi?id=316686). Closing first stops the page even if
+/// something else still holds the view.
 @MainActor
 enum PageRetirement {
     private static var retiring: [WKWebView] = []
 
-    static func retire(_ webView: WKWebView) {
+    /// `endingPasskeys`: a waiting passkey request is ended before the page closes, in case closing leaves it with macOS (#348).
+    static func retire(_ webView: WKWebView, endingPasskeys: Bool = Passkeys.available) {
+        guard endingPasskeys else { queue(webView); return }
+        Passkeys.endRequests(in: webView) { queue(webView) }
+    }
+
+    private static func queue(_ webView: WKWebView) {
         retiring.append(webView)
         guard retiring.count == 1 else { return }
         DispatchQueue.main.async { MainActor.assumeIsolated { closeRetired() } }

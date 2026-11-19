@@ -1,18 +1,13 @@
 import WebKit
 
-/// Stand-ins for tracking libraries the content blocker stops, on sites that can't start without them.
-///
-/// EasyPrivacy blocks FingerprintJS 2 (`/fingerprint2.min.js` and the like) everywhere. Some sites call it from their
-/// own code before anything else, so with the file blocked `Fingerprint2` is never defined, the first call throws, and
-/// the page stays blank (中语智汇's web.zyamoy.com, a teaching platform schools use). uBlock Origin serves a harmless
-/// file in its place; WebKit's content blocker can only stop a request, so pages that are blocked for get a small
-/// stand-in instead, there only when the page asked for the library and the library never came. It answers
-/// FingerprintJS 2's calls with no fingerprint: one random ID per site, kept with that site's own data, so the site
-/// sees the same browser from visit to visit and learns nothing about the Mac.
-///
-/// This is for any site, as uBlock Origin's `fingerprint2.js` is. A fix for one site goes in the "Zigzag fixes" list
-/// (AdFilters.swift), not here, unless the site breaks on a block the content blocker makes whether or not that list
-/// has reached the page (`siteCalls`).
+/// Stand-ins for blocked tracking libraries that some sites need to start. EasyPrivacy blocks FingerprintJS 2
+/// (`/fingerprint2.min.js` etc.); sites that call it first then throw on an undefined `Fingerprint2` and stay blank
+/// (web.zyamoy.com, a school teaching platform). uBlock Origin serves a harmless replacement; WebKit's content
+/// blocker can only block, so a small stand-in is added only when the page asked for the library and it never loaded.
+/// It returns no real fingerprint: a random ID per site, stored with that site's data, so the site sees a stable
+/// browser and learns nothing about the Mac. Generic, like uBlock Origin's `fingerprint2.js`. Single-site fixes
+/// belong in the "Zigzag fixes" list (AdFilters.swift), unless the site breaks on a block made before that list
+/// reaches the page (`siteCalls`).
 enum BlockedScriptStandIns {
     /// The file names EasyPrivacy blocks FingerprintJS 2 by.
     static let fingerprint2Files = #"/(?:fingerprint2(?:\.min)?|fp2\.min|fp2\.compressed|fpt2)\.js(?:[?#]|$)"#
@@ -30,16 +25,13 @@ enum BlockedScriptStandIns {
 
     static var scripts: [WKUserScript] { [script, siteCalls] }
 
-    /// A site's own calls the content blocker stops, each on the one host it was seen on, that the site reads as a
-    /// broken network. Their fetch and XMLHttpRequest get an empty answer from the page itself: nothing is sent, as
-    /// with the block.
-    ///
-    /// DeepSeek (chat.deepseek.com) posts its telemetry to /api/v0/telemetry, which EasyPrivacy blocks; after three
-    /// failures in a row, while its other calls go through, it says "Please check your browser extensions" (#208).
-    /// The "Zigzag fixes" list answers it too, but only once uBlock Origin's lists and scriptlets have downloaded, only
-    /// in pages loaded after that (a pinned DeepSeek restored at launch while the lists are rebuilt after an update
-    /// kept failing until it was reloaded), and never beside an ad blocker extension. This block is Zigzag's own and
-    /// always there with it, so its answer is too.
+    /// Site calls the content blocker stops that the site treats as a network failure, each limited to the host it
+    /// was seen on. Their fetch and XMLHttpRequest get an empty local response; nothing is sent. DeepSeek
+    /// (chat.deepseek.com) posts to /api/v0/telemetry, which EasyPrivacy blocks; after three failures it says "Please
+    /// check your browser extensions" (#208). The "Zigzag fixes" list handles it too, but only after uBlock Origin's
+    /// lists download, only in pages loaded afterwards (a pinned DeepSeek restored at launch during a list rebuild
+    /// kept failing until reloaded), and never with an ad blocker extension. This block is always present, so its
+    /// answer is too.
     static let siteCalls = WKUserScript(source: """
     \(mark)
     (() => {
@@ -52,7 +44,7 @@ enum BlockedScriptStandIns {
           return url.origin === location.origin && path.test(url.pathname);
         } catch (e) { return false; }
       };
-      // Proxies, so fetch and XMLHttpRequest still read as the browser's own to the page.
+      // Proxies, so fetch and XMLHttpRequest still look native to the page.
       window.fetch = new Proxy(window.fetch, {
         apply(target, self, args) {
           const input = args[0];
@@ -62,7 +54,7 @@ enum BlockedScriptStandIns {
       });
       const proto = XMLHttpRequest.prototype;
       const opened = new WeakMap();
-      // The ones given an answer of their own: opened again, they read as a request of their own again.
+      // Answered requests; reopening one makes it a new request.
       const answeredWith = new WeakMap();
       proto.open = new Proxy(proto.open, {
         apply(target, self, args) {

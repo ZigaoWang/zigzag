@@ -14,7 +14,7 @@ import Testing
         row.subviews.compactMap { $0 as? Label }.filter { !$0.isHidden && $0.frame.width > 0 }.sorted { $0.frame.minX < $1.frame.minX }
     }
 
-    /// The hairlines between parts: thin views as tall as the row less its margins.
+    /// Hairlines between parts: thin views the row's height minus margins.
     private func lines(of row: TabRowView) -> [NSRect] {
         row.subviews.filter { !$0.isHidden && $0.frame.width == Tokens.Metric.hairline && $0.frame.height == row.bounds.height - Tokens.Space.x4 }
             .map(\.frame).sorted { $0.minX < $1.minX }
@@ -42,8 +42,7 @@ import Testing
         }
     }
 
-    /// A tab's title is faded once a layout, where it ends up (under the close button, past a pin's name), not first
-    /// where a plain row would put it.
+    /// A tab title's fade is applied once per layout at its final position.
     @Test func aTabsTitleIsFadedOnceALayout() {
         let row = row(parts: 1, width: 220)
         let before = row.title.fadesAsked
@@ -61,9 +60,7 @@ import Testing
 }
 
 extension SplitRowAlignmentTests {
-    /// Each part shows its title, cut where it must, all ending where they should: the last where a tab's title ends
-    /// in a wide row (the close button comes over its faded end), the others as far before the hairline as the next
-    /// icon is after it.
+    /// Every part shows a truncated title: the last ends like a tab title, others leave the same gap before the hairline as the next icon after it.
     @Test(arguments: [2, 3, 4]) func eachPartShowsItsTitle(parts: Int) {
         let width: CGFloat = 360
         let r = row(parts: parts, width: width)
@@ -71,27 +68,26 @@ extension SplitRowAlignmentTests {
         let shown = titles(of: r), icons = icons(of: r), lines = lines(of: r)
         #expect(shown.count == parts)
         #expect(lines.count == parts - 1)
-        // Every title level with a tab's, starting the same way after its icon.
+        // Titles align with a tab's, after the icon.
         for (label, icon) in zip(shown, icons) {
             #expect(label.frame.minY == single.title.frame.minY && label.frame.height == single.title.frame.height)
             #expect(label.frame.minX - icon.maxX == single.title.frame.minX - single.icon.frame.maxX)
         }
-        // Nothing kept for the close button: the last title ends where a tab's does.
+        // No room reserved for close: the last title ends where a tab's does.
         #expect(shown.last?.frame.maxX == single.title.frame.maxX)
-        // Equal margins either side of each hairline: the text stops as far before it as the next icon starts after.
+        // Equal margins either side of each hairline.
         for (i, line) in lines.enumerated() {
             let textEnd = shown[i].frame.maxX - Label.inset
             #expect(abs((line.midX - textEnd) - (icons[i + 1].minX - line.midX)) <= 1)
             #expect(abs(line.midX - textEnd - TabRowView.inset) <= 0.5)
         }
-        // Parts of one width, a point's rounding apart.
+        // Equal part widths within a point.
         let starts = [0] + lines.map(\.midX) + [width]
         let widths = zip(starts.dropFirst(), starts).map { $0 - $1 }
         #expect((widths.max() ?? 0) - (widths.min() ?? 0) <= 1)
     }
 
-    /// Where the close button would cover the last part's whole title, its room is kept, at rest too, so every part
-    /// keeps a title and nothing moves when it comes.
+    /// When the close button would hide the last title, its room is reserved even at rest, so nothing shifts on hover.
     @Test func aNarrowLastPartKeepsTheCloseButtonsRoom() {
         let parts = 3
         let r = row(parts: parts, width: 228)
@@ -110,8 +106,7 @@ extension SplitRowAlignmentTests {
         let xs = icons(of: r).map(\.midX)
         #expect(!TabRowView.segmentShowsTitle(width: width / 4))
         #expect(titles(of: r).isEmpty)
-        // Centered in four equal parts that end where the close's room begins: evenly apart, the hairlines halfway
-        // between them, so they're never crowded.
+        // Centered in four equal parts ending at the close button's room, hairlines halfway between.
         let lines = lines(of: r)
         #expect(xs.count == 4 && lines.count == 3)
         let steps = zip(xs.dropFirst(), xs).map { $0 - $1 }
@@ -120,7 +115,7 @@ extension SplitRowAlignmentTests {
         #expect(xs[3] < r.closeButton.frame.minX)
     }
 
-    /// The parts never run past the row, however many and however narrow it is.
+    /// Parts never overflow the row.
     @Test(arguments: [2, 3, 4]) func neverOverflows(parts: Int) {
         for width in [120, 160, 200, 240, 300] as [CGFloat] {
             let r = row(parts: parts, width: width)
@@ -130,8 +125,7 @@ extension SplitRowAlignmentTests {
         }
     }
 
-    /// The narrowest part with a title, at each sidebar size: room for the icon, its gap, a few letters and the inset
-    /// either side.
+    /// Minimum part width for a title per sidebar size: icon, gap, a few letters, insets.
     @Test func theTitleThresholdFollowsTheSidebarSize() {
         #expect(TabRowView.segmentMinWidth(for: .medium) == 56)
         #expect(TabRowView.segmentMinWidth(for: .small) < TabRowView.segmentMinWidth(for: .medium))
@@ -143,7 +137,7 @@ extension SplitRowAlignmentTests {
         }
     }
 
-    /// VoiceOver names every page of the row.
+    /// VoiceOver names every page in the row.
     @Test func theRowNamesItsPages() {
         let label = row(parts: 3, width: 260).accessibilityLabel() ?? ""
         #expect(["Page", "Second", "Page 2"].allSatisfy { label.contains($0) })

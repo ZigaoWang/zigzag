@@ -237,8 +237,8 @@ final class SwipeNavigator {
     }
 
     #if DEBUG
-    /// Debug builds: holds a swipe at `progress` of the way to navigating (1 arms it), as fingers resting there would,
-    /// so a test copy can show it without a trackpad (`swipestep back 0.5`). `nil` lets go without navigating.
+    /// Debug builds: holds a swipe at `progress` toward navigating (1 arms it), so a test copy can show it without a
+    /// trackpad (`swipestep back 0.5`). `nil` releases without navigating.
     func debugHold(direction wanted: Int, progress value: CGFloat?) {
         guard let value else {
             if state == .tracking { cancel() }
@@ -267,8 +267,7 @@ final class SwipeNavigator {
         self.arrow = arrow
     }
 
-    /// The card showing this page, which moves it aside over a backdrop of its own; none for a page shown some
-    /// other way, which moves by itself.
+    /// The card that slides this page aside over its own backdrop; nil when the page moves by itself.
     private var card: PageCardView? {
         var view = webView?.superview
         while let current = view, !(current is PageCardView) { view = current.superview }
@@ -485,9 +484,9 @@ final class SwipeArrowView: NSView {
     var progress: CGFloat = 0 { didSet { refresh() } }
     var isArmed = false { didSet { refresh(animated: true) } }
 
-    /// Where the arrow floats for a page whose place is `page` (before it moved), pushed `offset` points aside: in the
-    /// middle of the gap that opens at its edge, and never nearer that edge than a margin, so it never hangs over the
-    /// sidebar, the next pane or the window's edge. While the gap is narrower than the arrow, it floats over the page.
+    /// The arrow, for a page at `page` shifted `offset` points: centered in the gap at its edge, at least a margin
+    /// from that edge so it never overlaps the sidebar, the next pane or the window edge. Floats over the page while
+    /// the gap is narrower than the arrow.
     static func frame(in page: NSRect, offset: CGFloat, back: Bool) -> NSRect {
         let margin = Tokens.Space.x2
         let edge = back ? page.minX : page.maxX

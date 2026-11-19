@@ -1,6 +1,6 @@
 import AppKit
 
-/// Settings › Spaces › Add Site…: asks for a site and the space it always opens in (#286).
+/// Settings › Spaces › Add Site…: a site and the space it always opens in (#286).
 enum SiteRouteSheet {
     @discardableResult
     static func add(in host: NSView) -> FormSheet {
@@ -8,7 +8,7 @@ enum SiteRouteSheet {
         let spaces = Library.shared.spaces
         let choice = DropdownButton()
         choice.options = spaces.map { DropdownButton.Option(title: $0.name) }
-        // The space you're in is likely where the site is wanted.
+        // Default to the current space.
         let current = BrowserWindowController.undoTarget?.tabManager.currentSpaceID
         choice.selectedIndex = spaces.firstIndex { $0.id == current } ?? 0
         return FormSheet.show(in: host, title: String(localized: "Always Open a Site in a Space", comment: "Title of the sheet that sends a site to a space, from Settings › Spaces."), symbol: "square.stack",

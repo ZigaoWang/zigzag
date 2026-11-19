@@ -93,16 +93,14 @@ final class PageHolder: NSView {
 
     // MARK: Into real full screen
 
-    /// Over a page that fills itself with a video (Full screen videos fill: The Page): a button at its top corner
-    /// that takes the video into the screen's own full screen (#257). It shows while the pointer moves over the page
-    /// and goes after a moment still, as a player's controls do.
+    /// On a page-filled video (Full screen videos fill: The Page), a top-corner button that sends it to real full
+    /// screen (#257). Shows on pointer movement and hides after a moment, like player controls.
     var showsExpand = false {
         didSet {
             guard showsExpand != oldValue else { return }
             if showsExpand { revealExpand() } else { removeExpand() }
         }
     }
-    /// What the button does: the tab sends its video to the screen.
     var onExpand: (() -> Void)?
     private var expandButton: IconButton?
     private var expandIdle: DispatchWorkItem?
@@ -149,7 +147,7 @@ final class PageHolder: NSView {
         let inset = Tokens.Space.x3
         button.frame = NSRect(x: bounds.maxX - inset - Self.expandSide, y: isFlipped ? inset : bounds.maxY - inset - Self.expandSide,
                               width: Self.expandSide, height: Self.expandSide)
-        // Over the page, never under it.
+        // Keep it on top.
         if subviews.last !== button { addSubview(button, positioned: .above, relativeTo: nil) }
     }
 

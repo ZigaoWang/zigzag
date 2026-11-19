@@ -23,8 +23,7 @@ struct ShipFixesTests {
         #expect(ImportCoordinator.Choice.retrying([], else: all) == all)
     }
 
-    /// #272: with the sidebar hidden, a link opened in a new tab behind the page says so; docked or slid out, the
-    /// new row in the sidebar does, and over the desk there's no page to say it on.
+    /// #272: with the sidebar hidden, a background new tab shows a note; with it visible the new row does, and over the desk there's no page for it.
     @Test func newTabNoteOnlyWithTheSidebarOutOfSight() {
         #expect(NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: false))
         #expect(!NewTabNote.shows(sidebarVisible: true, sidebarFloating: false, deskVisible: false))
@@ -32,7 +31,7 @@ struct ShipFixesTests {
         #expect(!NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: true))
     }
 
-    /// #272: the note names the site until the page gives its title, then the title.
+    /// #272: the note shows the site until the title loads.
     @Test func newTabNoteNamesTheSiteUntilTheTitleComes() {
         let site = URL(string: "https://www.example.com/a")!
         // WebKit's empty tab for Open Link in New Tab: the site it's about to load.
@@ -209,19 +208,19 @@ struct BookmarkFolderTests {
 
     // MARK: Swiping back and forward
 
-    /// The swipe arrow sits in the gap the page leaves, never over the sidebar, the next pane or the window's edge.
+    /// The swipe arrow stays in the page's gap, never over the sidebar, the next pane or the window edge.
     @Test func swipeArrowStaysInsideTheCard() {
         let page = NSRect(x: 300, y: 0, width: 800, height: 600)
         let size = SwipeArrowView.size, margin = Tokens.Space.x2
-        // Back: a wide gap centers it; a narrow one keeps it a margin in from the card's edge.
+        // Back: centered in a wide gap, a margin from the card edge in a narrow one.
         let wide = SwipeArrowView.frame(in: page, offset: size + margin * 4, back: true)
         #expect(wide.minX == page.minX + margin * 2)
         let narrow = SwipeArrowView.frame(in: page, offset: 10, back: true)
         #expect(narrow.minX == page.minX + margin)
-        // Forward: the same at the right edge, the page pushed left.
+        // Forward: same at the right edge.
         let forward = SwipeArrowView.frame(in: page, offset: -10, back: false)
         #expect(forward.maxX == page.maxX - margin)
-        // Halfway down the page, either way.
+        // Vertically centered either way.
         #expect(narrow.midY == page.midY)
     }
 
@@ -554,8 +553,7 @@ struct UpdateBackupTests {
         #expect(UpdateBackup.all(in: root).count == 1)
     }
 
-    /// A data folder with nothing in it yet makes no backup, even when another build ran last (a fresh folder, or
-    /// Zigzag installed again after its data was removed), so General never offers to restore one that holds nothing.
+    /// An empty data folder makes no backup, even after another build ran, so General never offers an empty restore.
     @Test func freshDataIsNeverOfferedAsABackup() throws {
         let root = try makeRoot()
         let suite = "zigzag-backup-test-\(UUID().uuidString)"
@@ -566,7 +564,7 @@ struct UpdateBackupTests {
         UpdateBackup.backUpIfUpdated(build: "105", version: "0.9.1", defaults: defaults, root: root)
         #expect(UpdateBackup.all(in: root).isEmpty)
         #expect(defaults.string(forKey: "LastRunBuild") == "105")
-        // An empty backup left by an earlier version isn't offered either.
+        // Nor empty backups from earlier versions.
         let folder = root.appendingPathComponent("Backups", isDirectory: true)
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("2026-11-15T02-00-00Z 0.9.1"), withIntermediateDirectories: true)
         #expect(UpdateBackup.restorable(in: root) == nil)
@@ -591,7 +589,7 @@ struct UpdateBackupTests {
 
     /// A backup from before there were profiles has no Profiles.json: putting it back leaves the one there is, so
     /// spaces stay on their profiles.
-    /// The restore marker names a backup folder, never a path: one that leads out of Backups is ignored.
+    /// The restore marker names a backup folder; paths escaping Backups are ignored.
     @Test func restoreRefusesAPathOutOfTheBackups() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -844,7 +842,7 @@ struct PageTextSubstitutionTests {
     }
 }
 
-/// A spelling or substitution choice made in one page reaches every page already open, not only that one (#296).
+/// Spelling and substitution changes in one page apply to every open page (#296).
 @MainActor
 struct PageTextCheckingTests {
     private func page(_ site: String) async throws -> (WKWebView, NSWindow) {
@@ -888,7 +886,7 @@ struct PageTextCheckingTests {
     }
 
     @Test func correctingFollowsTheMacUntilYouChoose() {
-        // Registered defaults are the whole app's, whichever UserDefaults sets them: only the Mac's own value here.
+        // Registered defaults are app-wide, so only the system value is used here.
         let mac = NSSpellChecker.isAutomaticSpellingCorrectionEnabled
         let registered = UserDefaults.standard.volatileDomain(forName: UserDefaults.registrationDomain)
         #expect(registered[PageTextChecking.spellingCorrectionKey] as? Bool == mac)
@@ -897,7 +895,7 @@ struct PageTextCheckingTests {
         let checking = PageTextChecking(defaults: defaults, center: NotificationCenter(), systemCorrects: { mac })
         checking.start()
         #expect(defaults.bool(forKey: PageTextChecking.spellingCorrectionKey) == mac)
-        // Your choice, once made, stands over the Mac's.
+        // A user choice overrides the system's.
         defaults.set(!mac, forKey: PageTextChecking.spellingCorrectionKey)
         checking.followSystem()
         #expect(defaults.bool(forKey: PageTextChecking.spellingCorrectionKey) == !mac)
@@ -906,7 +904,7 @@ struct PageTextCheckingTests {
     @Test func aChangedChoiceIsSentToThePagesOnce() async throws {
         let (defaults, name) = scratchDefaults()
         defer { defaults.removePersistentDomain(forName: name) }
-        // The one UserDefaults says a change on.
+        // The notification UserDefaults posts on change.
         let center = NotificationCenter.default
         var posted = 0
         let watch = center.addObserver(forName: NSSpellChecker.didChangeAutomaticSpellingCorrectionNotification, object: nil, queue: nil) { _ in posted += 1 }

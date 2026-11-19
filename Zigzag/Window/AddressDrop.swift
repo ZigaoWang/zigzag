@@ -6,9 +6,8 @@ import AppKit
 /// field, an accent ring around it says it'll land there, the same ring the sidebar and the page show for a drop.
 @MainActor
 final class AddressDrop {
-    /// What a drop carries, as Zigzag goes to it: the first link (a page on the web or a file), else the text as an
-    /// address when it reads as one, else a search for it. Nil for nothing usable (an empty string, a link of another
-    /// kind, like `javascript:`). Text that's an address without a scheme carries its fallback over http, as typed.
+    /// A drop's destination: the first URL (web or file), else the text as an address, else a search. Nil for nothing
+    /// usable (empty, `javascript:`). Scheme-less addresses get the http fallback, as when typed.
     static func destination(urls: [URL], text: String?, engine: SearchEngine) -> CommandRanker.Destination? {
         if let url = urls.first(where: { ["http", "https", "file"].contains($0.scheme?.lowercased() ?? "") }) { return .init(url: url) }
         guard urls.isEmpty, let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }

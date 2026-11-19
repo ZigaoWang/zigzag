@@ -36,14 +36,14 @@ final class ImportView: NSView {
     private let subtitle = NSTextField(wrappingLabelWithString: "")
     private var sources: [ImportCoordinator.Source] = []
     private var rows: [SourceRow] = []
-    /// Everything between the heading and the buttons. When it's taller than the window can be (many browsers,
-    /// Chrome's profiles, the choices wrapping), the browsers scroll first, so what to bring stays in view; on a
-    /// screen too short even for that, all of it scrolls. Import and Not Now stay at the bottom either way (#293).
+    /// Everything between heading and buttons. When too tall (many browsers, Chrome profiles, wrapped choices), the
+    /// browser list scrolls first so the choices stay visible; on very short screens everything scrolls. Import and Not
+    /// Now stay at the bottom (#293).
     private let bodyScroll = NSScrollView()
     private let body = FlippedView()
     private let rowScroll = NSScrollView()
     private let rowList = FlippedView()
-    /// How tall it would be with nothing scrolled away: what its own window fits to.
+    /// Unscrolled height, which its window fits to.
     private(set) var naturalHeight: CGFloat = 0
     private var rowsScrolled = false
     private let choiceLabel = Label(String(localized: "Bring", comment: "Label in the Import window, before the choices of what to bring over: Passwords, Bookmarks…"), font: Tokens.Font.small(.medium), color: Tokens.Color.textSecondary)
@@ -287,8 +287,8 @@ final class ImportView: NSView {
         }
         primary.isEnabled = stage != .choose || choosesFileFirst || (rows.contains(where: \.isChosen) && !chosenData.isEmpty)
         needsLayout = true
-        // A choice that brings more lines (Chrome's Extensions, the note on Sign-ins) makes room for them while the
-        // screen has it; it never shrinks back, so ticking a browser on and off doesn't bounce the window.
+        // Grow for choices that add lines (Chrome's Extensions, the Sign-ins note) while the screen allows; never
+        // shrink, so toggling doesn't bounce the window.
         fitWindow(growOnly: true)
     }
 
@@ -509,16 +509,15 @@ final class ImportView: NSView {
         needsLayout = true
     }
 
-    /// The tallest its own window gets: 780 points, or less on a short screen, where what's left scrolls.
+    /// 780 points, or less on a short screen.
     static func tallestWindow(on screen: NSScreen?) -> CGFloat {
         min(780, (screen ?? NSScreen.main)?.visibleFrame.height ?? 900)
     }
 
-    /// In its own window, the window follows the content: shorter once only the summary is left. `growOnly`: only
-    /// taller, never shorter.
+    /// Resizes its window to the content. `growOnly`: never shrink.
     func fitWindow(growOnly: Bool = false) {
         guard presentation == .window, let window else { return }
-        // Measured as it is now, not as it was last laid out.
+        // Measure the current state, not the last layout.
         needsLayout = true
         layoutSubtreeIfNeeded()
         var frame = window.frame
@@ -530,7 +529,7 @@ final class ImportView: NSView {
         guard abs(delta) > 1, !growOnly || delta > 0 else { return }
         frame.size.height += delta
         frame.origin.y -= delta
-        // Grown down past the bottom of the screen, it moves up to stay on it.
+        // Keep the window on screen.
         if let visible = (window.screen ?? NSScreen.main)?.visibleFrame, frame.minY < visible.minY {
             frame.origin.y = min(visible.minY, visible.maxY - frame.height)
         }
@@ -600,11 +599,11 @@ final class ImportView: NSView {
         }
     }
 
-    /// A password CSV, or Safari's browsing data zip.
+    /// A password CSV, a bookmarks HTML file, or Safari's browsing data zip.
     private func pickFile() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = String(localized: "Choose a password export (a .csv file) or Safari’s browsing data export (a .zip file).", comment: "Message of the open panel from the Import window's Choose File… button.")
+        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html]
+        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s browsing data export (a .zip file).", comment: "Message of the open panel from the Import window's Choose File… button.")
         panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         let handle: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let url = panel.url, let self else { return }
@@ -626,7 +625,7 @@ final class ImportView: NSView {
         super.layout()
         let width: CGFloat = min(440, bounds.width - Tokens.Space.x8 * 2)
         let x = round((bounds.width - width) / 2)
-        // Everything but the banner and the buttons goes in the body, top-down from its own top.
+        // Body content, top-down.
         var y: CGFloat = 0
         func place(_ view: NSView, height: CGFloat, gap: CGFloat = 0) {
             view.frame = NSRect(x: x, y: y, width: width, height: height)
@@ -653,7 +652,7 @@ final class ImportView: NSView {
             ry += height + Tokens.Space.x2
         }
         rowList.frame = NSRect(x: 0, y: 0, width: width, height: rowsHeight)
-        // Lays the body out with the browsers this tall, and says how tall the body came to.
+        // Lays out the body with this list height and returns the body height.
         func layBody(listHeight: CGFloat) -> CGFloat {
             y = 0
             if hero.superview != nil {
@@ -662,7 +661,7 @@ final class ImportView: NSView {
             }
             title.alignment = .left
             title.attributedStringValue = Brand.display(title.stringValue, size: Tokens.TypeSize.display, color: Tokens.Color.textPrimary)
-            // What isn't placed is hidden, so nothing is left drawing where it last was, or in the corner.
+            // Hide unplaced views so they don't draw at stale positions.
             title.isHidden = title.stringValue.isEmpty
             subtitle.isHidden = subtitle.stringValue.isEmpty
             if !title.isHidden { place(title, height: titleHeight, gap: Tokens.Space.x2) }
@@ -674,9 +673,8 @@ final class ImportView: NSView {
             if showsChoices {
                 y += Tokens.Space.x4
                 place(choiceLabel, height: choiceLabel.lineHeight, gap: Tokens.Space.x2)
-                // The pills reach out by their padding, so each line's first check starts where the words above do, as
-                // Choose File… below does. They wrap onto a second line when they don't fit one (Arc's Spaces and Tabs
-                // with Sign-ins).
+                // Pills extend by their padding, so the first check aligns with the text above, like Choose File…. They
+                // wrap when needed (Arc's Spaces and Tabs with Sign-ins).
                 let start = x + Label.inset - Tokens.Space.x2
                 var cx = start
                 for (_, box) in choiceButtons where !box.isHidden {
@@ -707,7 +705,7 @@ final class ImportView: NSView {
         let fullHeight = layBody(listHeight: rowsHeight)
         var contentHeight = fullHeight
         let buttonHeight = Tokens.Space.x8
-        // Below the body: a gap, the buttons, and the margin under them.
+        // Gap, buttons and bottom margin.
         let tail = Tokens.Space.x8 + buttonHeight + (presentation == .window ? Tokens.Space.x6 : Tokens.Space.x16)
         let top: CGFloat
         if presentation == .window {
@@ -718,19 +716,19 @@ final class ImportView: NSView {
             top = max(Tokens.Space.x16, round((bounds.height - contentHeight - tail) / 2))
         }
         naturalHeight = top + fullHeight + tail
-        // Too tall for the window: the browsers give up room first, down to two and a half of them (the half one says
-        // there are more), so the choices of what to bring stay in view.
+        // Too tall: the browser list shrinks first, down to two and a half rows (the half row hints at more), keeping
+        // the choices visible.
         let room = bounds.height - top - tail
         if fullHeight > room, !visibleRows.isEmpty {
             let shortest = min(rowsHeight, (rowHeights.first ?? 0) * 2.5 + Tokens.Space.x2 * 2)
             contentHeight = layBody(listHeight: max(shortest, rowsHeight - (fullHeight - room)))
         }
-        // The browsers just started to scroll: their scroller shows for a moment, so the ones below are found.
+        // Flash the scroller when the list starts scrolling.
         let rowsScroll = rowScroll.frame.height < rowsHeight
         if rowsScroll, !rowsScrolled { rowScroll.flashScrollers() }
         rowsScrolled = rowsScroll
         Self.keepInRange(rowScroll)
-        // The body gets what's left once the heading and the buttons fit; what doesn't fit scrolls between them.
+        // The body gets what's left after the heading and buttons; the rest scrolls.
         let viewport = max(0, min(contentHeight, bounds.height - top - tail))
         bodyScroll.frame = NSRect(x: 0, y: top, width: bounds.width, height: viewport)
         body.frame = NSRect(x: 0, y: 0, width: bounds.width, height: contentHeight)
@@ -751,7 +749,7 @@ final class ImportView: NSView {
         }
     }
 
-    /// Shorter content (a choice turned off, the import begun) doesn't leave a list scrolled past its end.
+    /// Clamps the scroll position after content shrinks.
     private static func keepInRange(_ scroll: NSScrollView) {
         let clip = scroll.contentView
         let furthest = max(0, (scroll.documentView?.frame.height ?? 0) - clip.bounds.height)
@@ -1017,7 +1015,7 @@ final class ImportWindowController: NSWindowController, NSWindowDelegate {
         // Laid out once tall, so the content's real height can be measured, then fitted.
         view.frame.size.height = 2000
         view.layoutSubtreeIfNeeded()
-        // A screen too short for it all gets a window that fits, and the browsers and choices scroll (#293).
+        // Short screens get a fitting window, and the content scrolls (#293).
         let chrome = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 560, height: 100)).height - 100
         window.setContentSize(NSSize(width: 560, height: min(view.naturalHeight, ImportView.tallestWindow(on: NSScreen.main) - chrome)))
         window.center()
@@ -1186,7 +1184,7 @@ private final class ImportHero: NSView {
 /// come over from a file.
 final class ImportEmptyState: NSView {
     private let heading = NSTextField(wrappingLabelWithString: String(localized: "No other browsers found on this Mac", comment: "Import window, when no other browser was found."))
-    private let note = NSTextField(wrappingLabelWithString: String(localized: "You can still bring passwords from an exported .csv file, or bookmarks and history from Safari’s export (a .zip file).",
+    private let note = NSTextField(wrappingLabelWithString: String(localized: "You can still bring passwords from an exported .csv file, bookmarks from an exported .html file, or bookmarks and history from Safari’s export (a .zip file).",
                                                                    comment: "Import window, under “No other browsers found on this Mac”: what can still come over from a file."))
 
     override init(frame: NSRect) {

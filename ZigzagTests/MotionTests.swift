@@ -183,11 +183,11 @@ struct MotionTests {
         let inside = NSPoint(x: 40, y: 30)
         panel.present()
         #expect(panel.hitTest(inside) != nil)
-        // On its way out it's still drawn, but a click lands on what's under it.
+        // While dismissing it's still drawn but clicks pass through.
         panel.dismiss()
         #expect(panel.superview === host)
         #expect(panel.hitTest(inside) == nil)
-        // Shown again while leaving: it takes clicks again.
+        // Shown again while leaving: takes clicks again.
         panel.present()
         #expect(panel.hitTest(inside) != nil)
     }
@@ -203,7 +203,7 @@ struct MotionTests {
         #expect(scrim.hitTest(inside) != nil)
         scrim.hide(evenFromKeyboard: true)
         #expect(scrim.hitTest(inside) == nil)
-        // Shown again at once, mid-fade: there, fully, taking clicks.
+        // Shown again mid-fade: fully visible, taking clicks.
         scrim.show(animated: false)
         #expect(scrim.alphaValue == 1)
         #expect(scrim.hitTest(inside) != nil)
@@ -212,12 +212,12 @@ struct MotionTests {
     @MainActor @Test func aFieldsMenuGrowsOutOfItsField() {
         let host = FlippedView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
         let field = NSRect(x: 40, y: 40, width: 120, height: 24)
-        // Under the field: out of its top, across from the field's middle.
+        // Below the field: arrow out of its top, centered on the field.
         let below = FloatingPanelView(frame: NSRect(x: 40, y: 68, width: 240, height: 100))
         host.addSubview(below)
         below.grow(from: field)
         #expect(below.growsFrom == CGPoint(x: 0.25, y: 0))
-        // No room under it, so above: out of its bottom.
+        // No room below, so above: arrow out of its bottom.
         let above = FloatingPanelView(frame: NSRect(x: 40, y: -64, width: 240, height: 100))
         host.addSubview(above)
         above.grow(from: field)

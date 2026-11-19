@@ -15,8 +15,7 @@ struct SettingsLayoutTests {
         window.contentView?.addSubview(settings)
         settings.layoutSubtreeIfNeeded()
 
-        // Checked once the animation is over: until then the views here answer with their old frames too. Waited for
-        // with a deadline, so an animation that never reports back fails the test instead of holding up the run.
+        // Checked after the animation, since views report old frames until then. Uses a deadline so a stuck animation fails instead of hanging.
         final class Over: @unchecked Sendable { var yes = false }
         let over = Over()
         NSAnimationContext.runAnimationGroup({ context in
@@ -40,13 +39,9 @@ struct SettingsLayoutTests {
         #expect(pane.frame.width == 1032 - Tokens.Page.columnWidth - Tokens.Metric.hairline)
     }
 
-    /// A control's words sit with their capitals in the middle: the system font draws them a little under its line's
-    /// middle, so a label is set that much higher than its line box would be, in a container counting from the top
-    /// or from the bottom, on the screen's pixels.
+    /// Labels center their capitals: the system font sits a bit low in its line, so labels shift up, in flipped and unflipped containers, pixel-aligned.
     @Test func labelsCenterTheirCapitals() {
-        // Where the letters land is a sub-pixel offset: on a display with no sub-pixels to speak of it rounds away
-        // and the two positions measured below come out equal, so there is nothing here to measure. Upstream runs
-        // this on Retina; a CI runner has no screen at all, and reports none.
+        // The offset is sub-pixel and rounds away at 1x, so this only measures on Retina; CI runners have no screen.
         guard (NSScreen.main?.backingScaleFactor ?? 1) >= 2 else { return }
         let font = Tokens.Font.control()
         final class Flipped: NSView { override var isFlipped: Bool { true } }
@@ -66,8 +61,7 @@ struct SettingsLayoutTests {
         withExtendedLifetime((flipped, plain)) {}
     }
 
-    /// A row's explanation is measured at the width it's drawn at: one that just fits on a line gets one line's room,
-    /// not two, at every width, so the row's text and control share its middle.
+    /// Row explanations are measured at their drawn width, so one that fits one line gets one line's height.
     @Test func rowsKeepRoomOnlyForTheLinesTheyDraw() {
         let detail = "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it."
         for width in stride(from: CGFloat(420), through: 1000, by: 1) {
@@ -81,7 +75,7 @@ struct SettingsLayoutTests {
         }
     }
 
-    /// Menus in one group of settings share the widest one's width, and follow it when its choices change.
+    /// Menus in a settings group share the widest width and update when choices change.
     @Test func menusInAGroupShareAWidth() {
         let short = DropdownButton(), long = DropdownButton()
         short.options = [.init(title: "Small"), .init(title: "Medium")]
@@ -97,8 +91,7 @@ struct SettingsLayoutTests {
         #expect(long.intrinsicContentSize.width == alone)
     }
 
-    /// A label measures its text once (a sidebar row asks on every layout), and again whenever its text, styled
-    /// text or font changes.
+    /// A label caches its measured width and remeasures when text, attributed text or font changes.
     @Test func aLabelsMeasuredWidthFollowsItsTextAndFont() {
         let label = Label("Short", font: Tokens.Font.body())
         #expect(!label.hasMeasuredInk)
@@ -112,20 +105,19 @@ struct SettingsLayoutTests {
         label.font = Tokens.Font.body().withSize(Tokens.Font.body().pointSize * 2)
         #expect(!label.hasMeasuredInk)
         #expect(label.inkWidth > long)
-        // Styled text with tracking is measured as drawn.
+        // Tracked attributed text is measured as drawn.
         let font = label.font ?? Tokens.Font.body()
         label.attributedStringValue = NSAttributedString(string: "A much longer title than that", attributes: [.font: font, .kern: 4])
         #expect(!label.hasMeasuredInk)
         let tracked = label.inkWidth
         #expect(tracked > ceil(("A much longer title than that" as NSString).size(withAttributes: [.font: font]).width))
-        // Each measurement is the same as a fresh label's.
+        // Each matches a fresh label.
         let fresh = Label("", font: font)
         fresh.attributedStringValue = NSAttributedString(string: "A much longer title than that", attributes: [.font: font, .kern: 4])
         #expect(fresh.inkWidth == tracked)
     }
 
-    /// Text or a font set around the label, through its cell, is measured again too: what was measured is checked
-    /// against what the label has.
+    /// Text or font set through the cell is remeasured too, since the cache records what it measured.
     @Test func aLabelsMeasureChecksWhatItWasFor() throws {
         let label = Label("Short", font: Tokens.Font.body())
         let short = label.inkWidth
@@ -137,7 +129,7 @@ struct SettingsLayoutTests {
         #expect(label.inkWidth > long)
     }
 
-    /// The fade at a label's end follows its text: one that grows past its room fades, one cut back to fit doesn't.
+    /// The trailing fade follows the text: on when it overflows, off when it fits.
     @Test func aLabelsFadeFollowsItsText() {
         let label = Label("Fits", font: Tokens.Font.body())
         label.fadesTail = true
@@ -147,7 +139,7 @@ struct SettingsLayoutTests {
         label.stringValue = "A title far too long for a hundred and twenty points"
         label.fadeTail()
         #expect(label.layer?.mask != nil)
-        // Asked again with nothing changed, it stays as it is.
+        // Unchanged: the mask stays.
         let mask = label.layer?.mask
         label.fadeTail()
         #expect(label.layer?.mask === mask)
@@ -156,9 +148,7 @@ struct SettingsLayoutTests {
         #expect(label.layer?.mask == nil)
     }
 
-    /// A row puts its control where the control's own width says. A field is filled by the space it's given, so
-    /// nothing else would ever give it one, and it drew at no width: a row holding one (the test address under the
-    /// download rules) showed the words and no field to type in.
+    /// Rows size controls by their own width; fields have none, so a row with one (the download rules test address) drew no field.
     @Test func aFieldInARowIsGivenRoomToDraw() async throws {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
         window.contentView?.wantsLayer = true
@@ -181,9 +171,7 @@ struct SettingsLayoutTests {
         }
     }
 
-    /// A form sheet lays its rows out by frame. A row holding a field with a Choose… button beside it must give the
-    /// button its width inside the row: `NSStackView(views:)` turns autoresizing off, so a stack left to itself sizes
-    /// to its content (the field's own width plus the button) and the button is drawn past the row's end, unseen.
+    /// Form sheets lay rows out by frame; `NSStackView(views:)` disables autoresizing, so a field plus Choose… overflowed the row and hid the button.
     @Test func aFieldBesideAButtonKeepsTheButtonInsideTheRow() {
         let field = FilledField(placeholder: "example.com")
         let button = PillButton(title: "Choose…")

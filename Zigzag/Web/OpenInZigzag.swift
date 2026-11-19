@@ -1,20 +1,16 @@
 import AppKit
 import WebKit
 
-/// Opens a web address in Zigzag itself, at the place it was asked for: the tab you're in, a new tab, or the small
-/// window that shows one page (the pop-up viewer). One place, so a page's pop-up question and a download rule's Open
-/// URL action mean exactly the same thing by "This Tab", "New Tab" and "Mini" — and so a rule can write the answer
-/// down and mean the same thing later.
+/// Opens a web address in Zigzag: this tab, a new tab, or the pop-up viewer (Mini). Shared by the pop-up question and
+/// Open URL rules so "This Tab", "New Tab" and "Mini" mean the same in both, including when saved.
 nonisolated enum OpenInZigzag {
-    /// One of the three places Zigzag can show a web address, all of them inside Zigzag. The raw value is what a rule
-    /// saves and what a question's answer comes back as, so it is also the id the pop-up question's menu has always
-    /// used: the two can never drift apart.
+    /// The raw value is what rules save and questions return, and matches the pop-up question's menu ids.
     enum Place: String, Codable, CaseIterable, Sendable {
         case thisTab
         case newTab
         case mini
 
-        /// The words the rule editor and the question both use, the same ones the pop-up question has always offered.
+        /// Shared by the rule editor and the questions.
         var title: String {
             switch self {
             case .thisTab: String(localized: "This Tab", comment: "Choice in the pop-up question's menu, and in a download rule's Open in choice: loads the address in the tab you are in.")
@@ -24,9 +20,8 @@ nonisolated enum OpenInZigzag {
         }
     }
 
-    /// Where an Open URL rule opens a web address: one of Zigzag's places, the Mac's default browser, or Ask — the
-    /// rule that has not been told yet. The sheet offers all five; the question offers the four destinations, never
-    /// Ask, because its buttons already decide whether the rule runs at all.
+    /// Where an Open URL rule opens a web address: a Zigzag place, the default browser, or Ask (not decided yet). The
+    /// sheet offers all five; the question omits Ask, since its buttons already decide whether the rule runs.
     enum Choice: String, Codable, CaseIterable, Sendable {
         case ask
         case defaultBrowser
@@ -34,11 +29,10 @@ nonisolated enum OpenInZigzag {
         case newTab
         case mini
 
-        /// The destinations the question's dropdown offers, in the order it shows them. The hand-off card puts This
-        /// Tab first instead (`DownloadHandoff.cardPlaces`): its dropdown is answered in a hurry.
+        /// Order in the question's dropdown. The hand-off card puts This Tab first (`DownloadHandoff.cardPlaces`).
         static var destinations: [Choice] { [.defaultBrowser, .thisTab, .newTab, .mini] }
 
-        /// The place inside Zigzag, or nil for Ask and the Mac's default browser.
+        /// Nil for Ask and the default browser.
         var place: Place? {
             switch self {
             case .thisTab: .thisTab
@@ -57,16 +51,14 @@ nonisolated enum OpenInZigzag {
         }
     }
 
-    /// Whether Zigzag is what shows an address: the web's own, and only the web's. Anything else — mpv://, a magnet, a
-    /// mail link — belongs to the app that handles it, and is handed on as it always was.
+    /// Only web addresses. Others (mpv://, magnet, mailto) go to their handler.
     static func handles(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
         return scheme == "http" || scheme == "https"
     }
 
-    /// Opens `url` where it was asked for. `configuration` is a pop-up's own, where it has one, so the Mini viewer is
-    /// on the same data store as the page it came from. `sender` is whose open it is: a pop-up's own link is the
-    /// page's, while a rule opening the address it just took is the rule's, so the page it lands on doesn't catch it.
+    /// `configuration` is a pop-up's own when it has one, so Mini uses the page's data store. `sender` is `.rule`
+    /// when a rule opens an address it just took, so the landing page doesn't trigger it again.
     @MainActor
     static func open(_ url: URL, at place: Place, from tab: Tab?, in host: PromptHost,
                      configuration: WKWebViewConfiguration? = nil, by sender: Tab.LoadSender = .rule) {
@@ -76,20 +68,15 @@ nonisolated enum OpenInZigzag {
         case .newTab:
             inWindow(url, disposition: .foregroundTab, from: tab, in: host, configuration: configuration, by: sender)
         case .mini:
-            // The small window that shows one page of its own, on the same data store where there is one to share.
+            // Mini, on the same data store when there is one.
             guard let configuration = configuration ?? tab?.webView?.configuration else { return }
-            PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window, by: sender)
+            _ = PopupWindowController.viewer(url: url, configuration: configuration, parent: host.window, by: sender)
         }
     }
 
-    /// A page opened somewhere in a window: in this tab, or a new one. It goes through the asking tab's own host, so a
-    /// browser window, Zigzag Mini and an installed app's window are all served — the hosts of the last two are not
-    /// `BrowserWindowController`s. Where no tab asked (a pop-up window's own child), the window it was asked from
-    /// opens it: a browser window at once, or, for a window with one page of its own and no tabs to name, that page's
-    /// own host — which is what settles what "this tab" and "a new tab" mean inside it.
-    ///
-    /// Sent as `.rule`, so the page it lands on is never caught by a rule again: a rule that took the address it had
-    /// just opened would ask, or open, for ever.
+    /// Opens via the asking tab's host, so browser windows, Zigzag Mini and installed app windows all work. With no
+    /// tab (a pop-up's child), uses the window it came from, or that window's single page's host. Sent as `.rule` so
+    /// the landing page isn't caught by a rule again, which would loop.
     @MainActor
     private static func inWindow(_ url: URL, disposition: OpenDisposition, from tab: Tab?, in host: PromptHost,
                                  configuration: WKWebViewConfiguration?, by sender: Tab.LoadSender) {

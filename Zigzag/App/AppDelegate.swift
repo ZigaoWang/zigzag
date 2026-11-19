@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.register(defaults: Self.pageTextDefaults)
-        // And a spelling or substitution choice holds for every page, the Mac's until you make one (#296).
+        // Applies the saved spelling and substitution choices to every page (#296).
         PageTextChecking.shared.start()
         // A second copy (one opened from the disk image while the installed one runs) would load the same data
         // and save over it: it hands over to the one already running and goes, before reading anything.
@@ -42,8 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Site permissions kept by host alone become per origin before any page can ask.
             SitePermissions.migrateHostOnlyAnswers()
             SitePermissions.migrateMediaAnswers()
-            // And the old yes/no answers become action ids here, once, so the store is one shape from launch on:
-            // reading already understands both, so this only retires the legacy reading, it doesn't change it.
+            // Converts old yes/no answers to action ids once at launch.
             SitePermissions.migrateAnswersToActions()
             // Extensions' service worker backgrounds start afresh, as in Chrome, before WebKit reads their registrations:
             // in every profile's store, each before WebKit has opened it. Off the main thread, while launch goes on; a
@@ -77,12 +76,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         _ = Library.shared
         _ = Profiles.shared.default.history
-        // Empty pages' pictures no space has any more: a deleted space's, kept until now so ⌘Z could bring it back.
+        // Deletes empty-page backgrounds no space uses; kept until now for ⌘Z.
         let backgrounds = Set(Library.shared.spaces.compactMap(\.backgroundImage))
         DispatchQueue.global(qos: .utility).async { SpaceBackground.prune(keeping: backgrounds) }
-        // Image icons no saved tab, pinned page, favorite or site names any more (#303), kept until now for ⌘Z.
+        // Deletes image icons nothing uses any more (#303); kept until now for ⌘Z.
         let started = Date()
-        // A site's icon (#310) is kept in the settings, not a file.
+        // Site icons (#310) live in settings, not files.
         let siteIcons = Data(SiteIcons.all.values.joined(separator: "\n").utf8)
         DispatchQueue.global(qos: .utility).async {
             let saved = ((try? FileManager.default.contentsOfDirectory(at: Paths.support, includingPropertiesForKeys: nil)) ?? [])
@@ -93,8 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
         // Copies an import read through, if Zigzag stopped before removing them: they can hold passwords.
         DispatchQueue.global(qos: .utility).async { ImportScratch.removeLeftovers() }
-        // The Public Suffix List, which the first page's address needs for whose site it is, read off the main thread
-        // right away, so it's ready before that address is shown. (The HSTS preload list is searched in place.)
+        // Loads the Public Suffix List off the main thread before the first address shows. The HSTS list is searched in
+        // place.
         DispatchQueue.global(qos: .userInitiated).async { _ = PublicSuffix.isLoaded }
         ContentBlocker.prepare()
         // A page stuck working hard (an extension in a loop, usually) gets named, with a way out.
@@ -117,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Developer tools turned on or off, or a site put on its list or taken off: open tabs are told at once.
         developerToken = DeveloperTools.changed.observe {
-            // Before the tabs: a page that comes onto the list waits for the rule that keeps its images off there.
+            // Before the tabs, so a listed page waits for its no-images rule.
             PageImages.sitesChanged()
             for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) { tab.refreshDevelopment(settingsChanged: true) }
             // Its menu items come and go with it, and whatever lists the menu bar's shortcuts hears of it.
@@ -158,10 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !pendingURLs.isEmpty {
             // A link for Zigzag Mini opens just that, as it would with Zigzag already running.
             if !restored, !WindowManager.shared.opensInMini(pendingURLs[0]) {
-                let url = pendingURLs.removeFirst()
-                let offers = WindowManager.shared.offersMini(url)
-                let controller = WindowManager.shared.newWindow(url: url, showCommandBar: false)
-                if offers { WindowManager.shared.offerMini(in: controller) }
+                WindowManager.shared.newWindow(url: pendingURLs.removeFirst(), showCommandBar: false)
             }
             pendingURLs.forEach { WindowManager.shared.openExternal($0) }
             pendingURLs = []
@@ -220,8 +216,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let downloading = DownloadManager.shared.activeCount
         // Going for good: downloads still coming in pause first, so they go on from Downloads after the next launch.
         func quitNow() -> NSApplication.TerminateReply {
-            guard downloading > 0 else { return .terminateNow }
-            DownloadManager.shared.pauseAllForQuit { NSApp.reply(toApplicationShouldTerminate: true) }
+            guard downloading > 0 || !KeptCookies.profilesClearingOnQuit().isEmpty else { return .terminateNow }
+            Self.finishBeforeQuitting(downloading: downloading)
             return .terminateLater
         }
         // Asked already, or not asking: downloads are the one thing worth asking about anyway.
@@ -242,11 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if let monitor { NSEvent.removeMonitor(monitor) }
             guard quit else { NSApp.reply(toApplicationShouldTerminate: false); return }
             Self.quitConfirmed = true
-            if downloading > 0 {
-                DownloadManager.shared.pauseAllForQuit { NSApp.reply(toApplicationShouldTerminate: true) }
-            } else {
-                NSApp.reply(toApplicationShouldTerminate: true)
-            }
+            Self.finishBeforeQuitting(downloading: downloading)
         }
         let message = downloading == 0
             ? String(localized: "Your tabs and spaces will be right here when you open it again.",
@@ -266,6 +258,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
+    /// Pauses downloads and clears the cookies chosen to go at quit (#334) side by side, each bounded, then quits.
+    private static func finishBeforeQuitting(downloading: Int) {
+        let clearing = KeptCookies.profilesClearingOnQuit()
+        var left = (downloading > 0 ? 1 : 0) + (clearing.isEmpty ? 0 : 1)
+        guard left > 0 else { NSApp.reply(toApplicationShouldTerminate: true); return }
+        let finish = {
+            left -= 1
+            if left == 0 { NSApp.reply(toApplicationShouldTerminate: true) }
+        }
+        if downloading > 0 { DownloadManager.shared.pauseAllForQuit(then: finish) }
+        if !clearing.isEmpty { KeptCookies.clearForQuit(clearing, done: finish) }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         guard !Self.isHostingTests else { return }
         WindowManager.shared.prepareForTermination()
@@ -276,7 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         StrictTransport.finishWriting()
         // Undo ends with Zigzag, and the icons clearing history set aside for it go now (or at the next start).
         try? FileManager.default.removeItem(at: Paths.setAsideIcons)
-        // A password copied a moment ago doesn't outlive Zigzag on the clipboard.
+        // Clears a copied password from the clipboard on quit.
         Clipboard.clearIfStillOurs()
         // Password managers' helpers end with Zigzag, so none are left running.
         if #available(macOS 15.4, *) { NativeMessagingHost.terminateAll() }
@@ -288,8 +293,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Opening URLs from elsewhere
 
-    /// A `file:` link to a page on this Mac that a browser shows as a page: HTML, SVG or PDF, a file that's there and
-    /// readable, never a folder (which would list its files) or anything a page could run as an app.
+    /// A `file:` URL to a readable local HTML, SVG or PDF file; never a folder or anything runnable.
     nonisolated static func localPage(_ string: String) -> URL? {
         guard let url = URL(string: string.trimmingCharacters(in: .whitespacesAndNewlines)), url.isFileURL,
               ["html", "htm", "xhtml", "svg", "pdf"].contains(url.pathExtension.lowercased()) else { return nil }
@@ -307,9 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if launched { WebAppStore.handle(link, from: sender) } else { pendingWebApps.append(link) }
             return
         }
-        // A link another app hands over (or a script's `open location`) is a web address, or a page saved on this Mac
-        // (a plot a script wrote, `webbrowser.open("file:///…/plot.html")`): never one of Zigzag's own pages, an
-        // extension's, a folder, or any other kind of file.
+        // Only a web address or a local page; never an internal, extension or folder URL, or other file types.
         guard let url = Scripting.webAddress(string) ?? Self.localPage(string) else { return }
         // Zigzag handing a link to macOS (as the default browser) gets it straight back: that's a link from inside
         // Zigzag, so it opens in a tab here, not in Zigzag Mini as one from another app would.
@@ -332,8 +334,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         urls.filter(Self.opensAsDocument).forEach(open)
     }
 
-    /// Whether a URL handed over as a document is opened: a local file (a tab, even with Zigzag Mini taking links:
-    /// a file you open is one you mean to keep at), or a web address (Zigzag Mini, when it takes links).
+    /// Whether a URL handed over as a document opens: local files always open in a tab; web addresses only when Zigzag
+    /// Mini takes links.
     nonisolated static func opensAsDocument(_ url: URL) -> Bool {
         url.isFileURL || ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
@@ -475,7 +477,7 @@ extension AppDelegate: NSMenuItemValidation {
         if menuItem.action == #selector(reopenClosedWindow(_:)) { return WindowManager.shared.canReopenClosedWindow }
         // Zigzag Mini names it Open in Zigzag while it's in front; anywhere else it's itself again.
         if menuItem.action == #selector(openDocument(_:)) { menuItem.title = BrowserWindowController.openFileTitle }
-        // Restart to Update while an update is ready, which it then does.
+        // Shows Restart to Update while an update is ready.
         if menuItem.action == #selector(checkForUpdates(_:)) { menuItem.title = Updater.shared.menuTitle }
         if menuItem.action == #selector(reopenClosedTab(_:)) {
             let manager = (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first)?.tabManager

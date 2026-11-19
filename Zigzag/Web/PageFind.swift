@@ -63,9 +63,8 @@ final class PageFind: NSObject {
         return finder
     }
 
-    /// Goes to the next match (the previous one, `backwards`) and selects it, wrapping around, and says how many there
-    /// are and which one it's on. Nil when WebKit didn't answer. `showsIndicator` off: WebKit draws no mark of its
-    /// own over the match, for when Zigzag marks it (`FindMarks`).
+    /// Selects the next match (previous when `backwards`), wrapping, and returns the count and current index. Nil
+    /// when WebKit didn't answer. `showsIndicator` off hides WebKit's own mark when Zigzag draws marks (`FindMarks`).
     static func find(_ query: String, in webView: WKWebView, backwards: Bool, showsIndicator: Bool = true) async -> Result? {
         var options: Options = [.caseInsensitive, .wrapAround, .determineMatchIndex]
         if backwards { options.insert(.backwards) }

@@ -91,12 +91,13 @@ that never send it can't crowd out the apps that do.
 | `reload` | Reloads a tab. |
 | `read_page` | Gives the page's title, address and readable text, and its form fields, without the values of password, hidden, card number, card code and one-time code fields. |
 | `get_links` | Gives the links on the page, their text and address. |
+| `snapshot` | Gives the page as a screen reader has it, with a ref for each thing the app can use. See [Snapshots and refs](#snapshots-and-refs). |
 | `screenshot` | Gives a picture of the page as it shows now. The tab has to be on screen. |
-| `click` | Clicks an element, found by a CSS selector or by the text it shows. |
-| `type` | Types into a field, or picks an option in a menu on the page. |
-| `scroll` | Scrolls the page, or a part of it, up or down. |
+| `click` | Clicks an element, found by its ref, a CSS selector or the text it shows. |
+| `type` | Types into a field, found by its ref or a CSS selector, or picks an option in a menu on the page. |
+| `scroll` | Scrolls the page, or a part of it (by ref or CSS selector), up or down. |
 | `wait_for` | Waits until some text shows or goes, an element shows or goes, or the page finishes loading. |
-| `press_key` | Presses a key in the page, like Enter, Escape, Tab or an arrow, with Shift, Alt, Ctrl or Meta if wanted. |
+| `press_key` | Presses a key in the page, like Enter, Escape, Tab or an arrow, with Shift, Alt, Ctrl or Meta if wanted, in the element with the focus or one found by ref or CSS selector. |
 
 A tool given no tab acts on the tab in front of you. There is no tool that runs an app's own JavaScript in a page.
 
@@ -110,12 +111,13 @@ A tool given no tab acts on the tab in front of you. There is no tool that runs 
 | `go_back`, `go_forward`, `reload` | `id` |
 | `read_page` | `id`, `max_chars` (500 to 100,000, default 20,000) |
 | `get_links` | `id`, `max` (1 to 1,000, default 200) |
+| `snapshot` | `id`, `filter` (`all` or `interactive`), `depth`, `ref` (only that part of the page), `max_chars` (500 to 100,000, default 20,000) |
 | `screenshot` | `id` |
-| `click` | `id`, and one of `selector` or `text` |
-| `type` | `selector` and `text` (both required), `id`, `clear` (default true), `submit` (default false) |
-| `scroll` | `dy` (required: points, positive down, negative up), `id`, `selector` |
+| `click` | `id`, and one of `ref`, `selector` or `text` |
+| `type` | `text` (required) and one of `ref` or `selector`, `id`, `clear` (default true), `submit` (default false) |
+| `scroll` | `dy` (required: points, positive down, negative up), `id`, and `ref` or `selector` for a part of the page |
 | `wait_for` | one of `text`, `text_gone`, `selector`, `selector_gone` or `load`, and `id`, `timeout_ms` |
-| `press_key` | `key` (required), `id`, `modifiers`, `selector` |
+| `press_key` | `key` (required), `id`, `modifiers`, and `ref` or `selector` |
 
 `id` is a tab's id from `list_tabs`; leave it out for the tab in front. A tool given an argument it doesn't take says
 which ones it takes. Addresses can be written without `https://`, like `example.com`; only http and https pages open.
@@ -127,6 +129,54 @@ orders to the model. So every tool result that carries them comes with a line sa
 untrusted and never to be taken as instructions, and the content itself goes between two `page-content-…` lines
 whose tag is random each time, so a page can't close the block early. Zigzag's own words in a result, like an error,
 aren't marked.
+
+### Snapshots and refs
+
+`snapshot` gives an app the page the way a screen reader reads it: its landmarks, headings and text, and each thing
+it can use (a link, a button, a field, a menu) with a short ref like `e12`. The app then clicks `e12`, rather than
+guessing a CSS selector from the page's text:
+
+```
+Page "Sign in" at "https://example.com/login"
+
+- heading "Welcome back" [level=1]
+- textbox "Email" [ref=e3]: "me@example.com"
+- textbox "Password" [ref=e4] [password]
+- checkbox "Remember me" [checked] [ref=e5]
+- button "Sign in" [ref=e6]
+- link "Help" [ref=e2]:
+  - /url: "/help"
+```
+
+`click`, `type`, `scroll` and `press_key` take a ref in place of a selector. A ref stands for one element as it was
+when the app got it. If the page changes it (a button that said Buy now says Pay), takes it away, or loads again,
+the ref is refused and the app is told to take a new snapshot; it is never matched to something else that looks
+alike, and a new page never reuses an old ref's number. A ref works only on the tab it came from: used on another
+tab, it's refused, even when two tabs were read at the same moment. `[new]` marks what appeared since the app's last snapshot of
+the page, like a menu a click opened.
+
+`filter: "interactive"` gives only the things that can be used, one per line; `depth` and `ref` give part of the
+page; `max_chars` keeps it short, cutting from the middle so the end of the page (where a dialog's buttons usually
+are) stays. While a dialog is open, only the dialog is listed, as the rest of the page can't be used.
+
+A snapshot only has what shows on the page. Text a page hides from people (off the screen, a pixel high, see-through,
+shrunk or clipped to nothing, inside a closed "more details", hidden from screen readers) is left out, so a page
+can't slip instructions to an app that you'd never see. It's a filter for the ways pages are known to hide text,
+not a guarantee: text the colour of its background, or under a picture, still gets through. Names are
+what you see: a button that shows Save but tells screen readers something else is listed as Save, marked
+`[label differs]`. One that shows only a sign (×, +) goes by what it tells screen readers. A link to another site says `[other site]`, and a word mixing alphabets (a Cyrillic а in
+Wаlmart) says `[mixed scripts]`. Everything the page wrote is in quotes, so it can't pass for Zigzag's own words.
+A run of text longer than 1,000 characters is cut there and marked `[shortened]`; `read_page` has all of it. The
+answer's `truncated` is about the snapshot as a whole: true when it was cut to fit `max_chars`, or the page was
+too large to read in full.
+
+Snapshots read the page itself, not frames inside it, which are listed with their site. Clicks come from Zigzag,
+not your hand, so what a page only allows on a real click (a pop-up window, the clipboard, choosing a file) may not
+happen. A click is refused when something covers the element (a cookie banner, for example), when it's disabled, or
+when a dialog is in the way. `type` and `press_key` are refused the same way for an element that's disabled or
+behind a dialog, and for one that can't take the keyboard focus (a field the page hides), with a ref or a selector.
+`type` takes a field: for a rich-text editor that's the editor itself, not a paragraph inside it (clearing "the
+paragraph" would empty the whole editor). To put text at one place in it, click there and use `press_key`.
 
 ### Waiting for a page
 
@@ -170,9 +220,17 @@ field.
 ### What an app can never do
 
 - See or use **private windows**. They aren't listed, and nothing reaches them.
-- Read or type **passwords**. `read_page` never gives a password field's value, and `type` and `press_key` refuse
-  password fields, so the app has to ask you to type one. Hidden fields, card numbers and codes, and one-time codes
-  are left out of `read_page` too.
+- Read or type **passwords**. `read_page` and `snapshot` never give a password field's value, not even after a
+  site's Show password turns it into plain text, and `type` and `press_key` refuse password fields, so the app has to ask
+  you to type one.
+- Read **card details, one-time codes and the like**: a card's number, expiry or security code, a one-time code, an
+  IBAN, a PIN, by the field's type, name or label, or a card number in any field. The same fields Zigzag never
+  keeps for a sleeping tab. The rule errs on the careful side (a field named `passenger_name` has "pass" in it), so
+  an app is still given back what it typed into such a field itself, for as long as the field holds exactly that.
+- Read **what your saved details filled in**. A name, email, phone number or address that came from your saved data
+  is given only as filled, and how long it is, unless the app typed all of it itself (adding to what's there doesn't
+  count).
+- See **text a page hides** from you, in `snapshot` and in the names tools give back.
 - Use **Zigzag's own pages** (Settings, History) or **extension pages**. They're listed, so the app knows they're
   there, but every tool on them is refused.
 - Use Zigzag's **error or certificate warning page**. Only you can choose Visit anyway; the app has to go back or
@@ -221,6 +279,10 @@ every app.
 - **The app can't connect at all.** Check that Let AI apps use Zigzag is on and Zigzag is open: the server runs only
   while it is. Check that the app uses the HTTP transport, not stdio or SSE.
 - **`screenshot` fails.** The tab has to be on screen. Ask the app to switch to it with `activate_tab` first.
+- **A tool says a ref changed or isn't on the page.** The page changed since the app's snapshot, or loaded again.
+  The app should take a new snapshot and use the refs in it.
+- **A click says something covers the element.** A banner or a dialog is on top of it, as it would be for you. The
+  app should close it first (its button is in the snapshot), or scroll the element out from under it.
 - **`wait_for` times out.** What it waited for never happened in time: the text may be spelled differently on the
   page, or the element may be there but hidden. Ask the app to read the page with `read_page`, or to wait longer
   with `timeout_ms`.

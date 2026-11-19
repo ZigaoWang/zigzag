@@ -2,53 +2,44 @@ import Foundation
 import Security
 import WebKit
 
-/// Certificates that identify you to a site (#297): a site that asks for one (mutual TLS, as some organizations'
-/// Microsoft sign-in and intranets do) is offered the identities in your Keychain that it would take, as Safari offers
-/// them. Importing one is Keychain Access's job (a .p12, or a .pem with its key); Zigzag only reads what's there.
-///
-/// The one you choose is used for the site's host for the session; with "Always use", it's kept for that host and
-/// used without asking until it's gone from the Keychain or expires. Private windows keep nothing and use nothing
-/// kept: they ask, and their choice holds for that window's session only.
+/// Client certificates (#297): a site that asks (mutual TLS, e.g. some Microsoft sign-ins and intranets) is offered
+/// matching Keychain identities, as in Safari. Importing is Keychain Access's job; Zigzag only reads. The choice
+/// holds for the host for the session; "Always use" keeps it until it leaves the Keychain or expires. Private windows
+/// ignore kept choices and keep nothing past their session.
 enum ClientCertificates {
-    /// One identity as the sheet lists it.
     nonisolated struct Info: Equatable, Sendable {
         var name: String
         var issuer: String?
         var validFrom: Date?
         var validUntil: Date?
-        /// The certificate's SHA-256, which a kept choice is found again by.
+        /// Kept choices are matched by this.
         var sha256: String
     }
 
-    /// An identity from the Keychain with what the sheet shows of it.
     nonisolated struct Found: @unchecked Sendable {
         let identity: SecIdentity
         let certificate: SecCertificate
         let info: Info
     }
 
-    /// What a session already said for a host.
+    /// What this session already answered for a host.
     nonisolated enum SessionAnswer: Equatable, Sendable {
         case identity(sha256: String)
-        /// Cancel: holds a little while, so the page's other connections don't ask again at once.
+        /// Cancel holds briefly so the page's other connections don't ask again at once.
         case declined(until: Date)
     }
 
     nonisolated enum Decision: Equatable, Sendable {
-        /// Nothing in the Keychain fits: WebKit goes on as it would without Zigzag.
+        /// Nothing fits: default WebKit handling.
         case noMatch
-        /// Use the candidate at this index without asking.
         case use(Int)
-        /// You said no a moment ago.
         case declined
         case ask
     }
 
-    /// How long a Cancel holds before the site may ask again.
     nonisolated static let declineHolds: TimeInterval = 60
 
-    /// What to do with the candidates found: what this session chose first, then what's kept for the site; a choice
-    /// whose identity is gone or expired (no longer a candidate) is asked again.
+    /// Session choice first, then the kept one; a choice whose identity is gone or expired asks again.
     nonisolated static func decide(candidates: [Info], session: SessionAnswer?, kept: String?, now: Date) -> Decision {
         guard !candidates.isEmpty else { return .noMatch }
         switch session {
@@ -62,15 +53,13 @@ enum ClientCertificates {
         return .ask
     }
 
-    /// Valid at `now`: not before its start and not after its end.
     nonisolated static func isValid(_ info: Info, at now: Date) -> Bool {
         if let from = info.validFrom, from > now { return false }
         if let until = info.validUntil, until < now { return false }
         return true
     }
 
-    /// The Keychain query for identities a site would take: limited to those whose chain includes one of the issuers
-    /// it named (DER distinguished names), when it named any.
+    /// Limited to chains containing one of the site's issuers (DER distinguished names), if it named any.
     nonisolated static func query(issuers: [Data]?, searchList: [SecKeychain]? = nil) -> [CFString: Any] {
         var query: [CFString: Any] = [kSecClass: kSecClassIdentity, kSecMatchLimit: kSecMatchLimitAll, kSecReturnRef: true]
         if let issuers, !issuers.isEmpty { query[kSecMatchIssuers] = issuers }
@@ -78,9 +67,9 @@ enum ClientCertificates {
         return query
     }
 
-    /// The identities in the Keychain (and on smart cards) a site naming `issuers` would take, valid at `now`, by name.
-    /// Listing them asks nothing; using one's key later may bring up macOS's own "wants to use the key" prompt.
-    /// Call off the main thread. `searchList` is for tests: only those keychains, and no smart cards.
+    /// Matching Keychain and smart card identities valid at `now`, by name. Listing doesn't prompt; using a key later
+    /// may bring up macOS's key access prompt. Call off the main thread. `searchList` is for tests: only those
+    /// keychains, no smart cards.
     nonisolated static func find(issuers: [Data]?, searchList: [SecKeychain]? = nil, now: Date = Date()) -> [Found] {
         var queries = [query(issuers: issuers, searchList: searchList)]
         if searchList == nil {
@@ -108,8 +97,8 @@ enum ClientCertificates {
         return found.sorted { $0.info.name.localizedStandardCompare($1.info.name) == .orderedAscending }
     }
 
-    /// The credential for an identity: with the certificates between it and its root, so a server that knows only
-    /// the root can follow the chain. Built without the network. Call off the main thread.
+    /// Includes the intermediates up to the root so the server can follow the chain. No network. Call off the main
+    /// thread.
     nonisolated static func credential(for found: Found) -> URLCredential {
         var trust: SecTrust?
         var intermediates: [SecCertificate] = []
@@ -125,9 +114,8 @@ enum ClientCertificates {
 
     // MARK: Kept choices
 
-    /// Where kept choices live; tests use their own.
+    /// Tests use their own.
     static var defaults: UserDefaults = .standard
-    /// Host → ["sha256": …, "name": …].
     private static let key = "ClientCertificateChoices"
 
     struct Kept: Equatable {
@@ -140,7 +128,7 @@ enum ClientCertificates {
         set { newValue.isEmpty ? defaults.removeObject(forKey: key) : defaults.set(newValue, forKey: key) }
     }
 
-    /// The host a choice is kept under: the one that asked, lowercased.
+    /// The asking host, lowercased.
     nonisolated static func site(_ host: String) -> String { host.lowercased() }
 
     static func kept(host: String) -> Kept? {
@@ -148,18 +136,17 @@ enum ClientCertificates {
         return Kept(sha256: sha256, name: entry["name"] ?? sha256)
     }
 
-    /// Hosts with a kept certificate, as Settings › Privacy › Sites lists them.
+    /// For Settings › Privacy › Sites.
     static var sites: Set<String> { Set(stored.keys) }
 
     static func forget(site host: String) { stored[site(host)] = nil }
 
     static func forgetAll() { defaults.removeObject(forKey: key) }
 
-    /// Session answers per data store: a private window's go with it, and one store's never answer another's.
+    /// Per data store, so a private window's answers go with it.
     private static let sessions = NSMapTable<WKWebsiteDataStore, SessionBox>.weakToStrongObjects()
     private final class SessionBox {
         var answers: [String: SessionAnswer] = [:]
-        /// When each host last asked for a certificate.
         var asked: [String: Date] = [:]
     }
 
@@ -179,26 +166,24 @@ enum ClientCertificates {
         sessions.setObject(box, forKey: store)
     }
 
-    /// How long after a site asked for a certificate a dropped connection is put down to it.
+    /// How long after a certificate request a dropped connection counts as a refusal.
     nonisolated static let refusalWindow: TimeInterval = 30
 
-    /// Whether a failed load was the site turning you away for want of a certificate it accepts. Over TLS 1.3 the
-    /// server says so only after the handshake, so the load fails as a lost or failed connection, which would read
-    /// as being offline; right after the site asked for a certificate, that's what it was.
+    /// Whether a failed load was the site rejecting us for lack of an accepted certificate. Over TLS 1.3 the server
+    /// says so only after the handshake, so it shows up as a lost connection that would read as offline.
     nonisolated static func isRefusal(code: Int, askedAt: Date?, now: Date) -> Bool {
         guard let askedAt, now.timeIntervalSince(askedAt) < refusalWindow, askedAt <= now else { return false }
         return code == NSURLErrorNetworkConnectionLost || code == NSURLErrorSecureConnectionFailed
     }
 
-    /// The error a page shows: a refusal (`isRefusal`) as the certificate error it is, anything else as it was.
+    /// Shows a refusal (`isRefusal`) as a certificate error; other errors unchanged.
     static func explain(_ error: NSError, url: URL?, store: WKWebsiteDataStore, now: Date = Date()) -> NSError {
         guard error.domain == NSURLErrorDomain, let host = url?.host(),
               isRefusal(code: error.code, askedAt: sessions.object(forKey: store)?.asked[site(host)], now: now) else { return error }
         return NSError(domain: NSURLErrorDomain, code: NSURLErrorClientCertificateRequired, userInfo: error.userInfo)
     }
 
-    /// Writes down a choice: for the store's session always, and kept for the host only when asked to and never from
-    /// a private window (a store that isn't persistent), whatever `always` says.
+    /// Always for the session; kept for the host only with `always` and never from a non-persistent (private) store.
     static func noteChosen(_ info: Info, host: String, store: WKWebsiteDataStore, always: Bool) {
         setSession(.identity(sha256: info.sha256), host: host, store: store)
         guard always, store.isPersistent else { return }
@@ -209,7 +194,7 @@ enum ClientCertificates {
         setSession(.declined(until: now.addingTimeInterval(declineHolds)), host: host, store: store)
     }
 
-    /// Settings' Forget: the session's choice for the host goes too, in every store, so the site asks again.
+    /// Settings' Forget also clears session choices in every store, so the site asks again.
     static func forgetSessions(site host: String) {
         for store in sessions.keyEnumerator().allObjects.compactMap({ $0 as? WKWebsiteDataStore }) {
             sessions.object(forKey: store)?.answers[site(host)] = nil
@@ -220,12 +205,11 @@ enum ClientCertificates {
 
     // MARK: Answering
 
-    /// One question per store and host at a time: a page's several connections asking at once share one sheet.
+    /// One question per store and host; simultaneous connections share one sheet.
     private static var asking: [String: Task<(URLSession.AuthChallengeDisposition, URLCredential?), Never>] = [:]
 
-    /// Answers a site's request for a certificate. No identity fits: default handling, as before. Cancel goes on
-    /// without one (`rejectProtectionSpace`), as Safari and Chrome do, so the site can show its own page or try
-    /// another way to sign in, rather than the load failing.
+    /// No match: default handling. Cancel continues without one (`rejectProtectionSpace`), like Safari and Chrome, so
+    /// the site can show its own page instead of failing.
     static func respond(to challenge: URLAuthenticationChallenge, window: NSWindow?, store: WKWebsiteDataStore,
                         page: WKWebView?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let space = challenge.protectionSpace
@@ -236,7 +220,7 @@ enum ClientCertificates {
         let task = Task { @MainActor () -> (URLSession.AuthChallengeDisposition, URLCredential?) in
             let issuers = space.distinguishedNames
             let candidates = await Task.detached { find(issuers: issuers) }.value
-            // A private window asks for itself: what's kept for the site isn't sent from there unasked.
+            // Private windows never send a kept choice unasked.
             let keptHere = store.isPersistent ? kept(host: host)?.sha256 : nil
             switch decide(candidates: candidates.map(\.info), session: sessionAnswer(host: host, store: store), kept: keptHere, now: Date()) {
             case .noMatch:
@@ -270,7 +254,6 @@ enum ClientCertificates {
         return answer
     }
 
-    /// "Issued by …, expires …" under a certificate's name in the sheet.
     static func detail(of info: Info) -> String {
         let date = info.validUntil.map { $0.formatted(date: .abbreviated, time: .omitted) }
         switch (info.issuer, date) {

@@ -3,24 +3,22 @@ import CryptoKit
 import Foundation
 import Security
 
-/// A Chrome Web Store package (CRX3): a protobuf header of signatures, then a zip. Opening one checks that it
-/// really is the extension it claims to be: the header names an ID, a key in the header hashes to that ID, and
-/// that key's signature covers the zip byte for byte. The Chrome Web Store signs every package it serves too, and
-/// Chrome takes a package from the store only with that signature as well: so does Zigzag. Anything else is refused.
+/// A Chrome Web Store package (CRX3): protobuf signature header, then a zip. Opening verifies the header's ID matches a
+/// key's hash and that key signs the zip. Like Chrome, the store's own signature is required too; anything else is
+/// refused.
 nonisolated struct CRXPackage {
     let id: String
     let zip: Data
 
     enum Failure: Error { case notCRX3, malformed, wrongExtension, unsigned, notFromStore }
 
-    /// The SHA-256 of the Chrome Web Store's own signing key, as Chrome's package check has it (kPublisherKeyHash).
+    /// SHA-256 of the Chrome Web Store signing key, from Chrome's kPublisherKeyHash.
     static let webStoreKeyHash: [UInt8] = [
         0x61, 0xF7, 0xF2, 0xA6, 0xBF, 0xCF, 0x74, 0xCD, 0x0B, 0xC1, 0xFE, 0x24, 0x97, 0xCC, 0x9B, 0x04,
         0x25, 0x4C, 0x65, 0x8F, 0x79, 0xF2, 0x14, 0x53, 0x92, 0x86, 0x7E, 0xA8, 0x36, 0x63, 0x67, 0xCF,
     ]
 
-    /// `publisherKeyHash` names the key that must have signed it besides the developer's: the store's, unless a test
-    /// signs as the store.
+    /// `publisherKeyHash`: the key required besides the developer's; the store's unless a test signs as the store.
     init(_ data: Data, expectedID: String, publisherKeyHash: [UInt8] = webStoreKeyHash) throws {
         let bytes = [UInt8](data)
         guard bytes.count > 12, bytes[0..<4] == [0x43, 0x72, 0x32, 0x34] /* "Cr24" */ else { throw Failure.notCRX3 }
@@ -62,7 +60,7 @@ nonisolated struct CRXPackage {
         // The developer's key is the one whose hash is the ID; its signature is the one that matters.
         let developer = proofs.filter { Array(SHA256.hash(data: $0.key).prefix(16)) == crxID }
         guard developer.contains(where: { Self.verify($0, message: message) }) else { throw Failure.unsigned }
-        // And the store's: a package only its developer signed never came from the store.
+        // And the store's: a developer-only signature means it didn't come from the store.
         let publisher = proofs.filter { Array(SHA256.hash(data: $0.key)) == publisherKeyHash }
         guard publisher.contains(where: { Self.verify($0, message: message) }) else { throw Failure.notFromStore }
         self.id = id
@@ -189,10 +187,9 @@ nonisolated enum PackageZip {
     /// Far more than any extension: the largest in the store unpack to a few hundred megabytes.
     static let maxTotalSize = 2 << 30
     static let maxEntries = 65_000
-    /// The most one file may unpack to, whatever its entry claims.
+    /// Per-file unpacked size cap, whatever the entry claims.
     static let maxEntrySize = 512 << 20
-    /// Deflate can't make more than about 1,032 bytes of one: an entry claiming more than that is lying, and would
-    /// have Zigzag set aside room for all of it.
+    /// Deflate expands at most about 1,032x; a larger claimed ratio is a lie and would make Zigzag reserve that much.
     static let maxDeflateRatio = 1_032
 
     /// The entries, from the archive's index, each checked.

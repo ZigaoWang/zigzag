@@ -43,16 +43,13 @@ nonisolated enum HistoryClusters {
         return sessions
     }
 
-    /// Whether `entry`, visited before `last`, belongs to the same session: the same day and the same time of day
-    /// (morning, afternoon, evening, night), without a long break. A session is named by when it began, so one that
-    /// ran on from morning into the evening would show its evening pages under "morning"; split there, every heading
-    /// says when the pages under it were seen.
+    /// Same session: same day and time of day (morning, afternoon, evening, night) with no long break. Sessions are
+    /// named by when they began, so splitting at time-of-day boundaries keeps every heading accurate.
     static func continues(_ last: HistoryEntry, with entry: HistoryEntry, calendar: Calendar = .current) -> Bool {
         last.lastVisit.timeIntervalSince(entry.lastVisit) <= sessionGap && calendar.isDate(last.lastVisit, inSameDayAs: entry.lastVisit)
             && part(of: last.lastVisit, calendar: calendar) == part(of: entry.lastVisit, calendar: calendar)
     }
 
-    /// The time of day an instant falls in.
     private static func part(of date: Date, calendar: Calendar) -> Part {
         switch calendar.component(.hour, from: date) {
         case 5..<12: .morning
@@ -63,12 +60,12 @@ nonisolated enum HistoryClusters {
         }
     }
 
-    /// A session's name, from the day and the time of day it began: "This afternoon", "Yesterday evening",
-    /// "Last night", "Tuesday morning", "Sunday afternoon, October 18".
+    /// From the start's day and time of day: "This afternoon", "Yesterday evening", "Last night", "Tuesday morning",
+    /// "Sunday afternoon, October 18".
     static func title(startingAt start: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
         let part = part(of: start, calendar: calendar)
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: now)).day ?? 0
-        // Visited after midnight while it's still that night: it's tonight, not last night, until the morning.
+        // After midnight but before 5 a.m.: still tonight, not last night.
         if days <= 0, part == .lateNight, calendar.component(.hour, from: now) < 5 {
             return String(localized: "history.session.tonightAfterMidnight", defaultValue: "Tonight",
                           comment: "Name of a History session that began after midnight, seen while it's still night (before 5 AM). In English it's still tonight; say it as your language says these hours.")

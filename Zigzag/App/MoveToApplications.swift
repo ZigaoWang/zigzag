@@ -50,7 +50,7 @@ enum MoveToApplications {
         return find(bundle as CFURL, nil)?.takeRetainedValue() as URL? ?? bundle
     }
 
-    /// `copy` has a valid signature, all of it, that meets the designated requirement of `app` (same team, same app).
+    /// Whether `copy` is fully validly signed and meets `app`'s designated requirement.
     static func isSigned(like app: URL, _ copy: URL) -> Bool {
         var appCode: SecStaticCode?, copyCode: SecStaticCode?, requirement: SecRequirement?
         guard SecStaticCodeCreateWithPath(app as CFURL, [], &appCode) == errSecSuccess, let appCode,
@@ -71,16 +71,14 @@ enum MoveToApplications {
                        duration: 6, in: controller)
             return
         }
-        // The copy must be signed exactly as this Zigzag is, or it isn't what was checked when it first opened:
-        // it goes, quarantine and all, and the one you have stays where it is.
+        // A copy not signed like this one is deleted; the original stays.
         guard isSigned(like: Bundle.main.bundleURL, destination) else {
             try? manager.trashItem(at: destination, resultingItemURL: nil)
             Toast.show(String(localized: "Couldn’t move Zigzag to Applications", comment: "Toast when moving the app into Applications fails."), symbol: "exclamationmark.triangle",
                        duration: 6, in: controller)
             return
         }
-        // Moved by Zigzag, not by Finder: without this, macOS would keep the new copy apart too. Its signature and
-        // notarization were already checked when it first opened, and the copy was just checked against them.
+        // Removes quarantine, which Finder would do on a move; the signature was already checked above.
         let clear = Process()
         clear.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
         clear.arguments = ["-dr", "com.apple.quarantine", destination.path]

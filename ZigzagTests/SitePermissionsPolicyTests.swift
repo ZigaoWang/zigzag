@@ -17,7 +17,7 @@ import WebKit
         try body(defaults)
     }
 
-    /// The same, for the tests that await the question itself.
+    /// Async variant.
     private func withDefaultsAsync(_ body: () async throws -> Void) async throws {
         let suite = "SitePermissionsPolicyTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -48,7 +48,7 @@ import WebKit
         }
     }
 
-    /// Resetting every site clears both halves of the store: a destination kept beside the yeses and nos goes too.
+    /// Reset all clears both stores, including destinations.
     @Test func forgetAllClearsBothStores() throws {
         try withDefaults { defaults in
             SitePermissions.remember("deny", subject: PermissionSubject.location, origin: "https://example.com")
@@ -102,8 +102,7 @@ import WebKit
         }
     }
 
-    /// "This time" holds for the page that asked, and a private tab keeps nothing even when its caller forgets to say
-    /// it is private.
+    /// "This time" holds for the asking page; private tabs keep nothing even if the caller doesn't say private.
     @Test func thisTimeHoldsForThePageAndAPrivateTabKeepsNothing() throws {
         try withDefaults { _ in
             let tab = Tab(url: URL(string: "https://a.com"), spaceID: UUID())
@@ -125,8 +124,7 @@ import WebKit
 
     // MARK: Downloads: whether a site may save files at all
 
-    /// Asking is off by default, as Chrome and Arc leave a site's first download alone, and the one place the factory
-    /// answer lives says so.
+    /// Asking before downloads is off by default, like Chrome and Arc.
     @Test func askingBeforeADownloadIsOffByDefault() throws {
         #expect(!SitePermissions.asksBeforeDownloadsByDefault)
         try withDefaults { _ in
@@ -134,22 +132,20 @@ import WebKit
         }
     }
 
-    /// Turned off in Settings, a site nobody has answered for saves files as it always did: no card, no refusal. A
-    /// stored Block still wins, and asking back on asks again.
+    /// With asking off, unanswered sites download as before; a stored Block still wins, and turning asking on asks again.
     @Test func aTurnedOffSettingAnswersYesWithoutAsking() async throws {
         try await withDefaultsAsync {
             SitePermissions.asksBeforeDownloads = false
             #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
             #expect(await SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
 
-            // Asking back on asks again, whatever the factory answer is.
+            // Asking on asks again regardless of the default.
             SitePermissions.asksBeforeDownloads = true
             #expect(await !SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
         }
     }
 
-    /// A page with no site of its own (an about:blank pop-up a site wrote a file into) saves as it always did while
-    /// asking is off; only with asking on is it refused, having no site to ask about. A local file always saves.
+    /// A page without a site (about:blank popup) downloads as before with asking off; with it on it's refused. Local files always save.
     @Test func aPageWithoutASiteSavesAsBeforeWithAskingOff() throws {
         try withDefaults { _ in
             SitePermissions.asksBeforeDownloads = false
@@ -161,7 +157,7 @@ import WebKit
         }
     }
 
-    /// Asking on: the first download asks, and the site's Allow is kept, so the next file is decided without a card.
+    /// Asking on: the first download asks and the Allow is kept, so the next one doesn't.
     @Test func askingOnceKeepsTheAnswerForTheSite() async throws {
         try await withDefaultsAsync {
             let origin = "https://files.example"
@@ -176,7 +172,7 @@ import WebKit
         }
     }
 
-    /// A Block kept for the site still refuses with asking off, and a page's own "This time" block does too.
+    /// A stored site Block, or a page "This time" block, refuses even with asking off.
     @Test func aStoredBlockWinsWithTheSettingOff() async throws {
         try await withDefaultsAsync {
             SitePermissions.asksBeforeDownloads = false
@@ -189,9 +185,7 @@ import WebKit
         }
     }
 
-    /// A page-started download is the flow policy's, never the site question's: asking on or off, the first one goes
-    /// through and a stream is held back exactly as before. At the permission layer it is allowed without a card, and
-    /// a Block kept for the site still refuses it.
+    /// Page-started downloads go through the flow policy, never the site question; the permission layer allows them without a card unless the site is blocked.
     @MainActor @Test func aPageStartedDownloadNeverAsks() async throws {
         try await withDefaultsAsync {
             for asking in [true, false] {
@@ -212,10 +206,10 @@ import WebKit
         }
     }
 
-    /// The downloads question is one answer kept like every other, and never asks once it has one.
+    /// A stored download answer is used without asking.
     @Test func aStoredDownloadAnswerIsUsedWithoutAskingAnything() async throws {
         try await withDefaultsAsync {
-            // Asking on: a site with no answer would be refused, so the stored answers are what decide these.
+            // Asking on: unanswered sites would be refused, so stored answers decide.
             SitePermissions.asksBeforeDownloads = true
             SitePermissions.remember("allow", subject: PermissionSubject.downloads, origin: "https://files.example")
             #expect(SitePermissions.downloads(origin: "https://files.example") == true)
@@ -225,14 +219,13 @@ import WebKit
             #expect(SitePermissions.downloads(origin: "https://files.example") == false)
             #expect(await !SitePermissions.downloadsAllowed(origin: "https://files.example", window: nil, isPrivate: false, tab: nil))
 
-            // A site nobody has answered for has said nothing; with nowhere to ask, the file is refused rather than
-            // saved unasked.
+            // Unanswered with nowhere to ask: refused, not saved silently.
             #expect(SitePermissions.downloads(origin: "https://other.example") == nil)
             #expect(await !SitePermissions.downloadsAllowed(origin: "https://other.example", window: nil, isPrivate: false, tab: nil))
         }
     }
 
-    /// "This time" is the page's answer, not the site's: another tab is asked.
+    /// "This time" belongs to the page; another tab is asked.
     @Test func thisTimeDownloadAnswerHoldsForThePageNotTheSite() throws {
         try withDefaults { _ in
             let tab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
@@ -245,8 +238,7 @@ import WebKit
         }
     }
 
-    /// Allow Once on a blocked download's notice: the answer is kept for the page, exactly as "This time" is, and
-    /// never for the site.
+    /// Allow Once on a blocked download's notice is kept for the page, like "This time", never for the site.
     @Test func allowOnceOnANoticeHoldsForThePage() throws {
         try withDefaults { _ in
             let tab = Tab(url: URL(string: "https://files.example"), spaceID: UUID())
@@ -259,21 +251,21 @@ import WebKit
             #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == true)
             #expect(SitePermissions.action(PermissionSubject.downloads, origin: "https://files.example") == nil)
 
-            // A site blocked outright stays blocked: the offer is one file at a time, so the next one is refused again.
+            // A blocked site stays blocked: one file at a time.
             _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
                                                subject: PermissionSubject.downloads, origin: "https://files.example",
                                                tab: nil, isPrivate: false)
             SitePermissions.allowThisDownload(origin: "https://files.example", tab: tab)
             #expect(SitePermissions.downloads(origin: "https://files.example", tab: tab) == false)
 
-            // With no page to keep it on (a tab already gone) nothing is written, and nothing is said about the site.
+            // No page (tab gone): nothing written.
             SitePermissions.remember(nil, subject: PermissionSubject.downloads, origin: "https://files.example")
             SitePermissions.allowThisDownload(origin: "https://files.example", tab: nil)
             #expect(SitePermissions.downloads(origin: "https://files.example") == nil)
         }
     }
 
-    /// "Always" keeps a deny for the site, and a private window keeps nothing whatever the answer says.
+    /// "Always" keeps a deny for the site; private windows keep nothing.
     @Test func aDownloadDenyIsKeptForTheSiteAndAPrivateTabKeepsNothing() throws {
         try withDefaults { _ in
             _ = SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: true),
@@ -293,8 +285,7 @@ import WebKit
         }
     }
 
-    /// One answer, in the two places it is chosen: the question and the site's own row. Allow, Block and Ask in Site
-    /// Controls are the same decision the question makes, so neither can drift from the other.
+    /// The question and the Site Controls row write the same answer.
     @Test func theSiteControlsDownloadRowIsTheSameAnswerAsTheQuestion() throws {
         try withDefaults { _ in
             SitePermissions.setChoice(.block, for: .downloads, origin: "https://files.example")
@@ -306,8 +297,7 @@ import WebKit
         }
     }
 
-    /// Its row is offered once the site has an answer, in a private window too (which asks and keeps nothing), and it
-    /// offers the same three choices as every other row.
+    /// The row appears once the site has an answer, in private windows too, with the usual three choices.
     @Test func downloadsAreARowInSiteControlsOnceTheSiteHasAnAnswer() throws {
         #expect(SitePermission.downloads.kinds == ["downloads"])
         #expect(SitePermission.downloads.choices == PermissionChoice.allCases)
@@ -329,7 +319,7 @@ import WebKit
         }
     }
 
-    /// A private window asks, but writes nothing down, even if an answer says it should be kept.
+    /// Private windows ask but never store, even if told to.
     @Test func aPrivateWindowKeepsNothing() throws {
         try withDefaults { _ in
             let allowed = SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: true),
@@ -344,20 +334,19 @@ import WebKit
         }
     }
 
-    /// The three ways WebKit can answer, and the answer each is kept as — so a kept one can be read back as the same
-    /// choice. It used to be the one question that kept nothing; now a no, a display and a window are all keepable.
+    /// WebKit's three answers and how each is stored; no, display and window are all keepable now.
     @Test func screenSharingOffersThreeActionsAndKeepsThem() {
         #expect(DisplayCaptureChoice.actions.map(\.id) == ["deny", "screen", "allow"])
         #expect(DisplayCaptureChoice.actions.last?.isProminent == true)
         for choice in DisplayCaptureChoice.allCases {
             #expect(DisplayCaptureChoice(action: choice.action) == choice)
         }
-        // A kept "allow" is Share Window…, the action the filled button has, and nothing else is a choice.
+        // A kept "allow" is Share Window… (the default button).
         #expect(DisplayCaptureChoice(action: "allow") == .window)
         #expect(DisplayCaptureChoice(action: "toast") == nil)
     }
 
-    /// The screen-sharing buttons reach the three ways WebKit can answer, and nothing else is a yes.
+    /// Screen-sharing buttons map to WebKit's three answers; nothing else is a yes.
     @Test func screenSharingMapsItsActions() {
         #expect(DisplayCaptureChoice(PermissionAnswer(action: "screen", remember: false)) == .screen)
         #expect(DisplayCaptureChoice(PermissionAnswer(action: "allow", remember: false)) == .window)
@@ -365,8 +354,7 @@ import WebKit
         #expect(DisplayCaptureChoice(nil) == .deny)
     }
 
-    /// A page answer keeps the action it was given, not just yes or no: a handoff rule's "browser" has to survive
-    /// so the same page is not asked twice.
+    /// Page answers keep their action, not just yes/no, so a handoff's "browser" isn't asked twice.
     @Test func aPageAnswerKeepsItsActionAndItsYesOrNo() {
         var page = PagePermissionAnswers()
         let kind = "handoff:\(UUID().uuidString)"
@@ -379,7 +367,7 @@ import WebKit
         #expect(page.action(key: "https://a.com", kind: "location") == "allow")
         #expect(page.answer(key: "https://a.com", kind: "location") == true)
 
-        // An answer given to both at once, from before the split, is not read as either.
+        // A pre-split combined answer isn't read as either.
         page.note("deny", key: "https://a.com", kind: "cameraAndMicrophone")
         #expect(page.answer(key: "https://a.com", kind: "camera") == nil)
         #expect(page.answer(key: "https://a.com", kind: "microphone") == nil)
@@ -389,16 +377,14 @@ import WebKit
         #expect(page.action(key: "https://a.com", kind: kind) == nil)
     }
 
-    /// An app answer is kept only for a secure page, and never for a frame from another site.
+    /// App answers are kept only for secure pages and never for cross-site frames.
     @Test func anHttpPageCannotRememberAnAppQuestion() {
         #expect(ExternalLinks.canRemember(url: URL(string: "http://example.com"), foreign: false) == false)
         #expect(ExternalLinks.canRemember(url: URL(string: "https://example.com"), foreign: false) == true)
         #expect(ExternalLinks.canRemember(url: URL(string: "https://example.com"), foreign: true) == false)
     }
 
-    /// A kept answer is honored as it stands — the site's Allow opens, its Block stops, and nothing asks again.
-    /// Whether an answer *may* be written is a separate gate (`saves`), so `verdict` never second-guesses a stored
-    /// Allow: an http origin's Allow can only have been chosen in Site Controls, and it must be respected.
+    /// Stored answers are honored as is; whether one may be written is `saves`, so `verdict` never overrides an http Allow from Site Controls.
     @Test func aStoredAllowSkipsTheQuestionAndABlockStopsIt() {
         #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "allow") == .open)
         #expect(ExternalLinks.verdict(byYou: false, clickedHere: false, scheme: "zoommtg", stored: "deny") == .block)
@@ -428,9 +414,7 @@ import WebKit
         }
     }
 
-    /// Every stored or answered pop-up value has a destination, and an unknown one — an older build's "allow", from
-    /// when Always Allow meant an everyday pop-up — reads as the ordinary routing, rather than opening nothing at all
-    /// and leaving the page's pop-up unseen.
+    /// Every popup value has a destination; unknown ones (an older "allow") use ordinary routing instead of opening nothing.
     @Test func everyPopupValueHasADestination() {
         #expect(PopupNotice.destination(for: "deny") == .deny)
         #expect(PopupNotice.destination(for: "thisTab") == .thisTab)
@@ -441,9 +425,7 @@ import WebKit
         #expect(PopupNotice.destination(for: "") == .viewer)
     }
 
-    /// What happens to the pop-up WebKit offered once the answer is in. Mini keeps that very window, so a sign-in
-    /// can hand its result back; This Tab and New Tab close it and open their own; the ordinary yes keeps it only
-    /// where it is a real pop-up anyway — a plain window.open still opens a tab, as it did before the card.
+    /// Mini keeps WebKit's offered popup so sign-ins can return results; This Tab and New Tab close it; the ordinary yes keeps it only for real popups.
     @Test func theOfferedPopUpIsKeptForMiniAndDroppedOtherwise() {
         #expect(PopupNotice.heldOutcome(for: "mini", sized: true) == .reveal)
         #expect(PopupNotice.heldOutcome(for: "mini", sized: false) == .reveal)
@@ -454,9 +436,7 @@ import WebKit
         #expect(PopupNotice.heldOutcome(for: "deny", sized: true) == .discard)
     }
 
-    /// A legacy `true` for a site's pop-ups meant the routing it had before the card — a plain window.open opened a
-    /// real tab, a sized one a real pop-up — so it becomes "automatic", not the viewer, which would have made every
-    /// pop-up a small window. Every other subject's `true` is a plain "allow".
+    /// A legacy popup `true` becomes "automatic", not the viewer; other subjects' `true` is "allow".
     @Test func aLegacyPopupYesKeepsTheOrdinaryRouting() throws {
         try withDefaults { defaults in
             defaults.set(["https://example.com|popups": true, "https://example.com|camera": true], forKey: "SitePermissions")
@@ -466,8 +446,7 @@ import WebKit
         }
     }
 
-    /// Whether a site's pop-ups were allowed is kept as the routing it means, so neither Site Controls nor the debug
-    /// bridge can write a bare "allow" that opens nothing.
+    /// Allowing popups stores the routing, so nothing writes a bare "allow" that opens nothing.
     @Test func allowingPopupsKeepsTheOrdinaryRouting() throws {
         try withDefaults { _ in
             SitePermissions.setPopups(true, origin: "https://example.com")
@@ -480,8 +459,7 @@ import WebKit
         }
     }
 
-    /// Site Controls keeps working on the unified store: its Allow is the permission's own ordinary yes (the ordinary
-    /// pop-up routing for pop-ups), its Block is a deny, and Ask removes the answer.
+    /// Site Controls on the unified store: Allow is the ordinary yes (ordinary routing for popups), Block is deny, Ask removes it.
     @Test func siteControlsStillReadTheUnifiedAnswers() throws {
         try withDefaults { _ in
             SitePermissions.remember("newTab", subject: PermissionSubject.popups, origin: "https://a.com")
@@ -495,10 +473,7 @@ import WebKit
         }
     }
 
-    /// A page's own pop-up answered "This Tab" or "New Tab" is opened by the tab that asked, through that tab's own
-    /// host: Zigzag Mini's and an installed app's windows are not `BrowserWindowController`s, and casting to one was
-    /// how their pop-ups used to vanish. A host that is not a browser window still routes correctly, and "Don't
-    /// Allow" opens nothing at all.
+    /// This Tab / New Tab popups open through the asking tab's host; Mini and web app windows aren't `BrowserWindowController`s, and casting to one lost their popups. "Don't Allow" opens nothing.
     @Test func aPopUpGoesThroughTheTabThatAskedNotABrowserWindow() {
         let host = QuestionHostStub()
         let recorder = RecordingTabHost()
@@ -521,8 +496,7 @@ import WebKit
         #expect(recorder.opened.isEmpty, "a refused pop-up opens nowhere")
     }
 
-    /// The answer the pop-up question writes is the answer the next ask reads: This time is keyed by the one
-    /// address, through the same path `ask` uses, not by a key a test wrote by hand.
+    /// The answer the popup question writes is what the next ask reads, keyed by URL through the same path as `ask`.
     @Test func thePopUpAnswerAskWritesIsTheOneReadBack() {
         let origin = "https://example.com"
         let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
@@ -534,9 +508,7 @@ import WebKit
                 "the page answer is keyed by the request, not by the bare subject")
     }
 
-    /// A page that asks again on its own for the same address is held to the answer it already gave "this time" — no
-    /// second question — and nothing is read back in a private window or with no site to key the answer to, where
-    /// nothing is kept.
+    /// A page asking again for the same URL gets its "this time" answer; nothing is read in private windows or without a site.
     @Test func aPagesOwnThisTimePopUpAnswerIsReadBack() {
         let origin = "https://example.com"
         let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
@@ -544,16 +516,15 @@ import WebKit
         #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: popup, isPrivate: false) == nil, "nothing answered yet")
         tab.permissionAnswers.note("mini", key: origin, kind: PopupNotice.requestKind(popup))
         #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: popup, isPrivate: false) == "mini")
-        // The answer is the page's own: another site on it is asked separately.
+        // Page-scoped: another site on it is asked separately.
         #expect(PopupNotice.pageAction(tab: tab, origin: "https://other.com", url: popup, isPrivate: false) == nil)
-        // A private window keeps nothing, and neither does a page with no site or no tab.
+        // Private windows, pages without a site, or no tab: nothing kept.
         #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: popup, isPrivate: true) == nil)
         #expect(PopupNotice.pageAction(tab: tab, origin: nil, url: popup, isPrivate: false) == nil)
         #expect(PopupNotice.pageAction(tab: nil, origin: origin, url: popup, isPrivate: false) == nil)
     }
 
-    /// "This time" answers the request it was given for, not the whole page: after one window.open is answered, a
-    /// pop-up to another address is its own question rather than opening unseen.
+    /// "This time" covers one request; a popup to another URL is a new question.
     @Test func aThisTimePopUpAnswerCoversOneRequest() {
         let origin = "https://example.com"
         let tab = Tab(url: URL(string: origin + "/"), spaceID: UUID())
@@ -562,12 +533,11 @@ import WebKit
         tab.permissionAnswers.note("newTab", key: origin, kind: PopupNotice.requestKind(first))
         #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: first, isPrivate: false) == "newTab")
         #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: second, isPrivate: false) == nil)
-        // The same address still has its answer later, so a retry need not ask again.
+        // The same URL keeps its answer, so a retry doesn't ask.
         #expect(PopupNotice.pageAction(tab: tab, origin: origin, url: first, isPrivate: false) == "newTab")
     }
 
-    /// A page's own pop-up may be asked about only from its main frame and only for a web address or about:blank.
-    /// A frame's pop-up is blocked quietly, and so is a data: page, a script, a file or a blob.
+    /// Only main-frame popups to web URLs or about:blank are asked about; frame, data:, script, file and blob popups are blocked silently.
     @Test func onlyThePagesOwnWebPopupIsAskedAbout() {
         #expect(PopupNotice.mayAsk(url: URL(string: "https://example.com/x"), fromMainFrame: true))
         #expect(PopupNotice.mayAsk(url: URL(string: "http://example.com/x"), fromMainFrame: true))
@@ -580,8 +550,7 @@ import WebKit
         #expect(PopupNotice.mayAsk(url: URL(string: "blob:https://example.com/abc"), fromMainFrame: true) == false)
         #expect(PopupNotice.mayAsk(url: nil, fromMainFrame: true) == false)
 
-        // The routing a kept destination is held to is the same: a web address opens, an app's asks, the rest goes
-        // nowhere.
+        // Kept destinations route the same: web URLs open, app links ask, the rest go nowhere.
         #expect(PopupNotice.route(URL(string: "https://example.com/x")!, from: nil) == .open)
         #expect(PopupNotice.route(URL(string: "about:blank")!, from: nil) == .open)
         #expect(PopupNotice.route(URL(string: "zoommtg://zoom.us/join")!, from: nil) == .app)
@@ -590,8 +559,7 @@ import WebKit
         #expect(PopupNotice.route(URL(string: "file:///tmp/index.html")!, from: URL(string: "file:///tmp/page.html")) == .open)
     }
 
-    /// `window.open('')` reaches the delegate as an address with no scheme, not as nil, so an empty or scheme-less
-    /// address is the blank page. An allowed site's blank pop-up is then a web address like any other and opens.
+    /// `window.open('')` reaches the delegate as a schemeless URL, not nil, so empty or schemeless is about:blank and opens for allowed sites.
     @Test func aBlankPopupIsTheBlankPageNotARefusal() {
         let blank = URL(string: "about:blank")!
         let empty = PopupNotice.popupTarget(nil)
@@ -609,8 +577,7 @@ import WebKit
         #expect(named.isBlank == false)
         #expect(PopupNotice.route(empty.url, from: nil) == .open)
 
-        // An allowed site's blank pop-up may open; a frame's or a blank one may not use This Tab or New Tab, since
-        // either would move the page without a click.
+        // An allowed site's blank popup may open; blank or frame popups can't use This Tab or New Tab, which would navigate without a click.
         #expect(PopupNotice.storedDestinationMayOpen(.automatic, forBlankOrFrame: true))
         #expect(PopupNotice.storedDestinationMayOpen(.viewer, forBlankOrFrame: true))
         #expect(PopupNotice.storedDestinationMayOpen(.thisTab, forBlankOrFrame: true) == false)
@@ -620,8 +587,7 @@ import WebKit
         #expect(PopupNotice.storedDestinationMayOpen(.newTab, forBlankOrFrame: false))
     }
 
-    /// The old store stays exactly what an older build reads: a [String: Bool] of plain yeses and nos. A destination
-    /// or a handoff's choice keeps its own key beside it, so an action id never makes the Bool store unreadable.
+    /// The old store stays [String: Bool] for older builds; destinations and handoff choices use a separate key.
     @Test func simpleAnswersStayReadableToAnOlderBuild() throws {
         try withDefaults { defaults in
             SitePermissions.remember("allow", subject: PermissionSubject.media(.camera), origin: "https://a.com")
@@ -634,7 +600,7 @@ import WebKit
             #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] ==
                     ["https://a.com|camera": true, "https://a.com|location": false, "https://a.com|popups": true])
 
-            // A destination or a handoff's choice is not a yes or no: it keeps its id, under its own key.
+            // Destinations and handoff choices keep their id under the separate key.
             SitePermissions.remember("mini", subject: PermissionSubject.popups, origin: "https://b.com")
             SitePermissions.remember("handOff", subject: "handoff:\(UUID().uuidString)", origin: "https://b.com")
             #expect(defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] ==
@@ -647,8 +613,7 @@ import WebKit
         }
     }
 
-    /// A store from the first card build, with action strings mixed into the Bool store, is split on the launch
-    /// migration: the old key becomes pure Bool again, and every action is still read.
+    /// Stores from the first card build, with actions mixed into the Bool store, are split at launch; every action is still read.
     @Test func aMixedStoreIsSplitForOlderBuilds() throws {
         try withDefaults { defaults in
             defaults.set(["https://a.com|camera": true,
@@ -665,8 +630,7 @@ import WebKit
         }
     }
 
-    /// A page's own "this time" app answer covers one launch: a script firing the same link again a moment later is
-    /// held to the same few seconds a question is, rather than setting the app going over and over.
+    /// A page's "this time" app answer covers one launch; scripted repeats are throttled like questions.
     @Test func aPagesAppAnswerSpeedsNoRunOfLaunches() {
         var asked = ExternalLinks.Asked()
         let key = "https://zoom.us|zoommtg"
@@ -679,13 +643,12 @@ import WebKit
         #expect(justBefore == false)
         let afterTheGap = asked.mayOpenAgain(key, now: now.addingTimeInterval(ExternalLinks.Asked.repeatGap))
         #expect(afterTheGap)
-        // Another site's launch isn't held up by this one.
+        // Other sites aren't throttled by this one.
         let elsewhere = asked.mayOpenAgain("https://meet.example|zoommtg", now: now.addingTimeInterval(1))
         #expect(elsewhere)
     }
 
-    /// A page's pop-up questions keep the same few seconds: a page that asks again on its own right after a question
-    /// went up doesn't get a second card, and a question put off isn't put straight back.
+    /// Popup questions use the same throttle: no second card right after one, and a dismissed one isn't shown again immediately.
     @Test func aPageAskingAgainIsHeldToItsFewSeconds() {
         let origin = "https://example.com"
         let now = Date()
@@ -700,8 +663,7 @@ import WebKit
         PopupNotice.forgetAnswers(origin: origin)
     }
 
-    /// Settings › Downloads groups a rule's answered sites by what was answered, so a refused site does not read like
-    /// a handed-off one; the groups come in the question's own order and only when they have sites.
+    /// Settings › Downloads groups answered sites by answer, in the question's order, omitting empty groups.
     @Test func theDownloadsListGroupsSitesByTheirAnswer() throws {
         try withDefaults { _ in
             let rule = UUID()
@@ -713,25 +675,24 @@ import WebKit
             #expect(decided.map(\.origin) == ["https://a.com", "https://b.com", "https://c.com", "https://d.com"])
             let groups = SettingsView.handoffAnswerGroups(decided)
             #expect(groups.map(\.sites) == [["https://a.com", "https://c.com"], ["https://d.com"], ["https://b.com"]])
-            // The row's title is the very word the question's button used.
+            // Titles match the question's button labels.
             #expect(groups.map(\.title) == ["Hand Off", "Open in Browser", "Don’t Allow"])
             #expect(SettingsView.handoffAnswerGroups([]).isEmpty)
         }
     }
 
-    /// A kept answer's row takes the rule as its subject, as the rule's own row does, and keeps the answer and the site
-    /// it was given on in the detail beneath it.
+    /// A kept answer row is titled with the rule, with the answer and site in the detail.
     @Test func aKeptAnswersRowNamesItsRuleAndSite() {
         let row = SettingsView.handoffAnswerRow(ruleNamed: "YouTube", answer: "Hand Off", sites: "youtube.com")
         #expect(row.title == "YouTube")
         #expect(row.detail.contains("Hand Off"))
         #expect(row.detail.contains("youtube.com"))
-        // A rule with no name still reads as a rule, never as an empty row.
+        // Unnamed rules read as a rule, never an empty row.
         #expect(SettingsView.handoffAnswerRow(ruleNamed: "  ", answer: "Hand Off", sites: "youtube.com").title == "Untitled Rule")
     }
 }
 
-/// The tab that asked a pop-up's question, recording what its host was told to open.
+/// The tab that asked a popup question, recording what its host was told to open.
 @MainActor
 private final class RecordingTabHost: TabHost {
     var opened: [(tab: Tab, url: String, disposition: String, sender: Tab.LoadSender)] = []
@@ -747,8 +708,7 @@ private final class RecordingTabHost: TabHost {
     func tabWantsToBeShown(_ tab: Tab) {}
 }
 
-/// A window that can show a question but is no browser window; nothing here is touched for the two destinations
-/// that go through the tab, which is the point.
+/// A non-browser window that can show questions; it's untouched for the two tab-routed destinations.
 @MainActor
 private final class QuestionHostStub: PromptHost {
     var window: NSWindow? { nil }

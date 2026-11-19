@@ -24,8 +24,8 @@ enum ProxyCheck {
         return nil
     }
 
-    /// Whether the system sends a page at `url` through a proxy of any kind, on this Mac or elsewhere: the one for
-    /// its scheme, a SOCKS proxy, or an automatic configuration (a PAC file, or one found on the network).
+    /// Whether the system proxies `url` in any way: a per-scheme proxy, SOCKS, or auto-configuration (PAC file or
+    /// network discovery).
     nonisolated static func anyProxy(for url: URL) -> Bool {
         guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any] else { return false }
         return anyProxy(in: settings, scheme: url.scheme ?? "")

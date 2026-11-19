@@ -286,6 +286,46 @@ struct ArcFolderTests {
         #expect(folders.holdingPages == [top.id, mid.id, low.id])
     }
 
+    /// Open All in Tabs takes the folder's tree in list order (#343).
+    @Test func openAllTakesTheTreeInListOrder() {
+        let p = (0..<6).map { _ in UUID() }
+        var top = BookmarkFolder(name: "Top", bookmarkIDs: [p[1], p[4]]), mid = BookmarkFolder(name: "Mid", bookmarkIDs: [p[2]])
+        var low = BookmarkFolder(name: "Low", bookmarkIDs: [p[3]])
+        mid.parentID = top.id; low.parentID = mid.id
+        let other = BookmarkFolder(name: "Other", bookmarkIDs: [p[5]])
+        let folders = [low, other, top, mid]
+        #expect(folders.pages(in: top.id, ordered: p) == [p[1], p[2], p[3], p[4]])
+        #expect(folders.pages(in: mid.id, ordered: p.reversed()) == [p[3], p[2]])
+        top.bookmarkIDs = []
+        #expect([top].pages(in: top.id, ordered: p).isEmpty)
+    }
+
+    /// Expand All and Collapse All reach every level and nothing outside (#343).
+    @Test func expandAndCollapseAllReachEveryLevel() {
+        let p = (0..<3).map { _ in UUID() }
+        var top = BookmarkFolder(name: "Top", bookmarkIDs: [p[0]]), mid = BookmarkFolder(name: "Mid", bookmarkIDs: [p[1]])
+        var low = BookmarkFolder(name: "Low"), side = BookmarkFolder(name: "Side", bookmarkIDs: [p[2]])
+        mid.parentID = top.id; low.parentID = mid.id
+        mid.isOpen = false; side.isOpen = false
+        let folders = [top, mid, low, side]
+        #expect(folders.anyInTree(of: top.id, isOpen: false) && folders.anyInTree(of: top.id, isOpen: true))
+        #expect(!folders.anyInTree(of: low.id, isOpen: false))
+
+        let shut = folders.folding(top.id, open: false, shown: [p[1], p[2]])
+        #expect(shut.filter { [top.id, mid.id, low.id].contains($0.id) }.allSatisfy { !$0.isOpen })
+        #expect(!shut.anyInTree(of: top.id, isOpen: true))
+        // Pages inside are hidden at any depth; the one outside stays.
+        #expect(shut.first { $0.id == top.id }?.tucked == [p[1]])
+        #expect(shut.first { $0.id == mid.id }?.tucked == [p[1]])
+        #expect(shut.first { $0.id == low.id }?.tucked == nil)
+        #expect(shut.first { $0.id == side.id } == side)
+
+        let open = shut.folding(top.id, open: true)
+        #expect(open.filter { [top.id, mid.id, low.id].contains($0.id) }.allSatisfy { $0.isOpen && $0.tucked == nil })
+        #expect(!open.anyInTree(of: top.id, isOpen: false))
+        #expect(open.first { $0.id == side.id } == side)
+    }
+
     /// Rows step in a full indent for the first levels, then half as far, every level still a step in.
     @Test func deepRowsStepInLess() {
         let full = SidebarListView.folderIndent

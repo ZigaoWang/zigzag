@@ -36,15 +36,13 @@ struct SiteControlsPermissionTests {
         #expect(PermissionChoice.block.allowed == false)
     }
 
-    /// Screen sharing follows the same rule as everything else now: **a kept no is a no for the site, and "this time"
-    /// leaves the site asking.** It used to be the one question that kept nothing at all — the same two answers
-    /// meaning something different there than on every other card.
+    /// Screen sharing now follows the common rule: a kept no blocks the site, "this time" keeps asking.
     @Test func aScreenSharingNoCanBeKeptForTheSite() throws {
         try withDefaults {
             #expect(SitePermissions.choice(.screen, origin: site) == .ask)
             #expect(DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) == nil)
 
-            // "Always" on Don't Allow: Block for the site, read back as the same no when it next asks.
+            // "Always" with Don't Allow blocks the site, read back as no next time.
             let always = SitePermissions.rememberAnswer(
                 PermissionAnswer(action: DisplayCaptureChoice.deny.action, remember: true),
                 subject: PermissionSubject.screen, origin: site, tab: nil, isPrivate: false)
@@ -52,7 +50,7 @@ struct SiteControlsPermissionTests {
             #expect(SitePermissions.choice(.screen, origin: site) == .block)
             #expect(DisplayCaptureChoice(action: SitePermissions.action(PermissionSubject.screen, origin: site)) == .deny)
 
-            // A kept yes is the Share Window… answer, which is the filled button, and a kept Share Screen… is its own.
+            // A kept yes is Share Window… (the default button); Share Screen… is kept separately.
             SitePermissions.rememberAnswer(PermissionAnswer(action: DisplayCaptureChoice.window.action, remember: true),
                                            subject: PermissionSubject.screen, origin: site, tab: nil, isPrivate: false)
             #expect(SitePermissions.choice(.screen, origin: site) == .allow)
@@ -109,7 +107,7 @@ struct SiteControlsPermissionTests {
             #expect(tab.permissionAnswers.answer(key: site, kind: "location") == false)
             // Nothing kept for the site: it's still Ask, and another tab on it asks.
             #expect(SitePermissions.choices(origin: site).isEmpty)
-            // WebRTC is never Ask: with nothing kept, it follows its setting.
+            // WebRTC has no Ask; with nothing kept it follows its setting.
             for permission in SitePermission.allCases where permission.choices.contains(.ask) { #expect(SitePermissions.choice(permission, origin: site) == .ask) }
             let other = Tab(url: URL(string: site), title: "Meet", spaceID: UUID())
             #expect(SitePermissions.notifications(origin: site, tab: other) == nil)
@@ -119,7 +117,7 @@ struct SiteControlsPermissionTests {
             tab.permissionAnswers.forget()
             #expect(tab.permissionAnswers.isEmpty)
             #expect(SitePermissions.notifications(origin: site, tab: tab) == nil)
-            // An answer given to both at once, from before the split, is not read as either.
+            // A combined answer from before the split isn't read as either.
             tab.permissionAnswers.note(true, key: site, kind: "cameraAndMicrophone")
             #expect(tab.permissionAnswers.answer(key: site, kind: "camera") == nil)
             #expect(tab.permissionAnswers.answer(key: site, kind: "microphone") == nil)
@@ -146,7 +144,7 @@ struct SiteControlsPermissionTests {
                 SitePermissions.setChoice(.block, for: permission, origin: site)
                 #expect(SitePermissions.choice(permission, origin: site) == .block)
                 SitePermissions.setChoice(.ask, for: permission, origin: site)
-                // WebRTC has no Ask: forgotten, it's what the setting says (off: allowed).
+                // WebRTC has no Ask: forgotten means the setting (off: allowed).
                 #expect(SitePermissions.choice(permission, origin: site) == (permission == .webRTC ? .allow : .ask))
                 #expect(!SitePermissions.hasDecision(permission, origin: site))
             }
@@ -154,7 +152,7 @@ struct SiteControlsPermissionTests {
         }
     }
 
-    /// The camera and the microphone are two permissions: one row and one answer each.
+    /// Camera and microphone are separate permissions: one row and answer each.
     @Test func theCameraAndMicrophoneHaveTwoAnswers() throws {
         try withDefaults {
             SitePermissions.remember(false, origin: site, type: .microphone)
@@ -165,20 +163,20 @@ struct SiteControlsPermissionTests {
             #expect(SitePermissions.choice(.microphone, origin: site) == .block)
             #expect(SitePermissions.choices(origin: site) == ["camera": true, "microphone": false])
             #expect(SitePermissions.mediaDecisions(origin: site) == [true, false])
-            // Ask forgets one without touching the other.
+            // Ask clears one without touching the other.
             SitePermissions.setChoice(.ask, for: .camera, origin: site)
             #expect(SitePermissions.decision(origin: site, type: .camera) == nil)
             #expect(SitePermissions.decision(origin: site, type: .microphone) == false)
         }
     }
 
-    /// A camera-and-microphone request is two questions, and a call gets both only when both say yes.
+    /// A camera-and-microphone request is two questions; the call gets both only if both are allowed.
     @Test func aRequestForBothTakesTwoAnswers() throws {
         try withDefaults {
             #expect(SitePermissions.mediaTypes(for: .camera) == [.camera])
             #expect(SitePermissions.mediaTypes(for: .microphone) == [.microphone])
             #expect(SitePermissions.mediaTypes(for: .cameraAndMicrophone) == [.camera, .microphone])
-            // Nothing kept for it until both kinds are answered.
+            // Nothing kept until both are answered.
             #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == nil)
             SitePermissions.remember(true, origin: site, type: .camera)
             #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == nil)
@@ -186,32 +184,32 @@ struct SiteControlsPermissionTests {
             #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == false)
             SitePermissions.remember(true, origin: site, type: .microphone)
             #expect(SitePermissions.decision(origin: site, type: .cameraAndMicrophone) == true)
-            // Remembering an answer for both writes one for each, never the other way round.
+            // Remembering for both writes one per kind, never a combined one.
             SitePermissions.remember(false, origin: site, type: .cameraAndMicrophone)
             #expect(SitePermissions.choices(origin: site) == ["camera": false, "microphone": false])
         }
     }
 
-    /// One answer for both, from before the split, becomes one for each; a kind's own answer wins.
+    /// A pre-split combined answer becomes one per kind; a kind's own answer wins.
     @Test func anAnswerForBothBecomesOneForEach() throws {
         try withDefaults {
             SitePermissions.defaults.set(["https://meet.example.com|cameraAndMicrophone": true,
                                           "https://other.example|cameraAndMicrophone": false,
                                           "https://meet.example.com|camera": false], forKey: "SitePermissions")
             SitePermissions.migrateMediaAnswers()
-            // Written as the Bool an older build reads: a deny is false, a yes true.
+            // Written as Bool for older builds: deny false, allow true.
             let now = SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: Bool]
             #expect(now == ["https://meet.example.com|camera": false,
                             "https://meet.example.com|microphone": true,
                             "https://other.example|camera": false,
                             "https://other.example|microphone": false])
-            // Once is enough: again, nothing changes.
+            // Idempotent.
             SitePermissions.migrateMediaAnswers()
             #expect(SitePermissions.defaults.dictionary(forKey: "SitePermissions") as? [String: Bool] == now)
         }
     }
 
-    /// Two rows, two dropdowns: blocking the camera leaves the microphone as it was.
+    /// Two rows, two dropdowns: blocking the camera leaves the microphone.
     @Test func theCameraAndMicrophoneHaveARowEach() throws {
         try withDefaults {
             SitePermissions.noteAsked(.camera, origin: site, isPrivate: false)
@@ -286,12 +284,12 @@ struct SiteControlsPermissionTests {
     /// A frame from another site on the page is held back by the page's Block, and never let in by its Allow.
     @Test func aFrameFromElsewhereOnlyFollowsBlock() throws {
         try withDefaults {
-            // A site-wide Allow covers every app the page opens, as the row always meant.
+            // A site-wide Allow covers every app the page opens.
             SitePermissions.setChoice(.allow, for: .apps, origin: site)
             #expect(SitePermissions.action(PermissionSubject.apps, origin: site) == "allow")
             #expect(ExternalLinks.decision(page: site, foreign: false, stored: "allow") == "allow")
             #expect(ExternalLinks.decision(page: site, foreign: true, stored: "allow") == nil)
-            // Always Open on one app is kept under that app's own key.
+            // Always Open on one app is stored under that app's key.
             SitePermissions.allowOpeningApp(origin: site, scheme: "zoommtg")
             #expect(SitePermissions.action(PermissionSubject.app("zoommtg"), origin: site) == "allow")
             SitePermissions.setChoice(.block, for: .apps, origin: site)
@@ -302,9 +300,7 @@ struct SiteControlsPermissionTests {
         }
     }
 
-    /// The whole read a page's app link is held to: the site-wide row is read before the app's own key, so a
-    /// site-wide Allow reaches every app, and the page's own "this time" answer is read too so a page that asks again
-    /// isn't asked twice. This is the composition whose absence let the site-wide-Allow regression ship.
+    /// App link lookup order: site-wide row, then the app's key, then the page's "this time" answer. A missing step here let the site-wide Allow regression ship.
     @Test func anAppLinkReadsTheSiteWideRowThenTheAppThenThePage() throws {
         try withDefaults {
             let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
@@ -313,25 +309,24 @@ struct SiteControlsPermissionTests {
                                                   foreign: false, tab: tab)?.action == "allow")
             #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
                                                   foreign: false, tab: tab)?.action == "allow")
-            // A foreign frame never gets the page's site-wide Allow.
+            // Foreign frames never get the page's site-wide Allow.
             #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg",
                                                   foreign: true, tab: tab) == nil)
-            // The page's own answer this time, with nothing kept for the site.
+            // A page "this time" answer with nothing kept for the site.
             SitePermissions.setChoice(.ask, for: .apps, origin: site)
             SitePermissions.rememberAnswer(PermissionAnswer(action: "deny", remember: false),
                                            subject: PermissionSubject.app("zoommtg"), origin: site, tab: tab, isPrivate: false)
             let pageAnswer = ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg",
                                                            foreign: false, tab: tab)
             #expect(pageAnswer?.action == "deny")
-            // Given on this page only: it must never be returned as an answer to keep for the site.
+            // Page-only: never returned as an answer to keep.
             #expect(pageAnswer?.remember == false)
             #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
                                                   foreign: false, tab: tab) == nil)
         }
     }
 
-    /// A page's This-time app answer must never be read back as one to keep: the card would write it down as the
-    /// site's Always, and the same app would open without asking on every page of the site.
+    /// A page's This-time app answer must never come back as keepable, or the card would store it as the site's Always.
     @Test func aThisTimeAppAnswerNeverBecomesTheSitesAlways() throws {
         try withDefaults {
             let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
@@ -340,7 +335,7 @@ struct SiteControlsPermissionTests {
             let kept = ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg", foreign: false, tab: tab)
             #expect(kept?.action == "allow")
             #expect(kept?.remember == false)
-            // Handing it back to the card as if it were an answer to keep still stays on the page.
+            // Passing it back to the card as keepable still stays page-only.
             if let kept {
                 _ = SitePermissions.rememberAnswer(PermissionAnswer(action: kept.action, remember: kept.remember),
                                                    subject: PermissionSubject.app("zoommtg"), origin: site, tab: tab, isPrivate: false)
@@ -350,8 +345,7 @@ struct SiteControlsPermissionTests {
         }
     }
 
-    /// "Don't Allow" is kept for that one app, not the whole site: refusing the App Store link on a site must not
-    /// also block its Zoom link there. Site Controls still writes the site-wide "Open apps" row, and that Block wins.
+    /// "Don't Allow" is kept per app, not site-wide, so refusing the App Store link doesn't block Zoom. A Site Controls Block still wins.
     @Test func anAnsweredDenyStaysWithItsApp() throws {
         try withDefaults {
             let tab = Tab(url: URL(string: site + "/"), spaceID: UUID())
@@ -363,20 +357,20 @@ struct SiteControlsPermissionTests {
                                                  scheme: "zoommtg") == PermissionSubject.app("zoommtg"))
             SitePermissions.rememberAnswer(deny, subject: ExternalLinks.storageSubject(for: deny, scheme: "zoommtg"),
                                            origin: site, tab: tab, isPrivate: false)
-            // That app is refused, and the next app the page opens asks on its own.
+            // That app is refused; the next app asks separately.
             #expect(SitePermissions.appDecision(origin: site, scheme: "zoommtg") == false)
             #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == nil)
             #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "zoommtg",
                                                   foreign: false, tab: tab)?.action == "deny")
             #expect(ExternalLinks.storedAppAnswer(pageOrigin: site, origin: site, scheme: "itms-apps",
                                                   foreign: false, tab: tab) == nil)
-            // A Block chosen for the site in Site Controls still covers every app.
+            // A site Block from Site Controls covers every app.
             SitePermissions.setChoice(.block, for: .apps, origin: site)
             #expect(SitePermissions.appDecision(origin: site, scheme: "itms-apps") == false)
         }
     }
 
-    /// A page with no site (about:blank its opener wrote) is held by the opener's Block, never let in by its Allow.
+    /// A page without a site (about:blank written by its opener) inherits the opener's Block, never its Allow.
     @Test func aPageWithNoSiteKeepsItsOpenersBlock() throws {
         try withDefaults {
             #expect(ExternalLinks.storedAppAnswer(pageOrigin: nil, standIns: [site], origin: nil, scheme: "zoommtg", foreign: false, tab: nil) == nil)
@@ -421,8 +415,7 @@ struct ZoomStepperTests {
         #expect(ZoomLevels.step(1.0004, by: 1) == 1.1)
     }
 
-    /// Page zoom (#273): a site with no zoom of its own opens at the default, Actual Size goes back to it, and a site
-    /// set to 100% under a larger default keeps that as its own.
+    /// Page zoom (#273): sites without their own zoom use the default, Actual Size returns to it, and 100% under a larger default is kept as the site's.
     @Test func sitesWithoutTheirOwnZoomOpenAtTheDefault() {
         let before = ZoomLevels.defaultZoom
         let plain = URL(string: "https://default-zoom-plain.example")!, mine = URL(string: "https://default-zoom-mine.example")!
@@ -432,13 +425,13 @@ struct ZoomStepperTests {
         #expect(ZoomLevels.zoom(for: plain) == 1.25)
         #expect(!ZoomLevels.hasOwnZoom(plain))
 
-        // 100% is the site's own now; the default needs no entry.
+        // 100% is now the site's; the default needs no entry.
         ZoomLevels.set(1, for: mine)
         #expect(ZoomLevels.zoom(for: mine) == 1)
         ZoomLevels.set(1.25, for: mine)
         #expect(!ZoomLevels.hasOwnZoom(mine))
 
-        // Not one of the steps: the default falls back to 100%.
+        // Not a valid step: falls back to 100%.
         UserDefaults.standard.set(1.3, forKey: "DefaultZoom")
         #expect(ZoomLevels.defaultZoom == 1)
     }
@@ -590,18 +583,16 @@ struct SitePanelRowsTests {
     private typealias Context = SitePanelRows.Context
 
     @Test func anOrdinaryPage() {
-        #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(Context()) == [.zoom, .adBlocking, .darkPage, .keepAwake, .keepCookies])
         // The connection is a line under the site's name (#221), not a row into a page.
         #expect(SitePanelRows.links(Context()).isEmpty)
     }
 
-    /// The first page is the page's own switches: zoom, ads, cookie banners, dark page, keeping it awake, full
-    /// screen, translating and the space it opens in. Permissions, JavaScript and extensions are the Permissions
-    /// page's (#311, #313), so an ordinary web page has none of them here.
+    /// The first page holds page switches only (zoom, ads, cookie banners, dark page, keep awake, full screen, translate, space); permissions, JavaScript and extensions are on the Permissions page (#311, #313).
     @Test func theFirstPageIsOnlyPageSwitches() {
         var c = Context()
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake])
-        // Every web page's Permissions page has JavaScript on it, so there's always a way in.
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .keepCookies])
+        // Every web page's Permissions page has JavaScript, so it's always reachable.
         c.hasPermissions = true
         #expect(SitePanelRows.links(c) == [.permissions])
     }
@@ -610,7 +601,7 @@ struct SitePanelRowsTests {
         var c = Context()
         c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .keepCookies, .fullScreenFills, .alwaysTranslate])
     }
 
     /// Cookie banners (#175): there once a pop-up was found or a choice kept, under Ad blocking; never in a private
@@ -619,10 +610,10 @@ struct SitePanelRowsTests {
         var c = Context()
         #expect(!SitePanelRows.rows(c).contains(.cookieBanners))
         c.cookieBanners = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .cookieBanners, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .cookieBanners, .darkPage, .keepAwake, .keepCookies])
         // Apart from ad blocking: there with ad blocking off too.
         c.adBlocking = false
-        #expect(SitePanelRows.rows(c) == [.zoom, .cookieBanners, .darkPage, .keepAwake])
+        #expect(SitePanelRows.rows(c) == [.zoom, .cookieBanners, .darkPage, .keepAwake, .keepCookies])
         var privately = c
         privately.isPrivate = true
         #expect(!SitePanelRows.rows(privately).contains(.cookieBanners))
@@ -636,7 +627,7 @@ struct SitePanelRowsTests {
         var c = Context()
         c.fullScreen = true
         c.foreignLanguage = true
-        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .fullScreenFills, .alwaysTranslate])
+        #expect(SitePanelRows.rows(c) == [.zoom, .adBlocking, .darkPage, .keepAwake, .keepCookies, .fullScreenFills, .alwaysTranslate])
     }
 
     @Test func noZoomOverReaderOrAPDF() {
@@ -649,7 +640,7 @@ struct SitePanelRowsTests {
         var c = Context()
         c.isPrivate = true
         c.siteChoices = false
-        // JavaScript has moved to the Permissions page, chosen for the tab alone (#282).
+        // JavaScript moved to the Permissions page, per tab (#282).
         #expect(SitePanelRows.rows(c) == [.zoom])
         #expect(SitePanelRows.links(c).isEmpty)
     }
@@ -710,20 +701,25 @@ struct SitePanelRowsTests {
 
 /// How tall Site Controls gets, and when a page scrolls under its header (#220).
 struct SitePanelSizingTests {
-    /// Under the sidebar's address the panel starts where the field does (6 pt in), not at the window's 8 pt inset,
-    /// so its edges line up with the field's and nothing under it shows past its corner.
+    /// Under the sidebar address the panel aligns with the field (6 pt in), not the window's 8 pt inset.
     @Test func underTheAddressItLinesUpWithTheField() {
         let inset = Tokens.Metric.cardInset
         #expect(SitePanelSizing.x(6, alongAddress: true, inset: inset) == 6)
         #expect(SitePanelSizing.x(1_200, alongAddress: true, inset: inset) == 1_200)
-        // The address off screen (the sidebar hidden), or anything else: kept in from the window's edge.
+        // Address offscreen (sidebar hidden) or anything else: inset from the window edge.
         #expect(SitePanelSizing.x(-240, alongAddress: true, inset: inset) == inset)
         #expect(SitePanelSizing.x(6, alongAddress: false, inset: inset) == inset)
-        // A sidebar on the right: under its address as the window resizes (the address moves with the right edge),
-        // and never past that edge.
+        // Right sidebar: follows the address as the window resizes, never past the edge.
         #expect(SitePanelSizing.x(1_200 - 6 - 240, alongAddress: true, inset: inset, width: 240, overlayWidth: 1_200) == 954)
         #expect(SitePanelSizing.x(900 - 6 - 240, alongAddress: true, inset: inset, width: 240, overlayWidth: 900) == 654)
         #expect(SitePanelSizing.x(1_250, alongAddress: true, inset: inset, width: 240, overlayWidth: 1_200) == 1_200 - inset - 240)
+    }
+
+    /// Fixed width regardless of the sidebar (#335), narrower only in small windows.
+    @Test func itKeepsItsOwnWidth() {
+        #expect(SitePanel.fittingWidth(in: 1_280) == SitePanel.width)
+        #expect(SitePanel.fittingWidth(in: 300) == 300 - Tokens.Metric.cardInset * 2)
+        #expect(SitePanel.fittingWidth(in: 200) == SitePanel.minimumWidth)
     }
 
     @Test func aPageThatFitsDoesntScroll() {

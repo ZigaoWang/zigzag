@@ -3,12 +3,9 @@ import JavaScriptCore
 import Testing
 @testable import Zigzag
 
-/// The runtime context claims: what `runtime.getContexts` and `runtime.getBackgroundPage` promise, and that Chrome's
-/// MV3-only members are not part of an MV2 extension's world.
+/// Runtime context claims for getContexts and getBackgroundPage; MV3-only members stay out of MV2.
 struct ExtensionContextClaimsTests {
-    /// A fake extension world for api-surface.js: WebKit's runtime with the manifest and the diagnostics channel an
-    /// extension's background has, and none of the API namespaces the surface must fill. `setup` runs after the world
-    /// and before the surface, as another prelude layer would.
+    /// A fake extension world for api-surface.js: WebKit's runtime, manifest and diagnostics channel, no API namespaces. `setup` runs between world and surface.
     private static func surfaceWorld(version: Int, setup: String = "") throws -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
@@ -49,7 +46,7 @@ struct ExtensionContextClaimsTests {
         let registry = CompatibilityRegistry(overlay: overlay)
         let implementations = CompatibilityImplementations.shipped()
 
-        // runtime.getContexts is answered by the bridge, and only for MV3. Its words name what Zigzag cannot report.
+        // getContexts is bridged, MV3 only; its text names what Zigzag can't report.
         let contexts = try #require(registry.claim(for: "runtime.getContexts"))
         #expect(contexts.status == .bridged)
         #expect(contexts.implementation == "swift:BridgeContexts")
@@ -59,7 +56,7 @@ struct ExtensionContextClaimsTests {
         #expect(CompatibilityText.text(for: "extension.limit.runtimeContexts", fallback: "⟨unwritten⟩")
                 != "⟨unwritten⟩")
 
-        // runtime.getBackgroundPage is WebKit's member corrected to Chrome's MV2-only answer.
+        // getBackgroundPage is WebKit's, corrected to Chrome's MV2-only behavior.
         let background = try #require(registry.claim(for: "runtime.getBackgroundPage"))
         #expect(background.status == .patched)
         #expect(background.implementation == "js:correctGetBackgroundPage")
@@ -69,7 +66,7 @@ struct ExtensionContextClaimsTests {
         #expect(CompatibilityText.text(for: "extension.limit.backgroundPage", fallback: "⟨unwritten⟩")
                 != "⟨unwritten⟩")
 
-        // The namespace's own answer does not leak over either member, and the whole overlay still holds together.
+        // The namespace status doesn't override either member, and the overlay validates.
         #expect(registry.claim(for: "runtime.getContexts")?.status == .bridged)
         #expect(registry.claim(for: "runtime.getBackgroundPage")?.status == .patched)
         let problems = CompatibilityValidator.diagnostics(overlay: overlay, universe: universe,
@@ -78,17 +75,17 @@ struct ExtensionContextClaimsTests {
     }
 
     @Test func mv2SurfaceHasNoMV3OnlyRuntimeMembers() throws {
-        // webkit-differences.js adds ContextType before the surface runs; an MV2 extension must not see it anyway.
+        // webkit-differences.js adds ContextType first; MV2 still must not see it.
         let context = try Self.surfaceWorld(version: 2, setup: """
         chrome.runtime.ContextType = { TAB: 'TAB', POPUP: 'POPUP' };
         chrome.runtime.OnInstalledReason = { INSTALL: 'install' };
         """)
         #expect(context.evaluateScript("'ContextType' in chrome.runtime").toBool() == false)
         #expect(context.evaluateScript("typeof chrome.runtime.ContextType").toString() == "undefined")
-        // getContexts is MV3's too, and stays absent rather than becoming a stand-in MV2 extensions would detect.
+        // getContexts stays absent in MV2 rather than a detectable stand-in.
         #expect(context.evaluateScript("'getContexts' in chrome.runtime").toBool() == false)
         #expect(context.evaluateScript("typeof chrome.runtime.getContexts").toString() == "undefined")
-        // Only the members Chrome reserves for MV3 go: an MV2 runtime keeps Chrome's other constants.
+        // Only MV3-reserved members are removed; other constants stay.
         #expect(context.evaluateScript("chrome.runtime.OnInstalledReason.INSTALL").toString() == "install")
     }
 
@@ -96,8 +93,7 @@ struct ExtensionContextClaimsTests {
         let context = try Self.surfaceWorld(version: 3)
         #expect(context.evaluateScript("chrome.runtime.ContextType.SIDE_PANEL").toString() == "SIDE_PANEL")
         #expect(context.evaluateScript("Object.isFrozen(chrome.runtime.ContextType)").toBool())
-        // The surface has no native handler: in PR A its stand-in answers quietly, as main's did, and the promise
-        // form still rejects with the error naming the member.
+        // No native handler: the stand-in returns nothing, and the promise form rejects naming the member.
         #expect(context.evaluateScript("typeof chrome.runtime.getContexts").toString() == "function")
         context.evaluateScript("""
         var __called = 0, __args = -1, __lastError = 'unset';

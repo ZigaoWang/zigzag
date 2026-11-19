@@ -25,10 +25,10 @@ nonisolated struct ChromeUniverse: Sendable {
     /// Every path the universe names.
     var paths: Set<String> { Set(nodes.keys) }
 
-    /// Whether Chrome has this member. A path the universe lacks is not something an extension can call.
+    /// Whether Chrome has this member.
     func contains(_ path: String) -> Bool { nodes[path] != nil }
 
-    /// What the path names, or nil where the universe has no such path.
+    /// The path's kind, or nil if unknown.
     func kind(of path: String) -> NodeKind? { nodes[path] }
 
     enum LoadError: LocalizedError {
@@ -45,7 +45,7 @@ nonisolated struct ChromeUniverse: Sendable {
         }
     }
 
-    /// The universe as the app ships it. `bundle` is the app's, or a test's, own bundle.
+    /// The shipped universe. `bundle` is the app's or a test's.
     static func load(bundle: Bundle = .main) throws -> ChromeUniverse {
         try load(resource: "chrome-api", bundle: bundle)
     }
@@ -70,7 +70,7 @@ nonisolated struct ChromeUniverse: Sendable {
         return ChromeUniverse(nodes: nodes)
     }
 
-    /// A namespace's or object's own members, and the objects and properties under it.
+    /// Members of a namespace or object, including nested objects and properties.
     private static func add(_ spec: [String: Any], at path: String, to nodes: inout [String: NodeKind]) {
         for name in spec["functions"] as? [String] ?? [] {
             nodes["\(path).\(name)"] = .function

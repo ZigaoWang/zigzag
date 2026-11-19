@@ -183,8 +183,7 @@ struct PageTranslatorTests {
 
     private static let traditional = Locale.Language(identifier: "zh-Hant")
 
-    /// Wikipedia's Simplified article under a variant menu and notice in Traditional: one translation, from the page's
-    /// Simplified, never a second one from Traditional.
+    /// Simplified Wikipedia with a Traditional variant menu and notice: one translation, from Simplified.
     @Test func aPagesOwnLanguageInAnotherScriptGoesWithThePage() {
         let page = text([
             ["豫园是建于明朝时期的古典园林，座落于中华人民共和国上海市黄浦区，原上海老城厢东北部，北靠福佑路，东临安仁街。"],
@@ -196,7 +195,7 @@ struct PageTranslatorTests {
         #expect(groups.first?.pieces == [0, 1])
     }
 
-    /// A site translated from Simplified Chinese: its next page, read as Traditional, is still taken as Simplified.
+    /// A site translated from Simplified keeps Simplified on its next page, even if detected as Traditional.
     @Test func aTranslatedSitesNextPageKeepsItsLanguage() {
         #expect(PageTranslator.keeping(Self.chinese, over: Self.traditional) == Self.chinese)
         #expect(PageTranslator.keeping(Self.chinese, over: Locale.Language(identifier: "ja")) == Locale.Language(identifier: "ja"))
@@ -206,8 +205,7 @@ struct PageTranslatorTests {
 
     // MARK: Titles mixing scripts
 
-    /// A GitHub issue in Chinese: its title names a product in English, the page says lang="en", and its template's
-    /// headings and the replies are English, so the page reads as English.
+    /// A Chinese GitHub issue with an English product name in the title, lang="en", and English template headings and replies: reads as English.
     static let chineseIssue = """
     <html lang="en"><body>
     <h1><bdi class="markdown-title">类似Little Arc功能</bdi><span> #246</span></h1>
@@ -229,24 +227,24 @@ struct PageTranslatorTests {
         let groups = PageTranslator.plan(text, page: Self.english, into: Self.english)
         #expect(groups.count == 1)
         #expect(groups.first?.pieces.contains(title) == true)
-        // From the Simplified Chinese the issue is in, never a Traditional download for its title alone (#231).
+        // From Simplified, never a Traditional download just for the title (#231).
         #expect(groups.first?.source.minimalIdentifier == Self.chinese.minimalIdentifier)
-        // Into Chinese, the title is already in it; the English is what's translated.
+        // Into Chinese, the title is skipped; the English is translated.
         let intoChinese = PageTranslator.plan(text, page: Self.english, into: Self.chinese)
         #expect(!intoChinese.flatMap(\.pieces).contains(title))
         #expect(texts(text, intoChinese.first).contains("What you're trying to do"))
     }
 
     @Test func textMostlyInAnotherScriptIsInALanguageWrittenInIt() {
-        // Read as a little English, with too little confidence; the ideographs say it's Chinese.
+        // Low-confidence English; the ideographs say Chinese.
         #expect(PageTranslator.blockLanguage("类似Little Arc功能", page: Self.english)?.languageCode == .chinese)
         #expect(PageTranslator.blockLanguage("功能", page: Self.english)?.languageCode == .chinese)
-        // On a page in that script, it's the page's language, script and all.
+        // On a page in that script it's the page's language and script.
         #expect(PageTranslator.blockLanguage("类似Little Arc功能", page: Self.chinese) == Self.chinese)
         #expect(PageTranslator.blockLanguage("東京", page: Locale.Language(identifier: "ja"))?.languageCode == .japanese)
-        // On an English page with Chinese in it, it goes with that Chinese.
+        // On an English page with Chinese, it matches that Chinese.
         #expect(PageTranslator.blockLanguage("功能", page: Self.english, onPage: [Self.english, Self.chinese]) == Self.chinese)
-        // English that quotes a name in Chinese is still English.
+        // English quoting a Chinese name is English.
         #expect(PageTranslator.blockLanguage("An interview with 张艺谋 about his new film and the city he grew up in", page: Self.english)?.languageCode == .english)
     }
 
@@ -262,7 +260,7 @@ struct PageTranslatorTests {
         codes.enumerated().map { PageTranslator.Group(source: Locale.Language(identifier: $0.element), pieces: [$0.offset]) }
     }
 
-    /// Asked for, the page's own language may need a download; a menu of other language names never brings one up.
+    /// Only the page's own language may trigger a download when asked; language-name menus never do.
     @Test func onlyThePagesOwnLanguageAskedForMayDownload() {
         let planned = groups(["zh-Hans", "nl", "ja", "la"])
         let asked = PageTranslator.runnable(planned, status: [.supported, .supported, .installed, .unsupported], asked: true)
@@ -271,7 +269,7 @@ struct PageTranslatorTests {
         #expect(!asked.offer)
     }
 
-    /// Translating on its own (a site you translated), a language not on this Mac is offered, not downloaded.
+    /// Auto-translation offers missing languages, never downloads them.
     @Test func translatingOnItsOwnNeverDownloads() {
         let planned = groups(["zh-Hant", "ja"])
         let missing = PageTranslator.runnable(planned, status: [.supported, .installed], asked: false)
@@ -281,7 +279,7 @@ struct PageTranslatorTests {
         #expect(!here.offer)
     }
 
-    /// A language Apple can't translate doesn't count as the page's own: the next one is.
+    /// A language Apple can't translate is skipped for the next group.
     @Test func anUnsupportedFirstGroupPassesToTheNext() {
         let result = PageTranslator.runnable(groups(["la", "zh-Hans"]), status: [.unsupported, .supported], asked: true)
         #expect(result.groups.map(\.source.minimalIdentifier) == ["zh"])
@@ -446,9 +444,9 @@ struct PageTranslatorTests {
     }
 }
 
-/// What a page is taken to be in, from its text and the language it says it's in, and which page an offer is for.
+/// Page language from its text and declared lang, and which page an offer belongs to.
 struct PageLanguageChoiceTests {
-    /// An English article about Shanghai: English paragraphs, and an infobox of Chinese names, each a few characters.
+    /// An English article about Shanghai with an infobox of short Chinese names.
     static let englishWithChineseNames = [
         "Shanghai is a direct-administered municipality and the most populous urban area in China.",
         "上海市，简称沪，是中华人民共和国直辖市之一",
@@ -458,9 +456,9 @@ struct PageLanguageChoiceTests {
     ]
 
     @Test func anEnglishPageQuotingChineseStaysEnglish() {
-        // By weight alone (a character says about a word) the Chinese names are most of it.
+        // By character weight alone the Chinese names dominate.
         #expect(PageTranslator.pageLanguage(blocks: Self.englishWithChineseNames, declared: nil)?.languageCode == .chinese)
-        // Marked English, with a fair part of it English, it's English.
+        // Declared English with enough English text: English.
         #expect(PageTranslator.pageLanguage(blocks: Self.englishWithChineseNames, declared: "en")?.languageCode == .english)
         #expect(PageTranslator.pageLanguage(blocks: Self.englishWithChineseNames, declared: "en-GB")?.languageCode == .english)
     }
@@ -471,7 +469,7 @@ struct PageLanguageChoiceTests {
                        "La próxima vez queremos quedarnos más tiempo y visitar los pueblos de la costa, que todos nos recomendaron."]
         #expect(PageTranslator.pageLanguage(blocks: spanish, declared: "en")?.languageCode == .spanish)
         #expect(PageTranslator.pageLanguage(blocks: spanish, declared: "es")?.languageCode == .spanish)
-        // Too little text: nothing, whatever the page says, so it's looked at again once it's drawn.
+        // Too little text: nil regardless of lang, so it's checked again after drawing.
         #expect(PageTranslator.pageLanguage(blocks: ["Inicio", "Contacto"], declared: "es") == nil)
     }
 
@@ -483,8 +481,7 @@ struct PageLanguageChoiceTests {
         }
     }
 
-    /// Old codes still in pages' `lang` (iw for Hebrew, in for Indonesian, ji for Yiddish, no for Norwegian) read as
-    /// the codes the language recognizer gives, so the page's own word agrees with its text.
+    /// Legacy codes (iw, in, ji, no) map to the recognizer's codes so lang agrees with the text.
     @Test func anOldLanguageCodeReadsAsTheNewOne() {
         #expect(PageTranslator.language(declared: "iw")?.languageCode?.identifier == "he")
         #expect(PageTranslator.language(declared: "iw-IL")?.region?.identifier == "IL")
@@ -492,7 +489,7 @@ struct PageLanguageChoiceTests {
         #expect(PageTranslator.language(declared: "JI")?.languageCode?.identifier == "yi")
         #expect(PageTranslator.language(declared: "no_NO")?.languageCode?.identifier == "nb")
         #expect(PageTranslator.language(declared: "nn")?.languageCode?.identifier == "nn")
-        // A Hebrew page marked the old way, with a fair part of it in Hebrew, is Hebrew, as one marked "he" is.
+        // Hebrew marked "iw" with enough Hebrew text reads as Hebrew, like "he".
         let hebrew = Array(repeating: "שלום לכולם, זהו עמוד בעברית שמספר על מזג האוויר ועל החדשות של היום בעיר.", count: 2)
         let english = Array(repeating: "Hello everyone, this page tells you about the weather and the news of the day in town.", count: 3)
         #expect(PageTranslator.pageLanguage(blocks: hebrew + english, declared: "he")?.languageCode?.identifier == "he")
@@ -502,9 +499,9 @@ struct PageLanguageChoiceTests {
     @Test func anOfferIsForItsOwnPage() {
         let page = URL(string: "https://zh.wikipedia.org/wiki/%E4%B8%8A%E6%B5%B7%E5%B8%82")!
         #expect(PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: false))
-        // A jump within the page is the same page.
+        // A fragment jump is the same page.
         #expect(PageTranslator.offerStands(offeredFor: page, now: URL(string: page.absoluteString + "#history")!, foreign: true, translated: false))
-        // Another page, one found to be in your language after all, or one translated: the offer goes.
+        // Another page, one detected as your language, or one translated: the offer goes.
         #expect(!PageTranslator.offerStands(offeredFor: page, now: URL(string: "https://en.wikipedia.org/wiki/Shanghai")!, foreign: true, translated: false))
         #expect(!PageTranslator.offerStands(offeredFor: page, now: page, foreign: false, translated: false))
         #expect(!PageTranslator.offerStands(offeredFor: page, now: page, foreign: true, translated: true))
@@ -514,17 +511,17 @@ struct PageLanguageChoiceTests {
     @Test func onlyASitesPageIsReadForItsLanguage() {
         #expect(PageTranslator.readsLanguage(of: URL(string: "https://en.wikipedia.org/wiki/Shanghai"), errorPage: false))
         #expect(PageTranslator.readsLanguage(of: URL(fileURLWithPath: "/tmp/notes.html"), errorPage: false))
-        // History and Settings list pages' titles in other languages: they're Zigzag's own, never offered.
+        // Zigzag pages (History, Settings) are never offered.
         #expect(!PageTranslator.readsLanguage(of: URL(string: "zigzag://history"), errorPage: false))
         #expect(!PageTranslator.readsLanguage(of: URL(string: "zigzag://settings/general"), errorPage: false))
         #expect(!PageTranslator.readsLanguage(of: URL(string: "about:blank"), errorPage: false))
         #expect(!PageTranslator.readsLanguage(of: nil, errorPage: false))
-        // An error page shown for a site is in your language, whatever the site's is.
+        // Error pages are in your language.
         #expect(!PageTranslator.readsLanguage(of: URL(string: "https://expired.badssl.com"), errorPage: true))
     }
 
     @Test func aLanguageNotDownloadedIsNamedWhenTranslatingFails() {
-        // The download sheet closed without downloading French: it says so, not to try again in a moment.
+        // The download sheet closed without downloading French: say so, not "try again".
         let french = Locale.Language(identifier: "fr")
         let missing = PageTranslator.failureMessage(notDownloaded: french)
         #expect(missing.contains(PageTranslator.name(of: french)))

@@ -7,6 +7,7 @@ import WebKit
 /// WebKit's own find (`PageFind`) still goes from match to match and says the count, so "3 of 28" stays the count
 /// it marks. A script of Zigzag's own, in Zigzag's isolated world (`.defaultClient`, never the page's), finds the
 /// same text and marks it with the CSS Custom Highlight API, which paints over text without touching the page's DOM.
+/// Text WebKit won't paint a highlight on (a button's, a flex box's) gets a box in a layer of its own instead.
 /// The highlight colors come from a user style sheet the page can't see or outrank. The match WebKit lands on is
 /// told by the selection it makes, which the script then folds to a caret, so the stronger color shows instead of a
 /// gray selection; it is selected again just before the next find, which goes on from it.
@@ -76,12 +77,14 @@ enum FindMarks {
     /// take a highlight's `color` from a user sheet), so on a dark page the orange is a deep one its light text reads on.
     static func css(_ names: Names) -> String {
         """
-        ::highlight(\(names.all)) { background-color: rgba(255, 214, 10, 0.42) !important; }
-        ::highlight(\(names.current)) { background-color: rgb(255, 150, 20) !important; }
-        ::highlight(\(names.allDark)) { background-color: rgba(255, 176, 32, 0.34) !important; }
-        ::highlight(\(names.currentDark)) { background-color: rgb(204, 102, 0) !important; }
+        ::highlight(\(names.all)) { background-color: \(colors.all) !important; }
+        ::highlight(\(names.current)) { background-color: \(colors.current) !important; }
+        ::highlight(\(names.allDark)) { background-color: \(colors.allDark) !important; }
+        ::highlight(\(names.currentDark)) { background-color: \(colors.currentDark) !important; }
         """
     }
+
+    static let colors = (all: "rgba(255, 214, 10, 0.42)", current: "rgb(255, 150, 20)", allDark: "rgba(255, 176, 32, 0.34)", currentDark: "rgb(204, 102, 0)")
 
     /// The tick colors, the highlights' own made solid enough to see on a scroll bar.
     static func tickColor(current: Bool, dark: Bool) -> NSColor {
@@ -144,7 +147,8 @@ enum FindMarks {
     /// in another window, so the page's changes aren't followed yet (`pause`).
     static func mark(_ query: String, in webView: WKWebView, paused: Bool = false) async -> Snapshot? {
         install(in: webView)
-        return Snapshot(await run("mark(query, names, paused)", ["query": query, "names": namesArgument, "paused": paused], in: webView))
+        let colors = ["all": colors.all, "current": colors.current, "allDark": colors.allDark, "currentDark": colors.currentDark]
+        return Snapshot(await run("mark(query, names, colors, paused)", ["query": query, "names": namesArgument, "colors": colors, "paused": paused], in: webView))
     }
 
     /// Before going to the next match: the find starts from the match you're on, either way.
@@ -211,15 +215,15 @@ enum FindMarks {
     /// Runs in Zigzag's world, defined once per page: what it keeps (the matches, the one you're on) lasts between
     /// calls and goes with the page.
     static let script = #"""
-    if (!globalThis.__zigzagFind || globalThis.__zigzagFind.version !== 1) {
+    if (!globalThis.__zigzagFind || globalThis.__zigzagFind.version !== 2) {
       const MAX = 1000;
       // Never searched: not text on screen, or only fallback content.
       const SKIP = new Set(['head', 'script', 'style', 'noscript', 'template', 'textarea', 'select', 'option', 'datalist',
         'canvas', 'video', 'audio', 'object', 'embed', 'img', 'picture', 'input']);
       const F = {
-        version: 1, query: '', index: null, ranges: [], count: 0, current: null, docs: [], names: null,
+        version: 2, query: '', index: null, ranges: [], count: 0, current: null, docs: [], names: null, colors: null,
         caret: null, observers: [], timer: 0, firstWait: 0, rebuild: false, said: '', lastLook: 0, gap: 1000, paused: false,
-        looks: 0,
+        looks: 0, layers: new Map(), placing: 0, gone: 0, soon: false,
       };
       const isSpace = (code) => code === 32 || code === 9 || code === 10 || code === 13 || code === 12 || code === 160;
       // Lowercased one character at a time, so every place in the text still stands for one character of the page.
@@ -308,7 +312,7 @@ enum FindMarks {
       };
 
       const search = () => {
-        F.ranges = []; F.count = 0;
+        F.ranges = []; F.count = 0; F.gone = 0;
         const q = normalized(F.query);
         if (!q.trim()) return;
         if (!F.index) F.index = build();
@@ -363,21 +367,120 @@ enum FindMarks {
         if (!registry || !F.names) return;
         for (const name of Object.values(F.names)) registry.delete(name);
       };
+      // WebKit paints no highlight on text in an anonymous box (#329): text right in a button, a flex, grid or table
+      // box, columns, or beside a block. Unselectable text gets it on the wrong words. Those are boxed instead.
+      const unpaintable = (text, cache) => {
+        let el = text.assignedSlot || text.parentNode;
+        if (el && el.nodeType === 11) el = el.host;
+        if (!el || el.nodeType !== 1) return false;
+        if (cache.has(el)) return cache.get(el);
+        const view = el.ownerDocument.defaultView;
+        let style = view.getComputedStyle(el), box = el;
+        if (style.webkitUserSelect === 'none' || style.userSelect === 'none') { cache.set(el, true); return true; }
+        while (style.display === 'contents' && box.parentElement) { box = box.parentElement; style = view.getComputedStyle(box); }
+        const display = style.display;
+        let anonymous = box.localName === 'button' || /flex|grid|table|ruby/.test(display) && !/table-(cell|caption)/.test(display)
+          || style.columnCount !== 'auto' || style.columnWidth !== 'auto';
+        if (!anonymous && !display.startsWith('inline')) {
+          for (let c = box.firstElementChild; c; c = c.nextElementSibling) {
+            const s = view.getComputedStyle(c);
+            if (s.float !== 'none' || s.position === 'absolute' || s.position === 'fixed') continue;
+            if (s.display !== 'none' && s.display !== 'contents' && !s.display.startsWith('inline')) { anonymous = true; break; }
+          }
+        }
+        cache.set(el, anonymous);
+        return anonymous;
+      };
+
+      // A layer of boxes under a closed shadow root, there only while a match needs one. Multiplied on a light page and
+      // screened on a dark one, so the text keeps its color; no z-index, which would keep it from blending.
+      const HOST = { all: 'initial', display: 'block', position: 'absolute', left: '0', top: '0', width: '0', height: '0',
+        overflow: 'visible', 'pointer-events': 'none', 'z-index': 'auto' };
+      const place = (layer) => {
+        const { host, root, ranges, current, dark } = layer;
+        const origin = host.getBoundingClientRect();
+        const boxes = [];
+        for (const range of ranges) {
+          const color = range === current ? (dark ? F.colors.currentDark : F.colors.current) : (dark ? F.colors.allDark : F.colors.all);
+          for (const rect of range.getClientRects()) {
+            if (!rect.width || !rect.height) continue;
+            const b = host.ownerDocument.createElement('div');
+            const s = b.style;
+            s.position = 'absolute'; s.left = (rect.left - origin.left) + 'px'; s.top = (rect.top - origin.top) + 'px';
+            s.width = rect.width + 'px'; s.height = rect.height + 'px'; s.background = color; s.mixBlendMode = dark ? 'screen' : 'multiply';
+            // Readable where the page's own isolation keeps the box from blending.
+            if (range === current) s.opacity = '0.65';
+            boxes.push(b);
+          }
+        }
+        root.replaceChildren(...boxes);
+      };
+      // Boxes in a scrolled box, or a fixed or sticky one, follow it; the page's own scrolling carries the rest.
+      const moved = (event) => {
+        if (F.placing || event.target.nodeType === 9 && ![...F.layers.values()].some((l) => l.pinned)) return;
+        F.placing = requestAnimationFrame(() => { F.placing = 0; for (const layer of F.layers.values()) place(layer); });
+      };
+      const unbox = (doc) => {
+        const layer = F.layers.get(doc);
+        if (!layer) return;
+        layer.host.remove();
+        doc.removeEventListener('scroll', moved, true);
+        F.layers.delete(doc);
+      };
+      const pinned = (el, cache) => {
+        const seen = [];
+        let result = false;
+        for (let e = el; e; e = e.parentElement) {
+          if (cache.has(e)) { result = cache.get(e); break; }
+          seen.push(e);
+          const position = e.ownerDocument.defaultView.getComputedStyle(e).position;
+          if (position === 'fixed' || position === 'sticky') { result = true; break; }
+        }
+        for (const e of seen) cache.set(e, result);
+        return result;
+      };
+      const box = (doc, ranges, current, dark) => {
+        if (!ranges.length || !doc.documentElement) { unbox(doc); return; }
+        let layer = F.layers.get(doc);
+        if (!layer || !layer.host.isConnected) {
+          unbox(doc);
+          const host = doc.createElement(F.names.all + '-m');
+          for (const [k, v] of Object.entries(HOST)) host.style.setProperty(k, v, 'important');
+          layer = { host, root: host.attachShadow({ mode: 'closed' }) };
+          doc.documentElement.appendChild(host);
+          doc.addEventListener('scroll', moved, { capture: true, passive: true });
+          F.layers.set(doc, layer);
+        }
+        const cache = new Map();
+        Object.assign(layer, { ranges, current, dark, pinned: ranges.some((r) => pinned(r.startContainer.parentElement, cache)) });
+        place(layer);
+      };
+
       const paint = () => {
         const current = F.current !== null ? F.ranges[F.current] : null;
+        const cache = new Map();
+        for (const doc of [...F.layers.keys()]) if (!F.docs.includes(doc)) unbox(doc);
         for (const doc of F.docs) {
           const view = doc.defaultView;
-          if (!view || !view.CSS || !view.CSS.highlights || !view.Highlight) continue;
+          if (!view) continue;
           unpaint(doc);
           const dark = isDark(doc);
-          // The one you're on only in its own highlight, so the soft color never tints the strong one.
-          const mine = F.ranges.filter((r) => r !== current && r.startContainer.ownerDocument === doc);
+          const mine = [], boxed = [];
+          for (const r of F.ranges) {
+            // A match whose text the page took away: WebKit would paint its highlight on whatever comes before.
+            if (r.collapsed || r.startContainer.ownerDocument !== doc) continue;
+            if (unpaintable(r.startContainer, cache) || unpaintable(r.endContainer, cache)) boxed.push(r);
+            // The one you're on only in its own highlight, so the soft color never tints the strong one.
+            else if (r !== current) mine.push(r);
+          }
+          box(doc, boxed, current, dark);
+          if (!view.CSS || !view.CSS.highlights || !view.Highlight) continue;
           if (mine.length) {
             const all = new view.Highlight(...mine);
             all.priority = 1000;
             view.CSS.highlights.set(dark ? F.names.allDark : F.names.all, all);
           }
-          if (current && current.startContainer.ownerDocument === doc) {
+          if (current && !current.collapsed && current.startContainer.ownerDocument === doc && !boxed.includes(current)) {
             const one = new view.Highlight(current);
             one.priority = 1001;
             view.CSS.highlights.set(dark ? F.names.currentDark : F.names.current, one);
@@ -430,7 +533,7 @@ enum FindMarks {
       // clock, a live chat, a video's time) is looked at less and less often, down to every three seconds, until it
       // has been calm for a while.
       const SETTLE = 250, CALM = 5000, SLOWEST = 3000;
-      const changed = (rebuild) => {
+      const changed = (rebuild, lost) => {
         if (rebuild) F.index = null;
         F.rebuild = F.rebuild || rebuild;
         clearTimeout(F.timer);
@@ -438,11 +541,15 @@ enum FindMarks {
         if (!F.firstWait) F.firstWait = now;
         const next = F.lastLook + F.gap;
         // Waited a whole gap since the first change: looked at as soon as the gap since the last look allows.
-        const wait = now - F.firstWait >= F.gap ? Math.max(0, next - now) : Math.max(SETTLE, next - now);
+        let wait = now - F.firstWait >= F.gap ? Math.max(0, next - now) : Math.max(SETTLE, next - now);
+        // A match the page drew again is found again soon, busy page or not, up to once a second.
+        F.soon = F.soon || !!lost;
+        if (F.soon) wait = Math.min(wait, Math.max(SETTLE, F.lastLook + 1000 - now));
         F.timer = setTimeout(look, wait);
       };
       const look = () => {
         F.timer = 0;
+        F.soon = false;
         F.firstWait = 0;
         if (!F.query) return;
         const now = Date.now();
@@ -481,7 +588,15 @@ enum FindMarks {
         for (const doc of F.docs) {
           const view = doc.defaultView;
           if (!view) continue;
-          const mutations = new view.MutationObserver((records) => { if (touchesText(records)) changed(true); });
+          const mutations = new view.MutationObserver((records) => {
+            if (!touchesText(records)) return;
+            // Matches taken away come off at once, not at the next look.
+            let gone = 0;
+            for (const r of F.ranges) if (r.collapsed) gone++;
+            const lost = gone > F.gone;
+            if (lost) { F.gone = gone; paint(); }
+            changed(true, lost);
+          });
           mutations.observe(doc, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'open'] });
           F.observers.push(mutations);
         }
@@ -523,8 +638,9 @@ enum FindMarks {
         return null;
       };
 
-      F.mark = (query, names, paused) => {
+      F.mark = (query, names, colors, paused) => {
         F.names = names;
+        F.colors = colors;
         F.paused = !!paused;
         if (F.paused) sleep();
         const same = query === F.query && F.index;
@@ -585,13 +701,16 @@ enum FindMarks {
       F.clear = () => {
         unwatch();
         for (const doc of F.docs) unpaint(doc);
+        for (const doc of [...F.layers.keys()]) unbox(doc);
+        cancelAnimationFrame(F.placing);
+        F.placing = 0;
         F.query = ''; F.index = null; F.ranges = []; F.count = 0; F.current = null; F.docs = []; F.caret = null; F.said = '';
         return true;
       };
 
       F.state = () => ({ query: F.query, count: F.count, current: F.current === null ? -1 : F.current, docs: F.docs.length,
         highlights: F.names ? Object.values(F.names).filter((n) => CSS.highlights.has(n)).length : 0, observers: F.observers.length,
-        looks: F.looks, gap: F.gap, paused: F.paused });
+        looks: F.looks, gap: F.gap, paused: F.paused, boxed: [...F.layers.values()].reduce((n, l) => n + l.ranges.length, 0) });
 
       globalThis.__zigzagFind = F;
     }

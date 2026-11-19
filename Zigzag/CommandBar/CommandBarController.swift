@@ -72,8 +72,7 @@ final class CommandRowView: InteractiveView {
         action.isHidden = !(isSelected && hasAction)
         returnKey.isHidden = action.isHidden
         var right = bounds.width - inset
-        // The action shows on the chosen row only, but its room is kept on every row that has one: the title and
-        // what's beside it never cut shorter as the choice moves onto them.
+        // Every row with an action reserves its width, so titles don't shrink as the selection moves.
         if hasAction {
             let kw = returnKey.width, kh = Tokens.Metric.keyCapHeight
             returnKey.frame = NSRect(x: right - kw, y: round((bounds.height - kh) / 2), width: kw, height: kh)
@@ -120,7 +119,7 @@ protocol CommandBarHost: AnyObject {
     var commandBarFitsAnchor: Bool { get }
     /// The browser window's tabs, for open tabs among the results and for completing what you type; nil if there's none.
     var commandBarTabs: TabManager? { get }
-    /// The bar over the page can be dragged anywhere in the window, and stays where you put it (a browser window).
+    /// Browser windows: the bar can be dragged and keeps its place.
     var commandBarIsMovable: Bool { get }
     /// The profile whose history, favorites and open pages the bar suggests: the one of the space it's used in.
     var commandBarProfile: Profile { get }
@@ -165,7 +164,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         set { panel.showsDesktop = newValue }
     }
     private let field = PlainTextField(font: Tokens.Font.title(.regular), placeholder: String(localized: "Search or enter address", comment: "Placeholder of the command bar's field."))
-    /// Not a control: a press on it is the bar's own, and drags the bar.
+    /// A press on it drags the bar.
     private let fieldIcon = PassiveImageView()
     private let divider = ColorView(color: Tokens.Color.separator)
     private var rows: [CommandRowView] = []
@@ -189,7 +188,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// The key event of the last delete command, so the change it makes is known to take away, not type.
     private weak var deleteEvent: NSEvent?
     private(set) var isVisible = false
-    /// Opened for an empty window's first page: no tab was showing under it.
+    /// Opened for an empty window's first page.
     private(set) var isForEmptyWindow = false
     private var mouseAtOpen = NSPoint.zero
     /// Searching one site: its chip sits in front of the field, and Return searches there.
@@ -297,7 +296,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             history.use(host.commandBarProfile.history)
             history.reset()
             completionAsked = nil
-            // Another window may have moved it since.
+            // Another window may have moved it.
             position = CommandBarPlacement.load()
             scrim.frame = isAnchored ? host.commandBarOverlay.bounds : card
             host.commandBarOverlay.addSubview(scrim)
@@ -366,8 +365,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if restoringFocus { host.commandBarRestoreFocus() }
     }
 
-    /// A page came to the window some other way (moved in from Zigzag Mini, dragged from another window): the bar the
-    /// empty window opened with goes, so it isn't left over the page.
+    /// A page arrived another way (from Zigzag Mini, dragged in): close the empty window's bar.
     func pageArrived() {
         if isVisible, isForEmptyWindow { dismiss(restoringFocus: false) }
     }
@@ -464,14 +462,14 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     // MARK: Moving it
 
-    /// Where you've put the bar over the page; the default unless you dragged it.
+    /// The default unless dragged.
     private var position = CommandBarPlacement.load()
     private lazy var guides = CommandBarGuides()
-    /// While the bar is dragged: its top-left when the drag began, and which guides it's on.
+    /// Top-left at drag start, and the guides it's on.
     private var dragStart: NSPoint?
     private var snapped = (x: false, y: false)
 
-    /// A dragged bar keeps room for its field and this many rows.
+    /// Room a dragged bar always keeps: the field and this many rows.
     private static let minimumRows = 4
 
     private func placement(in host: CommandBarHost) -> CommandBarPlacement {
@@ -481,8 +479,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
 
     private var isMovable: Bool { isVisible && !isAnchored && host?.commandBarIsMovable == true }
 
-    /// A press on the bar's own surface, not its text or a row: dragged past a few points it moves the bar, as
-    /// Raycast's does; twice puts it back where it opens by default.
+    /// A press on the bar's background drags it past a few points, as Raycast's does; a double-click resets it.
     private func barePress(_ event: NSEvent) {
         guard isMovable, let host, let window = host.window else { return }
         if event.clickCount == 2 { resetPosition(); return }
@@ -513,12 +510,12 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         if guides.superview !== overlay { overlay.addSubview(guides, positioned: .below, relativeTo: panel) }
     }
 
-    /// `delta`: how far the pointer has come since the drag began, top-down.
+    /// `delta`: pointer movement since drag start, top-down.
     private func drag(by delta: NSPoint) {
         guard let host, let start = dragStart else { return }
         let placement = self.placement(in: host)
         let drag = placement.drag(to: NSPoint(x: start.x + delta.x, y: start.y + delta.y))
-        // Onto a guide: a light tap, as Keynote's alignment guides give.
+        // Haptic tap on snapping to a guide, like Keynote.
         if (drag.snappedX && !snapped.x) || (drag.snappedY && !snapped.y) { Haptics.snap() }
         snapped = (drag.snappedX, drag.snappedY)
         position = drag.position
@@ -534,7 +531,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         CommandBarPlacement.save(position)
     }
 
-    /// Back to where the bar opens by default, gliding there unless Reduce Motion is on.
+    /// Animates back to the default position unless Reduce Motion is on.
     private func resetPosition() {
         position = .standard
         CommandBarPlacement.save(position)
@@ -546,7 +543,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         Tokens.Motion.animate(Tokens.Motion.snappy, moves: true) { self.panel.animator().frame = to }
     }
 
-    /// The bar moved higher or lower: as many rows as fit there now.
+    /// Fit as many rows as the new height allows.
     private func refitRows() {
         guard let fresh = currentResults(), fresh.count != results.count else { return }
         display(fresh, animated: false)
@@ -614,7 +611,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         }
         // A little taller and wider than the text, which the field keeps inside, so selections draw whole.
         let textInset = field.textInset, boxHeight = textHeight + textInset * 4
-        // The text's capitals in the middle, as the chip's and every label's are: the box is the text's line, grown evenly.
+        // Caps centered, as every label's are.
         field.frame = NSRect(x: fieldX - textInset, y: field.centeredY(in: fieldHeight) - textInset * 2, width: max(40, fieldRight - fieldX) + textInset * 2, height: boxHeight)
         // A hairline between what you type and what it finds, held in from the edges like the rows.
         divider.frame = NSRect(x: Tokens.Space.x3, y: fieldHeight - Tokens.Metric.hairline, width: b.width - Tokens.Space.x3 * 2, height: Tokens.Metric.hairline)
@@ -1063,8 +1060,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let inCurrent = editing
         func open(_ url: URL, search: Bool = false, httpFallback: Bool = false) {
             if !inCurrent { Tutorial.complete("newTab") }
-            // A site you chose a space for opens there (#286), never over the page you're on in this one. A search
-            // stays where you asked it.
+            // Routed sites open in their space (#286), never over the current page. Searches stay here.
             if !search, controller.openRouted(url, arrival: .typed, inBackground: inBackground && !inCurrent, by: .you,
                                               httpFallback: httpFallback) { return }
             // Typed or chosen here: yours, so an app's link you typed opens without asking (the site's Block still holds).
@@ -1160,7 +1156,7 @@ extension CommandBarController {
         controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     }
 
-    /// As dragging the bar by its edge this far from where it is (`bardrag`); `ending` lets go.
+    /// `bardrag`: drags the bar by its edge; `ending` releases.
     func debugDrag(_ dx: CGFloat, _ dy: CGFloat, ending: Bool) {
         guard isMovable else { return }
         if dragStart == nil { beginDrag() }
@@ -1168,7 +1164,7 @@ extension CommandBarController {
         if ending { endDrag() }
     }
 
-    /// As a double-click on the bar's edge (`barreset`).
+    /// `barreset`: as a double-click on the edge.
     func debugResetPosition() { if isMovable { resetPosition() } }
 
     var debugPanelFrame: NSRect { panel.frame }
@@ -1196,13 +1192,12 @@ final class ScrimView: ColorView {
     override func mouseDown(with event: NSEvent) { onClick?() }
     override var mouseDownCanMoveWindow: Bool { false }
 
-    /// Going: clicks reach what's under it at once, rather than meeting a dimming that's already on its way out.
+    /// Clicks pass through while it fades out.
     private var isLeaving = false
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
 
-    /// Fades in with what it's behind, from wherever it's drawn: shown again while still fading out, it turns around
-    /// instead of flashing back to nothing first. `evenFromKeyboard`: it comes with something that shows up even from
-    /// a key (a peek), rather than at once with the command bar. Not `animated`: simply there.
+    /// Fades in from its current opacity, reversing a fade-out instead of flashing. `evenFromKeyboard`: fade even from
+    /// a key (a peek), unlike the command bar. `animated` false: shown at once.
     func show(evenFromKeyboard: Bool = false, animated: Bool = true) {
         isLeaving = false
         let shown = layer?.presentation()?.opacity
@@ -1221,13 +1216,13 @@ final class ScrimView: ColorView {
     }
 }
 
-/// An image that's only a picture: a press on it is what's under it.
+/// An image view that passes presses through.
 final class PassiveImageView: NSImageView {
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
-/// The guides a dragged command bar snaps to: a hairline down the middle of where it opens and one across its top,
-/// each showing only while the bar sits on it.
+/// Snap guides for a dragged command bar: a vertical line at the default center and a horizontal one at its top, each
+/// shown only while snapped.
 final class CommandBarGuides: NSView {
     private let vertical = CALayer()
     private let horizontal = CALayer()
@@ -1263,7 +1258,7 @@ final class CommandBarGuides: NSView {
         }
     }
 
-    /// Shows the line down at `x` and the one across at `y`, in the overlay's coordinates; nil fades a line out.
+    /// In overlay coordinates; nil fades that line out.
     func show(x: CGFloat?, y: CGFloat?) {
         if let x { self.x = x }
         if let y { self.y = y }

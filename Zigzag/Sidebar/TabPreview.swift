@@ -160,7 +160,7 @@ final class TabPreviewController {
     weak var debugRow: NSView?
     #endif
 
-    /// A menu is open (a row's right-click menu, or the menu bar): no preview beside it, half under it.
+    /// A menu is open (row context menu or menu bar): no preview half under it.
     private var menuOpen = false
     // Set once in init and only let go in deinit.
     nonisolated(unsafe) private var menuTokens: [NSObjectProtocol] = []
@@ -181,7 +181,7 @@ final class TabPreviewController {
     deinit { menuTokens.forEach(NotificationCenter.default.removeObserver) }
 
     func hover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
-        // No preview over an open panel or menu, or for a tab under the mini player while you point at it or drag it.
+        // No preview over an open panel or menu, or for a tab under the mini player while hovering or dragging it.
         guard !menuOpen, controller?.hasFloatingPanel != true, controller?.miniPlayer.isUnderPointer != true, let row, tab != nil || bookmark != nil else {
             // One about to appear doesn't: leaving the row, or starting to drag it, means you've moved on.
             showWork?.cancel()
@@ -257,7 +257,7 @@ final class TabPreviewController {
         if isNew {
             panel.frame = frame
             overlay.addSubview(panel)
-            // Out of the row it's for: from its side toward the sidebar, at the row's height.
+            // Slides out from the row's side toward the sidebar, at the row's height.
             let rowY = overlay.isFlipped ? rowFrame.midY - frame.minY : frame.maxY - rowFrame.midY
             panel.growsFrom = CGPoint(x: controller.root.sidebarOnRight ? 1 : 0, y: min(max(rowY / max(height, 1), 0), 1))
             panel.present()

@@ -1,8 +1,8 @@
 import AppKit
 import WebKit
 
-/// The Archive as a page in a tab, as Arc's: zigzag://archive. The tabs that tidied themselves away, by the day they
-/// went, each brought back to its space with a click. Served and styled as History is.
+/// zigzag://archive, as in Arc: auto-archived tabs grouped by day; a click restores one to its space. Served and
+/// styled like History.
 @MainActor
 enum ArchivePage {
     static let host = "archive"
@@ -10,11 +10,11 @@ enum ArchivePage {
 
     static func isArchive(_ url: URL?) -> Bool { HistoryPage.isInternal(url) && url?.host() == host }
 
-    /// The page's name, its tab's and the address's.
+    /// Used for the page, its tab and the address.
     static var title: String { String(localized: "Archive", comment: "Title of the Archive page, the list of tabs that were archived; also its tab's name.") }
 
-    /// The Archive tab this window already has in this space, or a new one. A private window archives nothing, so
-    /// it opens in your everyday window, as Settings does.
+    /// Reuses this window's Archive tab in the space, or opens one. Private windows archive nothing, so it opens in a
+    /// normal window, like Settings.
     static func open(in controller: BrowserWindowController) {
         if controller.tabManager.isPrivate {
             let normal = NSApp.orderedWindows.lazy.compactMap { window in
@@ -32,14 +32,14 @@ enum ArchivePage {
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
-    /// Every open Archive page shows the archive as it is now.
+    /// Refreshes every open Archive page.
     static func refreshOpenPages() {
         for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) where isArchive(tab.url) {
             tab.webView?.evaluateJavaScript("window.zigzagRefresh && window.zigzagRefresh()")
         }
     }
 
-    /// Whether an archived tab is this page's profile's: it was in one of its spaces.
+    /// Archived from one of this profile's spaces.
     private static func belongs(to webView: WKWebView?) -> (ArchivedTab) -> Bool {
         let profile = HistoryPage.profile(of: webView).id
         return { Library.shared.profileID(ofSpace: $0.spaceID) == profile }
@@ -52,7 +52,7 @@ enum ArchivePage {
 
         func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage,
                                    replyHandler: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
-            // Only the Archive itself may ask: never a website's page or frame.
+            // Only the Archive page itself, never a website or frame.
             guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.protocol == HistoryPage.scheme,
                   message.frameInfo.securityOrigin.host == ArchivePage.host,
                   let body = message.body as? [String: Any], let action = body["action"] as? String else {
@@ -80,7 +80,7 @@ enum ArchivePage {
         }
     }
 
-    /// The days and their rows as the page draws them, and whether archiving is on.
+    /// Days and rows for the page, and whether archiving is on.
     private static func list(query: String, for webView: WKWebView?) -> [String: Any] {
         let belongs = belongs(to: webView)
         let words = ArchiveDays.words(query)
@@ -224,7 +224,7 @@ const icon = (url) => {
   return img;
 };
 
-// A row is a button: it brings the tab back in its space, and the archive lets it go.
+// Restores the tab to its space and removes it from the archive.
 function row(item) {
   const b = el('button', 'row');
   b.title = item.space ? fill(words.restore, { space: item.space }) : item.url;
@@ -249,7 +249,7 @@ async function load() {
   }
   clearButton.hidden = !answer.any;
   empty.hidden = answer.days.length > 0;
-  // Off and empty: where to turn it on. Off with tabs still kept: those, as usual.
+  // Off and empty: show where to turn it on. Off with tabs kept: show them as usual.
   const off = !answer.on && !answer.any;
   settingsButton.hidden = !off;
   document.getElementById('emptyText').textContent = typed && answer.any ? fill(words.noMatch, { query: typed }) : off ? words.off : words.empty;
@@ -263,7 +263,7 @@ query.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); const first = list.querySelector('.row'); if (first) first.click(); }
   if (e.key === 'Escape' && query.value) { query.value = ''; load(); e.preventDefault(); }
 });
-// The arrow keys walk the rows, from the search field down and back up to it.
+// Arrow keys move through rows, from the search field and back.
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
   const rows = [...list.querySelectorAll('.row')];

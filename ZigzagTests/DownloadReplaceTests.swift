@@ -21,7 +21,7 @@ struct DownloadReplaceTests {
         #expect(!DownloadManager.isPlainFile(dir.appendingPathComponent("missing")))
     }
 
-    /// An extension's "overwrite" never takes a file of yours: only an empty name, or a file it saved itself.
+    /// An extension's "overwrite" only replaces an empty name or a file it saved itself.
     @available(macOS 15.4, *)
     @Test func anExtensionOverwritesOnlyItsOwnFiles() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("zz-overwrite-\(UUID().uuidString)")

@@ -34,14 +34,13 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
     ]
     /// The address and Copy Link's group, and ⋯'s, which goes with reload's.
     private static let addressGroup = 0, moreGroup = 3
-    /// What ⋯ always holds, after the buttons that gave way: what's on or off, the browser the page is told it's
-    /// in, and the rest, those this Mac's WebKit has. Each list is set apart by a line.
+    /// Fixed ⋯ contents after overflowed buttons: toggles, user agent, then whatever this WebKit supports, separated.
     static let moreGroups: [[DeveloperTool]] = [[.javaScript, .images, .styles, .outlines],
                                                 [.userAgentZigzag, .userAgentPhone, .userAgentTablet, .userAgentChrome, .userAgentFirefox],
                                                 [.phone, .viewSource, .settings, .site]].map { $0.filter(\.isAvailable) }
     static var moreTools: [DeveloperTool] { moreGroups.flatMap { $0 } }
 
-    /// The tools under ⋯ when `shown` of the buttons show: the ones that gave way, then those always there.
+    /// Overflowed buttons, then the fixed groups.
     static func toolsUnderMore(shown: Int) -> [DeveloperTool] { parts.dropFirst(shown).flatMap(\.tools) + moreTools }
 
     /// Whether a page gets the tools above it: a development tab, shown on its own (a split's panes have the row
@@ -225,8 +224,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         more.setAccessibilityValue(holder === more ? errors ?? hiddenChoiceValue : hiddenChoiceValue)
     }
 
-    /// ⋯ says whether something chosen under it is in effect, the buttons that gave way included: a choice nothing
-    /// shows is one you forget you made. Then the count, which goes with what's under ⋯ too.
+    /// ⋯ shows when an option under it is on, overflowed buttons included, plus the console count.
     private func refreshMore() {
         let state = tab?.developerInEffect ?? DeveloperState()
         let hidden = DeveloperTool.hasChoiceInEffect(among: Self.toolsUnderMore(shown: shown), in: state)
@@ -439,7 +437,7 @@ final class DeveloperBarTools: NSView, TopBarAccessory {
         }
         more.frame = layout.more
         more.isHidden = layout.width == 0
-        // The count goes with the console's button, and what ⋯ says with what's under it, wherever they are now.
+        // Follow the count and ⋯ state to wherever they moved.
         refreshMore()
     }
 }

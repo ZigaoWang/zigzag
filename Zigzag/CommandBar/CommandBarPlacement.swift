@@ -1,11 +1,9 @@
 import AppKit
 
-/// Where the ⌘T bar sits in a browser window: its own place over the page by default, or wherever you dragged it.
-/// A dragged place is kept as fractions of the window, so it holds at any window size; dragged back onto the
-/// default (the guides snap it there), it's the default again, and follows any change to where that is.
-/// Coordinates are the overlay's, top-down.
+/// Where the ⌘T bar sits: the default, or where it was dragged. Dragged positions are stored as window fractions so
+/// they survive resizing; snapping back to the default resets it. Overlay coordinates, top-down.
 struct CommandBarPlacement {
-    /// Where you put the bar, as fractions of the window: its middle across, its top down. Nil on an axis is the default.
+    /// Window fractions: center x, top y. Nil on an axis means default.
     struct Position: Equatable {
         var centerX: CGFloat?
         var top: CGFloat?
@@ -15,18 +13,18 @@ struct CommandBarPlacement {
 
     /// Within this of a guide, the bar snaps onto it.
     static let snapDistance: CGFloat = 8
-    /// A press moves the bar only once it has moved this far, so a click stays a click.
+    /// So a click stays a click.
     static let dragThreshold: CGFloat = 3
-    /// Room to breathe on both sides of the page by default.
+    /// Default margin on both sides of the page.
     static let pageMargin = Tokens.Space.x8
-    /// How close a dragged bar may come to the window's edges.
+    /// Closest a dragged bar may come to the window edges.
     static let edgeMargin = Tokens.Space.x2
 
-    /// The whole window (the overlay's bounds).
+    /// The overlay's bounds.
     let bounds: NSRect
-    /// The page beside the sidebar.
+    /// The page area beside the sidebar.
     let page: NSRect
-    /// The bar's field and as many rows as a dragged bar always keeps room for.
+    /// The field plus `minimumRows`.
     let minimumHeight: CGFloat
 
     init(bounds: NSRect, page: NSRect, minimumHeight: CGFloat) {
@@ -37,25 +35,25 @@ struct CommandBarPlacement {
 
     var width: CGFloat { min(Tokens.Metric.commandBarWidth, page.width - Self.pageMargin * 2) }
 
-    /// Centered on the whole window, not just the page beside the sidebar, but never tight against either edge of the page.
+    /// Centered on the window, but never touching the page's edges.
     var defaultX: CGFloat {
         min(max(page.minX + Self.pageMargin, floor(bounds.midX - width / 2)), page.maxX - width - Self.pageMargin)
     }
 
     var defaultTop: CGFloat { page.minY + max(Tokens.Space.x12, floor(page.height * 0.18)) }
 
-    /// Where the guides run: the default bar's middle across, and its top.
+    /// The default bar's center x and top.
     var guideX: CGFloat { defaultX + width / 2 }
     var guideY: CGFloat { defaultTop }
 
-    /// The bar's top-left for a position, kept inside the window.
+    /// The bar's top-left for a position, clamped to the window.
     func origin(for position: Position) -> NSPoint {
         let x = position.centerX.map { clampX(bounds.minX + $0 * bounds.width - width / 2) } ?? defaultX
         let top = position.top.map { clampTop(bounds.minY + $0 * bounds.height) } ?? defaultTop
         return NSPoint(x: x, y: top)
     }
 
-    /// The lowest the bar's list may reach: the page's bottom by default, the window's once you've moved it down.
+    /// Lowest the list may reach: the page's bottom by default, the window's once moved.
     func bottom(for position: Position) -> CGFloat { position.top == nil ? page.maxY : bounds.maxY }
 
     private func clampX(_ x: CGFloat) -> CGFloat {
@@ -75,7 +73,7 @@ struct CommandBarPlacement {
         var snappedY: Bool
     }
 
-    /// Where a bar dragged to `proposed` (its top-left) lands: inside the window, and onto a guide within reach.
+    /// The landing top-left for a drag: clamped, and snapped to a guide in reach.
     func drag(to proposed: NSPoint) -> Drag {
         var x = clampX(proposed.x), top = clampTop(proposed.y)
         let snappedX = abs(x + width / 2 - guideX) <= Self.snapDistance
@@ -100,7 +98,7 @@ struct CommandBarPlacement {
         return Position(centerX: fraction("x"), top: fraction("top"))
     }
 
-    /// The default is kept as no setting at all, so a later change to the default reaches it.
+    /// The default is stored as no value, so changes to the default apply.
     static func save(_ position: Position, to defaults: UserDefaults = .standard) {
         guard !position.isStandard else { defaults.removeObject(forKey: defaultsKey); return }
         var saved: [String: Double] = [:]

@@ -95,7 +95,7 @@ nonisolated struct CertificateDetails: Equatable, Sendable {
         return found
     }
 
-    /// The host names a certificate is made out to (its subject alternative names that are names, not addresses).
+    /// Subject alternative names that are DNS names.
     static func dnsNames(of certificate: SecCertificate) -> [String] {
         let oid = kSecOIDSubjectAltName
         guard let values = SecCertificateCopyValues(certificate, [oid] as CFArray, nil) as? [String: Any],
@@ -110,8 +110,7 @@ nonisolated struct CertificateDetails: Equatable, Sendable {
         }
     }
 
-    /// The IP addresses a certificate is made out to (its subject alternative names that are addresses), as the
-    /// system writes them: "192.168.1.1", or an IPv6 one in full.
+    /// Subject alternative names that are IPs, as the system formats them ("192.168.1.1", or full IPv6).
     static func ipAddresses(of certificate: SecCertificate) -> [String] {
         let oid = kSecOIDSubjectAltName
         guard let values = SecCertificateCopyValues(certificate, [oid] as CFArray, nil) as? [String: Any],
@@ -126,8 +125,7 @@ nonisolated struct CertificateDetails: Equatable, Sendable {
         }
     }
 
-    /// The SHA-256 fingerprint as the certificate page shows it: `perLine` pairs to a line, each line but the last
-    /// ending on its colon, so no line starts with one.
+    /// `perLine` pairs per line, each line but the last ending in a colon so no line starts with one.
     static func fingerprintLines(_ fingerprint: String, perLine: Int) -> String {
         let pairs = fingerprint.split(separator: ":")
         guard perLine > 0, pairs.count > perLine else { return fingerprint }

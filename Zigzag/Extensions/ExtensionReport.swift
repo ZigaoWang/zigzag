@@ -12,9 +12,8 @@ nonisolated enum ExtensionKind: String, Codable, Sendable {
 /// What an extension will be able to do, and what it asks for that Zigzag can't give it, in plain words.
 /// Shown before installing and in Settings.
 ///
-/// The limits come from the compatibility claims over `chrome-api.json`: each permission and manifest key is
-/// answered by the overlay, and the sheet shows the lines those answers name. A permission no claim covers and
-/// WebKit drops is still named, by the permission itself.
+/// Limits come from the compatibility claims over `chrome-api.json`; the sheet shows the lines they name. A permission
+/// WebKit drops that no claim covers is listed by name.
 @available(macOS 15.4, *)
 struct ExtensionReport {
     struct Line: Hashable {
@@ -24,7 +23,7 @@ struct ExtensionReport {
 
     /// What it can do once added, most important first. Empty for an extension that asks for nothing notable.
     let abilities: [Line]
-    /// Features it asks for that won't work in Zigzag, as the claims word them.
+    /// Requested features that won't work in Zigzag, worded by the claims.
     let limits: [CompatibilityLimit]
     /// What the lines were worded from, so several extensions' can be put together.
     private var asked = Asked()
@@ -79,8 +78,7 @@ struct ExtensionReport {
         return limits
     }
 
-    /// The lines the overlay has for these permissions and manifest keys, with a shim's covered permissions left
-    /// out: the prelude answers those well enough that the person won't miss them.
+    /// Overlay lines for these permissions and keys, minus those a shim prelude covers well enough.
     private static func claimedLines(for requested: Set<String>, manifestKeys: Set<String>, id: String,
                                      kind: ExtensionKind, log: Bool) -> [CompatibilityLimit] {
         let shim = ExtensionShims.shim(for: id)
@@ -105,13 +103,13 @@ struct ExtensionReport {
         return Set(overlay.manifest.keys.filter { manifest[$0] != nil })
     }
 
-    /// The manifest permission a line belongs to: its source's first component. A whole-permission line's source is
-    /// the permission itself; a member line's is the claim's path (`management.getSelf`).
+    /// The permission a line belongs to: first component of its source (the permission itself, or a claim path such as
+    /// `management.getSelf`).
     private static func permission(of limit: CompatibilityLimit) -> String {
         String(limit.source.prefix { $0 != "." })
     }
 
-    /// Whether a manifest string is a permission's name rather than a host match pattern MV2 allows beside it.
+    /// Whether a manifest string is a permission name, not an MV2 host pattern.
     private static func isPermissionName(_ name: String) -> Bool {
         !name.contains("://") && name != "<all_urls>" && !name.hasPrefix("*")
     }
@@ -289,7 +287,6 @@ struct ExtensionReport {
 }
 
 private extension CompatibilityLimit {
-    /// What makes two lines the same feature across versions: the catalog key that words it, or the raw permission
-    /// when no claim covers it.
+    /// Identity of a line across versions: its catalog key, or the raw permission when unclaimed.
     var identity: String { catalogKey ?? "permission:\(source)" }
 }

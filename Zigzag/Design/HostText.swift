@@ -1,11 +1,9 @@
 import AppKit
 
-/// An address as Zigzag shows it in a line of text (the pane strip, a tab's hover card, the command bar's rows, the
-/// link pill). Its host always in the form WebKit loads it with (an international name as its "xn--" spelling), the
-/// same everywhere, so a name made of lookalike letters can't read as another site's in one place and not another.
+/// Address text for display (pane strip, hover card, command bar rows, link pill). The host always uses WebKit's form
+/// ("xn--" for IDNs), so lookalike names read the same everywhere.
 nonisolated enum AddressText {
-    /// The address without a user name and password ("user:pass@" before the host), which can put another site's
-    /// name ahead of the real one: "paypal.com@evil.example".
+    /// Strips "user:pass@", which can spoof the host: "paypal.com@evil.example".
     static func withoutUserInfo(_ url: URL) -> URL {
         guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false), parts.percentEncodedUser != nil || parts.percentEncodedPassword != nil
         else { return url }
@@ -14,9 +12,8 @@ nonisolated enum AddressText {
         return parts.url ?? url
     }
 
-    /// Percent escapes decoded to read as text, except those that would change how the address reads: separators
-    /// ("/", "?", "#", "@", ":", "\" and "%" itself), spaces, controls, and the invisible marks that reorder or hide
-    /// text (right-to-left overrides, zero-width spaces). Those stay as they are, escaped.
+    /// Decodes percent escapes for reading, except ones that change how the address reads: separators ("/", "?", "#",
+    /// "@", ":", "\", "%"), spaces, controls, and bidi or invisible marks.
     static func readable(_ text: String) -> String {
         let bytes = Array(text.utf8)
         var out = ""
@@ -30,7 +27,7 @@ nonisolated enum AddressText {
             }
         }
         while i < bytes.count {
-            // A run of escapes, decoded together (one character can take several bytes).
+            // Decodes a run of escapes together; one character can span several bytes.
             var run: [UInt8] = [], raw = ""
             var j = i
             while j + 2 < bytes.count, bytes[j] == 0x25, let high = hex(bytes[j + 1]), let low = hex(bytes[j + 2]) {
@@ -39,7 +36,7 @@ nonisolated enum AddressText {
                 j += 3
             }
             guard !run.isEmpty else {
-                // Up to the next escape, as it is.
+                // Copies up to the next escape.
                 var k = i + 1
                 while k < bytes.count, bytes[k] != 0x25 { k += 1 }
                 out += String(decoding: bytes[i..<k], as: UTF8.self)
@@ -47,7 +44,7 @@ nonisolated enum AddressText {
                 continue
             }
             if let decoded = String(validating: run, as: UTF8.self) {
-                // Each character decoded unless it's one that must stay escaped, which keeps its own bytes' escapes.
+                // Keeps the original escapes for characters that must stay escaped.
                 var offset = 0
                 for character in decoded {
                     let length = String(character).utf8.count
@@ -63,9 +60,7 @@ nonisolated enum AddressText {
         return out
     }
 
-    /// `text` with every site name in it ("custom-progress-bar.com") kept whole on wrapping: a word joiner after each
-    /// of its hyphens, so a line never breaks a name into "custom-" and "progress-bar.com", which reads as two. The
-    /// line breaks around the name instead, at the spaces.
+    /// Adds a word joiner after hyphens in host names so lines don't break "custom-progress-bar.com" into two.
     static func keepingHostsWhole(_ text: String) -> String {
         guard text.contains("-") else { return text }
         let pattern = #"[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)+"#
@@ -90,27 +85,25 @@ nonisolated enum AddressText {
     }
 }
 
-/// A page's whole address where there's room for it (a pop-up window, Zigzag Mini's strip),
-/// as Chrome shows it: no "https://", no "www.", the host in the text's own ink and what follows it (path, query,
-/// fragment) quiet. The sidebar's narrow field keeps the host alone. Only for a website's page (http and https);
-/// every other page keeps its name (`AddressView.name(of:)`). The host is the one WebKit loads ("xn--" for an
-/// international name) and never has a user name and password ahead of it.
+/// A full address where there's room (pop-ups, Zigzag Mini's strip), as Chrome shows it: no "https://" or "www.", host
+/// in normal ink, the rest quiet. http(s) only; other pages keep their name (`AddressView.name(of:)`). The host is
+/// WebKit's form, never with user info.
 nonisolated enum FullAddress {
     struct Parts: Equatable {
-        /// The site with a port that isn't the usual one: "linux.do", "localhost:3000", "[::1]:8080".
+        /// Host plus any non-default port: "linux.do", "localhost:3000", "[::1]:8080".
         var host: String
-        /// The rest, decoded to read (`AddressText.readable`): "/t/topic/482293?page=2#reply". Empty on a site's front page.
+        /// Decoded path, query and fragment (`AddressText.readable`); empty on a front page.
         var rest: String
         var whole: String { host + rest }
     }
 
-    /// The most of the rest kept: the field shows its start, and a data-heavy query can run to megabytes.
+    /// Cap on `rest`; queries can run to megabytes.
     static let longestRest = 1000
 
     static func parts(of url: URL?) -> Parts? {
         guard let url, let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
               let raw = url.host(percentEncoded: false), !raw.isEmpty,
-              // Anything but the ASCII spelling WebKit loads is left to the name, which shows the host as it always has.
+              // Non-ASCII hosts fall back to the name.
               raw.unicodeScalars.allSatisfy({ $0.isASCII && $0.value > 0x20 && $0.value != 0x7F }) else { return nil }
         var host = raw.lowercased().withoutWWW
         if host.contains(":") { host = "[\(host)]" }
@@ -126,12 +119,12 @@ nonisolated enum FullAddress {
         return Parts(host: host, rest: AddressText.readable(rest))
     }
 
-    /// How the address fits `room`: whole, its rest cut at the end, while the host and the start of the rest fit
-    /// (`leastRest` characters of it and "…"); the host alone (cut the usual way, `AddressView.lineBreak(forName:)`)
-    /// when they don't, as the host is never squeezed for the rest's sake. `measure` gives a text's width.
+    /// How the address fits `room`: whole with the rest truncated while the host and `leastRest` characters fit; else
+    /// the host alone (`AddressView.lineBreak(forName:)`). The host is never squeezed for the rest. `measure` returns
+    /// text width.
     enum Shown: Equatable { case whole, host }
 
-    /// The least of the rest worth showing before its cut: less reads as noise after the host.
+    /// Fewer characters read as noise.
     static let leastRest = 4
 
     static func shown(_ parts: Parts, room: CGFloat, measure: (String) -> CGFloat) -> Shown {
@@ -139,13 +132,13 @@ nonisolated enum FullAddress {
         return measure(parts.host + parts.rest.prefix(leastRest) + HostText.ellipsis) <= room ? .whole : .host
     }
 
-    /// The address as styled text: the host in `color`, the rest in `quiet`, cut at its end with "…".
+    /// Styled address: host in `color`, rest in `quiet`, truncated with "…".
     @MainActor static func styled(_ parts: Parts, font: NSFont, color: NSColor = Tokens.Color.textPrimary,
                                   quiet: NSColor = Tokens.Color.textSecondary, alignment: NSTextAlignment = .natural) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
         paragraph.alignment = alignment
-        // Always left to right: an address read in a right-to-left language still runs host first.
+        // Always left to right, host first, even in RTL languages.
         paragraph.baseWritingDirection = .leftToRight
         let base: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
         let text = NSMutableAttributedString(string: parts.host, attributes: base.merging([.foregroundColor: color]) { $1 })
@@ -153,9 +146,8 @@ nonisolated enum FullAddress {
         return text
     }
 
-    /// Puts the address in `label`, `room` wide (its text's room, without the label's insets): whole, or the host
-    /// alone in `color` when the host and a little after it don't fit (`shown`). Sets nothing when that's what it
-    /// shows already, as the field lays itself out throughout a page load.
+    /// Sets the address in `label` for `room` (excluding insets): whole, or the host alone in `color` when it doesn't
+    /// fit (`shown`). No-op when unchanged, since the field relayouts throughout a load.
     @MainActor static func show(_ parts: Parts, in label: Label, room: CGFloat, color: NSColor = Tokens.Color.textPrimary,
                                 quiet: NSColor = Tokens.Color.textSecondary) {
         let font = label.font ?? Tokens.Font.body()

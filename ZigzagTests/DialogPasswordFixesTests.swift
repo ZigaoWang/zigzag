@@ -78,7 +78,7 @@ struct DialogPasswordFixesTests {
 
     // MARK: Page dialogs
 
-    /// Waits up to two seconds for `condition`, letting the main run loop (and the animations on it) go on meanwhile.
+    /// Waits up to two seconds for `condition`, running the main run loop.
     private func until(_ condition: () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(2)
         while !condition(), Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
@@ -95,7 +95,7 @@ struct DialogPasswordFixesTests {
         // It sits on its page, not over the window (and so never over the sidebar or another tab's page).
         #expect(page.subviews.contains { $0 is PageDialogSheet })
         #expect(window.contentView?.subviews.contains { $0 is PageDialogSheet } != true)
-        // Out of sight, it isn't up in the window (What's New may show); its page in front, it is.
+        // Hidden: not showing (What's New may be up); in front: showing.
         #expect(!PageDialogSheet.isShowing(in: window))
         window.contentView?.addSubview(page)
         #expect(PageDialogSheet.isShowing(in: window))
@@ -104,7 +104,7 @@ struct DialogPasswordFixesTests {
         PageDialogSheet.cancel(for: page)
         let result = await asking.value
         if case .cancelled = result {} else { Issue.record("expected cancelled, got \(result)") }
-        // On a page in sight it fades out as other sheets do, then goes; it's no longer up as soon as it's answered.
+        // Visible: fades out, but stops counting as showing once answered.
         #expect(!PageDialogSheet.isShowing(in: window))
         try await until { !page.subviews.contains { $0 is PageDialogSheet } }
         #expect(!page.subviews.contains { $0 is PageDialogSheet })

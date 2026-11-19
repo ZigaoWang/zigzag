@@ -29,10 +29,9 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     private var authorized: Bool?
     private var started = false
 
-    /// The page script, and beside it, in a world of Zigzag's own, the answers sites were given, so
-    /// `Notification.permission` is right before the page's own scripts run. Only the page's own answer reaches it:
-    /// the list says which sites you've allowed, and no page reads it. Added per web view, since a private window's
-    /// answer is always no.
+    /// Adds the page script, plus site answers in Zigzag's own world, so `Notification.permission` is right before
+    /// page scripts run. The page only learns its own answer, never the list. Per web view, since private windows
+    /// always deny.
     static func attach(to configuration: WKWebViewConfiguration, isPrivate: Bool) {
         let controller = configuration.userContentController
         guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return }
@@ -43,15 +42,15 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
     }
 
     private static let marker = "/* zigzag notifications */"
-    /// Where the sites' answers are kept in a page, apart from the page's own world.
+    /// Holds the answers, isolated from the page's world.
     static let world = WKContentWorld.world(name: "zigzag-notifications")
 
-    /// The page's stand-in for `window.Notification`.
+    /// Replaces `window.Notification`.
     static func pageSource(isPrivate: Bool) -> String {
         marker + "\n" + shim.replacingOccurrences(of: "__PRIVATE__", with: isPrivate ? "true" : "false")
     }
 
-    /// Tells the page script the answer for its own origin, as an event (granted, denied or default), when it asks.
+    /// Sends the page script its own origin's answer (granted, denied or default) as an event when it asks.
     static func answerSource(decisions: [String: Bool]) -> String {
         let json = (try? JSONSerialization.data(withJSONObject: decisions)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         return marker + """
@@ -291,8 +290,8 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
         guard let entry, let webView = entry.webView else { return }
         let source = "window.__zigzagNotification && window.__zigzagNotification(id, type)"
         let arguments: [String: Any] = ["id": entry.id, "type": dismissed ? "close" : "click"]
-        // A click on the notification is yours, as in other browsers (the page may bring its window forward); one
-        // closed or dismissed carries no click to the page.
+        // A click counts as user activation, as in other browsers (the page may focus its window); a close or
+        // dismissal doesn't.
         if dismissed {
             webView.runOwnScript(source, asFunction: true, arguments: arguments, in: entry.frame, world: .page)
         } else {
@@ -322,8 +321,8 @@ final class WebNotifications: NSObject, WKScriptMessageHandlerWithReply, UNUserN
       let sameSite = window === window.top;
       if (!sameSite) { try { sameSite = window.top.location.origin === location.origin; } catch (e) {} }
       const usable = sameSite && (location.protocol === 'https:' || (location.protocol === 'http:' && local));
-      // Answers are kept per origin (scheme, host and port), and only this origin's is told here, from Zigzag's own
-      // world, before the page's scripts run (WebNotifications.answerSource).
+      // Per origin (scheme, host, port); only this origin's answer is sent, from Zigzag's world, before page scripts
+      // run (WebNotifications.answerSource).
       let permission = !usable || isPrivate ? 'denied' : 'default';
       const listen = EventTarget.prototype.addEventListener, tell = EventTarget.prototype.dispatchEvent, NativeEvent = Event;
       for (const state of ['granted', 'denied', 'default']) {
@@ -460,19 +459,16 @@ nonisolated enum IconAddress {
         return bytes(of: host).map { !isPublic($0) } ?? false
     }
 
-    /// For a fetch whose answer goes back to the page (a style sheet Dark Pages reads for it): by every address the
-    /// name resolves to, as `mayFetch`, except that an address in the range a proxy's fake-IP mode hands out
-    /// (198.18.0.0/15, never a device on your network) stands for the site on the web it does for the proxy.
-    ///
-    /// `proxied` says whether the fetch goes through a proxy (the profile's own, set by an extension); nil asks the
-    /// system's settings alone.
+    /// For fetches whose result goes back to the page (a style sheet Dark Pages reads): checks every resolved address
+    /// like `mayFetch`, except that a proxy fake-IP range address (198.18.0.0/15, never a LAN device) counts as the
+    /// public site it stands for. `proxied`: whether the fetch uses a proxy (the profile's, set by an extension); nil
+    /// checks system settings only.
     static func mayFetchForPage(_ url: URL, proxied: Bool? = nil) async -> Bool {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), let host = url.host(percentEncoded: false), isPublicName(host) else { return false }
         if let literal = bytes(of: host) { return isPublic(literal) }
         let addresses = await addresses(of: host)
-        // Nothing resolves on this Mac when only a proxy reaches the web (it looks names up itself): judged by the
-        // name, as an icon is, rather than refusing every style sheet. Only then: without a proxy, a name that
-        // resolves to nothing now could resolve to this Mac's network the next moment (a site rebinding its name).
+        // When only a proxy reaches the web, nothing resolves locally, so judge by name, as for icons. Only behind a
+        // proxy: otherwise a name that resolves to nothing could rebind to the local network a moment later.
         guard !addresses.isEmpty else {
             let behindProxy = proxied ?? ProxyCheck.anyProxy(for: url)
             return behindProxy && mayFetchByName(url)
@@ -480,15 +476,14 @@ nonisolated enum IconAddress {
         return addresses.allSatisfy { isPublic($0) || isFakeIP($0) }
     }
 
-    /// Lookups wait on the network, so they run on a queue of their own, never the threads Swift's tasks share; a
-    /// page asks for many files from one host, so an answer is kept a minute, and the files asked for at once wait
-    /// on one lookup.
+    /// Lookups block on the network, so they get their own queue rather than Swift's shared threads. Answers are
+    /// cached a minute and concurrent requests share one lookup.
     private static let lookups = DispatchQueue(label: "app.zigzag.icon-address", qos: .utility, attributes: .concurrent)
     private static let answers = OSAllocatedUnfairLock(initialState: [String: (addresses: [[UInt8]], at: Date)]())
     private static let underWay = OSAllocatedUnfairLock(initialState: [String: Task<[[UInt8]], Never>]())
     static let answerLifetime: TimeInterval = 60
 
-    /// Every address `host` resolves to, from a lookup in the last minute, one under way, or a new one.
+    /// From the last minute's cache, a pending lookup, or a new one.
     static func addresses(of host: String, now: Date = Date(), resolver: (@Sendable (String) -> [[UInt8]])? = nil) async -> [[UInt8]] {
         let key = host.lowercased()
         if let kept = answers.withLock({ $0[key] }), now.timeIntervalSince(kept.at) < answerLifetime { return kept.addresses }
@@ -511,13 +506,12 @@ nonisolated enum IconAddress {
         return await lookup.value
     }
 
-    /// Forgets every answer kept: for tests.
+    /// Tests.
     static func forgetAnswers() { answers.withLock { $0 = [:] } }
 
     private static func isFakeIP(_ a: [UInt8]) -> Bool { a.count == 4 && a[0] == 198 && (18...19).contains(a[1]) }
 
-    /// Names that are this Mac or its own network, whatever they resolve to, are not: a name of one label (which
-    /// the network's own search domain finishes), and the endings home and office networks use.
+    /// Single-label names (completed by the search domain) and home/office network suffixes are never public.
     static func isPublicName(_ host: String) -> Bool {
         var name = host.lowercased()
         if name.hasSuffix(".") { name.removeLast() }
@@ -534,8 +528,8 @@ nonisolated enum IconAddress {
         var host = text
         if host.hasPrefix("["), host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
         var v4 = in_addr()
-        // Read as a resolver reads it, in the short and old forms too: "127.1", "2130706433", "0x7f.0.0.1", and
-        // "0177.0.0.1" in octal, which is 127.0.0.1 to it, not 177.0.0.1.
+        // Parsed as a resolver does, short and legacy forms included: "127.1", "2130706433", "0x7f.0.0.1", and octal
+        // "0177.0.0.1" (127.0.0.1, not 177.0.0.1).
         if host.allSatisfy({ $0.isASCII && ($0.isHexDigit || $0 == "." || $0 == "x" || $0 == "X") }), host.first?.isNumber == true,
            inet_aton(host, &v4) == 1 { return withUnsafeBytes(of: &v4) { Array($0) } }
         if inet_pton(AF_INET, host, &v4) == 1 { return withUnsafeBytes(of: &v4) { Array($0) } }

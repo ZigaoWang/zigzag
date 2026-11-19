@@ -91,7 +91,7 @@ nonisolated enum SafariImporter {
             case "csv":
                 if case .success(let (_, csv)) = CSVImporter.read(file) { batch.logins += csv.logins; batch.problems += csv.problems }
             case "html":
-                batch.bookmarks += netscapeBookmarks(file)
+                batch.bookmarks += BookmarksHTML.bookmarks(in: (try? Data(contentsOf: file)).map(BookmarksHTML.text(of:)) ?? "")
             case "json":
                 batch.history += historyJSON(file)
             default:
@@ -100,44 +100,6 @@ nonisolated enum SafariImporter {
         }
         if batch.logins.isEmpty, batch.bookmarks.isEmpty, batch.history.isEmpty, batch.problems.isEmpty { batch.problems.append(unreadable) }
         return batch
-    }
-
-    /// The bookmarks HTML every browser exports: `<A HREF="…">Title</A>`.
-    static func netscapeBookmarks(_ file: URL) -> [ImportBatch.Bookmark] {
-        guard let html = try? String(contentsOf: file, encoding: .utf8),
-              let pattern = try? NSRegularExpression(pattern: #"<A[^>]*HREF="([^"]+)"[^>]*>([^<]*)</A>"#, options: [.caseInsensitive]) else { return [] }
-        return pattern.matches(in: html, range: NSRange(html.startIndex..., in: html)).compactMap { match in
-            guard let urlRange = Range(match.range(at: 1), in: html), let titleRange = Range(match.range(at: 2), in: html),
-                  let url = URL(string: decodeEntities(String(html[urlRange]))), url.scheme == "http" || url.scheme == "https" else { return nil }
-            let title = decodeEntities(String(html[titleRange])).trimmingCharacters(in: .whitespacesAndNewlines)
-            return ImportBatch.Bookmark(url: url, title: title.isEmpty ? (url.host() ?? url.absoluteString) : title)
-        }
-    }
-
-    /// "Tom &amp; Jerry&#39;s" → "Tom & Jerry's": the named entities exports use, and numbered ones.
-    static func decodeEntities(_ text: String) -> String {
-        guard text.contains("&") else { return text }
-        let named = ["amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": "\u{00A0}"]
-        var result = "", rest = text[...]
-        while let amp = rest.firstIndex(of: "&") {
-            result += rest[..<amp]
-            let after = rest[rest.index(after: amp)...]
-            if let semi = after.prefix(10).firstIndex(of: ";") {
-                let name = after[..<semi]
-                var decoded: String?
-                if name.hasPrefix("#x") || name.hasPrefix("#X") { decoded = UInt32(name.dropFirst(2), radix: 16).flatMap(Unicode.Scalar.init).map { String(Character($0)) } }
-                else if name.hasPrefix("#") { decoded = UInt32(name.dropFirst()).flatMap(Unicode.Scalar.init).map { String(Character($0)) } }
-                else { decoded = named[String(name).lowercased()] }
-                if let decoded {
-                    result += decoded
-                    rest = after[after.index(after: semi)...]
-                    continue
-                }
-            }
-            result += "&"
-            rest = after
-        }
-        return result + rest
     }
 
     /// History JSON: entries with a URL, a title and a time, wherever they sit in the file.

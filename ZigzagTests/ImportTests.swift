@@ -157,7 +157,7 @@ struct CSVImportTests {
         #expect(batch.problems.count == 1)
     }
 
-    /// Zigzag's own export guards formula-like text with a ' (see PasswordExport.field); importing it gives the text back.
+    /// Zigzag's export prefixes formula-like text with ' (PasswordExport.field); importing removes it.
     @Test func zigzagsOwnExportComesBackAsItWas() throws {
         let row = ["Site", "https://a.test", "=sam", "-pw", "@note", "'quoted"].map { PasswordExport.field($0, neutralized: $0 != "-pw") }
         let (format, own) = try logins("name,url,username,password,note,otpauth\n" + row.joined(separator: ",") + "\n")
@@ -166,7 +166,7 @@ struct CSVImportTests {
         #expect(own[0].password.matches(SecretString("-pw")))
         #expect(own[0].notes == "@note")
         #expect(own[0].otpAuth == "'quoted")
-        // Another app's file is taken as written.
+        // Other apps' files are taken as written.
         let (_, other) = try logins("name,url,username,password,note\nSite,https://a.test,'=sam,p,\n")
         #expect(other[0].username == "'=sam")
     }
@@ -213,9 +213,76 @@ private final class FixtureMarker {}
 
 struct SafariExportTests {
     @Test func decodesEntitiesInBookmarks() {
-        #expect(SafariImporter.decodeEntities("Tom &amp; Jerry&#39;s &#x263A; &lt;b&gt;") == "Tom & Jerry's ☺ <b>")
-        #expect(SafariImporter.decodeEntities("a?x=1&amp;y=2") == "a?x=1&y=2")
-        #expect(SafariImporter.decodeEntities("R&D & more &bogus;") == "R&D & more &bogus;")
+        #expect(BookmarksHTML.decodeEntities("Tom &amp; Jerry&#39;s &#x263A; &lt;b&gt;") == "Tom & Jerry's ☺ <b>")
+        #expect(BookmarksHTML.decodeEntities("a?x=1&amp;y=2") == "a?x=1&y=2")
+        #expect(BookmarksHTML.decodeEntities("R&D & more &bogus;") == "R&D & more &bogus;")
+    }
+}
+
+/// bookmarks.html import (#330): pages with folders, as Firefox and Safari export them.
+struct BookmarksHTMLTests {
+    static func fixture(_ name: String) throws -> URL {
+        try #require(Bundle(for: FixtureMarker.self).url(forResource: name, withExtension: "html"))
+    }
+
+    static func summary(_ bookmarks: [ImportBatch.Bookmark]) -> [String] {
+        bookmarks.map { ($0.folders + [$0.title]).joined(separator: " / ") }
+    }
+
+    /// Firefox/LibreWolf: roots flattened, nesting and entities kept, feeds and non-web links skipped.
+    @Test func readsAFirefoxExport() throws {
+        let batch = BookmarksHTML.read(try Self.fixture("firefox-bookmarks"))
+        #expect(batch.problems.isEmpty)
+        #expect(Self.summary(batch.bookmarks) == ["Get Help", "LibreWolf / LibreWolf", "GitHub", "Work / Docs & Notes / Tom & Jerry's — docs",
+                                                  "Work / Plan", "untitled.example.net", "中文页面"])
+        #expect(batch.bookmarks[3].url.absoluteString == "https://example.com/a?x=1&y=2")
+        #expect(batch.bookmarks[6].url.host() == "example.com")
+    }
+
+    /// Safari: no outer list, roots flattened, Reading List skipped.
+    @Test func readsASafariExport() throws {
+        let batch = BookmarksHTML.read(try Self.fixture("safari-bookmarks"))
+        #expect(Self.summary(batch.bookmarks) == ["Apple", "Reading / Example Net", "In the menu", "Travel / Maps",
+                                                  "Travel / \(String(localized: "Folder", comment: "Name of an imported folder that had none.")) / Trains"])
+    }
+
+    /// Chrome/Edge style, with lowercase tags and missing closing tags.
+    @Test func readsAChromeExport() {
+        let html = """
+        <!DOCTYPE NETSCAPE-Bookmark-file-1>
+        <TITLE>Bookmarks</TITLE><H1>Bookmarks</H1>
+        <DL><p>
+            <DT><H3 ADD_DATE="1" LAST_MODIFIED="2" PERSONAL_TOOLBAR_FOLDER="true">Bookmarks bar</H3>
+            <DL><p>
+                <dt><a href='https://a.example/' add_date=1>A
+                <DT><H3>Empty</H3>
+                <DT><H3>Full</H3>
+                <DL><p><DT><A HREF="https://b.example/">B</A></DL><p>
+            </DL><p>
+            <DT><A HREF="https://c.example/">C</A>
+        </DL><p>
+        """
+        #expect(Self.summary(BookmarksHTML.bookmarks(in: html)) == ["A", "Full / B", "C"])
+    }
+
+    @Test func aFileWithoutBookmarksIsAProblem() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("page-\(UUID().uuidString).html")
+        try Data("<html><body><p>Hello</p></body></html>".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let batch = BookmarksHTML.read(file)
+        #expect(batch.bookmarks.isEmpty)
+        #expect(batch.problems.count == 1)
+    }
+
+    /// Goes into one new space, like a browser import.
+    @Test func goesIntoASpaceOfItsOwn() throws {
+        let bookmarks = BookmarksHTML.read(try Self.fixture("firefox-bookmarks")).bookmarks
+        let plan = ImportCoordinator.plan(bookmarks, source: "bookmarks.html", in: [SpaceInfo(name: "Personal", color: .sky)],
+                                          on: Profile.defaultID, profileOf: { _ in Profile.defaultID })
+        #expect(plan.count == 1)
+        #expect(plan.first?.space == nil)
+        #expect(plan.first?.name.contains("bookmarks.html") == true)
+        #expect(plan.first?.new.count == bookmarks.count)
     }
 }
 
@@ -289,7 +356,7 @@ struct ImportLayoutTests {
         (0..<count).map { ImportCoordinator.fileSource(FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-layout-\($0).csv")) }
     }
 
-    /// What it shows: its own views, and those in the body that scrolls between the heading and the buttons.
+    /// The view's own subviews plus those in the scrolling body between heading and buttons.
     static func laidOut(_ view: ImportView, height: CGFloat = 2000) -> [NSView] {
         view.frame = NSRect(x: 0, y: 0, width: 560, height: height)
         view.needsLayout = true
@@ -299,7 +366,7 @@ struct ImportLayoutTests {
         return own.filter { !($0 is NSScrollView) } + body
     }
 
-    /// Where a view is in the window, wherever it sits.
+    /// A view's frame in window coordinates.
     static func place(_ view: NSView) -> NSRect { view.convert(view.bounds, to: nil) }
 
     static func expectNothingPiled(_ shown: [NSView], sourceLocation: SourceLocation = #_sourceLocation) {
@@ -313,12 +380,11 @@ struct ImportLayoutTests {
         }
     }
 
-    /// Too much to fit (many browsers, Chrome's profiles, every choice): the body scrolls, and Import stays inside the
-    /// window under it, not pushed off the bottom (#293).
+    /// Tall content scrolls and Import stays visible at the bottom (#293).
     @Test func importStaysInViewWhenTheContentIsTall() throws {
         let view = ImportView(presentation: .window, detect: { Self.files(12) })
         for height: CGFloat in [2000, 520, 360] {
-            // Scrolled, the body's rows run on under the buttons, clipped, so they're checked laid out whole.
+            // Scrolled rows run under the buttons clipped, so they're checked laid out whole.
             let shown = Self.laidOut(view, height: height)
             if height == 2000 { Self.expectNothingPiled(shown) }
             let primary = try #require(view.subviews.first { $0 is PrimaryButton })
@@ -330,11 +396,11 @@ struct ImportLayoutTests {
             let list = try #require(content.subviews.first { $0 is NSScrollView } as? NSScrollView)
             let rows = try #require(list.documentView)
             if view.naturalHeight <= height {
-                // It all fits: nothing scrolls.
+                // Everything fits: no scrolling.
                 #expect(content.frame.height == scroll.frame.height)
                 #expect(rows.frame.height == list.frame.height)
             } else {
-                // The browsers scroll first, so the choices stay in view.
+                // The browser list scrolls first so the choices stay visible.
                 #expect(rows.frame.height > list.frame.height)
             }
             if height == 520 {
@@ -342,7 +408,7 @@ struct ImportLayoutTests {
                 #expect(pill.frame.maxY <= scroll.frame.height, "The choices are scrolled out of view")
             }
             if height == 360 {
-                // Too short even for that: all of it scrolls.
+                // Too short even for that: everything scrolls.
                 #expect(content.frame.height > scroll.frame.height)
             }
         }

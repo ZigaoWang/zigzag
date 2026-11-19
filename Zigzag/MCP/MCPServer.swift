@@ -5,11 +5,11 @@ import Network
 /// its own queue; only the tools themselves go to the main actor.
 nonisolated final class MCPServer: @unchecked Sendable {
     enum State: Equatable, Sendable {
-        /// `portInUse`: something else holds the port, and an app that connects there hands it the key.
+        /// `portInUse`: another process holds the port, and apps connecting there hand it the key.
         case starting, ready(port: UInt16), failed(String, portInUse: Bool), stopped
     }
-    /// The most connections at once, and the most of those that haven't yet sent the key: one that would go past it
-    /// pushes out the oldest keyless one, so connections that never send it can't keep the apps that do out.
+    /// Cap on connections and on keyless ones; past it the oldest idle keyless one is dropped, so keyless connections
+    /// can't lock out apps.
     static let maxConnections = 64
     static let maxKeylessConnections = 16
 
@@ -116,7 +116,7 @@ nonisolated final class MCPServer: @unchecked Sendable {
             }
             guard loopback else { connection.cancel(); return }
         }
-        // A connection working on a request is never cut for a new one, keyed or not.
+        // Busy connections are never dropped.
         let keyless = connections.values.filter { !$0.keyed && !$0.isBusy }
         if keyless.count >= Self.maxKeylessConnections, let oldest = keyless.min(by: { $0.number < $1.number }) { oldest.cancel() }
         guard connections.count < Self.maxConnections else { connection.cancel(); return }
@@ -135,25 +135,25 @@ nonisolated private final class Connection: @unchecked Sendable {
     /// How long one request may take to arrive whole, from its first byte (or the connection opening): one sent a
     /// byte at a time, to hold a connection open for ever, is cut off however often a byte comes.
     static let requestTimeout: TimeInterval = 15
-    /// The answers given before the key is checked, or because it was wrong. Once a request's key is accepted, a
-    /// 404 (a session or method not found) is an answer, not a refusal: the connection stays.
+    /// Statuses that close the connection before the key is accepted. After acceptance a 404 (unknown session or
+    /// method) is a normal answer.
     static let refusals: Set<Int> = [401, 403, 404]
 
-    /// Whether a request answered with `status` ends the connection, given whether its key was accepted.
+    /// Whether `status` closes the connection, given whether the key was accepted.
     static func refuses(status: Int, keyAccepted: Bool) -> Bool { !keyAccepted && refusals.contains(status) }
 
     private let connection: NWConnection
-    /// Its place in the order connections opened.
+    /// Open order.
     let number: Int
-    /// It has sent a request with the key. Read and written on the server's queue.
+    /// Sent a request with the key. Server queue only.
     private(set) var keyed = false
     private let endpoint: MCPEndpoint
     private let queue: DispatchQueue
     private var reader = HTTPRequestReader()
     private var busy = false
-    /// Working on a request. Read on the server's queue.
+    /// Handling a request. Read on the server queue.
     var isBusy: Bool { busy }
-    /// The request being answered had the key.
+    /// The current request had the key.
     private var keyAccepted = false
     private var closed = false
     /// The far end has sent all it will.
@@ -265,14 +265,14 @@ nonisolated private final class Connection: @unchecked Sendable {
             let endpoint = self.endpoint
             let queue = self.queue
             Task {
-                // Keyed as soon as the key is accepted, so a long tool call is never cut for keyless connections.
-                // Queued before the answer below, so it's set by the time that's sent.
+                // Marked keyed on acceptance so long tool calls aren't dropped for keyless connections; queued before
+                // the response so it's set by then.
                 let response = await endpoint.handle(request, authorized: {
                     queue.async { self.keyAccepted = true; self.keyed = true }
                 })
                 queue.async {
                     self.busy = false
-                    // Refused (no key, a page's request, the wrong path): answered, then the connection ends.
+                    // Refused (no key, a page's request, wrong path): respond, then close.
                     let refused = Self.refuses(status: response.status, keyAccepted: self.keyAccepted)
                     if !refused { self.keyed = true }
                     self.send(response, keepAlive: !request.closes && !refused)

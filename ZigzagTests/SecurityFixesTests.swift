@@ -5,7 +5,7 @@ import os
 @testable import Zigzag
 
 struct PrivateFoldersTests {
-    /// Page pictures and back/forward lists are readable by you alone, in a folder made by an older Zigzag too.
+    /// Snapshots and back/forward lists are owner-only, including folders an older Zigzag made.
     @Test func snapshotsAndTabStatesAreYoursAlone() throws {
         let base = FileManager.default.temporaryDirectory.appendingPathComponent("Private-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: base) }
@@ -24,7 +24,7 @@ struct PrivateFoldersTests {
 }
 
 struct MoveToApplicationsTests {
-    /// Only a copy signed as this app is gets its quarantine taken off.
+    /// Quarantine is removed only from copies signed like this app.
     @Test func onlyACopySignedLikeTheAppPasses() throws {
         let app = Bundle.main.bundleURL
         #expect(MoveToApplications.isSigned(like: app, app))
@@ -224,17 +224,17 @@ struct SecurityFixesTests {
         #expect(Tab.readAccess(for: index, downloadFolders: folders).path == project.path)
     }
 
-    /// A page loose in the home folder, or above it, reads only itself: its folder would be every file you have.
+    /// A page directly in or above the home folder gets read access to itself only, not every file.
     @Test func aPageInTheHomeFolderOrAboveReadsOnlyItself() {
         let home = URL(fileURLWithPath: "/Users/someone", isDirectory: true)
         for path in ["/Users/someone/page.html", "/Users/page.html", "/page.html"] {
             let file = URL(fileURLWithPath: path)
             #expect(Tab.readAccess(for: file, downloadFolders: [], home: home).path == file.path)
         }
-        // Inside a folder of its own there: that folder, as before.
+        // In its own folder there: that folder, as before.
         let site = URL(fileURLWithPath: "/Users/someone/site/index.html")
         #expect(Tab.readAccess(for: site, downloadFolders: [], home: home).path == "/Users/someone/site")
-        // A folder that only starts like home is another folder.
+        // A sibling path with the same prefix is a different folder.
         let other = URL(fileURLWithPath: "/Users/someone2/index.html")
         #expect(Tab.readAccess(for: other, downloadFolders: [], home: home).path == "/Users/someone2")
     }
@@ -341,8 +341,7 @@ struct SiteOriginPermissionTests {
             defaults.set(true, forKey: "UnrelatedSetting")
             SitePermissions.migrateHostOnlyAnswers()
             let now = defaults.dictionary(forKey: "SitePermissions") as? [String: Bool]
-            // An answer already kept for the origin stays as it was; a denial given to a host on its own is kept for
-            // its https site, and an allow given that way is not.
+            // Existing origin answers are kept; a host-only denial is kept for its https site, an allow isn't.
             #expect(now == ["https://localhost|camera": false, "https://kept.com|camera": true, "https://example.com|notifications": true])
             #expect(SitePermissions.decision(origin: "http://localhost", type: .microphone) == nil)
             #expect(SitePermissions.decision(origin: "https://localhost", type: .microphone) == nil)
@@ -470,7 +469,7 @@ struct PageNoticeTests {
         #expect(await IconAddress.mayFetch(try #require(URL(string: "https://8.8.8.8/icon.png"))))
     }
 
-    /// Many files asked for at once from one host wait on one lookup, not one each.
+    /// Concurrent requests for one host share one DNS lookup.
     @Test func oneLookupAHostAtATime() async {
         let host = "coalesce-\(UUID().uuidString).example"
         let count = OSAllocatedUnfairLock(initialState: 0)
@@ -487,7 +486,7 @@ struct PageNoticeTests {
         }
         #expect(answers.count == 8 && answers.allSatisfy { $0 == [[8, 8, 8, 8]] })
         #expect(count.withLock { $0 } == 1)
-        // Kept: asked again, no new lookup.
+        // Cached: no new lookup.
         _ = await IconAddress.addresses(of: host, resolver: resolver)
         #expect(count.withLock { $0 } == 1)
     }
@@ -519,7 +518,7 @@ struct PasswordSafetyTests {
         #expect(PasswordExport.field("=secret", neutralized: false) == "=secret")
     }
 
-    /// An export is readable by you alone from its first byte, replaces a file that wasn't, and leaves nothing beside it.
+    /// Exports are owner-only from the first byte, replace a non-private file, and leave no temp file.
     @Test func anExportIsYoursAloneFromTheStart() throws {
         let fm = FileManager.default
         let folder = fm.temporaryDirectory.appendingPathComponent("PasswordExport-\(UUID().uuidString)", isDirectory: true)
@@ -532,7 +531,7 @@ struct PasswordSafetyTests {
         #expect((try fm.attributesOfItem(atPath: file.path))[.posixPermissions] as? Int == 0o600)
         #expect(try String(contentsOf: file, encoding: .utf8) == "name,url\n")
         #expect(try fm.contentsOfDirectory(atPath: folder.path) == ["Passwords.csv"])
-        // Somewhere it can't be written: an error, and nothing left.
+        // Unwritable destination: an error, nothing left behind.
         let nowhere = folder.appendingPathComponent("missing/Passwords.csv")
         #expect(throws: (any Error).self) { try PasswordExport.writePrivately(Data("x".utf8), to: nowhere) }
         #expect(try fm.contentsOfDirectory(atPath: folder.path) == ["Passwords.csv"])
@@ -612,7 +611,7 @@ struct PasswordSafetyTests {
         #expect(await value("billing", in: webView) == "")
     }
 
-    /// Your card goes only into fields you'd see: not a sliver, not faded out, and only the form you're in.
+    /// Cards fill only visible fields (no slivers, no faded fields) in the focused form.
     @Test func myCardSkipsFieldsYouWouldntSee() async throws {
         let (webView, _, _) = await page("""
         <form><input id="name" name="first_name"><input id="tiny" name="email" style="width:15px;height:8px;padding:0;border:0">
@@ -623,11 +622,11 @@ struct PasswordSafetyTests {
         #expect(await value("name", in: webView) == "Ada")
         #expect(await value("tiny", in: webView) == "")
         #expect(await value("faded", in: webView) == "")
-        // Another form on the page: not the one you're in.
+        // Another form on the page isn't filled.
         #expect(await value("other", in: webView) == "")
     }
 
-    /// A field in no form: just that field, never every field on the page.
+    /// A field outside any form: only that field.
     @Test func myCardWithNoFormFillsOnlyYourField() async throws {
         let (webView, _, _) = await page("""
         <input id="name" name="first_name"><input id="email" name="email"><form><input id="inForm" name="phone"></form>
@@ -638,7 +637,7 @@ struct PasswordSafetyTests {
         #expect(await value("inForm", in: webView) == "")
     }
 
-    /// A field in no form, in a part of the page with others for your card: that part is filled, not the page.
+    /// A field outside any form with card fields around it: that section, not the page.
     @Test func myCardWithNoFormFillsTheFieldsAroundIt() async throws {
         let (webView, _, _) = await page("""
         <section><div><label>First <input id="name" name="first_name"></label></div>
@@ -651,7 +650,7 @@ struct PasswordSafetyTests {
         #expect(await value("other", in: webView) == "")
     }
 
-    /// Fields inside a page's component (an open shadow root), where the page's focus is only the component.
+    /// Fields inside an open shadow root, where the focus is only the host element.
     @Test func myCardFillsInsideShadowRoots() async throws {
         let (webView, _, _) = await page("""
         <div id="host"></div>
@@ -670,7 +669,7 @@ struct PasswordSafetyTests {
         #expect(await inside("email") == "ada@example.com")
     }
 
-    /// What the page looks like after a sign-in, as the password watcher reads it.
+    /// The page state as the password watcher reads it after a sign-in.
     private func passwordState(_ html: String, scrollTo: Double = 0) async throws -> [String: Any]? {
         let configuration = WKWebViewConfiguration()
         configuration.userContentController.addUserScript(PasswordCapture.script)
@@ -679,8 +678,7 @@ struct PasswordSafetyTests {
         return try await webView.callAsyncJavaScript("return window.__zigzagPasswordState()", arguments: [:], in: nil, contentWorld: .defaultClient) as? [String: Any]
     }
 
-    /// A sign-in form only scrolled away, or greyed out while the site answers, is still there: the sign-in hasn't
-    /// gone through. One taken away, or pushed off the page, has gone.
+    /// A sign-in form scrolled away or disabled while waiting is still there; removed or moved offscreen means it went through.
     @Test func aFormScrolledAwayOrDisabledHasntGone() async throws {
         let scrolled = try await passwordState("""
         <form><input id="p" type="password" value="typed"></form><div style="height:3000px"></div>
@@ -753,15 +751,15 @@ struct PasswordSafetyTests {
     }
 
     @Test func savedSignInsAnswerOnlyTheirOwnSite() {
-        // The page's own site, its other hosts included: answered, saved name and password or sheet.
+        // The page's site, other hosts included: answered from saved credentials or the sheet.
         #expect(AuthenticationPrompt.mayAnswer(pageHost: "intranet.example.com", askingHost: "intranet.example.com"))
         #expect(AuthenticationPrompt.mayAnswer(pageHost: "www.example.com", askingHost: "files.example.com"))
         #expect(AuthenticationPrompt.mayAnswer(pageHost: "WWW.Example.com", askingHost: "files.example.com"))
-        // Something from another site on the page: nothing saved is sent, and nothing asks.
+        // A cross-site resource: nothing sent, no prompt.
         #expect(!AuthenticationPrompt.mayAnswer(pageHost: "evil.example", askingHost: "router.example.com"))
-        // Another app on a shared host is another site.
+        // Different apps on a public suffix are different sites.
         #expect(!AuthenticationPrompt.mayAnswer(pageHost: "evil.vercel.app", askingHost: "myapp.vercel.app"))
-        // No page to go by: as before.
+        // No page: as before.
         #expect(AuthenticationPrompt.mayAnswer(pageHost: nil, askingHost: "router.example.com"))
         #expect(AuthenticationPrompt.mayAnswer(pageHost: "", askingHost: "router.example.com"))
     }

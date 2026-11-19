@@ -1139,10 +1139,10 @@ enum Clipboard {
         DispatchQueue.main.asyncAfter(deadline: .now() + 90, execute: work)
     }
 
-    /// The clipboard's change count right after a concealed copy, while it may still be on the clipboard.
+    /// Clipboard change count after a concealed copy.
     private static var ownCopy: (board: NSPasteboard, count: Int)?
 
-    /// The concealed copy goes, if nothing has been copied since: 90 seconds on, or when Zigzag quits before then.
+    /// Clears a concealed copy if nothing was copied since: after 90 seconds, or on quit.
     static func clearIfStillOurs() {
         clearWork?.cancel()
         clearWork = nil
@@ -1154,8 +1154,8 @@ enum Clipboard {
     static let concealedType = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
     static let transientType = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
 
-    /// Puts `text` on the clipboard in one write. Marked, it carries the concealed and transient markers with it
-    /// (nspasteboard.org), so it's never there unmarked even for a moment and clipboard managers leave it out.
+    /// Writes `text` in one write. `marked` adds the concealed and transient types (nspasteboard.org) in the same
+    /// write, so clipboard managers skip it.
     static func write(_ text: String, marked: Bool, to board: NSPasteboard, currentHostOnly: Bool = false) {
         let item = NSPasteboardItem()
         item.setString(text, forType: .string)
@@ -1192,9 +1192,8 @@ enum PasswordExport {
         return written
     }
 
-    /// Writes `data` to `url` readable by you alone (0600) from the first byte: into a new file beside it, made with
-    /// those permissions, then moved into place. Whatever goes wrong, nothing is left behind, not even a file whose
-    /// permissions couldn't be set.
+    /// Writes `data` to `url` as 0600 from the first byte: a new temp file created with those permissions, then moved
+    /// into place. Nothing is left behind on failure.
     nonisolated static func writePrivately(_ data: Data, to url: URL) throws {
         let temporary = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString)")
         let descriptor = open(temporary.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
@@ -1203,7 +1202,7 @@ enum PasswordExport {
         defer { if !moved { unlink(temporary.path) } }
         do {
             let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-            // The umask can only take permissions away; this makes sure of exactly 0600.
+            // The umask only removes bits; force exactly 0600.
             guard fchmod(descriptor, 0o600) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EPERM) }
             try handle.write(contentsOf: data)
             try handle.synchronize()
@@ -1211,7 +1210,7 @@ enum PasswordExport {
         }
         guard rename(temporary.path, url.path) == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         moved = true
-        // Checked where it landed: a file anyone else could read is removed rather than left.
+        // Remove the file if it ended up readable by others.
         do {
             let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber
             if mode?.int16Value != 0o600 { try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) }

@@ -51,8 +51,7 @@ struct SpaceProfileTests {
         #expect(directory.shownName(ofSpace: play, spaceName: "Play") == directory.all[0].displayName)
     }
 
-    /// Settings › Spaces › Give new spaces their own profile (#291): a space you make comes with a profile named
-    /// after it, in its color; off, it stays on the profile it was made from.
+    /// Give new spaces their own profile (#291): a new space gets a profile with its name and color; off, it stays on the current profile.
     @Test func aNewSpaceCanComeWithItsOwnProfile() {
         var directory = ProfileDirectory()
         let other = directory.add(name: "Other", color: .rose)
@@ -74,14 +73,14 @@ struct SpaceProfileTests {
         let first = directory.place(newSpace: SpaceInfo(name: "work", color: .sky), on: Profile.defaultID, ownProfile: true, usedColors: [])
         let second = directory.place(newSpace: SpaceInfo(name: "Work", color: .sky), on: Profile.defaultID, ownProfile: true, usedColors: [])
         #expect(first?.name == "work 2" && second?.name == "Work 3")
-        // The first profile's own name, Default until it's renamed, is taken too.
+        // The first profile's name (Default until renamed) counts as taken too.
         let named = directory.place(newSpace: SpaceInfo(name: directory.all[0].displayName, color: .sky), on: Profile.defaultID,
                                     ownProfile: true, usedColors: [])
         #expect(named?.name == directory.all[0].displayName + " 2")
     }
 
     @Test func aNewSpacesProfileTakesAColorNoProfileHas() {
-        // The space's own, unless a profile has it or it's gray, white or black: then the next one no profile has.
+        // The space's color unless taken or gray/white/black; then the next free one.
         #expect(ProfileDirectory.ownColor(for: .sage, used: [.sky]) == .sage)
         let taken = ProfileDirectory.ownColor(for: .sky, used: [.sky])
         #expect(taken != .sky && !taken.isNeutral)
