@@ -3348,29 +3348,28 @@ extension BrowserWindowController: SidebarDelegate {
     }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
     func sidebarAddMenu() -> [MenuPanel.Entry] {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge(keepingPanel: true) }
-        return SidebarMenus.addPanel(controller: self)
+        SidebarMenus.addPanel(controller: self)
     }
     func sidebarBlankMenu() -> [MenuPanel.Entry] {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge(keepingPanel: true) }
-        return SidebarMenus.blankPanel(controller: self)
+        SidebarMenus.blankPanel(controller: self)
     }
-    /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
+    /// Same as ⌘T: the new tab command bar, or an extension's new tab page. In the panel, the bar opens there.
     func sidebarDoubleClickedBlank() {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        if EdgeSidebar.shared.isShowing {
+            EdgeSidebar.shared.newTabInPlace()
+            return
+        }
         if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) }
     }
     func sidebarShowDownloads(from view: NSView) {
         if EdgeSidebar.shared.isShowing {
-            // The button that asked is in the panel, which is going: the window's own shows where the list will.
-            bringForwardForEdge()
-            DownloadsPanel.show(from: sidebar.downloadsButton, in: self)
+            // The button that asked is in the panel: the list opens there, over the panel's own lane.
+            EdgeSidebar.shared.showDownloads(from: view, in: self)
         } else {
             DownloadsPanel.show(from: view, in: self)
         }
     }
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
-        if EdgeSidebar.shared.isShowing { bringForwardForEdge(keepingPanel: true) }
         let menu = SidebarMenus.spaceMenu(for: id, controller: self)
         return menu.items.isEmpty ? nil : menu
     }

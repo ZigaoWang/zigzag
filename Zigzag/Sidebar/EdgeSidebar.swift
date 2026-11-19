@@ -347,11 +347,19 @@ final class EdgeSidebar {
         startFollowing()
     }
 
+    /// Downloads from the panel: the list in the panel's window, over the mirror's lane, not in the window behind.
+    func showDownloads(from anchor: NSView, in controller: BrowserWindowController) {
+        guard isShowing, let host, let target else { return }
+        let (sidebar, _) = target.edgeSidebarForDisplay()
+        DownloadsPanel.show(from: anchor, in: controller, host: host, lane: host.cardFrame, receding: [sidebar.list])
+    }
+
     /// Puts the panel away. Without the slide for a pick, so its window can come forward at once.
     func hide(animated: Bool = true) {
         stopDeciding(dismiss: true)
-        // The bar open over the screen goes with the panel.
+        // The bar and the downloads list open over the screen go with the panel.
         if isCommandBarOpen, let target { target.commandBar.dismiss(restoringFocus: false) }
+        if let host, DownloadsPanel.isOpen(in: host.window) { DownloadsPanel.closeCurrent() }
         followTimer?.invalidate()
         followTimer = nil
         guard isShowing else { return }
