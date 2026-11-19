@@ -158,6 +158,28 @@ struct GroupListingTests {
 
 }
 
+/// Settings' picture, taken for a tab's preview when you leave it.
+@MainActor
+struct SettingsSnapshotTests {
+    /// The picture is taken with the shadows off, since drawing them on the CPU froze Zigzag on Developer, and every
+    /// shadow is back as it was afterward.
+    @Test func snapshotLeavesShadowsAsTheyWere() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView?.wantsLayer = true
+        let settings = SettingsView(pane: .general)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        window.contentView?.addSubview(settings)
+        settings.layoutSubtreeIfNeeded()
+
+        let shadowed = SettingsView.shadowedLayers(in: settings)
+        let before = shadowed.map(\.shadowOpacity)
+        try #require(!shadowed.isEmpty, "General has switches, whose knobs have shadows")
+        let image = try #require(settings.snapshot())
+        #expect(image.size == settings.bounds.size)
+        #expect(shadowed.map(\.shadowOpacity) == before)
+    }
+}
+
 /// Find a setting, in Settings' header.
 @MainActor
 struct SettingsSearchTests {
