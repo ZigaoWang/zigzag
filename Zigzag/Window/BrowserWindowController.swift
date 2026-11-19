@@ -2274,8 +2274,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let onRight = root.sidebarOnRight
         let barShown = root.barOnScreen
         // Autohide has put the bar away: over the page, on the line an installed app puts its own, where the page's
-        // title bar would be (#358, #359). With Autohide off that only happens with the sidebar hidden.
-        let overPage = !fullScreen && !barShown && (root.barHoldsAddress || (!docked && !floating))
+        // title bar would be (#358, #359). With Autohide off that only happens with the sidebar hidden. A sidebar
+        // docked on the left keeps them in its own top row, level with its toggle, the bar there or not.
+        let overPage = !fullScreen && !barShown && ((root.barHoldsAddress && onRight) || (!docked && !floating))
         let barKeepsLights = onRight && root.barHoldsAddress
         let inBar = barShown && (root.barHoldsAddress || (!docked && !floating))
         let room = fullScreen || barKeepsLights ? 0 : window.trafficLightsWidth
