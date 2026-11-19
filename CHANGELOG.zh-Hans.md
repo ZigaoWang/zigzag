@@ -22,6 +22,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 弹出窗口在“保持置顶”旁边多了“拷贝链接”和“在新标签页中打开”。点“在新标签页中打开”或按 ⌘O，页面会在打开它的窗口里变成一个标签页，放在它登录时所用资料的空间里，弹出窗口随之关闭；登录用的弹出窗口不会自己变，除非你把它移过去。点按地址会选中完整地址方便拷贝，右键点按地址有“拷贝链接”。重新载入、查找、缩放、前进后退、⇧⌘C 和网页检查器在弹出窗口里也能用了。
 - “设置 › 外观”里的“边栏放在右侧”开关换成了“边栏位置”菜单，可以选左侧或右侧，一眼就知道边栏在哪边。“显示 › 将边栏移到右侧”和“将边栏移到左侧”照旧。感谢 [Lakeland97](https://github.com/Lakeland97)。([#360](https://github.com/ZigaoWang/zigzag/issues/360))
 - “设置 › 通用”里每个已安装的 App 都多了一个“打开”按钮，就在“在‘访达’中显示”前面。和点按它的程序坞图标一样，会打开这个 App；窗口已经开着的话就把它带到前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#355](https://github.com/ZigaoWang/zigzag/issues/355))
+- 边栏的边缘和分屏页面之间的分隔线更容易抓住了：指针在分隔线两侧几个点内就能拖动，并显示调整大小的指针，边栏里标签页行旁边的空白处也算在内。覆盖在网页滚动条上的部分更少，拖动时分隔线从原来的位置开始移动，不会一下跳到指针那里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#362](https://github.com/ZigaoWang/zigzag/issues/362))
 
 ### 修复
 - 按住 ⇧ 点链接仍然交给网页处理，所以在一排本身是链接的行上按住 ⇧ 选取一段，和以前一样好用；但网页如果随后把当前标签页送到这个链接，比如 GitHub 的文件列表，它会在“速览”卡片中打开，不再移动当前标签页。按住 ⌥ 也一样：网页原本会跳转的链接改为下载。感谢 [Lakeland97](https://github.com/Lakeland97)。([#322](https://github.com/ZigaoWang/zigzag/issues/322))
@@ -48,6 +49,9 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 发送到服务的下载规则，现在先写地址，方法放在后面的括号里，比如“以 .torrent 结尾的文件交给 127.0.0.1（load.start）”，不再是“load.start · 127.0.0.1”。网页上方的提示也这样写，规则下面网站保留的选择显示为“youtube.com：转交”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#367](https://github.com/ZigaoWang/zigzag/issues/367))
 - “网站设置”和“设置 › 隐私 › 网站”里的全屏开关改名为“全屏时留在窗口内”，不再叫“全屏幕只填满网页”；“网站设置”里开关下面会写明现在在这个网站上会怎样：“视频只铺满网页，不占满屏幕”或“视频铺满整个屏幕”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#385](https://github.com/ZigaoWang/zigzag/issues/385))
 - 密码扩展可以从自己的弹出窗口填写网站自身的登录框（HTTP 基本认证）了。以前 Zigzag 的登录框出现后，再在扩展里选登录信息不会有任何反应；现在登录框还开着时，第一个由扩展给出的用户名和密码会直接登录并关掉登录框。感谢 [Tuszy42](https://github.com/Tuszy42)。([#387](https://github.com/ZigaoWang/zigzag/issues/387))
+- 扩展在 Peek 里的网页上和在标签页里一样好用了。以前 Peek 里的网页对扩展来说不算标签页，像 SponsorBlock 这样的扩展能在网页上运行，却收不到后台的回复，也不知道自己在哪个标签页里。现在它是所在窗口的一个标签页，Peek 打开时就是当前标签页，打开、变化和关闭时扩展都会知道；“作为标签页打开”后仍是同一个标签页。在无痕浏览窗口中，只有你允许的扩展能看到它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#374](https://github.com/ZigaoWang/zigzag/issues/374))
+- 同一个网站在每个标签页、固定标签页、收藏和 Zigzag Mini 里显示的图标都一样了。以前两个 GitHub 标签页可能一个显示章鱼猫，另一个显示 GitHub 的圆角主屏幕图标，取决于哪个先加载。现在网站自己的图标总是优先于主屏幕图标，主屏幕图标只在网站没有自己的图标时才用；网页换了图标（比如 GitHub 在深色模式下会换），标签页上的图标也会跟着换。([#386](https://github.com/ZigaoWang/zigzag/issues/386))
+- 在边栏里选中几个标签页后按住 Delete 键，只会关闭它们一次，剩下的按键不会再传到网页里，以免删掉文本框里的文字。边栏里的 Delete 键只对用 ⌘ 或 ⇧ 点按选中的行起作用；普通点按一个标签页后，按键仍然交给网页，要关闭它请按 ⌘W。感谢 [Lakeland97](https://github.com/Lakeland97)。([#375](https://github.com/ZigaoWang/zigzag/issues/375))
 
 ## [0.9.3] - 2026-11-18
 
