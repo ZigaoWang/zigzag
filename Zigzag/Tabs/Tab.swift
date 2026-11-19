@@ -1515,6 +1515,9 @@ final class Tab: NSObject {
     /// The title waiting to go into History, a moment after the page last changed it.
     private var titleWrite: DispatchWorkItem?
 
+    /// The page changed its icon links (a light or dark swap): read them again.
+    func pageIconsChanged() { refreshFavicon() }
+
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url else { return }
         // Error pages keep the warning.

@@ -85,6 +85,7 @@ enum WebKitSetup {
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
             configuration.userContentController.add(ScrollMessages.shared, contentWorld: .defaultClient, name: ScrollMessages.messageName)
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagLinkClick")
+            configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagIcons")
             configuration.userContentController.addUserScript(PasswordCapture.script)
             configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
             configuration.userContentController.addUserScript(Autofill.script)
@@ -172,8 +173,27 @@ enum PageScripts {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
         [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark,
-         modifiedLinkClicks, ScrollMessages.script]
+         modifiedLinkClicks, ScrollMessages.script, iconWatch]
     }
+
+    /// Tells the browser when the page changes its icon links, as GitHub does for dark mode, so the tab's icon follows (#386).
+    static let iconWatch = WKUserScript(source: """
+    (() => {
+      if (!/^https?:$/.test(location.protocol)) return;
+      const isIcon = (n) => n && n.localName === 'link' && /icon/i.test(n.getAttribute('rel') || '');
+      let timer = 0;
+      const tell = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => { try { window.webkit.messageHandlers.zigzagIcons.postMessage(''); } catch (e) {} }, 300);
+      };
+      const watch = () => {
+        new MutationObserver((changes) => {
+          if (changes.some((c) => isIcon(c.target) || [...c.addedNodes, ...c.removedNodes].some(isIcon))) tell();
+        }).observe(document.head || document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['href', 'rel', 'sizes', 'type'] });
+      };
+      if (document.head) watch(); else document.addEventListener('DOMContentLoaded', watch, { once: true });
+    })();
+    """, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: .defaultClient)
 
     /// ⌘-click on a web link is stopped before the page (#317); ⇧ and ⌥ reach the page and are reported, so the
     /// page's navigation right after becomes Peek or a download (#322).
@@ -337,6 +357,9 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
             guard let body = message.body as? [String: Any], let text = body["url"] as? String,
                   let url = URL(string: text) else { return }
             tab.modifiedClickFollowed(url, peek: body["shift"] as? Bool == true, download: body["alt"] as? Bool == true)
+        case "zigzagIcons":
+            guard message.frameInfo.isMainFrame, webView.owner === tab else { return }
+            tab.pageIconsChanged()
         default:
             break
         }

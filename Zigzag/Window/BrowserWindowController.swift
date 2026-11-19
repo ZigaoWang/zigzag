@@ -57,6 +57,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// A playing video you've left, in a small card over the page.
     lazy var miniPlayer = MiniPlayer(controller: self)
     var peekController: PeekController? { peek }
+    /// The page in this window's Peek, while it's up.
+    var peekedTab: Tab? { peek.tab }
 
     init(tabManager: TabManager, frame: NSRect?, sidebarVisible: Bool = true, sidebarWidth: CGFloat = Tokens.Metric.sidebarWidth) {
         self.tabManager = tabManager
