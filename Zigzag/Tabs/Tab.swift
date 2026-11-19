@@ -162,8 +162,7 @@ final class Tab: NSObject {
     var isPeek = false {
         didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
     }
-    /// The ⇧ or ⌥ click a navigation may have followed (a page's own router after such a click), until it is one or
-    /// the moment passes. See `modifiedClickFollowed`.
+    /// The last ⇧ or ⌥ link click the page kept, for its own navigation right after (#322).
     var followedClick: (url: URL, activation: LinkActivation, at: Date)?
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore? { didSet { if privateStore !== oldValue { refreshChosenIcon() } } }
@@ -1622,8 +1621,7 @@ extension Tab: WKNavigationDelegate {
         // Only a link to the web opens elsewhere (a tab, a card): one to a file or a script stays the page's to try,
         // where WebKit holds it to what the page may reach.
         let toTheWeb = Self.route(forPageLink: url, from: self.url) == .load
-        // A ⇧ or ⌥ click the page was left to act on, whose link the page is sending this tab to right after. A link
-        // WebKit follows itself carries its modifier, so the click is settled there and the mark is cleared.
+        // A page navigation to the link a ⇧ or ⌥ click was just on is that click's; a real link click clears the mark.
         if isLinkClick { followedClick = nil }
         let followed = isMainFrame && toTheWeb && navigationAction.navigationType == .other ? followedActivation(for: url) : nil
         if (isLinkClick || followed != nil) && isMainFrame && toTheWeb {
@@ -1631,8 +1629,7 @@ extension Tab: WKNavigationDelegate {
             let activation = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: isMainFrame,
                                                  modifiers: flags, buttonNumber: navigationAction.buttonNumber,
                                                  followed: followed)
-            // A site you chose a space for opens there (#286): a click, or a link to a new tab. Not a peek (⇧) or a
-            // download (⌥), and never what the page does on its own — nor a ⇧ or ⌥ click the page was left to act on.
+            // Site routes (#286) apply to clicks and new-tab links; not peek (⇧), download (⌥) or page-initiated.
             let opensTab = activation.isNewTab
             if followed == nil, userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
                host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
@@ -1679,17 +1676,10 @@ extension Tab: WKNavigationDelegate {
         return (.allow, preferences)
     }
 
-    /// What a click on a link opens here, before a host window opens anything: the modifier it carried decides, as
-    /// in Chrome and Safari. ⌘ opens a new tab (⇧⌘ one you go to), ⇧ peeks, ⌥ downloads, and a plain click, a frame's
-    /// link or anything the page started itself is the page's own navigation.
-    ///
-    /// A ⇧ or ⌥ click is left to the page, so range-select on a row that is a real link still works. What the page
-    /// does with it comes back as `followed`: `PageScripts.modifiedLinkClicks` says which link such a click was on,
-    /// and a page navigation to that same link a moment later — GitHub's router, say — is that click's, not the
-    /// page's own. Only ⌘ is taken from the page outright (#317, #322).
+    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Peek, ⌥ download, else the
+    /// page. `followed` is a ⇧ or ⌥ click the page kept and then navigated to itself.
     enum LinkActivation: Equatable {
         case page, peek, download
-        /// A tab of its own, in front (⇧⌘) or behind (⌘).
         case newTab(inFront: Bool)
 
         var isNewTab: Bool { if case .newTab = self { true } else { false } }
@@ -1699,29 +1689,25 @@ extension Tab: WKNavigationDelegate {
                                            buttonNumber: Int, followed: LinkActivation? = nil) -> LinkActivation {
         guard isMainFrame else { return .page }
         if type == .linkActivated {
-            // A middle click opens a tab of its own, as ⌘ does. ⌘ comes first: ⌥ with it still opens a tab, as in Chrome.
+            // ⌘ wins over ⌥, as in Chrome.
             if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }
-            // WebKit follows a link the page left to it with its modifier: ⇧ peeks, ⌥ downloads.
             if modifiers.contains(.shift) { return .peek }
             if modifiers.contains(.option) { return .download }
             return .page
         }
-        // The page went somewhere itself, right after one of its links was ⇧- or ⌥-clicked: that click's.
         return followed ?? .page
     }
 
-    /// How long after a ⇧ or ⌥ click a navigation still counts as that click's: a page's router answers at once, and
-    /// a navigation of its own a minute later is not the click.
+    /// How long after a ⇧ or ⌥ click the page's navigation still counts as that click's.
     static let followedClickWindow: TimeInterval = 2
 
-    /// Reported by our page script: a ⇧ or ⌥ click landed on `url` and the page has it. If the page sends this tab
-    /// there within `followedClickWindow`, that navigation becomes the Peek or the download the click asked for.
+    /// From the page script: a ⇧ or ⌥ click landed on `url` and the page kept it.
     func modifiedClickFollowed(_ url: URL, peek: Bool, download: Bool) {
         let activation: LinkActivation = peek ? .peek : download ? .download : .page
         followedClick = activation == .page ? nil : (url, activation, Date())
     }
 
-    /// The click `url` follows, taken once: the same link, within the window, and nothing else.
+    /// The kept click `url` follows, taken once: same link, within the window.
     func followedActivation(for url: URL?) -> LinkActivation? {
         guard let clicked = followedClick, let url, Date().timeIntervalSince(clicked.at) < Self.followedClickWindow,
               Self.sameAddress(clicked.url, url) else { return nil }

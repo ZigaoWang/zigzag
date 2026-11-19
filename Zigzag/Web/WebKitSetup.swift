@@ -174,12 +174,12 @@ enum PageScripts {
          modifiedLinkClicks]
     }
 
-    /// ⌘ is the browser's and the page never hears it (#317); ⇧ and ⌥ are the page's, and only the navigation it makes right after one is taken (#322).
+    /// ⌘-click on a web link is stopped before the page (#317); ⇧ and ⌥ reach the page and are reported, so the
+    /// page's navigation right after becomes Peek or a download (#322).
     static let modifiedLinkClicks = WKUserScript(source: """
     (() => {
       if (!/^https?:$/.test(location.protocol)) return;
-      // The link the click is on, to the web: never one in text being edited, one to download or one to this page's
-      // own heading.
+      // The web link clicked, unless it's editable, a download or a same-page anchor.
       const target = (e) => {
         const link = e.composedPath().find((n) => n instanceof Element && (n.localName === 'a' || n.localName === 'area') &&
                                               (n.hasAttribute('href') || n.hasAttribute('xlink:href')));
