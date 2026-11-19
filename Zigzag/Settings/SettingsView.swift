@@ -3415,7 +3415,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let title = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? String(localized: "Untitled Rule", comment: "A download rule with no name yet.")
             : name
-        return (title, "\(answer) · \(sites)")
+        return (title, String(localized: "\(sites): \(answer)", comment: "Under a download rule in Settings › Downloads: the sites, then the answer kept for them, like “youtube.com: Hand Off”."))
     }
 
     /// Answered sites grouped by answer in the prompt's order (handed off, browser, refused), empty groups dropped.

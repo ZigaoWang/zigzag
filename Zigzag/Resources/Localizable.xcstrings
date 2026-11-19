@@ -47,7 +47,7 @@
       }
     },
     "%@ (%@)" : {
-      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.",
+      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.\nWhere a download rule sends links: the service's address, then its method in parentheses, like “127.0.0.1 (load.start)”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -929,7 +929,7 @@
       }
     },
     "%@: %@" : {
-      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.",
+      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.\nUnder a download rule in Settings › Downloads: the sites, then the answer kept for them, like “youtube.com: Hand Off”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -24001,7 +24001,7 @@
       }
     },
     "sent this link to %@" : {
-      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.",
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like 127.0.0.1 (aria2.addUri).",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
