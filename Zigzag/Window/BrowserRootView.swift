@@ -773,23 +773,25 @@ final class BrowserRootView: SpaceFrameView {
     static let borderlessChanged = Notification.Name("BorderlessPageChanged")
 
     /// Back, forward, reload and the address in a bar above the page instead of at the top of the sidebar, as in Arc
-    /// (#359): never there (`off`), there until you scroll down (`autohide`), or always (`always`). The old switch's
-    /// `addressAbovePage` true is an `always`, read once and written in the new key.
+    /// (#359): never there (`off`), there until you scroll down (`autohide`), or always (`always`). Until it's chosen,
+    /// the old switch's `addressAbovePage` on is an `always`.
     static var addressBarPlace: AddressBarPlace {
-        get {
-            if let raw = UserDefaults.standard.string(forKey: "addressBarPlace"), let place = AddressBarPlace(rawValue: raw) {
-                return place
-            }
-            let place: AddressBarPlace = UserDefaults.standard.bool(forKey: "addressAbovePage") ? .always : .off
-            UserDefaults.standard.set(place.rawValue, forKey: "addressBarPlace")
-            UserDefaults.standard.removeObject(forKey: "addressAbovePage")
-            return place
-        }
+        get { addressBarPlace(in: .standard) }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "addressBarPlace")
-            UserDefaults.standard.removeObject(forKey: "addressAbovePage")
+            setAddressBarPlace(newValue, in: .standard)
             NotificationCenter.default.post(name: addressPlaceChanged, object: nil)
         }
+    }
+
+    static func addressBarPlace(in defaults: UserDefaults) -> AddressBarPlace {
+        if let raw = defaults.string(forKey: "addressBarPlace"), let place = AddressBarPlace(rawValue: raw) { return place }
+        return defaults.bool(forKey: "addressAbovePage") ? .always : .off
+    }
+
+    /// The old switch is still written, on for Autohide and Always, so an older Zigzag keeps the bar where it was.
+    static func setAddressBarPlace(_ place: AddressBarPlace, in defaults: UserDefaults) {
+        defaults.set(place.rawValue, forKey: "addressBarPlace")
+        defaults.set(place != .off, forKey: "addressAbovePage")
     }
     static let addressPlaceChanged = Notification.Name("AddressPlaceChanged")
 

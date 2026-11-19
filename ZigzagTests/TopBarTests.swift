@@ -723,4 +723,18 @@ struct TopBarTests {
         root.setBarPutAway(true, animated: false)
         #expect(!root.barPutAway)
     }
+
+    @Test func theOldSwitchIsAlwaysAndStillWrittenForAnOlderZigzag() throws {
+        let name = "TopBarTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(BrowserRootView.addressBarPlace(in: defaults) == .off)
+        defaults.set(true, forKey: "addressAbovePage")
+        #expect(BrowserRootView.addressBarPlace(in: defaults) == .always)
+        BrowserRootView.setAddressBarPlace(.autohide, in: defaults)
+        #expect(BrowserRootView.addressBarPlace(in: defaults) == .autohide)
+        #expect(defaults.bool(forKey: "addressAbovePage"))
+        BrowserRootView.setAddressBarPlace(.off, in: defaults)
+        #expect(defaults.object(forKey: "addressAbovePage") as? Bool == false)
+    }
 }
