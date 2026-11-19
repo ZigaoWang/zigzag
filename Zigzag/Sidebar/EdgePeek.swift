@@ -74,6 +74,7 @@ final class EdgePeek {
         guard let panel, let card else { return }
         self.controller = controller
         self.tab = tab
+        controller.setEdgePeek(tab.id)
         _ = tab.ensureWebView()
         guard let holder = tab.pageHolder, let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else { return }
         // The page moves, not a copy: the same holder the pane has, so form state, scroll and media carry.
@@ -184,6 +185,7 @@ final class EdgePeek {
         if let tab { restore(tab) }
         token = nil
         tab = newTab
+        controller?.setEdgePeek(newTab.id)
         _ = newTab.ensureWebView()
         guard let holder = newTab.pageHolder else { close(); return }
         origin = holder.superview
@@ -316,6 +318,7 @@ final class EdgePeek {
     }
 
     private func teardown() {
+        controller?.setEdgePeek(nil)
         isVisible = false
         token = nil
         self.tab = nil

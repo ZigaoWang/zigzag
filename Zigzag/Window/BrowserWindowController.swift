@@ -3483,6 +3483,11 @@ extension BrowserWindowController: CommandBarHost {
 extension BrowserWindowController {
     /// The whole sidebar the hot screen edge brings out: the window's own sidebar, mirrored. Made once, on first use,
     /// and kept live from then on. It is never the window's sidebar, so nothing in the window moves or changes.
+    /// The row the peek popout came from: a temporary highlight, not a selection change.
+    func setEdgePeek(_ id: UUID?) {
+        edgeSidebarForDisplay().sidebar.list.setPeek(id)
+    }
+
     func edgeSidebarForDisplay() -> (sidebar: SidebarView, container: SidebarContainer) {
         if let edgeSidebar, let edgeContainer { return (edgeSidebar, edgeContainer) }
         let mirror = SidebarView(frame: .zero)

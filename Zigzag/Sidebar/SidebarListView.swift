@@ -159,6 +159,14 @@ final class SidebarListView: NSView {
     weak var delegate: SidebarListDelegate?
     /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
     var spaceOverride: UUID?
+    /// The tab the peek popout is showing: a temporary highlight, separate from the browser's selection.
+    var peekTabID: UUID?
+
+    func setPeek(_ id: UUID?) {
+        guard peekTabID != id else { return }
+        peekTabID = id
+        reload(animated: false)
+    }
     /// In a private window, the header says "Private" instead of the space name.
     var privateLabel = false
     private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
@@ -1116,6 +1124,7 @@ final class SidebarListView: NSView {
             row.configure(partners: partners)
             row.partnerLeads = partners.count == 1 && manager.split(for: tab)?.left == partner?.id
             row.isSelected = tab === selected || partners.contains { $0 === selected }
+            row.isPeeked = tab.id == peekTabID || partners.contains { $0.id == peekTabID }
             row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
             // The pane zoomed over the rest: its part of the row is lit (#160).
             row.zoomedPart = zoomedTabID.flatMap { zoomed in row.pages.firstIndex { $0.id == zoomed } }

@@ -14,6 +14,8 @@ class SidebarRowView: InteractiveView {
 
     /// Set while the list's sliding card travels to this row: the row draws no card of its own until it lands.
     var holdsCardBack = false { didSet { if oldValue != holdsCardBack { stateDidChange(animated: false) } } }
+    /// The tab the peek popout is showing: a temporary wash, separate from the selected row.
+    var isPeeked = false { didSet { if oldValue != isPeeked { stateDidChange(animated: false) } } }
     /// Picked with ⌘ or ⇧ along with others, to drag or act on together.
     var isMarked = false { didSet { if oldValue != isMarked { stateDidChange(animated: true) } } }
     /// A pinned page that's open: a fine edge, as on a favorite's tile, so you can tell which are loaded.
@@ -74,6 +76,8 @@ class SidebarRowView: InteractiveView {
         let showsCard = (isSelected && !holdsCardBack) || isLifted
         if showsCard {
             base = isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card
+        } else if isPeeked {
+            base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.2 : 0.14)
         } else if isMarked {
             base = Brand.Theme.for(self).accent.withAlphaComponent(isHovered ? 0.26 : 0.2)
         } else if isSelected {
