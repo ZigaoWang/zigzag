@@ -390,11 +390,60 @@ struct BookmarkFolderTests {
         #expect(try !keeps([cell], root: root, view: "{ scale: 1, pageLeft: 0, width: 832 }", deltaX: 12))
     }
 
+    @Test func swipeScriptLeavesAPageAFewPixelsOffAlone() throws {
+        // Nudged a pixel or two by a diagonal scroll: back still goes back.
+        let nudged = "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 3, style: {} }"
+        #expect(try !keeps([cell], root: nudged, deltaX: -12))
+        // Right to left, at its start on the right, 10 pixels too wide: back goes back, forward too.
+        let rtl = "{ scrollWidth: 1010, clientWidth: 1000, scrollLeft: 0, style: { direction: 'rtl' } }"
+        #expect(try !keeps([cell], root: rtl, deltaX: -12))
+        #expect(try !keeps([cell], root: rtl, deltaX: 12))
+        // Scrolled along to its left end, it has room behind it, on the right.
+        let rtlAlong = "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: -40, style: { direction: 'rtl' } }"
+        #expect(try keeps([cell], root: rtlAlong, deltaX: 12))
+        #expect(try !keeps([cell], root: rtlAlong, deltaX: -12))
+        // A really wide one keeps the way it can scroll, either way scrollLeft counts.
+        let wide = "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 0, style: { direction: 'rtl' } }"
+        #expect(try keeps([cell], root: wide, deltaX: -12))
+        #expect(try !keeps([cell], root: wide, deltaX: 12))
+        let legacy = "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 2000, style: { direction: 'rtl' } }"
+        #expect(try keeps([cell], root: legacy, deltaX: -12))
+        #expect(try !keeps([cell], root: legacy, deltaX: 12))
+        // An element right to left, at its start, a few pixels too wide.
+        let box = "{ scrollWidth: 810, clientWidth: 800, scrollLeft: 0, style: { overflowX: 'auto', direction: 'rtl' } }"
+        #expect(try !keeps([cell, box], deltaX: -12))
+    }
+
+    @Test func swipeScriptSkipsAPageThatHidesItsSidewaysScroll() throws {
+        // overflow-x: hidden on the root or the body: the page can't be scrolled sideways, so back goes back.
+        let along = "{ scrollWidth: 1400, clientWidth: 1000, scrollLeft: 200, style: {} }"
+        #expect(try !keeps([cell], root: along, ends: "[{ style: { overflowX: 'hidden' } }, { style: {} }]", deltaX: -12))
+        #expect(try !keeps([cell], root: along, ends: "[{ style: {} }, { style: { overflowX: 'hidden' } }]", deltaX: -12))
+        #expect(try !keeps([cell], root: along, ends: "[{ style: { overflowX: 'clip' } }, { style: {} }]", deltaX: 12))
+        // The body's own overflow doesn't count once the root scrolls itself.
+        #expect(try keeps([cell], root: along, ends: "[{ style: { overflowX: 'auto' } }, { style: { overflowX: 'hidden' } }]", deltaX: -12))
+        // Pinched in, the visible part still pans.
+        let view = "{ scale: 2, pageLeft: 200, width: 500 }"
+        #expect(try keeps([cell], root: along, ends: "[{ style: { overflowX: 'hidden' } }, { style: {} }]", view: view, deltaX: -12))
+    }
+
+    @Test func aFlickIsMeasuredUpToTheRelease() {
+        // 20 points every 8 ms toward back: 2500 points a second.
+        let samples: [(time: TimeInterval, dx: CGFloat)] = (0..<8).map { (time: 1 + Double($0) * 0.008, dx: CGFloat($0) * 20) }
+        let last = samples[7].time
+        #expect(abs(SwipeDecision.speed(samples, at: last, direction: -1) - 2500) < 1)
+        #expect(SwipeDecision.speed(samples, at: last, direction: 1) < 0)
+        // Fingers that stopped before letting go aren't flicking.
+        #expect(SwipeDecision.speed(samples, at: last + SwipeDecision.flickWindow * 2, direction: -1) == 0)
+        #expect(SwipeDecision.speed([], at: last, direction: -1) == 0)
+    }
+
     @Test func swipeNeedsAThirdOfThePage() {
-        // A third of the page, within reason, as in Safari (#377).
-        #expect(SwipeDecision.distance(forWidth: 900) == 300)
+        // A third of a narrow page, at most 220 points however wide the window (#377).
+        #expect(SwipeDecision.distance(forWidth: 600) == 200)
+        #expect(SwipeDecision.distance(forWidth: 900) == 220)
         #expect(SwipeDecision.distance(forWidth: 300) == 160)
-        #expect(SwipeDecision.distance(forWidth: 2000) == 320)
+        #expect(SwipeDecision.distance(forWidth: 2000) == 220)
         // All the way, or a quick flick well started.
         #expect(SwipeDecision.commits(progress: 1, speed: 0))
         #expect(SwipeDecision.commits(progress: 0.5, speed: 1000))

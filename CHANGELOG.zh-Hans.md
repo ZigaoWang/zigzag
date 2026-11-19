@@ -32,7 +32,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “全部在标签页中打开”会把文件夹里的页面作为新标签页打开，放在新标签页该去的位置，而且都会马上开始加载，切过去时就已经好了。以前它是在原处打开固定标签页，看起来像什么都没发生。固定标签页保持不变，⌘Z 仍然会关掉这些新标签页。感谢 [mrfragger](https://github.com/mrfragger)。([#343](https://github.com/ZigaoWang/zigzag/issues/343))
 - 在设置为总是显示滚动条的 Mac 上，速览里的滚动条重新变细，不再沿着卡片边缘出现一条宽宽的灰色滚动条。自己设置了滚动条样式的网页保持原样；滚动条只在滚动时显示的 Mac 上，以及在标签页里，网页仍用系统自己的滚动条，和 Safari 一样。
 - Peek 打开时，下面的页面不会再对鼠标指针有反应。以前在 Peek 卡片上移动指针，会让下面页面的链接被悬停、视频预览开始播放，底部显示的链接也可能是下面页面的；现在只有 Peek 里的页面能感知到指针，和在标签页里一样。感谢 [Lakeland97](https://github.com/Lakeland97)。([#374](https://github.com/ZigaoWang/zigzag/issues/374))
-- 用双指捏合放大网页后，或网页比窗口稍宽时，左右轻扫会先滚动网页，不再直接后退或前进。和 Safari 一样，只有轻扫开始时网页已经在边缘，才会后退或前进。后退和前进现在也要扫得更远，大约网页宽度的三分之一，或者快速一扫；箭头外圈会随着轻扫逐渐填满，松手前停下或扫回去就会取消。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
+- 用双指捏合放大网页后，或网页比窗口稍宽时，左右轻扫会先滚动网页，不再直接后退或前进。和 Safari 一样，只有轻扫开始时网页已经在边缘，才会后退或前进。后退和前进现在也要扫得更远，或者快速一扫；箭头外圈会随着轻扫逐渐填满，松手就会跳转时完全填满，松手前停下或扫回去就会取消。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - 弹出窗口里网页自己的“打印”按钮能用了，比如 Apple Store 发票上的那个；在弹出窗口、Zigzag Mini 和已安装的 App 里按 ⌘P 也能打印了。以前弹出窗口不响应网页的打印请求，“文件 › 打印”在这些窗口里也找不到要打印的页面，只会发出提示音。
 - 密码菜单里的“密码…”每次都能打开 Mac 的密码列表，点别处或按 Esc 就会关上。以前它可能刚打开就关掉，之后再也打不开，或者一直停在网页上，关了又冒出来。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 停在“设置 › 开发者”的标签页切换走时，Zigzag 不会再卡住一两秒了。之前标签页的预览会把每个功能标志的开关和阴影都画一遍，连滚到看不见的也一样，而且每一行都会把自己的开关量好几次。([#379](https://github.com/ZigaoWang/zigzag/issues/379)) 感谢 [hungraw](https://github.com/hungraw)。

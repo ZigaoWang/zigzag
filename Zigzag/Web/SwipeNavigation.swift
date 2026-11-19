@@ -58,6 +58,7 @@ final class SwipeNavigator {
     }
 
     isolated deinit {
+        recheck?.cancel()
         watchdog?.cancel()
         stopWatchingRest()
     }
@@ -122,14 +123,14 @@ final class SwipeNavigator {
                     direction = wanted
                     state = .tracking
                     showArrow()
-                    update()
+                    update(at: event.timestamp)
                     armWatchdog()
                     return true
                 }
             case .tracking:
                 // The page answered late that it scrolls this way: hand the swipe back.
                 if page == .took || pageTakes(direction) { cancel(); state = .ignoring; return false }
-                update()
+                update(at: event.timestamp)
                 armWatchdog()
                 return true
             default:
@@ -140,7 +141,7 @@ final class SwipeNavigator {
             watchdog?.cancel()
             stopWatchingRest()
             if wasTracking {
-                if event.phase == .ended, SwipeDecision.commits(progress: progress, speed: speed) { go() } else { cancel() }
+                if event.phase == .ended, SwipeDecision.commits(progress: progress, speed: speed(at: event.timestamp)) { go() } else { cancel() }
                 state = .finishing
             } else {
                 state = .idle
@@ -164,11 +165,8 @@ final class SwipeNavigator {
 
     private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / threshold }
 
-    /// How fast the fingers were going the swipe's way over its last tenth of a second, points a second.
-    private var speed: CGFloat {
-        guard let last = samples.last, let first = samples.first(where: { last.time - $0.time < 0.1 }),
-              last.time > first.time else { return 0 }
-        return CGFloat(-direction) * (last.dx - first.dx) / CGFloat(last.time - first.time)
+    private func speed(at now: TimeInterval) -> CGFloat {
+        SwipeDecision.speed(samples, at: now, direction: direction)
     }
 
     private func armWatchdog() {
@@ -220,7 +218,8 @@ final class SwipeNavigator {
         let x = point.x / zoom, y = (webView.isFlipped ? point.y : webView.bounds.height - point.y) / zoom
         let script = """
         (() => {
-          const el = document.elementFromPoint(\(x), \(y));
+          // Pinched in, the visible part starts that far into the page.
+          const v = window.visualViewport, el = document.elementFromPoint(\(x) + (v ? v.offsetLeft : 0), \(y) + (v ? v.offsetTop : 0));
           const room = (\(SwipeAnswers.sideways))(el, getComputedStyle, document.scrollingElement, [document.documentElement, document.body], window.visualViewport);
           return [room.left, room.right, !!el && /^(IFRAME|FRAME|EMBED|OBJECT)$/.test(el.tagName), room.still];
         })()
@@ -284,7 +283,8 @@ final class SwipeNavigator {
     }
     private static let maxShift: CGFloat = 72
 
-    private func update() {
+    /// `now`: when the fingers were last heard from, for how fast they're going.
+    private func update(at now: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         guard let webView, let arrow, let overlay = arrow.superview else { return }
         // The page follows the fingers a little, and the arrow waits in the gap that opens at its edge.
         let offset = shift * CGFloat(-direction)
@@ -295,14 +295,27 @@ final class SwipeNavigator {
         }
         let page = overlay.convert(webView.bounds, from: webView)
         arrow.frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
-        arrow.progress = min(progress, 1)
-        let nowArmed = progress >= 1
-        if nowArmed != armed {
-            armed = nowArmed
-            arrow.isArmed = nowArmed
-            if nowArmed { Haptics.snap() }
+        // Filled whenever letting go now would navigate, a quick flick short of the distance too.
+        let commits = SwipeDecision.commits(progress: progress, speed: speed(at: now))
+        arrow.progress = commits ? 1 : min(progress, 1)
+        if commits != armed {
+            armed = commits
+            arrow.isArmed = commits
+            if commits { Haptics.snap() }
         }
+        recheck?.cancel()
+        recheck = nil
+        // Armed by speed alone: fingers that stop there no longer flick, though no event says so.
+        guard commits, progress < 1 else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.state == .tracking else { return }
+            self.update()
+        }
+        recheck = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + SwipeDecision.flickWindow / 2, execute: work)
     }
+    /// Looks again at a swipe armed by its speed once the fingers may have stopped.
+    private var recheck: DispatchWorkItem?
 
     /// The page settles back into place: with the page it went to, or without, if let go too soon.
     private func settlePage() {
@@ -319,6 +332,8 @@ final class SwipeNavigator {
     }
 
     private func go() {
+        recheck?.cancel()
+        recheck = nil
         watchdog?.cancel()
         stopWatchingRest()
         // Let go after its tab went to the back: it isn't where you're looking, so it doesn't move.
@@ -332,6 +347,8 @@ final class SwipeNavigator {
     }
 
     private func cancel() {
+        recheck?.cancel()
+        recheck = nil
         watchdog?.cancel()
         stopWatchingRest()
         settlePage()
@@ -353,13 +370,25 @@ enum SwipeDecision: Equatable {
     /// What the page did with the gesture's sideways scrolls, as SwipeAnswers hears it.
     enum Page { case unknown, left, took }
 
-    /// How far a swipe on a page `width` wide goes before letting go navigates: a third of it, within reason.
-    static func distance(forWidth width: CGFloat) -> CGFloat { min(max(width / 3, 160), 320) }
+    /// How far a swipe on a page `width` wide goes before letting go navigates: a third of a narrow page, and no
+    /// more than 220 points on a wide one, since the fingers travel the same trackpad whatever the window's size.
+    static func distance(forWidth width: CGFloat) -> CGFloat { min(max(width / 3, 160), 220) }
 
     /// Whether letting go navigates, `progress` along `distance` and the fingers going at `speed` points a second
     /// the swipe's way: all the way, or a quick flick that got well started. Pulled back, it doesn't.
     static func commits(progress: CGFloat, speed: CGFloat) -> Bool {
         progress >= 1 || (progress >= 0.4 && speed > 700)
+    }
+
+    /// How far back a flick's speed is measured.
+    static let flickWindow: TimeInterval = 0.1
+
+    /// How fast the fingers were going `direction`'s way (-1 back, 1 forward) over the last `flickWindow` before
+    /// `now`, points a second, from `samples` of the scroll so far. Still for that long, they aren't going at all.
+    static func speed(_ samples: [(time: TimeInterval, dx: CGFloat)], at now: TimeInterval, direction: Int) -> CGFloat {
+        let recent = samples.filter { now - $0.time < flickWindow }
+        guard let first = recent.first, let last = recent.last, last.time > first.time else { return 0 }
+        return CGFloat(-direction) * (last.dx - first.dx) / CGFloat(last.time - first.time)
     }
 
     /// How long a swipe waits for the page to answer before going on without it. Pages answer well within this,
@@ -418,17 +447,29 @@ final class SwipeAnswers: NSObject, WKScriptMessageHandler {
     static let sideways = """
     (el, style, root, ends, view) => {
       let left = false, right = false, still = false;
-      // Room behind always counts; room ahead past `slack`, as a few pixels too wide is usually by accident (#377).
-      const room = (box, rtl, slack) => {
-        const max = box.scrollWidth - box.clientWidth, at = rtl ? max + box.scrollLeft : box.scrollLeft;
-        left = left || at > 0.5; right = right || (max > slack && at < max - 1);
+      // Room past `behind` toward where the box starts and past `ahead` toward its end: a box a few pixels too wide,
+      // or nudged a pixel or two by a diagonal scroll, is usually by accident (#377).
+      const room = (box, rtl, behind, ahead) => {
+        const max = box.scrollWidth - box.clientWidth;
+        if (!(max > 0)) return;
+        // Right to left, WebKit counts scrollLeft from 0 at the start down to -max; older engines from max down to 0.
+        const x = box.scrollLeft || 0, done = rtl ? (x > 0 ? max - x : -x) : x;
+        const back = done > behind, on = max > ahead && done < max - 1;
+        // The start is on the left, or on the right of a right-to-left box.
+        if (rtl) { right = right || back; left = left || on; } else { left = left || back; right = right || on; }
       };
+      const [top, body] = ends;
+      const rootX = top ? style(top).overflowX : 'visible';
+      // The body's overflow is the page's when the root leaves its own visible.
+      const pageX = rootX === 'visible' && body ? style(body).overflowX : rootX;
       for (; el; el = el.parentElement || (el.parentNode && el.parentNode.host) || null) {
         if (el.nodeType === 3) continue;
         const s = style(el);
         const scrollsX = /(auto|scroll|overlay)/.test(s.overflowX) && el.scrollWidth > el.clientWidth;
         const scrollsY = /(auto|scroll|overlay)/.test(s.overflowY) && el.scrollHeight > el.clientHeight;
-        if (scrollsX) room(el, s.direction === 'rtl', 24);
+        // The page's own scrolling is counted once, below.
+        const isPage = el === root || (el === body && rootX === 'visible');
+        if (scrollsX && !isPage) room(el, s.direction === 'rtl', 8, 24);
         // Something that scrolls and asked to keep its overscroll: the gesture never goes past it.
         if ((scrollsX || scrollsY) && /(none|contain)/.test(s.overscrollBehaviorX)) still = true;
       }
@@ -436,7 +477,7 @@ final class SwipeAnswers: NSObject, WKScriptMessageHandler {
       if (root && view && view.scale > 1.01) {
         left = left || view.pageLeft > 0.5;
         right = right || view.pageLeft + view.width < root.scrollWidth - 1;
-      } else if (root && root.scrollWidth > root.clientWidth) room(root, style(root).direction === 'rtl', 80);
+      } else if (root && !/(hidden|clip)/.test(pageX)) room(root, style(root).direction === 'rtl', 8, 80);
       // The page's own setting is what turns off going back and forward.
       for (const end of ends) if (end && /(none|contain)/.test(style(end).overscrollBehaviorX)) still = true;
       return { left, right, still };
