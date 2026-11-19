@@ -3609,8 +3609,12 @@ extension BrowserWindowController {
 
     /// A tab, favorite or page picked in the edge sidebar: its window comes forward on it, and the panel goes at once.
     private func pickFromEdgeSidebar(_ tab: Tab) {
-        EdgeSidebar.shared.picked()
-        // The page comes with it: a Peek over the app in front, not the browser window coming forward.
+        // The tab that is already out goes back in: the same click opens and closes the page.
+        if EdgePeek.shared.isVisible, EdgePeek.shared.tab === tab {
+            EdgePeek.shared.close()
+            return
+        }
+        // The page comes with it, beside the panel; the browser window does not come forward.
         EdgePeek.shared.show(tab: tab, from: self)
     }
 

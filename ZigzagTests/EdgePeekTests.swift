@@ -2,56 +2,43 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// The edge Peek's card on the screen: the window Peek's proportions, centered, never off the edge.
+/// The page beside the edge sidebar: the rest of the screen, its top and bottom the sidebar card's.
 @MainActor
 struct EdgePeekTests {
-    @Test func theCardSitsCenteredAndClearOfTheEdges() {
-        let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let card = EdgePeekLayout.frame(in: screen)
-        #expect(card.midX == screen.midX)
-        #expect(card.midY == screen.midY)
-        #expect(card.width < screen.width)
-        #expect(card.height < screen.height)
-        #expect(card.width > 0)
-        #expect(card.height > 0)
+    private let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
+
+    @Test func thePageFillsTheOtherSideOfARightSidebar() {
+        let sidebar = NSRect(x: 1160, y: 16, width: 264, height: 868)
+        let page = EdgePeekLayout.frame(attachedTo: sidebar, in: screen, onRight: true)
+        #expect(page.minX == screen.minX + Tokens.Space.x2)
+        #expect(page.maxX == sidebar.minX - Tokens.Space.x2)
+        #expect(page.minY == sidebar.minY)
+        #expect(page.height == sidebar.height)
+        #expect(page.width > 0)
     }
 
-    @Test func aSmallScreenStillGetsAPositiveCard() {
-        let screen = NSRect(x: 0, y: 0, width: 400, height: 300)
-        let card = EdgePeekLayout.frame(in: screen)
-        #expect(card.width > 0)
-        #expect(card.height > 0)
-        #expect(card.width <= screen.width)
-        #expect(card.height <= screen.height)
+    @Test func thePageFillsTheOtherSideOfALeftSidebar() {
+        let sidebar = NSRect(x: 16, y: 16, width: 264, height: 868)
+        let page = EdgePeekLayout.frame(attachedTo: sidebar, in: screen, onRight: false)
+        #expect(page.minX == sidebar.maxX + Tokens.Space.x2)
+        #expect(page.maxX == screen.maxX - Tokens.Space.x2)
+        #expect(page.minY == sidebar.minY)
+        #expect(page.height == sidebar.height)
+        #expect(page.width > 0)
     }
 
-    @Test func anOffsetScreenKeepsTheCardOnIt() {
-        let screen = NSRect(x: 1512, y: 0, width: 1280, height: 800)
-        let card = EdgePeekLayout.frame(in: screen)
-        #expect(screen.contains(card))
+    @Test func aNarrowScreenLeavesAPositivePage() {
+        let small = NSRect(x: 0, y: 0, width: 300, height: 300)
+        let sidebar = NSRect(x: 290, y: 10, width: 10, height: 280)
+        let page = EdgePeekLayout.frame(attachedTo: sidebar, in: small, onRight: true)
+        #expect(page.width >= 0)
+        #expect(page.height >= 0)
     }
 
-    @Test func aRememberedFrameStaysWholeOnTheScreen() {
-        let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let offEdge = NSRect(x: 1300, y: 850, width: 600, height: 400)
-        let fitted = EdgePeekLayout.fit(offEdge, in: screen)
-        #expect(screen.contains(fitted))
-        #expect(fitted.width == 600)
-        #expect(fitted.height == 400)
-    }
-
-    @Test func aTinyRememberedFrameGrowsToTheMinimum() {
-        let screen = NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let tiny = NSRect(x: 100, y: 100, width: 50, height: 40)
-        let fitted = EdgePeekLayout.fit(tiny, in: screen)
-        #expect(fitted.width == EdgePeekLayout.minimumSize.width)
-        #expect(fitted.height == EdgePeekLayout.minimumSize.height)
-    }
-
-    @Test func aFrameLargerThanTheScreenIsCutToIt() {
-        let screen = NSRect(x: 0, y: 0, width: 800, height: 600)
-        let large = NSRect(x: -100, y: -50, width: 1200, height: 1000)
-        let fitted = EdgePeekLayout.fit(large, in: screen)
-        #expect(fitted == screen)
+    @Test func anOffsetScreenKeepsThePageOnIt() {
+        let offset = NSRect(x: 1512, y: 0, width: 1280, height: 800)
+        let sidebar = NSRect(x: 1512 + 1000, y: 16, width: 264, height: 768)
+        let page = EdgePeekLayout.frame(attachedTo: sidebar, in: offset, onRight: true)
+        #expect(offset.contains(page))
     }
 }

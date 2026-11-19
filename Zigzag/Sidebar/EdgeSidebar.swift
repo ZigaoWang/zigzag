@@ -78,6 +78,8 @@ final class EdgeSidebar {
     private var reveal = SidebarEdgeReveal()
     /// Whether the panel is out now (or on its way back in).
     private(set) var isShowing = false
+    /// The Peek's page is attached beside it: the pointer being over the page is not the pointer leaving.
+    private var holdsForPeek = false
     /// The visible frame of the screen the panel is on, while it's out.
     private var shownScreen: NSRect?
     private var decideTimer: Timer?
@@ -144,6 +146,21 @@ final class EdgeSidebar {
 
     /// A tab, favorite or other action picked in the panel: it goes at once, and its window comes forward.
     func picked() { hide(animated: false) }
+
+    /// The Peek keeps the panel out while its page is attached, whatever the pointer does.
+    func holdForPeek(_ hold: Bool) { holdsForPeek = hold }
+
+    /// The panel's window, so the Peek can tell a click on the sidebar from a click outside.
+    var panelWindow: NSWindow? { panel }
+
+    /// The panel is along the screen's right edge; the page attaches on the other side of it.
+    var panelOnRight: Bool { sideIsRight }
+
+    /// The sidebar card's frame on screen: the page sits beside its inner edge.
+    var sidebarCardScreenFrame: NSRect? {
+        guard let panel, let host else { return nil }
+        return panel.convertToScreen(host.convert(host.cardFrame, to: nil))
+    }
 
     /// The last browser window to become key: what the edge brings out from now on.
     func noteFocused(_ controller: BrowserWindowController) {
@@ -239,6 +256,8 @@ final class EdgeSidebar {
 
     private func follow() {
         guard isShowing, let visible = shownScreen, let zone = zone(in: visible) else { return }
+        // The page is attached beside the panel: the pointer is over the page, not the panel, and the panel stays.
+        guard !holdsForPeek else { return }
         // Zigzag came forward, or the window's sidebar came out: the panel has nothing left to show.
         guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront) else {
             hide()
@@ -357,6 +376,7 @@ final class EdgeSidebar {
     /// Puts the panel away. Without the slide for a pick, so its window can come forward at once.
     func hide(animated: Bool = true) {
         stopDeciding(dismiss: true)
+        holdsForPeek = false
         // The bar and the downloads list open over the screen go with the panel.
         if isCommandBarOpen, let target { target.commandBar.dismiss(restoringFocus: false) }
         if let host, DownloadsPanel.isOpen(in: host.window) { DownloadsPanel.closeCurrent() }

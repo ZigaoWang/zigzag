@@ -1,29 +1,25 @@
 import AppKit
 import WebKit
 
-/// Where the edge Peek's card sits on a screen: the window Peek's proportions, on the screen's visible frame instead
-/// of a browser card.
+/// Where the edge Peek's page sits: the rest of the screen beside the sidebar, its top and bottom the sidebar card's.
 enum EdgePeekLayout {
-    /// The smallest the card may be dragged to: the header and a page worth reading.
-    static let minimumSize = NSSize(width: 420, height: 320)
-
-    static func frame(in screen: NSRect) -> NSRect {
-        let dx = max(Tokens.Space.x8, Tokens.Space.snap(screen.width * Tokens.Metric.peekInsetRatio))
-        let dy = max(Tokens.Space.x6, Tokens.Space.snap(screen.height * Tokens.Metric.peekInsetRatio * 0.6))
-        return screen.insetBy(dx: dx, dy: dy)
-    }
-
-    /// A frame the person moved or resized, kept whole on the screen the card opens on.
-    static func fit(_ frame: NSRect, in screen: NSRect) -> NSRect {
-        let width = min(max(frame.width, minimumSize.width), screen.width)
-        let height = min(max(frame.height, minimumSize.height), screen.height)
-        let x = min(max(frame.minX, screen.minX), screen.maxX - width)
-        let y = min(max(frame.minY, screen.minY), screen.maxY - height)
-        return NSRect(x: x, y: y, width: width, height: height)
+    static func frame(attachedTo sidebar: NSRect, in screen: NSRect, onRight: Bool) -> NSRect {
+        let gap = Tokens.Space.x2
+        let inset = Tokens.Space.x2
+        let bottom = max(sidebar.minY, screen.minY + inset)
+        let top = min(sidebar.maxY, screen.maxY - inset)
+        let height = max(0, top - bottom)
+        if onRight {
+            let x = screen.minX + inset
+            return NSRect(x: x, y: bottom, width: max(0, sidebar.minX - gap - x), height: height)
+        }
+        let x = sidebar.maxX + gap
+        return NSRect(x: x, y: bottom, width: max(0, screen.maxX - inset - x), height: height)
     }
 }
 
-/// The edge sidebar's Peek: the tab you picked, in a card over the app in front, not in the browser window.
+/// The edge sidebar's Peek: the tab you picked, filling the screen beside the sidebar over the app in front. The
+/// app behind is dimmed while it is out; the sidebar stays as it was, so another tab can be picked in place.
 ///
 /// The page is the tab's own `pageHolder`, moved out of its pane and put back on close, so its state carries: the
 /// same page, not a second load. Close gives it back; Open as Tab gives it back and brings the browser forward.
@@ -35,6 +31,8 @@ final class EdgePeek {
     private var clip: FlippedView?
     private let header = PeekHeaderView(frame: .zero)
     private let content = NSView()
+    /// The app behind, dimmed while the page is out beside the sidebar.
+    private var dimPanel: NSPanel?
     private weak var controller: BrowserWindowController?
     private(set) var tab: Tab?
     private(set) var isVisible = false
@@ -50,8 +48,6 @@ final class EdgePeek {
     private var spaceObserver: NSObjectProtocol?
     private var appObserver: NSObjectProtocol?
     private var activationObserver: NSObjectProtocol?
-    /// Where the card was left last time: a move or resize sticks for the next Peek.
-    private var preferredFrame: NSRect?
 
     private var headerHeight: CGFloat { Tokens.Metric.peekHeaderHeight }
     private static let inset = Tokens.Metric.peekInset
@@ -67,13 +63,20 @@ final class EdgePeek {
     // MARK: Showing
 
     func show(tab: Tab, from controller: BrowserWindowController) {
-        if isVisible { close() }
+        if isVisible {
+            if self.controller === controller {
+                if self.tab === tab { return }
+                swap(to: tab)
+                return
+            }
+            close()
+        }
         makePanel()
         guard let panel, let card else { return }
         self.controller = controller
         self.tab = tab
         _ = tab.ensureWebView()
-        guard let holder = tab.pageHolder else { return }
+        guard let holder = tab.pageHolder, let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else { return }
         // The page moves, not a copy: the same holder the pane has, so form state, scroll and media carry.
         origin = holder.superview
         originFrame = holder.frame
@@ -87,10 +90,15 @@ final class EdgePeek {
         refreshGround()
         token = tab.changed.observe { [weak self] _ in self?.refreshHeader() }
 
-        let screen = NSScreen.screens.first { $0.visibleFrame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(sidebarFrame) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        panel.setFrame(preferredFrame.map { EdgePeekLayout.fit($0, in: visible) } ?? EdgePeekLayout.frame(in: visible),
-                       display: false)
+        let dim = dimPanel ?? makeDim()
+        dim.setFrame(visible, display: false)
+        dim.orderFrontRegardless()
+        panel.setFrame(EdgePeekLayout.frame(attachedTo: sidebarFrame, in: visible,
+                                           onRight: EdgeSidebar.shared.panelOnRight), display: false)
+        // The panel keeps the sidebar out while the page is attached, whatever the pointer does.
+        EdgeSidebar.shared.holdForPeek(true)
         card.layoutSubtreeIfNeeded()
         layout()
         isVisible = true
@@ -116,7 +124,8 @@ final class EdgePeek {
             }
             return event
         }
-        // A click outside, in this app or another, puts it away as Esc does.
+        // A click outside, in this app or another, puts it away as Esc does. The sidebar is not outside: picking
+        // another tab there swaps the page, and picking this one again is the toggle.
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isVisible, MenuPanel.current == nil else { return }
@@ -126,7 +135,12 @@ final class EdgePeek {
         outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.isVisible else { return event }
             if MenuPanel.current != nil { return event }
-            if event.window !== self.panel { self.close() }
+            if event.window === self.dimPanel {
+                // The dimmed ground is the click that puts it away; it does not reach the app behind.
+                self.close()
+                return nil
+            }
+            if event.window !== self.panel && event.window !== EdgeSidebar.shared.panelWindow { self.close() }
             return event
         }
         // Moving to another app or desktop is moving away: the page goes back rather than following the focus.
@@ -150,9 +164,38 @@ final class EdgePeek {
         }
     }
 
+    /// Another tab picked in the sidebar while the page is out: the old page goes back and the new one takes its place,
+    /// with the panel and the dim staying put.
+    private func swap(to newTab: Tab) {
+        if let tab { restore(tab) }
+        token = nil
+        tab = newTab
+        _ = newTab.ensureWebView()
+        guard let holder = newTab.pageHolder else { close(); return }
+        origin = holder.superview
+        originFrame = holder.frame
+        holder.removeFromSuperview()
+        holder.frame = content.bounds
+        holder.autoresizingMask = [.width, .height]
+        content.addSubview(holder)
+        refreshHeader()
+        refreshGround()
+        token = newTab.changed.observe { [weak self] _ in self?.refreshHeader() }
+        layout()
+        if let webView = newTab.webView { panel?.makeFirstResponder(webView) }
+    }
+
+    private func restore(_ tab: Tab) {
+        guard let holder = tab.pageHolder, let origin else { return }
+        holder.removeFromSuperview()
+        holder.frame = originFrame
+        origin.addSubview(holder)
+        origin.needsLayout = true
+    }
+
     private func makePanel() {
         guard panel == nil else { return }
-        let panel = EdgeSidebarPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel, .resizable],
+        let panel = EdgeSidebarPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                                      backing: .buffered, defer: false)
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
@@ -160,9 +203,7 @@ final class EdgePeek {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
-        panel.isMovable = true
-        panel.isMovableByWindowBackground = true
-        panel.minSize = EdgePeekLayout.minimumSize
+        panel.isMovable = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
         let card = FloatingPanelView()
@@ -178,6 +219,25 @@ final class EdgePeek {
         self.panel = panel
         self.card = card
         self.clip = clip
+    }
+
+    private func makeDim() -> NSPanel {
+        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+                            backing: .buffered, defer: false)
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = false
+        panel.hidesOnDeactivate = false
+        panel.isMovable = false
+        panel.isReleasedWhenClosed = false
+        panel.animationBehavior = .none
+        let dim = ColorView(color: NSColor.black.withAlphaComponent(0.3))
+        dim.autoresizingMask = [.width, .height]
+        panel.contentView = dim
+        dimPanel = panel
+        return panel
     }
 
     private func layout() {
@@ -210,22 +270,13 @@ final class EdgePeek {
 
     // MARK: Closing
 
-    /// Puts the page back and takes the card away.
+    /// Puts the page back and takes the card and the dim away.
     func close() {
         guard isVisible else { return }
         let tab = self.tab
-        let origin = self.origin
-        let originFrame = self.originFrame
         let controller = self.controller
+        if let tab { restore(tab) }
         teardown()
-        if let holder = tab?.pageHolder {
-            holder.removeFromSuperview()
-            if let origin {
-                holder.frame = originFrame
-                origin.addSubview(holder)
-                origin.needsLayout = true
-            }
-        }
         if let controller, let webView = controller.selectedWebView {
             controller.window?.makeFirstResponder(webView)
         }
@@ -260,7 +311,8 @@ final class EdgePeek {
         spaceObserver = nil
         if let appObserver { NSWorkspace.shared.notificationCenter.removeObserver(appObserver) }
         appObserver = nil
-        if let panel { preferredFrame = panel.frame }
+        EdgeSidebar.shared.holdForPeek(false)
+        dimPanel?.orderOut(nil)
         panel?.orderOut(nil)
     }
 
