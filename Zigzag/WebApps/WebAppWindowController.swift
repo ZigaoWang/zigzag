@@ -89,7 +89,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         window.setAccessibilityTitle(app.name)
         // Where you left it last time, and remembered from now on.
         window.setFrameUsingName(Self.frameName(app.id))
-        window.setFrameAutosaveName(Self.frameName(app.id))
+        if !AppDelegate.isHostingTests { window.setFrameAutosaveName(Self.frameName(app.id)) }
 
         strip.title.stringValue = app.name
         strip.back.onClick = { [weak self] _ in self?.tab.goBack() }
