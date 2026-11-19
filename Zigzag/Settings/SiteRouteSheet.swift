@@ -6,7 +6,7 @@ enum SiteRouteSheet {
     static func edit(_ existing: SiteRoutes.Route, in host: NSView, isNew: Bool = false) -> FormSheet {
         let library = Library.shared
         let spaces = library.spaces
-        let field = FilledField(placeholder: "github.com/org1")
+        let field = FilledField(placeholder: "github.com")
         field.stringValue = existing.site
         let enabled = Toggle(isOn: existing.isEnabled)
         let enabledTitle = String(localized: "Enabled", comment: "Switch in the space rule editor.")
