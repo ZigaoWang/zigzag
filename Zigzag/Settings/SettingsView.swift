@@ -47,7 +47,7 @@ final class FormGroup: NSView {
         lines = []
     }
 
-    /// Keep fields attached to their window when an editable row is saved or moved.
+    /// Keep the focused row and its controls attached when rules change order.
     func setRows(_ ordered: [NSView]) {
         let kept = Set(ordered.map(ObjectIdentifier.init))
         for row in rows where !kept.contains(ObjectIdentifier(row)) { row.removeFromSuperview() }
@@ -1029,7 +1029,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let routesGroup = FormGroup()
     private let routeHint = FormRow(title: "", detail: String(localized: "The first enabled match chooses the space. Drag to reorder.", comment: "Byline under Sites in Spaces."),
                                     control: SiteRouteSheet.matchHelpButton())
-    private var pendingRoute: SiteRoutes.Route?
     private var routeRows: [(id: UUID, row: SiteRouteRow)] = []
     private let profilesGroup = FormGroup()
     private let appearanceGroup = FormGroup()
@@ -2499,42 +2498,25 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func addRoute() {
         let library = Library.shared
         guard let spaceID = BrowserWindowController.undoTarget?.tabManager.currentSpaceID ?? library.spaces.first?.id else { return }
-        if pendingRoute == nil { pendingRoute = .init(match: .domain, site: "", spaceID: spaceID) }
-        reloadRoutes()
-        layoutDocument()
-        layoutSubtreeIfNeeded()
-        guard let row = routeRows.last?.row else { return }
-        row.scrollToVisible(row.bounds)
-        window?.makeFirstResponder(row.address.field)
+        guard let host = window?.contentView else { return }
+        SiteRouteSheet.edit(.init(site: "", spaceID: spaceID), in: host, isNew: true)
     }
 
     private func reloadRoutes() {
         let library = Library.shared
-        if let draft = pendingRoute, library.space(draft.spaceID) == nil { pendingRoute = nil }
-        let rules = library.siteRoutes + [pendingRoute].compactMap { $0 }
+        let rules = library.siteRoutes
         let existing = Dictionary(uniqueKeysWithValues: routeRows.map { ($0.id, $0.row) })
         routeRows = rules.enumerated().map { index, rule in
             let row = existing[rule.id] ?? SiteRouteRow(rule)
-            row.refresh(rule, spaces: library.spaces, number: index + 1, isNew: pendingRoute?.id == rule.id)
-            row.onSave = { [weak self] changed in
-                guard let self else { return }
-                if pendingRoute?.id == changed.id {
-                    if changed.site.isEmpty { pendingRoute = changed; return }
-                    pendingRoute = nil
-                } else if !library.siteRoutes.contains(where: { $0.id == changed.id }) { return }
-                library.saveRoute(changed)
+            row.refresh(rule, spaces: library.spaces, number: index + 1)
+            row.onDraftChange = { [weak self] in
+                self?.updateRouteWarnings()
+                self?.layoutDocument()
             }
-            row.onDiscard = { [weak self] in
-                guard let self, pendingRoute?.id == rule.id else { return }
-                pendingRoute = nil
-                reloadRoutes()
-                layoutDocument()
-            }
-            row.onHeightChange = { [weak self] in self?.layoutDocument() }
-            row.onDraftChange = { [weak self] in self?.updateRouteWarnings() }
-            row.onRightClick = { [weak self] _ in self?.routeMenu(for: rule.id) }
-            row.grip.onDragStart = { [weak self, weak row] event in
-                guard let self, let row, self.pendingRoute?.id != rule.id else { return false }
+            row.onSave = library.saveRoute
+            row.onRightClick = { _ in Self.routeMenu(for: rule.id) }
+            row.onDragStart = { [weak self, weak row] event in
+                guard let self, let row, !row.isEditing else { return false }
                 return self.beginRouteDrag(row, event: event)
             }
             return (rule.id, row)
@@ -2546,23 +2528,30 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func updateRouteWarnings() {
         let rows = routeRows.map(\.row)
         let coverage = SiteRoutes.coverage(in: rows.map(\.ruleForValidation))
-        layingOutOnce {
-            for (row, result) in zip(rows, coverage) { row.setWarning(result.warning) }
-        }
+        for (row, result) in zip(rows, coverage) { row.setWarning(result.warning) }
     }
 
-    private func routeMenu(for id: UUID) -> NSMenu {
+    static func routeMenu(for id: UUID) -> NSMenu {
         let library = Library.shared, routes = library.siteRoutes
         let menu = NSMenu()
+        guard let rule = routes.first(where: { $0.id == id }) else { return menu }
+        let title = rule.isEnabled ? String(localized: "Turn Off", comment: "Turn off a space rule from its context menu.")
+            : String(localized: "Turn On", comment: "Turn on a space rule from its context menu.")
+        menu.addItem(SidebarMenus.Item(title) {
+            guard var updated = library.siteRoutes.first(where: { $0.id == id }) else { return }
+            updated.isEnabled = !rule.isEnabled
+            library.saveRoute(updated)
+        })
+        if routes.count > 1 { menu.addItem(.separator()) }
         SiteRouteReorderMenu.addMoves(to: menu, for: id, in: routes.map(\.id)) { library.moveRoute(id, before: $0) }
-        if let rule = routes.first(where: { $0.id == id }), let i = SiteRoutes.blocker(for: rule, in: routes) {
+        if let i = SiteRoutes.blocker(for: rule, in: routes) {
             menu.addItem(SidebarMenus.Item(String(localized: "Move Above Rule \(i + 1)", comment: "Move a space rule above the rule hiding it.")) {
                 library.moveRoute(id, before: routes[i].id)
             })
         }
-        if menu.numberOfItems > 0 { menu.addItem(.separator()) }
-        menu.addItem(SidebarMenus.Item(String(localized: "Remove", comment: "Remove a space rule.")) { [weak self] in
-            if self?.pendingRoute?.id == id { self?.routeRows.last?.row.onDiscard?() } else { library.removeRoute(id) }
+        menu.addItem(.separator())
+        menu.addItem(SidebarMenus.Item(String(localized: "Remove", comment: "Remove a space rule.")) {
+            library.removeRoute(id)
         })
         return menu
     }
@@ -3862,7 +3851,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Reordering space rules
 
     private func beginRouteDrag(_ row: SiteRouteRow, event: NSEvent) -> Bool {
-        let order = routeRows.filter { $0.id != pendingRoute?.id }
+        let order = routeRows
         let visible = order.filter { !$0.row.isHidden }
         guard let window, visible.count > 1, let startIndex = visible.firstIndex(where: { $0.row === row }) else { return false }
         let id = visible[startIndex].id
@@ -3871,6 +3860,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let copy = CarriedCopy(of: row, picture: CarriedCopy.picture(of: row), grabbedAt: window.convertPoint(toScreen: event.locationInWindow),
                                ground: nil, radius: Tokens.Radius.row)
         row.isLifted = false
+        let originalOpacity = row.alphaValue
         row.alphaValue = CarriedCopy.faint
         copy.lift()
         let line = InsertionLineView()
@@ -3889,6 +3879,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: self.routesGroup.bounds.width, height: 6) }
         }
         line.removeFromSuperview()
+        row.alphaValue = originalOpacity
         if released != nil, target != startIndex {
             // In search results the last visible row can have hidden rows below it. Drop just after that row.
             let before: UUID?
@@ -3902,7 +3893,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             Library.shared.moveRoute(id, before: before)
         }
         layoutSubtreeIfNeeded()
-        row.alphaValue = 1
         copy.land(on: routeRows.first { $0.id == id }?.row)
         return true
     }

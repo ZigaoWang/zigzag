@@ -79,82 +79,131 @@ struct SiteRoutesTests {
         #expect(SiteRoutes.route(for: page, in: [legacy, path]) == legacy)
     }
 
-    @Test func addressFieldValidatesWhileTypingAndOnlySavesOnCommit() {
-        let space = SpaceInfo(id: work, name: "Work", color: .sky)
-        let saved = SiteRoutes.Route(match: .host, site: "example.com", spaceID: work)
+    @Test func clickingTheRowEditsADraftAndShowsItsSwitch() throws {
+        let spaces = [SpaceInfo(id: work, name: "Work", color: .sky), SpaceInfo(id: media, name: "Media", color: .sage)]
+        var saved = SiteRoutes.Route(match: .path, site: "github.com/Org1", spaceID: work, isEnabled: false)
         let row = SiteRouteRow(saved)
-        row.refresh(saved, spaces: [space], number: 1, isNew: false)
-        var changes: [SiteRoutes.Route] = []
-        row.onSave = { changes.append($0) }
-        let edit = Notification(name: NSControl.textDidChangeNotification, object: row.address.field)
-        row.address.stringValue = "https://github.com/org1"
-        row.controlTextDidChange(edit)
-        #expect(row.address.isInvalid)
-        row.controlTextDidEndEditing(edit)
-        #expect(changes.isEmpty)
-        #expect(row.address.stringValue == "https://github.com/org1")
-
-        // Saving an unrelated change in Settings keeps the invalid draft and its error visible.
-        row.refresh(saved, spaces: [space], number: 2, isNew: false)
-        #expect(row.address.stringValue == "https://github.com/org1")
-        row.match.selectedIndex = SiteRoutes.Match.allCases.firstIndex(of: .path)!
-        row.match.onSelect?(row.match.selectedIndex)
-        #expect(changes.last?.site == "github.com/org1")
-        #expect(changes.last?.match == .path)
-        #expect(!row.address.isInvalid)
-
-        row.refresh(saved, spaces: [space], number: 1, isNew: false)
-        row.match.selectedIndex = SiteRoutes.Match.allCases.firstIndex(of: .host)!
-        row.address.stringValue = "HTTPS://GitHub.com/"
-        row.controlTextDidChange(edit)
-        #expect(row.address.stringValue == "HTTPS://GitHub.com/")
-        row.controlTextDidEndEditing(edit)
-        #expect(changes.last?.site == "github.com")
-        #expect(row.address.stringValue == "github.com")
-    }
-
-    @Test func inlineLabelsFollowTheirFieldsAtBothWidthsAndExplainTheSelectedMatch() throws {
-        let saved = SiteRoutes.Route(match: .host, site: "example.com", spaceID: work)
-        let row = SiteRouteRow(saved)
-        row.refresh(saved, spaces: [SpaceInfo(id: work, name: "Work", color: .sky)], number: 1, isNew: false)
-        let hostname = String(localized: "Hostname", comment: "Label above a space rule that takes only a hostname.")
-        let fields: [(String, NSView)] = [
-            (String(localized: "Enabled", comment: "Label above a space rule's switch."), row.enabled),
-            (String(localized: "Match", comment: "Space rule match type."), row.match),
-            (hostname, row.address),
-            (String(localized: "Open in", comment: "Destination space for a rule."), row.destination)
-        ]
-        for width: CGFloat in [800, 350] {
-            row.frame.size = NSSize(width: width, height: row.height(for: width))
-            row.layoutSubtreeIfNeeded()
-            for (name, field) in fields {
-                let label = try #require(row.subviews.compactMap { $0 as? Label }.first { $0.stringValue == name })
-                #expect(label.frame.minX + Label.inset == field.frame.minX)
-                #expect(label.frame.maxY <= field.frame.minY)
-                #expect(label.frame.width >= label.inkWidth)
-            }
-            if width == 350 { #expect(row.address.frame.minY > row.match.frame.maxY) }
+        row.refresh(saved, spaces: spaces, number: 1)
+        row.setWarning(nil)
+        var saves = 0
+        row.onSave = { update in
+            saves += 1
+            saved = update
+            row.refresh(update, spaces: spaces, number: 1)
         }
-        #expect(row.address.field.accessibilityLabel() == hostname)
-        let i = try #require(SiteRoutes.Match.allCases.firstIndex(of: .path))
-        row.match.selectedIndex = i
-        row.match.onSelect?(i)
-        #expect(row.address.field.accessibilityLabel() == String(localized: "Host and path", comment: "Label above an address that matches a host and path."))
-        #expect(row.address.isInvalid)
+        defer { row.onSave = nil }
+        let toggle = try #require(row.subviews.compactMap { $0 as? Toggle }.first)
+        let field = try #require(row.subviews.compactMap { $0 as? FilledField }.first)
+        let match = try #require(row.subviews.compactMap { $0 as? DropdownButton }.first { $0 !== row.destination })
+        let buttons = row.subviews.compactMap { $0 as? PillButton }
+        let save = try #require(buttons.first { $0.title == String(localized: "Save") })
+        let cancel = try #require(buttons.first { $0.title == String(localized: "Cancel") })
+        #expect(toggle.isHidden && field.isHidden && buttons.allSatisfy(\.isHidden))
+        #expect(row.alphaValue < 1 && row.accessibilityLabel()?.contains(String(localized: "Off")) == true)
+        #expect(row.accessibilityPerformPress())
+        #expect(!toggle.isHidden && !field.isHidden && !save.isHidden && !cancel.isHidden)
+        #expect(field.stringValue == saved.site)
+        field.stringValue = "github.com"
+        row.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        #expect(field.isInvalid && !save.isEnabled)
+        #expect(row.control(field.field, textView: NSTextView(), doCommandBy: #selector(NSResponder.insertNewline(_:))))
+        #expect(row.isEditing && saves == 0)
+        #expect(toggle.accessibilityPerformPress())
+        row.destination.selectedIndex = 1
+        row.destination.onSelect?(1)
+        match.selectedIndex = try #require(SiteRoutes.Match.allCases.firstIndex(of: .host))
+        match.onSelect?(match.selectedIndex)
+        #expect(!field.isInvalid && save.isEnabled)
+        // Another library notification while typing must leave the draft intact.
+        row.refresh(saved, spaces: spaces, number: 1)
+        #expect(row.ruleForValidation.match == .host && row.ruleForValidation.spaceID == media)
+        #expect(!saved.isEnabled && saves == 0)
+        #expect(cancel.accessibilityPerformPress())
+        #expect(!row.isEditing && !toggle.isOn && row.destination.selectedIndex == 0)
+        #expect(row.accessibilityPerformPress())
+        #expect(field.stringValue == "github.com/Org1")
+        field.stringValue = "github.com/Org2"
+        row.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        row.setWarning("Blocks rule 2.")
+        #expect(save.isEnabled)
+        #expect(save.accessibilityPerformPress())
+        #expect(!row.isEditing && saves == 1 && saved.site == "github.com/Org2")
+        #expect(row.searchText.contains(saved.site))
     }
 
-    @Test func newInlineRulesKeepTheirDestinationAndEnabledStateUntilTheAddressIsReady() {
-        let a = SpaceInfo(id: work, name: "Work", color: .sky), b = SpaceInfo(id: media, name: "Media", color: .sage)
-        let draft = SiteRoutes.Route(match: .path, site: "", spaceID: work)
-        let row = SiteRouteRow(draft)
-        row.refresh(draft, spaces: [a, b], number: 1, isNew: true)
-        var changes: [SiteRoutes.Route] = []
-        row.onSave = { changes.append($0) }
-        row.enabled.onChange?(false)
-        row.destination.onSelect?(1)
-        row.address.stringValue = "github.com/org2"
-        row.controlTextDidEndEditing(Notification(name: NSControl.textDidEndEditingNotification))
-        #expect(changes.last == SiteRoutes.Route(id: draft.id, match: .path, site: "github.com/org2", spaceID: media, isEnabled: false))
+    @Test func theRuleContextMenuTurnsTheSameRuleOffAndOn() throws {
+        let library = Library.shared
+        let rule = SiteRoutes.Route(match: .path, site: "context-menu.test/example", spaceID: try #require(library.spaces.first?.id))
+        library.saveRoute(rule)
+        defer { library.removeRoute(rule.id) }
+        let order = library.siteRoutes.map(\.id)
+        for (title, enabled) in [(String(localized: "Turn Off"), false), (String(localized: "Turn On"), true)] {
+            let menu = SettingsView.routeMenu(for: rule.id)
+            let index = menu.indexOfItem(withTitle: title)
+            try #require(index >= 0)
+            menu.performActionForItem(at: index)
+            var expected = rule
+            expected.isEnabled = enabled
+            #expect(library.siteRoutes.first { $0.id == rule.id } == expected)
+            #expect(library.siteRoutes.map(\.id) == order)
+        }
+    }
+
+    @Test func theSpaceMenuKeepsItsFrameDuringInlineEditing() throws {
+        let space = SpaceInfo(id: work, name: "Work", color: .sky)
+        let rule = SiteRoutes.Route(match: .path, site: "github.com/org1", spaceID: work)
+        for width: CGFloat in [350, 800] {
+            let row = SiteRouteRow(rule)
+            row.refresh(rule, spaces: [space], number: 1)
+            row.setWarning(nil)
+            func layout() {
+                row.frame.size = NSSize(width: width, height: row.height(for: width))
+                row.layoutSubtreeIfNeeded()
+            }
+            layout()
+            let menu = row.destination.frame
+            #expect(menu.width > 0)
+            #expect(row.accessibilityPerformPress())
+            layout()
+            #expect(row.destination.frame == menu)
+            let field = try #require(row.subviews.compactMap { $0 as? FilledField }.first)
+            #expect(field.frame.width > 0 && !field.frame.intersects(menu))
+            let cancel = try #require(row.subviews.compactMap { $0 as? PillButton }.first { $0.title == String(localized: "Cancel") })
+            #expect(cancel.accessibilityPerformPress())
+            layout()
+            #expect(row.destination.frame == menu)
+        }
+    }
+
+    @Test func theSheetValidatesBeforeSavingAndCancelLeavesTheRuleAlone() throws {
+        let library = Library.shared
+        let original = SiteRoutes.Route(site: "", spaceID: try #require(library.spaces.first?.id))
+        defer { library.removeRoute(original.id) }
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 700))
+        let sheet = SiteRouteSheet.edit(original, in: host, isNew: true)
+        let field = try #require(sheet.selfAndDescendants(of: FilledField.self).first)
+        let toggle = try #require(sheet.selfAndDescendants(of: Toggle.self).first)
+        let saveTitle = String(localized: "Save", comment: "Save a space rule.")
+        let save = try #require(sheet.selfAndDescendants(of: PillButton.self).first { $0.title == saveTitle })
+        field.stringValue = "example.test/org1"
+        sheet.revalidate()
+        #expect(field.isInvalid)
+        #expect(!save.isEnabled)
+        field.stringValue = "www.example.test"
+        toggle.isOn = false
+        sheet.revalidate()
+        #expect(save.isEnabled)
+        #expect(!library.siteRoutes.contains { $0.id == original.id })
+        #expect(save.accessibilityPerformPress())
+        let saved = try #require(library.siteRoutes.first { $0.id == original.id })
+        #expect(saved.match == .domain && saved.site == "example.test" && !saved.isEnabled)
+        let editing = SiteRouteSheet.edit(saved, in: host)
+        let editField = try #require(editing.selfAndDescendants(of: FilledField.self).first)
+        editField.stringValue = "other.test"
+        let cancelTitle = String(localized: "Cancel", comment: "Button in a sheet that asks before doing something.")
+        let cancel = try #require(editing.selfAndDescendants(of: PillButton.self).first { $0.title == cancelTitle })
+        #expect(cancel.accessibilityPerformPress())
+        #expect(library.siteRoutes.first { $0.id == saved.id } == saved)
     }
 
     @Test func recognizedRulesAndFuturePayloadsSurviveEditingAndRelaunch() throws {
@@ -371,37 +420,19 @@ struct SiteRoutesTests {
         ])
     }
 
-    @Test func aDraftUpdatesCoverageBeforeTheAddressIsSaved() {
-        let saved = SiteRoutes.Route(match: .host, site: "example.com", spaceID: work)
-        let later = SiteRoutes.Route(match: .path, site: "github.com/org1", spaceID: personal)
-        let row = SiteRouteRow(saved)
-        var coverage: [SiteRoutes.Coverage] = []
-        row.onDraftChange = { coverage = SiteRoutes.coverage(in: [row.ruleForValidation, later]) }
-        row.address.stringValue = "github.com"
-        row.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
-        #expect(coverage.first?.blocks == [1])
-        row.address.stringValue = "github.com/org1"
-        row.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
-        #expect(row.address.isInvalid)
-        #expect(row.ruleForValidation == saved)
-        #expect(coverage.last?.blockedBy == nil)
-        row.onDraftChange = nil
-    }
-
     @Test func matchHelpExplainsEachModeAndFieldHelpFollowsTheSelection() {
         let modes = SiteRoutes.Match.allCases
         #expect(modes == [.host, .domain, .path])
         let lines = SiteRouteSheet.matchHelpButton().toolTip?.components(separatedBy: "\n") ?? []
         #expect(lines.count == modes.count)
         for (mode, line) in zip(modes, lines) { #expect(line.hasPrefix("• " + mode.title)) }
-        let row = SiteRouteRow(.init(site: "github.com", spaceID: work))
+        let field = FilledField(placeholder: "")
         var tips: Set<String> = []
-        for (index, mode) in modes.enumerated() {
-            row.match.selectedIndex = index
-            row.match.onSelect?(index)
-            #expect(row.address.field.toolTip?.contains(mode.inputHint) == true)
-            #expect(row.address.field.toolTip == row.address.toolTip)
-            tips.insert(row.address.field.toolTip ?? "")
+        for mode in modes {
+            mode.setInputHelp(on: field)
+            #expect(field.field.toolTip?.contains(mode.inputHint) == true)
+            #expect(field.field.toolTip == field.toolTip)
+            tips.insert(field.toolTip ?? "")
         }
         #expect(tips.count == 3)
     }

@@ -833,7 +833,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.\nWhat VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.",
+      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nMatch scope and status of a disabled space rule.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.\nWhat VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -957,7 +957,7 @@
       }
     },
     "%@: %@" : {
-      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.",
+      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.\nAn automation's notice over the page: the rule's name, then what it did. The placeholders are the rule's name and one of the “handed this link to …” lines.\nRule number followed by its coverage warning.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2225,6 +2225,17 @@
         }
       }
     },
+    "Add Space Rule" : {
+      "comment" : "Title of the sheet that creates a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加空间规则"
+          }
+        }
+      }
+    },
     "AI apps can’t use Zigzag now. Turn them back on in Settings › Automation." : {
       "comment" : "Toast after Stop on the bar over a tab an AI app was using: every AI app is cut off until the setting is turned on again.",
       "localizations" : {
@@ -3139,6 +3150,28 @@
         }
       }
     },
+    "and pages below it" : {
+      "comment" : "Short scope beside the path of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含下级路径"
+          }
+        }
+      }
+    },
+    "and subdomains" : {
+      "comment" : "Short scope beside the domain of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含子域名"
+          }
+        }
+      }
+    },
     "Another app is using the file" : {
       "comment" : "Why a file couldn't be saved, said after what failed, like “Couldn’t save the page. Not enough space on your Mac.”",
       "localizations" : {
@@ -4019,6 +4052,17 @@
         }
       }
     },
+    "this host only" : {
+      "comment" : "Short scope beside the address of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
     "You’ll be signed out of every site except the %lld sites you keep. Your passwords, pinned tabs and history stay." : {
       "comment" : "Message of the sheet that clears every site's cookies, when some sites keep theirs. The number is how many, always more than one.",
       "localizations" : {
@@ -4206,41 +4250,8 @@
         }
       }
     },
-    "Reorder or remove rule %lld" : {
-      "comment" : "Drag handle and menu for a space rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "调整第 %lld 条规则的顺序，或移除它"
-          }
-        }
-      }
-    },
-    "Host and path" : {
-      "comment" : "Label above an address that matches a host and path.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "域名和路径"
-          }
-        }
-      }
-    },
-    "Hostname" : {
-      "comment" : "Label above a space rule that takes only a hostname.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "域名"
-          }
-        }
-      }
-    },
     "Enabled" : {
-      "comment" : "Label above a space rule's switch.",
+      "comment" : "Switch in the space rule editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4539,7 +4550,7 @@
       }
     },
     "Cancel" : {
-      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nTooltip of a download's button in the downloads panel: stops the download.",
+      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nDiscard edits to a space rule.\nTooltip of a download's button in the downloads panel: stops the download.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7799,6 +7810,28 @@
     },
     "Opens in" : {
       "comment" : "Label of the choice of where a web address opens, in an Open URL download rule's sheet.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开位置"
+          }
+        }
+      }
+    },
+    "open in" : {
+      "comment" : "Inline after a domain and its subdomains, or a path and the pages below it: example.com and subdomains open in Work.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开位置"
+          }
+        }
+      }
+    },
+    "opens in" : {
+      "comment" : "Inline before the space menu for a single host: example.com (this host only) opens in Work.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13133,7 +13166,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nStatus of a disabled space rule.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20620,7 +20653,7 @@
       }
     },
     "Turn %@ on or off" : {
-      "comment" : "A download rule's switch for VoiceOver. The placeholder is the rule's name.\nA per-extension destination's switch for VoiceOver. The placeholder is the file extensions it names, like pdf, epub.\nEnable or disable a space rule.",
+      "comment" : "A download rule's switch for VoiceOver. The placeholder is the rule's name.\nA per-extension destination's switch for VoiceOver. The placeholder is the file extensions it names, like pdf, epub.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20631,7 +20664,7 @@
       }
     },
     "Turn Off" : {
-      "comment" : "Item in an extension's menu: turns the extension off.",
+      "comment" : "Item in an extension's menu: turns the extension off.\nTurn off a space rule from its context menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20708,7 +20741,7 @@
       }
     },
     "Turn On" : {
-      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.",
+      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.\nTurn on a space rule from its context menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

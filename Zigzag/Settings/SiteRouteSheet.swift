@@ -1,13 +1,16 @@
 import AppKit
 
-/// Site Controls can change the winning rule without leaving the page.
+/// Adds a rule from Settings or edits the winning rule from Site Controls.
 enum SiteRouteSheet {
     @discardableResult
-    static func edit(_ existing: SiteRoutes.Route, in host: NSView) -> FormSheet {
+    static func edit(_ existing: SiteRoutes.Route, in host: NSView, isNew: Bool = false) -> FormSheet {
         let library = Library.shared
         let spaces = library.spaces
         let field = FilledField(placeholder: "github.com/org1")
         field.stringValue = existing.site
+        let enabled = Toggle(isOn: existing.isEnabled)
+        let enabledTitle = String(localized: "Enabled", comment: "Switch in the space rule editor.")
+        enabled.setAccessibilityLabel(enabledTitle)
         let match = DropdownButton()
         let modes = SiteRoutes.Match.allCases
         match.options = modes.map { DropdownButton.Option(title: $0.title) }
@@ -16,25 +19,24 @@ enum SiteRouteSheet {
         existing.match.setInputHelp(on: field)
         let destination = DropdownButton()
         destination.options = spaces.map { DropdownButton.Option(title: $0.name) }
-        let current = existing.spaceID
-        destination.selectedIndex = spaces.firstIndex { $0.id == current } ?? 0
+        destination.selectedIndex = spaces.firstIndex { $0.id == existing.spaceID } ?? 0
 
         let matchControls = NSStackView(views: [match, matchHelpButton()])
         matchControls.spacing = Tokens.Space.x2
         let preview = NSTextField.dialogText("", font: Tokens.Font.detail())
         func draft() -> SiteRoutes.Route? {
-            let mode = modes[match.selectedIndex]
-            guard let value = SiteRoutes.entry(from: field.stringValue, match: mode),
-                  spaces.indices.contains(destination.selectedIndex) else { return nil }
-            return .init(id: existing.id, match: mode, site: value, spaceID: spaces[destination.selectedIndex].id, isEnabled: existing.isEnabled)
+            guard spaces.indices.contains(destination.selectedIndex) else { return nil }
+            return existing.edited(address: field.stringValue, match: modes[match.selectedIndex],
+                                   spaceID: spaces[destination.selectedIndex].id, isEnabled: enabled.isOn)
         }
         weak var presentedSheet: FormSheet?
         let sheet = FormSheet.show(in: host,
-            title: String(localized: "Edit Space Rule", comment: "Existing space rule sheet title."),
+            title: isNew ? String(localized: "Add Space Rule", comment: "Title of the sheet that creates a space rule.") : String(localized: "Edit Space Rule", comment: "Existing space rule sheet title."),
             symbol: "square.stack",
             rows: [.init(label: String(localized: "Address", comment: "Space rule address field."), view: field),
                    .init(label: String(localized: "Match", comment: "Space rule match type."), view: matchControls),
                    .init(label: String(localized: "Open in", comment: "Destination space for a rule."), view: destination),
+                   .init(label: enabledTitle, view: enabled),
                    .init(label: nil, view: preview, height: 0)],
             confirmTitle: String(localized: "Save", comment: "Save a space rule."),
             destructive: false, canConfirm: {
@@ -43,20 +45,21 @@ enum SiteRouteSheet {
                     if previous != preview.stringValue { presentedSheet?.needsLayout = true }
                 }
                 guard let rule = draft() else {
-                    field.isInvalid = true
+                    field.isInvalid = !field.stringValue.isEmpty
+                    preview.textColor = field.isInvalid ? Tokens.Color.destructive : Tokens.Color.textSecondary
                     preview.stringValue = modes[match.selectedIndex].inputHint
                     return false
                 }
                 field.isInvalid = false
+                preview.textColor = Tokens.Color.textSecondary
                 preview.stringValue = rule.scopeDescription
                 var rules = library.siteRoutes
-                if let i = rules.firstIndex(where: { $0.id == rule.id }) {
-                    rules[i] = rule
-                    if let warning = SiteRoutes.coverage(in: rules)[i].warning { preview.stringValue += "\n" + warning }
-                }
+                let index = rules.firstIndex { $0.id == rule.id } ?? rules.count
+                if index == rules.count { rules.append(rule) } else { rules[index] = rule }
+                if let warning = SiteRoutes.coverage(in: rules)[index].warning { preview.stringValue += "\n" + warning }
                 return true
             }) { confirmed in
-                if confirmed, let rule = draft() { library.saveRoute(rule) }
+                if confirmed, let rule = draft(), isNew || library.siteRoutes.contains(where: { $0.id == rule.id }) { library.saveRoute(rule) }
             }
         presentedSheet = sheet
         match.onSelect = { [weak sheet] index in
@@ -64,6 +67,7 @@ enum SiteRouteSheet {
             sheet?.revalidate()
             sheet?.needsLayout = true
         }
+        enabled.onChange = { [weak sheet] _ in sheet?.revalidate() }
         destination.onSelect = { [weak sheet] _ in sheet?.revalidate() }
         return sheet
     }

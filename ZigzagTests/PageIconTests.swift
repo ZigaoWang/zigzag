@@ -214,6 +214,10 @@ struct SiteIconTests {
             #expect(Bookmark(url: url, title: "P", icon: "🎧").displayIcon === IconChoice.pageIcon("🎧"))
             // History and the command bar, by URL.
             #expect(SiteIcons.shownIcon(for: url) === IconChoice.pageIcon("🦉"))
+            let rule = SiteRoutes.Route(match: .path, site: site + "/example", spaceID: UUID())
+            let row = SiteRouteRow(rule)
+            row.refresh(rule, spaces: [], number: 1)
+            #expect(row.subviews.compactMap { $0 as? FaviconView }.first?.image === IconChoice.pageIcon("🦉"))
         }
     }
 

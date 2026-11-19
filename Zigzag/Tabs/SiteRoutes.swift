@@ -21,6 +21,12 @@ enum SiteRoutes {
         var spaceID: UUID
         var isEnabled = true
 
+        /// Both editors validate and normalize the address before keeping an edit to this rule.
+        func edited(address: String, match: Match, spaceID: UUID, isEnabled: Bool) -> Self? {
+            guard let site = SiteRoutes.entry(from: address, match: match) else { return nil }
+            return Self(id: id, match: match, site: site, spaceID: spaceID, isEnabled: isEnabled)
+        }
+
         private var host: String { String(site.prefix { $0 != "/" }) }
         private var path: Substring { site.dropFirst(host.count) }
 
