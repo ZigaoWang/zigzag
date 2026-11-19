@@ -342,6 +342,20 @@ struct SystemPasswordsTests {
         #expect(picker.anchor.superview == nil)
     }
 
+    @Test func aWindowClosedBeforeTheAskAsksNothing() async throws {
+        // Closed during the wait for AutoFill, the window is never asked for its list (#378).
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0.2, dismissSystem: {})
+        var asked = false
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in asked = true; return true }) { outcome = $0 }
+        window.close()
+        try await wait(0.4)
+        #expect(!asked)
+        guard case .cancelled(.dismissed) = outcome else { Issue.record("expected dismissed, got \(String(describing: outcome))"); return }
+        #expect(!picker.isPresented)
+    }
+
     @Test func theMacsListClosesWithTheFields() async throws {
         // Left behind, it stayed over the page and came back each time the window became key (#378).
         let (window, overlay, stand) = host()
