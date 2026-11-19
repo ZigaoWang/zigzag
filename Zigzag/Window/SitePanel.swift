@@ -1119,17 +1119,17 @@ final class SitePanel: FloatingPanelView {
     private func openInRow() -> PanelRow {
         let spaces = Library.shared.spaces
         let route = Library.shared.siteRoute(for: url)
-        let site = route?.site ?? SiteRoutes.site(of: url) ?? self.site
+        let site = SiteRoutes.site(of: url) ?? self.site
         let selected = route.flatMap { route in spaces.firstIndex { $0.id == route.spaceID }.map { $0 + 1 } } ?? 0
         return .choice(String(localized: "Open in", comment: "Destination space in Site Controls."),
                        options: [Self.anySpace] + spaces.map(\.name), selected: selected,
                        status: { _ in route?.scopeDescription }) { [weak self] index in
+            guard let self else { return }
             if index > 0, spaces.indices.contains(index - 1) {
-                var updated = route ?? SiteRoutes.Route(match: .domain, site: site, spaceID: spaces[index - 1].id)
-                updated.spaceID = spaces[index - 1].id
+                let updated = SiteRoutes.assigning(url, site: site, to: spaces[index - 1].id, in: Library.shared.siteRoutes)
                 Library.shared.saveRoute(updated)
             } else if let route { Library.shared.removeRoute(route.id) }
-            self?.rebuildRows()
+            rebuildRows()
         }
     }
 

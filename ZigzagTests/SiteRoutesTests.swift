@@ -180,6 +180,19 @@ struct SiteRoutesTests {
         #expect(roundTrip == [future as NSDictionary])
     }
 
+    @Test func choosingASpaceReenablesOnlyTheEquivalentDomainRule() {
+        let page = url("https://github.com/org1")
+        let exact = SiteRoutes.Route(match: .host, site: "github.com", spaceID: work, isEnabled: false)
+        let disabled = SiteRoutes.Route(site: "github.com", spaceID: media, isEnabled: false)
+        let active = SiteRoutes.Route(match: .path, site: "github.com/org1", spaceID: work)
+        var expected = disabled
+        expected.spaceID = personal
+        expected.isEnabled = true
+        #expect(SiteRoutes.assigning(page, site: "github.com", to: personal, in: [exact, disabled]) == expected)
+        #expect(SiteRoutes.assigning(page, site: "github.com", to: personal, in: [disabled, active]).id == active.id)
+        #expect(SiteRoutes.assigning(page, site: "github.com", to: personal, in: [exact]).id != exact.id)
+    }
+
     // MARK: Deciding
 
     @Test func whatYouDoYourselfIsRouted() {

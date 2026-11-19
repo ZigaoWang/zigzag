@@ -230,6 +230,15 @@ enum SiteRoutes {
         return routes.first { $0.isEnabled && $0.matches(host, path: path) }
     }
 
+    /// Site Controls changes the winning rule. If there is none, reuse the exact domain rule it would create.
+    static func assigning(_ url: URL?, site: String, to space: UUID, in rules: [Route]) -> Route {
+        let existing = route(for: url, in: rules) ?? rules.first { !$0.isEnabled && $0.match == .domain && $0.site == site }
+        var rule = existing ?? Route(match: .domain, site: site, spaceID: space)
+        rule.spaceID = space
+        rule.isEnabled = true
+        return rule
+    }
+
     static func blocker(for rule: Route, in rules: [Route]) -> Int? {
         guard rule.isEnabled, !rule.site.isEmpty else { return nil }
         return rules.prefix { $0.id != rule.id }.firstIndex { $0.isEnabled && !$0.site.isEmpty && $0.includes(rule) }
