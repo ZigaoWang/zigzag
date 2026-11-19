@@ -218,6 +218,8 @@ final class BrowserWebView: WKWebView {
             }
         }
         addOpenSelection(to: menu)
+        addSaveToPins(to: menu)
+        addSavePage(to: menu)
         // Only in a browser window's page, which does the translating; not Zigzag Mini's or a web app's.
         if let owner, WindowManager.shared.controller(for: window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
@@ -229,6 +231,57 @@ final class BrowserWebView: WKWebView {
     }
 
     static let openSelectionIdentifier = "ZigzagOpenSelection"
+
+    static let saveToPinsIdentifier = "ZigzagSaveToPins"
+
+    /// A link's right-click menu gets Save to Pins (#326), under Open Link's items: the link saved without opening it.
+    /// Only over a link, and only in a browser window, which is where pins live.
+    private func addSaveToPins(to menu: NSMenu) {
+        guard owner != nil, WindowManager.shared.controller(for: window) != nil,
+              let last = menu.items.lastIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) else { return }
+        let item = NSMenuItem(title: String(localized: "Save to Pins", comment: "Item in a page's right-click menu over a link: saves the link, without opening it."),
+                              action: #selector(saveHoveredLinkToPins(_:)), keyEquivalent: "")
+        item.target = self
+        item.identifier = NSUserInterfaceItemIdentifier(Self.saveToPinsIdentifier)
+        item.image = Tokens.Symbol.image("star")
+        // After the link's own items: Open Link in New Tab, Peek, a New Window, a Private one, and a download.
+        var at = last
+        let linkItems = ["WKMenuItemIdentifierOpenLinkInNewTab", "WKMenuItemIdentifierOpenLinkInPeek", "WKMenuItemIdentifierOpenLinkInNewWindow",
+                         "WKMenuItemIdentifierDownloadLinkedFile", "WKMenuItemIdentifierDownloadLinkedFileAs"]
+        while at + 1 < menu.items.count, linkItems.contains(menu.items[at + 1].identifier?.rawValue ?? "") { at += 1 }
+        menu.insertItem(item, at: at + 1)
+    }
+
+    /// Save to Pins chosen in the page's menu: the link the pointer is on, as the hover script last reported it (the
+    /// same link WebKit offers Open Link for), saved without opening it. ⇧ held, it asks which folder (#326).
+    @objc private func saveHoveredLinkToPins(_ sender: NSMenuItem) {
+        guard let owner, let url = owner.hoveredLink,
+              let controller = WindowManager.shared.controller(for: window) else { return }
+        controller.saveLinkToPins(url, shiftHeld: BrowserWindowController.shiftHeld)
+    }
+
+    /// Save Page chosen in the page's menu: a quick save of the page on screen, or with ⇧ held the picker, the same as
+    /// the star and ⌘D (#326).
+    @objc private func savePageFromMenu(_ sender: NSMenuItem) {
+        guard let owner, let controller = WindowManager.shared.controller(for: window) else { return }
+        controller.saveFromPageMenu(owner)
+    }
+
+    static let savePageIdentifier = "ZigzagSavePage"
+
+    /// A page's right-click menu, away from its links, gets Save Page (#326) at its top: the page saved without leaving
+    /// it, as Chrome's and Safari's menus offer. ⇧ held, the same item asks which folder.
+    private func addSavePage(to menu: NSMenu) {
+        guard owner != nil, WindowManager.shared.controller(for: window) != nil,
+              !menu.items.contains(where: { $0.identifier?.rawValue == Self.saveToPinsIdentifier }) else { return }
+        let item = NSMenuItem(title: String(localized: "Save Page", comment: "Item in a page's right-click menu, away from its links: saves the page you're on, and with ⇧ held, asks which folder."),
+                              action: #selector(savePageFromMenu(_:)), keyEquivalent: "")
+        item.target = self
+        item.identifier = NSUserInterfaceItemIdentifier(Self.savePageIdentifier)
+        item.image = Tokens.Symbol.image("star")
+        menu.insertItem(item, at: 0)
+        if menu.items.count > 1, !menu.items[1].isSeparatorItem { menu.insertItem(.separator(), at: 1) }
+    }
 
     /// Selected text that's a web address but not a link ("example.com" in a post) gets Open and Open in New Tab at
     /// the top of its menu, as Chrome's Go to does (#234). Only in a browser window's page.

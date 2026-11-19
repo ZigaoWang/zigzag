@@ -2279,17 +2279,6 @@
         }
       }
     },
-    "Add %lld to Favorites" : {
-      "comment" : "Menu item for several picked sidebar rows",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将 %lld 项添加到收藏"
-          }
-        }
-      }
-    },
     "Add %lld to Folder" : {
       "comment" : "Menu item for several picked sidebar rows",
       "localizations" : {
@@ -2466,17 +2455,6 @@
         }
       }
     },
-    "Add to Favorites" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加到收藏"
-          }
-        }
-      }
-    },
     "Add to Folder" : {
       "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of folders.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Folder.",
       "localizations" : {
@@ -2550,17 +2528,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已添加 %@。"
-          }
-        }
-      }
-    },
-    "Added to Favorites" : {
-      "comment" : "Toast after the tab is added to Favorites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已添加到收藏"
           }
         }
       }
@@ -9044,7 +9011,7 @@
       }
     },
     "Folder" : {
-      "comment" : "Name of an imported folder that had none.",
+      "comment" : "Label of the folder menu in the sheet that saves a page to a place.\nName of an imported folder that had none.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11707,7 +11674,7 @@
       }
     },
     "Name" : {
-      "comment" : "Placeholder of the field that renames a favorite.\nPlaceholder of the field that renames a tab, in its sidebar row.",
+      "comment" : "Placeholder of the field that renames a favorite.\nPlaceholder of the field that renames a tab, in its sidebar row.\nPlaceholder of the name field in the sheet that saves a page to a place: what the saved page is called.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11872,7 +11839,7 @@
       }
     },
     "New Folder" : {
-      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder.",
+      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nPlaceholder of the field that names a new folder in the sheet that saves a page to a place.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14270,96 +14237,6 @@
         }
       }
     },
-    "Pin %lld Tabs" : {
-      "comment" : "Menu item for several picked tabs",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Pin Tab"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Pin %lld Tabs"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "固定 %lld 个标签页"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Pin Split View" : {
-      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定分屏浏览"
-          }
-        }
-      }
-    },
-    "Pin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nMenu item\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定标签页"
-          }
-        }
-      }
-    },
-    "Pin Tabs" : {
-      "comment" : "Undo action name, shown in Edit › Undo.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定标签页"
-          }
-        }
-      }
-    },
-    "Pin This Page" : {
-      "comment" : "Button in the toast after closing a pinned tab that had wandered: pins the page it was on instead.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定此页面"
-          }
-        }
-      }
-    },
-    "Pin This Page Instead" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "改为固定此页面"
-          }
-        }
-      }
-    },
     "Pin the sites you use" : {
       "comment" : "Title of the welcome window’s step that picks favorite sites.",
       "localizations" : {
@@ -14371,13 +14248,13 @@
         }
       }
     },
-    "Pin this page" : {
+    "Save this page" : {
       "comment" : "A step's title in the getting-started guide, a card in the window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "固定这个页面"
+            "value" : "存储这个页面"
           }
         }
       }
@@ -14411,17 +14288,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "粉色"
-          }
-        }
-      }
-    },
-    "Pinned" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已固定"
           }
         }
       }
@@ -16131,13 +15997,13 @@
         }
       }
     },
-    "Right-click its tab, then Pin Tab" : {
-      "comment" : "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.",
+    "Right-click its tab, then Save Page" : {
+      "comment" : "Under the save step's title in the getting-started guide, a card in the window, when Save Page has no shortcut. Save Page is an item in a tab's menu in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "右键点按它的标签页，然后点按“固定标签页”"
+            "value" : "右键点按它的标签页，然后点按“存储页面”"
           }
         }
       }
@@ -16385,7 +16251,7 @@
       }
     },
     "Save" : {
-      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton of the Edit Style sheet: keeps the CSS for the site.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.",
+      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton of the Edit Style sheet: keeps the CSS for the site.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.\nButton that saves the page, in the sheet that asks where in the space it goes.\nUndo action name, shown in the Edit menu as Undo Save.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16473,7 +16339,7 @@
       }
     },
     "Saved" : {
-      "comment" : "Toast after changes to a login are saved.",
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a page is saved into Pinned.\nToast after changes to a login are saved.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20700,74 +20566,6 @@
         }
       }
     },
-    "Unpin %lld Tabs" : {
-      "comment" : "Menu item for several picked pinned pages",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Unpin Tab"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Unpin %lld Tabs"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "取消固定 %lld 个标签页"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Unpin Split View" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消固定分屏浏览"
-          }
-        }
-      }
-    },
-    "Unpin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nMenu item\nUndo action name, shown in the Edit menu as Undo Unpin Tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消固定标签页"
-          }
-        }
-      }
-    },
-    "Unpin Tabs" : {
-      "comment" : "Undo action name, shown in Edit › Undo.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消固定标签页"
-          }
-        }
-      }
-    },
     "Unpin from Address" : {
       "comment" : "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.",
       "localizations" : {
@@ -20775,17 +20573,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从地址栏取消固定"
-          }
-        }
-      }
-    },
-    "Unpinned" : {
-      "comment" : "Toast after a pinned tab is unpinned.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已取消固定"
           }
         }
       }
@@ -24500,6 +24287,331 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取一张图像用作此网站的图标。"
+          }
+        }
+      }
+    },
+    "Save Page" : {
+      "comment" : "A command in the command bar, named as in the menu bar: saves the page into Pinned.\nFile menu item, with ⌘D: saves the page you're on, into the space you're in, without asking.\nItem in a tab's context menu in the sidebar: saves the page into Pinned, and with ⇧ held, asks which folder.\nMenu item for one picked tab: saves the page into Pinned.\nTitle of the sheet that saves the page you're on, with where in the space it goes and its name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save Page"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储页面"
+          }
+        }
+      }
+    },
+    "Save Page to Folder…" : {
+      "comment" : "File menu item, with ⇧⌘D: saves the page you're on, asking which folder of the space it goes in and what it's called.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save Page to Folder…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将页面存储到文件夹…"
+          }
+        }
+      }
+    },
+    "Save to Pins" : {
+      "comment" : "Item in a page's right-click menu over a link: saves the link, without opening it.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save to Pins"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储到已固定"
+          }
+        }
+      }
+    },
+    "Saved to Pins" : {
+      "comment" : "Toast after a link is saved to Pins from its right-click menu, without opening it.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saved to Pins"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储到已固定"
+          }
+        }
+      }
+    },
+    "In Every Space" : {
+      "comment" : "A tick on a saved page: it shows in every space of its profile, as a favorite does.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In Every Space"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在所有空间中"
+          }
+        }
+      }
+    },
+    "Saved in Every Space" : {
+      "comment" : "Toast after a saved page is ticked In Every Space: it now shows in every space of its profile.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saved in Every Space"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储在所有空间中"
+          }
+        }
+      }
+    },
+    "Saved in This Space" : {
+      "comment" : "Toast after In Every Space is ticked off a saved page: the page stays saved, in this space only.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Saved in This Space"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储在此空间"
+          }
+        }
+      }
+    },
+    "Top of Pinned" : {
+      "comment" : "Choice in the sheet that saves a page to a place: among the space's pinned pages, in no folder.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Top of Pinned"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已固定的顶端"
+          }
+        }
+      }
+    },
+    "New Folder…" : {
+      "comment" : "Item at the foot of the folder menu in the sheet that saves a page to a place: names a new folder to save the page in.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "New Folder…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建文件夹…"
+          }
+        }
+      }
+    },
+    "Unsave Page" : {
+      "comment" : "A command in the command bar, named as in the menu bar: takes a saved page out of Pinned.\nItem in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.\nUndo action name, shown in the Edit menu as Undo Unsave Page.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unsave Page"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消存储页面"
+          }
+        }
+      }
+    },
+    "Unsave Split View" : {
+      "comment" : "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unsave Split View"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消存储分屏浏览"
+          }
+        }
+      }
+    },
+    "Save %lld Pages" : {
+      "comment" : "Menu item for several picked sidebar rows and tabs: saves them into Pinned.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Save Page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Save %lld Pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "存储 %lld 个页面"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Unsave %lld Pages" : {
+      "comment" : "Menu item for several picked pinned pages: takes them out of Pinned, back among the tabs.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unsave Page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unsave %lld Pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "取消存储 %lld 个页面"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Save This Page" : {
+      "comment" : "Button in the toast after closing a pinned tab that had wandered: saves the page it was on instead.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save This Page"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "存储此页面"
+          }
+        }
+      }
+    },
+    "Save This Page Instead" : {
+      "comment" : "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the saved one.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Save This Page Instead"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改为存储此页面"
+          }
+        }
+      }
+    },
+    "Unsaved" : {
+      "comment" : "Toast after a saved page is taken out of Pinned, back among the tabs.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unsaved"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消存储"
+          }
+        }
+      }
+    },
+    "The page is saved in %@. In Every Space shows it in all of the profile’s spaces instead." : {
+      "comment" : "Under the title of the sheet that saves a page: the space it's saved in, which the sheet doesn't let you change, and what In Every Space means. The placeholder is the space's name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "The page is saved in %@. In Every Space shows it in all of the profile’s spaces instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面会存储在“%@”中。“在所有空间中”会让它显示在个人资料的所有空间里。"
           }
         }
       }

@@ -31,19 +31,20 @@ struct CommandActionTests {
         return c
     }
 
-    @Test func pinFollowsWhatThePageIs() {
-        #expect(titles("pin", onATab).contains("Pin Tab"))
+    @Test func savingFollowsWhatThePageIs() {
+        #expect(titles("save", onATab).contains("Save Page"))
+        #expect(titles("save", onATab).contains("Save Page to Folder…"))
         var pinned = onATab
         pinned.isPinned = true
-        #expect(titles("pin", pinned).contains("Unpin Tab"))
-        #expect(!titles("pin", pinned).contains("Pin Tab"))
+        #expect(titles("save", pinned).contains("Unsave Page"))
+        #expect(!titles("save", pinned).contains("Save Page"))
         var favorite = onATab
         favorite.isFavorite = true
-        #expect(!titles("pin", favorite).contains { $0.hasSuffix("Pin Tab") })
-        #expect(!titles("fav", favorite).contains("Add to Favorites"))
+        #expect(!titles("save", favorite).contains { $0.hasSuffix("Page") })
+        #expect(!titles("every", favorite).contains("In Every Space"))
         var blank = onATab
         blank.hasPage = false
-        #expect(titles("pin", blank).isEmpty)
+        #expect(titles("save", blank).isEmpty)
     }
 
     @Test func splitOrSeparate() {
@@ -69,7 +70,7 @@ struct CommandActionTests {
     @Test func privateWindowsKeepNothing() {
         var c = onATab
         c.isPrivate = true
-        #expect(titles("pin", c).isEmpty)
+        #expect(titles("save", c).isEmpty)
         #expect(titles("new space", c).isEmpty)
         #expect(titles("switch", c) == ["Import from Another Browser…"])
     }
@@ -85,12 +86,12 @@ struct CommandActionTests {
     }
 
     @Test func aFirstLetterNeverRunsOne() {
-        // "p" then Return searches for p, it doesn't pin; the app's own commands still match as before.
-        #expect(!titles("p", onATab).contains("Pin Tab"))
-        #expect(titles("p", onATab).contains("Passwords"))
-        #expect(titles("pi", onATab).isEmpty)
+        // "s" then Return searches for s, it doesn't save; the app's own commands still match as before.
+        #expect(!titles("s", onATab).contains("Save Page"))
+        #expect(titles("s", onATab).contains("Settings"))
+        #expect(!titles("sa", onATab).contains("Save Page"))
         #expect(!titles("cl", onATab).contains("Close Other Tabs"))
-        #expect(titles("pin", onATab).contains("Pin Tab"))
+        #expect(titles("save", onATab).contains("Save Page"))
     }
 
     @Test func chineseCountsByCharacters() {
@@ -102,9 +103,9 @@ struct CommandActionTests {
         #expect(!CommandRanker.isEnough("关", for: names))
         #expect(!CommandRanker.isEnough("其", for: names))
         // Latin still waits for three, and a Latin letter beside a character counts as Latin.
-        #expect(!CommandRanker.isEnough("pi", for: ["Pin Tab"]))
+        #expect(!CommandRanker.isEnough("sa", for: ["Save Page"]))
         #expect(!CommandRanker.isEnough("p固", for: names))
-        #expect(CommandRanker.isEnough("pin", for: ["Pin Tab"]))
+        #expect(CommandRanker.isEnough("save", for: ["Save Page"]))
         #expect(!CommandRanker.isEnough(" ", for: names))
     }
 }

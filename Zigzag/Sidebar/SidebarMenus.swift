@@ -62,9 +62,12 @@ enum SidebarMenus {
             }
         }
         if !isPrivate {
-            menu.addItem(Item(String(localized: "Add \(count) to Favorites", comment: "Menu item for several picked sidebar rows")) {
-                controller.favoriteMarked(items)
+            menu.addItem(Item(String(localized: "Save \(count) Pages", comment: "Menu item for several picked sidebar rows: saves them into Pinned, at the end of it.")) {
+                controller.pinMarked(controller.markedTabRows(items))
             })
+            if !controller.markedSavedIDs(items).isEmpty {
+                menu.addItem(Item(InEverySpace.title) { controller.favoriteMarked(items) })
+            }
         }
         if Library.shared.spaces.count > 1, !(isPrivate && !pins.isEmpty) {
             let move = NSMenuItem(title: String(localized: "Move \(count) to Space", comment: "Menu item for several picked sidebar rows"), action: nil, keyEquivalent: "")
@@ -84,8 +87,8 @@ enum SidebarMenus {
             }
             // Pins are shared by every window: a private one doesn't take them away.
             if !isPrivate {
-                menu.addItem(Item(pins.count == 1 ? String(localized: "Unpin Tab", comment: "Menu item")
-                                  : String(localized: "Unpin \(pins.count) Tabs", comment: "Menu item for several picked pinned pages")) {
+                menu.addItem(Item(pins.count == 1 ? String(localized: "Unsave Page", comment: "Menu item for one picked pinned page: takes it out of Pinned, back among the tabs.")
+                                  : String(localized: "Unsave \(pins.count) Pages", comment: "Menu item for several picked pinned pages: takes them out of Pinned, back among the tabs.")) {
                     controller.unpinMarked(pins)
                 })
             }
@@ -98,8 +101,8 @@ enum SidebarMenus {
                 controller.groupWithUndo(rows)
             })
             if !isPrivate {
-                menu.addItem(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item")
-                                  : String(localized: "Pin \(rows.count) Tabs", comment: "Menu item for several picked tabs")) {
+                menu.addItem(Item(rows.count == 1 ? String(localized: "Save Page", comment: "Menu item for one picked tab: saves the page into Pinned, at the end of it.")
+                                  : String(localized: "Save \(rows.count) Pages", comment: "Menu item for several picked tabs: saves them into Pinned, at the end of it.")) {
                     controller.pinMarked(rows)
                 })
             }
@@ -145,12 +148,12 @@ enum SidebarMenus {
         menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) {
             if let url = tab.url { controller.copyLink(url, title: tab.displayTitle) }
         })
-        // Half of a split pins with its other half, as a split.
-        let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
-        // Pins and favorites are shared by every window: a private one's tabs stay out of them.
-        if !manager.isPrivate {
-            menu.addItem(Item(pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.") : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
-            menu.addItem(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
+        // Save at the end of Pinned, or with ⇧ held where the picker says (#326). Pins are shared by every window: a
+        // private one's tabs stay out of them.
+        if !manager.isPrivate, tab.bookmarkID == nil {
+            menu.addItem(Item(String(localized: "Save Page", comment: "Item in a tab's context menu in the sidebar: saves the page into Pinned, and with ⇧ held, asks which folder."), enabled: tab.url != nil) {
+                controller.saveFromPageMenu(tab)
+            })
         }
         if manager.split(for: tab) != nil {
             menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a tab's context menu in the sidebar. Ends the split view the tab is in.")) { controller.unsplitWithUndo(tab) })
@@ -211,13 +214,14 @@ enum SidebarMenus {
             menu.addItem(Item(String(localized: "Separate from Pinned Tab", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own.")) { manager.separateBookmarkTab(bookmark.id) })
             // A private window never writes where it's been into your pins.
             if !manager.isPrivate {
-                menu.addItem(Item(String(localized: "Pin This Page Instead", comment: "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.")) {
+                menu.addItem(Item(String(localized: "Save This Page Instead", comment: "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the saved one.")) {
                     controller.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.updateBookmark(bookmark.id, url: url) }
                 })
             }
         }
-        menu.addItem(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
-            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
+        // In Every Space is a tick on a page already saved (#326), never a destination.
+        menu.addItem(Item(InEverySpace.title) {
+            controller.libraryChange(SavePath.saveName) { _ = SavePath.keepInEverySpace(bookmark.id, profile: manager.profile.id) }
             live?.isFavorite = true
         })
         // Split beside a tab, its row carries the pair, so it ends the split here as a tab's row does.
@@ -275,7 +279,7 @@ enum SidebarMenus {
                 menu.addItem(Item(String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")) { manager.close(pages) })
             }
             if !manager.isPrivate {
-                menu.addItem(Item(String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+                menu.addItem(Item(String(localized: "Unsave Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
                 menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
             }
             return menu
@@ -286,7 +290,7 @@ enum SidebarMenus {
         }
         // Pins are shared by every window: a private one doesn't take them away.
         if !manager.isPrivate {
-            menu.addItem(Item(String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+            menu.addItem(Item(String(localized: "Unsave Page", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
             menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
         }
         return menu
@@ -665,7 +669,7 @@ extension BrowserWindowController {
 
     func unpinMarked(_ pins: [UUID]) {
         var pages: [Tab] = []
-        pageChange(String(localized: "Unpin Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
+        pageChange(SavePath.unsaveName) { [tabManager] in
             pages = []
             // Each comes down to the top of the tabs, the last first, so they keep their order.
             Library.shared.together { for id in pins.reversed() { if let tab = tabManager.unbookmark(id, toIndex: 0) { pages.append(tab) } } }
@@ -673,10 +677,16 @@ extension BrowserWindowController {
         sidebar.list.mark(pages: pages)
     }
 
+    /// Several tabs saved at once, each through `SavePath.save`, so a picked row lands where the star and ⌘D do.
     func pinMarked(_ tabs: [Tab]) {
         Tutorial.complete("pin")
-        pageChange(String(localized: "Pin Tabs", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
-            Library.shared.together { for tab in tabs where tab.bookmarkID == nil { tabManager.bookmarkTab(tab, in: tab.spaceID) } }
+        pageChange(SavePath.saveName) { [tabManager] in
+            Library.shared.together {
+                for tab in tabs where tab.bookmarkID == nil {
+                    guard let page = SavePath.Page(tab: tab) else { continue }
+                    _ = SavePath.save(page, to: SavePath.quickPlace(in: tab.spaceID), in: tabManager)
+                }
+            }
         }
         sidebar.list.mark(pages: tabs)
     }
@@ -699,19 +709,30 @@ extension BrowserWindowController {
         sidebar.list.mark(pins: ids)
     }
 
-    /// Into the favorites, in order. They leave the list for the grid, so nothing stays picked.
+    /// In Every Space ticked on the picked pages already saved, in order. They leave the list for the grid, so nothing
+    /// stays picked.
     func favoriteMarked(_ items: [SidebarItem]) {
-        pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { [tabManager] in
+        let savedIDs = markedSavedIDs(items)
+        pageChange(SavePath.saveName) { [tabManager] in
             Library.shared.together {
-                for item in items {
-                    switch item {
-                    case .tab(let id): if let tab = tabManager.tab(with: id) { tabManager.favoriteTab(tab) }
-                    case .bookmark(let id):
-                        Library.shared.makeFavorite(id, in: tabManager.profile.id)
-                        tabManager.bookmarkTab(for: id)?.isFavorite = true
-                    default: break
-                    }
+                for id in savedIDs {
+                    Library.shared.makeFavorite(id, in: tabManager.profile.id)
+                    tabManager.bookmarkTab(for: id)?.isFavorite = true
                 }
+            }
+        }
+    }
+
+    /// The picked rows that are already saved, so In Every Space can tick them: never a row that isn't, since the tick
+    /// isn't a way to save.
+    func markedSavedIDs(_ items: [SidebarItem]) -> [UUID] {
+        items.compactMap { item in
+            switch item {
+            case .bookmark(let id): return Library.shared.isFavorite(id) ? nil : id
+            case .tab(let id):
+                guard let tab = tabManager.tab(with: id), let bookmarkID = tab.bookmarkID, !tab.isFavorite else { return nil }
+                return bookmarkID
+            default: return nil
             }
         }
     }

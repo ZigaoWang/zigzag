@@ -140,6 +140,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             return nil
         }
         sidebar.address.readerButton.onClick = { [weak self] _ in self?.toggleReader() }
+        wireAddressButtons()
         // The site's pill above the page (#275) is the address there: a click opens the command bar right over it, as
         // a split pane's pill does; a right-click, a middle-click and a drop do what they do on the sidebar's address.
         let pill = root.topBar.pill
@@ -451,7 +452,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let landing = sidebar.list.dropTarget(at: screenPoint, allowsPinned: true)
         let space = tabManager.currentSpaceID
         if landing.section == .bookmarks {
-            pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) {
+            pageChange(SavePath.saveName) {
                 Library.shared.pinFavorite(favorite.id, in: space, at: landing.index)
                 if let folder = landing.folder { Library.shared.moveBookmark(favorite.id, to: landing.index, in: space, folder: .some(folder)) }
             }
@@ -481,7 +482,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             pageChange(String(localized: "Move Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Move Pinned Tab.")) { Library.shared.moveBookmark(bookmarkID, to: landing.index, in: space, folder: .some(landing.folder)) }
             return sidebar.list.row(forBookmark: bookmarkID)
         }
-        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in
+        pageChange(SavePath.unsaveName) { [tabManager] in
             // Into this space first, so it comes down among the tabs you're looking at.
             Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space)
             tabManager.unbookmark(bookmarkID, toIndex: landing.index)
@@ -504,6 +505,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let row = dropFavorite(favorite, at: screenPoint)
         window?.makeKeyAndOrderFront(nil)
         return row
+    }
+
+    /// The star at the end of the address (#326) and the share button beside it: the star is the quick save, or with ⇧
+    /// held the place picker; Share opens the page's sharing services from the address bar.
+    private func wireAddressButtons() {
+        sidebar.address.saveButton.onClick = { [weak self] _ in self?.saveFromStar() }
+        sidebar.address.shareButton.onClick = { [weak self] _ in self?.sharePage(nil) }
     }
 
     private func reloadFavorites() {
@@ -2579,7 +2587,7 @@ extension BrowserWindowController: SidebarDelegate {
             // A long page title would stretch the note across the page: the start of it says which pin.
             let name = pin.title.count > 32 ? String(pin.title.prefix(31)).trimmingCharacters(in: .whitespaces) + "…" : pin.title
             Toast.show(String(localized: "\(name) stays pinned to its own page", comment: "Toast after closing a pinned tab that had wandered to another page. The title is the pinned tab's."), symbol: "pin",
-                       action: (String(localized: "Pin This Page", comment: "Button in the toast after closing a pinned tab that had wandered: pins the page it was on instead."), { [weak self] in
+                       action: (String(localized: "Save This Page", comment: "Button in the toast after closing a pinned tab that had wandered: saves the page it was on instead."), { [weak self] in
                 self?.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in the Edit menu as Undo Update Pinned Page.")) { Library.shared.updateBookmark(bookmarkID, url: here) }
             }), duration: 5, in: self)
             return
@@ -2645,14 +2653,16 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     /// Turns a tab into a bookmark, undoably. Half of a split pins the pair.
+    /// Turns a tab into a saved page, undoably: every save in the sidebar, a drag to Pinned included, comes through
+    /// `save`, so it lands as ⌘D does (#326). Half of a split saves the pair.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID) {
-        Tutorial.complete("pin")
-        pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID) }
+        guard let page = SavePath.Page(tab: tab) else { return }
+        save(page, to: SavePath.Place(spaceID: spaceID, index: index))
     }
 
     /// Turns a bookmark back into a tab, undoably. Half of a pinned split unpins the pair.
     func unbookmarkWithUndo(_ bookmarkID: UUID, to index: Int?) {
-        pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) { [tabManager] in tabManager.unbookmark(bookmarkID, toIndex: index) }
+        pageChange(SavePath.unsaveName) { [tabManager] in tabManager.unbookmark(bookmarkID, toIndex: index) }
     }
 
     /// A tab dropped on a pinned page: the two become one pinned split where the pinned page is, open side by side.
@@ -2810,7 +2820,7 @@ extension BrowserWindowController: SidebarDelegate {
         guard !tabManager.isPrivate else { return }
         let space = tabManager.currentSpaceID
         confirmProfileCrossing(pinned: bookmarkID, to: space) { [weak self, tabManager] in
-            self?.pageChange(String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")) {
+            self?.pageChange(SavePath.unsaveName) {
                 // Carried here from another space: into this one first, so it comes down among the tabs you're looking at.
                 if Library.shared.spaceID(ofBookmark: bookmarkID) != space { Library.shared.moveBookmark(bookmarkID, to: Int.max, in: space) }
                 tabManager.unbookmark(bookmarkID, toIndex: index, under: parent, group: group)
@@ -3004,7 +3014,7 @@ extension BrowserWindowController: SidebarDelegate {
             let tiles = Library.shared.favoriteTiles(in: tabManager.profile.id).count, at = slot
             switch item {
             case .tab(let id): if let tab = tabManager.tab(with: id) { favoriteWithUndo(tab, at: at) }
-            case .bookmark(let id): pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
+            case .bookmark(let id): pageChange(SavePath.saveName) { [tabManager] in tabManager.favoriteBookmark(id, at: at) }
             default: break
             }
             slot = slot.map { $0 + Library.shared.favoriteTiles(in: tabManager.profile.id).count - tiles }

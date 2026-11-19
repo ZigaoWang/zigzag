@@ -16,6 +16,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 运行脚本的下载规则会在网页上显示进度：运行时显示“正在运行脚本”，结束后显示“脚本运行完成”或“脚本运行失败”，并附上脚本最后输出的一行，规则不会再悄悄运行。把链接交给 App、下载工具或默认浏览器的规则，成功后每次打开 Zigzag 会提示一次。感谢 [Lakeland97](https://github.com/Lakeland97)。([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 - 网站可以有自己的图标。在“网站设置”的 ⋯ 菜单里选“更改网站图标…”，会打开和标签页一样的图标选择，有符号、表情符号和“选取图像…”，这个网站的所有标签页、固定标签页、收藏和历史记录都会用它。标签页自己的图标仍然优先，“使用网站图标”可以换回网站原来的图标。“设置 › 隐私 › 网站”会列出它，可以忘掉；在无痕浏览窗口里设置的只到窗口关闭为止。感谢 [bkonia](https://github.com/bkonia)。([#310](https://github.com/ZigaoWang/zigzag/issues/310))
 - “设置 › 隐私 › 网站”里，给一个网站做的每个选择各占一行，用的是和网站设置里一样的控件，每行都有一个 ×，只忘记那一项，不再是一句话加一个“忘记”。JavaScript 和扩展现在放在网站设置的“权限”页，和摄像头等放在一起；给某个网站关掉扩展会按个人资料分别记住。感谢 [Lakeland97](https://github.com/Lakeland97)。([#311](https://github.com/ZigaoWang/zigzag/issues/311)、[#312](https://github.com/ZigaoWang/zigzag/issues/312)、[#313](https://github.com/ZigaoWang/zigzag/issues/313)、[#314](https://github.com/ZigaoWang/zigzag/issues/314))
+- 存储页面只有一个词、一个按键。地址栏右端的星标、⌘D 和链接菜单里的“存储页面”，都会不提问地把页面存储到你所在的空间，按住 ⇧ 使用其中任何一个则会询问放进哪个文件夹。“收藏”变成已存储页面上的“在所有空间中”一个勾选，链接也可以不打开就存储。([#326](https://github.com/ZigaoWang/zigzag/issues/326))
 
 ### 修复
 - 在 YouTube 上按住 ⌘ 点视频，现在总会在新标签页打开。以前有时会在当前标签页打开，因为 YouTube 自己的脚本把链接接了过去。现在按住 ⌘ 点链接，不管网页怎么处理点按，都会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#317](https://github.com/ZigaoWang/zigzag/issues/317))

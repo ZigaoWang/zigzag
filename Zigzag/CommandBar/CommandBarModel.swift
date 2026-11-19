@@ -243,15 +243,19 @@ enum CommandRanker {
     static func contextActions(_ c: Context) -> [Action] {
         var list: [Action] = []
         if c.hasPage, !c.isPrivate, !c.isFavorite {
-            list.append(c.isPinned
-                ? Action(id: "unpin", title: String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar."),
-                         keywords: ["unpin", "pin", "tab", "remove"], symbol: "pin.slash")
-                : Action(id: "pin", title: String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar."),
-                         keywords: ["pin", "tab", "keep", "bookmark"], symbol: "pin"))
+            if c.isPinned {
+                list.append(Action(id: "unpin", title: String(localized: "Unsave Page", comment: "A command in the command bar, named as in the menu bar: takes a saved page out of Pinned."),
+                                   keywords: ["save", "unsave", "unpin", "pin", "tab", "remove"], symbol: "star.slash"))
+            } else {
+                list.append(Action(id: "pin", title: String(localized: "Save Page", comment: "A command in the command bar, named as in the menu bar: saves the page into Pinned."),
+                                   keywords: ["save", "pin", "tab", "keep", "bookmark"], symbol: "star"))
+                list.append(Action(id: "pin-to-folder", title: String(localized: "Save Page to Folder…", comment: "A command in the command bar, named as in the menu bar: saves the page, asking which folder of the space it goes in."),
+                                   keywords: ["save", "folder", "pin", "tab", "file"], symbol: "folder.badge.plus"))
+            }
         }
         if c.hasPage, !c.isFavorite, c.isPinned || !c.isPrivate {
-            list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
-                               keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: "star"))
+            list.append(Action(id: "favorite", title: InEverySpace.title,
+                               keywords: ["every", "space", "favorites", "favourites", "star", "bookmark"], symbol: "star.circle"))
         }
         if c.inSplit {
             list.append(Action(id: "separate", title: String(localized: "Separate Tabs", comment: "A command in the command bar, named as in the menu bar."),

@@ -220,9 +220,10 @@ extension BrowserWindowController {
 
     // MARK: Favorites
 
-    /// A tab (and a split's other half) into the favorites at a tile's place (nil: the end).
+    /// In Every Space ticked on a tab (#326): a page already saved, never a second save of it. A split's other half
+    /// comes with it.
     func favoriteWithUndo(_ tab: Tab, at index: Int? = nil) {
-        pageChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in the Edit menu as Undo Add to Favorites.")) { [tabManager] in tabManager.favoriteTab(tab, at: index) }
+        pageChange(SavePath.saveName) { [tabManager] in tabManager.favoriteTab(tab, at: index) }
     }
 
     /// A tab or pinned page dropped on a favorite's middle: the two become one favorite, side by side.

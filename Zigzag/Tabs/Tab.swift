@@ -400,6 +400,9 @@ final class Tab: NSObject {
     /// The icon you chose that stands for it, or the one set for its site (`SiteIcons`), or nil for the site's own.
     /// Kept up to date (`refreshChosenIcon`), and says `.favicon` when it changes, as a new site icon does.
     private(set) var chosenIcon: String?
+    /// The link under the pointer in its page, as the hover script last said: where Save to Pins in the page's menu
+    /// saves from (#326).
+    private(set) var hoveredLink: URL?
 
     /// A development tab (#141): Developer tools is on and the page it shows is on a site you develop
     /// (`DevelopmentSites`). The page it shows is the one last committed; before any, the address it's going to, so
@@ -2374,6 +2377,7 @@ extension Tab: WKUIDelegate {
 
     /// Reported by our hover script: the link under the pointer, or nil.
     func hoveredLinkChanged(_ url: URL?) {
+        hoveredLink = url
         host?.tab(self, hoveringLink: url)
     }
 
