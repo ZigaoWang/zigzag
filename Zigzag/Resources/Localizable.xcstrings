@@ -4223,17 +4223,6 @@
         }
       }
     },
-    "Reorder “%@”" : {
-      "comment" : "Drag handle and reorder menu for a space in Settings.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "调整“%@”的顺序"
-          }
-        }
-      }
-    },
     "Reorder or remove rule %lld" : {
       "comment" : "Drag handle and menu for a space rule.",
       "localizations" : {
@@ -8035,7 +8024,7 @@
       }
     },
     "Delete Space" : {
-      "comment" : "Button of the sheet that deletes a space from Settings.\nItem in a space's context menu.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Delete Space.",
+      "comment" : "Button of the sheet that deletes a space from Settings.\nItem in a space's context menu.\nTooltip of the trash button on a space's row in Settings › Spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Delete Space.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8541,7 +8530,7 @@
       }
     },
     "Edit" : {
-      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nOpen the space editor from its row in Settings.",
+      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8629,7 +8618,7 @@
       }
     },
     "Edit “%@”" : {
-      "comment" : "The space to edit from Settings.\nVoiceOver label of the Edit button on a profile's row in Settings › Profiles; the profile's name.",
+      "comment" : "VoiceOver label of the Edit button on a profile's row in Settings › Profiles; the profile's name.\nVoiceOver label of the Edit button on a space's row in Settings › Spaces; the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -8651,7 +8640,7 @@
       }
     },
     "Edit…" : {
-      "comment" : "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.\nButton on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color.",
+      "comment" : "At the end of the Custom style row in the site panel: opens the sheet to change the site's CSS.\nButton on a profile's row in Settings › Profiles: opens the sheet that renames it and changes its color.\nButton on a space's row in Settings › Spaces: opens its editor.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11802,7 +11791,7 @@
       }
     },
     "Move Space" : {
-      "comment" : "Undo action after reordering a space.\nWhat Edit › Undo undoes after a space is dragged to a new place.",
+      "comment" : "What Edit › Undo undoes after a space is dragged to a new place.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

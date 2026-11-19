@@ -1,7 +1,7 @@
 import AppKit
 
 /// A rule stays in its row while it is edited. Only a valid, committed address changes where links open.
-final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable, SettingsDragRow, NSTextFieldDelegate {
+final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable, NSTextFieldDelegate {
     let grip = IconButton(symbol: "line.3.horizontal", size: .compact)
     let address = FilledField(placeholder: "github.com")
     let match = DropdownButton()
@@ -234,5 +234,23 @@ final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable,
         place(matchLabel, at: match.frame.minX, above: match.frame.minY, width: match.frame.width)
         place(addressLabel, at: address.frame.minX, above: address.frame.minY, width: address.frame.width)
         place(destinationLabel, at: destination.frame.minX, above: destination.frame.minY, width: destination.frame.width)
+    }
+}
+
+/// Keyboard alternatives to dragging a routing rule.
+@MainActor
+enum SiteRouteReorderMenu {
+    static func addMoves(to menu: NSMenu, for id: UUID, in order: [UUID], moveBefore: @escaping (UUID?) -> Void) {
+        guard let index = order.firstIndex(of: id) else { return }
+        if index > 0 {
+            menu.addItem(SidebarMenus.Item(String(localized: "Move Up", comment: "Move a row one place up in Settings.")) {
+                moveBefore(order[index - 1])
+            })
+        }
+        if index + 1 < order.count {
+            menu.addItem(SidebarMenus.Item(String(localized: "Move Down", comment: "Move a row one place down in Settings.")) {
+                moveBefore(index + 2 < order.count ? order[index + 2] : nil)
+            })
+        }
     }
 }

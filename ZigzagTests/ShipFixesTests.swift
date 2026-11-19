@@ -952,10 +952,6 @@ struct ControlMenuTests {
 
     @Test func aSpaceRowInSettingsOffersItsMenuEverywhere() {
         let row = SpaceSettingsRow(space: SpaceInfo(name: "Work", color: .sky))
-        let buttons = row.subviews.compactMap { $0 as? InteractiveView }
-        #expect(buttons.count == 2)
-        #expect(buttons.contains { $0 === row.editButton })
-        #expect(row.grip.symbol == "line.3.horizontal")
         #expect(row.offersMenu)
         #expect(row.isAccessibilitySelectorAllowed(#selector(NSView.accessibilityPerformShowMenu)))
         let edit = String(localized: "Edit Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")
@@ -971,7 +967,7 @@ struct ControlMenuTests {
         var destinations: [UUID?] = []
         func menu(_ id: UUID, in ids: [UUID]) -> NSMenu {
             let menu = NSMenu()
-            SettingsReorderMenu.addMoves(to: menu, for: id, in: ids) { destinations.append($0) }
+            SiteRouteReorderMenu.addMoves(to: menu, for: id, in: ids) { destinations.append($0) }
             return menu
         }
         #expect(menu(a, in: [a]).items.isEmpty)

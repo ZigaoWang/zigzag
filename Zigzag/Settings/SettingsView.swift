@@ -161,7 +161,7 @@ nonisolated struct GroupListing<Key: Equatable> {
 /// A row "Find a setting" can find, by the words it shows.
 protocol SettingsSearchable { var searchText: String { get } }
 
-/// A row's delete button (a profile's or an extension's trash): one rule for all of them. It shows while
+/// A row's delete button (a space's, a profile's, an extension's trash): one rule for all of them. It shows while
 /// the row is pointed at or something in it has keyboard focus, and always while VoiceOver is on, which has no
 /// pointer to bring it. Hidden, it keeps its place, so nothing in the row moves when it comes; with Full Keyboard
 /// Access on it stays in the Tab order, see-through until Tab reaches it.
@@ -536,33 +536,9 @@ enum ExtensionPrivateRow {
 
 // MARK: - A row that can be dragged
 
-@MainActor
-protocol SettingsDragRow: AnyObject {
-    var isLifted: Bool { get set }
-}
-
-/// Both lists offer the same one-place moves as alternatives to dragging.
-@MainActor
-enum SettingsReorderMenu {
-    static func addMoves(to menu: NSMenu, for id: UUID, in order: [UUID], moveBefore: @escaping (UUID?) -> Void) {
-        guard let index = order.firstIndex(of: id) else { return }
-        if index > 0 {
-            menu.addItem(SidebarMenus.Item(String(localized: "Move Up", comment: "Move a row one place up in Settings.")) {
-                moveBefore(order[index - 1])
-            })
-        }
-        if index + 1 < order.count {
-            menu.addItem(SidebarMenus.Item(String(localized: "Move Down", comment: "Move a row one place down in Settings.")) {
-                moveBefore(index + 2 < order.count ? order[index + 2] : nil)
-            })
-        }
-    }
-}
-
-/// A group row that can be picked up and dropped at another place in its list. Settings' lists hold `FormRow`s, which
-/// are plain views that can't be grabbed, so the row rides inside this one: the whole row is the drag surface, except
-/// its own controls, which keep their clicks (`InteractiveView`'s hit test).
-final class DraggableRow: InteractiveView, SettingsDragRow, SettingsSizedRow, SettingsSearchable {
+/// A draggable group row. `FormRow`s are plain views, so the row sits inside this one, which is the drag surface; its
+/// controls keep their clicks (`InteractiveView`'s hit test).
+final class DraggableRow: InteractiveView, SettingsSizedRow, SettingsSearchable {
     /// The row it carries.
     let row: NSView
     var searchText: String { (row as? SettingsSearchable)?.searchText ?? "" }
@@ -607,38 +583,45 @@ final class DraggableRow: InteractiveView, SettingsDragRow, SettingsSizedRow, Se
 
 // MARK: - Spaces list
 
-/// A space in Settings, with the same drag grip and actions menu as the rules below it.
-final class SpaceSettingsRow: InteractiveView, SettingsDragRow, SettingsSearchable {
+/// A space in Settings: its color (click to change), its name (edit in place), delete on hover, drag to reorder.
+final class SpaceSettingsRow: InteractiveView, SettingsSearchable {
     var searchText: String { name.stringValue + " " + detail.stringValue }
     let spaceID: UUID
-    var onMoveBefore: ((UUID?) -> Void)?
-    let grip = IconButton(symbol: "line.3.horizontal", size: .compact)
-    let editButton = PillButton(title: String(localized: "Edit", comment: "Open the space editor from its row in Settings."))
     /// Its color as a tile with its first letter, the same size and shape as the icons on every other row.
     private let tile = NSImageView()
     private let name: Label
     private let detail = Label("", font: Tokens.Font.detail(), color: Tokens.Color.textSecondary)
+    private let editButton = PillButton(title: String(localized: "Edit…", comment: "Button on a space's row in Settings › Spaces: opens its editor."))
+    private let deleteButton = IconButton(symbol: "trash", size: .compact,
+                                          toolTip: String(localized: "Delete Space", comment: "Tooltip of the trash button on a space's row in Settings › Spaces."))
     /// True while the row is being dragged; it draws as lifted.
     var isLifted = false { didSet { stateDidChange(animated: false) } }
+    /// True while any space is carried: rows sliding under the pointer don't count as hovered.
+    static var isReordering = false
+
     init(space: SpaceInfo) {
         spaceID = space.id
         name = Label(space.name, font: Tokens.Font.row(), color: Tokens.Color.textPrimary)
         super.init(frame: NSRect(x: 0, y: 0, width: 400, height: Self.height))
         layer?.cornerRadius = Tokens.Radius.row
         layer?.cornerCurve = .continuous
-        grip.toolTip = String(localized: "Reorder “\(space.name)”", comment: "Drag handle and reorder menu for a space in Settings.")
-        editButton.setAccessibilityLabel(String(localized: "Edit “\(space.name)”", comment: "The space to edit from Settings."))
-        grip.isHidden = Library.shared.spaces.count < 2
         tile.image = Self.tile(for: space)
         detail.stringValue = Self.summary(of: space)
-        [grip, tile, name, detail, editButton].forEach { addSubview($0) }
+        RowDelete.apply(deleteButton, shows: false)
+        deleteButton.isEnabled = Library.shared.spaces.count > 1
+        [tile, name, detail, deleteButton, editButton].forEach { addSubview($0) }
+        // The row and its Edit button both open the same editor the sidebar uses.
         onClick = { [weak self] _ in self?.openEditor() }
         onRightClick = { [weak self] _ in self?.actionsMenu() }
-        editButton.onClick = onClick
-        grip.onClick = { [weak self] _ in
-            guard let self else { return }
-            actionsMenu().popUp(positioning: nil, at: NSPoint(x: 0, y: grip.bounds.maxY), in: grip)
+        editButton.onClick = { [weak self] _ in self?.openEditor() }
+        // Every row has an Edit: VoiceOver says which space it edits.
+        editButton.setAccessibilityLabel(String(localized: "Edit “\(space.name)”", comment: "VoiceOver label of the Edit button on a space's row in Settings › Spaces; the space's name."))
+        deleteButton.onClick = { [weak self] _ in
+            guard let self, let host = self.host else { return }
+            SpaceSettingsRow.confirmDelete(self.spaceID, in: host)
         }
+        deleteButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
+        editButton.keyboardFocusChanged = { [weak self] _ in self?.stateDidChange(animated: false) }
         setAccessibilityRole(.row)
         setAccessibilityLabel(space.name)
     }
@@ -658,12 +641,15 @@ final class SpaceSettingsRow: InteractiveView, SettingsDragRow, SettingsSearchab
         super.layout()
         let pad = Tokens.Page.groupPad
         let d = Tokens.Metric.favicon
-        grip.frame = NSRect(x: pad, y: (bounds.height - d) / 2, width: d, height: d)
-        tile.frame = grip.frame.offsetBy(dx: grip.isHidden ? 0 : d + Tokens.Space.x3, dy: 0)
-        let size = editButton.intrinsicContentSize
-        editButton.frame = NSRect(x: bounds.width - pad - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
+        tile.frame = NSRect(x: pad, y: (bounds.height - d) / 2, width: d, height: d)
+        let ew = editButton.fittingWidth, eh = Tokens.Page.controlHeight
+        editButton.frame = NSRect(x: bounds.width - pad - ew, y: (bounds.height - eh) / 2, width: ew, height: eh)
+        let b = deleteButton.frame.width
+        deleteButton.frame.origin = NSPoint(x: editButton.frame.minX - Tokens.Space.x2 - b, y: (bounds.height - b) / 2)
         let x = tile.frame.maxX + Tokens.Space.x3 - Label.inset
-        let width = max(0, editButton.frame.minX - Tokens.Space.x2 - x)
+        // The name has the room up to Edit while Delete isn't showing: a narrow page cuts it short only on hover.
+        let end = deleteButton.alphaValue > 0 ? deleteButton.frame.minX : editButton.frame.minX
+        let width = max(0, end - x - Tokens.Space.x2)
         let top = round((bounds.height - name.lineHeight - Self.lineGap - detail.lineHeight) / 2)
         name.frame = NSRect(x: x, y: top, width: width, height: name.lineHeight)
         detail.frame = NSRect(x: x, y: name.frame.maxY + Self.lineGap, width: width, height: detail.lineHeight)
@@ -674,7 +660,7 @@ final class SpaceSettingsRow: InteractiveView, SettingsDragRow, SettingsSearchab
     }
 
     /// Where the row's text starts, for the divider under it.
-    var textInset: CGFloat { Tokens.Page.groupPad + (grip.isHidden ? 1 : 2) * (Tokens.Metric.favicon + Tokens.Space.x3) }
+    var textInset: CGFloat { Tokens.Page.groupPad + Tokens.Metric.favicon + Tokens.Space.x3 }
 
     private static func tile(for space: SpaceInfo) -> NSImage { tile(name: space.name, swatch: space.swatch, icon: space.icon) }
 
@@ -742,9 +728,6 @@ final class SpaceSettingsRow: InteractiveView, SettingsDragRow, SettingsSearchab
         menu.addItem(SidebarMenus.Item(String(localized: "Edit Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
             self?.openEditor()
         })
-        if let onMoveBefore {
-            SettingsReorderMenu.addMoves(to: menu, for: spaceID, in: Library.shared.spaces.map(\.id), moveBefore: onMoveBefore)
-        }
         menu.addItem(SidebarMenus.useDefaultColorsItem(for: spaceID) { BrowserWindowController.changeLibrary($0, $1) })
         if Library.shared.spaces.count > 1 {
             menu.addItem(SidebarMenus.Item(String(localized: "Delete Space…", comment: "Item in the menu of a space's row in Settings › Spaces.")) { [weak self] in
@@ -758,6 +741,11 @@ final class SpaceSettingsRow: InteractiveView, SettingsDragRow, SettingsSearchab
     override func resetCursorRects() { if isLifted { addCursorRect(bounds, cursor: .closedHand) } }
 
     override func stateDidChange(animated: Bool) {
+        // Delete as on every row with one (`RowDelete`), never while the row is carried.
+        let focused = deleteButton.hasKeyboardFocus || editButton.hasKeyboardFocus
+        let showsDelete = RowDelete.shows(hovered: isHovered, focused: focused, voiceOver: RowDelete.voiceOver) && !isLifted && !Self.isReordering
+        RowDelete.apply(deleteButton, shows: showsDelete, keyboardAccess: InteractiveView.keyboardAccess && !isLifted)
+        needsLayout = true
         // At rest a space reads like every other row in Settings: no fill of its own. Carried, it's a card above
         // the others, solid at once so nothing shows through it.
         layer?.backgroundColor = isLifted ? cgColor(Tokens.Color.surfaceGroup) : nil
@@ -2547,8 +2535,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             row.onRightClick = { [weak self] _ in self?.routeMenu(for: rule.id) }
             row.grip.onDragStart = { [weak self, weak row] event in
                 guard let self, let row, self.pendingRoute?.id != rule.id else { return false }
-                return self.dragRow(row, event: event, in: self.routesGroup,
-                                    rows: { self.routeRows.filter { $0.id != self.pendingRoute?.id } }, move: library.moveRoute)
+                return self.beginRouteDrag(row, event: event)
             }
             return (rule.id, row)
         }
@@ -2567,7 +2554,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func routeMenu(for id: UUID) -> NSMenu {
         let library = Library.shared, routes = library.siteRoutes
         let menu = NSMenu()
-        SettingsReorderMenu.addMoves(to: menu, for: id, in: routes.map(\.id)) { library.moveRoute(id, before: $0) }
+        SiteRouteReorderMenu.addMoves(to: menu, for: id, in: routes.map(\.id)) { library.moveRoute(id, before: $0) }
         if let rule = routes.first(where: { $0.id == id }), let i = SiteRoutes.blocker(for: rule, in: routes) {
             menu.addItem(SidebarMenus.Item(String(localized: "Move Above Rule \(i + 1)", comment: "Move a space rule above the rule hiding it.")) {
                 library.moveRoute(id, before: routes[i].id)
@@ -2587,26 +2574,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         spacesGroup.removeAllRows()
         spaceRows = Library.shared.spaces.map { space in
             let row = SpaceSettingsRow(space: space)
-            row.onMoveBefore = { [weak self, weak row] before in
-                guard let self else { return }
-                let hadFocus = row?.grip.hasKeyboardFocus == true || row?.hasKeyboardFocus == true
-                moveSpace(space.id, before: before)
-                if hadFocus, let moved = spaceRows.first(where: { $0.spaceID == space.id }) {
-                    moved.scrollToVisible(moved.bounds)
-                    window?.makeFirstResponder(moved.grip)
-                }
-            }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
-                SpaceEditorPanel.current?.close()
-                return self.dragRow(row, event: event, in: self.spacesGroup,
-                                    rows: { self.spaceRows.map { ($0.spaceID, $0) } }, move: self.moveSpace)
+                return self.beginDrag(row, event: event)
             }
-            row.grip.onDragStart = row.onDragStart
             spacesGroup.add(row)
             return row
         }
         layoutSubtreeIfNeeded()
+        syncSpaceHover()
         if pane == .spaces || isSearching { layoutDocument() }
     }
 
@@ -3789,33 +3765,104 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     // MARK: Reordering spaces
 
-    private func moveSpace(_ id: UUID, before next: UUID?) {
-        let library = Library.shared
-        guard let from = library.index(of: id) else { return }
-        let to: Int
-        if let next {
-            guard let index = library.index(of: next) else { return }
-            to = index > from ? index - 1 : index
-        } else {
-            to = library.spaces.count - 1
+    /// Spaces drag the way tabs do in the sidebar: the space stays where it is, faint, a see-through copy follows
+    /// the pointer, and a line shows where it will land. Nothing else moves until it's dropped.
+    private func beginDrag(_ row: SpaceSettingsRow, event: NSEvent) -> Bool {
+        guard let window, let startIndex = spaceRows.firstIndex(where: { $0 === row }) else { return false }
+        SpaceEditorPanel.current?.close()
+        SpaceSettingsRow.isReordering = true
+        spaceRows.forEach { $0.isHovered = false }
+        // Lifted for its picture: its own solid card, so the copy reads off the list.
+        row.isLifted = true
+        let copy = CarriedCopy(of: row, picture: CarriedCopy.picture(of: row), grabbedAt: window.convertPoint(toScreen: event.locationInWindow),
+                               ground: nil, radius: Tokens.Radius.row)
+        row.isLifted = false
+        row.alphaValue = CarriedCopy.faint
+        copy.lift()
+        let line = InsertionLineView()
+        line.isHidden = true
+        spacesGroup.addSubview(line)
+        let others = spaceRows.filter { $0 !== row }
+        var target = startIndex
+        let released = CarriedCopy.track(in: window) { event in
+            copy.follow(window.convertPoint(toScreen: event.locationInWindow))
+            self.documentView.autoscroll(with: event)
+            // Its new place: after every other space whose middle is above the pointer.
+            let y = self.spacesGroup.convert(event.locationInWindow, from: nil).y
+            target = others.filter { $0.frame.midY < y }.count
+            line.isHidden = target == startIndex
+            let edge = target < others.count ? others[target].frame.minY : others.last?.frame.maxY ?? 0
+            Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: self.spacesGroup.bounds.width, height: 6) }
         }
-        guard from != to else { return }
-        BrowserWindowController.changeLibrary(String(localized: "Move Space", comment: "Undo action after reordering a space.")) {
-            library.moveSpace(id, to: to)
+        line.removeFromSuperview()
+        SpaceSettingsRow.isReordering = false
+        let spaceID = row.spaceID
+        if released != nil, target != startIndex {
+            BrowserWindowController.changeLibrary(String(localized: "Move Space", comment: "What Edit › Undo undoes after a space is dragged to a new place.")) {
+                Library.shared.moveSpace(spaceID, to: target)
+            }
+        }
+        reloadSpaces()
+        layoutSubtreeIfNeeded()
+        row.alphaValue = 1
+        copy.land(on: spaceRows.first { $0.spaceID == spaceID }) { [weak self] in self?.syncSpaceHover() }
+        return true
+    }
+
+    /// Hover follows where the pointer really is, once rows have moved or been rebuilt under it.
+    private func syncSpaceHover() {
+        guard let window else { return }
+        let mouse = window.mouseLocationOutsideOfEventStream
+        for row in spaceRows {
+            row.isHovered = row.window != nil && row.bounds.contains(row.convert(mouse, from: nil))
         }
     }
 
-    // MARK: Dragging settings rows
+    // MARK: Reordering download rules
 
     /// Drags like a space: the rule stays faint in place, a translucent copy follows the pointer, and a line marks the
     /// drop. Nothing moves until drop.
     private func beginDownloadRuleDrag(_ row: DraggableRow, event: NSEvent) -> Bool {
-        dragRow(row, event: event, in: downloadRulesGroup, rows: { self.downloadRuleRows }, move: DownloadRulesStore.shared.move)
+        guard let window, let startIndex = downloadRuleRows.firstIndex(where: { $0.row === row }) else { return false }
+        // Solid card for the drag image.
+        row.isLifted = true
+        let copy = CarriedCopy(of: row, picture: CarriedCopy.picture(of: row), grabbedAt: window.convertPoint(toScreen: event.locationInWindow),
+                               ground: nil, radius: Tokens.Radius.row)
+        row.isLifted = false
+        row.alphaValue = CarriedCopy.faint
+        copy.lift()
+        let line = InsertionLineView()
+        line.isHidden = true
+        downloadRulesGroup.addSubview(line)
+        let others = downloadRuleRows.filter { $0.row !== row }
+        var target = startIndex
+        let released = CarriedCopy.track(in: window) { event in
+            copy.follow(window.convertPoint(toScreen: event.locationInWindow))
+            self.documentView.autoscroll(with: event)
+            // New index: after every other rule whose middle is above the pointer.
+            let y = self.downloadRulesGroup.convert(event.locationInWindow, from: nil).y
+            target = others.filter { $0.row.frame.midY < y }.count
+            line.isHidden = target == startIndex
+            let edge = target < others.count ? others[target].row.frame.minY : others.last?.row.frame.maxY ?? 0
+            Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: self.downloadRulesGroup.bounds.width, height: 6) }
+        }
+        line.removeFromSuperview()
+        let ruleID = downloadRuleRows[startIndex].id
+        if released != nil, target != startIndex {
+            // The store's change signal rebuilds the list. The list shows only handoff rules, so move before the target
+            // rule's id, not an index.
+            DownloadRulesStore.shared.move(ruleID, before: target < others.count ? others[target].id : nil)
+        }
+        layoutSubtreeIfNeeded()
+        row.alphaValue = 1
+        copy.land(on: downloadRuleRows.first { $0.id == ruleID }?.row)
+        return true
     }
 
-    private func dragRow<Row: NSView & SettingsDragRow>(_ row: Row, event: NSEvent, in group: FormGroup,
-                                                        rows: () -> [(id: UUID, row: Row)], move: (UUID, UUID?) -> Void) -> Bool {
-        let order = rows()
+    // MARK: Reordering space rules
+
+    private func beginRouteDrag(_ row: SiteRouteRow, event: NSEvent) -> Bool {
+        let order = routeRows.filter { $0.id != pendingRoute?.id }
         let visible = order.filter { !$0.row.isHidden }
         guard let window, visible.count > 1, let startIndex = visible.firstIndex(where: { $0.row === row }) else { return false }
         let id = visible[startIndex].id
@@ -3828,18 +3875,18 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         copy.lift()
         let line = InsertionLineView()
         line.isHidden = true
-        group.addSubview(line)
+        routesGroup.addSubview(line)
         let others = visible.filter { $0.row !== row }
         var target = startIndex
         let released = CarriedCopy.track(in: window) { event in
             copy.follow(window.convertPoint(toScreen: event.locationInWindow))
             self.documentView.autoscroll(with: event)
             // Its new place: after every other visible row whose middle is above the pointer.
-            let y = group.convert(event.locationInWindow, from: nil).y
+            let y = self.routesGroup.convert(event.locationInWindow, from: nil).y
             target = others.filter { $0.row.frame.midY < y }.count
             line.isHidden = target == startIndex
             let edge = target < others.count ? others[target].row.frame.minY : others.last?.row.frame.maxY ?? 0
-            Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: group.bounds.width, height: 6) }
+            Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: self.routesGroup.bounds.width, height: 6) }
         }
         line.removeFromSuperview()
         if released != nil, target != startIndex {
@@ -3852,11 +3899,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             } else {
                 before = nil
             }
-            move(id, before)
+            Library.shared.moveRoute(id, before: before)
         }
         layoutSubtreeIfNeeded()
         row.alphaValue = 1
-        copy.land(on: rows().first { $0.id == id }?.row)
+        copy.land(on: routeRows.first { $0.id == id }?.row)
         return true
     }
 
