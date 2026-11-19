@@ -737,14 +737,14 @@ enum ZoomLevels {
     static let steps: [CGFloat] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
 
     /// The next step in (`by` 1) or out (-1) from `zoom`, which needn't be a step itself (a pinch, an old level); at
-    /// either end it stays there.
-    static func step(_ zoom: CGFloat, by direction: Int) -> CGFloat {
-        direction > 0 ? steps.first { $0 > zoom + 0.001 } ?? steps.last! : steps.last { $0 < zoom - 0.001 } ?? steps.first!
+    /// either end it stays there. `levels` holds the steps of what's stepped: a page's zoom, or the sidebar's size.
+    static func step(_ zoom: CGFloat, by direction: Int, in levels: [CGFloat] = steps) -> CGFloat {
+        direction > 0 ? levels.first { $0 > zoom + 0.001 } ?? levels.last! : levels.last { $0 < zoom - 0.001 } ?? levels.first!
     }
 
     /// Whether there's a step further that way.
-    static func canStep(_ zoom: CGFloat, by direction: Int) -> Bool {
-        direction > 0 ? zoom < steps.last! - 0.001 : zoom > steps.first! + 0.001
+    static func canStep(_ zoom: CGFloat, by direction: Int, in levels: [CGFloat] = steps) -> Bool {
+        direction > 0 ? zoom < levels.last! - 0.001 : zoom > levels.first! + 0.001
     }
 
     /// A zoom as people read it: "125%".

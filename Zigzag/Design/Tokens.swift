@@ -166,17 +166,41 @@ enum Tokens {
     /// 12pt, every title and label at 36pt. Pages (Settings, History) keep the calmer app scale (`Metric`,
     /// `TypeSize.row`).
     enum Sidebar {
-        /// Settings › Appearance › Sidebar size (#183), as macOS's own Sidebar icon size: the rows' text, icons and
-        /// heights, the space's name, the favorites' tiles and the address, all together. Medium is the sizes written
-        /// here; the toolbar's buttons, the traffic lights and the gaps between things stay as they are.
+        /// Settings › Appearance › Sidebar size (#183, #361), as macOS's own Sidebar icon size: the rows' text, icons
+        /// and heights, the space's name, the favorites' tiles and the address, all together. Medium is the sizes
+        /// written here; the toolbar's buttons, the traffic lights and the gaps between things stay as they are.
         enum Size: String, CaseIterable {
             case small, medium, large
+            /// The size you set, as a percentage of Medium.
+            case custom
+
             var scale: CGFloat {
                 switch self {
                 case .small: 0.9
                 case .medium: 1
                 case .large: 1.15
+                case .custom: Sidebar.customScale
                 }
+            }
+        }
+
+        /// The sidebar's scale now: its size's, and for Custom, the percentage set.
+        static var scale: CGFloat { current.scale }
+
+        /// The custom size's percents, 75 to 150 by 5: what the − and + beside Sidebar size step through.
+        static let customSteps: [CGFloat] = stride(from: 75, through: 150, by: 5).map { CGFloat($0) / 100 }
+
+        /// The custom size's scale, 0.75 to 1.5: written back in whole percents within that range, so every size it
+        /// makes is one the sidebar can lay out. Every part of the sidebar lays itself out again when it changes.
+        static var customScale: CGFloat {
+            get { CGFloat(customPercent) / 100 }
+            set {
+                let percent = min(max(Int((newValue * 100).rounded()), 75), 150)
+                guard percent != customPercent else { return }
+                customPercent = percent
+                UserDefaults.standard.set(percent, forKey: "SidebarSizePercent")
+                // Another size doesn't read it, so nothing would move.
+                if current == .custom { NotificationCenter.default.post(name: sizeChanged, object: nil) }
             }
         }
 
@@ -193,11 +217,15 @@ enum Tokens {
         static let sizeChanged = Notification.Name("SidebarSizeChanged")
         /// Read once: the sidebar asks for its sizes on every layout.
         private static var current: Size = UserDefaults.standard.string(forKey: "SidebarSize").flatMap(Size.init(rawValue:)) ?? .medium
+        /// A custom percentage as kept: 100 if none was kept, and within 75 to 150.
+        static func keptCustomPercent(_ stored: Int?) -> Int { min(max(stored ?? 100, 75), 150) }
+        /// Custom's percentage, read once and written as it changes.
+        private static var customPercent = keptCustomPercent(UserDefaults.standard.object(forKey: "SidebarSizePercent") as? Int)
 
         /// A Medium size at the size chosen, in whole points.
-        static func scaled(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size ?? current).scale).rounded() }
+        static func scaled(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size?.scale ?? scale)).rounded() }
         /// The same for a height or an icon, in even points, so what's centered in it lands on whole points.
-        static func scaledEven(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size ?? current).scale / 2).rounded() * 2 }
+        static func scaledEven(_ value: CGFloat, for size: Size? = nil) -> CGFloat { (value * (size?.scale ?? scale) / 2).rounded() * 2 }
 
         /// From the sidebar's edges to its rows, favorites and address.
         static let edge: CGFloat = 6
@@ -295,9 +323,9 @@ enum Tokens {
         static var spaceIcon: CGFloat { spaceIcon(for: current) }
         static func spaceIcon(for size: Size) -> CGFloat { (18 * size.scale / 2).rounded() * 2 }
         /// Each space's target in the bottom bar: a toolbar button, and at Large a little more round its larger icon,
-        /// as tall as the bar leaves room for.
+        /// as tall as the bar leaves room for. A custom size larger than Large gets the room its icon needs.
         static var spaceTarget: CGFloat { spaceTarget(for: current) }
-        static func spaceTarget(for size: Size) -> CGFloat { size == .large ? 28 : button }
+        static func spaceTarget(for size: Size) -> CGFloat { max(size == .large ? 28 : button, spaceIcon(for: size) + spaceIconRoom) }
         /// Padding around a space icon; the row scrolls before icons shrink (#238).
         static let spaceIconRoom: CGFloat = 4
         /// Each space target's width for `count` spaces: `spaceTarget` when they fit, narrower down to the icon (or

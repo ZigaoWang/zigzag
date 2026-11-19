@@ -1064,6 +1064,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let favoritesPerRow = DropdownButton()
     private let pageZoom = DropdownButton()
     private let sidebarSize = DropdownButton()
+    /// The size of your own beside Sidebar size, there while Custom is chosen (#361).
+    private let sidebarSizeStepper = ZoomStepper()
+    private var sidebarSizeRow: FormRow?
     private let darkPages = DropdownButton()
     private let pureBlackToggle = Toggle()
     private lazy var pureBlackRow: FormRow = {
@@ -1462,20 +1465,40 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sideToken = NotificationCenter.default.addObserver(forName: BrowserRootView.sidebarSideChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight }
         }
-        // As macOS's System Settings › Appearance › Sidebar icon size: three sizes, Medium as Zigzag has always been.
+        // As macOS's System Settings › Appearance › Sidebar icon size, and a size of your own (#361): Medium as
+        // Zigzag has always been.
         sidebarSize.options = Tokens.Sidebar.Size.allCases.map { size in
             let title = switch size {
             case .small: String(localized: "Small", comment: "A choice for “Sidebar size” in Settings › Appearance.")
             case .medium: String(localized: "Medium", comment: "A choice for “Sidebar size” in Settings › Appearance: the usual size.")
             case .large: String(localized: "Large", comment: "A choice for “Sidebar size” in Settings › Appearance.")
+            case .custom: String(localized: "Custom", comment: "A choice for “Sidebar size” in Settings › Appearance: a percentage of Medium that you set.")
             }
             return DropdownButton.Option(title: title)
         }
-        sidebarSize.onSelect = { index in Tokens.Sidebar.size = Tokens.Sidebar.Size.allCases[index] }
+        sidebarSizeStepper.steps = Tokens.Sidebar.customSteps
+        sidebarSizeStepper.reset = { 1 }
+        sidebarSizeStepper.lessTip = String(localized: "Smaller Sidebar", comment: "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.")
+        sidebarSizeStepper.moreTip = String(localized: "Larger Sidebar", comment: "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.")
+        sidebarSizeStepper.resetTip = String(localized: "Usual Size", comment: "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.")
+        sidebarSizeStepper.percentName = String(localized: "Sidebar size %@, Usual Size", comment: "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.")
+        sidebarSizeStepper.onChange = { value in Tokens.Sidebar.customScale = value }
+        let sizeControls = NSStackView(views: [sidebarSize, sidebarSizeStepper])
+        sizeControls.spacing = Tokens.Space.x2
+        sizeControls.alignment = .centerY
+        sizeControls.detachesHiddenViews = true
         let sizeRow = FormRow(title: String(localized: "Sidebar size", comment: "A setting in Settings › Appearance: how large the sidebar's tabs, folders, space names, favorites and address are, as macOS's Sidebar icon size."),
                               detail: String(localized: "The size of the tabs, folders, favorites and address. To make everything on your Mac larger, use Larger Text in System Settings › Displays.",
                                              comment: "Explanation under “Sidebar size” in Settings › Appearance. Larger Text and System Settings › Displays are macOS's own names."),
-                              control: sidebarSize)
+                              control: sizeControls)
+        sidebarSizeRow = sizeRow
+        // The menu and the percentage both set the size; the row shows whichever is chosen.
+        sidebarSize.onSelect = { [weak self] index in
+            Tokens.Sidebar.size = Tokens.Sidebar.Size.allCases[index]
+            self?.refreshSidebarSize()
+            self?.laidOutWidth = -1
+            self?.needsLayout = true
+        }
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sizeRow.keywords = String(localized: "text size font bigger larger smaller scale zoom interface ui", comment: "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sizeRow)
@@ -3535,6 +3558,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         needsLayout = true
     }
 
+    /// Sidebar size's row follows the size: the choice shown, and the percentage there only for Custom.
+    private func refreshSidebarSize() {
+        sidebarSize.selectedIndex = Tokens.Sidebar.Size.allCases.firstIndex(of: Tokens.Sidebar.size) ?? 1
+        sidebarSizeStepper.zoom = Tokens.Sidebar.customScale
+        sidebarSizeStepper.isHidden = Tokens.Sidebar.size != .custom
+        sidebarSizeRow?.needsLayout = true
+        appearanceGroup.needsLayout = true
+    }
+
     /// The custom address row shows only with Custom chosen.
     private func refreshCustomSearch() {
         let shown = Library.shared.searchEngine == .custom
@@ -3598,7 +3630,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
-        sidebarSize.selectedIndex = Tokens.Sidebar.Size.allCases.firstIndex(of: Tokens.Sidebar.size) ?? 1
+        // Sidebar size's dropdown, and whether the percentage beside it shows.
+        refreshSidebarSize()
         pageZoom.selectedIndex = ZoomLevels.steps.firstIndex { abs($0 - ZoomLevels.defaultZoom) < 0.001 } ?? ZoomLevels.steps.firstIndex(of: 1) ?? 0
         darkPages.selectedIndex = DarkPages.Mode.allCases.firstIndex(of: DarkPages.mode) ?? 0
         pureBlackToggle.isOn = DarkPages.pureBlack
