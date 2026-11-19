@@ -616,7 +616,6 @@ final class BrowserRootView: SpaceFrameView {
         addSubview(tileHandles)
         topBar.isHidden = true
         addSubview(topBar)
-        addSubview(resizeHandle)
         attentionEdge.isHidden = true
         attentionEdge.onClick = { [weak self] in
             guard let self else { return }
