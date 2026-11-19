@@ -259,6 +259,9 @@ enum Tokens {
         static let favoriteClose: CGFloat = 14
         static let favoriteCloseGlyph: CGFloat = 7
         static let favoriteCloseInset: CGFloat = 3
+        /// A favorite's speaker badge: its side as a share of the icon's, and its glyph's point size.
+        static let favoriteSpeakerShare: CGFloat = 0.55
+        static let favoriteSpeakerGlyph: CGFloat = 8
 
         /// The top row: the traffic lights' center line, from the sidebar's top, and every toolbar glyph's.
         static let lightsCenter: CGFloat = 22
@@ -563,6 +566,9 @@ enum Tokens {
             let box = inkBox(of: image, key: key)
             return CGSize(width: box.midX, height: box.midY)
         }
+
+        /// The size of an image's ink; `key` names it for the cache.
+        @MainActor static func inkSize(of image: NSImage, key: String) -> CGSize { inkBox(of: image, key: key).size }
 
         @MainActor private static func inkBox(of image: NSImage, key: String) -> CGRect {
             if let known = inkBoxes[key] { return known }
@@ -1505,8 +1511,8 @@ enum Tokens {
             highLight: white(0.9), highDark: white(0.19))
         static let openTileHover = Color.dynamic(light: white(0.84), dark: white(0.15),
             highLight: white(0.95), highDark: white(0.22))
-        /// A favorite whose page is open: a fine edge, the only line on a tile.
-        static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16),
+        /// A pinned page or favorite whose page is open: a hint of an edge, quieter than the selected card's (#351).
+        static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.03),
             highLight: Color.hex(0x000000, alpha: 0.45), highDark: white(0.45))
     }
 

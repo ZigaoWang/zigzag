@@ -66,11 +66,15 @@ extension Array where Element == BookmarkFolder {
 
     /// Opens or shuts a folder and all its subfolders; shutting hides their pages in `shown`.
     nonisolated func folding(_ id: UUID, open: Bool, shown: Set<UUID> = []) -> [BookmarkFolder] {
-        let tree = Set(descendants(of: id) + [id])
-        return map { folder in
+        folding(Set(descendants(of: id) + [id]), open: open, shown: shown)
+    }
+
+    /// Opens or shuts these folders; shutting hides their pages in `shown`.
+    nonisolated func folding(_ tree: Set<UUID>, open: Bool, shown: Set<UUID> = []) -> [BookmarkFolder] {
+        map { folder in
             guard tree.contains(folder.id) else { return folder }
             var folder = folder
-            let tucking = open ? [] : pages(in: folder.id).intersection(shown)
+            let tucking = open || shown.isEmpty ? [] : pages(in: folder.id).intersection(shown)
             folder.isOpen = open
             folder.tucked = tucking.isEmpty ? nil : tucking.sorted { $0.uuidString < $1.uuidString }
             return folder
@@ -1144,6 +1148,8 @@ final class Library {
             let at = known[Place(parent: parent, name: name)] ?? {
                 var made = BookmarkFolder(name: name)
                 made.parentID = parent
+                // Shut: a big import of open folders is a long list to scroll (#343).
+                made.isOpen = false
                 folders.append(made)
                 known[Place(parent: parent, name: name)] = folders.count - 1
                 return folders.count - 1
@@ -1315,6 +1321,14 @@ final class Library {
     func setFolderTreeOpen(_ id: UUID, _ open: Bool, shown: Set<UUID> = []) {
         guard let s = spaceIndex(ofFolder: id), let folders = spaces[s].folders else { return }
         spaces[s].folders = folders.folding(id, open: open, shown: shown)
+        commit()
+    }
+
+    /// Opens or shuts every folder in a space; shutting hides their pages in `shown`.
+    func setAllFoldersOpen(in spaceID: UUID, _ open: Bool, shown: Set<UUID> = []) {
+        guard let s = self.index(of: spaceID), let folders = spaces[s].folders,
+              folders.contains(where: { $0.isOpen != open }) else { return }
+        spaces[s].folders = folders.folding(Set(folders.map(\.id)), open: open, shown: shown)
         commit()
     }
 

@@ -56,3 +56,71 @@ struct PageWindowFrameTests {
         #expect(snapped(frame.width / innerWidth) == 1)
     }
 }
+
+/// A pop-up window's page takes the page commands a tab does, and can move into a tab.
+@MainActor struct PopupWindowTests {
+    private func popup() -> PopupWindowController {
+        PopupWindowController.asking(configuration: WKWebViewConfiguration(), features: WKWindowFeatures(), parent: nil, opener: nil)
+    }
+
+    private func validates(_ popup: PopupWindowController, _ action: Selector, hidden: Bool = false) -> Bool {
+        let item = NSMenuItem(title: "", action: action, keyEquivalent: "")
+        item.isHidden = hidden
+        guard popup.responds(to: action) else { return false }
+        return popup.validateMenuItem(item)
+    }
+
+    /// Print, Reload, Find, Zoom, Close and the Web Inspector are on with a pop-up in front; nothing beeps.
+    @Test func pageCommandsWorkInAPopup() {
+        let popup = popup()
+        defer { popup.discardHeldPage() }
+        let on: [Selector] = [
+            #selector(BrowserWindowController.reloadPage(_:)), #selector(BrowserWindowController.reloadPageFromOrigin(_:)),
+            #selector(BrowserWindowController.showFindBar(_:)), #selector(BrowserWindowController.useSelectionForFind(_:)),
+            #selector(BrowserWindowController.zoomIn(_:)), #selector(BrowserWindowController.zoomOut(_:)),
+            #selector(BrowserWindowController.actualSize(_:)), #selector(BrowserWindowController.closeTab(_:)),
+            #selector(BrowserWindowController.showWebInspector(_:)), #selector(BrowserWindowController.showJavaScriptConsole(_:)),
+            #selector(BrowserWindowController.inspectElement(_:)),
+        ]
+        for action in on { #expect(validates(popup, action), "\(action)") }
+        #expect(popup.responds(to: #selector(BrowserWindowController.printPage(_:))))
+        #expect(popup.responds(to: #selector(BrowserWindowController.copyPageURL(_:))))
+    }
+
+    /// What has nothing to act on is off, not beeping: no page behind or ahead, no address yet, no search.
+    @Test func commandsWithNothingToDoAreOff() {
+        let popup = popup()
+        defer { popup.discardHeldPage() }
+        #expect(!validates(popup, #selector(BrowserWindowController.goBack(_:))))
+        #expect(!validates(popup, #selector(BrowserWindowController.goForward(_:))))
+        #expect(!validates(popup, #selector(BrowserWindowController.copyPageURL(_:))))
+        #expect(!validates(popup, #selector(BrowserWindowController.findNextMatch(_:))))
+    }
+
+    /// ⌘O is Open in New Tab while a pop-up is in front, as it's Open in for Zigzag Mini.
+    @Test func openFileBecomesOpenInNewTab() {
+        let popup = popup()
+        defer { popup.discardHeldPage() }
+        let item = NSMenuItem(title: BrowserWindowController.openFileTitle, action: #selector(BrowserWindowController.openDocument(_:)), keyEquivalent: "o")
+        #expect(!popup.validateMenuItem(item))
+        #expect(item.title == PopupWindowController.openInTabTitle)
+    }
+
+    /// Only a web or file address moves into a tab: a blank page or an extension's own has nothing to load there.
+    @Test func whatMovesIntoATab() {
+        #expect(PopupWindowController.movableURL(URL(string: "https://secure9.store.apple.com/print/invoice")) != nil)
+        #expect(PopupWindowController.movableURL(URL(string: "http://localhost:8080/a")) != nil)
+        #expect(PopupWindowController.movableURL(URL(string: "about:blank")) == nil)
+        #expect(PopupWindowController.movableURL(URL(string: "data:text/html,hi")) == nil)
+        #expect(PopupWindowController.movableURL(URL(string: "webkit-extension://abc/popup.html")) == nil)
+        #expect(PopupWindowController.movableURL(nil) == nil)
+    }
+
+    /// Open in New Tab with no address leaves the pop-up as it is: a sign-in is never moved by accident.
+    @Test func openInTabWithNoAddressStays() {
+        let popup = popup()
+        defer { popup.discardHeldPage() }
+        popup.openInTab()
+        #expect(!popup.isClosed)
+    }
+}

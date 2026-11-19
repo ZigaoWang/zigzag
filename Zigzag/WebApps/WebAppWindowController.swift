@@ -217,6 +217,10 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     @objc func reloadPage(_ sender: Any?) { tab.reload() }
     @objc func reloadPageFromOrigin(_ sender: Any?) { tab.reloadFromOrigin() }
     @objc func stopLoading(_ sender: Any?) { tab.stopLoading() }
+    @objc func printPage(_ sender: Any?) {
+        guard let webView = tab.webView else { return }
+        PagePrinting.print(webView, in: window, completion: {})
+    }
 
     @objc func copyPageURL(_ sender: Any?) {
         guard let url = tab.url else { return }
@@ -307,6 +311,7 @@ extension WebAppWindowController: NSMenuItemValidation {
         case #selector(goBack(_:)): return tab.canGoBack
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
+        case #selector(printPage(_:)): return tab.webView != nil
         case #selector(copyPageURL(_:)), #selector(openInBrowser(_:)): return tab.url != nil
         case #selector(toggleToolbar(_:)):
             item.title = Self.toolbarTitle(showing: current.showsToolbar)

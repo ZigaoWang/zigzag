@@ -69,12 +69,23 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     private(set) var opened = false
     private let timeout: TimeInterval
     private let openCheck: TimeInterval?
+    private let settle: TimeInterval
+    private let dismissSystem: @MainActor () -> Void
+
+    /// How long AppKit's AutoFill takes to catch up with a newly focused field. Asked sooner, its own update for
+    /// the field closes the list a moment after it opens (#378).
+    static let settle: TimeInterval = 0.35
 
     /// `openCheck`: how soon the list must have taken the front, or the fields go away (nil, the default, never
     /// checks: the Mac can show its list inside Zigzag's own window, where Zigzag never stops being the active app).
-    init(timeout: TimeInterval = SystemPasswordPicker.timeout, openCheck: TimeInterval? = nil) {
+    /// `settle`: how long the password field is focused before the list is asked for (0 asks at once).
+    /// `dismissSystem`: closes whatever AutoFill still shows for the fields as they go.
+    init(timeout: TimeInterval = SystemPasswordPicker.timeout, openCheck: TimeInterval? = nil, settle: TimeInterval = SystemPasswordPicker.settle,
+         dismissSystem: @escaping @MainActor () -> Void = SystemPasswordPicker.dismissSystemAutoFill) {
         self.timeout = timeout
         self.openCheck = openCheck
+        self.settle = settle
+        self.dismissSystem = dismissSystem
         super.init()
         usernameField.contentType = .username
         passwordField.contentType = .password
@@ -94,7 +105,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     /// called once, on the main thread, with what came back; by then the fields are empty and gone, and the focus is
     /// back on `responder`.
     func present(over rect: NSRect, in overlay: NSView, restoringFocusTo responder: NSResponder?,
-                 ask: @MainActor (NSTextField) -> Bool = SystemPasswordPicker.askSystem, completion: @escaping (Outcome) -> Void) {
+                 ask: @escaping @MainActor (NSTextField) -> Bool = SystemPasswordPicker.askSystem, completion: @escaping (Outcome) -> Void) {
         if isPresented { finish(.cancelled(.replaced)) }
         self.completion = completion
         restoreTo = responder
@@ -129,8 +140,24 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
             return event
         }
         after(timeout) { $0.finish(.cancelled(.timedOut)) }
+        guard settle > 0 else { askNow(ask); return }
+        after(settle) { $0.askNow(ask) }
+    }
+
+    private func askNow(_ ask: @MainActor (NSTextField) -> Bool) {
+        // The focus moved on while AutoFill caught up: you've moved on.
+        guard let window = anchor.window, Self.owns(window.firstResponder, [passwordField]) else { finish(.cancelled(.dismissed)); return }
         guard ask(passwordField) else { finish(.cancelled(.unavailable)); return }
         if let openCheck { after(openCheck) { if !$0.opened { $0.giveUpIfEmpty(.unavailable) } } }
+    }
+
+    /// AppKit's AutoFill panel and suggestion outlive the fields they were opened for, and come back each time the
+    /// window becomes key, so they're closed with the fields. Private, so only where AppKit has it.
+    static func dismissSystemAutoFill() {
+        let shared = NSSelectorFromString("sharedInstance"), dismiss = NSSelectorFromString("_dismissAutoFill")
+        guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
+              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.responds(to: dismiss) else { return }
+        controller.perform(dismiss)
     }
 
     /// Takes the fields away with nothing filled.
@@ -212,8 +239,10 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
             field.abortEditing()
             field.stringValue = ""
         }
-        anchor.removeFromSuperview()
+        // Focus handed back while the fields are still in the window, so AppKit sees them let go of it.
         if focused, let window { window.makeFirstResponder(restoreTo.flatMap { ($0 as? NSView)?.window === window ? $0 : nil }) }
+        dismissSystem()
+        anchor.removeFromSuperview()
         switch outcome {
         case .filled: debugLog("syspasswords filled")
         case .cancelled(let reason): debugLog("syspasswords cancelled \(reason)")

@@ -52,7 +52,7 @@ struct ContrastTokensTests {
         ("Chrome.fieldPressed", Tokens.Chrome.fieldPressed, 0xFFFFFF, 0.52, 0xFFFFFF, 0.08),
         ("Chrome.key", Tokens.Chrome.key, 0xFFFFFF, 0.5, 0xFFFFFF, 0.07),
         ("Chrome.keyEdge", Tokens.Chrome.keyEdge, 0x000000, 0.07, 0xFFFFFF, 0.09),
-        ("Chrome.openEdge", Tokens.Chrome.openEdge, 0x000000, 0.1, 0xFFFFFF, 0.16),
+        ("Chrome.openEdge", Tokens.Chrome.openEdge, 0x000000, 0.035, 0xFFFFFF, 0.03),
     ]
 
     /// A color as drawn by day or at night, with Increase Contrast forced on or off whatever the Mac says.

@@ -3942,6 +3942,17 @@
         }
       }
     },
+    "Collapse All Folders" : {
+      "comment" : "Item in the View menu and in a space's context menu in the sidebar: shuts every pinned folder in the space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折叠所有文件夹"
+          }
+        }
+      }
+    },
     "Cookies cleared, except for the sites you keep" : {
       "comment" : "Toast after every site's cookies are cleared but those of the sites that keep theirs (Settings › Privacy).",
       "localizations" : {
@@ -3949,6 +3960,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已清除 Cookie，保留的网站除外"
+          }
+        }
+      }
+    },
+    "Each page in “%@” and the folders inside it opens in a new tab." : {
+      "comment" : "Message of the sheet that asks before Open All in Tabs opens many tabs at once. The folder's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”和其中文件夹里的每个页面都会在新标签页中打开。"
+          }
+        }
+      }
+    },
+    "Each page in “%@” opens in a new tab." : {
+      "comment" : "Message of the sheet that asks before Open All in Tabs opens many tabs at once, from a folder with no folders inside. The folder's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”里的每个页面都会在新标签页中打开。"
+          }
+        }
+      }
+    },
+    "Expand All Folders" : {
+      "comment" : "Item in the View menu and in a space's context menu in the sidebar: opens every pinned folder in the space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开所有文件夹"
           }
         }
       }
@@ -8859,28 +8903,6 @@
         }
       }
     },
-    "Every pinned tab in “%@” and the folders inside it opens." : {
-      "comment" : "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once. The folder's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@”和其中文件夹里的已固定标签页都会打开。"
-          }
-        }
-      }
-    },
-    "Every pinned tab in “%@” opens." : {
-      "comment" : "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once, from a folder with no folders inside. The folder's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@”里的已固定标签页都会打开。"
-          }
-        }
-      }
-    },
     "Every shortcut you changed goes back to its default." : {
       "comment" : "Message of the sheet that puts every shortcut back.",
       "localizations" : {
@@ -13419,7 +13441,7 @@
       }
     },
     "Open %lld tabs?" : {
-      "comment" : "Title of the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once (more than 10).",
+      "comment" : "Title of the sheet that asks before Open All in Tabs opens many tabs from a folder at once (more than 10).",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -13454,7 +13476,7 @@
       }
     },
     "Open All" : {
-      "comment" : "Button in the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once.",
+      "comment" : "Button in the sheet that asks before Open All in Tabs opens many tabs from a folder at once.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13465,7 +13487,7 @@
       }
     },
     "Open All in Tabs" : {
-      "comment" : "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.",
+      "comment" : "Item in a folder's context menu in the sidebar: opens every page in the folder and the folders inside it as new tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13959,13 +13981,13 @@
         }
       }
     },
-    "Opened in new tab: %@" : {
+    "Opened %@ in background" : {
       "comment" : "Said by VoiceOver when a link opens in a new tab behind the page while the sidebar is hidden. The placeholder is the tab's title, or its site.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已在新标签页中打开：%@"
+            "value" : "已在后台打开“%@”"
           }
         }
       }

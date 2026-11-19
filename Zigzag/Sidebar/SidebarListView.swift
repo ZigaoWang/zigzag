@@ -1484,6 +1484,8 @@ final class SidebarListView: NSView {
         return shownRow(item)
     }
     func bookmarkRow(_ id: UUID) -> NSView? { shownRow(.bookmark(id)) }
+    /// Where a tab's own row sits in the list as last laid out, whether it has a view or not; nil inside a closed folder.
+    func layoutFrame(ofTab id: UUID) -> NSRect? { shownFrames[.tab(id)] }
 
     /// A row scrolled into sight, to type in.
     private func shownRow(_ item: SidebarItem) -> NSView? {

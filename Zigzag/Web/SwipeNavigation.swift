@@ -50,8 +50,8 @@ final class SwipeNavigator {
     /// swipe where it is; only doing something else (moving the pointer, a click, a key) shows the fingers are gone.
     private var restMonitor: Any?
 
-    /// How far to swipe before letting go navigates.
-    private static let threshold: CGFloat = 85
+    /// How far to swipe before letting go navigates: a third of the page, as in Safari (#377).
+    private var threshold: CGFloat { SwipeDecision.distance(forWidth: webView?.bounds.width ?? 0) }
 
     init(webView: BrowserWebView) {
         self.webView = webView
@@ -140,7 +140,7 @@ final class SwipeNavigator {
             watchdog?.cancel()
             stopWatchingRest()
             if wasTracking {
-                if event.phase == .ended, progress >= 1 || isFlick { go() } else { cancel() }
+                if event.phase == .ended, SwipeDecision.commits(progress: progress, speed: speed) { go() } else { cancel() }
                 state = .finishing
             } else {
                 state = .idle
@@ -162,14 +162,13 @@ final class SwipeNavigator {
         if page == .took, state == .tracking { cancel(); state = .ignoring }
     }
 
-    private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / Self.threshold }
+    private var progress: CGFloat { max(0, CGFloat(-direction) * dx) / threshold }
 
-    /// A quick flick the right way counts even if it's short, as in Safari.
-    private var isFlick: Bool {
-        guard progress > 0.25, let last = samples.last,
-              let first = samples.first(where: { last.time - $0.time < 0.1 }), last.time > first.time else { return false }
-        let speed = CGFloat(-direction) * (last.dx - first.dx) / CGFloat(last.time - first.time)
-        return speed > 450
+    /// How fast the fingers were going the swipe's way over its last tenth of a second, points a second.
+    private var speed: CGFloat {
+        guard let last = samples.last, let first = samples.first(where: { last.time - $0.time < 0.1 }),
+              last.time > first.time else { return 0 }
+        return CGFloat(-direction) * (last.dx - first.dx) / CGFloat(last.time - first.time)
     }
 
     private func armWatchdog() {
@@ -216,12 +215,13 @@ final class SwipeNavigator {
     /// a frame, which only the frame's own answer can speak for.
     private func probe(at point: NSPoint) {
         guard let webView else { return }
-        let zoom = webView.pageZoom
+        // Pinched in, the page's points are bigger still.
+        let zoom = webView.pageZoom * webView.magnification
         let x = point.x / zoom, y = (webView.isFlipped ? point.y : webView.bounds.height - point.y) / zoom
         let script = """
         (() => {
           const el = document.elementFromPoint(\(x), \(y));
-          const room = (\(SwipeAnswers.sideways))(el, getComputedStyle, document.scrollingElement, [document.documentElement, document.body]);
+          const room = (\(SwipeAnswers.sideways))(el, getComputedStyle, document.scrollingElement, [document.documentElement, document.body], window.visualViewport);
           return [room.left, room.right, !!el && /^(IFRAME|FRAME|EMBED|OBJECT)$/.test(el.tagName), room.still];
         })()
         """
@@ -252,7 +252,7 @@ final class SwipeNavigator {
             state = .tracking
             showArrow()
         }
-        dx = CGFloat(-wanted) * value * Self.threshold
+        dx = CGFloat(-wanted) * value * threshold
         update()
     }
     #endif
@@ -277,6 +277,8 @@ final class SwipeNavigator {
 
     /// How far the page has moved with the fingers, at most `maxShift`, with resistance so it slows as it goes.
     private var shift: CGFloat {
+        // Reduce Motion: the page stays put and the arrow alone shows the swipe.
+        guard !Tokens.Motion.reduceMotion else { return 0 }
         let pulled = max(0, CGFloat(-direction) * dx)
         return Self.maxShift * (1 - exp(-pulled / (Self.maxShift * 1.6)))
     }
@@ -351,6 +353,15 @@ enum SwipeDecision: Equatable {
     /// What the page did with the gesture's sideways scrolls, as SwipeAnswers hears it.
     enum Page { case unknown, left, took }
 
+    /// How far a swipe on a page `width` wide goes before letting go navigates: a third of it, within reason.
+    static func distance(forWidth width: CGFloat) -> CGFloat { min(max(width / 3, 160), 320) }
+
+    /// Whether letting go navigates, `progress` along `distance` and the fingers going at `speed` points a second
+    /// the swipe's way: all the way, or a quick flick that got well started. Pulled back, it doesn't.
+    static func commits(progress: CGFloat, speed: CGFloat) -> Bool {
+        progress >= 1 || (progress >= 0.4 && speed > 700)
+    }
+
     /// How long a swipe waits for the page to answer before going on without it. Pages answer well within this,
     /// so on most a swipe never waits; one too busy to answer can still take it back late.
     static let answerWait: TimeInterval = 0.05
@@ -402,26 +413,30 @@ final class SwipeAnswers: NSObject, WKScriptMessageHandler {
 
     /// A function of the element under the pointer: which way it, the things around it, or the page itself can
     /// still scroll sideways (`left`, `right`), and whether one asked not to pass its overscroll on (`still`).
-    /// `style` is getComputedStyle; `root`, the page's scrolling element; `ends`, its root and body.
+    /// `style` is getComputedStyle; `root`, the page's scrolling element; `ends`, its root and body; `view`, the
+    /// page's visualViewport, which pans inside the page once it's pinched in.
     static let sideways = """
-    (el, style, root, ends) => {
+    (el, style, root, ends, view) => {
       let left = false, right = false, still = false;
-      const room = (box, rtl) => {
+      // Room behind always counts; room ahead past `slack`, as a few pixels too wide is usually by accident (#377).
+      const room = (box, rtl, slack) => {
         const max = box.scrollWidth - box.clientWidth, at = rtl ? max + box.scrollLeft : box.scrollLeft;
-        left = left || at > 0.5; right = right || at < max - 1;
+        left = left || at > 0.5; right = right || (max > slack && at < max - 1);
       };
       for (; el; el = el.parentElement || (el.parentNode && el.parentNode.host) || null) {
         if (el.nodeType === 3) continue;
         const s = style(el);
         const scrollsX = /(auto|scroll|overlay)/.test(s.overflowX) && el.scrollWidth > el.clientWidth;
         const scrollsY = /(auto|scroll|overlay)/.test(s.overflowY) && el.scrollHeight > el.clientHeight;
-        // A few pixels too wide is usually by accident.
-        if (scrollsX && el.scrollWidth > el.clientWidth + 24) room(el, s.direction === 'rtl');
+        if (scrollsX) room(el, s.direction === 'rtl', 24);
         // Something that scrolls and asked to keep its overscroll: the gesture never goes past it.
         if ((scrollsX || scrollsY) && /(none|contain)/.test(s.overscrollBehaviorX)) still = true;
       }
-      // The page itself only counts when it's really wide: many are a few pixels too wide by accident.
-      if (root && root.scrollWidth > root.clientWidth + 80) room(root, style(root).direction === 'rtl');
+      // Pinched in, the visible part pans across the page: its room counts, however wide the page is (#377).
+      if (root && view && view.scale > 1.01) {
+        left = left || view.pageLeft > 0.5;
+        right = right || view.pageLeft + view.width < root.scrollWidth - 1;
+      } else if (root && root.scrollWidth > root.clientWidth) room(root, style(root).direction === 'rtl', 80);
       // The page's own setting is what turns off going back and forward.
       for (const end of ends) if (end && /(none|contain)/.test(style(end).overscrollBehaviorX)) still = true;
       return { left, right, still };
@@ -444,7 +459,7 @@ final class SwipeAnswers: NSObject, WKScriptMessageHandler {
         lastAt = now;
         // The room there is now, before the page's listeners or the scroll itself have moved anything.
         let room = null;
-        try { room = sideways(e.composedPath()[0] || e.target, getComputedStyle, document.scrollingElement, [document.documentElement, document.body]); } catch (_) {}
+        try { room = sideways(e.composedPath()[0] || e.target, getComputedStyle, document.scrollingElement, [document.documentElement, document.body], window.visualViewport); } catch (_) {}
         // When the scroll came, in wall-clock time: Zigzag drops answers about an earlier gesture.
         const age = now - e.timeStamp, at = Date.now() - (age >= 0 && age < 2000 ? age : 0);
         // Once the page's own listeners have all had it.
@@ -474,13 +489,15 @@ protocol SwipeArrowHost: AnyObject {
     var swipeArrowLayer: NSView { get }
 }
 
-/// The round arrow at the page's edge during a swipe: a small floating button in the panel's surface while you swipe,
-/// filled in the accent once letting go will navigate.
+/// The round arrow at the page's edge during a swipe: a small floating button in the panel's surface whose accent ring
+/// closes as you swipe, filled in the accent once letting go will navigate.
 final class SwipeArrowView: NSView {
     static let size = Tokens.Metric.floatingButton
     /// The panel's surface at rest; the accent once armed.
     private let fill = ColorView()
     private let symbol = NSImageView()
+    /// How far along the swipe is, drawn around the edge.
+    private let ring = CAShapeLayer()
     var progress: CGFloat = 0 { didSet { refresh() } }
     var isArmed = false { didSet { refresh(animated: true) } }
 
@@ -503,6 +520,10 @@ final class SwipeArrowView: NSView {
         fill.layer?.cornerRadius = Self.size / 2
         fill.layer?.borderWidth = Tokens.Metric.hairline
         addSubview(fill)
+        ring.fillColor = nil
+        ring.lineWidth = Tokens.Metric.focusRing
+        ring.lineCap = .round
+        fill.layer?.addSublayer(ring)
         symbol.image = Tokens.Symbol.image(back ? "arrow.left" : "arrow.right", size: Tokens.Symbol.glyph)
         symbol.imageScaling = .scaleNone
         addSubview(symbol)
@@ -515,6 +536,13 @@ final class SwipeArrowView: NSView {
         super.layout()
         fill.frame = bounds
         symbol.frame = bounds
+        // From the top, clockwise.
+        let inset = bounds.insetBy(dx: ring.lineWidth / 2, dy: ring.lineWidth / 2)
+        let path = CGMutablePath()
+        let top = fill.isFlipped ? -CGFloat.pi / 2 : CGFloat.pi / 2
+        path.addArc(center: CGPoint(x: inset.midX, y: inset.midY), radius: inset.width / 2, startAngle: top,
+                    endAngle: top + (fill.isFlipped ? 2 : -2) * .pi, clockwise: !fill.isFlipped)
+        Tokens.Motion.withoutAnimation { ring.frame = bounds; ring.path = path }
         layer?.shadowPath = CGPath(ellipseIn: bounds, transform: nil)
     }
 
@@ -528,6 +556,7 @@ final class SwipeArrowView: NSView {
         let apply = {
             self.fill.layer?.backgroundColor = self.cgColor(self.isArmed ? theme.accent : theme.panel)
             self.fill.layer?.borderColor = self.cgColor(self.isArmed ? .clear : Tokens.Color.panelEdge)
+            self.ring.strokeColor = self.cgColor(theme.accent)
             // The one panel shadow, as every floating thing has.
             self.layer?.shadowColor = self.cgColor(Tokens.Color.panelShadow)
             self.layer?.shadowOpacity = 1
@@ -544,6 +573,7 @@ final class SwipeArrowView: NSView {
             Tokens.Motion.withoutAnimation(apply)
         }
         symbol.contentTintColor = isArmed ? theme.onAccent : Tokens.Color.icon
+        Tokens.Motion.withoutAnimation { ring.strokeEnd = min(max(progress, 0), 1) }
         // Fades in as you swipe; once letting go will move, it fills.
         alphaValue = min(1, max(0, (progress - 0.1) * 2))
     }

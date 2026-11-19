@@ -1,0 +1,66 @@
+import AppKit
+import Testing
+import WebKit
+@testable import Zigzag
+
+/// Peek hosts its page as a tab does: the pointer and the wheel over the card reach the peeked page, never the page
+/// under it (#374).
+@MainActor struct PeekHostingTests {
+    private func inWindow(_ body: (BrowserWindowController, Tab) throws -> Void) rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = Tab(url: nil, title: "Under", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        _ = tab.ensureWebView()
+        controller.window?.layoutIfNeeded()
+        try body(controller, tab)
+    }
+
+    /// The middle of the peeked page, in window coordinates.
+    private func middle(of page: WKWebView) -> NSPoint {
+        page.convert(NSPoint(x: page.bounds.midX, y: page.bounds.midY), to: nil)
+    }
+
+    @Test func pageUnderTheCardIgnoresThePointerUntilItCloses() throws {
+        try inWindow { controller, under in
+            let page = try #require(under.webView)
+            #expect(page.window != nil)
+            #expect(!PeekController.isCovered(page))
+            let peeked = try #require(controller.peek.show(url: nil, configuration: nil, opener: under))
+            #expect(PeekController.isCovered(page))
+            #expect(!PeekController.isCovered(peeked))
+            controller.peek.close()
+            #expect(!PeekController.isCovered(page))
+        }
+    }
+
+    @Test func openingAsTabGivesThePointerBack() throws {
+        try inWindow { controller, under in
+            let page = try #require(under.webView)
+            let peeked = try #require(controller.peek.show(url: nil, configuration: nil, opener: under))
+            controller.peek.openAsTab()
+            #expect(!PeekController.isCovered(page))
+            #expect(!PeekController.isCovered(peeked))
+        }
+    }
+
+    @Test func theCardsPageIsWhatThePointerHits() throws {
+        try inWindow { controller, under in
+            let window = try #require(controller.window)
+            let peeked = try #require(controller.peek.show(url: nil, configuration: nil, opener: under))
+            window.layoutIfNeeded()
+            controller.peek.panelView.layoutSubtreeIfNeeded()
+            let point = middle(of: peeked)
+            let frame = try #require(window.contentView?.superview)
+            #expect(frame.hitTest(frame.convert(point, from: nil)) === peeked)
+            // Wheel and clicks go to the view hit here; the page under the card ignores the pointer too.
+            #expect(PeekController.isCovered(try #require(under.webView)))
+            controller.peek.close()
+        }
+    }
+}

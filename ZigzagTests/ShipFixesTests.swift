@@ -31,17 +31,36 @@ struct ShipFixesTests {
         #expect(!NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: true))
     }
 
-    /// #272: the note shows the site until the title loads.
-    @Test func newTabNoteNamesTheSiteUntilTheTitleComes() {
-        let site = URL(string: "https://www.example.com/a")!
-        // WebKit's empty tab for Open Link in New Tab: the site it's about to load.
+    /// #272: WebKit's empty tab shows the site it's about to load; once the tab has a page, its own title, live.
+    @Test func newTabRowFollowsTheTabsTitle() {
+        let site = URL(string: "https://www.youtube.com/watch?v=1")!
         let empty = Tab(url: nil, spaceID: UUID())
-        #expect(NewTabNote.title(of: empty, site: site) == "example.com")
-        let loading = Tab(url: site, spaceID: UUID())
-        #expect(NewTabNote.title(of: loading, site: nil) == "example.com")
-        let titled = Tab(url: site, title: "Example Domain", spaceID: UUID())
-        #expect(NewTabNote.title(of: titled, site: site) == "Example Domain")
-        #expect(NewTabNote.announcement(for: "Example Domain").contains("Example Domain"))
+        #expect(NewTabNote.placeholder(for: empty, site: site) == "www.youtube.com")
+        #expect(NewTabNote.placeholder(for: Tab(url: site, spaceID: UUID()), site: site) == nil)
+
+        let peek = NewTabPeekView(tab: empty, site: site)
+        #expect(peek.row.title.stringValue == "www.youtube.com")
+        empty.customTitle = "A Video"
+        #expect(peek.row.title.stringValue == "A Video")
+        let titled = Tab(url: site, title: "YouTube", spaceID: UUID())
+        let live = NewTabPeekView(tab: titled, site: site)
+        #expect(live.row.title.stringValue == "YouTube")
+        titled.customTitle = "Another Video"
+        #expect(live.row.title.stringValue == "Another Video")
+        #expect(NewTabNote.announcement(for: "A Video").contains("A Video"))
+    }
+
+    /// #272: each new tab's row comes out at its own place in the list; one scrolled past comes out at that end of the
+    /// list in sight, stacked inward in list order and clear of the others.
+    @Test func newTabRowsEachTakeTheirOwnPlace() {
+        let h: CGFloat = 30, gap: CGFloat = 2, sight: ClosedRange<CGFloat> = 100...400
+        #expect(NewTabNote.slots(rows: [120, 152, 184], visible: sight, height: h, gap: gap) == [120, 152, 184])
+        // Below the fold: up from the bottom, the last lowest.
+        #expect(NewTabNote.slots(rows: [500, 532], visible: sight, height: h, gap: gap) == [338, 370])
+        // Above: down from the top. Nowhere (in a closed folder): the bottom.
+        #expect(NewTabNote.slots(rows: [10, nil], visible: sight, height: h, gap: gap) == [100, 370])
+        // A stacked one steps past a row already there.
+        #expect(NewTabNote.slots(rows: [370, 600], visible: sight, height: h, gap: gap) == [370, 338])
     }
 
     @Test func oldHTTPLoginsFillOnTheSecureSiteOnly() throws {
@@ -304,14 +323,14 @@ struct BookmarkFolderTests {
 
     /// Runs the swipe script's own decision in JavaScriptCore over made-up elements: `chain` from the one under the
     /// pointer outward, each a JavaScript object literal with its style.
-    private func keeps(_ chain: [String], root: String = "null", ends: String = "[]", deltaX: Double,
-                       prevented: Bool = false) throws -> Bool {
+    private func keeps(_ chain: [String], root: String = "null", ends: String = "[]", view: String = "null",
+                       deltaX: Double, prevented: Bool = false) throws -> Bool {
         let context = try #require(JSContext())
         let result = context.evaluateScript("""
         const chain = [\(chain.joined(separator: ", "))];
         chain.forEach((el, i) => { el.parentElement = chain[i + 1] || null; });
         const style = (el) => Object.assign({ overflowX: 'visible', overflowY: 'visible', overscrollBehaviorX: 'auto', direction: 'ltr' }, el.style);
-        const room = (\(SwipeAnswers.sideways))(chain[0], style, \(root), \(ends));
+        const room = (\(SwipeAnswers.sideways))(chain[0], style, \(root), \(ends), \(view));
         (\(SwipeAnswers.keeps))(room, \(deltaX), \(prevented))
         """)
         #expect(context.exception == nil)
@@ -335,8 +354,10 @@ struct BookmarkFolderTests {
         let rtl = "{ scrollWidth: 3000, clientWidth: 800, scrollLeft: 0, style: { overflowX: 'auto', direction: 'rtl' } }"
         #expect(try keeps([cell, rtl], deltaX: -12))
         #expect(try !keeps([cell, rtl], deltaX: 12))
-        // A page a little too wide by accident doesn't count; a really wide one does.
-        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
+        // A page a little too wide by accident has no room ahead; scrolled along, it has room behind (#377).
+        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 0, style: {} }", deltaX: 12))
+        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 0, style: {} }", deltaX: -12))
+        #expect(try keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
         #expect(try keeps([cell], root: "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
         // Nothing scrolls: a plain page leaves it to the swipe.
         #expect(try !keeps([cell, "{ scrollWidth: 1000, clientWidth: 1000, style: {} }"], deltaX: -12))
@@ -354,6 +375,33 @@ struct BookmarkFolderTests {
         #expect(try !keeps([cell], ends: "[{ style: {} }, { style: {} }]", deltaX: -12))
         // A page that cancels the scrolls itself (Canva) keeps them, whatever scrolls.
         #expect(try keeps([cell], deltaX: -12, prevented: true))
+    }
+
+    @Test func swipeScriptKeepsWhatPansWhenPinchedIn() throws {
+        // Pinched in to twice the size, the visible half pans across a page no wider than the window (#377).
+        let root = "{ scrollWidth: 832, clientWidth: 832, scrollLeft: 0, style: {} }"
+        let panned = "{ scale: 2, pageLeft: 200, width: 416 }"
+        #expect(try keeps([cell], root: root, view: panned, deltaX: -12))
+        #expect(try keeps([cell], root: root, view: panned, deltaX: 12))
+        // At its left edge it goes back; at its right edge it goes forward.
+        #expect(try !keeps([cell], root: root, view: "{ scale: 2, pageLeft: 0, width: 416 }", deltaX: -12))
+        #expect(try !keeps([cell], root: root, view: "{ scale: 2, pageLeft: 416, width: 416 }", deltaX: 12))
+        // Not pinched in: the page's own width decides.
+        #expect(try !keeps([cell], root: root, view: "{ scale: 1, pageLeft: 0, width: 832 }", deltaX: 12))
+    }
+
+    @Test func swipeNeedsAThirdOfThePage() {
+        // A third of the page, within reason, as in Safari (#377).
+        #expect(SwipeDecision.distance(forWidth: 900) == 300)
+        #expect(SwipeDecision.distance(forWidth: 300) == 160)
+        #expect(SwipeDecision.distance(forWidth: 2000) == 320)
+        // All the way, or a quick flick well started.
+        #expect(SwipeDecision.commits(progress: 1, speed: 0))
+        #expect(SwipeDecision.commits(progress: 0.5, speed: 1000))
+        // Short, slow, or pulled back before letting go: no.
+        #expect(!SwipeDecision.commits(progress: 0.3, speed: 2000))
+        #expect(!SwipeDecision.commits(progress: 0.9, speed: 0))
+        #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }
 
     @Test func swipeScriptLooksPastShadowRoots() throws {

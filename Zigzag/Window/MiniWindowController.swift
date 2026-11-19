@@ -748,6 +748,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     @objc func reloadPageFromOrigin(_ sender: Any?) { tab.reloadFromOrigin() }
     @objc func stopLoading(_ sender: Any?) { tab.stopLoading() }
 
+    @objc func printPage(_ sender: Any?) {
+        guard let webView = tab.webView, !movedOut, !isLeaving else { return }
+        PagePrinting.print(webView, in: window, completion: {})
+    }
+
     @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
     @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
     @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
@@ -907,6 +912,7 @@ extension MiniWindowController: NSMenuItemValidation {
         case #selector(goBack(_:)): return tab.canGoBack
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
+        case #selector(printPage(_:)): return tab.webView != nil && !movedOut && !isLeaving
         case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)): return !isLeaving && madeFindBar?.hasQuery == true
         default: return !isLeaving
         }
