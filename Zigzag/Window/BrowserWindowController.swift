@@ -3696,7 +3696,8 @@ extension BrowserWindowController {
         }
     }
 
-    /// A tab, favorite or page picked in the edge sidebar: its window comes forward on it, and the panel goes at once.
+    /// A tab picked in the edge sidebar is borrowed into a floating Mini beside it; a favorite or a page Mini can't
+    /// take brings the window forward on it. Either way the panel goes at once, unless it is the same tab again.
     private func pickFromEdgeSidebar(_ tab: Tab) {
         // The tab that is already out goes back: the same click opens and closes the Mini.
         if let mini = edgeMini {
