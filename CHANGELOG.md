@@ -18,6 +18,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - YouTube Music installed as an app goes on to the next song while its window is behind other windows or on another desktop. A covered window's page counted as hidden, where the next song can't start, so it stopped at the end of each one. A page playing sound now counts as on screen while its window is covered, until it's been quiet for 30 seconds, in browser windows too. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#199](https://github.com/ZigaoWang/zigzag/issues/199))
 - With the sidebar hidden, a link you open in a new tab behind the page shows the new tab's own sidebar row instead of a note. It slides out from the sidebar's edge where the tab sits in the list, stays for a moment, then slides back in. Each link gets its own row, even several in quick succession, and the row shows the page's title and spinner as it loads instead of only the site's name. Click a row to go to its tab, or hover to keep them out. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#272](https://github.com/ZigaoWang/zigzag/issues/272))
 
+### Fixed
+- The outline on a pinned tab or favorite whose page is loaded is much fainter, a hint instead of a box, most of all in dark mode. Thanks to [drewbeck](https://github.com/drewbeck). ([#351](https://github.com/ZigaoWang/zigzag/issues/351))
+
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, cookies you can keep when clearing, and fixes for passkeys, Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
