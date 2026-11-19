@@ -191,9 +191,12 @@ struct SettingsLayoutTests {
     @Test func theCustomSidebarSizeShowsItsPercentageOnlyWhenChosen() {
         let wasSize = Tokens.Sidebar.size
         let wasScale = Tokens.Sidebar.customScale
+        // The tests run in the app, on its own preferences: the percentage goes back to unset if it was.
+        let wasKept = UserDefaults.standard.object(forKey: "SidebarSizePercent")
         defer {
             Tokens.Sidebar.size = wasSize
             Tokens.Sidebar.customScale = wasScale
+            UserDefaults.standard.set(wasKept, forKey: "SidebarSizePercent")
         }
         Tokens.Sidebar.size = .medium
         Tokens.Sidebar.customScale = 1

@@ -149,9 +149,12 @@ extension SplitRowAlignmentTests {
     @Test func theCustomSizeIsAWholePercentageWithinItsRange() {
         let wasSize = Tokens.Sidebar.size
         let wasScale = Tokens.Sidebar.customScale
+        // The tests run in the app, on its own preferences: the percentage goes back to unset if it was.
+        let wasKept = UserDefaults.standard.object(forKey: "SidebarSizePercent")
         defer {
             Tokens.Sidebar.size = wasSize
             Tokens.Sidebar.customScale = wasScale
+            UserDefaults.standard.set(wasKept, forKey: "SidebarSizePercent")
         }
 
         #expect(Tokens.Sidebar.keptCustomPercent(nil) == 100)
@@ -195,9 +198,12 @@ extension SplitRowAlignmentTests {
     @Test func theCustomSizeTellsTheSidebarOnlyWhenItChanges() {
         let wasSize = Tokens.Sidebar.size
         let wasScale = Tokens.Sidebar.customScale
+        // The tests run in the app, on its own preferences: the percentage goes back to unset if it was.
+        let wasKept = UserDefaults.standard.object(forKey: "SidebarSizePercent")
         defer {
             Tokens.Sidebar.size = wasSize
             Tokens.Sidebar.customScale = wasScale
+            UserDefaults.standard.set(wasKept, forKey: "SidebarSizePercent")
         }
 
         nonisolated final class Count: @unchecked Sendable { var heard = 0 }
