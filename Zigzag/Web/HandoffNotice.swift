@@ -34,7 +34,7 @@ enum HandoffNotice {
         case .app(let name):
             String(localized: "handed this link to \(name)", comment: "An automation's notice over the page: what a rule did with the link. The placeholder is the app's own name, like mpv.")
         case .service(let name):
-            String(localized: "sent this link to \(name)", comment: "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.")
+            String(localized: "sent this link to \(name)", comment: "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like 127.0.0.1 (aria2.addUri).")
         }
         let named = rule.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return named.isEmpty ? did

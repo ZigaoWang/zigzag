@@ -97,7 +97,8 @@ enum DebugBridge {
     /// webapp eval <path> <script>, webapp hide|minimize|offscreen (the first app's window), webapp state <path> (JSON: the list,
     /// the open windows), webapp settings (Settings › General), webapp toolbar on|off (the first app's), webapp front |
     /// browserfront (the menu bar for that window in front), webapp menukey <char> (⌘<char>'s item, run), webapp menu
-    /// <path> (the menu bar's items), webapp sidebutton <back|forward> x y (in the first app's window).
+    /// <path> (the menu bar's items), webapp sidebutton <back|forward> x y (in the first app's window), webapp site (its
+    /// Site Controls, opened or closed).
     private static func runWebApp(_ arg: String) {
         let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
         let rest = f.count > 1 ? f[1] : ""
@@ -111,6 +112,7 @@ enum DebugBridge {
         case "remove": WebAppStore.shared.remove(rest)
         case "closeall": WebAppWindowController.all.forEach { $0.window?.close() }
         case "sidebutton": if let window = WebAppWindowController.all.first?.window { sendSideButton(rest, to: window) }
+        case "site": WebAppWindowController.all.first?.showSiteControls()
         case "removeall": WebAppStore.shared.apps.forEach { WebAppStore.shared.remove($0.id) }
         case "eval":
             // eval <path> <script>: the first app's page runs the script; its result goes to the file.
@@ -805,7 +807,7 @@ enum DebugBridge {
         case "newtabclick": controller.newTabNote.debugClick(Int(arg) ?? 0)
         // topbar on|off: Settings › Appearance › Address bar above the page.
         case "topbar": BrowserRootView.addressAbovePage = arg == "on"
-        // sidebarside right|left: Settings › Appearance › Sidebar on the right.
+        // sidebarside right|left: Settings › Appearance › Sidebar position.
         case "sidebarside": BrowserRootView.sidebarOnRight = arg == "right"
         // sideframes: where the sidebar, the page and the traffic lights are, in the debug log.
         case "sideframes":
@@ -1413,7 +1415,7 @@ enum DebugBridge {
         // keepawake on|off: the site panel's Keep tabs awake row for the page in front.
         case "keepawake": KeepAwake.set(arg == "on", for: controller.tabManager.selectedTab?.url)
         // fsfill screen|page: Settings › Tabs › Full screen videos fill. fssite page|screen|follow: the site panel's
-        // Full screen fills the page row for the page in front. fsesc: Esc in the window, as the key would be.
+        // Keep full screen in the window row for the page in front. fsesc: Esc in the window, as the key would be.
         // fsstate <path>: whether each tab of the window fills its page (JSON).
         case "fsfill": if let fill = PageFullScreen.Fill(rawValue: arg) { PageFullScreen.fill = fill }
         case "fssite": PageFullScreen.setChoice(arg == "follow" ? nil : PageFullScreen.Fill(rawValue: arg), for: controller.tabManager.selectedTab?.url)
