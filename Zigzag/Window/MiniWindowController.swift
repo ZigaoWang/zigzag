@@ -402,8 +402,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         showPage()
         refreshStrip()
         refreshBar(animated: false)
-        window.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - window.trafficLightHeight) / 2))
-        strip.trafficLightsWidth = window.trafficLightsWidth
+        if let browserWindow = window as? BrowserWindow {
+            browserWindow.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - browserWindow.trafficLightHeight) / 2))
+            strip.trafficLightsWidth = browserWindow.trafficLightsWidth
+        } else {
+            strip.trafficLightsWidth = 0
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
