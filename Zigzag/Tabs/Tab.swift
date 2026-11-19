@@ -556,14 +556,7 @@ final class Tab: NSObject {
         webView.allowsMagnification = true
         webView.isInspectable = true
         Self.stopsAutomaticInsets(webView)
-        #if DEBUG
-        // Lets scripted screenshots capture pages while the window is behind other apps.
-        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
-        if webView.responds(to: occlusion) {
-            typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
-            unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, false)
-        }
-        #endif
+        if !Self.watchesCover { Self.setWatchesCover(false, of: webView) }
         #if DEBUG
         if DebugBridge.mutesEverything { isMuted = webView.setPageAudioMuted(true) ?? true }
         #endif
@@ -1413,8 +1406,48 @@ final class Tab: NSObject {
         let playing = (change?[.newKey] as? Bool) ?? false
         MainActor.assumeIsolated {
             self.isPlayingAudio = playing
+            self.refreshCoverWatch()
             self.changed.send(.audio)
         }
+    }
+
+    // MARK: Covered windows
+
+    /// Whether WebKit hides a page whose window is covered or on another desktop. Debug builds never let it, so
+    /// scripted screenshots capture pages behind other apps; ZIGZAG_REAL_OCCLUSION=1 keeps it, as release builds have it.
+    static let watchesCover: Bool = {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["ZIGZAG_REAL_OCCLUSION"] == "1"
+        #else
+        return true
+        #endif
+    }()
+
+    static func setWatchesCover(_ on: Bool, of webView: WKWebView) {
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        guard webView.responds(to: occlusion) else { return }
+        typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, on)
+    }
+
+    /// The wait, once the page stops playing, before a covered window hides it again.
+    private var coverWait: DispatchWorkItem?
+
+    /// A page playing sound stays on screen to WebKit while its window is covered (an installed app's behind other
+    /// apps, most often), and for a while after it stops, so a playlist's next song can load and start (#199).
+    private func refreshCoverWatch() {
+        guard Self.watchesCover, let webView else { return }
+        coverWait?.cancel()
+        coverWait = nil
+        if isPlayingAudio { Self.setWatchesCover(false, of: webView); return }
+        let stopped = Date()
+        let wait = DispatchWorkItem { [weak self, weak webView] in
+            guard let self, let webView, self.webView === webView,
+                  !MiniPlayerLayout.ignoresCover(playingSound: self.isPlayingAudio, quiet: Date().timeIntervalSince(stopped)) else { return }
+            Self.setWatchesCover(true, of: webView)
+        }
+        coverWait = wait
+        DispatchQueue.main.asyncAfter(deadline: .now() + MiniPlayerLayout.nextItemWait, execute: wait)
     }
 
     /// The page and icon links the tab's icon came from, so the second look at the same page (on commit, then on

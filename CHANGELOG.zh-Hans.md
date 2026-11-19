@@ -22,6 +22,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - Zigzag 启动后第一次按 ⌘, 会马上打开设置，不再要等好几秒。以前打开设置时会把每个部分要列的内容都读一遍，比如网站数据、扩展和已安装的 App；现在只在你第一次打开某个部分或搜索时才读取。感谢 [Lakeland97](https://github.com/Lakeland97)。([#357](https://github.com/ZigaoWang/zigzag/issues/357))
 - 固定标签页收起时，打开着的固定页面会显示在所在文件夹的名字下面，和展开时一样缩进，而不是一个个单独列出。以前收起时固定一个分组，看起来像散成了几个单独的固定标签页；现在会显示成它那一个文件夹。没有打开页面的文件夹仍然隐藏。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 - 像 YouMind 这样在后台检查登录状态的扩展，在它的网站上登录后就能认出你已登录，和在 Chrome 里一样。扩展向自己的网站查询账户时如果没写明要带上 Cookie，WebKit 会漏掉网站的 SameSite Cookie，而大多数登录用的正是这种 Cookie，所以扩展一直停在登录页面。
+- 安装为应用的 YouTube Music，窗口被其他窗口挡住或在另一个桌面上时，也会接着播下一首了。以前被挡住的窗口里的网页会被当成隐藏，下一首开始不了，所以每首歌放完就停住。现在正在播放声音的网页在窗口被挡住时仍算作显示在屏幕上，安静 30 秒后才不再这样，浏览器窗口里也一样。感谢 [Lakeland97](https://github.com/Lakeland97)。([#199](https://github.com/ZigaoWang/zigzag/issues/199))
 
 ## [0.9.3] - 2026-11-18
 

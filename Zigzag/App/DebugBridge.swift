@@ -93,7 +93,8 @@ enum DebugBridge {
     }
 
     /// webapp install (the Install as App sheet over the front tab), webapp confirm|cancel (its answer),
-    /// webapp open|close <id> (as the app's small app asks), webapp remove <id>, webapp closeall, webapp removeall, webapp state <path> (JSON: the list,
+    /// webapp open|close <id> (as the app's small app asks), webapp remove <id>, webapp closeall, webapp removeall,
+    /// webapp eval <path> <script>, webapp hide|minimize|offscreen (the first app's window), webapp state <path> (JSON: the list,
     /// the open windows), webapp settings (Settings › General), webapp toolbar on|off (the first app's), webapp front |
     /// browserfront (the menu bar for that window in front), webapp menukey <char> (⌘<char>'s item, run), webapp menu
     /// <path> (the menu bar's items), webapp sidebutton <back|forward> x y (in the first app's window).
@@ -111,6 +112,21 @@ enum DebugBridge {
         case "closeall": WebAppWindowController.all.forEach { $0.window?.close() }
         case "sidebutton": if let window = WebAppWindowController.all.first?.window { sendSideButton(rest, to: window) }
         case "removeall": WebAppStore.shared.apps.forEach { WebAppStore.shared.remove($0.id) }
+        case "eval":
+            // eval <path> <script>: the first app's page runs the script; its result goes to the file.
+            let g = rest.split(separator: " ", maxSplits: 1).map(String.init)
+            guard g.count == 2, let webView = WebAppWindowController.all.first?.tab.webView else { break }
+            webView.evaluateJavaScript(g[1]) { result, error in
+                try? (result.map { "\($0)" } ?? "error \(String(describing: error))").write(toFile: g[0], atomically: true, encoding: .utf8)
+            }
+        case "hide": WebAppWindowController.all.first?.hideWebApp(nil)
+        case "minimize": WebAppWindowController.all.first?.window?.miniaturize(nil)
+        case "offscreen":
+            // offscreen: the first app's window moved wholly past every screen, where macOS counts it as covered.
+            guard let window = WebAppWindowController.all.first?.window else { break }
+            // Not remembered for the app's next window.
+            window.setFrameAutosaveName("")
+            window.setFrame(NSRect(origin: NSPoint(x: -20000, y: -20000), size: window.frame.size), display: false)
         case "toolbar":
             // toolbar on|off: the first app's toolbar, as Settings' switch sets it.
             if let app = WebAppStore.shared.apps.first { WebAppStore.shared.setShowsToolbar(rest == "on", for: app.id) }
