@@ -136,12 +136,16 @@ enum ContentBlocker {
 
     // MARK: Site filters
 
-    /// The ad blocker extension that blocks ads for this web view's pages, if one does. Private windows run no
-    /// extensions, so there it's always Zigzag.
+    /// The ad blocker extension that blocks ads for this web view's pages, if one does. In a private window, only one
+    /// allowed there; else it's Zigzag.
     static func extensionBlocker(for webView: WKWebView) -> String? {
         let configuration = webView.configuration
         if #available(macOS 15.4, *), configuration.webExtensionController == nil { return nil }
         let store = configuration.websiteDataStore
+        if !store.isPersistent {
+            guard let profile = (webView as? BrowserWebView)?.owner?.profile else { return nil }
+            return AdBlockers.active(in: profile, inPrivate: true)
+        }
         guard let profile = Profiles.shared.opened.first(where: { $0.storeIfMade === store }) else { return nil }
         return AdBlockers.active(in: profile)
     }
@@ -234,12 +238,13 @@ enum AdBlockers {
 
     /// The ad blocker installed, on and allowed on YouTube in a profile, by name. Read from what the profile has
     /// installed, not from what's running, as for password managers: pages restored at launch already get it right.
-    static func active(in profile: Profile) -> String? {
+    static func active(in profile: Profile, inPrivate: Bool = false) -> String? {
         guard #available(macOS 15.4, *) else { return nil }
         let installs = profile.installs
         let offSites = ExtensionStore.extensionsOffSites(in: profile)
         return active(among: known.keys.filter { id in
-            guard installs.isEnabled(id), installs.isInstalled(id) else { return false }
+            guard installs.isEnabled(id), installs.isInstalled(id),
+                  PrivateAccess.sees(isPrivate: inPrivate, allowed: installs.allowsPrivate(id)) else { return false }
             return reachesYouTube(access: installs.siteAccess(id), approved: installs.state(id)?.grantedMatchPatterns,
                                   sites: installs.accessSites(id), offSites: offSites)
         })

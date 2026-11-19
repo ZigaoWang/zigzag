@@ -56,19 +56,22 @@ import WebKit
         guard let window = window ?? webView.window else { completion(); return }
         // Kept by id, not by the window: a window freed while its sheet was up still lets go of its place.
         let id = ObjectIdentifier(window)
-        guard !printing.contains(id) else { completion(); return }
-        printing.insert(id)
+        guard window.attachedSheet == nil, claim(id) else { completion(); return }
         let operation = operation(for: webView, frame: frame)
         operation.view?.frame = webView.bounds
         operation.showsPrintPanel = true
         operation.showsProgressPanel = true
         let done = Done {
-            printing.remove(id)
+            release(id)
             completion()
         }
         operation.runModal(for: window, delegate: done, didRun: #selector(Done.printOperationDidRun(_:success:contextInfo:)),
                            contextInfo: Unmanaged.passRetained(done).toOpaque())
     }
+
+    /// Takes the window's one print place; false while its print sheet is already up.
+    static func claim(_ id: ObjectIdentifier) -> Bool { printing.insert(id).inserted }
+    static func release(_ id: ObjectIdentifier) { printing.remove(id) }
 
     /// The frame that asked, when WebKit can print one frame on its own; otherwise the whole page.
     static func operation(for webView: WKWebView, frame: AnyObject?) -> NSPrintOperation {

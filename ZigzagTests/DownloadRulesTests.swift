@@ -969,6 +969,21 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
     }
 
+    /// A service's place leads and its method follows in brackets (#367), without a dot between them.
+    @MainActor @Test func aServiceReadsAsItsPlaceThenItsMethod() {
+        var send = DownloadRuleAction(kind: .jsonRPC)
+        send.rpcEndpoint = "http://127.0.0.1:5000/RPC2"
+        send.rpcMethod = "load.start"
+        #expect(send.summary == "127.0.0.1 (load.start)")
+        let rule = DownloadRule(name: "Send to rTorrent", applies: .downloads, match: .endsWith, pattern: ".torrent", action: send)
+        #expect(rule.summarySentence == "Files ending in .torrent go to 127.0.0.1 (load.start)")
+        send.rpcEndpoint = ""
+        #expect(send.summary == "load.start")
+        let kept = SettingsView.handoffAnswerRow(ruleNamed: "YouTube", answer: "Hand Off", sites: "youtube.com")
+        #expect(kept.detail == "youtube.com: Hand Off")
+        #expect(!send.summary.contains("·") && !rule.summarySentence.contains("·") && !kept.detail.contains("·"))
+    }
+
     // MARK: What an automation says for itself
 
     /// Only otherwise invisible handoffs are announced (app, service, default browser, another app's URL), once per rule.
@@ -987,7 +1002,7 @@ struct DownloadRuleTests {
 
         // An app or service handoff gets a line.
         #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: app), elsewhere: .app("mpv")) == "Videos: handed this link to mpv")
-        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: service), elsewhere: .service("aria2.addUri · 127.0.0.1")) == "Videos: sent this link to aria2.addUri · 127.0.0.1")
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: service), elsewhere: .service("127.0.0.1 (aria2.addUri)")) == "Videos: sent this link to 127.0.0.1 (aria2.addUri)")
         // An unnamed rule gets a generic line.
         #expect(HandoffNotice.line(for: DownloadRule(name: "", action: app), elsewhere: .app("mpv")) == "handed this link to mpv")
         // Visible results get none: script card, tab, Mini, question, download.

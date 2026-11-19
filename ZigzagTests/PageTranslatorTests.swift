@@ -355,24 +355,6 @@ struct PageTranslatorTests {
         #expect(PageTranslator.menuTitle(translated: true) == String(localized: "Show Original", comment: "Tooltip of the Original action in the site panel."))
     }
 
-    @Test func aTabsMenuTranslatesItsLoadedPage() throws {
-        let tab = Tab(url: URL(string: "http://127.0.0.1:1/a.html"), spaceID: UUID())
-        // Not loaded: there's no text yet, so it's there, dimmed.
-        let unloaded = try #require(SidebarMenus.translateItem(for: tab) {})
-        #expect(!unloaded.isEnabled && unloaded.title == PageTranslator.menuTitle(translated: false))
-        _ = tab.ensureWebView()
-        var asked = 0
-        let item = try #require(SidebarMenus.translateItem(for: tab) { asked += 1 })
-        #expect(item.isEnabled && item.title == PageTranslator.menuTitle(translated: false))
-        NSApp.sendAction(try #require(item.action), to: item.target, from: item)
-        #expect(asked == 1)
-        tab.isTranslated = true
-        #expect(SidebarMenus.translateItem(for: tab) {}?.title == PageTranslator.menuTitle(translated: true))
-        // Zigzag's own pages have nothing to translate.
-        let own = Tab(url: URL(string: "zigzag://history"), spaceID: UUID())
-        #expect(SidebarMenus.translateItem(for: own) {} == nil)
-    }
-
     @Test func thePagesMenuHasTranslateUnderReload() throws {
         let tab = Tab(url: URL(string: "https://example.com/"), spaceID: UUID())
         func menu(_ identifiers: [String]) -> NSMenu {

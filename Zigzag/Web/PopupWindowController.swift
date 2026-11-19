@@ -29,6 +29,33 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         button.isChrome = true
         return button
     }()
+    /// Copy Link and Open in New Tab, beside Keep on Top, as in Zigzag Mini's strip.
+    private let copyButton: IconButton = {
+        let button = IconButton(symbol: "link", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph,
+                                toolTip: Shortcuts.tooltip(PopupWindowController.copyLinkTitle, for: #selector(PopupWindowController.copyPageURL(_:))))
+        button.isChrome = true
+        return button
+    }()
+    private let openButton: IconButton = {
+        let button = IconButton(symbol: "arrow.up.forward.app", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph,
+                                toolTip: Shortcuts.tooltip(PopupWindowController.openInTabTitle, for: #selector(PopupWindowController.openDocument(_:))))
+        button.isChrome = true
+        return button
+    }()
+    static var copyLinkTitle: String { String(localized: "Copy Link", comment: "Edit menu item.") }
+    static var openInTabTitle: String {
+        String(localized: "Open in New Tab", comment: "Button in a pop-up window's top strip, its right-click menu and the File menu while it's in front: moves its page into a tab of the browser window.")
+    }
+    /// Over the page, for the find bar and toasts.
+    private let overlay = PassthroughView()
+    /// ⌘F: made the first time it's asked for.
+    private var madeFindBar: FindBarController?
+    private var findBar: FindBarController {
+        if let madeFindBar { return madeFindBar }
+        let made = FindBarController(window: self)
+        madeFindBar = made
+        return made
+    }
     private var keepOnTopToken: NSObjectProtocol?
     private var parentObserver: Any?
     /// The browser window that opened it, where news about it (a pop-up it tried to open) is shown.
@@ -219,11 +246,21 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         content.addSubview(holder)
         header.frame = NSRect(x: 0, y: 0, width: size.width, height: Self.headerHeight)
         header.autoresizingMask = [.width]
-        let pin = Tokens.Pane.button
-        pinButton.frame = NSRect(x: size.width - Tokens.Space.x2 - pin, y: round((Self.headerHeight - pin) / 2), width: pin, height: pin)
-        pinButton.autoresizingMask = [.minXMargin]
-        content.addSubview(pinButton)
-        header.trailingInset = pin + Tokens.Space.x2
+        let pin = Tokens.Pane.button, gap = Tokens.Pane.stripGap
+        // As far in from the right edge as from the top, with room between the buttons' hover boxes.
+        let buttonY = round((Self.headerHeight - pin) / 2)
+        openButton.frame = NSRect(x: size.width - buttonY - pin, y: buttonY, width: pin, height: pin)
+        copyButton.frame = NSRect(x: openButton.frame.minX - gap - pin, y: buttonY, width: pin, height: pin)
+        pinButton.frame = NSRect(x: copyButton.frame.minX - gap - pin, y: buttonY, width: pin, height: pin)
+        for button in [pinButton, copyButton, openButton] {
+            button.autoresizingMask = [.minXMargin]
+            content.addSubview(button)
+        }
+        header.trailingInset = size.width - pinButton.frame.minX
+        copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
+        openButton.onClick = { [weak self] _ in self?.openInTab() }
+        header.onCopy = { [weak self] in self?.copyPageURL(nil) }
+        header.onOpenInTab = { [weak self] in self?.openInTab() }
         pinButton.onClick = { [weak window] _ in
             guard let window else { return }
             KeepOnTop.toggle(window)
@@ -240,6 +277,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         let area = content.bounds
         holder.frame = NSRect(x: 0, y: Self.headerHeight, width: area.width, height: max(0, area.height - Self.headerHeight))
         holder.autoresizingMask = [.width, .height]
+        overlay.frame = holder.frame
+        overlay.autoresizingMask = [.width, .height]
+        content.addSubview(overlay)
         webView.uiDelegate = self
         webView.navigationDelegate = self
         webView.isInspectable = true
@@ -308,6 +348,125 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               certificateException: CertificateExceptions.isShowingException(in: webView),
                                               hasCertificate: !(shownURL != nil && shownURL == errorShownFor))
         header.show(url: shownURL, secure: !connection.warns)
+        copyButton.isEnabled = Self.movableURL(shownURL) != nil
+        openButton.isEnabled = canOpenInTab
+    }
+
+    // MARK: Its page, as a tab's
+
+    /// An address a tab can open: none for a blank page or an extension's own.
+    static func movableURL(_ url: URL?) -> URL? {
+        guard let url, let scheme = url.scheme?.lowercased(), ["http", "https", "file"].contains(scheme) else { return nil }
+        return url
+    }
+
+    /// The profile whose sign-ins the page has; nil for a private page or one in no profile's store.
+    private var profile: Profile? { isPrivate ? nil : Profiles.shared.profile(ofStore: webView.configuration.websiteDataStore) }
+
+    /// Whether the page can move into a tab and keep its sign-in: a web or file address, in a private window's store
+    /// or a profile's. One in a store no tab has would sign in afresh, so it stays a pop-up.
+    var canOpenInTab: Bool { Self.movableURL(shownURL) != nil && (isPrivate || profile != nil) }
+
+    /// Reopens the page as a tab in the opener's window, in a space of the page's own profile, then closes the popup
+    /// (WebKit can't move a live page). Never in another profile's space, where its sign-in isn't.
+    func openInTab() {
+        guard let url = Self.movableURL(shownURL ?? webView.url), !isClosed else { return }
+        let manager = WindowManager.shared
+        let store = webView.configuration.websiteDataStore
+        let target: BrowserWindowController
+        var space: UUID?
+        if isPrivate {
+            // The private window whose store it shares keeps its sign-in.
+            target = manager.controllers.first { $0.tabManager.privateStore === store }
+                ?? manager.newWindow(showCommandBar: false, isPrivate: true)
+        } else {
+            guard let profile else { return }
+            target = manager.controller(for: parentWindow).flatMap { $0.tabManager.isPrivate ? nil : $0 } ?? MiniWindowController.browserWindow()
+            let openerSpace = opener.flatMap { tab in target.tabManager.allTabs.contains { $0 === tab } ? tab.spaceID : nil }
+            space = Self.space(for: profile.id, opener: openerSpace, manager: target.tabManager)
+        }
+        let inTarget = opener.flatMap { tab in target.tabManager.allTabs.contains { $0 === tab } && tab.spaceID == space ? tab : nil }
+        if let space { target.tabManager.switchToSpace(space) }
+        target.tabManager.newTab(url: url, spaceID: space, opener: inTarget, by: .you)
+        window?.close()
+        target.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Where a page of `profile` opens as a tab: the opener's space when it's on that profile, else one of that
+    /// profile's, else a new space on it.
+    static func space(for profile: UUID, opener: UUID?, manager: TabManager) -> UUID {
+        let library = Library.shared
+        if let opener, library.space(opener) != nil, library.profileID(ofSpace: opener) == profile { return opener }
+        if library.profileID(ofSpace: manager.currentSpaceID) == profile { return manager.currentSpaceID }
+        let spaces = library.spaces(in: profile).map(\.id)
+        if let space = spaces.first(where: { !manager.tabs(in: $0).isEmpty }) ?? spaces.first { return space }
+        return library.addSpace(profile: profile).id
+    }
+
+    /// ⌘O with the popup in front, as in Zigzag Mini: Open in New Tab.
+    @objc func openDocument(_ sender: Any?) { openInTab() }
+
+    /// The strip's Copy Link, ⇧⌘C, and the address's right-click menu.
+    @objc func copyPageURL(_ sender: Any?) {
+        // A web or file address, as Copy Link in the strip and its right-click menu; never a blank or extension page's.
+        guard let url = Self.movableURL(shownURL) else { return }
+        CleanLink.write(url, title: webView.title)
+        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
+    }
+
+    /// ⌘W: the popup holds one page, so the window closes.
+    @objc func closeTab(_ sender: Any?) { window?.performClose(sender) }
+    @objc func goBack(_ sender: Any?) { webView.goBack() }
+    @objc func goForward(_ sender: Any?) { webView.goForward() }
+    @objc func reloadPage(_ sender: Any?) { webView.reload() }
+    @objc func reloadPageFromOrigin(_ sender: Any?) { webView.reloadFromOrigin() }
+    @objc func stopLoading(_ sender: Any?) { webView.stopLoading() }
+
+    @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
+    @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
+    @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
+    @objc func useSelectionForFind(_ sender: Any?) {
+        webView.runOwnScript("window.getSelection().toString()") { [weak self] answer in
+            let result = try? answer.get()
+            MainActor.assumeIsolated {
+                guard let text = result as? String, !text.isEmpty else { return }
+                self?.findBar.show(query: text)
+            }
+        }
+    }
+
+    @objc func zoomIn(_ sender: Any?) { setZoom(ZoomLevels.step(webView.pageZoom, by: 1)) }
+    @objc func zoomOut(_ sender: Any?) { setZoom(ZoomLevels.step(webView.pageZoom, by: -1)) }
+    @objc func actualSize(_ sender: Any?) {
+        setZoom(ZoomLevels.defaultZoom)
+        webView.magnification = 1
+    }
+
+    /// As in a tab: kept for the site, except in private.
+    private func setZoom(_ zoom: CGFloat) {
+        webView.pageZoom = zoom
+        if !isPrivate, let url = shownURL { ZoomLevels.set(zoom, for: url) }
+        Toast.show(ZoomLevels.percent(zoom), symbol: zoom < 1 ? "minus.magnifyingglass" : zoom > 1 ? "plus.magnifyingglass" : "magnifyingglass",
+                   over: overlay, area: overlay.bounds)
+    }
+
+    private var inspector: NSObject? {
+        let selector = NSSelectorFromString("_inspector")
+        guard webView.responds(to: selector) else { return nil }
+        return webView.perform(selector)?.takeUnretainedValue() as? NSObject
+    }
+
+    @objc func showWebInspector(_ sender: Any?) {
+        guard let inspector else { return }
+        inspector.callIfPresent(inspector.inspectorFlag("isVisible") ? "close" : "show")
+    }
+
+    @objc func showJavaScriptConsole(_ sender: Any?) { inspector?.callIfPresent("showConsole") }
+
+    @objc func inspectElement(_ sender: Any?) {
+        guard let inspector else { return }
+        if !inspector.inspectorFlag("isVisible") { inspector.callIfPresent("show") }
+        inspector.callIfPresent("toggleElementSelection")
     }
 
     /// Shows an extension's popup over this window, from the right end of its header, so it isn't hidden behind it.
@@ -319,6 +478,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func windowWillClose(_ notification: Notification) {
+        madeFindBar?.hide()
         noteClosed()
         observations.forEach { $0.invalidate() }
         webView.stopLoading()
@@ -645,6 +805,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         DownloadManager.shared.track(download, window: window)
     }
 
+    /// The page's own Print button (`window.print()`), as in a tab (`PagePrinting`).
+    @objc(_webView:printFrame:pdfFirstPageSize:completionHandler:)
+    func webView(_ webView: WKWebView, printFrame frame: AnyObject?, pdfFirstPageSize size: CGSize, completionHandler: @escaping () -> Void) {
+        PagePrinting.printForPage(webView, frame: frame, in: window, completion: completionHandler)
+    }
+
+    @objc(_webView:printFrame:)
+    func webView(_ webView: WKWebView, printFrame frame: AnyObject?) {
+        PagePrinting.printForPage(webView, frame: frame, in: window, completion: {})
+    }
+
+    /// File › Print… (⌘P) with the popup in front.
+    @objc func printPage(_ sender: Any?) {
+        PagePrinting.print(webView, in: window, completion: {})
+    }
+
     /// The window the page is told it's in, as a tab's page is (PageWindowFrame).
     @objc(_webView:getWindowFrameWithCompletionHandler:)
     func webView(_ webView: WKWebView, getWindowFrameWithCompletionHandler completion: @escaping (CGRect) -> Void) {
@@ -654,6 +830,46 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     func webView(_ webView: WKWebView, respondTo challenge: URLAuthenticationChallenge) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         await AuthenticationPrompt.respond(to: challenge, window: window, store: webView.configuration.websiteDataStore, page: webView, tab: isPrivate ? nil : tab)
     }
+}
+
+#if DEBUG
+extension PopupWindowController {
+    var debugState: [String: Any] {
+        ["url": shownURL?.absoluteString ?? "-", "copy": copyButton.isEnabled, "open": openButton.isEnabled,
+         "selected": (window?.firstResponder as? NSTextView)?.string ?? ""]
+    }
+    func debugSelectAddress() { header.selectAddress() }
+}
+#endif
+
+extension PopupWindowController: NSMenuItemValidation {
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        // ⌘← and ⌘→ (the hidden Back and Forward) in a text field or the page move the cursor, as in a browser window.
+        if item.isHidden, item.action == #selector(goBack(_:)) || item.action == #selector(goForward(_:)),
+           window?.firstResponder is NSText || window?.firstResponder is WKWebView {
+            return false
+        }
+        switch item.action {
+        case #selector(openDocument(_:)):
+            item.title = Self.openInTabTitle
+            return canOpenInTab
+        case #selector(copyPageURL(_:)): return Self.movableURL(shownURL) != nil
+        case #selector(goBack(_:)): return webView.canGoBack
+        case #selector(goForward(_:)): return webView.canGoForward
+        case #selector(stopLoading(_:)): return webView.isLoading
+        case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)): return madeFindBar?.hasQuery == true
+        default: return true
+        }
+    }
+}
+
+extension PopupWindowController: FindBarHost {
+    var focusedPaneFrame: NSRect { overlay.bounds }
+    var findBarHeaderHeight: CGFloat { 0 }
+    var findBarOverlay: NSView { overlay }
+    var findBarIsCovered: Bool { false }
+    var findableWebView: WKWebView? { webView }
+    var findablePDF: PDFViewerView? { nil }
 }
 
 /// Gives extension shortcuts the keys first, like the browser window, and keeps the traffic lights centered on the
@@ -688,6 +904,14 @@ final class PopupHeaderView: NSView {
     private let lock = NSImageView()
     /// Room kept clear at the right end for buttons laid over the strip (Zigzag Mini's Open in Zigzag).
     var trailingInset: CGFloat = 0 { didSet { needsLayout = true } }
+    /// The address's right-click menu.
+    var onCopy: (() -> Void)?
+    var onOpenInTab: (() -> Void)?
+    /// The whole address, selectable to copy, while the address is clicked.
+    private var shownURL: URL?
+    private var shownSecure = true
+    private let hit = AddressHit()
+    private var selectable: SelectableAddress?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -697,6 +921,8 @@ final class PopupHeaderView: NSView {
         // A long host loses its start, never its end, which says whose site it is.
         label.lineBreakMode = .byTruncatingHead
         addSubview(label)
+        hit.onClick = { [weak self] in self?.selectAddress() }
+        addSubview(hit)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -705,6 +931,9 @@ final class PopupHeaderView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
 
     func show(url: URL?, secure: Bool) {
+        if url != shownURL { endSelecting() }
+        shownURL = url
+        shownSecure = secure
         // An extension's own page: whose it is, not an address no one could read.
         fullAddress = nil
         if #available(macOS 15.4, *), let ext = ExtensionCenter.webExtension(ofPage: url) {
@@ -761,6 +990,101 @@ final class PopupHeaderView: NSView {
         lock.frame = NSRect(x: x, y: 0, width: lockWidth, height: bounds.height)
         label.frame = NSRect(x: lock.frame.maxX + gap, y: (bounds.height - h) / 2, width: max(0, min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4 - trailingInset)), height: h)
         if let fullAddress { FullAddress.show(fullAddress, in: label, room: label.frame.width - Label.inset * 2) }
+        hit.frame = label.frame.insetBy(dx: -Tokens.Space.x1, dy: 0)
+        hit.frame.origin.y = 0
+        hit.frame.size.height = bounds.height
+        hit.isHidden = PopupWindowController.movableURL(shownURL) == nil
+        selectable?.frame = selectableFrame
+    }
+
+    /// The room the whole address takes while selected: the strip between the traffic lights and the buttons.
+    private var selectableFrame: NSRect {
+        let leading = Tokens.Space.x16 + Tokens.Space.x4
+        let h = ceil(label.lineHeight)
+        return NSRect(x: leading, y: round((bounds.height - h) / 2), width: max(0, bounds.width - leading - Tokens.Space.x2 - trailingInset), height: h)
+    }
+
+    /// Shows the whole address selected, read-only, until Esc or focus moves on.
+    func selectAddress() {
+        guard let url = PopupWindowController.movableURL(shownURL), selectable == nil else { return }
+        let field = SelectableAddress(string: url.absoluteString)
+        field.isEditable = false
+        field.isSelectable = true
+        field.isBordered = false
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = label.font
+        field.textColor = Tokens.Color.textPrimary
+        field.lineBreakMode = .byTruncatingTail
+        field.cell?.usesSingleLineMode = true
+        field.cell?.isScrollable = true
+        field.alignment = .center
+        field.onEnd = { [weak self] in self?.endSelecting() }
+        field.setAccessibilityLabel(String(localized: "Address", comment: "VoiceOver label of a pop-up window's address while it's selected to copy."))
+        field.frame = selectableFrame
+        addSubview(field)
+        selectable = field
+        [label, lock, hit].forEach { $0.isHidden = true }
+        window?.makeFirstResponder(field)
+        field.selectText(nil)
+    }
+
+    private func endSelecting() {
+        guard let field = selectable else { return }
+        selectable = nil
+        field.onEnd = nil
+        if field.currentEditor() != nil { window?.makeFirstResponder(nil) }
+        field.removeFromSuperview()
+        label.isHidden = false
+        hit.isHidden = false
+        show(url: shownURL, secure: shownSecure)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard PopupWindowController.movableURL(shownURL) != nil else { return nil }
+        let menu = NSMenu()
+        let copy = NSMenuItem(title: PopupWindowController.copyLinkTitle, action: #selector(menuCopy), keyEquivalent: "")
+        let open = NSMenuItem(title: PopupWindowController.openInTabTitle, action: #selector(menuOpen), keyEquivalent: "")
+        [copy, open].forEach { $0.target = self; menu.addItem($0) }
+        return menu
+    }
+
+    @objc private func menuCopy() { onCopy?() }
+    @objc private func menuOpen() { onOpenInTab?() }
+}
+
+/// Over the address: a click selects it, a drag moves the window as the rest of the strip does.
+private final class AddressHit: NSView {
+    var onClick: (() -> Void)?
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .iBeam) }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        let start = event.locationInWindow
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if next.type == .leftMouseUp {
+                onClick?()
+                return
+            }
+            let p = next.locationInWindow
+            if hypot(p.x - start.x, p.y - start.y) > 3 {
+                window.performDrag(with: event)
+                return
+            }
+        }
+    }
+}
+
+/// The selected address: says when it's let go, by Esc or by focus moving on.
+private final class SelectableAddress: NSTextField {
+    var onEnd: (() -> Void)?
+    override func cancelOperation(_ sender: Any?) { onEnd?() }
+    override func textDidEndEditing(_ notification: Notification) {
+        super.textDidEndEditing(notification)
+        let end = onEnd
+        DispatchQueue.main.async { end?() }
     }
 }
 
@@ -802,7 +1126,7 @@ extension PopupWindowController: WKWebExtensionWindow {
     func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { tab }
     func windowType(for context: WKWebExtensionContext) -> WKWebExtension.WindowType { .popup }
     func windowState(for context: WKWebExtensionContext) -> WKWebExtension.WindowState { window?.isMiniaturized == true ? .minimized : .normal }
-    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { isPrivate }
     func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
     func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
 

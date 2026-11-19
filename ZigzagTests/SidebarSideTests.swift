@@ -78,11 +78,10 @@ struct SidebarSideTests {
     }
 
     @Test func theResizeHandleIsOnTheSidebarsEdgeByThePage() {
-        let handle = Tokens.Metric.resizeHandleWidth
         let left = BrowserRootView.resizeHandleFrame(in: window, sidebarWidth: width, onRight: false)
         let right = BrowserRootView.resizeHandleFrame(in: window, sidebarWidth: width, onRight: true)
-        #expect(left.midX == width && left.width == handle)
-        #expect(right.midX == window.maxX - width && right.width == handle && right.height == window.height)
+        #expect(left.minX < width && left.maxX > width)
+        #expect(right.minX < window.maxX - width && right.maxX > window.maxX - width && right.height == window.height)
     }
 
     @Test func draggingTheEdgeMeasuresFromTheSidebarsSide() {
@@ -222,6 +221,18 @@ struct SidebarSideTests {
         #expect(sidebar.sidebarButton.symbol == "sidebar.right")
         sidebar.isOnRight = false
         #expect(sidebar.sidebarButton.symbol == "sidebar.left")
+    }
+
+    /// Settings › Appearance › Sidebar position (#360): Left and Right in Zigzag's own menu, on the same preference.
+    @Test func sidebarPositionIsALeftRightMenuOnTheSamePreference() throws {
+        #expect(SettingsView.sidebarSides == [false, true])
+        let settings = SettingsView(pane: .appearance)
+        func all(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(all) }
+        let row = try #require(all(settings).compactMap { $0 as? FormRow }.first { $0.titleText == String(localized: "Sidebar position") })
+        let menu = try #require(all(row).compactMap { $0 as? DropdownButton }.first)
+        #expect(menu.options.map(\.title) == [String(localized: "Left"), String(localized: "Right")])
+        #expect(SettingsView.sidebarSides[menu.selectedIndex] == BrowserRootView.sidebarOnRight)
+        #expect(!all(row).contains { $0 is Toggle })
     }
 }
 

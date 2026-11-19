@@ -1,6 +1,18 @@
 import AppKit
 import WebKit
 
+/// A window of one page with no browser window behind it, where Site Controls opens from its strip: Zigzag Mini (#225)
+/// and an installed app's window (#356).
+@MainActor protocol SitePanelPageHost: AnyObject {
+    var tab: Tab { get }
+    var overlay: PassthroughView { get }
+    var window: NSWindow? { get }
+    /// Its extensions listed, their menus working and their popups not: those open from a browser window's address.
+    var listsExtensions: Bool { get }
+    func copyPageURL(_ sender: Any?)
+    func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab)
+}
+
 /// Everything about the page you're on, behind one button by the address (#174). Its first page is short: the site,
 /// with whether its connection is secure in a small line under its name (#221), a row of quick actions, your
 /// extensions to click right there (#215), a line into Permissions (once the site asked), and the few switches that
@@ -17,9 +29,9 @@ final class SitePanel: FloatingPanelView {
     static func closeCurrent() { current?.close() }
 
     private weak var controller: BrowserWindowController?
-    /// Opened in Zigzag Mini (#225): its one page, with what a page's own settings are; what needs a browser window
-    /// (Reader, translating, extensions' popups, the developer tools) stays there.
-    private weak var mini: MiniWindowController?
+    /// Opened in Zigzag Mini (#225) or an installed app's window (#356): its one page, with what a page's own settings
+    /// are; what needs a browser window (Reader, translating, extensions' popups, the developer tools) stays there.
+    private weak var pageHost: SitePanelPageHost?
     private weak var anchor: NSView?
     /// The button it opened from, shown pressed while it's open: the sidebar's, or a split pane's (#160).
     private weak var opener: IconButton?
@@ -36,6 +48,8 @@ final class SitePanel: FloatingPanelView {
     private let isBlank: Bool
     /// The panel is about one page: when it goes to another site (a sign-in redirect), the panel goes too.
     private var pageToken: SignalToken?
+    /// Clear cookies when Zigzag quits, which shows or hides Keep cookies while the panel is open (#383).
+    private var clearingToken: SignalToken?
     /// Whether this panel describes the page in this tab.
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
     /// Opened from a split pane's strip, under its address: it belongs to where that strip is.
@@ -150,13 +164,13 @@ final class SitePanel: FloatingPanelView {
     static func forTesting(tab: Tab) -> SitePanel? { SitePanel(controller: nil, tab: tab) }
     #endif
 
-    private init?(controller: BrowserWindowController?, mini: MiniWindowController? = nil, tab asked: Tab?) {
+    private init?(controller: BrowserWindowController?, pageHost: SitePanelPageHost? = nil, tab asked: Tab?) {
         // With no page (a new tab), it still opens: your extensions are always one click away.
         guard let tab = asked ?? controller.map({ $0.tabManager.selectedTab ?? Tab(url: nil, spaceID: $0.tabManager.currentSpaceID) }) else { return nil }
         let url = tab.url.flatMap { ["http", "https", "webkit-extension"].contains($0.scheme ?? "") ? $0 : nil }
         isBlank = url == nil
         self.controller = controller
-        self.mini = mini
+        self.pageHost = pageHost
         self.tab = tab
         isPrivate = tab.isPrivate || controller?.tabManager.isPrivate == true
         self.url = url ?? URL(string: "about:blank")!
@@ -221,6 +235,12 @@ final class SitePanel: FloatingPanelView {
             if change == .loading || change == .navigation { self.refreshConnection() }
             guard change == .url, let now = tab?.url else { return }
             if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite || SiteOrigin.of(now) != origin { self.close() }
+        }
+        let profileID = tab.profile.id
+        clearingToken = KeptCookies.clearingChanged.observe { [weak self] profile in
+            guard let self, profile == profileID, !self.isBlank,
+                  SitePanelRows.rows(self.rowContext).contains(.keepCookies) != self.rows.contains(where: { $0 === self.keepCookiesRow }) else { return }
+            self.rebuildRows()
         }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
         moreButton.isHidden = !canClear && !canBoost && !canSetIcon
@@ -298,17 +318,18 @@ final class SitePanel: FloatingPanelView {
         }
     }
 
-    /// Opens the panel for Zigzag Mini's page under its strip's Site Controls button, or closes the one open (#225).
-    static func toggle(in mini: MiniWindowController, from button: IconButton) {
+    /// Opens the panel for the page of Zigzag Mini or an app's window under its strip's Site Controls button, or
+    /// closes the one open (#225, #356).
+    static func toggle(in host: SitePanelPageHost, from button: IconButton) {
         if let current, current.superview != nil {
-            let here = current.window === mini.window
+            let here = current.window === host.window
             current.close()
             if here { return }
         }
-        guard let panel = SitePanel(controller: nil, mini: mini, tab: mini.tab) else { return }
+        guard let panel = SitePanel(controller: nil, pageHost: host, tab: host.tab) else { return }
         panel.anchor = button
         // Over the page, under the button's end, as from the address above a browser window's page; kept in the window.
-        let overlay = mini.overlay
+        let overlay = host.overlay
         let inset = Tokens.Metric.cardInset
         panel.width = Self.fittingWidth(in: overlay.bounds.width)
         let b = button.convert(button.bounds, to: overlay)
@@ -358,6 +379,7 @@ final class SitePanel: FloatingPanelView {
 
     func close() {
         pageToken = nil
+        clearingToken = nil
         if let scrollToken { NotificationCenter.default.removeObserver(scrollToken) }
         scrollToken = nil
         extensionsToken = nil
@@ -373,8 +395,8 @@ final class SitePanel: FloatingPanelView {
     /// What this page can do right now, as named tiles: sharing, the link, a screenshot and translating always, Reader
     /// and Picture in Picture when the page has them. The steady ones come first, so they never move.
     private func buildTiles() {
-        // Zigzag Mini (`mini`) has the page's own actions: sharing, the link and Picture in Picture.
-        guard controller != nil || mini != nil else { return }
+        // Zigzag Mini and an app's window (`pageHost`) have the page's own actions: sharing, the link and Picture in Picture.
+        guard controller != nil || pageHost != nil else { return }
         let readerOn = controller?.isShowingReader ?? false
         // (symbol, caption, full name for the tooltip and VoiceOver, on, action)
         var specs: [(String, String, String, Bool, () -> Void)] = []
@@ -390,7 +412,7 @@ final class SitePanel: FloatingPanelView {
         let copyLink = String(localized: "Copy Link", comment: "Action in the site panel: copies the page's address.")
         specs.append(("link", copyLink, copyLink, false, { [weak self] in
             guard let self else { return }
-            if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.mini?.copyPageURL(nil) }
+            if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.pageHost?.copyPageURL(nil) }
             self.close()
         }))
         if controller != nil, PageScreenshot.canTake(tab), !readerOn {
@@ -742,12 +764,42 @@ final class SitePanel: FloatingPanelView {
     static var debugExtensionCount = 0
     #endif
 
+    /// Extensions are listed in a browser window and an app's window.
+    private var listsExtensions: Bool { controller != nil || pageHost?.listsExtensions == true }
+
+    /// Where the store, Settings and an extension's settings open: this browser window, or from an app's window, one
+    /// brought forward.
+    private func windowToOpenIn() -> BrowserWindowController? {
+        if let controller { return controller }
+        guard pageHost != nil else { return nil }
+        let target = MiniWindowController.browserWindow()
+        target.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        return target
+    }
+
+    /// An extension's menu, from a browser window or, about this page, from an app's window.
+    @available(macOS 15.4, *)
+    private func extensionMenu(for context: WKWebExtensionContext) -> NSMenu? {
+        if let controller { return controller.extensionMenu(for: context) }
+        guard let pageHost else { return nil }
+        let profile = tab.profile
+        return BrowserWindowController.extensionMenu(for: context, profile: profile, tab: tab, isPrivate: isPrivate, over: pageHost.overlay,
+                                                     openOptions: { [weak self] options in
+            guard let target = self?.windowToOpenIn() else { return }
+            target.tabManager.newTab(url: options, spaceID: target.tabManager.space(for: profile), title: context.webExtension.displayName)
+        }, pins: { menu, id in menu.addItem(BrowserWindowController.pinItem(for: id, installs: profile.installs)) })
+    }
+
     /// Your extensions, as their toolbar buttons are: the icon, the badge, and whether each works on this site.
     private func buildExtensions() {
-        // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
-        // In Zigzag Mini, none: an extension's popup opens from a browser window's address.
-        guard #available(macOS 15.4, *), controller != nil, let host = tab.extensionHost else { return }
-        let actions = host.actions(for: tab)
+        // In a private window, only those allowed there, as in Chrome's incognito (ExtensionHost.actions).
+        // In Zigzag Mini, none: an extension's popup opens from a browser window's address. An app's window lists
+        // them with their menus (#356).
+        guard #available(macOS 15.4, *), listsExtensions, let host = tab.extensionHost else { return }
+        // A blank private window's stand-in tab isn't private itself: the window says it.
+        let actions = host.actions(for: tab).filter { PrivateAccess.sees(isPrivate: isPrivate, allowed: $0.context.hasAccessToPrivateData) }
+        if isPrivate, actions.isEmpty { return }
         let installs = tab.profile.installs
         let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
         let web = ["http", "https"].contains(url.scheme ?? "")
@@ -761,11 +813,13 @@ final class SitePanel: FloatingPanelView {
             return SiteExtensionsSection.Item(id: action.id, name: context.webExtension.displayName ?? action.label, label: action.label,
                                               icon: action.icon, badge: action.badge,
                                               needsAttention: action.attention != nil, access: access,
-                                              run: { [weak self] _ in
-                                                  guard let self, let controller = self.controller else { return }
+                                              run: { [weak self] view in
+                                                  guard let self else { return }
+                                                  // No popup without a browser window: the click opens its menu.
+                                                  guard let controller = self.controller else { (view as? InteractiveView)?.showContextMenu(); return }
                                                   host.performAction(action, tab: self.tab, in: controller)
                                               },
-                                              menu: { [weak self] in self?.controller?.extensionMenu(for: context) })
+                                              menu: { [weak self] in self?.extensionMenu(for: context) })
         }
         // By name, so a tile is always where it was, whatever order they were loaded in.
         items.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -782,11 +836,14 @@ final class SitePanel: FloatingPanelView {
         #endif
         let profile = Library.shared.hasManyProfiles && !tab.isPrivate ? Library.shared.directory.profile(tab.profile.id)?.displayName : nil
         let section = SiteExtensionsSection(items: items, isWhole: isBlank, profile: profile, get: { [weak self] in
-            self?.controller?.tabManager.newTab(url: ExtensionStore.webStoreURL)
+            // In a space of the page's profile, so what's added is that profile's.
+            if let self, let target = self.windowToOpenIn() {
+                target.tabManager.newTab(url: ExtensionStore.webStoreURL, spaceID: self.controller == nil ? target.tabManager.space(for: self.tab.profile) : nil)
+            }
             self?.close()
         }, manage: { [weak self] in
             // Every extension, its sites and its pins: Settings › Extensions.
-            guard let self, let controller = self.controller else { return }
+            guard let self, let controller = self.windowToOpenIn() else { return }
             self.close()
             SettingsPage.open(.extensions, in: controller)
         })
@@ -888,6 +945,7 @@ final class SitePanel: FloatingPanelView {
         let hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.hasPermissions = hasPermissions || context.isWeb
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
+        context.clearsCookiesOnQuit = KeptCookies.clearsOnQuit(in: tab.profile.id)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
@@ -900,14 +958,28 @@ final class SitePanel: FloatingPanelView {
         return context
     }
 
+    /// The full-screen row's name, here and in Settings › Privacy › Sites: on, a video's full screen stays in the window.
+    static var fullScreenTitle: String {
+        String(localized: "Keep full screen in the window", comment: "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.")
+    }
+
+    /// Under the full-screen row, what full screen does on this site now (#385).
+    static func fullScreenStatus(_ on: Bool) -> String {
+        on ? String(localized: "Videos fill the page, not the screen", comment: "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.")
+            : String(localized: "Videos fill your screen", comment: "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.")
+    }
+
     /// The Dark page row, while there is one.
     private weak var darkRow: PanelRow?
+    /// The Keep cookies row, while there is one.
+    private weak var keepCookiesRow: PanelRow?
     /// The JavaScript row, while there is one.
     private weak var javaScriptRow: PanelRow?
 
     private func buildRows() {
         rows = []
         zoomStepper = nil
+        keepCookiesRow = nil
         // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
         // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
         // Privacy › Sites. Its tabs still follow the ones made elsewhere.
@@ -969,15 +1041,17 @@ final class SitePanel: FloatingPanelView {
                 })
             case .keepCookies:
                 // Clear Cookies… and quitting leave the site's cookies alone (#334).
-                rows.append(.toggle(String(localized: "Keep cookies", comment: "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in."),
+                let row = PanelRow.toggle(String(localized: "Keep cookies", comment: "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in."),
                                     on: KeptCookies.keeps(url, in: tab.profile.id), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     KeptCookies.set(on, for: self.url, in: self.tab.profile.id, isPrivate: self.isPrivate || self.tab.isPrivate)
-                })
+                }
+                keepCookiesRow = row
+                rows.append(row)
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
-                rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
-                                    on: PageFullScreen.fills(for: url) == .page, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                rows.append(.toggle(Self.fullScreenTitle,
+                                    on: PageFullScreen.fills(for: url) == .page, status: Self.fullScreenStatus) { [weak self] on in
                     guard let self else { return }
                     PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
                 })
@@ -1040,7 +1114,7 @@ final class SitePanel: FloatingPanelView {
         }
         // Whether extensions run here; when off, tiles above dim and say so (#215). It's a site permission, so it's
         // listed here. Only once extensions could run here or were turned off here before.
-        if #available(macOS 15.4, *), controller != nil, !isPrivate, !isBlank, tab.extensionHost != nil,
+        if #available(macOS 15.4, *), listsExtensions, !isPrivate, !isBlank, tab.extensionHost != nil,
            ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
            !(extensionsSection?.items.isEmpty ?? true) || ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) {
             let profile = tab.profile
@@ -1214,7 +1288,7 @@ final class SitePanel: FloatingPanelView {
     private func clear(_ kind: WebsiteData.Kind) {
         let tab = tab
         close()
-        if let controller { controller.confirmClear(kind, of: tab) } else { mini?.confirmClear(kind, of: tab) }
+        if let controller { controller.confirmClear(kind, of: tab) } else { pageHost?.confirmClear(kind, of: tab) }
     }
 
     // MARK: Layout
@@ -2092,6 +2166,8 @@ enum SitePanelRows {
         var cookieBanners = false
         /// Choices kept for a site (dark page, keeping tabs awake) are offered for it (`KeepAwake.isOffered`).
         var siteChoices = true
+        /// Settings › Privacy › Clear cookies when Zigzag quits is on for the profile: Keep cookies is everyday then (#383).
+        var clearsCookiesOnQuit = false
         /// Full screen in the page is offered here, and the page has a video or a choice was made.
         var fullScreen = false
         /// The page is in a language other than yours.
@@ -2118,7 +2194,7 @@ enum SitePanelRows {
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
-            rows.append(.keepCookies)
+            if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }

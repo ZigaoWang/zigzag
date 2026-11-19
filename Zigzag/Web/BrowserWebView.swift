@@ -40,6 +40,8 @@ final class BrowserWebView: WKWebView {
         super.viewDidMoveToWindow()
         // Its tab went to the back mid-swipe: the swipe can't finish here any more.
         if window == nil { swipe.leftWindow() }
+        // Covered by Peek in the window it left, or under Peek in the one it came to.
+        PeekController.pageMoved(self)
     }
 
     /// Edit › Select All (⌘A) on the History page selects every row, as in Safari, rather than the page's text. The

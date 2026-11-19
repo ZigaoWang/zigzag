@@ -206,11 +206,16 @@ final class ExtensionStorms {
             let open = Set(WindowManager.shared.controllers.flatMap { $0.tabManager.allTabs.map(\.id) })
             byTab = byTab.filter { open.contains($0.key) }
         }
-        let site = ContentBlocker.site(of: tab.url) ?? "a page"
+        let site = Self.loggedSite(tab.url, isPrivate: tab.isPrivate)
         if logged.insert(id + "|" + site).inserted, lines < Self.maxLines {
             lines += 1
             ExtensionLog.write("\(name) reconnected to its background \(rate) times a second on \(site); held back there to one try a second or less")
         }
         EnergyWatch.shared.extensionIsBusy(id, name: name, in: tab, host: host)
+    }
+
+    /// The site named in the log; a private tab's is left out.
+    static func loggedSite(_ url: URL?, isPrivate: Bool) -> String {
+        isPrivate ? "a private page" : ContentBlocker.site(of: url) ?? "a page"
     }
 }

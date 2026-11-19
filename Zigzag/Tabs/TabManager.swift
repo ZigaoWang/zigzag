@@ -506,6 +506,37 @@ final class TabManager {
         return tab
     }
 
+    /// Pages as new tabs side by side in this order, where one new tab would go (Open All in Tabs, #343). All start
+    /// loading right away; the first shows.
+    @discardableResult
+    func newTabs(_ pages: [(url: URL, title: String)]) -> [Tab] {
+        guard let firstURL = pages.first?.url else { return [] }
+        let space = currentSpaceID
+        let place = newTabPlacement(in: space, opener: nil, select: true, site: firstURL)
+        let anchor = selectedTab?.spaceID == space ? selectedTab : nil
+        let joins = anchor?.groupID.flatMap { group in place.index > 0 && tabs(in: space)[place.index - 1].groupID == group ? group : nil }
+        let made = pages.map { page in
+            let tab = Tab(url: page.url, title: page.title, spaceID: space)
+            tab.firstLoad = Tab.FirstLoad(sender: .zigzag, httpFallback: false)
+            tab.host = host
+            watch(tab)
+            tab.parentID = place.parent
+            tab.groupID = joins
+            return tab
+        }
+        tabsBySpace[space, default: []].insert(contentsOf: made, at: place.index)
+        unfold(place.parent)
+        placedBeside = nil
+        if #available(macOS 15.4, *) { made.forEach { ExtensionCenter.tabOpened($0) } }
+        structureChanged()
+        for tab in made.dropFirst().reversed() {
+            recentTabIDs.insert(tab.id, at: min(1, recentTabIDs.count))
+            tab.ensureWebView()
+        }
+        select(made[0])
+        return made
+    }
+
     /// Where a tab stood in the list as it left without closing (into Zigzag Mini): `putBack` returns it there.
     struct Place {
         let spaceID: UUID
