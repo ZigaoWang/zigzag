@@ -1129,6 +1129,15 @@ final class Tab: NSObject {
         changed.send(.audio)
     }
 
+    #if DEBUG
+    /// The row's speaker as if the page played sound or were muted, with the page itself left as it is (screenshots).
+    func debugShowSound(playing: Bool, muted: Bool) {
+        isPlayingAudio = playing
+        isMuted = muted
+        changed.send(.audio)
+    }
+    #endif
+
     private static let setAutomaticInsets = NSSelectorFromString("_setAutomaticallyAdjustsContentInsets:")
 
     /// The page is placed under Zigzag's own bars, never under the window's title bar, so WebKit isn't to inset it for

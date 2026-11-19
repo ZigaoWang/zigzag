@@ -468,19 +468,22 @@ final class FavoriteTile: InteractiveView {
     /// The badge itself: a disc of the selected card's light, under the speaker's glyph.
     private let audioDisc = CALayer()
 
-    /// The speaker's glyph for the badge, its ink in the disc's middle.
+    /// The speaker's glyph for the badge: playing and muted in the disc's middle together, the speaker's body on the
+    /// same pixels in both.
     private static func speakerGlyph(muted: Bool) -> (image: NSImage, ink: CGSize) {
-        let name = muted ? "speaker.slash" : "speaker.wave.2"
-        let key = "favorite speaker \(name)"
-        if let made = speakerGlyphs[key] { return made }
-        let config = NSImage.SymbolConfiguration(pointSize: Tokens.Sidebar.favoriteSpeakerGlyph, weight: .semibold, scale: .small)
-        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
-        image.isTemplate = true
-        let made = (image, Tokens.Symbol.inkOffset(of: image, key: key))
-        speakerGlyphs[key] = made
-        return made
+        if speakerGlyphs.isEmpty {
+            let config = NSImage.SymbolConfiguration(pointSize: Tokens.Sidebar.favoriteSpeakerGlyph, weight: .semibold, scale: .small)
+            let names = ["speaker.wave.2", "speaker.slash"], keys = names.map { "favorite speaker \($0)" }
+            let images = names.map { name in
+                let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
+                image.isTemplate = true
+                return image
+            }
+            speakerGlyphs = Array(zip(images, Tokens.Symbol.sharedInkOffsets(of: images, keys: keys)))
+        }
+        return speakerGlyphs[muted ? 1 : 0]
     }
-    private static var speakerGlyphs: [String: (image: NSImage, ink: CGSize)] = [:]
+    private static var speakerGlyphs: [(image: NSImage, ink: CGSize)] = []
 
     /// Developer Mode (#141): the icon of a favorite whose open page is in it has the chip a tab's row has
     /// (`FaviconView.developerBadge`), and its tooltip says so, with the host.

@@ -218,6 +218,8 @@ enum Tokens {
         /// From a row's edge to its icon, and from the icon to its title's first letter.
         static let rowInset: CGFloat = 6
         static let iconGap: CGFloat = Space.x2
+        /// From a title's last letter to a symbol in its line (a tab's speaker): a word space at the title's size.
+        static let inlineGlyphGap: CGFloat = 4.5
         /// The corners of small things in the sidebar: a row's fill, a favorite, a button.
         static let rowRadius: CGFloat = Radius.control
         /// A row's own small buttons (a tab's close and mute): a 20pt target, an 11pt glyph.
@@ -604,6 +606,16 @@ enum Tokens {
             return box
         }
         @MainActor private static var inkBoxes: [String: CGRect] = [:]
+
+        /// Offsets (as `inkOffset`) for symbols that take turns in one place (a speaker playing and muted): each is
+        /// drawn with its alignment rect's origin, its baseline's start, where the others' is, so what they share (the
+        /// speaker's body) stays on the same pixels. The ink centered is `reference`'s, or with none, all of theirs.
+        @MainActor static func sharedInkOffsets(of images: [NSImage], keys: [String], reference: Int? = nil) -> [CGSize] {
+            let origins = images.map { CGPoint(x: $0.alignmentRect.minX - $0.size.width / 2, y: $0.alignmentRect.minY - $0.size.height / 2) }
+            let boxes = zip(images, keys).enumerated().map { i, pair in inkBox(of: pair.0, key: pair.1).offsetBy(dx: -origins[i].x, dy: -origins[i].y) }
+            let middle = reference.map { boxes[$0] } ?? boxes.dropFirst().reduce(boxes[0]) { $0.union($1) }
+            return origins.map { CGSize(width: middle.midX + $0.x, height: middle.midY + $0.y) }
+        }
     }
 
     // MARK: - Motion (five roles, one curve family)

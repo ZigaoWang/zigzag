@@ -1583,6 +1583,13 @@ enum DebugBridge {
         case "edgedrag": controller.root.debugEdgeDrag(arg)
         case "spacedrag": controller.sidebar.debugSpaceDrag(arg)
         case "chromestate": controller.sidebar.debugChromeState(arg)
+        case "fakesound":
+            // fakesound <tab index|selected|title word> <playing|muted|off>: the tab's speaker as if, with no sound played.
+            let f = arg.split(separator: " ").map(String.init)
+            let tabs = controller.tabManager.currentTabs
+            let tab = f.first.flatMap(Int.init).flatMap { tabs.indices.contains($0) ? tabs[$0] : nil }
+                ?? (f.first == "selected" ? controller.tabManager.selectedTab : controller.tabManager.allTabs.first { $0.title.contains(f.first ?? "-") })
+            if f.count == 2, let tab { tab.debugShowSound(playing: f[1] == "playing", muted: f[1] == "muted") }
         case "sidebarwidth":
             // sidebarwidth <points>: as a drag of the sidebar's edge would leave it, within its narrowest and widest.
             if let n = Double(arg) {
