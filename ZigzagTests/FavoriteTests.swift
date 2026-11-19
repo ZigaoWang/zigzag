@@ -7,7 +7,7 @@ import Testing
 struct FavoriteTests {
     private let ids = (0..<5).map { _ in UUID() }
 
-    /// A repeated page is added once per profile, keeping the first name and its place in Arc's order.
+    /// A repeated page is added once per profile, keeping the first name and Arc's order.
     @MainActor @Test func importingFavoritesDeduplicatesTheBatchWithinEachProfile() {
         let library = Library.shared
         let work = library.addProfile(name: "Favorite import Work"), home = library.addProfile(name: "Favorite import Home")
@@ -137,8 +137,7 @@ struct BookmarkTitleTests {
     }
 }
 
-/// A favorite's tile shows what a tab row shows: the one you're on, open or not, and a page that moved on from the one
-/// it was saved with, as a pinned tab's row does.
+/// Favorite tiles show selected, open, and moved-away like a pinned tab row.
 @MainActor struct FavoriteTileStateTests {
     private let saved = URL(string: "https://mail.example.com/inbox")!
 
@@ -149,16 +148,16 @@ struct BookmarkTitleTests {
 
     @Test func aTileIsOpenOnlyWhileOneOfItsPagesIsLoaded() {
         #expect(FavoriteTile.look(selected: false, loaded: [true]) == .open)
-        // A split favorite with one page loaded is open, as its pinned row is.
+        // A split favorite with one loaded page is open.
         #expect(FavoriteTile.look(selected: false, loaded: [false, true]) == .open)
-        // Never opened, asleep, or not loaded since Zigzag reopened: all closed alike.
+        // Never opened, asleep, or not loaded since relaunch: closed.
         #expect(FavoriteTile.look(selected: false, loaded: []) == .closed)
         #expect(FavoriteTile.look(selected: false, loaded: [false]) == .closed)
         #expect(FavoriteTile.look(selected: false, loaded: [false, false]) == .closed)
     }
 
     @Test func aTileIconIsNeverFaded() {
-        // Never faded: a closed favorite has no edge instead.
+        // Never faded; a closed favorite has no edge instead.
         #expect(FavoriteTile.iconAlpha(.closed, hovered: false) == 1)
         #expect(FavoriteTile.iconAlpha(.closed, hovered: true) == 1)
         #expect(FavoriteTile.iconAlpha(.open, hovered: false) == 1)
@@ -167,9 +166,9 @@ struct BookmarkTitleTests {
 
     @Test func onItsSavedPageItIsNotAway() {
         #expect(!FavoriteTile.isAway(current: saved, saved: saved, landing: nil))
-        // The same address written another way: http, www, a slash or a fragment.
+        // Same address with http, www, a slash or a fragment.
         #expect(!FavoriteTile.isAway(current: URL(string: "http://www.mail.example.com/inbox/#top")!, saved: saved, landing: nil))
-        // Not open: nothing to be away from.
+        // Not open: not away.
         #expect(!FavoriteTile.isAway(current: nil, saved: saved, landing: nil))
     }
 
@@ -193,7 +192,7 @@ struct BookmarkTitleTests {
     @Test func anAwayTileNamesBothPagesInItsTooltip() {
         let favorite = Bookmark(url: saved, title: "Mail")
         let tile = FavoriteTile(bookmark: favorite)
-        // The tile holds its pages weakly, as the tab manager owns them.
+        // The tile holds pages weakly; the tab manager owns them.
         let home = Tab(url: saved, title: "Inbox", spaceID: UUID())
         tile.track(home)
         #expect(tile.awayParts == [false])
@@ -202,7 +201,7 @@ struct BookmarkTitleTests {
         tile.track(away)
         #expect(tile.awayParts == [true])
         #expect(tile.toolTip?.components(separatedBy: "\n").first == "Mail — Video")
-        // Unloaded (closed), nothing is away.
+        // Unloaded: not away.
         tile.track(nil)
         #expect(tile.awayParts == [false])
         _ = (home, away)
@@ -224,7 +223,7 @@ struct BookmarkTitleTests {
     @Test func anAwayPageWithoutAnIconYetShowsTheFavoritesOwn() {
         let current = NSImage(size: NSSize(width: 16, height: 16))
         #expect(FavoriteTile.awayIcon(away: true, current: current) === current)
-        // Its page's icon isn't known yet: the favorite as it was saved, never a stand-in for that page's.
+        // Unknown page icon: the saved favorite's, never a placeholder.
         #expect(FavoriteTile.awayIcon(away: true, current: nil) == nil)
         #expect(FavoriteTile.awayIcon(away: false, current: current) == nil)
         let favorite = Bookmark(url: saved, title: "Mail", icon: "star")
@@ -232,16 +231,16 @@ struct BookmarkTitleTests {
         let away = Tab(url: URL(string: "https://no-icon-yet.example.com/watch")!, title: "Video", spaceID: UUID())
         tile.track(away)
         #expect(tile.awayParts == [true])
-        // Its own icon, and no badge of it on the corner.
+        // Its own icon, with no corner badge.
         #expect(tile.pageIcons[0].image.map(IconChoice.isPageIcon) == true)
         #expect(tile.pageIcons[0].originalIcon == nil)
         _ = away
     }
 
-    /// Made a favorite while its page is still on its way: where that load lands is its page too.
+    /// A favorite made while its page loads isn't away where the load ends up.
     @Test func aFavoriteMadeWhileItsPageLoadsIsNotAwayWhereItLands() async throws {
         let saved = URL(string: "https://en.wikipedia.org/")!
-        // The page sends itself on as it loads, as a site's redirect does.
+        // The page redirects itself while loading.
         let html = "<script>history.replaceState(null, '', '/wiki/Main_Page')</script>Main Page"
         func open(settling: Bool) async throws -> Tab {
             let tab = Tab(url: nil, spaceID: UUID())
@@ -257,9 +256,9 @@ struct BookmarkTitleTests {
         let favorite = try await open(settling: true)
         #expect(favorite.pinnedLanding?.path == "/wiki/Main_Page")
         #expect(!FavoriteTile.isAway(current: favorite.url, saved: saved, landing: favorite.pinnedLanding))
-        // The load over, a while longer for a page that sends itself on, then anywhere else is moving on.
+        // After the load plus a grace period, anywhere else counts as away.
         #expect(favorite.landingUntil.map { $0 < Date().addingTimeInterval(9) } == true)
-        // One not settled (a plain tab) has no landing: the same page reads as away.
+        // An unsettled plain tab has no landing, so the same page reads as away.
         let plain = try await open(settling: false)
         #expect(plain.pinnedLanding == nil)
         #expect(FavoriteTile.isAway(current: plain.url, saved: saved, landing: plain.pinnedLanding))

@@ -60,8 +60,8 @@ final class LinkStatusController {
             return String(localized: "Email \(address)", comment: "Shown at the bottom of the window while pointing at an email link. The address is the link's.")
         }
         guard let scheme = url.scheme, ["http", "https"].contains(scheme.lowercased()) else { return url.absoluteString }
-        // Never a user name ahead of the host ("good.example%2F@evil.example" goes to evil.example), and the host as
-        // the address shows it: only what follows it is decoded to read, and never into a "/" or "@" of its own.
+        // Strip user info ahead of the host ("good.example%2F@evil.example" goes to evil.example) and show the host as
+        // is: only the rest is decoded, never into a "/" or "@".
         var text = AddressText.withoutUserInfo(url).absoluteString
         if let range = text.range(of: "\(scheme)://") { text.removeSubrange(range) }
         text = text.withoutWWW

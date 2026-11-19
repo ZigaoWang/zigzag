@@ -32,8 +32,8 @@ final class MiniQuickOpen: NSWindowController, NSWindowDelegate {
     /// Open tabs, among the results and for completing an address: the front browser window's.
     static var tabs: TabManager? { browser?.tabManager }
 
-    /// The page a chosen result opens in Zigzag Mini, whether it's a search, and whether it may go over http if
-    /// https can't reach it (`CommandRanker.Destination`); nil for one that isn't a page.
+    /// The page a result opens in Zigzag Mini, whether it's a search, and whether http fallback applies
+    /// (`CommandRanker.Destination`); nil for non-pages.
     static func page(for kind: CommandResult.Kind) -> (url: URL, search: Bool, httpFallback: Bool)? {
         switch kind {
         case .open(let url, let httpFallback): (url, false, httpFallback)
@@ -50,7 +50,7 @@ final class MiniQuickOpen: NSWindowController, NSWindowDelegate {
         guard case .switchTo(let id) = kind else { return false }
         for found in WindowManager.shared.controllers {
             guard let tab = found.tabManager.tab(with: id) else { continue }
-            // The window it's in, of those sharing it (#162).
+            // Its window among sharing ones (#162).
             let controller = WindowManager.shared.window(of: tab) ?? found
             controller.tabManager.select(tab)
             controller.window?.makeKeyAndOrderFront(nil)

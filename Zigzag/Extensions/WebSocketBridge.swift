@@ -20,9 +20,9 @@ import WebKit
     /// The extension asked to close: the connection ending is expected, not an error.
     private var closeRequested: URLSessionWebSocketTask.CloseCode?
     private let onClose: () -> Void
-    /// The profile's proxies (set by an extension through chrome.proxy), so a socket leaves as the profile's pages do.
+    /// Profile proxies (from chrome.proxy), so sockets route like the profile's pages.
     private let proxies: [ProxyConfiguration]
-    /// Whether the extension may reach this address now: checked when the socket opens.
+    /// Whether the extension may reach this address; checked on open.
     private let mayConnect: (URL) -> Bool
 
     init(port: WKWebExtension.MessagePort, extensionID: String, proxies: [ProxyConfiguration] = [],
@@ -80,9 +80,9 @@ import WebKit
         }
     }
 
-    /// Where a background's socket may go. Chrome asks no host access for one; Zigzag keeps to what the extension
-    /// could reach anyway: this Mac (a companion app's local server), a site its manifest's host_permissions name,
-    /// or one it was granted since (an optional one). `wss://host` is matched as `https://host`.
+    /// Allowed socket targets for a background. Chrome needs no host access here; Zigzag limits it to what the extension
+    /// could reach anyway: this Mac (a companion app's server), host_permissions, or granted optional hosts. `wss://host`
+    /// matches as `https://host`.
     static func allows(_ url: URL, context: WKWebExtensionContext) -> Bool {
         guard let scheme = url.scheme?.lowercased(), ["ws", "wss"].contains(scheme), let host = url.host(), !host.isEmpty,
               url.user == nil, url.password == nil,

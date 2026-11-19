@@ -85,7 +85,7 @@ struct WebAppTests {
         #expect(WebAppWindowController.stripTitle(app: app, page: URL(string: "https://github.com/issues")!) == "GitHub")
         #expect(WebAppWindowController.stripTitle(app: app, page: URL(string: "https://gist.github.com/")!) == "GitHub")
         #expect(WebAppWindowController.stripTitle(app: app, page: URL(string: "https://accounts.google.com/")!) == "accounts.google.com")
-        // Installed from one site under a shared host: another site there is named as itself.
+        // An app installed from a site on a shared host names other sites there as themselves.
         let hosted = WebApp(id: "0123456789abcdee", name: "My App", url: URL(string: "https://myapp.vercel.app/")!, profileID: profile,
                             spaceID: UUID(), bundlePath: "/y.app", created: Date())
         #expect(WebAppWindowController.stripTitle(app: hosted, page: URL(string: "https://myapp.vercel.app/settings")!) == "My App")
@@ -269,8 +269,7 @@ struct WebAppTests {
 }
 
 extension WebAppTests {
-    /// An app found only by its bundle id comes back only if its id is the one Zigzag gives its web address on one
-    /// of your profiles: another address in its marker, or one that isn't a web address, matches none.
+    /// Apps recovered by bundle id only count if the id is Zigzag's for that web URL on one of your profiles.
     @Test func recoveredAppsMustBeZigzagsOwn() {
         let other = UUID()
         let site = URL(string: "https://mail.example/")!

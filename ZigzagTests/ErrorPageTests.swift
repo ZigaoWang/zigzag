@@ -32,8 +32,7 @@ struct ErrorPageTests {
         #expect(ErrorPage.kind(of: error(NSURLErrorResourceUnavailable), url: gone) == .extensionGone)
     }
 
-    /// Only a server that doesn't speak https, or nothing on the port, sends an address typed without a scheme on to
-    /// http; a certificate keeps its warning.
+    /// Only no-https or closed-port errors fall back to http; certificate errors keep the warning.
     @Test func onlyAnHTTPOnlyServerFallsBackToHTTP() {
         #expect(ErrorPage.Kind.allCases.filter(ErrorPage.fallsBackToHTTP) == [.refused, .secureFailed])
         #expect(ErrorPage.fallsBackToHTTP(ErrorPage.kind(of: error(NSURLErrorSecureConnectionFailed), url: site)))
@@ -151,11 +150,11 @@ struct ErrorPageTests {
     }
 
     @MainActor @Test func anErrorPagesTabWearsAWarning() throws {
-        // The certificate warning in place of a page: the tab shows the warning, never the last page's icon.
+        // A certificate warning shows the warning icon, not the last page's.
         let page = try #require(URL(string: "https://expired.badssl.com/"))
         #expect(Tab.immediateIcon(for: page, errorPage: true) === Tab.errorPageIcon)
         #expect(Tab.errorPageIcon != nil)
-        // Any other page wears its own (Settings its gear), never the warning.
+        // Other pages keep their own icon.
         let settings = try #require(URL(string: "zigzag://settings"))
         #expect(Tab.immediateIcon(for: settings, errorPage: false) !== Tab.errorPageIcon)
         #expect(Tab.immediateIcon(for: settings, errorPage: false) != nil)

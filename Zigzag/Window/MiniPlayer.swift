@@ -115,7 +115,7 @@ final class MiniPlayer {
     /// or by a page in the background) goes back in, out of sight, as one you leave playing does.
     func soundChanged() {
         guard let controller else { return }
-        // Not one another window sharing the tabs has (#162).
+        // Skip tabs another sharing window shows (#162).
         for tab in controller.tabManager.allTabs where tab.isPlayingAudio && !tab.isPeek && !tab.isClosed && tab.id != model.tab && !isOnScreen(tab)
             && controller.holds(tab) && !controller.tabManager.isShownElsewhere(tab) {
             guard let webView = tab.webView, webView.window == nil, tab.pageHolder?.superview == nil,
@@ -161,7 +161,7 @@ final class MiniPlayer {
     func tabsChanged() {
         unpark { entry in
             guard let tab = entry.tab, let webView = entry.webView else { return true }
-            // Or one another window sharing the tabs has put on screen since (#162).
+            // Or that another sharing window has since shown (#162).
             let elsewhere = controller?.tabManager.store.isShared == true && webView.window != nil && webView.window !== controller?.window
                 && webView.fullscreenState == .notInFullscreen
             return tab.isClosed || controller?.tabManager.tab(with: tab.id) !== tab || tab.webView !== webView || elsewhere
@@ -172,17 +172,16 @@ final class MiniPlayer {
         apply(model.lost(id))
     }
 
-    /// Zigzag went to the background with `tab` on screen playing a video you were watching
-    /// (`AutoPictureInPicture`): the video moves into the card and plays on over the app you went to. Not when the card
-    /// shows a video already. Whether it took it.
+    /// Zigzag went to the background with `tab` playing a watched video on screen (`AutoPictureInPicture`): the video
+    /// moves into the card and keeps playing over other apps. Not when the card already has a video. Returns whether it
+    /// did.
     func takeOnLeaving(_ tab: Tab) -> Bool {
         guard model.tab == nil, card == nil, isOnScreen(tab), follows(tab) else { return false }
         apply(model.left(tab.id))
         return holds(tab)
     }
 
-    /// Back in front of the tab the card took as you left Zigzag, still on screen in its window: its video goes back
-    /// in its page, still playing, as when you go back to a tab.
+    /// Back in Zigzag with the taken tab still on screen: its video returns to the page, still playing.
     func cameBack() {
         guard let tab, let manager = controller?.tabManager, let front = manager.selectedTab, isOnScreen(tab) else { return }
         apply(model.switched(shown: Set(manager.panes(of: front).map(\.id)), playing: nil))
@@ -193,17 +192,37 @@ final class MiniPlayer {
         apply(model.close())
     }
 
-    /// Back to the tab (its arrow, its site's name, a double-click on the card), in its own space if it's in another:
-    /// its page, video still playing, goes back into the page card.
+    /// Returns to the tab (arrow, site name, double-click), switching spaces if needed; the playing video goes back
+    /// into the page card. Finds the tab in any window (#333); closes the card if it's gone.
     func returnToTab() {
-        guard let tab, let controller, !tab.isClosed, controller.tabManager.tab(with: tab.id) === tab else { return }
-        controller.tabManager.select(tab)
+        guard let controller else { return }
+        let home = Self.home(of: tab, here: controller, in: WindowManager.shared.controllers) { window, tab in
+            !window.tabManager.isInvalidated && window.tabManager.tab(with: tab.id) === tab
+        }
+        guard let home, let tab else {
+            close()
+            return
+        }
+        // Moved to another window: give the page back first.
+        if home !== controller { apply(model.lost(tab.id)) }
+        home.tabManager.select(tab)
+        // Already selected: select() changes nothing, so end the card here.
+        if home === controller, model.tab == tab.id, isOnScreen(tab), let front = controller.tabManager.selectedTab {
+            apply(model.switched(shown: Set(controller.tabManager.panes(of: front).map(\.id)), playing: nil))
+        }
         // From over another app, or a window put away in the Dock: the window comes forward with its tab.
-        if let window = controller.window {
+        if let window = home.window {
             if window.isMiniaturized { window.deminiaturize(nil) }
             NSApp.activate()
             window.makeKeyAndOrderFront(nil)
         }
+    }
+
+    /// The window holding the tab, this one first; nil if closed or in none.
+    static func home<Window: AnyObject>(of tab: Tab?, here: Window, in windows: [Window], holds: (Window, Tab) -> Bool) -> Window? {
+        guard let tab, !tab.isClosed else { return nil }
+        if holds(here, tab) { return here }
+        return windows.first { $0 !== here && holds($0, tab) }
     }
 
     /// Its window is closing: the card goes with it, and minimized videos' pages too.
@@ -253,7 +272,7 @@ final class MiniPlayer {
         menu.addItem(SidebarMenus.Item(String(localized: "Close", comment: "Tooltip of the mini player's close button: stops the video and closes the player.")) { [weak self] in
             self?.close()
         })
-        // Taken as you left Zigzag, its tab still on screen: that's the other switch in Settings › Tabs, not this one.
+        // Taken when Zigzag went to the background with its tab on screen: that's the other Settings › Tabs switch.
         if let tab, isOnScreen(tab) { return menu }
         menu.addItem(.separator())
         menu.addItem(SidebarMenus.Item(String(localized: "Turn Off Mini Player", comment: "Item in the mini player's right-click menu: videos stop following you into a mini player when you switch tabs (Settings › Tabs).")) { [weak self] in
@@ -368,7 +387,7 @@ final class MiniPlayer {
     /// left it; closed, the card fades as it goes. `parking`: minimized, the page stays in the window, out of sight,
     /// so its video plays on even with no sound (`park`).
     private func finish(closing: Bool, parking: Bool = false) {
-        // Taken as you left Zigzag, its tab is still the one on screen: the page goes back in its card, never parked.
+        // Taken on leaving with its tab still on screen: return the page to its card, never park it.
         let onScreen = tab.map(isOnScreen) ?? false
         let parking = parking && !onScreen
         lostWait?.cancel()
@@ -538,13 +557,13 @@ final class MiniPlayer {
         }
     }
 
-    /// `tab`'s video is the one in the card, playing or paused.
+    /// `tab`'s video is in the card, playing or paused.
     func holds(_ tab: Tab) -> Bool { self.tab === tab && card != nil }
 
-    /// `tab`'s video is the one in the card, and playing: a muted or silent video plays without making a sound.
+    /// `tab`'s video is in the card and playing (muted or silent counts).
     func isPlaying(_ tab: Tab) -> Bool { holds(tab) && video?.isPlaying == true }
 
-    /// Plays or pauses `tab`'s video when it's the one in the card, as the card's own button does. False otherwise.
+    /// Toggles `tab`'s video if it's in the card, like the card's button. False otherwise.
     func togglePlayback(of tab: Tab) -> Bool {
         guard holds(tab), currentFrame != nil else { return false }
         command("toggle")
@@ -564,7 +583,7 @@ final class MiniPlayer {
         guard let webView, let tab else { return }
         if PageVideos.shared.isPresentingItself(webView) { apply(model.lost(tab.id)); return }
         let frame = currentFrame
-        // What else is playing on the page, when it isn't the video shown: the next one of a feed.
+        // Another video playing on the page (the next one in a feed).
         let elsewhere = PageVideos.shared.playing(in: webView).flatMap { found in
             found.frame.id == frameID && found.video.index == videoIndex ? nil : found
         }
@@ -595,7 +614,7 @@ final class MiniPlayer {
         let wasPlaying = video?.isPlaying
         video = found
         card?.update(found)
-        // Played or paused from the page, the card or a media key: Now Playing's button follows.
+        // Played or paused from the page, card or media key: update Now Playing.
         if wasPlaying != found.isPlaying { controller?.miniPlayerChanged() }
         place()
         isolate()
@@ -1130,8 +1149,6 @@ final class MiniPlayerView: NSView {
         isGrowing = false
         guard let window, let superview, autoresizingMask.isEmpty else { return }
         let now = frame.offsetBy(dx: MiniPlayer.global(window.frame).minX, dy: MiniPlayer.global(window.frame).minY)
-        // The panel shrinking to the card and the card filling it show together, never one a frame before the other.
-        window.disableScreenUpdatesUntilFlush()
         Tokens.Motion.withoutAnimation {
             globalFrame = isDragging ? now : target
             frame = superview.bounds
@@ -1269,8 +1286,7 @@ final class MiniPlayerView: NSView {
         if !on { [backButton, minimizeButton, closeButton, rewindButton, playButton, forwardButton].forEach { $0.isHovered = false } }
     }
 
-    /// Paused, the play button stays on the picture with the pointer away, alone, where it is with the rest: the card
-    /// says it's paused with its own control. Everything else comes only with the pointer.
+    /// When paused, the play button stays visible without hover; other controls show only on hover.
     private func showControls(animated: Bool) {
         let all: CGFloat = showsControls ? 1 : 0
         let play: CGFloat = showsControls || !isPlaying ? 1 : 0

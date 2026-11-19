@@ -373,7 +373,7 @@ final class SiteDataToolbar: NSView {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        // Outlined and round-ended, as every page's search is (the header's, Feature Flags').
+        // Outlined and rounded, like every page's search.
         search.isOutlined = true
         search.isPill = true
         sort.options = [DropdownButton.Option(title: String(localized: "Sort by Name", comment: "A choice for the order of the list in Settings › Privacy › Stored by Websites.")),

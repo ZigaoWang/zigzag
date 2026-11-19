@@ -175,9 +175,8 @@ final class SavePasswordPrompt: FloatingPanelView {
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.superview != nil, let area = controller.pageFrame(showing: tab) else { return }
                 if self.isHidden {
-                    // One question at a time at the top of the page (`PageQuestions`): a site's question showing
-                    // there goes first, and this comes up once it's answered. Placed first, hidden still: one over
-                    // another pane of a split doesn't hold it up.
+                    // One question at a time at the page top (`PageQuestions`): a site's question goes first, this
+                    // shows after it's answered. Placed hidden first so one over another split pane doesn't block it.
                     self.place(in: area)
                     guard PageQuestions.mayShow(self, in: controller.promptOverlay) else { return }
                     self.isHidden = false
@@ -230,7 +229,7 @@ final class SavePasswordPrompt: FloatingPanelView {
         current?.close(saved: false)
         let prompt = SavePasswordPrompt(kind: .save(username: "student"), origin: origin)
         [prompt.neverButton, prompt.notNowButton, prompt.saveButton].forEach { $0.onClick = { [weak prompt] _ in prompt?.close(saved: false) } }
-        // For the tab in front, where and when a real one comes up: it takes its turn after a site's question.
+        // The front tab, so it queues after a site's question like a real one.
         prompt.tab = controller.tabManager.selectedTab
         prompt.controller = controller
         prompt.slidesFromTop = true
@@ -274,8 +273,8 @@ final class SavePasswordPrompt: FloatingPanelView {
         DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: work)
     }
 
-    /// Set once it starts closing: closing frees the turn for the other questions, which asks this one to follow its
-    /// tab again, and with its tab gone that would close it again, without end.
+    /// Set on close: freeing the turn re-asks this prompt to follow its tab, which with the tab gone would close it
+    /// again forever.
     private var isClosing = false
 
     private func close(saved: Bool) {

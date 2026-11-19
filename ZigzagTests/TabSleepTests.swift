@@ -45,7 +45,7 @@ struct TabSleepTests {
     }
 
     @Test func aPageOnItsWayIsLetArriveFirst() {
-        // Put to sleep as a site sent it on after the Mac woke, WebKit crashed committing the new site's page (#305).
+        // Sleeping a tab mid-redirect after wake crashed WebKit committing the new page (#305).
         var loading = tab(5 * 60 * minute)
         loading.isLoading = true
         let other = tab(5 * 60 * minute)
@@ -227,7 +227,7 @@ struct KeepAwakeTests {
     }
 }
 
-/// A web view let go of outlives the callback it was let go in, and goes at the next turn of the main loop (#305).
+/// A released web view outlives the callback and is freed on the next main loop turn (#305).
 @MainActor
 struct PageRetirementTests {
     @Test func aRetiredWebViewGoesOnlyAtTheNextTurn() async {
@@ -237,7 +237,7 @@ struct PageRetirementTests {
             gone = webView
             PageRetirement.retire(webView)
         }
-        // Still there where it was let go, as inside a WebKit callback.
+        // Still alive inside the callback.
         #expect(gone != nil)
         for _ in 0..<50 where gone != nil {
             try? await Task.sleep(for: .milliseconds(20))

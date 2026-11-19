@@ -344,13 +344,13 @@ struct SystemPasswordsTests {
     @Test func theKeyIconIsOnlyZigzagsWhenItFills() {
         guard #available(macOS 27, *) else { return }
         #expect(AutofillKeyIcon.shows(fills: true, managerOn: false, panelAvailable: true))
-        // Fill passwords off: no key, even with the Mac's panel there (#236).
+        // Fill passwords off: no key icon, even with the system panel (#236).
         #expect(!AutofillKeyIcon.shows(fills: false, managerOn: false, panelAvailable: true))
-        // A password-manager extension draws its own icon in the field; Zigzag's would sit on it.
+        // Password manager extensions draw their own icon in the field.
         #expect(!AutofillKeyIcon.shows(fills: true, managerOn: true, panelAvailable: true))
         #expect(!AutofillKeyIcon.shows(fills: false, managerOn: true, panelAvailable: true))
         #expect(!AutofillKeyIcon.shows(fills: true, managerOn: false, panelAvailable: false))
-        // Not a browser tab's page (an extension's own, a test's): never.
+        // Not in a browser tab (extension or test web view): never.
         #expect(!AutofillKeyIcon.shows(in: WKWebView()))
     }
 

@@ -3,8 +3,7 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// WebRTC and your IP address (#229): which pages get it, the Site Controls row, a private window's choice, and
-/// WebKit's switch itself.
+/// WebRTC IP protection (#229): which pages get WebRTC, the Site Controls row, private window choices, and WebKit's switch.
 @MainActor
 @Suite(.serialized)
 struct WebRTCProtectionTests {
@@ -25,14 +24,14 @@ struct WebRTCProtectionTests {
     }
 
     @Test func theDecision() {
-        // Off, as it starts: every site has it.
+        // Off (default): every site has it.
         #expect(WebRTCProtection.allows(protectionOn: false, kept: nil, here: nil))
-        // On: none has it, unless allowed.
+        // On: none have it unless allowed.
         #expect(!WebRTCProtection.allows(protectionOn: true, kept: nil, here: nil))
         #expect(WebRTCProtection.allows(protectionOn: true, kept: true, here: nil))
-        // A site blocked keeps it off with the setting off.
+        // A blocked site stays off with the setting off.
         #expect(!WebRTCProtection.allows(protectionOn: false, kept: false, here: nil))
-        // A private tab's own choice comes first.
+        // A private tab's choice comes first.
         #expect(WebRTCProtection.allows(protectionOn: true, kept: false, here: true))
         #expect(!WebRTCProtection.allows(protectionOn: false, kept: true, here: false))
     }
@@ -50,11 +49,11 @@ struct WebRTCProtectionTests {
         try await withDefaults {
             WebRTCProtection.isOn = true
             #expect(!WebRTCProtection.allows(URL(string: site + "/abc"), in: nil))
-            // A page with no site follows the setting.
+            // Pages without a site follow the setting.
             #expect(!WebRTCProtection.allows(URL(string: "about:blank"), in: nil))
             WebRTCProtection.choose(true, origin: site, in: nil)
             #expect(WebRTCProtection.allows(URL(string: site + "/abc"), in: nil))
-            // Another origin on the host is its own site.
+            // Another origin on the host is a separate site.
             #expect(!WebRTCProtection.allows(URL(string: "http://meet.example.com"), in: nil))
             #expect(SitePermissions.webRTC(origin: site) == true)
         }
@@ -65,18 +64,18 @@ struct WebRTCProtectionTests {
         try await withDefaults {
             #expect(SitePermission.webRTC.choices == [.allow, .block])
             #expect(SitePermission.camera.choices == PermissionChoice.allCases)
-            // While it's on, every site has the row, Block until allowed.
+            // On: every site shows the row, Block until allowed.
             WebRTCProtection.isOn = true
             #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])
             #expect(SitePermissions.shown(origin: site, isPrivate: true) == [.webRTC])
             #expect(SitePermissions.choice(.webRTC, origin: site) == .block)
             SitePermissions.setChoice(.allow, for: .webRTC, origin: site)
             #expect(SitePermissions.choice(.webRTC, origin: site) == .allow)
-            // Off, the row stays for a site with a choice kept, and none for the rest.
+            // Off: only sites with a kept choice show the row.
             WebRTCProtection.isOn = false
             #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])
             #expect(SitePermissions.shown(origin: "https://other.example.com", isPrivate: false).isEmpty)
-            // Reset Permissions puts it back to the setting.
+            // Reset Permissions returns it to the setting.
             SitePermissions.reset(origin: site)
             #expect(SitePermissions.webRTC(origin: site) == nil)
             #expect(SitePermissions.shown(origin: site, isPrivate: false).isEmpty)
@@ -86,20 +85,19 @@ struct WebRTCProtectionTests {
     @Test func theSettingAloneIsNotTheSitesChoice() async throws {
         guard WebRTCProtection.isAvailable else { return }
         try await withDefaults {
-            // On, every site has the row, so a call can be allowed before it starts, but Block from the setting is
-            // nobody's answer: not counted on the Permissions row, and nothing to reset.
+            // On: every site has the row so calls can be allowed in advance, but the setting's Block isn't a site answer: not counted, nothing to reset.
             WebRTCProtection.isOn = true
             #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])
             #expect(!SitePermissions.isOwn(.webRTC, origin: site))
-            // A private tab's own choice is the site's, there.
+            // A private tab's choice counts as the site's there.
             #expect(SitePermissions.isOwn(.webRTC, origin: site, here: true))
-            // Asked (a call tried to start), or chosen: the site's own.
+            // Asked (a call tried to start) or chosen: the site's own.
             SitePermissions.noteAsked(.webRTC, origin: site, isPrivate: false)
             #expect(SitePermissions.isOwn(.webRTC, origin: site))
             SitePermissions.forgetAsked()
             SitePermissions.setChoice(.allow, for: .webRTC, origin: site)
             #expect(SitePermissions.isOwn(.webRTC, origin: site))
-            // Reset takes it back to the setting's.
+            // Reset returns it to the setting.
             SitePermissions.reset(origin: site)
             #expect(!SitePermissions.isOwn(.webRTC, origin: site))
             #expect(SitePermissions.shown(origin: site, isPrivate: false) == [.webRTC])
@@ -115,17 +113,16 @@ struct WebRTCProtectionTests {
             WebRTCProtection.choose(true, origin: site, in: tab)
             #expect(WebRTCProtection.allows(URL(string: site), in: tab))
             #expect(WebRTCProtection.choice(origin: site, in: tab) == .allow)
-            // Nothing kept for the site, nor for any other tab.
+            // Nothing kept for the site or other tabs.
             #expect(SitePermissions.webRTC(origin: site) == nil)
             #expect(!WebRTCProtection.allows(URL(string: site), in: Tab(url: URL(string: site), spaceID: UUID())))
-            // It follows a choice kept elsewhere.
+            // Follows choices kept for other sites.
             SitePermissions.setChoice(.allow, for: .webRTC, origin: "https://call.example.com")
             #expect(WebRTCProtection.allows(URL(string: "https://call.example.com"), in: tab))
         }
     }
 
-    /// A private tab's pop-up keeps the tab's choices once the tab has closed (`PopupWindowController.webRTCChoices`):
-    /// they're kept as a copy, which WebRTC follows as it would the tab.
+    /// A private tab's popup keeps the tab's choices after it closes (`PopupWindowController.webRTCChoices`), as a copy.
     @Test func aPopUpKeepsItsPrivateOpenersChoice() async throws {
         guard WebRTCProtection.isAvailable else { return }
         try await withDefaults {
@@ -174,19 +171,19 @@ struct WebRTCProtectionTests {
     // MARK: A page that tries on its own (#276)
 
     @Test func whenTheNoticeShows() {
-        // Blocked, nothing chosen, the page itself, the first time: it says so.
+        // Blocked, unchosen, main frame, first time: notice.
         #expect(WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
-        // WebRTC allowed: nothing to say.
+        // Allowed: no notice.
         #expect(!WebRTCProtection.notices(allowed: true, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
         #expect(!WebRTCProtection.notices(allowed: true, chosen: true, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
-        // Blocked for the site by choice: blocked without a word, as chosen.
+        // Blocked by choice: silent.
         #expect(!WebRTCProtection.notices(allowed: false, chosen: false, isMainFrame: true, noticedHere: false, askedHere: false, putAway: false))
-        // A frame in the page (an ad's): quiet.
+        // A subframe (an ad's): silent.
         #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: false, noticedHere: false, askedHere: false, putAway: false))
-        // Once a page, and not once its question was asked.
+        // Once per page, and not after asking.
         #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: true, askedHere: false, putAway: false))
         #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: true, putAway: false))
-        // Put away this session: not again.
+        // Dismissed this session: not again.
         #expect(!WebRTCProtection.notices(allowed: false, chosen: nil, isMainFrame: true, noticedHere: false, askedHere: false, putAway: true))
     }
 
@@ -195,13 +192,13 @@ struct WebRTCProtectionTests {
         try await withDefaults {
             let origin = "https://once-\(UUID().uuidString.lowercased()).example.com"
             let tab = Tab(url: URL(string: origin + "/call"), title: "Call", spaceID: UUID())
-            // Off: every site has WebRTC, nothing to say.
+            // Off: every site has WebRTC, no notice.
             #expect(!WebRTCProtection.notice(in: tab, isMainFrame: true))
             WebRTCProtection.isOn = true
             #expect(!WebRTCProtection.notice(in: tab, isMainFrame: false))
             #expect(WebRTCProtection.notice(in: tab, isMainFrame: true))
             #expect(!WebRTCProtection.notice(in: tab, isMainFrame: true))
-            // The next page load says so again.
+            // The next load shows it again.
             tab.permissionAnswers.forget()
             #expect(WebRTCProtection.notice(in: tab, isMainFrame: true))
         }
@@ -214,13 +211,13 @@ struct WebRTCProtectionTests {
             let origin = "https://allow-\(UUID().uuidString.lowercased()).example.com"
             let tab = Tab(url: URL(string: origin), title: "Call", spaceID: UUID())
             #expect(WebRTCProtection.notice(in: tab, isMainFrame: true))
-            // What Allow for This Site does: kept for the site, as Site Controls' row shows it.
+            // Allow for This Site: kept for the site, shown in Site Controls.
             WebRTCProtection.choose(true, origin: origin, in: tab)
             #expect(SitePermissions.webRTC(origin: origin) == true)
             #expect(SitePermissions.choice(.webRTC, origin: origin) == .allow)
             tab.permissionAnswers.forget()
             #expect(!WebRTCProtection.notice(in: tab, isMainFrame: true))
-            // In a private window, for that tab alone.
+            // In a private window: for that tab only.
             let other = "https://private-\(UUID().uuidString.lowercased()).example.com"
             let privateTab = Tab(url: URL(string: other), title: "Call", spaceID: UUID())
             privateTab.privateStore = .nonPersistent()
@@ -233,7 +230,7 @@ struct WebRTCProtectionTests {
         }
     }
 
-    /// Loads a fresh page and reads `typeof RTCPeerConnection` in it.
+    /// Loads a fresh page and reads `typeof RTCPeerConnection`.
     private static func peerConnectionType(in webView: WKWebView) async throws -> String? {
         let token = UUID().uuidString
         webView.loadHTMLString("<p id='\(token)'>hi</p>", baseURL: URL(string: "https://meet.example.com/"))

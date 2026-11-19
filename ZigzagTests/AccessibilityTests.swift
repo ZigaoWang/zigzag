@@ -2,11 +2,10 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// VoiceOver over the controls Zigzag draws: each is one element with its role and its name, never an image named
-/// after its symbol, and a view that only holds controls stays out of the way so they're reached one by one.
+/// VoiceOver on drawn controls: one named element each, no symbol names, container views skipped.
 @MainActor
 struct AccessibilityTests {
-    /// Every element VoiceOver can reach under `root`, as it walks them: through each element's children.
+    /// Every accessibility element under `root`, depth first.
     private func elements(under root: NSView) -> [NSObject] {
         var found: [NSObject] = []
         func walk(_ object: NSObject, depth: Int) {
@@ -33,14 +32,12 @@ struct AccessibilityTests {
         return label.isEmpty ? title : label
     }
 
-    /// The problems VoiceOver would have under `root`: a control with no name, a name that's a symbol's, a picture
-    /// read on its own inside a control.
+    /// VoiceOver problems under `root`: unnamed controls, symbol names, images read separately.
     private func problems(under root: NSView) -> [String] {
         var problems: [String] = []
         let pressable: Set<NSAccessibility.Role> = [.button, .checkBox, .radioButton, .popUpButton, .menuButton, .disclosureTriangle, .row, .cell]
         for object in elements(under: root) {
-            // The system draws an overlay scroll view's scrollers as accessibility buttons; they are chrome, not the
-            // pane's own controls, and AppKit names them itself.
+            // Overlay scrollers show up as accessibility buttons; AppKit names them.
             if String(describing: type(of: object)).contains("ScrollerPart") { continue }
             guard let role = role(object) else { continue }
             let said = name(object)
@@ -69,9 +66,9 @@ struct AccessibilityTests {
         #expect(button.isAccessibilityElement())
         #expect(button.accessibilityRole() == .button)
         #expect(button.accessibilityLabel() == "Split View")
-        // Its symbol isn't read on its own.
+        // The symbol isn't a separate element.
         #expect(button.accessibilityChildren()?.isEmpty ?? true)
-        // A translated tooltip names it, its shortcut left out.
+        // The tooltip names it, without the shortcut.
         button.toolTip = "返回（⌘[）"
         #expect(button.accessibilityLabel() == "返回")
     }
@@ -117,11 +114,11 @@ struct AccessibilityTests {
         #expect(!panel.isAccessibilityElement())
         let reached = controls(under: panel).compactMap { $0 as? IconButton }
         #expect(reached.count == 2)
-        // Named, a group is one VoiceOver steps into: its controls are still each their own.
+        // A named group is entered, its controls still separate.
         panel.setAccessibilityLabel("Navigation")
         #expect(panel.isAccessibilityElement())
         #expect(controls(under: panel).count == 2)
-        // Told outright, it isn't.
+        // Unless marked ignored.
         let quiet = InteractiveView()
         quiet.onClick = { _ in }
         quiet.setAccessibilityElement(false)
@@ -150,7 +147,7 @@ struct AccessibilityTests {
         #expect(row.accessibilityRole() == .button)
         #expect(row.accessibilityLabel() == "Example Domain")
         #expect(row.isAccessibilitySelected())
-        // Its title isn't read a second time on its own; its close button is a button of its own, named.
+        // The title isn't read twice; the close button is separate and named.
         let children = row.accessibilityChildren() ?? []
         #expect(!children.contains { $0 is Label })
         #expect(children.contains { ($0 as? NSView) === row.closeButton })

@@ -52,9 +52,9 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
     /// Per tab: the login sent there whose answer hasn't come yet.
     private var held: [ObjectIdentifier: HeldLogin] = [:]
 
-    /// A strong password filled from Use Strong Password, kept as a pending login (`Credential.isPendingGenerated`)
-    /// until the site takes it. Making another for the same form, before the first could have been sent, replaces
-    /// it; one made for another form is kept beside it.
+    /// A Use Strong Password password, saved as a pending login (`Credential.isPendingGenerated`) until the site
+    /// accepts it. Another for the same form before the first could be sent replaces it; one for another form is kept
+    /// too.
     private final class PendingGenerated {
         let origin: Origin
         let id: UUID
@@ -83,7 +83,7 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
 
     private var generated: [PendingGenerated] = []
 
-    /// The one being watched holding `password` on `origin`.
+    /// The watched one holding `password` on `origin`.
     private func pendingGenerated(on origin: Origin, matching password: SecretString) -> PendingGenerated? {
         generated.last { $0.origin == origin && $0.password.matches(password) }
     }
@@ -266,10 +266,9 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
 
     // MARK: Strong passwords
 
-    /// Keeps a strong password just filled into a page as a pending login of its own (never over the account's), and
-    /// watches the tab for its form going through. Filling another into the same form before the first could have
-    /// been sent replaces it, so trying a few leaves one behind, not several. `sameForm`: the page script found the
-    /// fields the last one went into, on the same page.
+    /// Saves a generated password as its own pending login (never over the account's) and watches the tab for the form
+    /// submitting. Another for the same form before submit replaces it, so retries leave one. `sameForm`: the script
+    /// found the same fields on the same page.
     @discardableResult
     func filledGenerated(_ password: SecretString, origin: Origin, username: String, sameForm: Bool, in tab: Tab?) async throws -> Credential {
         let previous = generated.last { $0.origin == origin && $0.tab === tab }
@@ -282,19 +281,17 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         return credential
     }
 
-    /// Whether a new strong password takes the place of the last one made in the tab: only for the same form, and
-    /// only while that one can't have been sent. One that may have been (a press on its form, or another form,
-    /// perhaps sent by a clickable box Zigzag can't tell from the rest) stays: the site may have taken it.
+    /// A new generated password replaces the tab's last one only for the same form and only if it can't have been sent.
+    /// One that may have been (a press on its form or another, maybe via an unrecognized clickable box) stays, since
+    /// the site may have accepted it.
     nonisolated static func replacesPending(attempted: Date?, sameForm: Bool) -> Bool { sameForm && attempted == nil }
 
-    /// Strong passwords are never tidied away by age: one the site took without Zigzag seeing it (a verification
-    /// step that outlasted the watch, or a site you only ever sign in to by cookie afterwards) may be the only copy
-    /// of the account's password. One goes only once a later strong password for the same site and account has
-    /// settled in its place (`dropEarlierStandIns`); until then Passwords lists it as a generated password.
+    /// Generated passwords are never pruned by age: one the site accepted unseen (a verification step that outlasted
+    /// the watch, cookie-only sign-ins afterwards) may be the only copy. One is removed only when a later one for the
+    /// same site and account settles (`dropEarlierStandIns`); until then Passwords lists it as generated.
 
-    /// Deletes the pending strong passwords on `origin` made for `account` no later than `settled`, the one that has
-    /// just taken the account's place. Ones for no account, or for another, stay: which account they're for is
-    /// yours to say. Returns how many went.
+    /// Deletes pending generated passwords on `origin` for `account` up to `settled`. Ones for no or another account
+    /// stay for you to assign. Returns the count removed.
     @discardableResult
     static func dropEarlierStandIns(origin: Origin, account: String, settled: Credential, in store: PasswordStore) async -> Int {
         guard !account.isEmpty else { return 0 }
@@ -379,23 +376,22 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
 
     /// How settling a strong password went.
     enum Settlement {
-        /// `password` wasn't a pending strong password: it goes the way a typed one does.
+        /// Not a pending generated password: handle as typed.
         case notGenerated
-        /// Done: the account has it, it's a new account's login, or it stays pending for you to name.
+        /// Done: the account has it, it's a new account's login, or it stays pending to be named.
         case settled
-        /// The account has another password saved, which only you replace: ask, as for a typed one. The pending one
+        /// The account has a different saved password, which only you replace: ask as for a typed one. The pending one
         /// keeps the new password meanwhile.
         case ask(Credential)
 
         var wasGenerated: Bool { if case .notGenerated = self { false } else { true } }
     }
 
-    /// A strong password from "Use Strong Password" is kept as a pending login of its own the moment it's filled
-    /// (`filledGenerated`), never over the one saved for the account, so a change the site turns down, or a reload
-    /// before the form is sent, loses nothing. Once the site has taken the form it settles. An account saved with
-    /// another password (`username`'s, or else the one the form had when it was filled) is replaced only once you
-    /// say so, since that the site took it is a guess; for a new account the pending one becomes its login. With no
-    /// username to go by it stays pending, unless it's the site's only login.
+    /// Generated passwords are saved as separate pending logins when filled (`filledGenerated`), never over the
+    /// account's, so a rejected change or a reload loses nothing; they settle once the site accepts the form. An
+    /// account saved with another password (`username`'s, or the form's at fill time) is replaced only with your OK,
+    /// since acceptance is a guess; a new account gets the pending one as its login. Without a username it stays
+    /// pending unless it's the site's only login.
     static func settleGenerated(origin: Origin, username: String, password: SecretString, in store: PasswordStore) async -> Settlement {
         let saved = (try? await store.credentials(for: origin)) ?? []
         guard let generated = await pendingGenerated(matching: password, among: saved, in: store) else { return .notGenerated }
@@ -407,7 +403,7 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
                 try? await store.markUsed(generated.id)
                 return .ask(account)
             }
-            // The account has it already: the pending one has done its job.
+            // The account already has it.
             try? await store.markUsed(account.id)
             try? await store.delete(generated.id)
             await dropEarlierStandIns(origin: origin, account: account.username, settled: generated, in: store)
@@ -435,8 +431,7 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         return nil
     }
 
-    /// An account given a pending strong password by hand (the update prompt): the pending one has done its job,
-    /// and so have any made for that account before it.
+    /// A pending password assigned by hand (the update prompt): drop it and earlier ones for that account.
     static func dropGenerated(origin: Origin, password: SecretString, account: String, in store: PasswordStore) async {
         let saved = (try? await store.credentials(for: origin)) ?? []
         guard let generated = await pendingGenerated(matching: password, among: saved, in: store) else { return }
@@ -450,7 +445,7 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         let store = PasswordStore.shared
         let settlement = await Self.settleGenerated(origin: origin, username: username, password: password, in: store)
         if case .ask(let account) = settlement {
-            // Asked whatever Offer to save says: you chose to keep this password.
+            // Ask regardless of Offer to save: you chose this password.
             SavePasswordPrompt.show(.update(account), origin: origin, password: password, in: tab)
             return
         }
@@ -500,8 +495,8 @@ final class PasswordCapture: NSObject, WKScriptMessageHandler {
         return s.visibility === 'visible' && parseFloat(s.opacity) >= 0.1;
       };
       const fields = (scope) => [...(scope || document).querySelectorAll('input')].filter(visible);
-      // Still on the page, scrolled into view or not, taking typing or greyed out while the site answers: a form
-      // that's only scrolled away or disabled hasn't gone. Pushed off the page's top or left edge, it has.
+      // Still in the document, even scrolled away, disabled or grayed while the site responds. Pushed past the top or
+      // left edge counts as gone.
       const present = (el) => {
         if (!el || el.type === 'hidden') return false;
         const r = el.getBoundingClientRect();
@@ -626,6 +621,7 @@ enum PasswordManagers {
         "bfogiafebfohielmmehodmfbbebbbpei": "Keeper",
         "eiaeiblijfjekdanodkjadfinkhbfgcd": "NordPass",
         "pejdijmoenmkgeppbflobdenhhabjlaj": "iCloud Passwords",
+        "mnilpkfepdibngheginihjpknnopchbn": "Strongbox",
     ]
 
     /// The password manager installed and turned on in a profile, by name. Read from what the profile has
@@ -647,29 +643,27 @@ enum PasswordManagers {
     }
 }
 
-/// Who saves and fills passwords in a profile (#248): Zigzag itself, or Apple's iCloud Passwords extension, which
-/// talks to the Passwords app on this Mac. Choosing iCloud turns Zigzag's own saving and filling off there, so the
-/// two never both offer, and remembers them as they were; choosing Zigzag again puts them back. The Passwords
-/// window is there either way.
+/// Who saves and fills passwords in a profile (#248): Zigzag, or Apple's iCloud Passwords extension (via the Passwords
+/// app). Choosing iCloud turns Zigzag's saving and filling off and remembers them; choosing Zigzag restores them. The
+/// Passwords window works either way.
 nonisolated enum PasswordFiller: String {
     case zigzag
     case iCloud
 
-    /// Apple's iCloud Passwords extension, by its Chrome Web Store ID.
+    /// iCloud Passwords' Chrome Web Store ID.
     static let iCloudExtensionID = "pejdijmoenmkgeppbflobdenhhabjlaj"
 
-    /// What was chosen in a profile; nil until something is.
+    /// Nil until chosen.
     static func chosen(in profile: UUID, defaults: UserDefaults = .standard) -> PasswordFiller? {
         defaults.string(forKey: ProfileKey.passwordFiller.name(in: profile)).flatMap(PasswordFiller.init)
     }
 
-    /// Who fills now. Until you choose, iCloud when its extension is on and Zigzag already stepped aside for it
-    /// (PasswordManagers), so the choice shows what's so.
+    /// Until chosen: iCloud if its extension is on and Zigzag already stepped aside (PasswordManagers).
     static func current(chosen: PasswordFiller?, iCloudOn: Bool, zigzagSaves: Bool, zigzagFills: Bool) -> PasswordFiller {
         chosen ?? (iCloudOn && !zigzagSaves && !zigzagFills ? .iCloud : .zigzag)
     }
 
-    /// iCloud fills: Zigzag's own saving and filling go off, kept as they were for when Zigzag fills again.
+    /// Turns Zigzag's saving and filling off, remembering them.
     static func useICloud(in profile: UUID, saves: Bool, fills: Bool, defaults: UserDefaults = .standard) {
         if chosen(in: profile, defaults: defaults) != .iCloud {
             defaults.set([saves, fills], forKey: ProfileKey.passwordsBeforeICloud.name(in: profile))
@@ -679,8 +673,8 @@ nonisolated enum PasswordFiller: String {
         defaults.set(PasswordFiller.iCloud.rawValue, forKey: ProfileKey.passwordFiller.name(in: profile))
     }
 
-    /// Zigzag fills again: saving and filling as they were before iCloud, chosen outright, so the extension, still
-    /// installed, doesn't turn them off. If both were off, both go on: Zigzag is what you chose.
+    /// Restores saving and filling as they were before iCloud, set explicitly so the still-installed extension doesn't
+    /// turn them off. Both on if both were off.
     static func useZigzag(in profile: UUID, defaults: UserDefaults = .standard) {
         let before = defaults.array(forKey: ProfileKey.passwordsBeforeICloud.name(in: profile)) as? [Bool] ?? []
         var saves = before.first ?? true, fills = before.dropFirst().first ?? true
@@ -691,19 +685,19 @@ nonisolated enum PasswordFiller: String {
         defaults.set(PasswordFiller.zigzag.rawValue, forKey: ProfileKey.passwordFiller.name(in: profile))
     }
 
-    /// What choosing iCloud needs first in a profile: its extension added, or turned back on there.
+    /// What choosing iCloud needs first: install or re-enable the extension.
     enum Need: Equatable { case nothing, turnOn, install }
 
     static func need(installed: Bool, enabled: Bool) -> Need { !installed ? .install : enabled ? .nothing : .turnOn }
 
-    /// Whether to offer iCloud once, when its extension went in by hand: only while Zigzag still saves or fills,
-    /// before anything was chosen, and never twice.
+    /// Offer iCloud once when its extension was installed by hand, while Zigzag still saves or fills and nothing's
+    /// chosen.
     static func offersSwitch(chosen: PasswordFiller?, zigzagHandles: Bool, offered: Bool) -> Bool {
         chosen == nil && zigzagHandles && !offered
     }
 }
 
-/// Handing a profile's passwords to the iCloud Passwords extension and back.
+/// Switches a profile's passwords to iCloud Passwords and back.
 @MainActor
 enum ICloudPasswords {
     static var id: String { PasswordFiller.iCloudExtensionID }
@@ -713,14 +707,14 @@ enum ICloudPasswords {
                                zigzagSaves: PasswordCapture.offersToSave(in: profile), zigzagFills: Autofill.isOn(in: profile))
     }
 
-    /// The extension is installed and on in the profile.
+    /// Installed and enabled in the profile.
     static func isOn(in profile: Profile) -> Bool {
         guard #available(macOS 15.4, *) else { return false }
         return profile.installs.isInstalled(id) && profile.installs.isEnabled(id)
     }
 
-    /// iCloud fills in the profile; its extension is there already. Its button is pinned by the address when
-    /// there's room, so it's easy to find to connect.
+    /// Uses iCloud in the profile (extension already present); pins its button by the address when there's room, so
+    /// it's easy to connect.
     static func use(in profile: Profile) {
         PasswordFiller.useICloud(in: profile.id, saves: PasswordCapture.offersToSave(in: profile), fills: Autofill.isOn(in: profile))
         Autofill.shared.hide()

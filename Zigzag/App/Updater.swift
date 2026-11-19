@@ -1,14 +1,9 @@
 import AppKit
 import Sparkle
 
-/// Automatic updates via Sparkle, which downloads, checks each update's signature and installs it. Zigzag looks every
-/// few hours and on waking from sleep, quietly; once an update is ready the sidebar's update card says so, with a
-/// Restart that brings everything back in the new version, and an update you don't restart for installs when Zigzag
-/// quits.
-///
-/// Sparkle never shows a window of its own: `QuietUserDriver` stands in for its standard one, so an update found in
-/// the background stays out of the way. One you asked for comes in on the card, which shows it downloading and being
-/// prepared before it's ready; a toast only says a check is under way, or what it found when that's nothing.
+/// Automatic updates via Sparkle. Checks every few hours and on wake; a ready update shows on the sidebar card and
+/// installs on Restart or quit. `QuietUserDriver` replaces Sparkle's windows; manual checks show progress on the card
+/// and a toast only for "checking" or nothing found.
 final class Updater {
     static let shared = Updater()
     private var updater: SPUUpdater?
@@ -40,13 +35,13 @@ final class Updater {
         return !key.isEmpty
     }
 
-    /// The update that's ready, if one is: the sidebar's card, the Zigzag menu and Settings follow it (`changed`).
+    /// The staged update; the card, menu and Settings follow it (`changed`).
     private(set) var readiness = UpdateReadiness() {
         didSet { if readiness != oldValue { Self.changed.send() } }
     }
     static let changed = Signal<Void>()
 
-    /// An update you asked for on its way in, for the card: downloading, then being prepared.
+    /// A manual update's download or preparation, for the card.
     private(set) var activity: UpdateCardState? {
         didSet { if activity?.differsVisibly(from: oldValue) ?? (oldValue != nil) { Self.changed.send() } }
     }
@@ -58,15 +53,14 @@ final class Updater {
         return .ready(version: staged.version)
     }
 
-    /// With the sidebar hidden, the card floats in its corner: for an update you asked for, and once when one is
-    /// ready. It stops floating when you close it or restart, or once the sidebar's shown, where it stays.
+    /// With the sidebar hidden, the card floats for a manual update, and once when an update is ready, until closed,
+    /// restarted or the sidebar shows.
     private(set) var cardFloats = false {
         didSet { if cardFloats != oldValue { Self.changed.send() } }
     }
-    /// The build the card last floated for, so one that's ready floats only once.
+    /// So a ready build floats only once.
     private var floatedBuild: String?
 
-    /// The sidebar came back in a window: the card lives there now.
     func stopFloating() { cardFloats = false }
 
     /// Zigzag › Check for Updates…, or Restart to Update while one is ready.
@@ -75,21 +69,21 @@ final class Updater {
             : String(localized: "Check for Updates…", comment: "Zigzag menu item.")
     }
 
-    /// Restart asked for: `waiting` while Sparkle finishes something else, `running` once it's installing.
+    /// `waiting` while Sparkle is busy, `running` once installing.
     private enum Restart { case none, waiting, running }
     private var restart = Restart.none
-    /// Check for Updates… is under way: it answers in toasts, where a quiet check says nothing.
+    /// A manual check answers in toasts.
     private var manualCheck = false
-    /// The window whose toast says "Checking…", put away when the check ends without a word.
+    /// The window showing "Checking…", cleared if the check ends silently.
     private weak var workingToast: BrowserWindowController?
-    /// The staged update was let go for a newer one: Sparkle fetches that as soon as it's done.
+    /// The staged update was dropped for a newer one, to fetch once Sparkle's done.
     private var fetchesAfterCycle = false
-    /// What Sparkle last said it found, staged once it's ready.
+    /// Sparkle's last found update, staged once ready.
     private var found: UpdateReadiness.Staged?
     private var clock: Timer?
     private var wakeObserver: NSObjectProtocol?
     #if DEBUG
-    /// Shown by the debug command `updateready`: Restart only says what it would do.
+    /// Set by `updateready`: Restart only logs.
     private var stagedForDebug = false
     #endif
 
@@ -100,28 +94,26 @@ final class Updater {
         let updater = SPUUpdater(hostBundle: .main, applicationBundle: .main, userDriver: driver, delegate: delegate)
         guard (try? updater.start()) != nil else { return }
         self.updater = updater
-        // Sparkle looks every few hours by itself (SUScheduledCheckInterval), but stops once an update is staged:
-        // this clock goes on, so the staged update is compared with the feed and a newer one takes its place.
+        // Sparkle stops its own checks once an update is staged; this timer keeps comparing it with the feed.
         let clock = Timer(timeInterval: 30 * 60, repeats: true) { _ in MainActor.assumeIsolated { Updater.shared.checkQuietly(onWake: false) } }
         clock.tolerance = 5 * 60
         RunLoop.main.add(clock, forMode: .common)
         self.clock = clock
-        // A Mac that sleeps most of the day still hears of updates: after a wake, once the network is back.
+        // Check after waking, once the network is back.
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 20) { MainActor.assumeIsolated { Updater.shared.checkQuietly(onWake: true) } }
         }
     }
 
-    /// A look for something new, with nothing shown: Sparkle downloads what it finds and stages it, or, with an update
-    /// already staged, Zigzag compares that one with the feed (`found(_:state:reply:)`).
+    /// A silent check: Sparkle stages what it finds, or with an update staged, Zigzag compares it with the feed
+    /// (`found(_:state:reply:)`).
     func checkQuietly(onWake: Bool) {
         guard let updater, !updater.sessionInProgress, restart == .none,
               UpdateSchedule.shouldCheck(lastCheck: updater.lastUpdateCheckDate, now: Date(), onWake: onWake) else { return }
         updater.checkForUpdatesInBackground()
     }
 
-    /// Zigzag › Check for Updates… and Settings' button: with an update ready, restarts into it; otherwise looks now
-    /// and says what it found in a toast.
+    /// Menu and Settings: restarts into a ready update, else checks and answers in a toast.
     func checkForUpdates() {
         if readiness.canRestart { restartToUpdate(); return }
         guard let updater else {
@@ -130,26 +122,24 @@ final class Updater {
                        comment: "Toast after Check for Updates in a development build."), symbol: "arrow.down.circle")
             return
         }
-        // Coming in already: the card shows it, out where you can see it.
+        // Already downloading: float the card.
         if activity != nil { cardFloats = true; return }
         let checking = String(localized: "Checking for updates…", comment: "Toast while Zigzag › Check for Updates… looks for a new version.")
-        // Asked again while the first is under way: the same check goes on.
+        // Already checking.
         if manualCheck { sayWorking(checking); return }
         manualCheck = true
         sayWorking(checking)
         whenSparkleIsFree { [weak self] in
             guard let self, self.manualCheck else { return }
-            // A quiet check that was under way may have staged one meanwhile.
+            // A background check may have staged one meanwhile.
             if self.readiness.canRestart { self.showReady(); self.manualCheck = false; return }
-            // Sparkle still busy after the wait, or not taking checks: it would start nothing, and no answer would
-            // ever come, so say so now.
+            // Sparkle busy or refusing checks would never answer, so fail now.
             guard updater.canCheckForUpdates else { self.failed(); self.manualCheck = false; return }
             updater.checkForUpdates()
         }
     }
 
-    /// The card's Restart, Zigzag › Restart to Update and Settings': Sparkle installs the staged update and opens
-    /// Zigzag again, with every window and tab as it was (`UpdateRelaunch`, written as Sparkle asks to relaunch).
+    /// Installs the staged update and relaunches with windows and tabs restored (`UpdateRelaunch`).
     func restartToUpdate() {
         cardFloats = false
         #if DEBUG
@@ -163,21 +153,21 @@ final class Updater {
         restart = .waiting
         whenSparkleIsFree { [weak self] in
             guard let self, self.restart == .waiting else { return }
-            // Sparkle would start nothing, and the restart would wait for good, holding up every later check.
+            // Otherwise the restart would wait forever and block later checks.
             guard updater.canCheckForUpdates else { self.failed(); self.restart = .none; return }
             self.restart = .running
-            // The staged update is resumed, as a check you asked for, and installed at once (`found`).
+            // Resumes the staged update as a manual check, installed at once (`found`).
             updater.checkForUpdates()
         }
     }
 
-    /// The card's ×: away for this version until Zigzag restarts. The update still installs when Zigzag quits.
+    /// Hides the card for this version until relaunch; it still installs on quit.
     func dismissCard() {
         cardFloats = false
         readiness.dismiss()
     }
 
-    /// Runs `action` once Sparkle has no check of its own under way.
+    /// Runs `action` once Sparkle has no check of its own running.
     private func whenSparkleIsFree(_ action: @escaping () -> Void, tries: Int = 120) {
         guard let updater else { return }
         guard updater.sessionInProgress, tries > 0 else { action(); return }
@@ -188,16 +178,14 @@ final class Updater {
 
     // MARK: What Sparkle says
 
-    /// Sparkle found an update. One already staged (`installing`) is installed now for Restart; found by a quiet check,
-    /// it's compared with the feed, and let go when there's a newer one. Anything else is downloaded, in the
-    /// background unless you asked.
+    /// An already staged update installs now for Restart; from a background check it's compared with the feed and
+    /// dropped if outdated. Anything else downloads, in the background unless manual.
     fileprivate func found(_ item: SUAppcastItem, state: SPUUserUpdateState, reply: @escaping (SPUUserUpdateChoice) -> Void) {
         let update = UpdateReadiness.Staged(version: item.displayVersionString, build: item.versionString)
         found = update
         if item.isInformationOnlyUpdate { reply(.dismiss); return }
         guard state.stage == .installing else {
-            // Asked for, or Restart found its staged update gone and fetches it again: the card shows it coming in,
-            // in place of the toast.
+            // Manual, or Restart refetching a vanished staged update: the card replaces the toast.
             if manualCheck || restart == .running {
                 downloadBegins(update.version)
             }
@@ -209,7 +197,7 @@ final class Updater {
         newestOnFeed { [weak self] newest in
             guard let self else { return }
             if let newest, UpdateReadiness.isNewer(newest.build, than: update.build) {
-                // Out of date: Sparkle lets it go, and once it's done, downloads the newer one in its place.
+                // Outdated: Sparkle drops it, then downloads the newer one.
                 self.readiness.clear()
                 self.fetchesAfterCycle = true
                 reply(.skip)
@@ -220,13 +208,13 @@ final class Updater {
         }
     }
 
-    /// Downloaded, checked and ready to install: staged until Restart, or until Zigzag quits.
+    /// Ready to install: staged until Restart or quit.
     fileprivate func readyToInstall(_ reply: @escaping (SPUUserUpdateChoice) -> Void) {
         if let found { stage(found) }
         reply(restart == .running ? .install : .dismiss)
     }
 
-    /// The same, from Sparkle's automatic downloads. Restart asked for meanwhile installs it at once.
+    /// Same, from Sparkle's automatic download. A pending Restart installs it now.
     fileprivate func willInstallOnQuit(_ item: SUAppcastItem, now install: @escaping () -> Void) -> Bool {
         stage(.init(version: item.displayVersionString, build: item.versionString))
         guard restart != .none else { return false }
@@ -235,8 +223,7 @@ final class Updater {
         return true
     }
 
-    /// No newer version: nothing staged after all (its installer went), so nothing to restart for. Sparkle tells
-    /// both the user driver (`manual`) and the delegate; the toast is said once.
+    /// No newer version, so nothing is staged. Sparkle tells both the driver (`manual`) and the delegate; toast once.
     fileprivate func noUpdate(manual: Bool) {
         readiness.clear()
         activity = nil
@@ -253,11 +240,11 @@ final class Updater {
     }
 
     fileprivate func cycleFinished() {
-        // A restart that's running and still here didn't happen; one waiting for this check to end goes on.
+        // A running restart that got here failed; a waiting one continues.
         if restart == .running { restart = .none }
         hideWorkingToast()
         manualCheck = false
-        // A download that stopped without coming to anything.
+        // Download ended without an update.
         activity = nil
         if fetchesAfterCycle {
             fetchesAfterCycle = false
@@ -270,13 +257,13 @@ final class Updater {
         activity = nil
         readiness.stage(version: update.version, build: update.build)
         if asked { showReady() } else if floatedBuild != update.build {
-            // Ready from a quiet check: once, where you'll see it with the sidebar hidden.
+            // Background update ready: float once with the sidebar hidden.
             floatedBuild = update.build
             cardFloats = true
         }
     }
 
-    /// Ready, for a check you asked for: on the card, out where you can see it, never in a toast.
+    /// Manual check: show the card, not a toast.
     private func showReady() {
         hideWorkingToast()
         readiness.undismiss()
@@ -286,14 +273,13 @@ final class Updater {
 
     // MARK: The download, for the card
 
-    /// An update you asked for starts coming in: the card shows it, in place of the toast.
+    /// Manual download started: the card replaces the toast.
     private func downloadBegins(_ version: String) {
         hideWorkingToast()
         activity = .downloading(version: version, received: 0, total: 0)
         cardFloats = true
     }
 
-    /// Sparkle knows how big the download is.
     fileprivate func downloadExpects(_ length: UInt64) {
         guard case .downloading(let version, _, _) = activity else { return }
         activity = .downloading(version: version, received: 0, total: length)
@@ -304,17 +290,16 @@ final class Updater {
         activity = .downloading(version: version, received: received + length, total: total)
     }
 
-    /// Downloaded: Sparkle unpacks it and checks its signature before it's ready.
+    /// Sparkle unpacks and checks the signature.
     fileprivate func extracting() {
         guard let activity else { return }
         self.activity = .preparing(version: activity.version)
     }
 
-    /// One session for every look at the feed, with no cookies or cache kept: a session made per look is never
-    /// let go of.
+    /// One shared cookieless session; per-check sessions would leak.
     private static let feedSession = URLSession.cookieless
 
-    /// The newest version on the feed Sparkle reads, or nil when it can't be read.
+    /// Newest version on the feed, or nil if unreadable.
     private func newestOnFeed(_ done: @escaping (UpdateFeed.Item?) -> Void) {
         guard let url = updater?.feedURL else { done(nil); return }
         let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
@@ -342,8 +327,7 @@ final class Updater {
         workingToast = nil
     }
 
-    /// How long "Checking…" stays up when no word comes from Sparkle: then it goes, and the check is no longer one
-    /// you asked for (what it finds still shows on the card).
+    /// "Checking…" times out after this; the check is no longer treated as manual (results still go to the card).
     static let workingLimit: TimeInterval = 90
     private var workingTimeout: DispatchWorkItem?
 
@@ -365,7 +349,7 @@ final class Updater {
     }
 
     #if DEBUG
-    /// `updateready <version>`: the card, menu item and Settings row for a pretend update; `off` takes it away.
+    /// `updateready <version>`: a pretend staged update; `off` removes it.
     func debugStage(_ version: String?) {
         stagedForDebug = version != nil
         var shown = UpdateReadiness()
@@ -375,12 +359,11 @@ final class Updater {
         if version == nil { cardFloats = false; floatedBuild = nil }
     }
 
-    /// Counts `updatesim` runs, so a new one stops the last.
+    /// Bumped per `updatesim` run so a new one cancels the last.
     private var simulation = 0
 
-    /// `updatesim <version> [share|preparing]`: Check for Updates… finding a pretend update, then downloading,
-    /// preparing and staging it through the same steps Sparkle's answers take; held at that share of the download
-    /// (0.3), or while preparing, when one is given.
+    /// `updatesim <version> [share|preparing]`: a pretend manual update through Sparkle's steps, held at that download
+    /// share (0.3) or at preparing.
     func debugSimulate(_ version: String, holdAt hold: String?) {
         simulation += 1
         let run = simulation
@@ -420,13 +403,13 @@ final class Updater {
     #endif
 }
 
-/// Sparkle's questions, answered for Zigzag: which feed, the release notes it never shows, and what's staged.
+/// Feed URL, no release notes, and staging.
 private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
     func feedURLString(for updater: SPUUpdater) -> String? {
         Updater.getsBetas ? Updater.betaFeed : nil
     }
 
-    /// Zigzag shows what's new itself, after the update.
+    /// Zigzag shows what's new itself after updating.
     func updater(_ updater: SPUUpdater, shouldDownloadReleaseNotesForUpdate updateItem: SUAppcastItem) -> Bool { false }
 
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem, immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
@@ -448,11 +431,10 @@ private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
     }
 }
 
-/// Sparkle's user interface, as Zigzag's: nothing pops up. What a check finds goes to `Updater`, which stages it
-/// for the sidebar's card; a check you asked for answers in a toast.
+/// Sparkle's UI replaced: nothing pops up. Finds go to `Updater` for the card; manual checks answer in toasts.
 private final class QuietUserDriver: NSObject, SPUUserDriver {
     func show(_ request: SPUUpdatePermissionRequest, reply: @escaping (SUUpdatePermissionResponse) -> Void) {
-        // Info.plist turns automatic checks on, so Sparkle doesn't ask; if it ever does, the answer is the same.
+        // Info.plist enables automatic checks; answer the same if Sparkle ever asks.
         reply(SUUpdatePermissionResponse(automaticUpdateChecks: true, sendSystemProfile: false))
     }
 
@@ -575,8 +557,7 @@ nonisolated enum UpdateBackup {
         all(in: root).filter { !$0.lastPathComponent.hasSuffix(beforeRestore) }
     }
 
-    /// The backup a restore puts back: the newest that holds your spaces. One without them (made over a data folder
-    /// that had nothing yet) has nothing to give back, so it's never offered.
+    /// The newest backup that has spaces; an empty one is never offered.
     static func restorable(in root: URL = Paths.support) -> URL? {
         updates(in: root).first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("Library.json").path) }
     }
@@ -615,9 +596,8 @@ nonisolated enum UpdateBackup {
     static func backUpIfUpdated(build: String, version: String, defaults: UserDefaults = .standard, root: URL = Paths.support) {
         let lastBuild = defaults.string(forKey: lastBuildKey)
         guard lastBuild != build else { return }
-        // Only what an earlier run left: a first run has no data yet, whatever build last ran (a fresh data folder,
-        // or Zigzag installed again after its data was removed), and a backup of nothing would be offered as one.
-        // A run from before builds were recorded is backed up all the same.
+        // Only back up data a previous run left; a first run has nothing, and an empty backup would be offered. Runs
+        // from before builds were recorded are still backed up.
         if FileManager.default.fileExists(atPath: root.appendingPathComponent("Library.json").path) {
             make(from: defaults.string(forKey: lastVersionKey), in: root)
         }
@@ -670,7 +650,7 @@ nonisolated enum UpdateBackup {
         NSApp.terminate(nil)
     }
 
-    /// A backup folder's own name, as `make` writes it ("2026-10-02T09-00-00Z 0.4.0"): one path component, dated.
+    /// A backup folder name as `make` writes it ("2026-10-02T09-00-00Z 0.4.0"): one dated path component.
     static func isBackupName(_ name: String) -> Bool {
         !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0") && !name.hasPrefix(".")
             && date(of: name) != nil
@@ -683,7 +663,7 @@ nonisolated enum UpdateBackup {
         let marker = folder(in: root).appendingPathComponent(restoreMarker)
         guard let name = try? String(contentsOf: marker, encoding: .utf8) else { return }
         try? manager.removeItem(at: marker)
-        // Only the name of a backup made at an update, right in the Backups folder: never a path out of it.
+        // Only a backup name directly in Backups, never a path out of it.
         guard isBackupName(name) else { return }
         let source = folder(in: root).appendingPathComponent(name, isDirectory: true)
         guard manager.fileExists(atPath: source.path) else { return }

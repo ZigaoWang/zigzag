@@ -302,10 +302,9 @@ enum AutofillKeyIcon {
         controller.addScriptMessageHandler(Asker.shared, contentWorld: world, name: messageName)
     }
 
-    /// Whether sign-in fields show the key: only where Zigzag itself fills passwords and the Mac's panel can open. Not
-    /// with a password-manager extension on, which draws its own icon at the same end of the field (Bitwarden,
-    /// 1Password), nor with Fill passwords off: as in Chrome, the browser puts nothing in a field it isn't offering
-    /// to fill (#236).
+    /// Show the key only where Zigzag fills passwords and the system panel can open. Not with a password-manager
+    /// extension on (Bitwarden and 1Password draw their own icon there), nor with Fill passwords off, as in Chrome
+    /// (#236).
     static func shows(fills: Bool, managerOn: Bool, panelAvailable: Bool) -> Bool {
         panelAvailable && fills && !managerOn
     }
@@ -318,7 +317,7 @@ enum AutofillKeyIcon {
                      panelAvailable: SystemAutoFillPanel.isAvailable)
     }
 
-    /// Answers the page script's one question: should sign-in fields show the key? (`shows`)
+    /// Answers the page script's question: show the key? (`shows`)
     final class Asker: NSObject, WKScriptMessageHandlerWithReply {
         static let shared = Asker { webView in AutofillKeyIcon.shows(in: webView) }
         private let isOn: (WKWebView?) -> Bool

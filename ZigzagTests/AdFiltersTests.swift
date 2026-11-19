@@ -49,7 +49,7 @@ struct AdFiltersTests {
     // MARK: A server that answers as the publishers do
 
     nonisolated final class Server: URLProtocol, @unchecked Sendable {
-        /// `delay`: how long the answer takes, as a slow publisher's does.
+        /// `delay`: response latency.
         struct Answer { var status: Int; var body: Data; var headers: [String: String] = [:]; var delay: TimeInterval = 0 }
         nonisolated(unsafe) static var answers: [String: Answer] = [:]
         nonisolated(unsafe) static var asked: [URLRequest] = []
@@ -159,8 +159,7 @@ struct AdFiltersTests {
         #expect(await again.injection(for: URL(string: "https://www.youtube.com/")!).page.count == 1)
     }
 
-    /// The scriptlets coming while the lists are still downloading build nothing from the lists half there (the
-    /// downloaded ones with the app's copy of Zigzag's list): the lists and the scriptlets are built once, together.
+    /// Scriptlets requested mid-download wait so lists and scriptlets build once, together.
     @Test func scriptletsComingMidDownloadWaitForTheLists() async throws {
         Self.serveEverything()
         let website = AdFilterSources.zigzagFixes.urls[0].absoluteString

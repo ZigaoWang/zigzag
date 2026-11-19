@@ -20,7 +20,7 @@ nonisolated struct PageVideo: Equatable, Sendable {
     var isStartedByUser = false
     /// It sits in a link: a card's preview of a page it goes to.
     var isInLink = false
-    /// The page said it mustn't float in Picture in Picture (its disablePictureInPicture attribute).
+    /// The page's disablePictureInPicture attribute is set.
     var blocksPictureInPicture = false
     /// Its CSS object-fit.
     var fit = "contain"
@@ -104,9 +104,9 @@ nonisolated enum MiniPlayerLayout {
         plays(video) && video.isWatched
     }
 
-    /// Whether the card stays on the video it shows. A feed of short videos (Douyin, TikTok, Reels) plays the next
-    /// one in another element when this one is done: once it has stopped and another is playing, the card moves to
-    /// that one, rather than holding a stopped or black picture. Paused by you, with nothing else playing, it stays.
+    /// Whether the card keeps its video. Short-video feeds (Douyin, TikTok, Reels) play the next clip in another
+    /// element: once this one stops and another plays, the card switches instead of showing a stopped or black frame. A
+    /// user pause with nothing else playing keeps it.
     static func keeps(_ shown: PageVideo, whilePlaying other: PageVideo?) -> Bool {
         shown.isPlaying || other == nil
     }
@@ -456,8 +456,8 @@ nonisolated struct MiniPlayerModel: Equatable {
         return steps
     }
 
-    /// Zigzag went to the background with this tab on screen playing a video (`AutoPictureInPicture`): its video
-    /// goes into the mini player, unless the player shows one already. Back on its tab, `switched` puts it back.
+    /// Zigzag went to the background with this tab playing a video on screen (`AutoPictureInPicture`): move it to the
+    /// mini player unless it already has one. `switched` returns it when back on the tab.
     mutating func left(_ id: UUID) -> [Step] {
         guard tab == nil else { return [] }
         tab = id

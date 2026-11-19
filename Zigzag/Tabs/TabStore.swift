@@ -1,39 +1,37 @@
 import AppKit
 import WebKit
 
-/// The open tabs a window shows (#162): each space's list, the open pages of pinned tabs and favorites, the splits
-/// and tile groups, the groups of tabs, and the closed tabs ⇧⌘T brings back. Each window has a store of its own,
-/// unless Settings › Tabs has windows share a space's tabs, as in Arc: then every everyday window is a view of one
-/// store (`TabManager`), with its own space, its own tab chosen in each space and its own place on screen, and opening,
-/// closing, moving, nesting or folding a tab in one shows in all of them. A space belongs to one profile, so windows
-/// on different profiles' spaces never see each other's tabs. A private window always has a store of its own.
+/// A window's open tabs (#162): each space's list, open pinned and favorite pages, splits, tile groups, tab groups and
+/// closed tabs for ⇧⌘T. Each window has its own store unless Settings › Tabs shares them (as in Arc): then every
+/// everyday window is a `TabManager` view of one store, with its own space, selection and on-screen pages, and tab
+/// changes show in all. Spaces belong to one profile, so other profiles' windows never share. Private windows always
+/// have their own.
 ///
-/// A page can be on screen in only one window: the one that last showed it has it (`Tab.shownBy`), and another
-/// window on the same tab shows that it's open there, until you show it there again.
+/// A page shows in one window at a time: the last to show it (`Tab.shownBy`); others show a placeholder.
 final class TabStore {
     var tabsBySpace: [UUID: [Tab]] = [:]
     var bookmarkTabs: [UUID: Tab] = [:]
     var splits: [TabManager.SplitPair] = []
     var closedTabs: [TabManager.ClosedTab] = []
-    /// Closed tabs brought back, by the id each had: the new tab's id.
+    /// Reopened closed tabs: old id to new id.
     var reopenedAs: [UUID: UUID] = [:]
-    /// How many closed tabs ⇧⌘T and ⌘Z can bring back: fifty more than the biggest lot closed at once. It never
-    /// shrinks back, or closing two more after Clear took sixty would leave ⌘Z on the sixty short.
+    /// How many closed tabs ⇧⌘T and ⌘Z can reopen: 50 more than the largest batch closed. Never shrinks, so ⌘Z after a
+    /// big Clear still works.
     var closedLimit = 50
-    /// The groups of tabs (#209), by id; which tabs are in each, the tabs say (`Tab.groupID`).
+    /// Tab groups (#209) by id; membership is on `Tab.groupID`.
     var groups: [UUID: TabGroup] = [:]
-    /// Groups that went when their last tab closed or left, so ⌘Z or ⇧⌘T bringing a tab back brings its group too.
+    /// Groups removed with their last tab, so reopening the tab restores its group.
     var emptiedGroups: [UUID: TabGroup] = [:]
 
-    /// Private windows' tabs share one throwaway store, gone when the window closes.
+    /// Shared throwaway data store for private tabs.
     let privateStore: WKWebsiteDataStore?
     var isPrivate: Bool { privateStore != nil }
 
     private struct Member { weak var manager: TabManager? }
     private var members: [Member] = []
-    /// The windows' views of the store, oldest first.
+    /// Window views of the store, oldest first.
     var managers: [TabManager] { members.compactMap(\.manager) }
-    /// Whether more than one window shows these tabs.
+    /// More than one window shows these tabs.
     var isShared: Bool { managers.count > 1 }
 
     init(isPrivate: Bool = false) {
@@ -51,8 +49,7 @@ final class TabStore {
 
     var allTabs: [Tab] { tabsBySpace.values.flatMap { $0 } + Array(bookmarkTabs.values) }
 
-    /// Settings › Tabs: everyday windows share each space's open tabs, as in Arc (#162). Off unless you turn it on:
-    /// each window has tabs of its own.
+    /// Settings › Tabs: everyday windows share each space's tabs, as in Arc (#162). Off by default.
     static var windowsShareTabs: Bool {
         get { UserDefaults.standard.bool(forKey: "WindowsShareTabs") }
         set {
@@ -66,9 +63,8 @@ final class TabStore {
 
     private var tabTokens: [UUID: SignalToken] = [:]
 
-    /// Watches a tab so navigation inside it gets saved for crash recovery, whichever window it's in. A page's own
-    /// title saves at most every half minute: pages that count down or flash "(1) New message" would otherwise save
-    /// the whole session every second or two. A name you give a tab saves at once.
+    /// Saves navigation for crash recovery, in any window. Page titles save at most every 30 seconds, so countdowns or
+    /// "(1) New message" titles don't save the session constantly. Custom tab names save at once.
     func watch(_ tab: Tab) {
         tab.privateStore = privateStore
         tab.store = self
@@ -92,14 +88,14 @@ final class TabStore {
         for manager in managers { manager.changed.send(.content) }
     }
 
-    /// The lists changed: what each window works out for extensions from them starts over.
+    /// Lists changed: reset each window's cached extension lists.
     func listsChanged() {
         for manager in managers { manager.forgetExtensionLists() }
     }
 
     // MARK: Pages on screen
 
-    /// Whether another window than `manager`'s has this page on screen now, or in its mini player.
+    /// Whether a window other than `manager`'s shows this page or has it in its mini player.
     func isShownElsewhere(_ tab: Tab, than manager: TabManager) -> Bool {
         guard let owner = tab.shownBy, owner !== manager, !owner.isInvalidated, owner.store === self else { return false }
         return owner.isShowing(tab) || tab.isInMiniPlayer
@@ -107,15 +103,14 @@ final class TabStore {
 
     // MARK: Turning sharing on and off
 
-    /// Windows that had tabs of their own share one list from now on: each space's tabs, window after window, so no
-    /// tab is lost. A pinned page or favorite open in more than one window keeps the page on screen (else the first
-    /// window's); another copy that went on from its pinned page stays as an ordinary tab, and one still on it closes,
-    /// since the pin opens it again. Each window keeps its space and the tab it was on.
+    /// Merges windows' tabs into one shared list, each space's tabs window by window, so none is lost. A pinned page or
+    /// favorite open in several windows keeps the visible copy (else the first window's); other copies that navigated
+    /// away become ordinary tabs, the rest close. Each window keeps its space and selection.
     static func share(_ managers: [TabManager]) {
         let windows = managers.filter { !$0.isPrivate && !$0.isInvalidated }
         let stores = windows.map(\.store).reduce(into: [TabStore]()) { list, store in if !list.contains(where: { $0 === store }) { list.append(store) } }
         guard stores.count > 1, let shared = stores.first else { return }
-        // Which window shows each page now: the copy to keep of a pinned page open in two.
+        // Which pages are on screen, to pick the copy of a pinned page to keep.
         var shown: Set<ObjectIdentifier> = []
         for window in windows {
             if let tab = window.selectedTab { window.panes(of: tab).forEach { shown.insert(ObjectIdentifier($0)) } }
@@ -124,7 +119,7 @@ final class TabStore {
             for (space, list) in store.tabsBySpace { shared.tabsBySpace[space, default: []].append(contentsOf: list) }
             for (bookmark, tab) in store.bookmarkTabs {
                 guard let kept = shared.bookmarkTabs[bookmark] else { shared.bookmarkTabs[bookmark] = tab; continue }
-                // Two windows have this pinned page open: one stays its page.
+                // Pinned page open in two windows: keep one.
                 let keepNew = shown.contains(ObjectIdentifier(tab)) && !shown.contains(ObjectIdentifier(kept))
                 let (stays, other) = keepNew ? (tab, kept) : (kept, tab)
                 shared.bookmarkTabs[bookmark] = stays
@@ -149,8 +144,8 @@ final class TabStore {
         windows.forEach { $0.storeChanged() }
     }
 
-    /// A copy of a pinned page's open page that another window had too: an ordinary tab at the top of its space if it
-    /// went on from its pinned page, else closed (the pin opens it again).
+    /// A duplicate pinned page from another window: an ordinary tab at the top of its space if it navigated away, else
+    /// closed (the pin reopens it).
     private func setAside(_ tab: Tab, from bookmark: UUID) {
         let away: Bool = {
             guard let url = tab.url, let mark = Library.shared.bookmark(bookmark) else { return false }
@@ -169,10 +164,9 @@ final class TabStore {
         tabsBySpace[tab.spaceID, default: []].insert(tab, at: 0)
     }
 
-    /// The windows sharing one list each have tabs of their own again: a tab goes with the window that has it on
-    /// screen, else the one it was last in (`Tab.host`), else the first. A split or tile group goes whole, with its
-    /// first page; a nested tab whose parent went elsewhere comes to the top level. The closed tabs stay with the
-    /// first window. Every tab stays open, in one window.
+    /// Splits a shared list back into per-window tabs: each tab goes to the window showing it, else its last
+    /// (`Tab.host`), else the first. Splits and tile groups go whole with their first page; nested tabs whose parent
+    /// went elsewhere move to the top level. Closed tabs stay with the first window. No tab closes.
     static func unshare(_ managers: [TabManager]) {
         let windows = managers.filter { !$0.isPrivate && !$0.isInvalidated }
         var seen: [TabStore] = []
@@ -189,12 +183,12 @@ final class TabStore {
             }
             var owners: [ObjectIdentifier: TabManager] = [:]
             for tab in store.allTabs { owners[ObjectIdentifier(tab)] = owner(of: tab) }
-            // A split goes whole, with its first page.
+            // Splits go whole, with their first page.
             let byID = Dictionary(store.allTabs.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             for pair in store.splits {
                 let pages = pair.ids.compactMap { byID[$0] }
                 guard let lead = pages.first, let goes = owners[ObjectIdentifier(lead)] else { continue }
-                // The one with a page of it on screen takes it.
+                // The window showing one of its pages takes it.
                 let to = pages.lazy.compactMap { page in views.first { $0.isShowing(page) } }.first ?? goes
                 pages.forEach { owners[ObjectIdentifier($0)] = to }
             }
@@ -205,7 +199,7 @@ final class TabStore {
                 target.groups = store.groups
                 target.closedLimit = store.closedLimit
             }
-            // Each list keeps its order, split among the windows.
+            // Each list keeps its order, split among windows.
             for (space, list) in store.tabsBySpace {
                 var lists: [ObjectIdentifier: [Tab]] = [:]
                 for tab in list { lists[ObjectIdentifier(owners[ObjectIdentifier(tab)] ?? first), default: []].append(tab) }

@@ -48,8 +48,7 @@ struct WebNotificationsTests {
         #expect(kind == "function function")
     }
 
-    /// The page knows its own answer before its scripts run, and nothing of any other site's: the answers say which
-    /// sites you've allowed, and stay in Zigzag's own world.
+    /// A page knows its own answer before scripts run, and nothing about other sites; answers stay in Zigzag's content world.
     @Test func aPageKnowsOnlyItsOwnAnswer() async throws {
         let decisions = ["https://example.com": true, "https://secret.example": true, "https://blocked.example": false]
         #expect(!WebNotifications.pageSource(isPrivate: false).contains("secret.example"))

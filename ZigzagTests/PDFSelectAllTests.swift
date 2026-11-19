@@ -4,22 +4,21 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// A PDF's pages are dark as a web page would be in the window it's in: dark pages' setting and the site's choice,
-/// with the window's own look, never the Mac's behind it; the moon pressed for that PDF over all of it.
+/// PDF dark mode follows the dark pages setting, site choice and the window's appearance, not the system's; the moon toggle overrides all.
 @MainActor
 struct PDFDarkPagesTests {
     @Test func darkFollowsTheWindowAndDarkPages() {
-        // Dark pages off (the default): light in a light window and a dark one.
+        // Dark pages off (default): light in light and dark windows.
         #expect(!PDFViewerView.isDark(chosen: nil, mode: .off, windowIsDark: false, site: nil))
         #expect(!PDFViewerView.isDark(chosen: nil, mode: .off, windowIsDark: true, site: nil))
-        // "When the Mac is dark": as the window is, so a light window on a dark Mac stays light.
+        // "When the Mac is dark" follows the window, so a light window on a dark Mac stays light.
         #expect(!PDFViewerView.isDark(chosen: nil, mode: .system, windowIsDark: false, site: nil))
         #expect(PDFViewerView.isDark(chosen: nil, mode: .system, windowIsDark: true, site: nil))
         #expect(PDFViewerView.isDark(chosen: nil, mode: .always, windowIsDark: false, site: nil))
-        // The site's own choice over the setting.
+        // The site choice overrides the setting.
         #expect(!PDFViewerView.isDark(chosen: nil, mode: .always, windowIsDark: true, site: false))
         #expect(PDFViewerView.isDark(chosen: nil, mode: .off, windowIsDark: false, site: true))
-        // The moon, for this PDF, over everything.
+        // The moon overrides everything.
         #expect(PDFViewerView.isDark(chosen: true, mode: .off, windowIsDark: false, site: false))
         #expect(!PDFViewerView.isDark(chosen: false, mode: .always, windowIsDark: true, site: true))
     }
@@ -111,8 +110,7 @@ struct PDFSelectAllTests {
 }
 
 extension PDFDarkPagesTests {
-    /// A PDF whose response says it's past the viewer's limit is left to WebKit's viewer before any of it is copied;
-    /// one that gives no length (-1) is read and measured as before.
+    /// A PDF whose Content-Length exceeds the limit goes to WebKit's viewer before copying; unknown length (-1) is read as before.
     @Test func aPDFSaidToBeTooLargeIsNeverCopied() {
         #expect(PDFViewerView.isTooLarge(said: Int64(PDFLimits.maxInputBytes) + 1))
         #expect(!PDFViewerView.isTooLarge(said: Int64(PDFLimits.maxInputBytes)))
@@ -122,8 +120,7 @@ extension PDFDarkPagesTests {
 }
 
 extension PDFDarkPagesTests {
-    /// A title or heading is measured in UTF-16 units: combining marks piled on a few letters count, and the helper
-    /// cuts a long one at a whole character so it still fits.
+    /// Titles are capped by UTF-16 length, so stacked combining marks count; the helper cuts at a character boundary.
     @Test func titlesAreCappedByTheirUTF16Length() {
         let piled = "a" + String(repeating: "\u{301}", count: 5_000)
         #expect(piled.count == 1)
@@ -143,7 +140,7 @@ extension PDFDarkPagesTests {
 }
 
 extension PDFDarkPagesTests {
-    /// A selection made on a page's text stays a forward run, or none, when the text comes back shorter.
+    /// A selection stays forward, or empty, when the text shrinks.
     @Test func aSelectionNeverRunsBackwards() {
         #expect(ZigzagPDFView.run(from: 2, to: 6, length: 10) == 2..<6)
         #expect(ZigzagPDFView.run(from: 2, to: 60, length: 10) == 2..<10)

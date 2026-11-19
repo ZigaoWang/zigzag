@@ -63,8 +63,8 @@ class CardRow: InteractiveView {
     /// From the row's edge to its icon, and from the icon to the title: the sidebar's rows use the same.
     static let inset: CGFloat = Tokens.Space.x2 + 2
 
-    /// Under rows with larger pictures (a download's file icon): the icon centered in their column, `x` in from the
-    /// row's edge and `width` wide, and the title where theirs starts, so the text lines up down the list.
+    /// For rows with larger icons (download file icons): centers the icon in this column and aligns titles down the
+    /// list.
     var iconColumn: (x: CGFloat, width: CGFloat)? { didSet { needsLayout = true } }
 
     override func layout() {
@@ -198,7 +198,7 @@ extension InteractiveView {
     /// primary's dark fill (a light button on the brand's blue, a destructive red), with `ink` on it.
     @discardableResult
     func applyButtonLook(_ look: ButtonLook, tint: NSColor? = nil, ink: NSColor? = nil) -> NSColor {
-        // A disabled control is inert: the pointer over it must not make it look clickable.
+        // Disabled: no hover look.
         let hovered = isEnabled && isHovered
         let pressed = isEnabled && isPressed
         let fill: NSColor?
@@ -215,7 +215,7 @@ extension InteractiveView {
                 text = ink ?? Tokens.Color.onPrimary
             }
         case .quiet:
-            // Disabled, it doesn't answer the pointer: no wash that would say it can be clicked.
+            // Disabled: no hover fill.
             fill = !isEnabled ? nil : isPressed ? Tokens.Color.pressedFill : isHovered || isSelected ? Tokens.Color.hoverFill : nil
             text = !isEnabled ? Tokens.Color.textDisabled : isHovered || isSelected ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         }
@@ -229,7 +229,7 @@ extension InteractiveView {
             layer?.shadowRadius = Tokens.Shadow.controlRadius
             layer?.shadowOffset = CGSize(width: 0, height: isFlipped ? Tokens.Shadow.controlDrop : -Tokens.Shadow.controlDrop)
         }
-        // Words alone can't be faded further and still read: a quiet one takes the disabled ink instead.
+        // Text can't fade further and stay readable, so quiet buttons use the disabled ink instead.
         alphaValue = isEnabled || look == .quiet ? 1 : Tokens.Opacity.disabled
         return text
     }
@@ -366,8 +366,8 @@ final class KeyCap: NSView {
         layer?.cornerRadius = Tokens.Radius.small
         layer?.cornerCurve = .continuous
         layer?.borderWidth = Tokens.Metric.hairline
-        // The Globe key is drawn as the globe, as the menu bar draws it, rather than as an emoji.
-        let symbol = symbol ?? (key == Shortcuts.globe ? "globe" : nil)
+        // Globe key as the globe symbol, as the menu bar draws it, not an emoji; Hyper (⌃⌥⇧⌘) as a sparkle.
+        let symbol = symbol ?? (key == Shortcuts.globe ? "globe" : key == Shortcuts.hyper ? "sparkle" : nil)
         label.stringValue = key
         label.alignment = .center
         iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.Symbol.inline) }

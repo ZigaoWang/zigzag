@@ -2,7 +2,6 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// The Archive page: archived tabs by the day they went, and a click bringing one back to its space.
 @MainActor struct ArchiveTests {
     private let calendar: Calendar = {
         var c = Calendar(identifier: .gregorian)
@@ -39,9 +38,9 @@ import Testing
         #expect(title("2026-11-18T00:00:00Z") == String(localized: "Today"))
         #expect(title("2026-11-17T00:00:00Z") == String(localized: "Yesterday"))
         #expect(title("2026-11-14T00:00:00Z") == "Saturday, November 14")
-        // Across New Year, the year too.
+        // Across New Year the year is shown.
         #expect(title("2025-12-30T00:00:00Z").contains("2025"))
-        // A clock turned back: what's ahead of now is still today's.
+        // Future dates (clock set back) count as today.
         #expect(title("2026-11-19T00:00:00Z") == String(localized: "Today"))
     }
 

@@ -16,13 +16,12 @@ struct AddressTests {
         #expect(CommandRanker.url(from: "youtube.com/@mkbhd")?.absoluteString == "https://youtube.com/@mkbhd")
     }
 
-    /// Selected text that's an address gets Open in the page's menu (#234); a sentence's punctuation around it
-    /// comes off, and only web addresses count.
+    /// Selected text that's an address gets Open in the context menu (#234); surrounding punctuation is trimmed.
     @Test func selectedTextThatIsAnAddress() {
         #expect(CommandRanker.destination(fromSelection: " example.com ")?.url.absoluteString == "https://example.com")
         #expect(CommandRanker.destination(fromSelection: "(github.com/ZigaoWang/zigzag).")?.url.absoluteString == "https://github.com/ZigaoWang/zigzag")
         #expect(CommandRanker.destination(fromSelection: "“https://example.com/a?b=1”")?.url.absoluteString == "https://example.com/a?b=1")
-        // A parenthesis is the address's own when it has its partner in it.
+        // Balanced parentheses stay in the address.
         let planet = "https://en.wikipedia.org/wiki/Mercury_(planet)"
         #expect(CommandRanker.destination(fromSelection: planet)?.url.absoluteString == planet)
         #expect(CommandRanker.destination(fromSelection: "(\(planet)).")?.url.absoluteString == planet)
@@ -39,26 +38,23 @@ struct AddressTests {
         #expect(CommandRanker.destination(fromSelection: "") == nil)
     }
 
-    /// An address typed without a scheme goes over https, and over http once if https can't be reached, as other
-    /// browsers do.
+    /// Schemeless addresses use https, then http once if https fails.
     @Test func anAddressWithoutASchemeFallsBackToHTTP() {
         let typed = CommandRanker.destination(from: "localtest.me:3600/x?y=1#z")
         #expect(typed?.url.absoluteString == "https://localtest.me:3600/x?y=1#z")
         #expect(typed?.httpFallback == true)
         #expect(CommandRanker.destination(from: " example.com ")?.httpFallback == true)
         #expect(CommandRanker.destination(fromSelection: "(example.com).")?.httpFallback == true)
-        // A scheme you typed is the one you get, and an address that goes over http anyway has nothing to fall back to.
+        // An explicit scheme, or an address already on http, has no fallback.
         for text in ["https://example.com", "http://example.com", "localhost:3000", "192.168.1.1", "printer.local", "app.test",
                      "file:///etc/hosts", "about:blank"] {
             #expect(CommandRanker.destination(from: text)?.httpFallback == false, "\(text)")
         }
-        // Words are searched for, not opened.
         #expect(CommandRanker.destination(from: "node.js") == nil)
         #expect(CommandRanker.destination(from: "go to example.com") == nil)
     }
 
-    /// The selection read as the right-click started counts only while WebKit's menu is still for it: a click that
-    /// selected a word instead has no Open (#234).
+    /// The selection counts only while WebKit's menu is for it; a click that selects a word has no Open (#234).
     @Test func theMenuIsForTheSelectionReadAsTheClickStarted() {
         #expect(BrowserWebView.lookUpTitle("Look Up “example.com”", names: "example.com"))
         #expect(BrowserWebView.lookUpTitle("Look Up “https://example.com/a-v…”", names: "https://example.com/a-very-long-path"))
@@ -345,31 +341,29 @@ struct AddressTests {
         withExtendedLifetime(windows) {}
     }
 
-    /// A popup stays inside its window: from a sidebar's address near the window's left edge, it moves toward the
-    /// page, along the address while that's enough, past its end when the popup is wider than that.
+    /// A popup stays inside the window, shifting along or past the anchor's address field.
     @Test func aPopupStaysInsideTheWindow() {
         let room = NSRect(x: 0, y: 0, width: 1280, height: 800)
         let margin = ExtensionPopups.windowMargin
         func popup(_ x: CGFloat, _ width: CGFloat) -> ClosedRange<CGFloat> { (x - width / 2)...(x + width / 2) }
         func inside(_ span: ClosedRange<CGFloat>) -> Bool { span.lowerBound >= room.minX + margin - 0.5 && span.upperBound <= room.maxX - margin + 0.5 }
-        // Room for it centered: the anchor's middle.
+        // Room to center: anchored at the middle.
         let page = NSRect(x: 600, y: 10, width: 26, height: 26)
         #expect(ExtensionPopups.pointingX(anchor: page, reach: page, width: 360, room: room) == page.midX)
-        // A narrow popup under the sidebar's address moves right along the address.
+        // Narrow popup under the sidebar address shifts right.
         let address = NSRect(x: 6, y: 40, width: 228, height: 30)
         let narrow = ExtensionPopups.pointingX(anchor: address, reach: address, width: 300, room: room)
         #expect(inside(popup(narrow, 300)) && address.contains(NSPoint(x: narrow, y: address.midY)))
-        // One wider than twice the address goes past its end, inside the window.
+        // Wider than twice the address: past its end, inside the window.
         let wide = ExtensionPopups.pointingX(anchor: address, reach: address, width: 500, room: room)
         #expect(inside(popup(wide, 500)) && wide > address.maxX - Tokens.Space.x3)
-        // A pinned button near the edge points along the address it's in.
+        // A pinned button near the edge shifts along its address.
         let pin = NSRect(x: 150, y: 44, width: 22, height: 22)
         let fromPin = ExtensionPopups.pointingX(anchor: pin, reach: address, width: 380, room: room)
         #expect(inside(popup(fromPin, 380)) && fromPin > pin.midX && fromPin <= address.maxX)
-        // At the right edge, it moves left.
         let right = NSRect(x: 1250, y: 10, width: 26, height: 26)
         #expect(inside(popup(ExtensionPopups.pointingX(anchor: right, reach: right, width: 360, room: room), 360)))
-        // Wider than the window, it can't fit anyway: as near the window's middle as the address reaches.
+        // Wider than the window: as centered as the address allows.
         #expect(ExtensionPopups.pointingX(anchor: address, reach: address, width: 2000, room: room) == address.maxX - Tokens.Space.x3)
     }
 

@@ -374,13 +374,12 @@ final class FavoriteTile: InteractiveView {
             dropHalf.isHidden = splitSide == nil
         }
     }
-    /// Its page is loaded in the background: a fine edge, so you can tell at a glance which are. Not for a page put to
-    /// sleep or not loaded yet since Zigzag reopened: that looks like a favorite never opened, with no edge (#205).
+    /// Page loaded in the background: shown with a fine edge. Not for sleeping pages or ones not loaded since relaunch,
+    /// which look unopened (#205).
     private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
 
-    /// How a favorite's tile looks, in the tab rows' terms: the one you're on has the selected tab's card; one whose
-    /// page is loaded has the open edge; one that isn't running has neither. Its icon is always at full strength: a
-    /// favorite is a site you chose to keep in view, and a faded one read as washed out rather than as closed.
+    /// Tile style in tab row terms: the current one gets the selected card, a loaded one the open edge, others neither.
+    /// Icons stay full strength; faded ones looked washed out rather than closed.
     enum Look: Equatable { case closed, open, selected }
 
     static func look(selected: Bool, loaded: [Bool]) -> Look {
@@ -392,25 +391,24 @@ final class FavoriteTile: InteractiveView {
         1
     }
 
-    /// Whether a favorite's open page has moved on from the address it was saved with, as a pinned tab's row tells
-    /// (`TabManager.isAway`): not where it was saved, nor where that address lands on its own (a redirect).
+    /// Whether the open page has left its saved URL (`TabManager.isAway`, as pinned rows): neither the saved URL nor where
+    /// it redirects.
     static func isAway(current: URL?, saved: URL, landing: URL?) -> Bool {
         guard let current else { return false }
         let here = TabManager.normalize(current)
         return here != TabManager.normalize(saved) && here != landing.map(TabManager.normalize)
     }
 
-    /// What pointing at one of its pages says: its name, and while it's away the page it shows now, as the pinned
-    /// row reads "Original / Current page".
+    /// Tooltip: the name, plus the current page while away, like a pinned row's "Original / Current page".
     static func pageName(saved: String, away current: String?) -> String {
         guard let current, !current.isEmpty else { return saved }
         return String(localized: "\(saved) — \(current)", comment: "Tooltip of a favorite whose page moved on from the one it was saved with: the favorite's name, then the page it shows now.")
     }
 
-    /// Which of its pages, in order, have moved on from their saved address.
+    /// Which pages, in order, have left their saved URL.
     private(set) var awayParts: [Bool] = []
 
-    /// Every page's open tab, in order (nil for one that isn't open).
+    /// Each page's open tab, in order (nil when not open).
     private var livePages: [Tab?] { [tab] + partners.indices.map { partnerTabs.indices.contains($0) ? partnerTabs[$0].tab : nil } }
     override var pressSinks: Bool { get { true } set {} }
     var iconImage: NSImage? { icon.image }
@@ -566,7 +564,7 @@ final class FavoriteTile: InteractiveView {
         for (i, view) in extraIcons.enumerated() { view.isHidden = i >= partners.count - 1 }
     }
 
-    /// Its pages' names, in order; a page that moved on, with the page it shows now.
+    /// Page names in order; an away page with its current page.
     private var name: String {
         guard let bookmark else { return "" }
         let live = livePages
@@ -630,8 +628,8 @@ final class FavoriteTile: InteractiveView {
         isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: live.compactMap { $0?.isLoaded })
         refreshAway()
         let name = self.name
-        // A favorite has no hover card, so one whose page isn't running says why in its tooltip: asleep, and what
-        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge.
+        // Favorites have no hover card, so the tooltip explains an unloaded page (asleep and memory freed, or not loaded since
+        // relaunch). Shown without an edge, like an unopened favorite.
         let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.notLoadedNote].compactMap { $0 }
         toolTip = ([name].filter { !$0.isEmpty } + notes).joined(separator: "\n")
         if awayParts.first != true, let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
@@ -650,7 +648,7 @@ final class FavoriteTile: InteractiveView {
             }
         }
         if isAway(part: 0) {
-            // The page it's on now: `refreshAwayIcons`.
+            // Current page's icon: `refreshAwayIcons`.
         } else if let image = bookmark.displayIcon {
             icon.image = image
             needsLayout = true
@@ -663,10 +661,9 @@ final class FavoriteTile: InteractiveView {
 
     private func isAway(part: Int) -> Bool { awayParts.indices.contains(part) && awayParts[part] }
 
-    /// A page that moved on shows the icon of the page it's on now, as its pinned row does, with the icon it was
-    /// saved with small on the corner, the way an icon wears its app's badge, so the tile still says which favorite
-    /// it is. Pointing at it names both; its menu goes back. Only once that page's own icon is known
-    /// (`awayIcon`): until then the favorite's own, with no badge, never a stand-in for the page's.
+    /// An away page shows its current page's icon with the saved icon as a small corner badge, so the tile is still
+    /// recognizable. Tooltip names both; the menu goes back. Only once that icon is known (`awayIcon`); until then the
+    /// saved icon, no badge.
     private func refreshAwayIcons() {
         guard let bookmark else { return }
         let live = livePages
@@ -682,8 +679,7 @@ final class FavoriteTile: InteractiveView {
         }
     }
 
-    /// The icon a favorite's page that moved on is drawn with: the page's own, once it's known; nil draws the
-    /// favorite as it was saved, its own icon and no badge.
+    /// Icon for an away page: the current page's once known; nil draws the saved icon with no badge.
     static func awayIcon(away: Bool, current: NSImage?) -> NSImage? { away ? current : nil }
 
     override func layout() {
@@ -759,8 +755,7 @@ final class FavoriteTile: InteractiveView {
         closeButton.isHidden = !(isOpen && isHovered) || number != nil
         let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
         for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
-        // A soft tile of the space's own color, a step lighter under the pointer; brighter, with a fine edge, while its
-        // page is open, so you can tell which are loaded. The one you're on is the selected tab's card.
+        // Space-tinted tile, lighter on hover; brighter with a fine edge while loaded. The current one uses the selected card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
             : isPressed ? Tokens.Chrome.fieldPressed
             : isOpen ? (isHovered ? Tokens.Chrome.openTileHover : Tokens.Chrome.openTile)

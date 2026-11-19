@@ -203,16 +203,15 @@ final class PageCardView: NSView {
     /// match across the gap and the corner by the sidebar matches the window's.
     var isAttached = false { didSet { if isAttached != oldValue { needsLayout = true; refreshColors() } } }
 
-    /// The corner it rounds to: none edge to edge, the window's own beside the sidebar, a card's floating.
+    /// No corners edge to edge, the window's radius when attached, a card radius when floating.
     private var cornerRadius: CGFloat { edgeToEdge ? 0 : isAttached ? Self.attachedRadius(in: window) : Tokens.Radius.card }
     #if DEBUG
-    /// Debug builds: another attached radius, to compare (`pagecorner <points>`, `pagecorner window` for the window's).
+    /// Debug: override the attached radius (`pagecorner <points>`, `pagecorner window` for the window's).
     static var attachedRadiusOverride: CGFloat?
     #endif
 
-    /// Meeting the window's edges, the page's corners are the window's own curve, so where they meet the window's
-    /// corners no frame shows between the two: the radius macOS gives the window (larger on newer releases), and none
-    /// in full screen, where the window has no corners and a round one left a wedge of the frame at each (#283).
+    /// Attached to the window edges, the page uses the window's corner radius so no frame shows at the corners (larger
+    /// on newer macOS), and none in full screen, where a rounded corner left a wedge of frame (#283).
     static func attachedRadius(in window: NSWindow?) -> CGFloat {
         #if DEBUG
         if let attachedRadiusOverride { return attachedRadiusOverride }
@@ -222,7 +221,7 @@ final class PageCardView: NSView {
         return systemCornerRadius(of: window) ?? Tokens.Radius.attached
     }
 
-    /// The window's corner radius as AppKit draws it. Not public API, so asked first; without it, nil.
+    /// Private AppKit selector for the window's corner radius; nil when unavailable.
     private static let windowCornerRadius = NSSelectorFromString("_cornerRadius")
     static func systemCornerRadius(of window: NSWindow) -> CGFloat? {
         guard window.responds(to: windowCornerRadius),
@@ -438,8 +437,8 @@ final class PageCardView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// The empty page's ground (`EmptyPageBackdrop`): on the surface under the page, so it has the card's shape,
-    /// corners and edge in every layout, and moves with it.
+    /// Empty page background (`EmptyPageBackdrop`), placed on the surface under the page so it shares the card's shape
+    /// and moves with it.
     func setBackdrop(_ backdrop: NSView) {
         backdrop.frame = surface.bounds
         backdrop.autoresizingMask = [.width, .height]
@@ -615,22 +614,21 @@ final class PageCardView: NSView {
 
     // MARK: Swiping back and forward
 
-    /// Under the page while a swipe pushes it aside (`SwipeNavigator`): the plain backdrop a page at a size of its own
-    /// lies on, in light or dark, with the page's shadow falling onto it, so the gap reads as the page lifted off its
-    /// place. Not the card's ground, the page's own color, which next to the page's edge could show as a stray strip.
+    /// Behind the page during a swipe (`SwipeNavigator`): the plain backdrop, light or dark, with the page's shadow, so
+    /// the gap reads as the page lifted. Not the card background, which beside the page edge could look like a stray
+    /// strip.
     private let swipeBackdrop = ColorView(color: Tokens.Color.pdfBackdrop)
-    /// The page's shadow on the backdrop, moving with the page; only its leading edge shows.
+    /// The page's shadow on the backdrop; only its leading edge shows.
     private let swipeShade = CALayer()
-    /// Counts settles, so one that finishes after a new swipe began leaves the backdrop be.
+    /// Counts settles, so one finishing after a new swipe began leaves the backdrop alone.
     private var swipeSettles = 0
 
-    /// What moves aside with the fingers: the page and whatever covers it (a PDF, Reader).
+    /// Layers moved by the swipe: the page and anything covering it (PDF, Reader).
     private var swipeMoving: [CALayer] {
         [holder, document, overlay, placeholder].compactMap { $0?.layer } + [swipeShade]
     }
 
-    /// The page pushed `offset` points aside, the backdrop showing in the gap. Everything stays inside the card: its
-    /// corners and, in a split, its pane.
+    /// Offsets the page by `offset`, showing the backdrop in the gap, clipped to the card (and pane in a split).
     func setSwipeOffset(_ offset: CGFloat) {
         swipeSettles += 1
         holder?.wantsLayer = true
@@ -641,8 +639,7 @@ final class PageCardView: NSView {
         Tokens.Motion.withoutAnimation {
             swipeBackdrop.frame = NSRect(x: 0, y: 0, width: bounds.width, height: bounds.height - contentTop)
             swipeBackdrop.isHidden = false
-            // Only the page's own rectangle: anything WebKit draws past it (a header's color carried out sideways)
-            // would otherwise come into the gap.
+            // Clip to the page: WebKit can draw past it (a header color extended sideways) into the gap.
             holder?.layer?.masksToBounds = true
             swipeShade.frame = holder.map { swipeBackdrop.convert($0.frame, from: clip) } ?? swipeBackdrop.bounds
             swipeShade.shadowPath = CGPath(rect: swipeShade.bounds, transform: nil)
@@ -657,7 +654,7 @@ final class PageCardView: NSView {
         }
     }
 
-    /// The page back in its place, gliding there from wherever the fingers left it, and the backdrop gone after it.
+    /// Animates the page back into place, then removes the backdrop.
     func settleSwipe() {
         swipeSettles += 1
         let settle = swipeSettles
@@ -672,7 +669,7 @@ final class PageCardView: NSView {
             let from = layer.presentation()?.affineTransform() ?? layer.affineTransform()
             Tokens.Motion.withoutAnimation { layer.setAffineTransform(.identity) }
             guard from != .identity, !Tokens.Motion.reduceMotion else { continue }
-            // The app's critically damped spring, as stiff as before (a perceptual 0.35 s).
+            // The app's critically damped spring (perceptual 0.35 s).
             let back = Tokens.Motion.springAnimation(keyPath: "transform", duration: Tokens.Motion.large)
             back.fromValue = NSValue(caTransform3D: CATransform3DMakeAffineTransform(from))
             back.toValue = NSValue(caTransform3D: CATransform3DIdentity)
@@ -681,7 +678,7 @@ final class PageCardView: NSView {
         CATransaction.commit()
     }
 
-    /// Any swipe dropped at once: everything back in its place, the backdrop gone.
+    /// Cancels any swipe immediately: everything back, backdrop removed.
     private func dropSwipe() {
         guard !swipeBackdrop.isHidden, swipeBackdrop.superview != nil else { return }
         swipeSettles += 1
@@ -697,10 +694,10 @@ final class PageCardView: NSView {
 
     /// Puts a web view in the card, in its holder. The new one goes in before the old one leaves, so nothing flickers.
     func show(_ newWebView: WKWebView?, placeholderImage: NSImage? = nil) {
-        // A page here again: no longer standing in for one in another window.
+        // A page again: remove the shown-elsewhere placeholder.
         if newWebView != nil, elsewhere != nil { showElsewhere(nil) }
         guard newWebView !== webView else { return }
-        // A swipe on the page leaving is over: its holder goes back to its place, wherever it shows next.
+        // End any swipe on the outgoing page so its holder is reset.
         dropSwipe()
         let old = webView, oldHolder = holder
         let owner = (newWebView as? BrowserWebView)?.owner
@@ -801,23 +798,21 @@ final class PageCardView: NSView {
         placeholder.image = nil
     }
 
-    /// Standing in for a page another window has on screen, while windows share their tabs (#162): the card's own
-    /// ground, saying so, with a button to show it here.
+    /// Placeholder for a page shown in another sharing window (#162), with a Show Here button.
     private var elsewhere: ShownElsewhereView?
-    /// The tab whose page is in another window, while the card stands in for it.
+    /// The tab whose page is in another window, while the placeholder shows.
     private(set) weak var shownElsewhere: Tab?
 
-    /// Shows that this tab's page is in another window (nil: the card shows pages again). `showHere` brings it here.
+    /// Shows that this tab's page is in another window (nil: show pages again). `showHere` moves it here.
     func showElsewhere(_ tab: Tab?, showHere: (() -> Void)? = nil) {
         shownElsewhere = tab
-        guard let tab else {
+        guard tab != nil else {
             elsewhere?.removeFromSuperview()
             elsewhere = nil
             return
         }
         if let holder, holder.superview !== clip {
-            // Already on screen in the other window's card: let go of it there as it is, its size and ground the
-            // other card's now.
+            // Already in the other window's card: just release it; its size and background are the other card's now.
             webView = nil
             self.holder = nil
             documentToken = nil
@@ -837,8 +832,8 @@ final class PageCardView: NSView {
     }
 }
 
-/// What a card shows for a page that's on screen in another window (#162): the card's own ground, "Shown in another
-/// window", and Show Here. No picture of the page: whatever it has in its middle would run into the words.
+/// Placeholder for a page shown in another window (#162): the card background, "Shown in another window" and Show Here.
+/// No page snapshot: its content would clash with the text.
 final class ShownElsewhereView: NSView {
     private let ground = ColorView(color: Tokens.Color.cardBackground)
     private let message = Label(String(localized: "Shown in another window", comment: "Over a tab's picture, in place of its page, when another window has that page on screen."),

@@ -22,14 +22,14 @@ enum ExternalLinks {
         /// Asked and put off (closed, or the tab moved on): not again from that site for a minute, so a page can't
         /// keep putting the question back up.
         var putOff: [String: Date] = [:]
-        /// When the page's own "this time" answer last opened an app, by site and scheme: that answer covers one
-        /// launch, not a page that fires the same link over and over.
+        /// When a page's "this time" answer last opened an app, by site and scheme, so it covers one launch rather
+        /// than a repeating link.
         var lastOpened: [String: Date] = [:]
-        /// How long a page's own answer is held to one launch, the same gap a question keeps.
+        /// Same gap as for questions.
         static let repeatGap: TimeInterval = 10
 
-        /// Whether the page's own "this time" answer may open the app again now, and notes that it did. A click of
-        /// yours never comes here: a click is you asking, and opens each time.
+        /// Whether a "this time" answer may open the app again now; records the open. Clicks don't come here, they
+        /// open every time.
         mutating func mayOpenAgain(_ key: String, now: Date = Date()) -> Bool {
             if let last = lastOpened[key], now.timeIntervalSince(last) < Self.repeatGap { return false }
             lastOpened[key] = now
@@ -37,12 +37,11 @@ enum ExternalLinks {
             return true
         }
 
-        /// Whether `key` may ask now. A page asking again on its own, after you put it off or said Don't Open, is let
-        /// be for now. A click of yours in the page asks even right after a question was put off: the click that
-        /// dismissed the last question (claude.ai asks on load, and its Open Claude button asks again) must not be
-        /// what silences this one. Only a click on a link (`linkClick`) undoes Don't Open: a click is also what a
-        /// page's own script rides on while you press anything.
-        /// `page`: the site of the page it's on, whose frames share its few seconds' gap (by default, the key's site).
+        /// Whether `key` may ask now. A page re-asking on its own after you put it off or chose Don't Open waits. A
+        /// click asks even right after a put-off, since the click that dismissed one question (claude.ai asks on
+        /// load, then its Open Claude button asks again) mustn't silence the next. Only a link click (`linkClick`)
+        /// undoes Don't Open, because page scripts can ride on any click. `page` is the page's site, whose frames
+        /// share the gap (defaults to the key's site).
         mutating func mayAsk(_ key: String, page: String? = nil, clickedHere: Bool, linkClick: Bool, now: Date = Date()) -> Bool {
             guard !asking.contains(key) else { return false }
             if clickedHere {
@@ -51,9 +50,8 @@ enum ExternalLinks {
                 return true
             }
             guard !declined.contains(key), putOff[key].map({ now > $0 }) ?? true else { return false }
-            // Asking on its own, from any site or frame: never while another question is up, and not again from the
-            // same page's site for a few seconds, so frames from many sites on it can't line up question after
-            // question. Another site (another tab's meeting page) isn't held up by this one.
+            // Unclicked asks: never while another question is up, and not again from the same page's site for a few
+            // seconds, so frames from many sites can't queue questions. Other sites aren't held up.
             let site = page ?? String(key.prefix { $0 != "|" })
             guard asking.isEmpty, lastOnItsOwn[site].map({ now.timeIntervalSince($0) >= Self.unaskedGap }) ?? true else { return false }
             if lastOnItsOwn.count > 200 { lastOnItsOwn = lastOnItsOwn.filter { now.timeIntervalSince($0.value) < Self.unaskedGap } }
@@ -61,7 +59,7 @@ enum ExternalLinks {
             return true
         }
 
-        /// When a question last went up without a click of yours, by the site of the page it was on.
+        /// Last unclicked question time, by page site.
         var lastOnItsOwn: [String: Date] = [:]
         static let unaskedGap: TimeInterval = 10
     }
@@ -72,17 +70,12 @@ enum ExternalLinks {
         return !webSchemes.contains(scheme)
     }
 
-    /// Frames count too: meeting pages often open their app from a hidden frame, and the question keeps that honest.
-    /// Only a page you can see asks; one in a background tab never puts a question over another site.
-    /// `isClick`: a real click or key started it (not a script's click()).
-    /// `linkClick`: it's a link you clicked (`.linkActivated`), not a page's script running on your click; nil when
-    /// that's what `isClick` already means (a link in Reader or a PDF).
-    /// `asker`: the frame that asked, when it's from another site than the page (an ad on a meeting page): it's named,
-    /// and it never gets the page's saved answer, though the page's Block holds for it too.
-    /// `byYou`: you typed it in the address bar or chose it in the command bar, never a page or Zigzag on its own: it
-    /// opens without asking, unless the site is set to Block.
-    /// `sourceIsMainFrame`: the link or script that asked is the page's own document, not a frame in it.
-    /// `fromPDF`: the link is in a PDF, so it's the PDF's, not the site's: it always asks, and never opens an app at
+    /// Frames count too: meeting pages often open their app from a hidden frame. Only a visible page asks. `isClick`:
+    /// a real click or key, not a script's click(). `linkClick`: a clicked link (`.linkActivated`) rather than a
+    /// script on your click; nil means same as `isClick` (Reader, PDF). `asker`: a cross-site frame that asked (an ad
+    /// on a meeting page); named in the question, never gets the page's saved answer, but the page's Block applies.
+    /// `byYou`: typed in the address or command bar; opens without asking unless the site is Blocked.
+    /// `sourceIsMainFrame`: asked by the page's own document. `fromPDF`: a PDF's link always asks and never opens at
     /// once.
     static func open(_ url: URL, isMainFrame: Bool, isClick: Bool, linkClick: Bool? = nil, sourceIsMainFrame: Bool = true, from webView: WKWebView,
                      asker: WKSecurityOrigin? = nil, byYou: Bool = false, fromPDF: Bool = false) {
@@ -116,13 +109,10 @@ enum ExternalLinks {
         let origin = foreign ? asker.flatMap { SiteOrigin.of($0) } : pageOrigin
         let key = "\(origin ?? host)|\(scheme)"
         let tab = (webView as? BrowserWebView)?.owner
-        // The page's Allow or Block, or the app it was told Always Open to. The site-wide row comes first, as it
-        // always did: Allow means every app on the site, Block means none. A frame from elsewhere gets only Block, and
-        // so does a link in a PDF (`fromPDF`), whose links are the PDF's, not the site's: it always asks.
-        // A page with no site of its own (about:blank its opener wrote) is held to the Block of the site that made
-        // it: the frame that asked, which has its origin, or the tab that opened it.
-        // What this page already answered "this time" is a kept answer too, from the tab's page store, so a page that
-        // asks again on its own (a redirect on load, the same link fired twice) is not asked twice for the same app.
+        // Site-wide Allow or Block first (Allow means every app), then the app's Always Open. Cross-site frames and
+        // PDF links (`fromPDF`) get only Block. A page with no site (an about:blank its opener wrote) uses the Block
+        // of the asking frame's or opener tab's site. The page's "this time" answer counts too, so a redirect or
+        // repeated link doesn't ask twice.
         let openerOrigin = (webView as? BrowserWebView)?.owner?.opener.flatMap { SiteOrigin.of($0.url) }
         let standIns = pageOrigin == nil ? [asker.flatMap { SiteOrigin.of($0) }, openerOrigin].compactMap { $0 } : []
         let stored: () -> KeptAppAnswer? = {
@@ -134,12 +124,11 @@ enum ExternalLinks {
         let everydayClick = isEverydayClick(clickedHere: clickedHere, linkClick: linkClick ?? isClick, sourceIsMainFrame: sourceIsMainFrame, fromPDF: fromPDF)
         func openApp() {
             NSWorkspace.shared.open(url)
-            // A sign-in page in Zigzag Mini sending you back to the app that asked: that window's done (#246).
+            // A sign-in in Zigzag Mini returning to the app that asked closes that window (#246).
             MiniWindowController.pageOpenedApp(webView, isMainFrame: isMainFrame, linkClick: linkClick ?? isClick)
         }
         let kept = stored()
-        // The page's own "this time" answer covers one launch, not a page that fires the same link over and over: a
-        // script's repeat is held to the same few seconds a question is. A click of yours is you asking, and opens.
+        // A "this time" answer covers one launch: script repeats are throttled like questions. Clicks always open.
         if kept?.remember == false, !clickedHere, !asked.mayOpenAgain(key) { return }
         switch verdict(byYou: byYou, clickedHere: everydayClick, scheme: scheme, stored: kept?.action) {
         case .block:
@@ -151,14 +140,10 @@ enum ExternalLinks {
         case .ask:
             break
         }
-        // A page asking again on its own, after you put it off, is let be for now. A click of yours in the page is
-        // asked every time: it's you asking, and the click that dismissed the last question (claude.ai asks on load,
-        // and its Open Claude button asks again) must not be what silences this one. A Deny holds on the page that
-        // gave it (its `stored` above), so a page cannot ask again for an answer you already refused.
-        // A background tab's page has no window attached, but its question still belongs to it: ask in the tab's own
-        // host, where `PermissionPrompt` holds it and marks the tab until it can be shown. A web view with neither a
-        // window nor a tab (an orphaned pop-up) must not put a question up in whatever window happens to be in front.
-        // Mini and an installed app's window are hosts in their own right, with no browser window to fall back on.
+        // A page re-asking after you put it off waits; clicks always ask (see `mayAsk`). A Deny holds for the page
+        // (`stored` above). A background tab asks in its own host, where `PermissionPrompt` holds the question and
+        // marks the tab. A web view with no window or tab (an orphaned pop-up) must not ask in whichever window is in
+        // front. Mini and installed app windows are their own hosts.
         let pagePromptHost: PromptHost? = (webView.window?.windowController as? PromptHost)
             .flatMap { $0 is BrowserWindowController ? nil : $0 }
             ?? (owner?.host as? PromptHost).flatMap { $0 is BrowserWindowController ? nil : $0 }
@@ -172,9 +157,8 @@ enum ExternalLinks {
         let saves = Self.saves(isPrivate: isPrivate, origin: origin, canRemember: canRemember) && !fromPDF
         if !foreign { SitePermissions.noteAsked(.apps, origin: pageOrigin, isPrivate: isPrivate) }
         asked.asking.insert(key)
-        // Asked where the page is: in Zigzag Mini or an installed app's window, over its own page, not in a browser
-        // window behind it, where it couldn't be seen (a report: claude.ai's Open Claude did nothing in Mini).
-        // Asked from a popup: its window comes forward, so the question isn't hidden behind the pop-up.
+        // Ask over the page itself, in Mini or an app window, not a browser window behind it (claude.ai's Open Claude
+        // did nothing in Mini). A pop-up's window comes forward so the question isn't hidden.
         if popup != nil { promptHost.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
             let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, answerKey: key, what: name, symbol: "arrow.up.forward.app",
@@ -189,9 +173,9 @@ enum ExternalLinks {
                 asked.putOff[key] = Date().addingTimeInterval(60)
                 return
             }
-            // This time holds on the page that asked, until it navigates; Always is kept for the site, and only
-            // where it could be kept (https, no foreign frame, not a private window). Both answers stay that one
-            // app's, a Don't Allow included: refusing one link must not block every other app on the site.
+            // This time holds for the page until it navigates; Always is kept for the site where allowed (https, no
+            // foreign frame, not private). Both are per app, Don't Allow included, so refusing one link doesn't block
+            // every app on the site.
             if let origin {
                 SitePermissions.rememberAnswer(answer, subject: Self.storageSubject(for: answer, scheme: scheme),
                                                origin: origin, tab: tab, isPrivate: isPrivate)
@@ -204,10 +188,9 @@ enum ExternalLinks {
         }
     }
 
-    /// The address of the page a link for an app is from: the web view's. A tab Zigzag itself sends to an app's link
-    /// (an extension's tabs.update: Downie's button) already shows that link as its address while it's decided, so
-    /// the page is the one it's still on, the frame that asked (`asker`, its origin). Taking the link for the page
-    /// made every such question come from a site of its own ("downie://xuopenlink"), never the site you're on (#239).
+    /// The page's address for an app link. A tab Zigzag sends to an app link (an extension's tabs.update, e.g.
+    /// Downie) already shows that link while it's decided, so the asking frame's origin (`asker`) is used instead.
+    /// Otherwise every question came from "downie://xuopenlink" (#239).
     static func page(showing address: URL?, asker: String?) -> URL? {
         guard let address, isExternal(address) else { return address }
         return asker.flatMap { URL(string: $0) }
@@ -215,14 +198,10 @@ enum ExternalLinks {
 
     enum Verdict: Equatable { case block, open, ask }
 
-    /// Whether a link for another app opens, asks first or goes nowhere. The site's Block always holds, even for an
-    /// address you typed: `byYou` only spares you the question. Mail, phone and FaceTime open at once for a link you
-    /// clicked in the page in front (`clickedHere`); from anywhere else (a hidden frame, a background tab, a script)
-    /// they ask like any other app.
-    /// `stored` is the site's kept answer: Allow or Block chosen in Site Controls or Settings, an app told Always
-    /// Allow, or the page's own answer this time. Both are honored as they stand. Writing an allow is already closed
-    /// to anywhere it shouldn't be kept (`saves`), and a frame from another site can only carry a Block this far
-    /// (`decision`), so an allow found here was given deliberately and is not second-guessed.
+    /// Whether an app link opens, asks or goes nowhere. A site Block always holds, even for typed addresses (`byYou`
+    /// only skips the question). Mail, phone and FaceTime open at once only for a click in the front page
+    /// (`clickedHere`); otherwise they ask. `stored` is honored as is: storing is already gated by `saves`, and
+    /// cross-site frames only carry a Block this far (`decision`).
     static func verdict(byYou: Bool, clickedHere: Bool, scheme: String, stored: String?) -> Verdict {
         if stored == "deny" { return .block }
         if stored == "allow" { return .open }
@@ -230,53 +209,44 @@ enum ExternalLinks {
         return .ask
     }
 
-    /// Whether mail, phone and FaceTime may open at once: only for a link you clicked in the page in front itself,
-    /// never from a frame in it, a script riding on your click, or a PDF.
+    /// Only a clicked link in the front page's own document, never a frame, a script on your click, or a PDF.
     static func isEverydayClick(clickedHere: Bool, linkClick: Bool, sourceIsMainFrame: Bool, fromPDF: Bool) -> Bool {
         clickedHere && linkClick && sourceIsMainFrame && !fromPDF
     }
 
-    /// Whether a question's answer may be kept for the site: not a private window, a site we can name, and a place an
-    /// answer can live (a secure page, and never a frame from another site). This is the whole gate on *storing*; what
-    /// may be *honored* is everything already in the store, which `verdict` trusts.
+    /// Whether an answer may be kept for the site: not private, a nameable site, and a secure page with no foreign
+    /// frame. This gates storing only; `verdict` trusts what's stored.
     static func saves(isPrivate: Bool, origin: String?, canRemember: Bool) -> Bool {
         !isPrivate && origin != nil && canRemember
     }
 
-    /// Whether an app answer can be kept for the page at `url`: only a secure page, and never a frame from another
-    /// site (its answer would be the page's to give, not the frame's).
+    /// Only secure pages, and never a cross-site frame, whose answer isn't the page's to give.
     static func canRemember(url: URL?, foreign: Bool) -> Bool {
         !foreign && url?.scheme?.lowercased() == "https"
     }
 
-    /// The subject an answered app question is kept under: always that one app. "Always / Don't Allow" refuses this
-    /// app on this site, and the next app the page opens asks on its own; the site-wide "apps" row stays Site
-    /// Controls' to write, so refusing the App Store link on a site doesn't block its Zoom link too.
+    /// Always the one app, so refusing the App Store link on a site doesn't block its Zoom link. The site-wide "apps"
+    /// row is only written by Site Controls.
     static func storageSubject(for answer: PermissionAnswer, scheme: String) -> String {
         PermissionSubject.app(scheme)
     }
 
-    /// What's kept for the page at `page` opening an app: its Allow or Block, or the app it was told Always Open to;
-    /// nil asks. A frame from another site on the page (`foreign`) is held by Block only, never let in.
+    /// The kept Allow, Block, or Always Open app; nil asks. A foreign frame (`foreign`) only gets Block.
     static func decision(page: String?, foreign: Bool, stored: String?) -> String? {
-        guard let page, let stored else { return nil }
+        guard page != nil, let stored else { return nil }
         if stored == "deny" { return "deny" }
         return foreign ? nil : stored
     }
 
-    /// What a page opening an app is held to, and whether that answer was kept for the site rather than given on this
-    /// page. The page's own This-time answer must never be returned as something to keep (`PermissionAnswer.remember`),
-    /// or the question machinery would write it down as the site's Always.
+    /// A kept app answer, and whether it's the site's rather than this page's. A page answer must never come back as
+    /// `remember`, or it would be saved as the site's Always.
     struct KeptAppAnswer: Equatable {
         let action: String
-        /// True only for an answer kept for the site; false for the page's own answer this time.
         let remember: Bool
     }
 
-    /// What a page opening an app is held to, in one place: the site's own Allow or Block (the one "Open apps" row,
-    /// which means every app), then the app told Always Allow, then the page's own answer this time. The site-wide
-    /// row is read before the app's own key — a site-wide Allow covers every app, exactly as it always did. A page
-    /// with no site of its own (`pageOrigin` nil) is held to the Block of the sites standing in for it. Nil asks.
+    /// Site-wide "Open apps" Allow or Block first (covers every app), then the app's Always Allow, then the page's
+    /// "this time" answer. A page with no site (`pageOrigin` nil) uses its stand-ins' Block. Nil asks.
     static func storedAppAnswer(pageOrigin: String?, standIns: [String] = [], origin: String?, scheme: String, foreign: Bool, tab: Tab?) -> KeptAppAnswer? {
         let siteWide = pageOrigin.flatMap { SitePermissions.action(PermissionSubject.apps, origin: $0) }
         let perApp = pageOrigin.flatMap { SitePermissions.action(PermissionSubject.app(scheme), origin: $0) }
@@ -295,9 +265,8 @@ enum ExternalLinks {
         return KeptAppAnswer(action: page, remember: false)
     }
 
-    /// Whether the frame that asked is someone other than the page: another site, or a frame with no host of its own
-    /// (sandboxed, data:) on a page that has one, which never gets the page's Always Open. `askerHost` nil: no
-    /// frame was named, the page asked.
+    /// Whether the asking frame isn't the page: another site, or a hostless frame (sandboxed, data:) on a page with a
+    /// host. Such frames never get the page's Always Open. `askerHost` nil means the page itself asked.
     static func isForeign(askerHost: String?, pageHost: String) -> Bool {
         guard let askerHost else { return false }
         if askerHost.isEmpty { return !pageHost.isEmpty }
@@ -310,7 +279,7 @@ enum ExternalLinks {
         asked.declined = asked.declined.filter { !$0.hasPrefix(origin + "|") }
         asked.putOff = asked.putOff.filter { !$0.key.hasPrefix(origin + "|") }
         asked.lastOpened = asked.lastOpened.filter { !$0.key.hasPrefix(origin + "|") }
-        // The ask-on-its-own gap too, so a site forgotten is asked at once rather than after its few seconds.
+        // Clears the throttle too, so a forgotten site asks at once.
         asked.lastOnItsOwn[origin] = nil
         if let host = URL(string: origin)?.host() { asked.lastOnItsOwn[host] = nil }
     }

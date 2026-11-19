@@ -14,8 +14,7 @@ struct ScriptingTests {
         }
     }
 
-    /// A page saved on this Mac that another app or a script hands over opens; a folder, a missing file or any
-    /// other kind of file doesn't.
+    /// Local pages handed over by other apps or scripts open; folders, missing files and other file types don't.
     @Test func opensLocalPagesFromOtherApps() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zz-localpage-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

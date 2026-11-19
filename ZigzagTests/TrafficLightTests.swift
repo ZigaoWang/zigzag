@@ -2,7 +2,7 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// Where the window's traffic lights go, and that they stay there when AppKit lays the title bar out again.
+/// Traffic light placement, and that it survives AppKit's title bar relayouts.
 @MainActor
 struct TrafficLightTests {
     @Test func buttonsSitInARowFromTheOrigin() {
@@ -14,9 +14,7 @@ struct TrafficLightTests {
         #expect(NSWindow.titlebarHeight(forTrafficLightsAt: NSPoint(x: 12, y: 15), buttonHeight: 14) == 15 + 14 + Tokens.Space.x1)
     }
 
-    /// AppKit puts the buttons back in its own spot each time it lays the title bar out again (a title, a document
-    /// URL, a key change). They must be back in ours by the layout pass that comes before the frame is drawn, the green
-    /// one too: put back only on the next turn of the run loop, it showed in AppKit's spot for a frame.
+    /// AppKit resets the buttons on each title bar relayout (title, represented URL, key change); they must be back before the frame draws, or they flash in AppKit's spot for a frame.
     @Test func buttonsAreBackBeforeTheFrameIsDrawn() {
         let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500))
         window.alphaValue = 0
@@ -36,7 +34,7 @@ struct TrafficLightTests {
         let placed = topLefts()
         #expect(placed.first == origin)
         for change in 0..<4 {
-            // Each of these makes AppKit lay the title bar out again; the subtitle isn't one Zigzag watches.
+            // Each of these triggers a title bar relayout; Zigzag doesn't observe subtitle.
             switch change {
             case 0: window.subtitle = "Moved"
             case 1: window.representedURL = nil

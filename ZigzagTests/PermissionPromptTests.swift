@@ -10,8 +10,7 @@ struct PermissionPromptTests {
         #expect(ordered.last?.isProminent == true)
     }
 
-    /// One question at a time in a window: the card that is up says how many wait their turn behind it, and says
-    /// nothing when none do — an empty line would be a label with no work.
+    /// One question at a time per window; the card shows how many wait, and nothing when none do.
     @Test func aCardSaysHowManyWaitBehindIt() {
         #expect(PermissionPrompt.waitingBehind(questionsWaiting: 0) == nil)
         #expect(PermissionPrompt.waitingBehind(questionsWaiting: 1) == nil)
@@ -47,10 +46,9 @@ struct PermissionPromptTests {
         #expect(answer?.remember == false)
     }
 
-    /// Two tabs of one site, a page's two frames, a private window and the window itself each ask for themselves: only
-    /// the same tab, frame and privacy's repeated question shares one card.
+    /// Different tabs, frames, privacy or windows each ask separately; only the same tab, frame and privacy share a card.
     @Test func twoAskersShareOnlyTheSameQuestion() {
-        // Held, not temporaries: a freed object's address can be reused by the next one.
+        // Kept alive: a freed object's address could be reused.
         let firstWindow = NSObject(), secondWindow = NSObject()
         let window = ObjectIdentifier(firstWindow), otherWindow = ObjectIdentifier(secondWindow)
         let tab = UUID(), otherTab = UUID()
@@ -82,8 +80,7 @@ struct PermissionPromptTests {
         #expect(dropdown.toolTip == "Private windows don’t remember answers.")
     }
 
-    /// The card is light or dark as the page under it, not as the window: a light space's window puts a dark card
-    /// on a dark page (#300). With no page color yet, the look the page is drawn in; with neither, the window's.
+    /// The card follows the page's appearance, not the window's (#300); without a page color, the page's drawn appearance, else the window's.
     @Test func theCardTakesItsPagesLook() {
         let black = NSColor(srgbRed: 0.1, green: 0.1, blue: 0.1, alpha: 1)
         #expect(PermissionPrompt.look(pageColor: black, pageLook: .aqua) == .darkAqua)

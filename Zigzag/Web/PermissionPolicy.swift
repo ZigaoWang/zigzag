@@ -1,8 +1,8 @@
 import Foundation
 import WebKit
 
-/// One answer a permission question offers. Denial comes first and the ordinary affirmative last and prominent;
-/// every alternative is plain between them.
+/// One answer a permission question offers. Deny first, the main affirmative last and prominent, alternatives plain
+/// in between.
 nonisolated struct PermissionAction {
     let id: String
     let title: String
@@ -27,16 +27,15 @@ nonisolated struct PermissionAction {
     }
 }
 
-/// The action chosen for a permission question and whether it is kept for the site or only its current page.
+/// The chosen action, and whether it's kept for the site or only the current page.
 nonisolated struct PermissionAnswer {
     let action: String
     let remember: Bool
-    /// The entry a question's own dropdown had picked, where it offers one to choose rather than to answer itself:
-    /// a rule's web address picks where to open it, then the buttons say whether to go ahead. Nil for a question with
-    /// no such dropdown, and for the answers that are the dropdown's own (a pop-up's destination).
+    /// The pick-only dropdown's entry (a rule's web address picks where to open; the buttons decide whether to go).
+    /// Nil when there's no such dropdown, or when the dropdown itself answers (a pop-up's destination).
     let choice: String?
-    /// Which of the question's durations was chosen, where it offered more than the usual two. Zero is This time, so
-    /// every existing answer keeps its meaning.
+    /// Index of the chosen duration when more than two are offered. Zero is This time, so existing answers keep their
+    /// meaning.
     let scopeIndex: Int
 
     init(action: String, remember: Bool, scopeIndex: Int = 0, choice: String? = nil) {
@@ -50,10 +49,9 @@ nonisolated struct PermissionAnswer {
 /// Stable identifiers under which permission actions are remembered.
 nonisolated enum PermissionSubject {
     static let location = "location", notifications = "notifications", popups = "popups", apps = "apps"
-    /// Screen sharing, whose yes is *which* picker macOS shows rather than a plain allow.
+    /// Screen sharing; its yes picks which macOS picker shows.
     static let screen = "screen"
-    /// Whether a site may save files at all. The destination an allowed file goes to is a separate decision, made per
-    /// file type by the download rules.
+    /// Whether a site may download at all. Where files go is decided per type by download rules.
     static let downloads = "downloads"
 
     static func media(_ type: WKMediaCaptureType) -> String {
@@ -65,6 +63,6 @@ nonisolated enum PermissionSubject {
     }
 
     static func app(_ scheme: String) -> String { "app:\(scheme)" }
-    /// A handoff rule's standing answers, kept per site under the rule's own id.
+    /// A handoff rule's kept answers, per site, under the rule's id.
     static func handoff(_ rule: UUID) -> String { "handoff:\(rule.uuidString)" }
 }

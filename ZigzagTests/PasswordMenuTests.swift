@@ -146,7 +146,7 @@ struct PasswordMenuTests {
         #expect(!heard.kinds.contains("focus"))
     }
 
-    /// A person pressing the down arrow, as the window hands it to the page.
+    /// A down-arrow key press sent through the window.
     private func pressDown(_ webView: WKWebView) async throws {
         guard let window = webView.window else { return }
         window.makeFirstResponder(webView)
@@ -161,8 +161,7 @@ struct PasswordMenuTests {
         _ = try await webView.callAsyncJavaScript("return 1", arguments: [:], in: nil, contentWorld: .defaultClient)
     }
 
-    /// The down arrow in a field the page put the cursor in brings the menu, saying the page chose the field; a
-    /// click says you did.
+    /// Down arrow in a page-focused field opens the menu marked page-chosen; a click marks it user-chosen.
     @Test func theMenuKnowsWhoChoseTheField() async throws {
         let (webView, window, heard, _) = await page("""
         <form><input id="u" name="email" autocomplete="username"><input id="p" type="password"></form>
@@ -177,7 +176,7 @@ struct PasswordMenuTests {
         #expect(heard.focuses.last?["byUser"] as? Bool == true)
     }
 
-    /// A field the page put the cursor in far below what you see: the down arrow never brings the menu up for it.
+    /// A page-focused field far out of view gets no menu from the down arrow.
     @Test func aFieldOffThePageYouSeeGetsNoMenu() async throws {
         let (webView, window, heard, _) = await page("""
         <form style="position:absolute;top:250vh"><input id="u" name="email" autocomplete="username"><input id="p" type="password"></form>
@@ -194,12 +193,12 @@ struct PasswordMenuTests {
 
     @Test func theMenuStaysInsideTheWindow() {
         let bounds = NSRect(x: 0, y: 0, width: 800, height: 600)
-        // A field far below the window, or far off to one side.
+        // Far below or to the side of the window.
         for field in [NSRect(x: 40, y: 1500, width: 300, height: 30), NSRect(x: -900, y: -400, width: 300, height: 30), NSRect(x: 2000, y: 300, width: 300, height: 30)] {
             let frame = Autofill.menuFrame(under: field, in: bounds, height: 200)
             #expect(bounds.contains(frame))
         }
-        // An ordinary field: right under it.
+        // A normal field: right under it.
         let field = NSRect(x: 40, y: 100, width: 300, height: 30)
         let frame = Autofill.menuFrame(under: field, in: bounds, height: 200)
         #expect(frame.minY == field.maxY + Tokens.Space.x1 && frame.minX == field.minX)
@@ -213,13 +212,12 @@ struct PasswordMenuTests {
         #expect(!Autofill.isInView(NSRect(x: 40, y: 100, width: 0, height: 0), viewport: viewport))
     }
 
-    /// Keys wait out the same half second clicks do, and Return fills only for a field you chose, or with the menu
-    /// where you can see it.
+    /// Keys wait the same half second as clicks; Return fills only for a field you chose, or with the menu visible.
     @Test func keysWaitAndReturnNeedsYou() {
         #expect(!AutofillMenu.takesInput(shownFor: 0.1))
         #expect(!AutofillMenu.takesInput(shownFor: 0.5))
         #expect(AutofillMenu.takesInput(shownFor: 0.6))
-        // Only Return waits; the arrows move the selection at once.
+        // Only Return waits; arrows move immediately.
         #expect(!AutofillMenu.takesKey("Enter", shownFor: 0.1) && AutofillMenu.takesKey("Enter", shownFor: 0.6))
         #expect(AutofillMenu.takesKey("ArrowDown", shownFor: 0.1) && AutofillMenu.takesKey("ArrowUp", shownFor: 0.1))
         #expect(Autofill.enterMayFill(focusedByUser: true, menuOnScreen: false))
@@ -227,7 +225,7 @@ struct PasswordMenuTests {
         #expect(!Autofill.enterMayFill(focusedByUser: false, menuOnScreen: false))
     }
 
-    /// A menu in a window that isn't on screen isn't one you can see.
+    /// A menu in an offscreen window isn't visible.
     @Test func aMenuInAHiddenWindowIsNotOnScreen() throws {
         let menu = AutofillMenu(items: [.generate], origin: try #require(Origin(URL(string: "https://example.com"))))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
@@ -291,7 +289,7 @@ struct PasswordMenuTests {
         #expect(await value("new", in: webView) == "")
     }
 
-    /// The field the menu was for, off the page you see: nothing goes in.
+    /// The field scrolled out of view: nothing is filled.
     @Test func aFieldScrolledAwayIsNotFilled() async throws {
         let (webView, _, _, _) = await page("""
         <form style="position:absolute;top:250vh"><input id="u" autocomplete="username"><input id="p" type="password"></form>
@@ -310,7 +308,7 @@ struct PasswordMenuTests {
                                               in: nil, contentWorld: .defaultClient) as? [String: Any]
     }
 
-    /// A strong password goes only into the site it was offered on.
+    /// A strong password fills only on the site it was offered for.
     @Test func aStrongPasswordChecksTheSite() async throws {
         let (webView, _, _, _) = await page("<form><input id='n' type='password' autocomplete='new-password'></form>")
         _ = try await webView.evaluateJavaScript("document.getElementById('n').focus()")
@@ -322,7 +320,7 @@ struct PasswordMenuTests {
         #expect(await value("n", in: webView) == "Strong-1-abc")
     }
 
-    /// Another strong password in the same form is another try; one in a different form isn't.
+    /// Another strong password in the same form is a retry; in another form it isn't.
     @Test func aStrongPasswordKnowsItsForm() async throws {
         let (webView, _, _, _) = await page("""
         <form id="a"><input id="n1" type="password" autocomplete="new-password"></form>

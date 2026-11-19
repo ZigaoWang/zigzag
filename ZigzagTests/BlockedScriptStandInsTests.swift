@@ -12,8 +12,7 @@ struct BlockedScriptStandInsTests {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
     }
 
-    /// The blocker's own rule for the file, as EasyPrivacy has it, and the same for a page script's address. Then
-    /// DeepSeek's telemetry, as EasyPrivacy has it too, and a call that isn't it.
+    /// EasyPrivacy rules for the file and a page script, then for DeepSeek telemetry, plus a non-matching call.
     private static let rules = """
     [{"trigger": {"url-filter": "\\\\/fingerprint2\\\\.min\\\\.js"}, "action": {"type": "block"}},
      {"trigger": {"url-filter": "\\\\/blocked-app\\\\.js"}, "action": {"type": "block"}},
@@ -118,8 +117,7 @@ struct BlockedScriptStandInsTests {
 
     // MARK: Site calls
 
-    /// DeepSeek's own flush, as its telemetry sends it: a keepalive POST to the blocked address, read as a network
-    /// failure when nothing comes back. Then the same by XMLHttpRequest.
+    /// DeepSeek's telemetry flush: keepalive POST to the blocked address, then the same via XMLHttpRequest.
     private static let telemetry = """
     const sent = await fetch('/api/v0/telemetry', { method: 'POST', body: new Uint8Array([1, 2, 3]), keepalive: true,
                                                      headers: { 'Content-Type': 'application/octet-stream' } })
@@ -138,22 +136,20 @@ struct BlockedScriptStandInsTests {
         try await webView.callAsyncJavaScript(body, contentWorld: .page).map { String(describing: $0) }
     }
 
-    /// DeepSeek told you to check your browser extensions when its blocked telemetry kept failing (#208), in pages the
-    /// "Zigzag fixes" list hadn't reached. With the blocker on, its telemetry gets an empty answer.
+    /// DeepSeek warned about extensions when blocked telemetry failed (#208); with blocking on, it gets an empty response.
     @Test func deepSeeksBlockedTelemetryGetsAnAnswer() async throws {
         let deepSeek = try await page("<p>DeepSeek</p>", at: "https://chat.deepseek.com/")
         #expect(try await run(Self.telemetry, in: deepSeek) == "200 4 200")
         #expect(try await run("return String(fetch.toString().includes('[native code]'))", in: deepSeek) == "true")
-        // On DeepSeek, a blocked address that isn't its telemetry stays blocked.
+        // Other blocked DeepSeek addresses stay blocked.
         let call = "return await fetch('/api/v0/blocked-call').then((response) => String(response.status), () => 'failed')"
         #expect(try await run(call, in: deepSeek) == "failed")
-        // Without the stand-ins (blocking off, or DeepSeek allowed) nothing answers it.
+        // Without stand-ins (blocking off or DeepSeek allowed) nothing responds.
         let bare = try await page("<p>DeepSeek</p>", standIn: false, at: "https://chat.deepseek.com/")
         #expect(try await run(Self.telemetry, in: bare) == "failed failed")
     }
 
-    /// One XMLHttpRequest answered for the telemetry, then opened again for another call: it reads as that call's
-    /// own, not as the telemetry's answer.
+    /// A reused XMLHttpRequest doesn't keep the telemetry response.
     @Test func aReusedRequestForgetsTheTelemetryAnswer() async throws {
         let deepSeek = try await page("<p>DeepSeek</p>", at: "https://chat.deepseek.com/")
         let reused = """
@@ -168,7 +164,7 @@ struct BlockedScriptStandInsTests {
         const own = ['status', 'readyState', 'responseURL'].filter((name) => Object.prototype.hasOwnProperty.call(xhr, name));
         return first + ' ' + xhr.readyState + ' ' + xhr.status + ' ' + own.length;
         """
-        // Opened again: readyState 1 (opened) and status 0, as any request that hasn't been sent.
+        // Reopened: readyState 1, status 0.
         #expect(try await run(reused, in: deepSeek) == "200 1 0 0")
     }
 

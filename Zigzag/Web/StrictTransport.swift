@@ -1,29 +1,22 @@
 import Foundation
 import WebKit
 
-/// Sites that asked to be reached only over a secure connection (HTTP Strict Transport Security, RFC 6797). A
-/// certificate warning for one of them has no "Visit anyway", as in Chrome and Safari: the site said a connection that
-/// can't be trusted must never be used.
-///
-/// WebKit enforces HSTS itself but doesn't say which hosts it knows, nor does a failed load say whether its host is one.
-/// So Zigzag keeps its own list: the browsers' preload list (Chromium's, which Safari and Firefox share, bundled as
-/// `hsts_preload.txt`), and the hosts that sent the header over a trusted connection, per website data store. A
-/// profile's are kept on disk across launches until the header's max-age runs out or its site data is cleared; a
-/// private window's stay in memory and go with it.
+/// HSTS hosts (RFC 6797). Their certificate warnings have no "Visit anyway", as in Chrome and Safari. WebKit enforces
+/// HSTS but doesn't expose which hosts it knows, so Zigzag keeps its own list: the shared browser preload list
+/// (Chromium's, bundled as `hsts_preload.txt`) plus hosts that sent the header over a trusted connection, per data
+/// store. A profile's persist until max-age runs out or site data is cleared; a private window's stay in memory.
 @MainActor enum StrictTransport {
-    /// The preload list, one name a line, sorted byte by byte: a name whose subdomains are covered too, or `=name` for
-    /// one covered alone. It's searched where it lies in the app, mapped rather than read, so the 95,000 names cost
-    /// next to no memory and nothing at launch; a look-up reads a few dozen lines.
+    /// One name per line, byte-sorted: a name covering its subdomains, or `=name` for itself only. Memory-mapped and
+    /// searched in place, so 95,000 names cost almost nothing; a lookup touches a few dozen lines.
     nonisolated private static let preload: Data = {
         guard let url = Bundle.main.url(forResource: "hsts_preload", withExtension: "txt"),
               let data = try? Data(contentsOf: url, options: .alwaysMapped) else { return Data() }
         return data
     }()
 
-    /// Whether the preload list is there.
     nonisolated static var isPreloadLoaded: Bool { !preload.isEmpty }
 
-    /// Whether `host` is on the preload list: itself, or under a name that covers its subdomains.
+    /// The host itself, or a parent that covers subdomains.
     nonisolated static func isPreloaded(_ host: String) -> Bool {
         let host = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         guard !host.isEmpty, !isAddress(host) else { return false }
@@ -33,8 +26,7 @@ import WebKit
         return false
     }
 
-    /// Whether `line` is one of the preload list's lines: a binary search over its bytes, each step moving to the
-    /// start of the line it lands in.
+    /// Binary search over the bytes, snapping each probe to the start of its line.
     nonisolated static func listed(_ line: String, in list: Data = preload) -> Bool {
         let key = Array(line.utf8)
         guard !key.isEmpty else { return false }
@@ -94,22 +86,21 @@ import WebKit
         return Policy(maxAge: min(maxAge, 2 * 365 * 24 * 60 * 60), includesSubdomains: subdomains)
     }
 
-    /// One host that sent the header, and until when it holds.
     nonisolated struct Entry: Codable, Equatable, Sendable {
         var until: Date
         var includesSubdomains: Bool
     }
 
-    /// One store's hosts that sent the header. A profile's file is read on the disk queue, so a page's first response
-    /// never waits for it: notes made meanwhile are kept and win over what the file said.
+    /// Hosts that sent the header in one store. A profile's file is read on the disk queue so the first response
+    /// never waits; notes made meanwhile win over the file.
     private final class Hosts {
         var entries: [String: Entry] = [:]
-        /// Where the list is kept; nil for a private window's, never written.
+        /// Nil for a private window's, which is never written.
         let url: URL?
-        /// The file's list, once read, until it's taken in.
+        /// The file's contents once read, until merged.
         let read = ReadBox()
         var isComplete: Bool
-        /// A write is on its way, after a moment, so a page's many responses make one.
+        /// Writes are coalesced so many responses make one.
         var saveScheduled = false
         init(url: URL?) {
             self.url = url
@@ -124,20 +115,20 @@ import WebKit
         func take() -> [String: Entry]? { lock.withLock { defer { value = nil }; return value } }
     }
 
-    /// Per data store: a private window's stay in it and go with it.
+    /// Per data store; a private window's go with it.
     private static let known = NSMapTable<WKWebsiteDataStore, Hosts>.weakToStrongObjects()
-    /// Lists with a write on its way, to finish at once when Zigzag quits (or a test waits).
+    /// Lists with a pending write, flushed on quit (or when a test waits).
     private static var unsaved: [ObjectIdentifier: Hosts] = [:]
 
     static let fileName = "Strict Transport.plist"
-    /// Hosts kept for each profile: the ones that run out first go first.
+    /// Per profile; the soonest to expire are dropped first.
     static let maxHosts = 5000
-    /// Where the lists are read, written and removed, in order.
+    /// Serializes reads, writes and removals.
     static let disk = DispatchQueue(label: "app.zigzag.strict-transport", qos: .utility)
-    /// How long a change waits for others before it's written.
+    /// Coalescing delay before a write.
     static let saveDelay: TimeInterval = 2
 
-    /// A profile's file (`DarkPages.nativeScope`). Tests never use a real profile's: they get one of their own.
+    /// A profile's file (`DarkPages.nativeScope`). Tests get their own.
     static var file: (String) -> URL? = { scope in
         if AppDelegate.isHostingTests {
             return FileManager.default.temporaryDirectory.appendingPathComponent("ZigzagTests-StrictTransport-\(ProcessInfo.processInfo.processIdentifier)")
@@ -148,7 +139,7 @@ import WebKit
         return Profiles.folder(of: id).appendingPathComponent(fileName)
     }
 
-    /// The hosts known in `store`: its profile's file starts being read the first time.
+    /// Starts reading the profile's file on first use.
     private static func hosts(in store: WKWebsiteDataStore) -> Hosts {
         if let hosts = known.object(forKey: store) {
             takeIn(hosts)
@@ -168,14 +159,14 @@ import WebKit
         return hosts
     }
 
-    /// The file's list, if it's been read: what was noted since stays over it.
+    /// Merges the file's list once read; newer notes win.
     private static func takeIn(_ hosts: Hosts) {
         guard !hosts.isComplete, let read = hosts.read.take() else { return }
         hosts.entries = read.merging(hosts.entries) { _, noted in noted }
         hosts.isComplete = true
     }
 
-    /// Everything known in `store`, the file waited for if it's still being read (a certificate warning's answer).
+    /// Waits for the file if it's still being read (for a certificate warning).
     private static func completeHosts(in store: WKWebsiteDataStore) -> Hosts {
         let hosts = hosts(in: store)
         if !hosts.isComplete {
@@ -185,8 +176,7 @@ import WebKit
         return hosts
     }
 
-    /// Writes a profile's list a moment from now, off the main thread, with whatever else changed meanwhile; a
-    /// private window's is never written.
+    /// Writes a profile's list after `saveDelay`, off the main thread; private windows are never written.
     private static func save(_ hosts: Hosts) {
         guard hosts.url != nil else { return }
         unsaved[ObjectIdentifier(hosts)] = hosts
@@ -198,7 +188,7 @@ import WebKit
     private static func write(_ hosts: Hosts) {
         hosts.saveScheduled = false
         guard unsaved.removeValue(forKey: ObjectIdentifier(hosts)) != nil, let url = hosts.url else { return }
-        // Never written over before the file's own list is in.
+        // Never overwrite before the file has been read.
         if !hosts.isComplete {
             disk.sync {}
             takeIn(hosts)
@@ -214,7 +204,7 @@ import WebKit
         }
     }
 
-    /// Writes what's waiting now (Zigzag quitting).
+    /// Flushes pending writes (on quit).
     static func finishWriting() {
         for hosts in Array(unsaved.values) { write(hosts) }
         disk.sync {}
@@ -233,7 +223,7 @@ import WebKit
     static func note(_ host: String, policy: Policy, in store: WKWebsiteDataStore, now: Date = Date()) {
         let host = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         guard !host.isEmpty else { return }
-        // Taking it back needs the file's list in, or the file would bring it back.
+        // Removing a host needs the file merged first, or the file would bring it back.
         let hosts = policy.maxAge <= 0 ? completeHosts(in: store) : hosts(in: store)
         let old = hosts.entries[host]
         // max-age=0 is the site taking it back.
@@ -242,7 +232,7 @@ import WebKit
             hosts.entries[host] = nil
         } else {
             let entry = Entry(until: now.addingTimeInterval(policy.maxAge), includesSubdomains: policy.includesSubdomains)
-            // The same answer again a little later (every page of the site sends it) isn't written each time.
+            // Every page of the site sends the same header; skip writing an unchanged entry.
             if let old, old.includesSubdomains == entry.includesSubdomains, abs(old.until.timeIntervalSince(entry.until)) < 24 * 60 * 60 { return }
             hosts.entries[host] = entry
             if hosts.entries.count > maxHosts {
@@ -254,8 +244,7 @@ import WebKit
         save(hosts)
     }
 
-    /// Whether `host` is to be reached only securely in `store`: it's on the preload list, or it or a domain over it
-    /// that covers its subdomains sent the header.
+    /// On the preload list, or the host or a subdomain-covering parent sent the header.
     static func isKnown(_ host: String, in store: WKWebsiteDataStore?, now: Date = Date()) -> Bool {
         let host = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         guard !host.isEmpty, !isAddress(host) else { return false }
@@ -270,8 +259,8 @@ import WebKit
         return false
     }
 
-    /// The hosts noted for `store` go (its site data was cleared): all of them, or one site's (covering its
-    /// subdomains and the domains it's under). The preload list stays.
+    /// Clears noted hosts after site data is cleared: all, or one site's (its subdomains and parent domains). The
+    /// preload list stays.
     static func forget(in store: WKWebsiteDataStore, site: String? = nil) {
         let hosts = completeHosts(in: store)
         if let site = site?.lowercased() {
@@ -284,10 +273,10 @@ import WebKit
         save(hosts)
     }
 
-    /// Writes what's waiting and waits for it (tests).
+    /// Flushes and waits (tests).
     static func settle() { finishWriting() }
 
-    /// Forgets what's been read, so the next look reads the files again (tests).
+    /// Drops what's been read so the next lookup rereads the files (tests).
     static func reload() {
         finishWriting()
         known.removeAllObjects()

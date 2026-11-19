@@ -188,11 +188,23 @@ struct SettingsSearchTests {
         #expect(settings.debugFound.contains("How it works"))
     }
 
-    /// A shortcut with the Globe key, as macOS gives Enter Full Screen, shows the Globe first, never a lone letter.
+    /// Globe key shortcuts (Enter Full Screen) show the Globe first.
     @Test func globeKeyShowsInAShortcut() {
         let fullScreen = Shortcuts.Combo(key: "f", modifiers: NSEvent.ModifierFlags.function.rawValue)
         #expect(Shortcuts.caps(fullScreen) == [Shortcuts.globe, "F"])
         let both = Shortcuts.Combo(key: "f", modifiers: NSEvent.ModifierFlags([.function, .control, .command]).rawValue)
         #expect(Shortcuts.caps(both) == [Shortcuts.globe, "⌃", "⌘", "F"])
+    }
+
+    /// ⌃⌥⇧⌘ together summarize as the Hyper key.
+    @Test func hyperKeyShowsInAShortcut() {
+        let hyper = Shortcuts.Combo(key: "t", modifiers: Shortcuts.hyperFlags.rawValue)
+        #expect(Shortcuts.caps(hyper) == [Shortcuts.hyper, "T"])
+        let withGlobe = Shortcuts.Combo(key: "t", modifiers: Shortcuts.hyperFlags.union(.function).rawValue)
+        #expect(Shortcuts.caps(withGlobe) == [Shortcuts.globe, Shortcuts.hyper, "T"])
+        let row = ShortcutRow(title: "New Tab", keys: Shortcuts.caps(hyper))
+        for query in ["hyper", "hypr", "command", "cmd", "shift", "option", "control", "✦T"] {
+            #expect(row.searchText.localizedCaseInsensitiveContains(query), "“\(query)” should match \(row.searchText)")
+        }
     }
 }

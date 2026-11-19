@@ -34,8 +34,7 @@ struct CommandBarHistoryTests {
         return (store, folder)
     }
 
-    /// Waits for the lookup's next answer after `ask` (which asks History something) returns. An answer that never
-    /// comes fails the test after 20 seconds instead of hanging the whole suite.
+    /// Waits for the lookup's next answer after `ask`; fails after 20 seconds instead of hanging.
     static func answer(_ lookup: HistoryLookup, sites: Bool = false, after ask: () -> Void) async {
         final class Once { var done = false }
         let once = Once()
