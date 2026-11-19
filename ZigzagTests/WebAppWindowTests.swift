@@ -92,6 +92,33 @@ struct WebAppWindowTests {
         _ = token
     }
 
+    // MARK: The toolbar's buttons (#356)
+
+    /// Back, forward and reload after the lights, the name in the middle, and Site Controls at the right end, as Zigzag
+    /// Mini's strip has them, its button the same as Mini's.
+    @Test func toolbarHasSiteControlsAtItsEnd() {
+        let strip = WebAppStripView()
+        strip.trafficLightsWidth = 52
+        strip.title.stringValue = "A Site Installed as an App With a Long Name"
+        let mini = MiniStripView()
+        #expect(strip.site.symbol == mini.siteButton.symbol)
+        #expect(strip.site.toolTip == mini.siteButton.toolTip)
+        #expect(strip.site.isOnPage)
+        for width in stride(from: Tokens.Metric.miniWindowMinSize.width, through: 1400, by: 20) {
+            strip.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.miniStripHeight)
+            strip.layout()
+            let row = [strip.back, strip.forward, strip.reload, strip.title, strip.site].map(\.frame).filter { $0.width > 0 }
+            for (a, b) in zip(row, row.dropFirst()) { #expect(a.maxX <= b.minX + 0.5, "at \(width)") }
+            #expect(strip.site.frame.size == strip.reload.frame.size)
+            #expect(strip.site.frame.midY == strip.reload.frame.midY)
+            // Mini's size, as far in from the right edge as from the top.
+            #expect(strip.site.frame.width == Tokens.Pane.stripButton)
+            #expect(width - strip.site.frame.maxX == strip.site.frame.minY, "at \(width)")
+            // The name stays in the middle of the window.
+            #expect(abs(strip.title.frame.midX - width / 2) <= 1, "at \(width)")
+        }
+    }
+
     // MARK: The menu bar
 
     private func items(_ menu: NSMenu) -> [NSMenuItem] {
