@@ -731,6 +731,23 @@
         }
       }
     },
+    "%@ wants to open the %@ app." : {
+      "comment" : "Under a page's question to open an app: the site, then the app's name, like “claude.ai wants to open the Claude app.”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ wants to open the %2$@ app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 想要打开 %2$@ 应用。"
+          }
+        }
+      }
+    },
     "%@ whose address contains %@" : {
       "comment" : "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the text looked for in the address.",
       "localizations" : {
@@ -2978,6 +2995,23 @@
         }
       }
     },
+    "Always allow %@ to open %@" : {
+      "comment" : "Checkbox on a page's question to open an app: the site may open this app without asking from now on. The placeholders are the site and the app's name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Always allow %1$@ to open %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终允许 %1$@ 打开 %2$@"
+          }
+        }
+      }
+    },
     "Always dark" : {
       "comment" : "Short, it fits beside a dropdown. Under Dark page in the site panel's This Site group, set to Force Dark: the site is drawn dark even where it looks dark on its own.",
       "localizations" : {
@@ -3854,6 +3888,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已清除 Cookie，保留的网站除外"
+          }
+        }
+      }
+    },
+    "Remember for this site" : {
+      "comment" : "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记住对此网站的选择"
           }
         }
       }
@@ -14846,17 +14891,6 @@
         }
       }
     },
-    "Private windows don’t remember answers." : {
-      "comment" : "Tooltip of the disabled duration dropdown on a permission question in a private window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无痕浏览窗口不会记住回答。"
-          }
-        }
-      }
-    },
     "Private windows don’t save new passwords" : {
       "comment" : "Under the dimmed row saying a private window offers no strong password, in the fill-password menu.",
       "localizations" : {
@@ -19732,17 +19766,6 @@
         }
       }
     },
-    "This page has no site to remember the answer for." : {
-      "comment" : "Tooltip of the disabled duration dropdown on a question for a page with no site to keep the answer under.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此页面没有可记住答案的网站。"
-          }
-        }
-      }
-    },
     "This page is in %@" : {
       "comment" : "Toast offering to translate a page. The language is its name, like French.",
       "localizations" : {
@@ -19853,17 +19876,6 @@
         }
       }
     },
-    "This site can’t remember this answer." : {
-      "comment" : "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此网站无法记住此回答。"
-          }
-        }
-      }
-    },
     "This site hasn’t asked for anything yet." : {
       "comment" : "On a site's Permissions page in the site panel when the site hasn't asked for the camera, location, notifications or anything else.",
       "localizations" : {
@@ -19953,7 +19965,7 @@
       }
     },
     "This time" : {
-      "comment" : "Duration choice on a site's permission question: the answer applies only to this page.",
+      "comment" : "Duration choice on a site's permission question: the answer holds for this page only.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

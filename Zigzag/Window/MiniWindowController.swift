@@ -1501,7 +1501,17 @@ extension MiniWindowController: PromptHost {
     var promptFrontTab: Tab? { movedOut || isClosing ? nil : tab }
     func promptHolds(_ tab: Tab) -> Bool { tab === self.tab && !movedOut && !isClosing }
     /// Its page is front only while the window is key: questions asked meanwhile wait and the edge glows.
-    func promptShows(_ tab: Tab) -> Bool { promptHolds(tab) && window?.isKeyWindow == true }
+    func promptShows(_ tab: Tab) -> Bool {
+        #if DEBUG
+        // A test copy kept behind is never key.
+        if Self.debugPromptsShow { return promptHolds(tab) }
+        #endif
+        return promptHolds(tab) && window?.isKeyWindow == true
+    }
+    #if DEBUG
+    /// Debug bridge: questions show in Zigzag Mini though its window isn't key.
+    static var debugPromptsShow = false
+    #endif
     var promptIsPrivate: Bool { false }
     var promptAccent: NSColor { Brand.Theme.of(space).accent }
     /// The page never changes; only key state does, which is when a held question shows (see `promptShows`).

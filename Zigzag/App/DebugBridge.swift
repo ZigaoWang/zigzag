@@ -755,13 +755,32 @@ enum DebugBridge {
         case "barreset": controller.commandBar.debugResetPosition()
         case "barframe": debugLog("barframe \(NSStringFromRect(controller.commandBar.debugPanelFrame)) overlay=\(NSStringFromRect(controller.root.overlay.bounds)) page=\(NSStringFromRect(controller.root.cardFrame))")
         case "permprompt":
-            if arg == "app" {
-                Task { _ = await PermissionPrompt.ask(host: "meeting.tencent.com", what: "Calendar", symbol: "arrow.up.forward.app",
-                                                      icon: NSWorkspace.shared.icon(forFile: "/System/Applications/Calendar.app"),
-                                                      in: controller, title: "Open Calendar", actions: [.deny, .allow]) }
+            // permprompt app [mini] [name]: the open-an-app question for a made-up app; never opens anything.
+            if arg == "app" || arg.hasPrefix("app ") {
+                var words = arg.split(separator: " ").dropFirst().map(String.init)
+                let inMini = words.first == "mini"
+                if inMini { words.removeFirst(); MiniWindowController.debugPromptsShow = true }
+                let host: PromptHost = inMini ? (MiniWindowController.all.last ?? controller) : controller
+                let tab = host.promptFrontTab
+                let origin = SiteOrigin.of(tab?.url) ?? "https://example.com"
+                let name = words.isEmpty ? "Lantern" : words.joined(separator: " ")
+                Task {
+                    let answer = await ExternalLinks.ask(app: name, icon: NSWorkspace.shared.icon(for: .applicationBundle), origin: origin,
+                                                         answerKey: "\(origin)|x-lantern", in: host, tab: tab, canRemember: tab?.isPrivate != true)
+                    debugLog("permprompt app: \(answer.map { "\($0.action) remember=\($0.remember)" } ?? "put off")")
+                }
             } else {
                 Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", in: controller) }
             }
+        // permremember on|off [mini], permkey <keyCode> [focused] [mini], permframes [mini]: the showing question.
+        case "permremember", "permkey", "permframes":
+            let words = arg.split(separator: " ").map(String.init)
+            let host: PromptHost = words.contains("mini") ? (MiniWindowController.all.last ?? controller) : controller
+            if name == "permremember" { PermissionPrompt.debugRemember(words.first == "on", in: host) }
+            if name == "permkey", let code = words.first.flatMap(UInt16.init) {
+                PermissionPrompt.debugKey(code, focused: words.contains("focused"), in: host)
+            }
+            if name == "permframes" { debugLog("permframes \(PermissionPrompt.debugFrames(in: host).sorted { $0.key < $1.key })") }
         case "renamepanel": RenamePanel.show(title: "Google", in: controller) { _ in }
         case "importanim": IntoZigzag.shown?.set(arg == "done" ? .done : .importing)
         case "bartab": controller.commandBar.debugTab()

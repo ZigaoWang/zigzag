@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### New
+- The prompt to open an app says who's asking ("claude.ai wants to open the Claude app."), with Cancel and Open Claude at the right and an Always allow checkbox instead of the This time menu. Other site questions use a Remember for this site checkbox the same way, and their buttons stack in a narrow window instead of getting cut off.
+
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, cookies you can keep when clearing, and fixes for passkeys, Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
