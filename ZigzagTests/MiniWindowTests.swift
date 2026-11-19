@@ -87,13 +87,26 @@ struct MiniWindowTests {
         #expect(MiniWindowController.opensExternalLinks(in: defaults))
     }
 
-    @Test func theFirstLinkSaysSoOnlyOnce() throws {
+    @Test func gotItKeepsMiniAndEndsTheNote() throws {
         let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        #expect(MiniWindowController.takeLinksNote(in: defaults))
-        #expect(!MiniWindowController.takeLinksNote(in: defaults))
-        #expect(!MiniWindowController.takeLinksNote(in: defaults))
+        #expect(MiniWindowController.needsLinksNote(in: defaults))
+        MiniWindowController.answerLinksNote(useTabs: false, in: defaults)
+        #expect(!MiniWindowController.needsLinksNote(in: defaults))
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
+    }
+
+    @Test func useTabsInsteadTurnsMiniOffAndUndoTurnsItBack() throws {
+        let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        MiniWindowController.answerLinksNote(useTabs: true, in: defaults)
+        #expect(!MiniWindowController.needsLinksNote(in: defaults))
+        #expect(!MiniWindowController.opensExternalLinks(in: defaults))
+        MiniWindowController.undoUseTabs(in: defaults)
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
+        #expect(!MiniWindowController.needsLinksNote(in: defaults))
     }
 
     // MARK: Its size

@@ -294,6 +294,8 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
          "store": tab.webView?.configuration.websiteDataStore.identifier?.uuidString ?? "default",
          "frame": window.map { NSStringFromRect($0.frame) } ?? "", "key": window?.isKeyWindow == true,
          "canGoBack": tab.canGoBack, "loading": tab.isLoading, "showsToolbar": root.showsToolbar, "visible": window?.isVisible == true,
+         "occluded": window?.occlusionState.contains(.visible) == false, "playing": tab.isPlayingAudio,
+         "watchesCover": tab.webView?.value(forKey: "_windowOcclusionDetectionEnabled") as? Bool ?? false,
          "bar": root.bar.color.flatMap { $0.usingColorSpace(.sRGB) }.map(DarkPages.hex) ?? ""]
     }
     #endif

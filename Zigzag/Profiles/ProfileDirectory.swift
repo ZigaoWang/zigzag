@@ -215,6 +215,10 @@ nonisolated enum ProfileKey: String, CaseIterable {
     case passwordsBeforeICloud = "PasswordsBeforeICloud"
     /// The one-time iCloud Passwords offer, after its extension was installed by hand, was shown.
     case iCloudPasswordsOffered = "PasswordsICloudOffered"
+    /// Sites whose cookies clearing leaves alone (#334).
+    case keptCookieSites = "CookiesKeptSites"
+    /// Every other site's cookies are cleared as Zigzag quits.
+    case clearsCookiesOnQuit = "CookiesClearOnQuit"
 
     func name(in profile: UUID) -> String {
         profile == Profile.defaultID ? rawValue : "\(rawValue).\(profile.uuidString)"

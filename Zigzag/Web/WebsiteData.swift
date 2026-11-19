@@ -20,8 +20,16 @@ enum WebsiteData {
     }
 
     /// Clears `kind` for a site ("youtube.com", covering its subdomains), or for every site when `site` is nil, in
-    /// one store: a profile's, or a private window's own.
-    static func clear(_ kind: Kind, site: String? = nil, in store: WKWebsiteDataStore) async {
+    /// one store: a profile's, or a private window's own. Every site's cookies leave the `kept` sites' alone (#334).
+    static func clear(_ kind: Kind, site: String? = nil, keeping kept: Set<String> = [], in store: WKWebsiteDataStore) async {
+        if kind == .cookies, site == nil, !kept.isEmpty {
+            let removed = await KeptCookies.clear(kind.types, keeping: kept, in: store) ?? []
+            for name in Set(removed.compactMap(KeptCookies.site(ofHost:))) {
+                DarkSeen.forget(in: store, site: name)
+                forgetConnections(in: store, site: name)
+            }
+            return
+        }
         // Dark pages' sites seen dark name the sites they were seen on: they go with either.
         DarkSeen.forget(in: store, site: site)
         // Clearing cookies also clears its trusted certificate exceptions and HSTS state.

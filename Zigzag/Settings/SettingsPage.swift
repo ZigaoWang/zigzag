@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 /// Settings as a page in a tab, as other browsers have it: zigzag://settings, or zigzag://settings/privacy for one
 /// section. The tab is an ordinary one (it sits in the sidebar, closes, splits and comes back with the session); its
@@ -42,6 +43,7 @@ enum SettingsPage {
             if !wasInFront { existing.showSettings(of: asked) }
             if let pane { existing.showSettings(pane) }
         } else {
+            SettingsTiming.askedAt = CACurrentMediaTime()
             controller.open(url(for: pane ?? .general), disposition: .foregroundTab, allowSwitch: false)
         }
         controller.window?.makeKeyAndOrderFront(nil)
@@ -51,5 +53,40 @@ enum SettingsPage {
     static var html: String {
         let title = String(localized: "Settings", comment: "Title of the Settings page, also its tab's name.")
         return #"<!doctype html><meta charset="utf-8"><title>"# + title + "</title><style>" + PageStyle.css(theme: .brand) + "</style>"
+    }
+}
+
+/// Signposts around what opening Settings reads and builds; debug builds also log each one's time to debug.log.
+@MainActor
+enum SettingsTiming {
+    private static let signposter = OSSignposter(subsystem: "wang.zigao.zigzag", category: "settings")
+    /// When ⌘, asked for Settings, until its first frame is drawn.
+    static var askedAt: CFTimeInterval?
+
+    struct Interval {
+        fileprivate let name: StaticString
+        fileprivate let state: OSSignpostIntervalState
+        fileprivate let start: CFTimeInterval
+
+        func end() {
+            SettingsTiming.signposter.endInterval(name, state)
+            #if DEBUG
+            debugLog(String(format: "settings-timing %@ %.1f ms", "\(name)", (CACurrentMediaTime() - start) * 1000))
+            #endif
+        }
+    }
+
+    static func begin(_ name: StaticString) -> Interval {
+        Interval(name: name, state: signposter.beginInterval(name), start: CACurrentMediaTime())
+    }
+
+    /// The first frame Settings draws: logs the time since ⌘, asked for it.
+    static func drew() {
+        guard let askedAt else { return }
+        self.askedAt = nil
+        signposter.emitEvent("first frame")
+        #if DEBUG
+        debugLog(String(format: "settings-timing asked-to-first-frame %.1f ms", (CACurrentMediaTime() - askedAt) * 1000))
+        #endif
     }
 }

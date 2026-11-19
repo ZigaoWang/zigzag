@@ -29,93 +29,127 @@ enum SidebarMenus {
         return item
     }
 
-    /// Translate to English, or Show Original once it is, for a tab's page, as in the page's own menu (#218). nil
-    /// for Zigzag's own pages; dimmed for a tab that isn't loaded, which has no text to translate yet.
-    static func translateItem(for tab: Tab, _ translate: @escaping () -> Void) -> NSMenuItem? {
-        guard PageTranslator.offersTranslation(tab) else { return nil }
-        return Item(PageTranslator.menuTitle(translated: tab.isTranslated), enabled: PageTranslator.canTranslate(tab), translate)
+    /// Sections in order, a separator between those that have items.
+    static func menu(_ sections: [[NSMenuItem]]) -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for section in sections where !section.isEmpty {
+            if !menu.items.isEmpty { menu.addItem(.separator()) }
+            section.forEach(menu.addItem)
+        }
+        return menu
+    }
+
+    static func Submenu(_ title: String, _ items: [NSMenuItem]) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let sub = NSMenu(title: title)
+        items.forEach(sub.addItem)
+        item.submenu = sub
+        return item
+    }
+
+    /// The menu bar's shortcut for `action`, as it is now, shown on the item.
+    static func withShortcut(_ item: NSMenuItem, of action: Selector) -> NSMenuItem {
+        guard let bar = Shortcuts.allItems.first(where: { $0.action == action }), !bar.keyEquivalent.isEmpty else { return item }
+        item.keyEquivalent = bar.keyEquivalent
+        item.keyEquivalentModifierMask = bar.keyEquivalentModifierMask
+        return item
+    }
+
+    /// The spaces to move to, as submenu items.
+    static func spaceItems(excluding current: UUID?, _ move: @escaping (SpaceInfo) -> Void) -> [NSMenuItem] {
+        let menu = NSMenu()
+        addSpaces(to: menu, excluding: current, move)
+        let items = menu.items
+        menu.removeAllItems()
+        return items
+    }
+
+    /// "Add to New Folder" while the space has no other folder; else "Add to Folder" with New Folder first.
+    private static func folderItems(new newTitle: String, add addTitle: String, folders: [BookmarkFolder],
+                                    new: @escaping () -> Void, into: @escaping (BookmarkFolder) -> Void) -> [NSMenuItem] {
+        guard !folders.isEmpty else { return [Item(newTitle, new)] }
+        let newFolder = Item(String(localized: "New Folder", comment: "Item in a space's context menu."), new)
+        return [Submenu(addTitle, [newFolder, .separator()] + folders.map { folder in Item(folder.name) { into(folder) } })]
+    }
+
+    static var separateSplitTitle: String {
+        String(localized: "Separate Split View", comment: "Item at the top of the context menu of a tab, pinned tab or favorite in a split view, in the sidebar: ends the split view, each page a tab of its own again.")
+    }
+
+    static var removeFromSplitTitle: String {
+        String(localized: "Remove from Split View", comment: "Item at the top of a tab's context menu in the sidebar, for one page of a split view of three or four: takes just this page out; the others stay side by side.")
+    }
+
+    static var moveToTitle: String {
+        String(localized: "Move To", comment: "Item in a tab's context menu in the sidebar. Opens a list: New Window, Zigzag Mini, then the spaces.")
     }
 
     /// For several picked rows: what makes sense for all of them at once, each item saying how many it acts on.
     /// With pinned pages and tabs picked together, each acts on the rows it makes sense for. The rows stay picked
     /// after it, wherever they now are, so the next one applies to the same set.
     static func markedMenu(for items: [SidebarItem], controller: BrowserWindowController) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
         let manager = controller.tabManager
         let rows = controller.markedTabRows(items)
         let pins = controller.markedPinRows(items)
         let count = items.count
         // A private window's tabs never join the pins and favorites every window shares.
         let isPrivate = manager.isPrivate
-        if !isPrivate || rows.isEmpty {
-            menu.addItem(Item(String(localized: "Add \(count) to New Folder", comment: "Menu item for several picked sidebar rows")) {
-                controller.fileMarked(items, in: nil)
+        var organize: [NSMenuItem] = []
+        if !rows.isEmpty, !isPrivate {
+            organize.append(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item")
+                                 : String(localized: "Pin \(rows.count) Tabs", comment: "Menu item for several picked tabs")) {
+                controller.pinMarked(rows)
             })
-            let folders = Library.shared.folders(in: manager.currentSpaceID)
-            if !folders.isEmpty {
-                let add = NSMenuItem(title: String(localized: "Add \(count) to Folder", comment: "Menu item for several picked sidebar rows"), action: nil, keyEquivalent: "")
-                let sub = NSMenu()
-                for folder in folders { sub.addItem(Item(folder.name) { controller.fileMarked(items, in: folder.id) }) }
-                add.submenu = sub
-                menu.addItem(add)
-            }
+        }
+        // Pins are shared by every window: a private one doesn't take them away.
+        if !pins.isEmpty, !isPrivate {
+            organize.append(Item(pins.count == 1 ? String(localized: "Unpin Tab", comment: "Menu item")
+                                 : String(localized: "Unpin \(pins.count) Tabs", comment: "Menu item for several picked pinned pages")) {
+                controller.unpinMarked(pins)
+            })
         }
         if !isPrivate {
-            menu.addItem(Item(String(localized: "Add \(count) to Favorites", comment: "Menu item for several picked sidebar rows")) {
+            organize.append(Item(String(localized: "Add \(count) to Favorites", comment: "Menu item for several picked sidebar rows")) {
                 controller.favoriteMarked(items)
             })
         }
-        if Library.shared.spaces.count > 1, !(isPrivate && !pins.isEmpty) {
-            let move = NSMenuItem(title: String(localized: "Move \(count) to Space", comment: "Menu item for several picked sidebar rows"), action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            addSpaces(to: sub, excluding: manager.currentSpaceID) { controller.moveMarked(items, to: $0.id) }
-            move.submenu = sub
-            menu.addItem(move)
-        }
-        if !pins.isEmpty {
-            if !menu.items.isEmpty { menu.addItem(.separator()) }
-            let pages = controller.markedPinPages(pins).compactMap(manager.bookmarkTab(for:))
-            if !pages.isEmpty {
-                menu.addItem(Item(pages.count == 1 ? String(localized: "Unload Page", comment: "Menu item")
-                                  : String(localized: "Unload \(pages.count) Pages", comment: "Menu item for several picked pinned pages")) {
-                    manager.close(pages)
-                })
-            }
-            // Pins are shared by every window: a private one doesn't take them away.
-            if !isPrivate {
-                menu.addItem(Item(pins.count == 1 ? String(localized: "Unpin Tab", comment: "Menu item")
-                                  : String(localized: "Unpin \(pins.count) Tabs", comment: "Menu item for several picked pinned pages")) {
-                    controller.unpinMarked(pins)
-                })
-            }
+        if !isPrivate || rows.isEmpty {
+            organize += folderItems(new: String(localized: "Add \(count) to New Folder", comment: "Menu item for several picked sidebar rows"),
+                                    add: String(localized: "Add \(count) to Folder", comment: "Menu item for several picked sidebar rows"),
+                                    folders: Library.shared.folders(in: manager.currentSpaceID),
+                                    new: { controller.fileMarked(items, in: nil) }, into: { controller.fileMarked(items, in: $0.id) })
         }
         if !rows.isEmpty {
-            if !menu.items.isEmpty { menu.addItem(.separator()) }
             // New tab group from the selection (#209), placed at the first tab.
-            menu.addItem(Item(rows.count == 1 ? String(localized: "New Group with Tab", comment: "Item in a tab's context menu in the sidebar: puts the tab in a new group of tabs, a folder among the tabs.")
-                              : String(localized: "Group \(rows.count) Tabs", comment: "Menu item for several picked tabs: puts them in a new group of tabs, a folder among the tabs.")) {
+            organize.append(Item(rows.count == 1 ? String(localized: "New Group with Tab", comment: "Item in a tab's context menu in the sidebar: puts the tab in a new group of tabs, a folder among the tabs.")
+                                 : String(localized: "Group \(rows.count) Tabs", comment: "Menu item for several picked tabs: puts them in a new group of tabs, a folder among the tabs.")) {
                 controller.groupWithUndo(rows)
             })
-            if !isPrivate {
-                menu.addItem(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item")
-                                  : String(localized: "Pin \(rows.count) Tabs", comment: "Menu item for several picked tabs")) {
-                    controller.pinMarked(rows)
-                })
-            }
+        }
+        if Library.shared.spaces.count > 1, !(isPrivate && !pins.isEmpty) {
+            organize.append(Submenu(String(localized: "Move \(count) to Space", comment: "Menu item for several picked sidebar rows"),
+                                    spaceItems(excluding: manager.currentSpaceID) { controller.moveMarked(items, to: $0.id) }))
         }
         // What goes, last, as in a single row's menu.
-        if !rows.isEmpty || (!pins.isEmpty && !isPrivate) { menu.addItem(.separator()) }
+        var close: [NSMenuItem] = []
+        let pages = controller.markedPinPages(pins).compactMap(manager.bookmarkTab(for:))
+        if !pages.isEmpty {
+            close.append(Item(pages.count == 1 ? String(localized: "Unload Page", comment: "Menu item")
+                              : String(localized: "Unload \(pages.count) Pages", comment: "Menu item for several picked pinned pages")) {
+                manager.close(pages)
+            })
+        }
         if !rows.isEmpty {
-            menu.addItem(Item(rows.count == 1 ? String(localized: "Close Tab", comment: "Menu item")
+            close.append(Item(rows.count == 1 ? String(localized: "Close Tab", comment: "Menu item")
                               : String(localized: "Close \(rows.count) Tabs", comment: "Menu item for several picked tabs")) {
                 controller.closeManyWithUndoToast(controller.markedTabs(items))
             })
         }
         if !pins.isEmpty, !isPrivate {
-            menu.addItem(Item(Self.removePinsTitle(pins.count)) { controller.removePinnedWithUndo(pins) })
+            close.append(Item(Self.removePinsTitle(pins.count)) { controller.removePinnedWithUndo(pins) })
         }
-        return menu
+        return menu([organize, close])
     }
 
     static var changeIconTitle: String {
@@ -140,136 +174,110 @@ enum SidebarMenus {
             : String(localized: "Remove \(count) Pinned Pages", comment: "Menu item: takes several picked pinned pages out of the sidebar")
     }
 
+    /// A tab's menu, or one page's of a split row. What only this tab has comes first (its split, its sound), then the
+    /// page, where it's kept, where it's shown, its name and icon, and closing last. Translate is the page's own, in
+    /// View › Translate Page, Site Controls and the page's menu.
     static func tabMenu(for tab: Tab, controller: BrowserWindowController) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
+        typealias C = BrowserWindowController
         let manager = controller.tabManager
-        menu.addItem(Item(String(localized: "Rename", comment: "Item in a tab's context menu in the sidebar.")) { controller.sidebar.list.beginRenaming(tab: tab.id) })
-        menu.addItem(Item(changeIconTitle) { controller.chooseIcon(for: tab) })
-        menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) {
-            if let url = tab.url { controller.copyLink(url, title: tab.displayTitle) }
-        })
-        // Half of a split pins with its other half, as a split.
-        let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
+        let isPrivate = manager.isPrivate
+        // The menu bar's keys act on the tab you're on, so only its menu shows them.
+        let isCurrent = tab === manager.selectedTab
+        func keyed(_ item: NSMenuItem, _ action: Selector) -> NSMenuItem { isCurrent ? withShortcut(item, of: action) : item }
+
+        var context: [NSMenuItem] = []
+        if let split = manager.split(for: tab) {
+            // One page of three or four can leave; the rest stay side by side.
+            if split.isGroup, tab.bookmarkID == nil { context.append(Item(removeFromSplitTitle) { controller.leaveGroupWithUndo(tab) }) }
+            context.append(keyed(Item(separateSplitTitle) { controller.unsplitWithUndo(tab) }, #selector(C.closeSplitView(_:))))
+        }
+        if tab.isPlayingAudio || tab.isMuted {
+            context.append(keyed(Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar.")) { tab.setMuted(!tab.isMuted) }, #selector(C.toggleMute(_:))))
+        }
+
+        var page: [NSMenuItem] = []
+        if tab.url != nil {
+            page.append(keyed(Item(String(localized: "Reload Page", comment: "Item in a tab's context menu in the sidebar.")) { tab.reload() }, #selector(C.reloadPage(_:))))
+        }
+        page.append(Item(String(localized: "Duplicate Tab", comment: "Item in a tab's context menu in the sidebar.")) { controller.duplicate(tab) })
+        if let url = tab.url {
+            page.append(keyed(Item(String(localized: "Copy Link", comment: "Item in a tab's context menu in the sidebar.")) { controller.copyLink(url, title: tab.displayTitle) }, #selector(C.copyPageURL(_:))))
+        }
+
+        var organize: [NSMenuItem] = []
         // Pins and favorites are shared by every window: a private one's tabs stay out of them.
-        if !manager.isPrivate {
+        if !isPrivate, tab.url != nil {
+            // Half of a split pins with its other half, as a split.
+            let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
             let pinTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.")
                 : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.")
                 : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar.")
-            menu.addItem(Item(pinTitle, enabled: tab.url != nil) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) })
-            menu.addItem(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar."), enabled: tab.url != nil) { controller.favoriteWithUndo(tab) })
+            organize.append(keyed(Item(pinTitle) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }, #selector(C.toggleBookmark(_:))))
+            organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a tab's context menu in the sidebar.")) { controller.favoriteWithUndo(tab) })
         }
-        if manager.split(for: tab) != nil {
-            menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a tab's context menu in the sidebar. Ends the split view the tab is in.")) { controller.unsplitWithUndo(tab) })
-        } else if let current = manager.selectedTab, manager.canSplit(current, with: tab) {
-            menu.addItem(Item(String(localized: "Open in Split View", comment: "Item in a tab's context menu in the sidebar. Shows this tab beside the current one.")) { controller.splitWithUndo(current, with: tab) })
+        if tab.bookmarkID == nil { organize += groupItems(for: tab, controller: controller) }
+
+        var view: [NSMenuItem] = []
+        if manager.split(for: tab) == nil, let current = manager.selectedTab, manager.canSplit(current, with: tab) {
+            view.append(Item(String(localized: "Open in Split View", comment: "Item in a tab's context menu in the sidebar. Shows this tab beside the current one.")) { controller.splitWithUndo(current, with: tab) })
         }
-        menu.addItem(Item(String(localized: "Duplicate Tab", comment: "Item in a tab's context menu in the sidebar.")) { controller.duplicate(tab) })
-        if !controller.tabManager.isPrivate, tab.bookmarkID == nil {
-            menu.addItem(Item(String(localized: "Move Tab to New Window", comment: "Item in a tab's context menu in the sidebar.")) { controller.moveToNewWindow(tab) })
+        // Another window, Zigzag Mini or another space: one list of where the tab can go.
+        var places: [NSMenuItem] = []
+        if !isPrivate, tab.bookmarkID == nil {
+            places.append(Item(String(localized: "New Window", comment: "File menu item.")) { controller.moveToNewWindow(tab) })
         }
         if controller.canOpenInMini(tab) {
-            menu.addItem(Item(BrowserWindowController.openInMiniTitle) { controller.openInMini(tab) })
+            places.append(Item(String(localized: "Zigzag Mini", comment: "The name of Zigzag's small window for one page, without the sidebar (Arc called it Little Arc). Kept in Latin letters, like the app's name.")) { controller.openInMini(tab) })
         }
-        if tab.bookmarkID == nil { addGroupItems(to: menu, for: tab, controller: controller) }
-        menu.addItem(.separator())
-        menu.addItem(Item(String(localized: "Reload Page", comment: "Item in a tab's context menu in the sidebar.")) { tab.reload() })
-        if let translate = translateItem(for: tab, { controller.translatePage(tab: tab) }) { menu.addItem(translate) }
-        if tab.isPlayingAudio || tab.isMuted {
-            menu.addItem(Item(tab.isMuted ? String(localized: "Unmute Tab", comment: "Item in a tab's context menu in the sidebar.") : String(localized: "Mute Tab", comment: "Item in a tab's context menu in the sidebar.")) { tab.setMuted(!tab.isMuted) })
-        }
-        if Library.shared.spaces.count > 1 {
-            let move = NSMenuItem(title: String(localized: "Move to Space", comment: "Item in a tab's context menu in the sidebar. Opens a list of spaces."), action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            addSpaces(to: sub, excluding: tab.spaceID) { controller.moveToSpaceWithToast(tab, spaceID: $0.id) }
-            move.submenu = sub
-            menu.addItem(move)
-        }
-        menu.addItem(.separator())
-        menu.addItem(Item(String(localized: "Close Tab", comment: "Item in a tab's context menu in the sidebar.")) { controller.closeWithUndo(tab) })
+        let spaces = Library.shared.spaces.count > 1 ? spaceItems(excluding: tab.spaceID) { controller.moveToSpaceWithToast(tab, spaceID: $0.id) } : []
+        if !places.isEmpty, !spaces.isEmpty { places.append(.separator()) }
+        places += spaces
+        if !places.isEmpty { view.append(Submenu(moveToTitle, places)) }
+
+        let edit = [
+            Item(String(localized: "Rename", comment: "Item in a tab's context menu in the sidebar.")) { controller.sidebar.list.beginRenaming(tab: tab.id) },
+            Item(changeIconTitle) { controller.chooseIcon(for: tab) },
+        ]
+
+        var close = [keyed(Item(String(localized: "Close Tab", comment: "Item in a tab's context menu in the sidebar.")) { controller.closeWithUndo(tab) }, #selector(C.closeTab(_:)))]
         // As in the menu bar: the tab's split partner is part of it, so neither closes it.
         let tabs = manager.tabs(in: tab.spaceID)
         let panes = manager.panes(of: tab)
         if let last = tabs.lastIndex(where: { page in panes.contains { $0 === page } }) {
             let below = Array(tabs.dropFirst(last + 1))
-            menu.addItem(Item(String(localized: "Close Tabs Below", comment: "Item in a tab's context menu in the sidebar."), enabled: !below.isEmpty) { controller.closeManyWithUndoToast(below) })
+            if !below.isEmpty {
+                close.append(Item(String(localized: "Close Tabs Below", comment: "Item in a tab's context menu in the sidebar.")) { controller.closeManyWithUndoToast(below) })
+            }
             let others = tabs.filter { page in !panes.contains { $0 === page } }
-            menu.addItem(Item(String(localized: "Close Other Tabs", comment: "Item in a tab's context menu in the sidebar."), enabled: !others.isEmpty) { controller.closeManyWithUndoToast(others) })
+            if !others.isEmpty {
+                close.append(keyed(Item(String(localized: "Close Other Tabs", comment: "Item in a tab's context menu in the sidebar.")) { controller.closeManyWithUndoToast(others) }, #selector(C.closeOtherTabs(_:))))
+            }
         }
-        return menu
+        return menu([context, page, organize, view, edit, close])
     }
 
+    /// A pinned page's menu. Wandered off its pinned address, going back or keeping where it is now come first; split
+    /// beside a tab, ending the split does.
     static func bookmarkMenu(for bookmark: Bookmark, controller: BrowserWindowController) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
         let manager = controller.tabManager
+        let isPrivate = manager.isPrivate
         let live = manager.bookmarkTab(for: bookmark.id)
         let pinned = Library.shared.pinnedSplit(containing: bookmark.id)
-        // A pinned split's row is named after both its pages, so renaming one of them from it would be a puzzle.
-        if pinned == nil { menu.addItem(Item(String(localized: "Rename", comment: "Item in a pinned tab's context menu in the sidebar.")) { BookmarkEditor.edit(bookmark.id, in: controller) }) }
-        // So is its icon, which a private window never writes into your pins.
-        if pinned == nil, !manager.isPrivate {
-            menu.addItem(Item(changeIconTitle) { controller.chooseIcon(forBookmark: bookmark.id) })
-        }
-        // Copy Link right after Rename and the icon, as in a tab's and a favorite's menus.
-        menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.copyLink(bookmark.url, title: bookmark.title) })
-        if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(bookmark.url) {
-            menu.addItem(Item(String(localized: "Back to Pinned Page", comment: "Item in a pinned tab's context menu in the sidebar. Goes back to the page the tab was pinned with.")) { manager.resetBookmarkTab(bookmark.id) })
-            menu.addItem(Item(String(localized: "Separate from Pinned Tab", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own.")) { manager.separateBookmarkTab(bookmark.id) })
+
+        var context: [NSMenuItem] = []
+        if let live, let url = live.url, manager.isAway(bookmark.id) {
+            context.append(Item(String(localized: "Back to Pinned Page", comment: "Item in a pinned tab's context menu in the sidebar. Goes back to the page the tab was pinned with.")) { manager.resetBookmarkTab(bookmark.id) })
             // A private window never writes where it's been into your pins.
-            if !manager.isPrivate {
-                menu.addItem(Item(String(localized: "Pin This Page Instead", comment: "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.")) {
+            if !isPrivate {
+                context.append(Item(String(localized: "Set Current Page as Pinned", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off its pinned address; this makes the page it shows now the pinned one.")) {
                     controller.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.updateBookmark(bookmark.id, url: url) }
                 })
             }
+            context.append(Item(String(localized: "Separate from Pinned Tab", comment: "Item in a pinned tab's context menu in the sidebar. The page wandered off; this opens it as a tab of its own.")) { manager.separateBookmarkTab(bookmark.id) })
         }
-        menu.addItem(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
-            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
-            live?.isFavorite = true
-        })
-        // Split beside a tab, its row carries the pair, so it ends the split here as a tab's row does.
-        if pinned == nil, let live, manager.split(for: live) != nil {
-            menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a tab's context menu in the sidebar. Ends the split view the tab is in.")) { controller.unsplitWithUndo(live) })
-        }
-        // Beside the tab you're on, as a tab opens; not loaded yet, it opens at its pinned address.
-        if pinned == nil, let current = manager.selectedTab, current.bookmarkID == nil, live.map({ manager.split(for: $0) == nil }) ?? true {
-            menu.addItem(Item(String(localized: "Open in Split View", comment: "Item in a pinned tab's context menu in the sidebar. Shows this pinned tab beside the current one.")) { controller.splitWithUndo(current, with: manager.pageTab(for: bookmark)) })
-        }
-        // Folders of this space's pinned pages.
-        let current = Library.shared.folderID(containing: bookmark.id)
-        let spaceFolders = Library.shared.spaceID(ofBookmark: bookmark.id).map { Library.shared.folders(in: $0) } ?? []
-        menu.addItem(.separator())
-        menu.addItem(Item(String(localized: "Add to New Folder", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.newFolder(with: [bookmark.id]) })
-        let others = spaceFolders.filter { $0.id != current }
-        if !others.isEmpty {
-            let add = NSMenuItem(title: String(localized: "Add to Folder", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of folders."), action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            for folder in others {
-                sub.addItem(Item(folder.name) { controller.listSetFolder(of: bookmark.id, to: folder.id) })
-            }
-            add.submenu = sub
-            menu.addItem(add)
-        }
-        if current != nil {
-            menu.addItem(Item(String(localized: "Remove from Folder", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.listSetFolder(of: bookmark.id, to: nil) })
-        }
-        if Library.shared.spaces.count > 1 {
-            let move = NSMenuItem(title: String(localized: "Move to Space", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces."), action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            let current = Library.shared.spaceID(ofBookmark: bookmark.id)
-            addSpaces(to: sub, excluding: current) { space in
-                // Its open page goes with it: to another profile's space, that's asked first.
-                controller.confirmProfileCrossing([live].compactMap { $0 }, to: space.id) {
-                    controller.libraryChange(String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.moveBookmark(bookmark.id, to: Int.max, in: space.id) }
-                }
-            }
-            move.submenu = sub
-            menu.addItem(move)
-        }
-        if pinned != nil || live != nil || !manager.isPrivate { menu.addItem(.separator()) }
         if let pinned {
             // Both stay pinned, each in a row of its own.
-            menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a pinned tab's context menu in the sidebar. Parts a pinned split view into two pinned tabs.")) {
+            context.append(Item(separateSplitTitle) {
                 let open = pinned.ids.compactMap(manager.bookmarkTab(for:)).first { manager.split(for: $0) != nil }
                 if let open {
                     controller.unsplitWithUndo(open)
@@ -277,38 +285,93 @@ enum SidebarMenus {
                     controller.libraryChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.removePinnedSplit(containing: bookmark.id) }
                 }
             })
+        } else if let live, manager.split(for: live) != nil {
+            // Split beside a tab, its row carries the pair, so it ends the split here as a tab's row does.
+            context.append(Item(separateSplitTitle) { controller.unsplitWithUndo(live) })
+        }
+
+        let page = [Item(String(localized: "Copy Link", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.copyLink(bookmark.url, title: bookmark.title) }]
+
+        var organize: [NSMenuItem] = []
+        // Pins are shared by every window: a private one doesn't take them away.
+        if !isPrivate {
+            let unpin = Library.shared.pinnedGroup(containing: bookmark.id) != nil ? unpinGroupTitle
+                : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar.")
+                : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar.")
+            organize.append(Item(unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+        }
+        organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
+            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
+            live?.isFavorite = true
+        })
+        // Folders of this space's pinned pages.
+        let folder = Library.shared.folderID(containing: bookmark.id)
+        let spaceFolders = Library.shared.spaceID(ofBookmark: bookmark.id).map { Library.shared.folders(in: $0) } ?? []
+        organize += folderItems(new: String(localized: "Add to New Folder", comment: "Item in a pinned tab's context menu in the sidebar."),
+                                add: String(localized: "Add to Folder", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of folders."),
+                                folders: spaceFolders.filter { $0.id != folder },
+                                new: { controller.newFolder(with: [bookmark.id]) }, into: { controller.listSetFolder(of: bookmark.id, to: $0.id) })
+        if folder != nil {
+            organize.append(Item(String(localized: "Remove from Folder", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.listSetFolder(of: bookmark.id, to: nil) })
+        }
+        if Library.shared.spaces.count > 1 {
+            organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a pinned tab's context menu in the sidebar. Opens a list of spaces."),
+                                    spaceItems(excluding: Library.shared.spaceID(ofBookmark: bookmark.id)) { space in
+                // Its open page goes with it: to another profile's space, that's asked first.
+                controller.confirmProfileCrossing([live].compactMap { $0 }, to: space.id) {
+                    controller.libraryChange(String(localized: "Move to Space", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.moveBookmark(bookmark.id, to: Int.max, in: space.id) }
+                }
+            }))
+        }
+
+        var view: [NSMenuItem] = []
+        // Beside the tab you're on, as a tab opens; not loaded yet, it opens at its pinned address.
+        if pinned == nil, let current = manager.selectedTab, current.bookmarkID == nil, live.map({ manager.split(for: $0) == nil }) ?? true {
+            view.append(Item(String(localized: "Open in Split View", comment: "Item in a pinned tab's context menu in the sidebar. Shows this pinned tab beside the current one.")) { controller.splitWithUndo(current, with: manager.pageTab(for: bookmark)) })
+        }
+
+        // A pinned split's row is named after both its pages, so renaming one of them from it would be a puzzle.
+        var edit: [NSMenuItem] = []
+        if pinned == nil {
+            edit.append(Item(String(localized: "Rename", comment: "Item in a pinned tab's context menu in the sidebar.")) { BookmarkEditor.edit(bookmark.id, in: controller) })
+            // So is its icon, which a private window never writes into your pins.
+            if !isPrivate { edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: bookmark.id) }) }
+        }
+
+        var close: [NSMenuItem] = []
+        if let pinned {
             let pages = pinned.ids.compactMap(manager.bookmarkTab(for:))
             if !pages.isEmpty {
-                menu.addItem(Item(String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")) { manager.close(pages) })
+                close.append(Item(String(localized: "Unload Pages", comment: "Item in a pinned tab's context menu in the sidebar. Unloads both pages of a pinned split view.")) { manager.close(pages) })
             }
-            if !manager.isPrivate {
-                menu.addItem(Item(Library.shared.pinnedGroup(containing: bookmark.id) != nil ? Self.unpinGroupTitle : String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
-                menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
-            }
-            return menu
+        } else if let live {
+            close.append(Item(String(localized: "Unload Page", comment: "Item in a pinned tab's context menu in the sidebar. Unloads the page; the pinned tab stays.")) { manager.close(live) })
         }
-        if let live {
-            if let translate = translateItem(for: live, { controller.translatePage(tab: live) }) { menu.addItem(translate) }
-            menu.addItem(Item(String(localized: "Unload Page", comment: "Item in a pinned tab's context menu in the sidebar. Unloads the page; the pinned tab stays.")) { manager.close(live) })
-        }
-        // Pins are shared by every window: a private one doesn't take them away.
-        if !manager.isPrivate {
-            menu.addItem(Item(Library.shared.pinnedGroup(containing: bookmark.id) != nil ? Self.unpinGroupTitle : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar.")) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
-            menu.addItem(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) })
-        }
-        return menu
+        if !isPrivate { close.append(Item(removePinsTitle(1)) { controller.removePinnedWithUndo([bookmark.id]) }) }
+        return menu([context, page, organize, view, edit, close])
     }
 
     static func folderMenu(for folder: BookmarkFolder, controller: BrowserWindowController) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(Item(String(localized: "Rename", comment: "Item in a folder's context menu in the sidebar.")) { controller.sidebar.list.renameFolder(folder.id) })
-        menu.addItem(Item(changeIconTitle) { controller.chooseFolderIcon(folder.id) })
-        menu.addItem(Item(folder.isOpen ? String(localized: "Close Folder", comment: "Item in a folder's context menu in the sidebar.") : String(localized: "Open Folder", comment: "Item in a folder's context menu in the sidebar.")) { controller.listSetFolderOpen(folder.id, !folder.isOpen) })
-        menu.addItem(Item(String(localized: "New Folder Inside", comment: "Item in a folder's context menu in the sidebar.")) { controller.newFolder(inside: folder.id) })
+        // First item, as in Safari's bookmark folders.
+        var open: [NSMenuItem] = []
+        if !Library.shared.allBookmarkIDs(inFolder: folder.id).isEmpty {
+            open.append(Item(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { controller.openAllInTabs(folder.id) })
+        }
+        var view = [Item(folder.isOpen ? String(localized: "Close Folder", comment: "Item in a folder's context menu in the sidebar.") : String(localized: "Open Folder", comment: "Item in a folder's context menu in the sidebar.")) { controller.listSetFolderOpen(folder.id, !folder.isOpen) }]
+        // Only with subfolders, and only when it would change something.
+        let folders = Library.shared.spaces.first { $0.folders?.contains { $0.id == folder.id } == true }?.folders ?? []
+        if !folders.descendants(of: folder.id).isEmpty {
+            if folders.anyInTree(of: folder.id, isOpen: false) {
+                view.append(Item(String(localized: "Expand All", comment: "Item in a folder's context menu in the sidebar: opens the folder and every folder inside it.")) { controller.setFolderTreeOpen(folder.id, true) })
+            }
+            if folders.anyInTree(of: folder.id, isOpen: true) {
+                view.append(Item(String(localized: "Collapse All", comment: "Item in a folder's context menu in the sidebar: shuts the folder and every folder inside it.")) { controller.setFolderTreeOpen(folder.id, false) })
+            }
+        }
+        var organize = [Item(String(localized: "New Folder Inside", comment: "Item in a folder's context menu in the sidebar.")) { controller.newFolder(inside: folder.id) }]
         // Out of the folder it's in, to the level above.
         if let parent = folder.parentID {
-            menu.addItem(Item(String(localized: "Move Out of Folder", comment: "Item in a folder's context menu in the sidebar. Moves the folder up a level, out of the folder it's in.")) {
+            organize.append(Item(String(localized: "Move Out of Folder", comment: "Item in a folder's context menu in the sidebar. Moves the folder up a level, out of the folder it's in.")) {
                 let up = Library.shared.folder(parent)?.parentID
                 // Just after the folder it leaves, counted without its own pages (as moving a folder counts).
                 let own = Set(Library.shared.allBookmarkIDs(inFolder: folder.id))
@@ -323,106 +386,104 @@ enum SidebarMenus {
                 controller.listMoveFolder(folder.id, to: at, in: controller.tabManager.currentSpaceID, parent: up)
             })
         }
-        menu.addItem(.separator())
+        let edit = [
+            Item(String(localized: "Rename", comment: "Item in a folder's context menu in the sidebar.")) { controller.sidebar.list.renameFolder(folder.id) },
+            Item(changeIconTitle) { controller.chooseFolderIcon(folder.id) },
+        ]
         // The folder goes; what was in it stays pinned, where it was.
-        menu.addItem(Item(String(localized: "Remove Folder", comment: "Item in a folder's context menu in the sidebar. The folder goes; its pinned tabs stay.")) {
+        let close = [Item(String(localized: "Remove Folder", comment: "Item in a folder's context menu in the sidebar. The folder goes; its pinned tabs stay.")) {
             controller.libraryChange(String(localized: "Remove Folder", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.removeFolder(folder.id) }
-        })
-        return menu
+        }]
+        return menu([open, view, organize, edit, close])
     }
 
-    /// Add to a new or existing tab group (#209), or remove from one.
-    private static func addGroupItems(to menu: NSMenu, for tab: Tab, controller: BrowserWindowController) {
-        let manager = controller.tabManager
-        menu.addItem(.separator())
+    /// Into a new or existing tab group (#209), or out of one. With no other group, New Group with Tab on its own;
+    /// else Add to Group lists them, New Group first.
+    private static func groupItems(for tab: Tab, controller: BrowserWindowController) -> [NSMenuItem] {
+        let others = controller.tabManager.groups(in: tab.spaceID).filter { $0.id != tab.groupID }
+        var items: [NSMenuItem] = []
+        let newGroup = { controller.groupWithUndo([tab]) }
         if tab.groupID == nil {
-            menu.addItem(Item(String(localized: "New Group with Tab", comment: "Item in a tab's context menu in the sidebar: puts the tab in a new group of tabs, a folder among the tabs.")) { controller.groupWithUndo([tab]) })
+            if others.isEmpty {
+                items.append(Item(String(localized: "New Group with Tab", comment: "Item in a tab's context menu in the sidebar: puts the tab in a new group of tabs, a folder among the tabs."), newGroup))
+            }
         } else {
-            menu.addItem(Item(String(localized: "Remove from Group", comment: "Item in a tab's context menu in the sidebar: takes the tab out of its group of tabs.")) { controller.setGroupWithUndo(of: [tab], to: nil) })
+            items.append(Item(String(localized: "Remove from Group", comment: "Item in a tab's context menu in the sidebar: takes the tab out of its group of tabs.")) { controller.setGroupWithUndo(of: [tab], to: nil) })
         }
-        let others = manager.groups(in: tab.spaceID).filter { $0.id != tab.groupID }
         if !others.isEmpty {
-            let add = NSMenuItem(title: String(localized: "Add to Group", comment: "Item in a tab's context menu in the sidebar. Opens a list of the space's groups of tabs."), action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            for group in others { sub.addItem(Item(group.name) { controller.setGroupWithUndo(of: [tab], to: group.id) }) }
-            add.submenu = sub
-            menu.addItem(add)
+            var list = others.map { group in Item(group.name) { controller.setGroupWithUndo(of: [tab], to: group.id) } }
+            if tab.groupID == nil { list = [Item(String(localized: "New Group", comment: "Name a new group of tabs gets, until it's renamed."), newGroup), .separator()] + list }
+            items.append(Submenu(String(localized: "Add to Group", comment: "Item in a tab's context menu in the sidebar. Opens a list of the space's groups of tabs."), list))
         }
+        return items
     }
 
     /// Tab group menu (#209): like a folder's, plus tab actions.
     static func groupMenu(for group: TabGroup, controller: BrowserWindowController) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.addItem(Item(String(localized: "Rename", comment: "Item in a group of tabs' context menu in the sidebar.")) { controller.sidebar.list.renameGroup(group.id) })
-        menu.addItem(Item(group.isOpen ? String(localized: "Collapse Group", comment: "Item in a group of tabs' context menu in the sidebar: folds its tabs away.")
-                          : String(localized: "Expand Group", comment: "Item in a group of tabs' context menu in the sidebar: shows its tabs again.")) {
+        let view = [Item(group.isOpen ? String(localized: "Collapse Group", comment: "Item in a group of tabs' context menu in the sidebar: folds its tabs away.")
+                         : String(localized: "Expand Group", comment: "Item in a group of tabs' context menu in the sidebar: shows its tabs again.")) {
             controller.listSetGroupOpen(group.id, !group.isOpen)
-        })
-        menu.addItem(Item(String(localized: "Ungroup", comment: "Item in a group of tabs' context menu in the sidebar. The group goes; its tabs stay where they are.")) { controller.ungroupWithUndo(group.id) })
+        }]
+        var organize = [Item(String(localized: "Ungroup", comment: "Item in a group of tabs' context menu in the sidebar. The group goes; its tabs stay where they are.")) { controller.ungroupWithUndo(group.id) }]
         if Library.shared.spaces.count > 1, let space = controller.tabManager.tabs(inGroup: group.id).first?.spaceID {
-            let move = NSMenuItem(title: String(localized: "Move to Space", comment: "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces."), action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            addSpaces(to: sub, excluding: space) { controller.listMoveGroup(group.id, to: Int.max, in: $0.id) }
-            move.submenu = sub
-            menu.addItem(move)
+            organize.append(Submenu(String(localized: "Move to Space", comment: "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces."),
+                                    spaceItems(excluding: space) { controller.listMoveGroup(group.id, to: Int.max, in: $0.id) }))
         }
-        menu.addItem(.separator())
-        menu.addItem(Item(String(localized: "Close Group", comment: "Item in a group of tabs' context menu in the sidebar: closes all its tabs, with Undo.")) { controller.closeGroupWithUndo(group.id) })
-        return menu
+        let edit = [Item(String(localized: "Rename", comment: "Item in a group of tabs' context menu in the sidebar.")) { controller.sidebar.list.renameGroup(group.id) }]
+        let close = [Item(String(localized: "Close Group", comment: "Item in a group of tabs' context menu in the sidebar: closes all its tabs, with Undo.")) { controller.closeGroupWithUndo(group.id) }]
+        return menu([view, organize, edit, close])
     }
 
+    /// A favorite's menu, laid out as a pinned page's.
     static func favoriteMenu(for favorite: Bookmark, controller: BrowserWindowController) -> NSMenu {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
         let manager = controller.tabManager
+        let isPrivate = manager.isPrivate
         let live = manager.bookmarkTab(for: favorite.id)
-        // Not a split favorite: a new name or icon would only reach its left page.
-        if Library.shared.pinnedSplit(containing: favorite.id) == nil {
-            menu.addItem(Item(String(localized: "Rename…", comment: "Item in a favorite's context menu.")) { BookmarkEditor.edit(favorite.id, in: controller) })
-            // A private window never writes into your favorites.
-            if !manager.isPrivate {
-                menu.addItem(Item(changeIconTitle) { controller.chooseIcon(forBookmark: favorite.id) })
-            }
-        }
-        menu.addItem(Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu.")) { controller.copyLink(favorite.url, title: favorite.title) })
-        if let live, let url = live.url, TabManager.normalize(url) != TabManager.normalize(favorite.url) {
-            menu.addItem(Item(String(localized: "Back to Favorite’s Page", comment: "Item in a favorite's context menu. Goes back to the page the favorite was saved with.")) { manager.resetBookmarkTab(favorite.id) })
-            menu.addItem(Item(String(localized: "Separate from Favorite", comment: "Item in a favorite's context menu. The page wandered off; this opens it as a tab of its own.")) { manager.separateBookmarkTab(favorite.id) })
-            // A private window never writes where it's been into your favorites.
-            if !manager.isPrivate {
-                menu.addItem(Item(String(localized: "Make This Page the Favorite", comment: "Item in a favorite's context menu.")) {
-                    controller.libraryChange(String(localized: "Update Favorite", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.updateBookmark(favorite.id, url: url) }
-                })
-            }
-        }
-        // A split favorite: its two pages go and come as one, and can be parted into two favorites.
-        if let pair = Library.shared.pinnedSplit(containing: favorite.id) {
+        let pair = Library.shared.pinnedSplit(containing: favorite.id)
+
+        var context: [NSMenuItem] = []
+        if let pair {
             // An away page goes back, like a single-page favorite.
             let away = pair.ids.filter(manager.isAway)
             if !away.isEmpty {
-                menu.addItem(Item(String(localized: "Back to Favorite’s Page", comment: "Item in a favorite's context menu. Goes back to the page the favorite was saved with.")) { away.forEach(manager.resetBookmarkTab) })
+                context.append(Item(String(localized: "Back to Favorite’s Page", comment: "Item in a favorite's context menu. Goes back to the page the favorite was saved with.")) { away.forEach(manager.resetBookmarkTab) })
             }
-            menu.addItem(Item(String(localized: "Separate Tabs", comment: "Item in a favorite's context menu. Parts a split favorite into two favorites.")) { controller.separateFavoriteSplitWithUndo(favorite.id) })
-            if !manager.isPrivate { menu.addItem(Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }) }
-            menu.addItem(.separator())
-            let pages = pair.ids.compactMap { manager.bookmarkTab(for: $0) }
-            if !pages.isEmpty { menu.addItem(Item(String(localized: "Unload Pages", comment: "Item in a favorite's context menu. Unloads both pages of a split favorite.")) { manager.close(pages) }) }
-            if !manager.isPrivate { menu.addItem(Item(String(localized: "Remove from Favorites", comment: "Item in a favorite's context menu.")) { controller.removeFavoriteWithUndo(favorite.id) }) }
-            return menu
+            // Its pages go and come as one, and part into two favorites.
+            context.append(Item(separateSplitTitle) { controller.separateFavoriteSplitWithUndo(favorite.id) })
+        } else if let live, let url = live.url, manager.isAway(favorite.id) {
+            context.append(Item(String(localized: "Back to Favorite’s Page", comment: "Item in a favorite's context menu. Goes back to the page the favorite was saved with.")) { manager.resetBookmarkTab(favorite.id) })
+            // A private window never writes where it's been into your favorites.
+            if !isPrivate {
+                context.append(Item(String(localized: "Set Current Page as Favorite", comment: "Item in a favorite's context menu. The page wandered off the favorite's address; this makes the page it shows now the favorite.")) {
+                    controller.libraryChange(String(localized: "Update Favorite", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.updateBookmark(favorite.id, url: url) }
+                })
+            }
+            context.append(Item(String(localized: "Separate from Favorite", comment: "Item in a favorite's context menu. The page wandered off; this opens it as a tab of its own.")) { manager.separateBookmarkTab(favorite.id) })
         }
+        if pair == nil, let live, live.isPlayingAudio || live.isMuted {
+            context.append(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu.")) { live.setMuted(!live.isMuted) })
+        }
+
+        let page = [Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu.")) { controller.copyLink(favorite.url, title: favorite.title) }]
         // Favorites are shared by every window: a private one doesn't take them away.
-        if !manager.isPrivate { menu.addItem(Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }) }
-        if live != nil || !manager.isPrivate { menu.addItem(.separator()) }
-        if let live {
-            if live.isPlayingAudio || live.isMuted {
-                menu.addItem(Item(live.isMuted ? String(localized: "Unmute Tab", comment: "Item in a favorite's context menu.") : String(localized: "Mute Tab", comment: "Item in a favorite's context menu.")) { live.setMuted(!live.isMuted) })
-            }
-            if let translate = translateItem(for: live, { controller.translatePage(tab: live) }) { menu.addItem(translate) }
-            menu.addItem(Item(String(localized: "Unload Page", comment: "Item in a favorite's context menu. Unloads the page; the favorite stays.")) { manager.close(live) })
+        let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
+
+        // Not a split favorite: a new name or icon would only reach its left page.
+        var edit: [NSMenuItem] = []
+        if pair == nil {
+            edit.append(Item(String(localized: "Rename…", comment: "Item in a favorite's context menu.")) { BookmarkEditor.edit(favorite.id, in: controller) })
+            if !isPrivate { edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: favorite.id) }) }
         }
-        if !manager.isPrivate { menu.addItem(Item(String(localized: "Remove from Favorites", comment: "Item in a favorite's context menu.")) { controller.removeFavoriteWithUndo(favorite.id) }) }
-        return menu
+
+        var close: [NSMenuItem] = []
+        if let pair {
+            let pages = pair.ids.compactMap { manager.bookmarkTab(for: $0) }
+            if !pages.isEmpty { close.append(Item(String(localized: "Unload Pages", comment: "Item in a favorite's context menu. Unloads both pages of a split favorite.")) { manager.close(pages) }) }
+        } else if let live {
+            close.append(Item(String(localized: "Unload Page", comment: "Item in a favorite's context menu. Unloads the page; the favorite stays.")) { manager.close(live) })
+        }
+        if !isPrivate { close.append(Item(String(localized: "Remove from Favorites", comment: "Item in a favorite's context menu.")) { controller.removeFavoriteWithUndo(favorite.id) }) }
+        return menu([context, page, organize, edit, close])
     }
 
     static func spaceMenu(for id: UUID, controller: BrowserWindowController) -> NSMenu {

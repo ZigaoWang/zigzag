@@ -337,6 +337,9 @@ struct ExtensionSecurityTests {
                                                    isPrivate: false, now: slider.addingTimeInterval(1)))
         #expect(!BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: site,
                                                    isPrivate: true, now: slider.addingTimeInterval(1)))
+        // A private one only for an extension allowed in private windows (#353).
+        #expect(BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: site,
+                                                  isPrivate: true, seesPrivate: true, now: slider.addingTimeInterval(1)))
         // Shazam asks for no sites at all: on every site you let it reach, its capture goes ahead (Chrome's needs no
         // host permission). An extension with only activeTab has the site once you click it, as WebKit grants it.
         let url = URL(string: "https://www.music.example/song")!
@@ -358,6 +361,9 @@ struct ExtensionSecurityTests {
         let found = BridgeFavicons.icons(for: ["https://video.example/watch", "https://bank.example/", "https://secret.example/",
                                                "https://blank.example/", "https://visited-once.example/", nil], among: open)
         #expect(found.map { $0 != nil } == [true, false, false, false, false, false])
+        // An extension allowed in private windows gets the private tab's icon too (#353).
+        let allowed = BridgeFavicons.icons(for: ["https://secret.example/", "https://bank.example/"], among: open, seesPrivate: true)
+        #expect(allowed.map { $0 != nil } == [true, false])
         let url = try #require(BridgeFavicons.dataURL(icon, side: BridgeFavicons.side))
         #expect(url.hasPrefix("data:image/png;base64,"))
         let data = try #require(Data(base64Encoded: String(url.dropFirst("data:image/png;base64,".count))))

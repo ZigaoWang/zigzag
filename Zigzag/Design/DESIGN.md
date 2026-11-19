@@ -537,6 +537,15 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Home and End, Return or Space to choose, Esc or Tab to close, typing to jump to a name. VoiceOver reads it as a menu
   of menu items and speaks the item the keys reach. A click outside closes it and goes no further. Panels under it
   leave Esc and that click to it (`MenuPanel.current`). The HTML pages' `.menu` matches it.
+- **A row's right-click menu** (`SidebarMenus`, #327): first what only this row has (Back to Pinned Page and Set
+  Current Page as Pinned while a pinned page or favorite is off its address; Separate Split View, and Remove from
+  Split View for one page of three or four; Mute Tab while it plays), then the page (Reload Page, Duplicate Tab, Copy
+  Link), where it's kept (Pin, Favorites, Group, Folder, Move to Space), where it's shown (Open in Split View, Move
+  To ▸ New Window, Zigzag Mini and the spaces), its name and icon, and what closes or removes it last, a separator
+  between sections. An item shows only when it would do something, never dimmed, and says what it does (Pin Group,
+  Unpin Split View, Close 3 Tabs). One submenu per kind of list (Move To, Add to Group, Add to Folder, the last two
+  with New first), and none for a list of one. The tab you're on shows the menu bar's shortcuts; another tab, none.
+  A split row's menu is the page right-clicked. What belongs to the page (Translate) is in its own menus, not here.
 - **Dropdown** (`DropdownButton`): a choice from a list. The secondary look with `Radius.row` corners, the current
   choice with its picture, and the up-down chevron. Its menu opens with the chosen item right over the button and
   its text lined up with the button's, as macOS places it; below the button when there's no room, scrolled when the

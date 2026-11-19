@@ -111,20 +111,27 @@ final class UpdateCard: InteractiveView {
         }
     }
 
-    /// "12 of 40 MB" in whole megabytes, so no decimals appear.
+    /// "9.4 of 18.2 MB", one decimal as Finder shows; whole kilobytes below a megabyte.
     static func amount(_ received: UInt64, of total: UInt64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = .useMB
-        formatter.countStyle = .file
-        formatter.allowsNonnumericFormatting = false
+        let inMB = total >= 1_000_000
+        let step: Double = inMB ? 100_000 : 1_000
+        let unitSize: Double = inMB ? 1_000_000 : 1_000
+        let number = NumberFormatter()
+        number.numberStyle = .decimal
+        number.minimumFractionDigits = inMB ? 1 : 0
+        number.maximumFractionDigits = inMB ? 1 : 0
         // Round the downloaded amount down, so it only reads complete when it is.
-        func megabytes(_ bytes: UInt64, _ rule: FloatingPointRoundingRule) -> Int64 {
-            Int64((Double(bytes) / 1_000_000).rounded(rule)) * 1_000_000
+        func figure(_ bytes: UInt64, _ rule: FloatingPointRoundingRule) -> String {
+            let value = (Double(bytes) / step).rounded(rule) * step / unitSize
+            return number.string(from: NSNumber(value: value)) ?? "\(value)"
         }
-        let whole = formatter.string(fromByteCount: megabytes(total, .toNearestOrAwayFromZero))
-        formatter.includesUnit = false
-        let part = formatter.string(fromByteCount: megabytes(min(received, total), .down))
-        return String(localized: "\(part) of \(whole)", comment: "On the sidebar's update card while an update downloads: how much has come of how much, like 12 of 40 MB.")
+        let unit = ByteCountFormatter()
+        unit.allowedUnits = inMB ? .useMB : .useKB
+        unit.countStyle = .file
+        unit.includesCount = false
+        let whole = figure(total, .toNearestOrAwayFromZero) + " " + unit.string(fromByteCount: Int64(total))
+        let part = figure(min(received, total), .down)
+        return String(localized: "\(part) of \(whole)", comment: "On the sidebar's update card while an update downloads: how much has come of how much, like 9.4 of 18.2 MB.")
     }
 
     private lazy var actions: [NSAccessibilityCustomAction] = [

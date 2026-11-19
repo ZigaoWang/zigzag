@@ -122,6 +122,18 @@ struct MiniPlayerPageTests {
         #expect(try await script("return document.querySelectorAll('[data-zigzag-mini]').length", in: webView) as? Int == 0)
     }
 
+    /// WebKit is told whether a covered window hides the page, as `Tab` does while it plays (#199).
+    @Test func aPageCanBeLeftOnScreenInACoveredWindow() {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        let key = "_windowOcclusionDetectionEnabled"
+        guard webView.responds(to: NSSelectorFromString(key)) else { return }
+        #expect(webView.value(forKey: key) as? Bool == true)
+        Tab.setWatchesCover(false, of: webView)
+        #expect(webView.value(forKey: key) as? Bool == false)
+        Tab.setWatchesCover(true, of: webView)
+        #expect(webView.value(forKey: key) as? Bool == true)
+    }
+
     /// A page out of the window counts as hidden, where WebKit won't load or start a playlist's next song; kept in the
     /// window, out of sight, it counts as on screen (#199).
     @Test func aPageKeptOutOfSightInTheWindowCountsAsOnScreen() async throws {

@@ -448,6 +448,92 @@ enum SettingsIcon {
     }
 }
 
+/// Settings › Extensions: where an extension may read and change pages, Chrome's three choices, in rows under its own
+/// (#324). The same answers as Site Access in its menu by the address.
+enum ExtensionSiteAccessRows {
+    static let choices: [ExtensionInstalls.SiteAccess] = [.all, .click, .sites]
+
+    static func title(_ access: ExtensionInstalls.SiteAccess) -> String {
+        switch access {
+        case .all: String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")
+        case .click: String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")
+        case .sites: String(localized: "On Specific Sites", comment: "Site Access choice in Settings › Extensions: the extension works only on the sites listed under it.")
+        }
+    }
+
+    /// The Site access row, then each listed site with its ×. `changed` hears the site that changed, nil for all.
+    static func make(id: String, name: String, installs: ExtensionInstalls, add: @escaping () -> Void, changed: @escaping (String?) -> Void) -> [FormRow] {
+        let access = installs.siteAccess(id)
+        let sites = access == .sites ? installs.accessSites(id) : []
+        let menu = DropdownButton()
+        menu.options = choices.map { DropdownButton.Option(title: title($0)) }
+        menu.selectedIndex = choices.firstIndex(of: access) ?? 0
+        menu.setAccessibilityLabel(String(localized: "Site access for \(name)", comment: "VoiceOver name of the Site access menu in Settings › Extensions. The placeholder is the extension's name."))
+        menu.onSelect = { index in
+            guard choices.indices.contains(index), choices[index] != installs.siteAccess(id) else { return }
+            installs.chooseSiteAccess(id, choices[index])
+            changed(nil)
+        }
+        var controls: [NSView] = [menu]
+        if access == .sites {
+            let addButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use."))
+            addButton.onClick = { _ in add() }
+            controls.insert(addButton, at: 0)
+        }
+        let stack = NSStackView(views: controls)
+        stack.spacing = Tokens.Space.x2
+        let note = access == .sites && sites.isEmpty
+            ? String(localized: "It runs on no site until you add one.", comment: "Under Site access in Settings › Extensions, when On Specific Sites is chosen and no site is listed yet.") : nil
+        let row = FormRow(title: String(localized: "Site access", comment: "A setting under an extension in Settings › Extensions: which sites the extension may read and change."),
+                          detail: note, control: stack)
+        row.isIndented = true
+        row.keywords = name
+        return [row] + sites.map { site in
+            let remove = IconButton(symbol: "xmark", size: .compact,
+                                    toolTip: String(localized: "Remove \(site)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
+            remove.onClick = { _ in
+                installs.removeAccessSite(id, site)
+                changed(site)
+            }
+            let row = FormRow(title: site, control: remove)
+            row.isIndented = true
+            row.keywords = name
+            return row
+        }
+    }
+
+    /// Asks for a site the extension may use, and adds it.
+    @discardableResult
+    static func addSite(id: String, name: String, installs: ExtensionInstalls, in host: NSView, added: @escaping (String) -> Void) -> FormSheet {
+        let field = FilledField(placeholder: "github.com")
+        return FormSheet.show(in: host, title: String(localized: "Add a Site for \(name)", comment: "Title of the sheet that adds a site an extension may use, from Settings › Extensions. The placeholder is the extension's name."), symbol: "globe",
+                              message: String(localized: "It can read and change pages on this site and its subdomains.", comment: "Under the title of the sheet that adds a site an extension may use, from Settings › Extensions."),
+                              rows: [FormSheet.Row(label: nil, view: field)],
+                              confirmTitle: String(localized: "Add", comment: "Button that adds the site, in the sheet that adds a site an extension may use."),
+                              canConfirm: { [weak field] in SiteRoutes.entry(from: field?.stringValue ?? "") != nil }) { confirmed in
+            guard confirmed, let site = SiteRoutes.entry(from: field.stringValue) else { return }
+            installs.addAccessSite(id, site)
+            added(site)
+        }
+    }
+}
+
+/// Settings › Extensions: whether an extension runs in private windows too, off until you turn it on (#353).
+enum ExtensionPrivateRow {
+    static func make(id: String, name: String, installs: ExtensionInstalls) -> FormRow {
+        let toggle = Toggle(isOn: installs.allowsPrivate(id))
+        toggle.setAccessibilityLabel(String(localized: "Allow \(name) in private windows", comment: "VoiceOver name of the switch that lets an extension run in private windows, in Settings › Extensions. The placeholder is the extension's name."))
+        toggle.onChange = { on in installs.setAllowsPrivate(id, on) }
+        let row = FormRow(title: String(localized: "Allow in private windows", comment: "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first."),
+                          detail: String(localized: "It can see and change your pages in private windows.", comment: "Under “Allow in private windows” in Settings › Extensions."),
+                          control: toggle)
+        row.isIndented = true
+        let words = String(localized: "incognito private browsing", comment: "Words that find an extension's Allow in private windows setting with Find a setting in Settings. Not shown.")
+        row.keywords = "\(name) \(words)"
+        return row
+    }
+}
+
 // MARK: - A row that can be dragged
 
 @MainActor
@@ -923,6 +1009,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let localServersGroup = FormGroup()
     private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site."))
     private var developerToken: SignalToken?
+    /// Kept cookies' sites, changed in Site Controls or here (#334).
+    private var keptCookiesToken: SignalToken?
+    /// Clear Cookies…, Add Site… and the quit switch, for the debug bridge.
+    private weak var clearCookiesButton: PillButton?
+    private weak var addKeptButton: PillButton?
+    private weak var clearOnQuitToggle: Toggle?
     /// Settings › Developer › Feature Flags (#173): WebKit's flags, a group for each status, made the first time the
     /// group shows. There only while Developer Mode is on and WebKit lists them.
     private var flagGroups: [FeatureFlags.Status: FormGroup] = [:]
@@ -1150,6 +1242,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var keyToken: NSObjectProtocol?
 
     init(pane: SettingsPane = .general) {
+        let timing = SettingsTiming.begin("init"); defer { timing.end() }
         self.pane = pane.shown(manyProfiles: Library.shared.hasManyProfiles)
         super.init(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
         // Its own layer, so it paints the page's surface rather than showing whatever is under it.
@@ -1196,6 +1289,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() {
         layer?.backgroundColor = cgColor(Tokens.Color.surface)
+        SettingsTiming.drew()
+        // Drawn: what the sections asked for is read after this frame, not before it.
+        if !sectionsToRead.isEmpty, !readIsQueued {
+            readIsQueued = true
+            DispatchQueue.main.async { [weak self] in self?.readWaitingSections() }
+        }
         columnWash.color = Brand.Theme.for(self).wash
     }
 
@@ -1204,6 +1303,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Building
 
     private func build() {
+        let timing = SettingsTiming.begin("build"); defer { timing.end() }
         buildSiteData()
         // The column of sections, under the page's title.
         column.addSubview(columnTitle)
@@ -1350,6 +1450,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                       control: developerTrustToggle))
         addSiteButton.onClick = { [weak self] _ in if let self { DevelopmentSiteSheet.add(in: self) } }
         addSizeButton.onClick = { [weak self] _ in if let self { PageSizeSheet.add(in: self) } }
+        keptCookiesToken = KeptCookies.changed.observe { [weak self] in
+            guard let self, self.showsWebsiteData else { return }
+            self.reloadPrivacy()
+            self.layoutDocument()
+        }
         // Changed here or in another window's Settings: the switch and the list follow.
         developerToken = DeveloperTools.changed.observe { [weak self] in
             guard let self else { return }
@@ -1678,9 +1783,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         header.leading = paneTitle
         header.trailing = [settingSearch]
 
-        reloadPrivacy()
-        reloadListedSiteData()
-
         scroll.drawsBackground = false
         scroll.automaticallyAdjustsContentInsets = false
         scroll.hasVerticalScroller = true
@@ -1692,9 +1794,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // The header's hairline shows once the page has scrolled under it, as History's does.
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
-        reloadSpaces()
-        reloadProfiles()
-        reloadExtensions()
         show(pane)
     }
 
@@ -1871,6 +1970,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if let item = items.first(where: { $0.isSelected }) { column.scrollToVisible(item.frame.insetBy(dx: 0, dy: -Tokens.Space.x2)) }
         refreshTitle()
         if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
+        readSoon([pane])
         if pane == .shortcuts { reloadShortcuts() }
         if pane == .extensions { findAppExtensions() }
         layoutDocument()
@@ -1886,6 +1986,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Shown again (its tab chosen, or moved to another window): what may have changed elsewhere is read afresh.
     override func viewDidMoveToWindow() {
+        let timing = SettingsTiming.begin("viewDidMoveToWindow"); defer { timing.end() }
         super.viewDidMoveToWindow()
         needsDisplay = true
         if let keyToken { NotificationCenter.default.removeObserver(keyToken) }
@@ -2035,9 +2136,61 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         (window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
     }
 
+    // MARK: Reading a section's rows
+
+    /// The sections whose rows were read from disk, WebKit or the extension host. Each is read the first time it's
+    /// shown or searched, after the page has drawn, so opening Settings waits for none of them (#357).
+    private var readSections: Set<SettingsPane> = []
+    /// Sections asked for and not read yet.
+    private var sectionsToRead: Set<SettingsPane> = []
+    private var readIsQueued = false
+
+    /// Privacy and Website Data are read together: one list makes both.
+    private static func readKey(_ pane: SettingsPane) -> SettingsPane { pane == .websiteData ? .privacy : pane }
+
+    private func isRead(_ pane: SettingsPane) -> Bool { readSections.contains(Self.readKey(pane)) }
+
+    /// Reads these sections' rows once the page has drawn.
+    private func readSoon(_ panes: [SettingsPane]) {
+        sectionsToRead.formUnion(panes.map(Self.readKey).filter { !readSections.contains($0) })
+        if !sectionsToRead.isEmpty { needsDisplay = true }
+    }
+
+    /// Reads the sections asked for, then lays the page out again, its scroll kept.
+    private func readWaitingSections() {
+        readIsQueued = false
+        let panes = sectionsToRead
+        sectionsToRead = []
+        guard !panes.isEmpty else { return }
+        readSections.formUnion(panes)
+        let timing = SettingsTiming.begin("readSections"); defer { timing.end() }
+        layingOutOnce {
+            for pane in SettingsPane.allCases where panes.contains(pane) {
+                switch pane {
+                case .general: reloadWebApps()
+                case .spaces: reloadSpaces()
+                case .profiles: reloadProfiles()
+                case .extensions: reloadExtensions()
+                case .privacy: reloadPrivacy(); reloadListedSiteData()
+                default: break
+                }
+            }
+            layoutDocument()
+        }
+    }
+
+    private func counted(_ read: String) {
+        #if DEBUG
+        debugReads[read, default: 0] += 1
+        #endif
+    }
+
     // MARK: Groups
 
     private func reloadExtensions() {
+        guard isRead(.extensions) else { return }
+        let timing = SettingsTiming.begin("reloadExtensions"); defer { timing.end() }
+        counted("extensions")
         extensionsGroup.removeAllRows()
         defer { if pane == .extensions || isSearching { layoutDocument() } }
         guard #available(macOS 15.4, *) else { return }
@@ -2052,7 +2205,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                         detail: String(localized: "Find one in the Chrome Web Store and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions."),
                                         control: get))
         }
-        for (id, ext) in installed { extensionsGroup.add(extensionRow(id: id, ext: ext)) }
+        for (id, ext) in installed {
+            extensionsGroup.add(extensionRow(id: id, ext: ext))
+            let name = ext.displayName ?? id
+            // Only for one that asks to read and change sites.
+            if !ext.allRequestedMatchPatterns.isEmpty {
+                ExtensionSiteAccessRows.make(id: id, name: name, installs: profile.installs,
+                                             add: { [weak self] in if let self { ExtensionSiteAccessRows.addSite(id: id, name: name, installs: self.profile.installs, in: self) { self.siteAccessChanged($0) } } },
+                                             changed: { [weak self] in self?.siteAccessChanged($0) }).forEach(extensionsGroup.add)
+            }
+            extensionsGroup.add(ExtensionPrivateRow.make(id: id, name: name, installs: profile.installs))
+        }
         // What your other profiles have that this one doesn't, to add without another trip to the store. Read from
         // each package, not from the other profile's running extensions: looking here starts none of them.
         let here = profile, has = Set(here.installs.installedIDs)
@@ -2087,6 +2250,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 if self.pane == .extensions || self.isSearching { self.layoutDocument() }
             }
         }
+    }
+
+    /// An extension's site access changed here: the front page, if it's on a site that changed, loads again, as from
+    /// the address menu. Nil is every site.
+    private func siteAccessChanged(_ site: String?) {
+        if let tabs = browser?.tabManager, tabs.profile === profile, let tab = tabs.selectedTab, let front = SiteRoutes.site(of: tab.url),
+           site.map({ SiteRoutes.covers($0, front) }) ?? true {
+            tab.reload()
+        }
+        reloadExtensions()
     }
 
     /// Looks through the apps in Applications for extensions that come inside them, off the main thread, then lists
@@ -2257,6 +2430,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The profiles there are, each with what it holds and the ways to change it. The first has no trash: there's
     /// always one profile.
     private func reloadProfiles() {
+        guard isRead(.profiles) else { return }
+        let timing = SettingsTiming.begin("reloadProfiles"); defer { timing.end() }
         profilesGroup.removeAllRows()
         let library = Library.shared
         for profile in library.profiles {
@@ -2292,8 +2467,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Data on this Mac from a profile that's in no list: a Profiles.json put back from an older backup, or one
     /// that couldn't be read, leaves it. Shown so it can be made a profile again or deleted, never deleted unasked.
     private func reloadUnlisted() {
+        guard isRead(.profiles) else { return }
+        counted("orphans")
         Task { @MainActor [weak self] in
+            let orphans = SettingsTiming.begin("orphans")
             let found = await Profiles.shared.orphans()
+            orphans.end()
             // The same data as is listed: its rows stay as they are.
             guard let self, self.unlistedListing.shown != found else { return }
             self.unlistedListing.show(found)
@@ -2402,6 +2581,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     private func reloadSpaces() {
+        guard isRead(.spaces) else { return }
+        let timing = SettingsTiming.begin("reloadSpaces"); defer { timing.end() }
         reloadRoutes()
         spacesGroup.removeAllRows()
         spaceRows = Library.shared.spaces.map { space in
@@ -2624,6 +2805,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Every shortcut, read from the menu bar itself so the list is always right.
     private func reloadShortcuts() {
+        let timing = SettingsTiming.begin("reloadShortcuts"); defer { timing.end() }
         var groups: [(String, FormGroup)] = []
         for top in NSApp.mainMenu?.items ?? [] {
             guard let menu = top.submenu else { continue }
@@ -2675,6 +2857,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         moveSectionSelection(animated: false)
         refreshTitle()
         reloadShortcuts()
+        if isSearching { readSoon(SettingsPane.allCases) }
         // "Find a setting" finds sites by name too: the list is read if no pane with it has been shown yet.
         if isSearching, siteDataList.model == nil || siteDataList.model?.state == .idle { reloadSiteData() }
         layoutDocument()
@@ -2746,6 +2929,24 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// keptcookies clear | add | quit on|off | top: Clear Cookies… or Add Site… pressed, the quit switch flipped as a
+    /// click does, or the page scrolled to them.
+    func debugKeptCookies(_ arg: String) {
+        let click = NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0)
+        switch arg {
+        case "clear": if let click { clearCookiesButton?.onClick?(click) }
+        case "add": if let click { addKeptButton?.onClick?(click) }
+        case "quit on", "quit off":
+            guard let toggle = clearOnQuitToggle else { break }
+            toggle.isOn = arg == "quit on"
+            toggle.onChange?(toggle.isOn)
+        case "top":
+            guard let button = clearCookiesButton else { break }
+            documentView.scroll(NSPoint(x: 0, y: max(0, button.convert(button.bounds, to: documentView).minY - 160)))
+        default: break
+        }
+    }
+
     /// Chooses the password filler, as the menu does.
     func debugChoosePasswordFiller(_ name: String) {
         if let filler = PasswordFiller(rawValue: name) { choosePasswordFiller(filler) }
@@ -2754,7 +2955,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     func debugFind(_ text: String) {
         settingSearch.stringValue = text
         searchChanged()
+        debugReadNow()
     }
+
+    /// How many times each slow read has run: site data, extensions, profile orphans, web apps, privacy.
+    private(set) var debugReads: [String: Int] = [:]
+
+    /// Reads the sections waiting for the page to draw, as the next frame would.
+    func debugReadNow() { readWaitingSections() }
 
     /// flags find <text> | all | top: Settings › Developer › Feature Flags searched, Show All opened, or scrolled to.
     func debugFlags(_ arg: String) {
@@ -3155,6 +3363,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var madeParts: [String: NSView] = [:]
 
     private var hasExtensions: Bool {
+        // Before the rows are read, from what's installed, without starting the profile's extensions.
+        guard isRead(.extensions) else { return !profile.installs.installedIDs.isEmpty }
         if #available(macOS 15.4, *) { return !profile.extensions.installed.isEmpty }
         return false
     }
@@ -3703,6 +3913,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// History, website data, and every per-site decision you've made, in one place. Each button says what it
     /// did, right where you clicked.
     private func reloadPrivacy() {
+        guard isRead(.privacy) else { return }
+        let timing = SettingsTiming.begin("reloadPrivacy"); defer { timing.end() }
+        counted("privacy")
         // Capture one profile: rows must change it even if the window switches, and it's read once.
         let profile = self.profile
         privacyGroup.removeAllRows()
@@ -3755,11 +3968,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         let cookies = PillButton(title: String(localized: "Clear Cookies…", comment: "Button in Settings › Privacy."))
         cookies.onClick = { [weak self, weak cookies] _ in
-            self?.confirm(title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that clears cookies."),
-                          message: Words.sentences(String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies."), only),
+            // The sites you keep cookies for are left alone, and the sheet says so.
+            let kept = KeptCookies.sites(in: profile.id)
+            self?.confirm(title: kept.isEmpty ? String(localized: "Clear cookies for every site?", comment: "Title of the sheet that clears cookies.") : KeptCookies.clearTitle,
+                          message: Words.sentences(kept.isEmpty ? String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that clears cookies.")
+                                                                : KeptCookies.clearMessage(keeping: kept.count), only),
                           action: String(localized: "Clear Cookies", comment: "Button of the sheet that clears cookies.")) {
                 Task { @MainActor in
-                    await WebsiteData.clear(.cookies, in: store)
+                    await WebsiteData.clear(.cookies, keeping: kept, in: store)
                     cookies?.flash(Self.cleared)
                     self?.reloadSiteData()
                 }
@@ -3771,17 +3987,48 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  detail: String(localized: "The cache makes pages load faster. Cookies keep you signed in.", comment: "Explanation under “Website data” in Settings › Privacy."),
                                  control: data))
 
+        // Sites whose cookies clearing leaves alone (#334), each with ×, then whether the rest go at quit.
+        let kept = KeptCookies.sites(in: profile.id)
+        let addKept = PillButton(title: String(localized: "Add Site…", comment: "Button beside “Keep cookies for these sites” in Settings › Privacy: opens the sheet that adds a site whose cookies are kept."))
+        addKept.onClick = { [weak self] _ in if let self { KeptCookiesSheet.add(in: self, profile: profile.id) } }
+        let keptRow = FormRow(title: String(localized: "Keep cookies for these sites", comment: "A setting in Settings › Privacy: the sites whose cookies Clear Cookies… and quitting leave alone, listed under it."),
+                              detail: kept.isEmpty
+                                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
+                                : String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed."),
+                              control: addKept)
+        keptRow.keywords = String(localized: "cookies keep exceptions signed in sign-in allow sites", comment: "Words that find the Keep cookies for these sites setting. Not shown.")
+        privacyGroup.add(keptRow)
+        for site in kept.sorted() {
+            let x = IconButton(symbol: "xmark", size: .compact,
+                               toolTip: String(localized: "Stop Keeping Cookies for \(site)", comment: "Tooltip of the × on a site under “Keep cookies for these sites” in Settings › Privacy. The site is a domain, like github.com."))
+            x.onClick = { _ in KeptCookies.remove(site, in: profile.id) }
+            let favicon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
+            let row = FormRow(title: site, icon: favicon, control: x)
+            row.keywords = keptRow.keywords
+            privacyGroup.add(row)
+        }
+        let quitToggle = Toggle(isOn: KeptCookies.clearsOnQuit(in: profile.id))
+        quitToggle.onChange = { KeptCookies.setClearsOnQuit($0, in: profile.id) }
+        let quitRow = FormRow(title: String(localized: "Clear cookies when Zigzag quits", comment: "A setting in Settings › Privacy: every site's cookies and data are cleared as Zigzag quits, except the sites kept."),
+                              detail: String(localized: "Each time you quit, every other site’s cookies and data are cleared, so you start signed out of them next time.", comment: "Explanation under “Clear cookies when Zigzag quits” in Settings › Privacy: every site but the ones kept."),
+                              control: quitToggle)
+        quitRow.keywords = keptRow.keywords
+        privacyGroup.add(quitRow)
+        clearCookiesButton = cookies
+        addKeptButton = addKept
+        clearOnQuitToggle = quitToggle
+
         // The choices made one site at a time, which otherwise have nowhere to be seen.
         let nothingChosen = permissionsChangedHere.isEmpty && ContentBlocker.allowedSites.isEmpty && ExtensionStore.extensionsOffSites(in: profile).isEmpty && SitePermissions.sites.isEmpty
             && ZoomLevels.count == 0 && DarkPages.sitesOn.isEmpty && DarkPages.sitesOff.isEmpty && DarkPages.sitesForced.isEmpty && KeepAwake.sites.isEmpty
             && PageFullScreen.pageSites.isEmpty && PageFullScreen.screenSites.isEmpty && CookieBanners.sitesHandled.isEmpty && CookieBanners.sitesLeft.isEmpty
             && SiteJavaScript.sitesOn.isEmpty && SiteJavaScript.sitesOff.isEmpty && ClientCertificates.sites.isEmpty && SiteBoosts.sites.isEmpty
-            && SiteIcons.sites.isEmpty
+            && SiteIcons.sites.isEmpty && kept.isEmpty
         let reset = PillButton(title: String(localized: "Reset All…", comment: "Button beside Sites in Settings › Privacy: forgets the choices made for single sites."))
         sitesReset = nothingChosen ? nil : reset
         reset.onClick = { [weak self] _ in
             self?.confirm(title: String(localized: "Reset choices made for single sites?", comment: "Title of the sheet that forgets the choices made for single sites."),
-                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, and zapped elements, site styles and site icons are removed.",
+                          message: String(localized: "Ads are blocked again everywhere, extensions run on every site, sites ask again for your camera, microphone, location, notifications and certificates, zoom, JavaScript, dark pages, full screen and cookie banners follow your settings again, every site’s tabs can sleep in the background, no site keeps its cookies when they’re cleared, and zapped elements, site styles and site icons are removed.",
                                           comment: "Message of the sheet that forgets the choices made for single sites."),
                           action: String(localized: "Reset All", comment: "Button of the sheet that forgets the choices made for single sites.")) {
                 ContentBlocker.allowedSites = []
@@ -3798,6 +4045,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetAllSessions()
                 SiteBoosts.forgetAll()
                 SiteIcons.forgetAll()
+                KeptCookies.setSites([], in: profile.id)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -3817,7 +4065,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .union(DarkPages.sitesOn).union(DarkPages.sitesOff).union(DarkPages.sitesForced).union(KeepAwake.sites)
             .union(PageFullScreen.pageSites).union(PageFullScreen.screenSites).union(CookieBanners.sitesHandled).union(CookieBanners.sitesLeft)
             .union(SiteJavaScript.sitesOn).union(SiteJavaScript.sitesOff).union(ClientCertificates.sites).union(SiteBoosts.sites)
-            .union(SiteIcons.sites)
+            .union(SiteIcons.sites).union(kept)
         var listed = 0, more = 0
         for site in sites.sorted() {
             let origin = origins[site]
@@ -3934,6 +4182,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             }
 
             // Same switches and names as Site Controls.
+            // Kept from Clear Cookies… and quitting (#334).
+            if kept.contains(site) {
+                let toggle = Toggle(isOn: true)
+                toggle.onChange = { on in on ? KeptCookies.add(site, in: profile.id) : KeptCookies.remove(site, in: profile.id) }
+                rows.append(makeRow(String(localized: "Keep cookies", comment: "Row in Settings › Privacy › Sites: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone."),
+                                    control: toggle) { KeptCookies.remove(site, in: profile.id) })
+            }
+
             if let url, PageFullScreen.pageSites.contains(site) || PageFullScreen.screenSites.contains(site) {
                 let toggle = Toggle(isOn: PageFullScreen.choice(for: url) == .page)
                 toggle.onChange = { [weak self] on in
@@ -3971,7 +4227,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 })
             }
 
-            if let url, ExtensionStore.extensionsOffSites(in: profile).contains(site) {
+            if url != nil, ExtensionStore.extensionsOffSites(in: profile).contains(site) {
                 let toggle = Toggle(isOn: false)
                 toggle.onChange = { [weak self] on in
                     guard let self else { return }
@@ -4045,6 +4301,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 ClientCertificates.forgetSessions(site: site)
                 SiteBoosts.forget(site: site)
                 SiteIcons.forget(site: site)
+                KeptCookies.remove(site, in: profile.id)
                 self?.reloadPrivacy()
                 self?.layoutDocument()
             }
@@ -4067,6 +4324,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// What websites keep, read again where it's listed (with more than one profile that's Website Data, and
     /// Privacy has no use for it): when the pane is shown, not each time a site's permission changes.
     private func reloadListedSiteData() {
+        guard isRead(.privacy) else { return }
         if !(pane == .privacy && hasManyProfiles) { reloadSiteData() }
     }
 
@@ -4171,6 +4429,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The profile's list: kept from the last time it was shown, and read again in the background, so it shows
     /// at once and never empties while it's looked at. Only read where it's listed.
     private func reloadSiteData() {
+        let timing = SettingsTiming.begin("reloadSiteData"); defer { timing.end() }
+        counted("siteData")
         let profile = profile
         let model = siteDataModels[profile.id] ?? {
             let model = SiteDataModel(source: WebKitSiteData(store: profile.store))
@@ -4235,6 +4495,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Settings › General › Installed Apps: each site installed as an app, with its toolbar's switch and Remove, which
     /// asks first.
     private func reloadWebApps() {
+        guard isRead(.general) else { return }
+        let timing = SettingsTiming.begin("reloadWebApps"); defer { timing.end() }
+        counted("webApps")
         webAppsGroup.removeAllRows()
         let store = WebAppStore.shared
         store.pruneMissing()
@@ -4328,7 +4591,11 @@ final class KeyCaps: NSView {
 final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// By name, and by its keys whichever way you type them: "⌘L", "⌘ L", or "command L".
     var searchText: String {
-        let names = ["⌘": "command cmd", "⇧": "shift", "⌥": "option alt", "⌃": "control ctrl", Shortcuts.globe: "fn globe"]
+        let names = [
+            "⌘": "command cmd", "⇧": "shift", "⌥": "option alt", "⌃": "control ctrl",
+            Shortcuts.globe: "fn globe",
+            Shortcuts.hyper: "hyper hypr command cmd shift option alt control ctrl ⌃⌥⇧⌘",
+        ]
         let spoken = keys.map { names[$0] ?? $0 }.joined(separator: " ")
         let shortcut = String(localized: "shortcut", comment: "A word that finds keyboard shortcuts with Find a setting in Settings. Not shown.")
         return title.stringValue + " " + shortcut + " " + keys.joined() + " " + keys.joined(separator: " ") + " " + spoken
@@ -4543,10 +4810,14 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     /// While recording: the modifiers you're holding, so you can see the shortcut forming.
     private func showHeld(_ flags: NSEvent.ModifierFlags) {
         var held = ""
-        if flags.contains(.control) { held += "⌃" }
-        if flags.contains(.option) { held += "⌥" }
-        if flags.contains(.shift) { held += "⇧" }
-        if flags.contains(.command) { held += "⌘" }
+        if flags.isSuperset(of: Shortcuts.hyperFlags) {
+            held = Shortcuts.hyper
+        } else {
+            if flags.contains(.control) { held += "⌃" }
+            if flags.contains(.option) { held += "⌥" }
+            if flags.contains(.shift) { held += "⇧" }
+            if flags.contains(.command) { held += "⌘" }
+        }
         fieldLabel.stringValue = held.isEmpty ? String(localized: "Type a shortcut", comment: "In Settings › Shortcuts while recording a new shortcut.") : held + " …"
         fieldLabel.textColor = held.isEmpty ? Tokens.Color.textSecondary : Tokens.Color.textPrimary
     }

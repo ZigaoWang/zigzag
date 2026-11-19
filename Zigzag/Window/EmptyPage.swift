@@ -163,6 +163,8 @@ final class EmptyPageBackdrop: NSView {
                 fade.duration = Tokens.Motion.large
                 fade.timingFunction = Tokens.Motion.easeOut
                 layer.add(fade, forKey: "ground")
+            } else {
+                layer?.removeAnimation(forKey: "ground")
             }
             paint()
         }
@@ -186,7 +188,7 @@ final class EmptyPageBackdrop: NSView {
         }
         if let decoded, decoded.name == name { set(decoded.image, animated: animated); return }
         let load = loads
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let image = SpaceBackground.load(name)
             DispatchQueue.main.async { [weak self] in
                 guard let self, load == self.loads, self.isActive, self.pictureName == name else { return }

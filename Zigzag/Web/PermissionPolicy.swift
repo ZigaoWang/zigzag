@@ -21,6 +21,15 @@ nonisolated struct PermissionAction {
         isDeny: false,
         isProminent: true
     )
+    /// Answers nothing, like Esc: the question is put off, never kept.
+    static let cancel = PermissionAction(
+        id: "cancel",
+        title: String(localized: "Cancel", comment: "Button that closes a sheet without doing anything."),
+        isDeny: true,
+        isProminent: false
+    )
+
+    var isCancel: Bool { id == Self.cancel.id }
 
     static func alternate(_ id: String, _ title: String) -> PermissionAction {
         PermissionAction(id: id, title: title, isDeny: false, isProminent: false)

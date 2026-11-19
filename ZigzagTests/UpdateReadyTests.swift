@@ -90,9 +90,11 @@ struct UpdateReadyTests {
         #expect(UpdateCardState.preparing(version: "0.9.2-beta.1").version == "0.9.2-beta.1")
     }
 
-    @MainActor @Test func theCardSaysHowMuchHasComeInWholeMegabytes() {
-        #expect(UpdateCard.amount(12_400_000, of: 40_000_000) == "12 of 40 MB")
-        #expect(UpdateCard.amount(50_000_000, of: 40_000_000) == "40 of 40 MB")
+    @MainActor @Test func theCardSaysHowMuchHasComeToOneDecimal() {
+        #expect(UpdateCard.amount(9_480_000, of: 18_240_000) == "9.4 of 18.2 MB")
+        #expect(UpdateCard.amount(12_000_000, of: 40_000_000) == "12.0 of 40.0 MB")
+        #expect(UpdateCard.amount(50_000_000, of: 40_000_000) == "40.0 of 40.0 MB")
+        #expect(UpdateCard.amount(400_400, of: 900_000) == "400 of 900 KB")
     }
 
     @MainActor @Test func aCheckYouAskedForShowsOnTheCard() {

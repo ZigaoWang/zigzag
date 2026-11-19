@@ -42,12 +42,12 @@ extension PromptHost {
 
     /// A toast over the page. `action` adds a button (title and handler) for offers (Allow Once, Try Again), which stay
     /// longer; `closes` adds a ×. The button ignores clicks for its first half second so a click meant for the page
-    /// can't hit it. `lines`: max wrap (`Toast.show`).
+    /// can't hit it.
     func promptToast(_ text: String, symbol: String, duration: TimeInterval,
-                     action: (title: String, run: () -> Void)? = nil, closes: Bool = false, lines: Int = 2) {
+                     action: (title: String, run: () -> Void)? = nil, closes: Bool = false) {
         let place = promptToastPlace
         Toast.show(text, symbol: symbol, action: action, duration: duration, closes: closes,
-                   over: place.over, area: place.area, lines: lines)
+                   over: place.over, area: place.area)
     }
 }
 

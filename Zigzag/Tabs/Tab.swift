@@ -162,6 +162,8 @@ final class Tab: NSObject {
     var isPeek = false {
         didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
     }
+    /// The last ⇧ or ⌥ link click the page kept, for its own navigation right after (#322).
+    var followedClick: (url: URL, activation: LinkActivation, at: Date)?
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore? { didSet { if privateStore !== oldValue { refreshChosenIcon() } } }
     var isPrivate: Bool { privateStore != nil }
@@ -215,9 +217,9 @@ final class Tab: NSObject {
     private(set) var profile: Profile
     /// The extensions that have been told this tab is open (ExtensionCenter).
     weak var toldTo: ExtensionHost?
-    /// Its profile's extensions. None for a private tab: as in Chrome, extensions stay out of private browsing.
+    /// Its profile's extensions. In a private tab, only those allowed in private windows run (ExtensionHost).
     @available(macOS 15.4, *)
-    var extensionHost: ExtensionHost? { isPrivate ? nil : profile.extensions }
+    var extensionHost: ExtensionHost? { profile.extensions }
     /// In a call (camera or microphone on, even muted), floating in Picture in Picture, or playing in the mini
     /// player: not to be put to sleep.
     var isInUse: Bool {
@@ -521,17 +523,14 @@ final class Tab: NSObject {
             Passkeys.attach(to: configuration, isPrivate: privateStore != nil, profile: profile)
             HistoryPage.attach(to: configuration)
             WebRTCProtection.attach(to: configuration)
-            if let privateStore {
-                configuration.websiteDataStore = privateStore
-                // Extensions stay out of private browsing, as in Chrome: they can't read or change these pages.
-                if #available(macOS 15.4, *) { configuration.webExtensionController = nil }
-            }
+            // The data store is what makes the page private to WebKit: only extensions allowed in private windows reach it.
+            if let privateStore { configuration.websiteDataStore = privateStore }
         }
-        // Extensions' user scripts (BridgeUserScripts), in a page WebKit opened for another too. Private pages, and
-        // extensions' own pages, run none.
-        if #available(macOS 15.4, *), extensionConfiguration == nil, privateStore == nil,
+        // Extensions' user scripts (BridgeUserScripts), in a page WebKit opened for another too. Extensions' own
+        // pages run none, and private pages only allowed extensions'.
+        if #available(macOS 15.4, *), extensionConfiguration == nil,
            configuration.webExtensionController === profile.extensions.controller {
-            profile.extensions.bridge.userScripts.attach(configuration.userContentController)
+            profile.extensions.bridge.userScripts.attach(configuration.userContentController, isPrivate: privateStore != nil)
         }
         showsExtensionPage = extensionConfiguration != nil
         openedByPage = fromWebKit
@@ -557,14 +556,7 @@ final class Tab: NSObject {
         webView.allowsMagnification = true
         webView.isInspectable = true
         Self.stopsAutomaticInsets(webView)
-        #if DEBUG
-        // Lets scripted screenshots capture pages while the window is behind other apps.
-        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
-        if webView.responds(to: occlusion) {
-            typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
-            unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, false)
-        }
-        #endif
+        if !Self.watchesCover { Self.setWatchesCover(false, of: webView) }
         #if DEBUG
         if DebugBridge.mutesEverything { isMuted = webView.setPageAudioMuted(true) ?? true }
         #endif
@@ -1414,8 +1406,48 @@ final class Tab: NSObject {
         let playing = (change?[.newKey] as? Bool) ?? false
         MainActor.assumeIsolated {
             self.isPlayingAudio = playing
+            self.refreshCoverWatch()
             self.changed.send(.audio)
         }
+    }
+
+    // MARK: Covered windows
+
+    /// Whether WebKit hides a page whose window is covered or on another desktop. Debug builds never let it, so
+    /// scripted screenshots capture pages behind other apps; ZIGZAG_REAL_OCCLUSION=1 keeps it, as release builds have it.
+    static let watchesCover: Bool = {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["ZIGZAG_REAL_OCCLUSION"] == "1"
+        #else
+        return true
+        #endif
+    }()
+
+    static func setWatchesCover(_ on: Bool, of webView: WKWebView) {
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        guard webView.responds(to: occlusion) else { return }
+        typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, on)
+    }
+
+    /// The wait, once the page stops playing, before a covered window hides it again.
+    private var coverWait: DispatchWorkItem?
+
+    /// A page playing sound stays on screen to WebKit while its window is covered (an installed app's behind other
+    /// apps, most often), and for a while after it stops, so a playlist's next song can load and start (#199).
+    private func refreshCoverWatch() {
+        guard Self.watchesCover, let webView else { return }
+        coverWait?.cancel()
+        coverWait = nil
+        if isPlayingAudio { Self.setWatchesCover(false, of: webView); return }
+        let stopped = Date()
+        let wait = DispatchWorkItem { [weak self, weak webView] in
+            guard let self, let webView, self.webView === webView,
+                  !MiniPlayerLayout.ignoresCover(playingSound: self.isPlayingAudio, quiet: Date().timeIntervalSince(stopped)) else { return }
+            Self.setWatchesCover(true, of: webView)
+        }
+        coverWait = wait
+        DispatchQueue.main.asyncAfter(deadline: .now() + MiniPlayerLayout.nextItemWait, execute: wait)
     }
 
     /// The page and icon links the tab's icon came from, so the second look at the same page (on commit, then on
@@ -1618,24 +1650,32 @@ extension Tab: WKNavigationDelegate {
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         // Only a link to the web opens elsewhere (a tab, a card): one to a file or a script stays the page's to try,
         // where WebKit holds it to what the page may reach.
-        if isLinkClick && isMainFrame && Self.route(forPageLink: url, from: self.url) == .load {
+        let toTheWeb = Self.route(forPageLink: url, from: self.url) == .load
+        // A page navigation to the link a ⇧ or ⌥ click was just on is that click's; a real link click clears the mark.
+        if isLinkClick { followedClick = nil }
+        let followed = isMainFrame && toTheWeb && navigationAction.navigationType == .other ? followedActivation(for: url) : nil
+        if (isLinkClick || followed != nil) && isMainFrame && toTheWeb {
             let flags = navigationAction.modifierFlags
+            let activation = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: isMainFrame,
+                                                 modifiers: flags, buttonNumber: navigationAction.buttonNumber,
+                                                 followed: followed)
             // Site routes (#286) apply to clicks and new-tab links; not peek (⇧), download (⌥) or page-initiated.
-            let opensTab = navigationAction.buttonNumber == 4 || flags.contains(.command)
-            if userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
+            let opensTab = activation.isNewTab
+            if followed == nil, userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
                host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
                 return (.cancel, preferences)
             }
-            if navigationAction.buttonNumber == 4 /* middle click */ || flags.contains(.command) {
-                host?.tab(self, openURL: url, disposition: flags.contains(.shift) ? .foregroundTab : .backgroundTab)
+            switch activation {
+            case .newTab(let inFront):
+                host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
-            }
-            if flags.contains(.shift) {
+            case .peek:
                 host?.tab(self, openURL: url, disposition: .peek)
                 return (.cancel, preferences)
-            }
-            if flags.contains(.option) {
+            case .download:
                 return (.download, preferences)
+            case .page:
+                break
             }
             // A pinned tab or favorite keeps its site: a link that leaves it opens beside it, in a new tab, so the
             // pinned Gmail is still Gmail when you come back. A site installed as an app sends it to the browser.
@@ -1664,6 +1704,45 @@ extension Tab: WKNavigationDelegate {
         // page it's in, as the blocklist does).
         if !showsExtensionPage { await ContentBlocker.prepareFilters(in: webView, for: url, mainFrame: isMainFrame) }
         return (.allow, preferences)
+    }
+
+    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Peek, ⌥ download, else the
+    /// page. `followed` is a ⇧ or ⌥ click the page kept and then navigated to itself.
+    enum LinkActivation: Equatable {
+        case page, peek, download
+        case newTab(inFront: Bool)
+
+        var isNewTab: Bool { if case .newTab = self { true } else { false } }
+    }
+
+    nonisolated static func linkActivation(type: WKNavigationType, isMainFrame: Bool, modifiers: NSEvent.ModifierFlags,
+                                           buttonNumber: Int, followed: LinkActivation? = nil) -> LinkActivation {
+        guard isMainFrame else { return .page }
+        if type == .linkActivated {
+            // ⌘ wins over ⌥, as in Chrome.
+            if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }
+            if modifiers.contains(.shift) { return .peek }
+            if modifiers.contains(.option) { return .download }
+            return .page
+        }
+        return followed ?? .page
+    }
+
+    /// How long after a ⇧ or ⌥ click the page's navigation still counts as that click's.
+    static let followedClickWindow: TimeInterval = 2
+
+    /// From the page script: a ⇧ or ⌥ click landed on `url` and the page kept it.
+    func modifiedClickFollowed(_ url: URL, peek: Bool, download: Bool) {
+        let activation: LinkActivation = peek ? .peek : download ? .download : .page
+        followedClick = activation == .page ? nil : (url, activation, Date())
+    }
+
+    /// The kept click `url` follows, taken once: same link, within the window.
+    func followedActivation(for url: URL?) -> LinkActivation? {
+        guard let clicked = followedClick, let url, Date().timeIntervalSince(clicked.at) < Self.followedClickWindow,
+              Self.sameAddress(clicked.url, url) else { return nil }
+        followedClick = nil
+        return clicked.activation
     }
 
     /// Whether a "Visit anyway" link came from the certificate warning itself: a click in the main frame of the web
@@ -1908,6 +1987,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLeavingPage = true
+        // Ended while the page is still in its process: the next page may get a new one (#348).
+        if Passkeys.available { Passkeys.endRequests(in: webView) {} }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {

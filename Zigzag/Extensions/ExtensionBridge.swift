@@ -11,7 +11,7 @@ import WebKit
 /// Every call is checked against what the person approved for the extension: one that wasn't allowed "history" can't
 /// read history through the bridge, whatever its scripts send, and one whose files now ask for more (an extension read
 /// from a folder can change them) gets it only once the person allows it (ExtensionHost.restoreGrants). Private
-/// windows never show through.
+/// windows show through only to an extension allowed in them.
 @available(macOS 15.4, *)
 @MainActor
 final class ExtensionBridge {
@@ -150,10 +150,12 @@ final class ExtensionBridge {
         ports.values.contains { $0.events.contains(event) && (extensionID == nil || $0.id == extensionID) }
     }
 
-    /// Tells every extension listening to `event` (all of them, or only `extensionID`).
-    func emit(_ event: String, _ args: [Any], to extensionID: String? = nil) {
+    /// Tells every extension listening to `event` (all of them, or only `extensionID`). About a private window
+    /// (`isPrivate`), only those allowed in private windows.
+    func emit(_ event: String, _ args: [Any], to extensionID: String? = nil, isPrivate: Bool = false) {
         let payload: [String: Any] = ["event": event, "args": Self.plain(args) ?? []]
-        for entry in ports.values where entry.events.contains(event) && (extensionID == nil || entry.id == extensionID) {
+        for entry in ports.values where entry.events.contains(event) && (extensionID == nil || entry.id == extensionID)
+            && PrivateAccess.sees(isPrivate: isPrivate, allowed: host.seesPrivate(entry.id)) {
             entry.port.sendMessage(payload, completionHandler: nil)
         }
     }
@@ -205,7 +207,65 @@ enum ExtensionBridgeScript {
     }()
 
     /// Where WebKit answers differently from Chrome, made to answer as Chrome does (webkit-differences.js).
-    static let differences: String = keepsBrowser + "\n" + idleCallbacks + "\n" + webLocks + "\n" + differencesSource
+    static let differences: String = keepsBrowser + "\n" + storageInOrder + "\n" + idleCallbacks + "\n" + webLocks + "\n" + differencesSource
+
+    /// Storage calls answer in the order made, as in Chrome; WebKit can answer a get before an earlier set (#350).
+    nonisolated static let storageInOrder = """
+    (() => {
+      const lines = {};
+      const kept = new Set();
+      const reads = ['get', 'getKeys', 'getBytesInUse'];
+      const order = (area, name) => {
+        if (!area || typeof area !== 'object' || kept.has(area)) return;
+        kept.add(area);
+        const line = lines[name] || (lines[name] = { writes: null, all: null, open: 0 });
+        for (const method of [...reads, 'set', 'remove', 'clear', 'setAccessLevel']) {
+          const native = area[method];
+          if (typeof native !== 'function') continue;
+          const write = !reads.includes(method);
+          const inOrder = function (...args) {
+            const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+            const ahead = write ? line.all : line.writes;
+            let finish;
+            const done = new Promise((resolve) => { finish = resolve; });
+            line.open++;
+            const mine = done.then(() => { if (--line.open === 0) { line.writes = null; line.all = null; } });
+            line.all = line.all ? Promise.all([line.all, mine]) : mine;
+            if (write) line.writes = line.all;
+            const start = () => {
+              try {
+                if (callback) {
+                  native.call(area, ...args, function (...values) { finish(); return callback.apply(this, values); });
+                  return undefined;
+                }
+                const answer = native.apply(area, args);
+                Promise.resolve(answer).then(finish, finish);
+                return answer;
+              } catch (error) { finish(); throw error; }
+            };
+            if (!ahead) return start();
+            const started = ahead.then(start);
+            if (!callback) return started;
+            started.catch((error) => { setTimeout(() => { throw error; }); });
+            return undefined;
+          };
+          try { Object.defineProperty(area, method, { value: inOrder, configurable: true, writable: true }); } catch (e) {}
+        }
+      };
+      const wrap = () => {
+        const roots = [...new Set([globalThis.chrome, globalThis.browser])].filter((root) => root && root.storage);
+        for (const root of roots) {
+          kept.add(root.storage);
+          for (const name of ['local', 'sync', 'session']) order(root.storage[name], name);
+        }
+        return roots.length > 0;
+      };
+      if (wrap() || typeof document === 'undefined') return;
+      let tries = 0;
+      const again = () => { if (!wrap() && ++tries < 100) setTimeout(again, 20); };
+      setTimeout(again, 0);
+    })();
+    """
 
     /// Keeps the global `browser` as WebKit's API in backgrounds, pages and content scripts. WebKit looks up listeners
     /// through that global on every delivery (message, port, event); Chrome doesn't. Proton Pass replaces `chrome` and

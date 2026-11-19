@@ -54,7 +54,7 @@ enum ExtensionMenuItems {
         var added: [(id: String, item: NSMenuItem)] = []
         /// Items WebKit already put in the menu, with whose they are.
         var adopted: [(id: String, item: NSMenuItem)] = []
-        /// Items WebKit put in that go (a private tab shows none).
+        /// Items WebKit put in that go: in a private tab, those of extensions not allowed there.
         var removed: [NSMenuItem] = []
     }
 
@@ -74,10 +74,6 @@ enum ExtensionMenuItems {
     static func plan(existing: [NSMenuItem], extensions: [(id: String, items: [NSMenuItem])], isPrivate: Bool) -> Plan {
         var plan = Plan()
         var candidates = existing.filter(isExtensionItem)
-        if isPrivate {
-            plan.removed = candidates
-            return plan
-        }
         for (id, items) in extensions {
             for item in items {
                 if let index = candidates.firstIndex(where: { isSame($0, item) }) {
@@ -87,6 +83,8 @@ enum ExtensionMenuItems {
                 }
             }
         }
+        // `extensions` are the ones allowed in a private tab; what's left is another's.
+        if isPrivate { plan.removed = candidates }
         return plan
     }
 }
@@ -389,7 +387,7 @@ final class ExtensionHost: NSObject {
 
     /// You used the extension on a tab: by its button, its item in the page's menu or its shortcut.
     func noteInvocation(_ id: String, tab: Tab?) {
-        guard let tab, !tab.isPrivate else { use.touched(id); return }
+        guard let tab, PrivateAccess.sees(isPrivate: tab.isPrivate, allowed: seesPrivate(id)) else { use.touched(id); return }
         use.invoked(id, tabID: tab.id, origin: SiteOrigin.of(tab.webView?.url ?? tab.url))
     }
 
@@ -439,11 +437,11 @@ final class ExtensionHost: NSObject {
         return view as? WKWebView
     }
 
-    /// The page in this profile's tabs that got the click or key. Private tabs are excluded; extensions don't see them.
+    /// The page in this profile's tabs that got the click or key. A private tab only while an extension here runs there.
     private func webPage(under event: NSEvent) -> Tab? {
-        guard let page = webView(under: event) as? BrowserWebView, page.configuration.websiteDataStore === profile.store,
-              let tab = page.owner, !tab.isPrivate else { return nil }
-        return tab
+        guard let page = webView(under: event) as? BrowserWebView, let tab = page.owner else { return nil }
+        if tab.isPrivate { return runsInPrivate && tab.profile === profile ? tab : nil }
+        return page.configuration.websiteDataStore === profile.store ? tab : nil
     }
 
     /// A page click or key counts for an extension once its content script reported it (`ExtensionUse.carriesPageGesture`).
@@ -540,6 +538,7 @@ final class ExtensionHost: NSObject {
             context.isInspectable = true
             #endif
             restoreGrants(for: context, extension: ext)
+            context.hasAccessToPrivateData = profile.installs.allowsPrivate(id)
             try controller.load(context)
             contexts.append(context)
             // Its user scripts, in every web view, from their next page.
@@ -677,6 +676,24 @@ final class ExtensionHost: NSObject {
         })
     }
 
+    // MARK: Private windows
+
+    /// Allowed into private windows or kept out: it starts again, as in Chrome, so it holds nothing from before.
+    func applyPrivateAccess(_ id: String) {
+        guard context(for: id) != nil else { changed.send(); return }
+        unload(id)
+        Task { await load(id) }
+    }
+
+    /// Whether an extension here is allowed in private windows: only then are they told to WebKit at all.
+    var runsInPrivate: Bool { contexts.contains { $0.hasAccessToPrivateData } }
+
+    /// Whether this extension may see private windows' tabs, downloads and pages.
+    func seesPrivate(_ id: String) -> Bool { context(for: id)?.hasAccessToPrivateData ?? false }
+
+    /// Sites "When You Click It" got from a click in a private window: kept until Zigzag quits, never written down.
+    private var privateClickSites: [String: [String]] = [:]
+
     // MARK: Site access
 
     func applySiteAccess(_ id: String) {
@@ -690,21 +707,35 @@ final class ExtensionHost: NSObject {
     /// clicked the extension on, or only sites they listed. Sites where extensions are off are denied to all.
     private func applySiteAccess(to context: WKWebExtensionContext) {
         let id = context.uniqueIdentifier
-        let approved = (profile.installs.state(id)?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
-        let access = profile.installs.siteAccess(id)
+        let state = profile.installs.state(id)
+        let approved = (state?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
         // Forget earlier decisions first (clearing one pattern can clear an overlapping one), then make the current ones.
         for pattern in context.grantedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
         for pattern in context.deniedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
-        if access == .all {
-            for pattern in approved { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
-        } else {
-            for site in profile.installs.accessSites(id) {
-                for pattern in Self.patterns(for: site) { context.setPermissionStatus(.grantedExplicitly, for: pattern) }
-            }
+        let clicked = state?.siteAccess == .click ? privateClickSites[id] ?? [] : []
+        for pattern in Self.siteAccessPatterns(state?.siteAccess, approved: approved, optional: context.webExtension.optionalPermissionMatchPatterns,
+                                               sites: profile.installs.accessSites(id) + clicked) {
+            context.setPermissionStatus(.grantedExplicitly, for: pattern)
         }
         for site in ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)) {
             for pattern in Self.patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
         }
+    }
+
+    /// The sites a site access choice grants (nil: never chosen). Chosen, "On All Sites" adds the optional host permissions too.
+    static func siteAccessPatterns(_ access: ExtensionInstalls.SiteAccess?, approved: [WKWebExtension.MatchPattern],
+                                   optional: Set<WKWebExtension.MatchPattern>, sites: [String]) -> [WKWebExtension.MatchPattern] {
+        switch access {
+        case nil: approved
+        case .all: approved + optional.filter { !approved.contains($0) }
+        case .click, .sites: sites.flatMap(patterns(for:))
+        }
+    }
+
+    /// Asks for sites only as optional and has none yet, so "On All Sites" isn't its state until chosen.
+    func asksForSitesOnlyOptionally(_ id: String) -> Bool {
+        guard let context = context(for: id), profile.installs.state(id)?.siteAccess == nil else { return false }
+        return (profile.installs.state(id)?.grantedMatchPatterns ?? []).isEmpty && !context.webExtension.optionalPermissionMatchPatterns.isEmpty
     }
 
     /// A site and its subdomains, over http and https, with a trailing dot too (bank.com. is bank.com).
@@ -745,7 +776,7 @@ final class ExtensionHost: NSObject {
     }
 
     private func announceExistingWindows(to context: WKWebExtensionContext) {
-        for window in openWindows {
+        for window in WindowManager.shared.controllers where !window.tabManager.isPrivate || runsInPrivate {
             controller.didOpenWindow(window)
             // Shared-tab windows (#162) list the same tabs; report each in the window it's in.
             for tab in window.tabManager.allTabs where tab.extensionHost === self && window.holds(tab) {
@@ -753,7 +784,7 @@ final class ExtensionHost: NSObject {
                 controller.didOpenTab(tab)
             }
         }
-        if let key = WindowManager.shared.keyController, !key.tabManager.isPrivate { controller.didFocusWindow(key) }
+        if let key = WindowManager.shared.keyController, !key.tabManager.isPrivate || runsInPrivate { controller.didFocusWindow(key) }
     }
 
     // MARK: Toolbar actions
@@ -769,24 +800,26 @@ final class ExtensionHost: NSObject {
         var id: String { context.uniqueIdentifier }
     }
 
-    /// None for a private tab: as in Chrome's incognito, extensions don't run there, so they can't be clicked there.
+    /// In a private tab, only those allowed in private windows: as in Chrome's incognito, the rest don't run there.
     func actions(for tab: Tab?) -> [ActionItem] {
-        guard tab?.isPrivate != true else { return [] }
-        return contexts.compactMap { actionItem($0, for: tab) }
+        running(in: tab).compactMap { actionItem($0, for: tab) }
     }
 
     /// The extensions with a button in the address, left to right. Only their icons are drawn.
     func pinnedActions(for tab: Tab?) -> [ActionItem] {
-        guard tab?.isPrivate != true else { return [] }
-        return profile.installs.pins.shown(among: Set(contexts.map(\.uniqueIdentifier))).compactMap { id in
+        profile.installs.pins.shown(among: Set(running(in: tab).map(\.uniqueIdentifier))).compactMap { id in
             context(for: id).flatMap { actionItem($0, for: tab) }
         }
     }
 
     /// Whether an extension with a button here can't work until the person does something.
     func needsAttention(for tab: Tab?) -> Bool {
-        guard tab?.isPrivate != true else { return false }
-        return contexts.contains { attention[$0.uniqueIdentifier] != nil && $0.action(for: tab) != nil }
+        running(in: tab).contains { attention[$0.uniqueIdentifier] != nil && $0.action(for: tab) != nil }
+    }
+
+    /// The extensions that run in this tab: all of them, or in a private tab those allowed there.
+    private func running(in tab: Tab?) -> [WKWebExtensionContext] {
+        contexts.filter { PrivateAccess.sees(isPrivate: tab?.isPrivate == true, allowed: $0.hasAccessToPrivateData) }
     }
 
     /// Each button's icon as last drawn, until WebKit says that button changed: drawing one renders it.
@@ -812,11 +845,11 @@ final class ExtensionHost: NSObject {
                           badge: action.badgeText, attention: attention[context.uniqueIdentifier])
     }
 
-    /// Extensions' items in a page's right-click menu, once each; none in a private tab. WebKit puts them in the
+    /// Extensions' items in a page's right-click menu, once each; in a private tab, only allowed ones'. WebKit puts them in the
     /// page's menu itself, so an item already there is kept (and noted as the extension's) rather than added again:
     /// adding every extension's items a second time showed Bitwarden's twice (#186).
     func addMenuItems(for tab: Tab, to menu: NSMenu) {
-        let ours = tab.isPrivate ? [] : contexts.map { (id: $0.uniqueIdentifier, items: $0.menuItems(for: tab)) }
+        let ours = running(in: tab).map { (id: $0.uniqueIdentifier, items: $0.menuItems(for: tab)) }
         let plan = ExtensionMenuItems.plan(existing: menu.items, extensions: ours, isPrivate: tab.isPrivate)
         plan.removed.forEach(menu.removeItem)
         for (id, item) in plan.adopted + plan.added {
@@ -936,8 +969,8 @@ final class ExtensionHost: NSObject {
 
     /// The extension's button pressed, from Site Controls or (`fromPin`) its pinned button in the address.
     func performAction(_ item: ActionItem, tab: Tab?, in controller: BrowserWindowController, fromPin: Bool = false) {
-        // Never handed a private tab, nor given its site, nor run from a private window at all.
-        guard tab?.isPrivate != true, !controller.tabManager.isPrivate else { return }
+        // In a private window, only one allowed there is handed the tab or given its site.
+        guard PrivateAccess.sees(isPrivate: tab?.isPrivate == true || controller.tabManager.isPrivate, allowed: item.context.hasAccessToPrivateData) else { return }
         popupRequest = nil
         // Its own popup always opens; if it still needs a step only you can do (1Password trusting Zigzag), a
         // short note says so, with the way there.
@@ -955,7 +988,13 @@ final class ExtensionHost: NSObject {
         // "When you click it": clicking gives it this site from now on.
         if profile.installs.siteAccess(item.id) == .click, let site = ContentBlocker.site(of: tab?.url),
            !profile.installs.accessSites(item.id).contains(site) {
-            profile.installs.setSiteAccess(item.id, .click, sites: profile.installs.accessSites(item.id) + [site])
+            if tab?.isPrivate == true {
+                // Not written down: a private window's sites stay out of what's kept.
+                if !(privateClickSites[item.id] ?? []).contains(site) { privateClickSites[item.id, default: []].append(site) }
+                applySiteAccess(item.id)
+            } else {
+                profile.installs.setSiteAccess(item.id, .click, sites: profile.installs.accessSites(item.id) + [site])
+            }
             tab?.reload()
         }
         // A click always does something: if the extension has no popup at all and opens no page, its options page
@@ -1023,9 +1062,9 @@ final class ExtensionHost: NSObject {
     /// action.openPopup() from an extension page framed on a site (FramedExtensionPopups): from the pinned button or the
     /// address. Nil on success, else a Chrome-style error.
     func openPopup(_ extensionID: String, from tab: Tab) -> String? {
-        guard !tab.isPrivate, let context = context(for: extensionID), tab.isSeen(by: context),
+        guard let context = context(for: extensionID), tab.isSeen(by: context),
               let controller = WindowManager.shared.controllers.first(where: { $0.tabManager.tab(with: tab.id) === tab }),
-              !controller.tabManager.isPrivate else { return "No active browser window." }
+              PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate, allowed: context.hasAccessToPrivateData) else { return "No active browser window." }
         guard context.action(for: tab)?.presentsPopup == true else { return "Extension does not have a popup on the active tab." }
         ExtensionLog.write("openPopup \(context.webExtension.displayName ?? "?") from its frame")
         controller.closeFloatingPanels()
@@ -1110,20 +1149,21 @@ final class ExtensionHost: NSObject {
 
     // MARK: Event fan-out from our model
 
-    // Private tabs are never reported: extensions don't see private browsing.
-    func tabOpened(_ tab: Tab) { if !tab.isPrivate { controller.didOpenTab(tab) } }
-    func tabClosed(_ tab: Tab, windowClosing: Bool = false) { if !tab.isPrivate { controller.didCloseTab(tab, windowIsClosing: windowClosing) } }
+    // Private tabs are told only while an extension here is allowed in private windows; WebKit keeps them from the rest.
+    private func tells(_ tab: Tab) -> Bool { !tab.isPrivate || runsInPrivate }
+    func tabOpened(_ tab: Tab) { if tells(tab) { controller.didOpenTab(tab) } }
+    func tabClosed(_ tab: Tab, windowClosing: Bool = false) { if tells(tab) { controller.didCloseTab(tab, windowIsClosing: windowClosing) } }
     func tabActivated(_ tab: Tab, previous: Tab?) {
-        guard !tab.isPrivate else { return }
+        guard tells(tab) else { return }
         // The tab you left is only news to the extensions that knew it.
         controller.didActivateTab(tab, previousActiveTab: previous?.extensionHost === self ? previous : nil)
     }
     func tabMoved(_ tab: Tab, from index: Int, in window: BrowserWindowController) {
-        guard !tab.isPrivate, !window.tabManager.isPrivate else { return }
+        guard tells(tab), !window.tabManager.isPrivate || runsInPrivate else { return }
         controller.didMoveTab(tab, from: index, in: window)
     }
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
-        guard !tab.isPrivate else { return }
+        guard tells(tab) else { return }
         switch change {
         // An address or sound is told at once, after what was waiting for that tab, so the order is as it happened.
         case .url: tellChanges(of: tab, adding: [.URL])
@@ -1162,9 +1202,9 @@ final class ExtensionHost: NSObject {
             controller.didChangeTabProperties(change.properties, for: tab)
         }
     }
-    // Private windows are never told to extensions: not opened, focused or closed, and never listed.
+    // Private windows are told only while an extension here is allowed in them, and listed only to those.
     func windowOpened(_ window: BrowserWindowController) {
-        guard !window.tabManager.isPrivate else { return }
+        guard !window.tabManager.isPrivate || runsInPrivate else { return }
         controller.didOpenWindow(window)
         // As in Chrome, there's always a current window while one is open, even with Zigzag behind another app:
         // extensions ask for its tabs as they start (Honey, LastPass) and stop when there's none.
@@ -1197,22 +1237,27 @@ final class ExtensionHost: NSObject {
     func miniFocused(_ mini: MiniWindowController) { controller.didFocusWindow(mini) }
     func miniClosed(_ mini: MiniWindowController) { controller.didCloseWindow(mini) }
     func windowClosed(_ window: BrowserWindowController) {
-        guard !window.tabManager.isPrivate else { return }
+        guard !window.tabManager.isPrivate || runsInPrivate else { return }
         controller.didCloseWindow(window)
     }
-    /// A private window in front reads to extensions as no window focused.
+    /// A private window in front reads as no window focused, but to those allowed there.
     func windowFocused(_ window: BrowserWindowController?) {
-        controller.didFocusWindow(window?.tabManager.isPrivate == true ? nil : window)
+        controller.didFocusWindow(window?.tabManager.isPrivate == true && !runsInPrivate ? nil : window)
     }
 
-    /// The windows extensions may see: every one but the private ones.
+    /// Everyday windows, where what an extension opens goes.
     private var openWindows: [BrowserWindowController] { WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate } }
 
-    /// Keyboard shortcuts declared by extensions (1Password's fill shortcut). Not in a private window.
+    /// The windows this extension may see: private ones only when it's allowed in them.
+    private func openWindows(for context: WKWebExtensionContext) -> [BrowserWindowController] {
+        WindowManager.shared.controllers.filter { PrivateAccess.sees(isPrivate: $0.tabManager.isPrivate, allowed: context.hasAccessToPrivateData) }
+    }
+
+    /// Keyboard shortcuts declared by extensions (1Password's fill shortcut). In a private window, only allowed ones'.
     func performCommand(for event: NSEvent) -> Bool {
         let window = event.window?.windowController as? BrowserWindowController
-        if window?.tabManager.isPrivate == true { return false }
-        for context in contexts where context.performCommand(for: event) {
+        let inPrivate = window?.tabManager.isPrivate == true
+        for context in contexts where PrivateAccess.sees(isPrivate: inPrivate, allowed: context.hasAccessToPrivateData) && context.performCommand(for: event) {
             noteInvocation(context.uniqueIdentifier, tab: window?.tabManager.selectedTab)
             return true
         }
@@ -1305,7 +1350,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
         // A browser window shows spaces of several profiles, so every profile's extensions have it, each seeing
         // their own tabs there. A sign-in popup or a Zigzag Mini is one page: only its own profile's have it.
         let popups: [any WKWebExtensionWindow] = PopupWindowController.all.filter(isOurs) + MiniWindowController.all.filter(isOurs)
-        let windows: [any WKWebExtensionWindow] = openWindows
+        let windows: [any WKWebExtensionWindow] = openWindows(for: extensionContext)
         let key: (any WKWebExtensionWindow)? = PopupWindowController.key.flatMap { isOurs($0) ? $0 : nil } ?? MiniWindowController.key.flatMap { isOurs($0) ? $0 : nil }
         return key.map { key in [key] + windows + popups.filter { $0 !== key } } ?? windows + popups
     }
@@ -1313,7 +1358,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
     func webExtensionController(_ controller: WKWebExtensionController, focusedWindowFor extensionContext: WKWebExtensionContext) -> (any WKWebExtensionWindow)? {
         if let popup = PopupWindowController.key { return isOurs(popup) ? popup : nil }
         if let mini = MiniWindowController.key { return isOurs(mini) ? mini : nil }
-        return WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
+        return WindowManager.shared.keyController.flatMap { PrivateAccess.sees(isPrivate: $0.tabManager.isPrivate, allowed: extensionContext.hasAccessToPrivateData) ? $0 : nil }
     }
 
     private func isOurs(_ popup: PopupWindowController) -> Bool {
@@ -1330,12 +1375,17 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
 
     /// What an extension hears when it asks for a tab or window and its profile has no space to open it in.
     private static let noSpace = NSError(domain: "app.zigzag.extensions", code: 1, userInfo: [NSLocalizedDescriptionKey: "This profile has no space to open a page in"])
+    /// What an extension not allowed in private windows hears when it asks for one.
+    private static let notInPrivate = NSError(domain: "app.zigzag.extensions", code: 2, userInfo: [NSLocalizedDescriptionKey: "This extension isn't allowed in private windows"])
 
     func webExtensionController(_ controller: WKWebExtensionController, openNewTabUsing configuration: WKWebExtension.TabConfiguration,
                                 for extensionContext: WKWebExtensionContext, completionHandler: @escaping ((any WKWebExtensionTab)?, (any Error)?) -> Void) {
-        // Never into a private window: what an extension opens belongs to everyday browsing.
+        // Into a private window only when it names one, which only an extension allowed there can; else everyday browsing.
         let key = WindowManager.shared.keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
-        let window = (configuration.window as? BrowserWindowController) ?? key ?? openWindows.last
+        let named = (configuration.window as? BrowserWindowController).flatMap {
+            PrivateAccess.sees(isPrivate: $0.tabManager.isPrivate, allowed: extensionContext.hasAccessToPrivateData) ? $0 : nil
+        }
+        let window = named ?? key ?? openWindows.last
             ?? WindowManager.shared.restoreIfNoWindows() ?? WindowManager.shared.newWindow(showCommandBar: false)
         // In a space on this profile: the page is the extension's, with this profile's sign-ins. A profile with no
         // space yet has nowhere to put it: better not opened than opened in another profile.
@@ -1366,6 +1416,14 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                 use.openedWindow(extensionContext.uniqueIdentifier, ObjectIdentifier(popup))
             }
             completionHandler(popup, nil)
+            return
+        }
+        if configuration.shouldBePrivate {
+            guard extensionContext.hasAccessToPrivateData else { completionHandler(nil, Self.notInPrivate); return }
+            let space = WindowManager.shared.keyController?.tabManager.space(for: profile) ?? Library.shared.spaces(in: profile.id).first?.id
+            let window = WindowManager.shared.newWindow(url: configuration.tabURLs.first, spaceID: space, showCommandBar: false, isPrivate: true)
+            for url in configuration.tabURLs.dropFirst() { window.tabManager.newTab(url: url, spaceID: space, select: false) }
+            completionHandler(window, nil)
             return
         }
         // The saved session comes back first, or the new window's first save would replace it.
@@ -1486,9 +1544,10 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             return
         }
         // Asked by the page (1Password's "Unlock" button) rather than a click, it comes from the address bar of the
-        // window you're in; never a private one, where extensions don't run.
-        let controller = ([WindowManager.shared.keyController].compactMap { $0 } + WindowManager.shared.controllers)
-            .first { !$0.tabManager.isPrivate }
+        // window you're in; a private one only for an extension allowed there.
+        let seen = { (window: BrowserWindowController) in PrivateAccess.sees(isPrivate: window.tabManager.isPrivate, allowed: context.hasAccessToPrivateData) }
+        let controller = request?.controller.flatMap { seen($0) ? $0 : nil }
+            ?? ([WindowManager.shared.keyController].compactMap { $0 } + WindowManager.shared.controllers).first(where: seen)
         let fromPin = request?.fromPin == true && request?.controller === controller
         guard let place = controller?.popupAnchor(forPin: fromPin ? context.uniqueIdentifier : nil), place.view.window != nil else {
             completionHandler(NSError(domain: "Zigzag", code: 2, userInfo: [NSLocalizedDescriptionKey: "No window to show the popup in"]))
@@ -1641,9 +1700,9 @@ extension Tab: WKWebExtensionTab {
         return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
     }
 
-    /// Whether this context's extensions are the tab's own profile's.
+    /// Whether this context's extensions are the tab's own profile's, and for a private tab, allowed in private windows.
     func isSeen(by context: WKWebExtensionContext) -> Bool {
-        !isPrivate && context.webExtensionController === profile.startedExtensions?.controller
+        PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData) && context.webExtensionController === profile.startedExtensions?.controller
     }
 
     /// The Zigzag Mini it's the page of, while it is.
@@ -1659,12 +1718,15 @@ extension Tab: WKWebExtensionTab {
     static func seers(_ context: WKWebExtensionContext) -> ObjectIdentifier {
         context.webExtensionController.map(ObjectIdentifier.init) ?? ObjectIdentifier(context)
     }
-    // A private tab that reaches an extension anyway (none should) tells it nothing: no page, title or address.
+    // A private tab that reaches an extension not allowed there tells it nothing: no page, title or address.
     // Nor does a tab on another profile: its page isn't one this context's extensions may reach.
     func webView(for context: WKWebExtensionContext) -> WKWebView? { isSeen(by: context) ? webView : nil }
     // Nor does a tab that has moved to another profile, to an extension of the one it left that still holds it.
-    func title(for context: WKWebExtensionContext) -> String? { isPrivate || isAnotherProfiles(context) ? nil : displayTitle }
-    func url(for context: WKWebExtensionContext) -> URL? { isPrivate || isAnotherProfiles(context) ? nil : url }
+    func title(for context: WKWebExtensionContext) -> String? { isHidden(from: context) ? nil : displayTitle }
+    func url(for context: WKWebExtensionContext) -> URL? { isHidden(from: context) ? nil : url }
+    private func isHidden(from context: WKWebExtensionContext) -> Bool {
+        !PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData) || isAnotherProfiles(context)
+    }
     /// Whether the extension asking runs in a profile this tab isn't in.
     private func isAnotherProfiles(_ context: WKWebExtensionContext) -> Bool {
         guard let controller = context.webExtensionController else { return false }
@@ -1675,7 +1737,9 @@ extension Tab: WKWebExtensionTab {
     func isPinned(for context: WKWebExtensionContext) -> Bool { bookmarkID != nil }
     func isPlayingAudio(for context: WKWebExtensionContext) -> Bool { isPlayingAudio }
     func isMuted(for context: WKWebExtensionContext) -> Bool { isMuted }
-    func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { !isPrivate }
+    func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool {
+        PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData)
+    }
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         miniWindow?.window?.makeKeyAndOrderFront(nil)
@@ -1723,18 +1787,18 @@ extension Tab: WKWebExtensionTab {
 
 @available(macOS 15.4, *)
 extension BrowserWindowController: WKWebExtensionWindow {
-    // A private window is never listed, but should one be reached anyway, its tabs stay unseen.
+    // A private window is listed only to an extension allowed there; to any other, its tabs stay unseen.
     // An extension sees the tabs of its own profile: the window may be showing a space on another.
     /// With shared tabs (#162), only the ones in this window; an extension sees each tab in one window (where it's shown
     /// or last was).
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {
-        tabManager.isPrivate ? [] : tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && self.holds($0) }
+        hides(from: context) ? [] : tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && self.holds($0) }
     }
 
     /// The tab you're on if it's on the extension's profile; else the one you left selected in a space that is,
     /// since Chrome's extensions expect a window to have an active tab.
     func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
-        guard !tabManager.isPrivate else { return nil }
+        guard !hides(from: context) else { return nil }
         if let tab = tabManager.selectedTab, tab.isSeen(by: context) { return tab }
         return Library.shared.spaces.lazy.compactMap { self.tabManager.selectedTab(in: $0.id) }.first { $0.isSeen(by: context) }
     }
@@ -1745,9 +1809,11 @@ extension BrowserWindowController: WKWebExtensionWindow {
         if window.styleMask.contains(.fullScreen) { return .fullscreen }
         return .normal
     }
-    /// Always false: saying true for private windows stopped extensions in normal windows too (WebKit, 2026-10).
-    /// Private tabs are kept out another way: their web views get no extension controller (see Tab).
-    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
+    /// WebKit keeps a private window, its tabs and their events from extensions not allowed there.
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { tabManager.isPrivate }
+    private func hides(from context: WKWebExtensionContext) -> Bool {
+        !PrivateAccess.sees(isPrivate: tabManager.isPrivate, allowed: context.hasAccessToPrivateData)
+    }
     func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
     func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
 

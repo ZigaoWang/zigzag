@@ -201,6 +201,26 @@ extension ExtensionBridgeTests {
         #expect(server.requests.withLock { $0 } == 2)
     }
 
+    @Test func defaultCredentialFetchStepsInOnlyForSameSiteCookies() async throws {
+        let store = WKWebsiteDataStore.nonPersistent()
+        let url = try #require(URL(string: "https://account.example/api/me"))
+        func cookie(_ name: String, domain: String, sameSite: String?) throws -> HTTPCookie {
+            var properties: [HTTPCookiePropertyKey: Any] = [.name: name, .value: "synthetic", .domain: domain, .path: "/", .secure: "TRUE"]
+            if let sameSite { properties[.sameSitePolicy] = sameSite }
+            return try #require(HTTPCookie(properties: properties))
+        }
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(url, in: store) == false)
+        // WebKit's own fetch sends these, so the bridge leaves them to it.
+        await store.httpCookieStore.setCookie(try cookie("plain", domain: "account.example", sameSite: nil))
+        await store.httpCookieStore.setCookie(try cookie("elsewhere", domain: "other.example", sameSite: "lax"))
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(url, in: store) == false)
+        await store.httpCookieStore.setCookie(try cookie("session", domain: ".account.example", sameSite: "lax"))
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(url, in: store))
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(try #require(URL(string: "https://other.example/")), in: store))
+        let scoped = ExtensionWrite.scoped(await store.httpCookieStore.allCookies(), to: url).map(\.name).sorted()
+        #expect(scoped == ["plain", "session"])
+    }
+
     @Test(arguments: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"])
     func credentialedFetchIsSharedAndLeavesUnsupportedRequestsUntouched(extensionID: String) async throws {
         let configuration = WKWebViewConfiguration()
@@ -239,6 +259,11 @@ extension ExtensionBridgeTests {
             const shared = calls.length === 8 && calls.every(c => c.ns === 'extensionFetch')
               && calls[0].args[0].cache === 'no-store' && calls[1].args[0].cache === 'reload'
               && calls[1].args[0].redirect === 'error' && calls[6].args[0].body === 'plain text';
+            // Left at the default, as Chrome sends cookies then too; the native side decides whether it steps in.
+            await fetch(other, {});
+            await fetch(other, { ...json, credentials: 'same-origin' });
+            const defaults = calls.length === 10 && calls[0].args[0].credentials === 'include'
+              && calls[8].args[0].credentials === 'same-origin' && calls[9].args[0].credentials === 'same-origin';
             const request = new Request(other, json);
             const fallback = await fetch(request);
             const untouched = !request.bodyUsed && normal[0][0] === request;
@@ -250,7 +275,7 @@ extension ExtensionBridgeTests {
             await streaming;
             const cases = [
               [other, { ...json, body: new Uint8Array([255, 0]) }], [other, { ...json, body: new Blob(['x']) }],
-              [other, { credentials: 'omit' }], [other, {}], [other, { credentials: 'include', method: 'PROPFIND' }],
+              [other, { credentials: 'omit' }], [other, { credentials: 'include', method: 'PROPFIND' }],
               [other, { credentials: 'include', mode: 'same-origin' }], [other, { credentials: 'include', mode: 'no-cors' }],
               [other, { credentials: 'include', integrity: 'sha256-test' }],
               [other, { credentials: 'include', redirect: 'manual' }], [other, { credentials: 'include', keepalive: true }],
@@ -260,9 +285,9 @@ extension ExtensionBridgeTests {
               ['data:text/plain,hello', { credentials: 'include' }]
             ];
             for (const [url, options] of cases) await fetch(url, options);
-            const unsupportedSkippedBridge = calls.length === 8;
+            const unsupportedSkippedBridge = calls.length === 10;
             await fetch('https://unapproved.example/me', { credentials: 'include' });
-            const declinedOnce = calls.length === 9 && normal.length === cases.length + 3;
+            const declinedOnce = calls.length === 11 && normal.length === cases.length + 3;
             let networkError = false;
             try { await fetch('https://fails.example/write', json); } catch (error) { networkError = error instanceof TypeError; }
             const noRetry = networkError && normal.length === cases.length + 3;
@@ -279,13 +304,13 @@ extension ExtensionBridgeTests {
             ongoingController.abort();
             try { await ongoing; } catch (error) { aborted = aborted && error.name === 'AbortError'; }
             const cancelForwarded = calls.at(-1).fn === 'cancel' && calls.at(-1).args[0] === calls.at(-2).args[0].requestID;
-            return { binary, cloneOK, shared, untouched, streamUntouched, fallback: await fallback.text(),
+            return { binary, cloneOK, shared, defaults, untouched, streamUntouched, fallback: await fallback.text(),
                      unsupportedSkippedBridge, declinedOnce, noRetry, aborted, preAbortedSkippedBridge, cancelForwarded };
             """, arguments: ["bridge": ExtensionBridgeScript.source, "extensionID": extensionID], in: nil, contentWorld: .page) as? [String: Any]
         let value = try #require(result)
         #expect(value["binary"] as? String == "0,255,128,65")
         #expect(value["fallback"] as? String == "original")
-        for key in ["cloneOK", "shared", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
+        for key in ["cloneOK", "shared", "defaults", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
             #expect(value[key] as? Bool == true, "Failed fetch behavior: \(key)")
         }
     }
@@ -498,6 +523,53 @@ extension ExtensionBridgeTests {
         #expect(response["url"] as? String == localURL.appendingPathComponent("unexpected").absoluteString)
     }
 
+    /// An extension asking for sites only as optional (Raindrop) reaches a server without CORS headers once "On All
+    /// Sites" is chosen, as Chrome does with host access; by default, or for another site listed, it's blocked (#324).
+    @Test func chosenAllSitesGivesOptionalHostAccessPastCORS() async throws {
+        let server = try SessionTestServer()
+        let target = try await server.start()
+        defer { server.listener.cancel() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":[],"optional_host_permissions":["*://*/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("<!doctype html><title>page</title>".utf8).write(to: folder.appendingPathComponent("page.html"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+
+        func fetched(_ access: ExtensionInstalls.SiteAccess?, sites: [String] = []) async throws -> String {
+            let controller = WKWebExtensionController(configuration: .nonPersistent())
+            let context = WKWebExtensionContext(for: ext)
+            try controller.load(context)
+            defer { try? controller.unload(context) }
+            for pattern in ExtensionHost.siteAccessPatterns(access, approved: [], optional: ext.optionalPermissionMatchPatterns, sites: sites) {
+                context.setPermissionStatus(.grantedExplicitly, for: pattern)
+            }
+            #expect(BridgeExtensionFetch.allows(target, context: context) == (access == .all))
+            let page = WKWebView(frame: .zero, configuration: try #require(context.webViewConfiguration))
+            page.load(URLRequest(url: context.baseURL.appendingPathComponent("page.html")))
+            for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(100)) }
+            #expect(page.title == "page")
+            return try await page.callAsyncJavaScript("""
+                try { const response = await fetch(target, { credentials: 'omit' }); return String(response.status) + ' ' + await response.text(); }
+                catch (error) { return error.name; }
+                """, arguments: ["target": target.absoluteString], in: nil, contentWorld: .page) as? String ?? ""
+        }
+        #expect(try await fetched(nil) == "TypeError")
+        #expect(try await fetched(.sites, sites: ["example.com"]) == "TypeError")
+        #expect(try await fetched(.all) == #"200 {"signedIn":false}"#)
+    }
+
+    @Test func siteAccessChoicesGrantWhatTheySay() throws {
+        let required = try WKWebExtension.MatchPattern(string: "https://api.example/*")
+        let optional: Set = [try WKWebExtension.MatchPattern(string: "*://*/*")]
+        #expect(ExtensionHost.siteAccessPatterns(nil, approved: [required], optional: optional, sites: []) == [required])
+        #expect(Set(ExtensionHost.siteAccessPatterns(.all, approved: [required], optional: optional, sites: [])) == optional.union([required]))
+        #expect(ExtensionHost.siteAccessPatterns(.click, approved: [required], optional: optional, sites: []).isEmpty)
+        #expect(Set(ExtensionHost.siteAccessPatterns(.sites, approved: [], optional: optional, sites: ["raindrop.io"]))
+            == Set(ExtensionHost.patterns(for: "raindrop.io")))
+    }
+
     /// A name an extension gives a download stays a plain file name inside Downloads.
     @Test func downloadNamesCantClimbOut() {
         #expect(BridgeDownloads.safeName("../../evil/report.pdf") == "report.pdf")
@@ -521,6 +593,17 @@ extension ExtensionBridgeTests {
         #expect(!BridgeDownloads.sees(second, in: Profile.defaultID))
         #expect(!BridgeDownloads.sees(hidden, in: Profile.defaultID))
         #expect(!BridgeDownloads.sees(hidden, in: other))
+    }
+
+    /// An extension allowed in private windows sees their downloads too, in its own profile only (#353).
+    @Test func privateDownloadsOnlyToAnExtensionAllowedThere() {
+        let other = UUID()
+        let hidden = DownloadItem(filename: "c.pdf", sourceURL: nil, isPrivate: true)
+        let everyday = DownloadItem(filename: "a.pdf", sourceURL: nil, isPrivate: false)
+        #expect(BridgeDownloads.sees(hidden, in: Profile.defaultID, seesPrivate: true))
+        #expect(!BridgeDownloads.sees(hidden, in: Profile.defaultID, seesPrivate: false))
+        #expect(!BridgeDownloads.sees(hidden, in: other, seesPrivate: true))
+        #expect(BridgeDownloads.sees(everyday, in: Profile.defaultID, seesPrivate: false))
     }
 
     /// A download fetched again (one listed from before Zigzag started has no store of its own) goes in its own

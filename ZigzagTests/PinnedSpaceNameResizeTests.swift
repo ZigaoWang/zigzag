@@ -20,6 +20,7 @@ struct PinnedSpaceNameResizeTests {
         func listSetGroupOpen(_ id: UUID, _ open: Bool) {}
         func listRenameGroup(_ id: UUID, to name: String) {}
         func listMoveGroup(_ id: UUID, to index: Int, in spaceID: UUID) {}
+        func listPinGroup(_ id: UUID, at index: Int, in spaceID: UUID, folder: UUID?) {}
         func listAddToGroup(_ tabs: [Tab], group: UUID) {}
         func listRenameFolder(_ id: UUID, to name: String) {}
         func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {}

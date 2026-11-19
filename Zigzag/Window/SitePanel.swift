@@ -695,7 +695,7 @@ final class SitePanel: FloatingPanelView {
          "fit": (rows + permissionsGroup.rows).map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "linksFit": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "place": ["x": frame.minX, "width": frame.width, "window": superview?.bounds.width ?? 0,
-                   "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? -1]]
+                   "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? CGFloat(-1)]]
     }
 
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
@@ -744,10 +744,12 @@ final class SitePanel: FloatingPanelView {
 
     /// Your extensions, as their toolbar buttons are: the icon, the badge, and whether each works on this site.
     private func buildExtensions() {
-        // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
+        // In a private window, only those allowed there, as in Chrome's incognito (ExtensionHost.actions).
         // In Zigzag Mini, none: an extension's popup opens from a browser window's address.
         guard #available(macOS 15.4, *), controller != nil, let host = tab.extensionHost else { return }
-        let actions = host.actions(for: tab)
+        // A blank private window's stand-in tab isn't private itself: the window says it.
+        let actions = host.actions(for: tab).filter { PrivateAccess.sees(isPrivate: isPrivate, allowed: $0.context.hasAccessToPrivateData) }
+        if isPrivate, actions.isEmpty { return }
         let installs = tab.profile.installs
         let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
         let web = ["http", "https"].contains(url.scheme ?? "")
@@ -964,6 +966,13 @@ final class SitePanel: FloatingPanelView {
                                     on: KeepAwake.isOn(for: url), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     KeepAwake.set(on, for: self.url)
+                })
+            case .keepCookies:
+                // Clear Cookies… and quitting leave the site's cookies alone (#334).
+                rows.append(.toggle(String(localized: "Keep cookies", comment: "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in."),
+                                    on: KeptCookies.keeps(url, in: tab.profile.id), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    KeptCookies.set(on, for: self.url, in: self.tab.profile.id, isPrivate: self.isPrivate || self.tab.isPrivate)
                 })
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
@@ -1741,6 +1750,12 @@ final class PanelRow: NSView {
 
     /// choose <index>: picks that choice in the row's dropdown, as its menu would.
     func debugChoose(_ index: Int) {
+        // A switch: 1 is on, 0 off.
+        if let toggle = control as? Toggle {
+            toggle.isOn = index != 0
+            toggle.onChange?(toggle.isOn)
+            return
+        }
         guard let dropdown = control as? DropdownButton, dropdown.options.indices.contains(index) else { return }
         dropdown.selectedIndex = index
         dropdown.onSelect?(index)
@@ -2066,7 +2081,7 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, fullScreenFills, alwaysTranslate, openIn }
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, openIn }
     /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
     /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
@@ -2105,6 +2120,7 @@ enum SitePanelRows {
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
+            rows.append(.keepCookies)
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }

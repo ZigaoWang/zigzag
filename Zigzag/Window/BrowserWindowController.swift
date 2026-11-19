@@ -128,6 +128,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             self.tabManager.switchSpace(by: offset)
             return before != self.tabManager.currentSpaceID
         }
+        sidebar.onSwipeLook = { [weak self] space, share in self?.swipeLook(toward: space, share: share) }
         sidebar.backButton.onClick = { [weak self] _ in self?.goBack(nil) }
         // Right-click Back or Forward: the pages that way, to jump several at once.
         sidebar.backButton.onRightClick = { [weak self] _ in self?.historyMenu(back: true) }
@@ -610,7 +611,29 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         if window?.isKeyWindow == true { handoff?.becomeCurrent() }
     }
 
+    /// Whether the window shows a look partway to another space, mid-swipe.
+    private var showsSwipeLook = false
+
+    /// Mid-swipe: the window's look `share` of the way to `id`'s, as far as the fingers have pulled that space in. Nil
+    /// or none of the way: the current space's own again, as when a swipe is called off.
+    private func swipeLook(toward id: UUID?, share: CGFloat) {
+        guard !tabManager.isPrivate else { return }
+        let space = tabManager.currentSpace
+        guard let id, id != space.id, share > 0, let next = Library.shared.space(id) else {
+            if showsSwipeLook { applySpaceColor(animated: true, crossFadesMode: false) }
+            return
+        }
+        showsSwipeLook = true
+        let (color, end) = root.paint(space, toward: next, share: share)
+        root.sidebarContainer.tint = color
+        root.sidebarContainer.gradient = end.map { ($0, share < 0.5 ? space.gradientAngle : next.gradientAngle) }
+        let t = Double(min(share, 1))
+        root.sidebarContainer.grain = (space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t
+        root.showEmptyPage(of: space, toward: next, share: share)
+    }
+
     private func applySpaceColor(animated: Bool, crossFadesMode: Bool = true) {
+        showsSwipeLook = false
         lastSpaceID = tabManager.currentSpaceID
         render(tabManager.currentSpace, animated: animated, crossFadesMode: crossFadesMode)
     }
@@ -685,9 +708,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let installs = installs
         let access = installs.siteAccess(id)
         let tab = tabManager.selectedTab
-        let site = ContentBlocker.site(of: tab?.url)
+        // A private window's site isn't offered: choosing it would keep it.
+        let site = tabManager.isPrivate ? nil : ContentBlocker.site(of: tab?.url)
         let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
-        all.state = access == .all ? .on : .off
+        all.state = access == .all && !tabManager.profile.extensions.asksForSitesOnlyOptionally(id) ? .on : .off
         let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
         click.state = access == .click ? .on : .off
         menu.addItem(all)
@@ -747,14 +771,19 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // The profile you're in when you ask; a private window's own store.
         let store = tabManager.privateStore ?? tabManager.profile.store
         let only = ProfileSheets.onlyNote(tabManager.isPrivate ? nil : tabManager.profile.id)
-        ConfirmSheet.show(in: root.overlay, title: String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies."),
-                          message: Words.sentences(String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies."), only),
+        // Sites you keep cookies for are left alone; a private window keeps none.
+        let kept = tabManager.isPrivate ? [] : KeptCookies.sites(in: tabManager.profile.id)
+        ConfirmSheet.show(in: root.overlay, title: kept.isEmpty ? String(localized: "Clear cookies for every site?", comment: "Title of the sheet that asks before clearing every site's cookies.") : KeptCookies.clearTitle,
+                          message: Words.sentences(kept.isEmpty ? String(localized: "You’ll be signed out of every site. Your passwords, pinned tabs and history stay.", comment: "Message of the sheet that asks before clearing every site's cookies.")
+                                                                : KeptCookies.clearMessage(keeping: kept.count), only),
                           confirmTitle: String(localized: "Clear Cookies", comment: "Button that clears cookies, in the sheet that asks first."), destructive: true) { [weak self] confirmed in
             guard confirmed else { return }
             Task { @MainActor in
-                await WebsiteData.clear(.cookies, in: store)
+                await WebsiteData.clear(.cookies, keeping: kept, in: store)
                 self?.tabManager.selectedTab?.reload()
-                if let self { Toast.show(String(localized: "Cookies cleared. You’re signed out everywhere.", comment: "Toast after every site's cookies are cleared."), symbol: "trash", duration: 2.4, in: self) }
+                let toast = kept.isEmpty ? String(localized: "Cookies cleared. You’re signed out everywhere.", comment: "Toast after every site's cookies are cleared.")
+                                         : String(localized: "Cookies cleared, except for the sites you keep", comment: "Toast after every site's cookies are cleared but those of the sites that keep theirs (Settings › Privacy).")
+                if let self { Toast.show(toast, symbol: "trash", duration: 2.4, in: self) }
             }
         }
     }
@@ -1442,7 +1471,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var attention = false
         var pins: [AddressView.Pin] = []
         var animated = false
-        // Extensions don't run in a private window: no host, so nothing to show.
+        // In a private window, only extensions allowed there (ExtensionHost.pinnedActions).
         if #available(macOS 15.4, *), let host = tab?.extensionHost ?? tabManager.extensionHost {
             attention = host.needsAttention(for: tab)
             pins = host.pinnedActions(for: tab).map { addressPin(for: $0, host: host) }
@@ -1510,7 +1539,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         menu.addItem(title)
         if let options = context.optionsPageURL {
             menu.addItem(SidebarMenus.Item(String(localized: "Settings", comment: "Item in an extension's menu: opens the extension's own settings page."), symbol: "gearshape") { [weak self] in
-                self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
+                guard let self else { return }
+                // From a private window, in an everyday one: the page keeps the extension's own data.
+                guard self.tabManager.isPrivate else { self.tabManager.newTab(url: options, title: context.webExtension.displayName); return }
+                let everyday = WindowManager.shared.controllers.first { !$0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false)
+                everyday.tabManager.newTab(url: options, spaceID: everyday.tabManager.space(for: profile), title: context.webExtension.displayName)
+                everyday.window?.makeKeyAndOrderFront(nil)
             })
         }
         menu.addItem(siteAccessItem(for: id))
@@ -2361,14 +2395,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     private func intercept(_ event: NSEvent) -> Bool {
         if (event.type == .keyDown || event.type == .flagsChanged), switcher.handle(event) { return true }
         if spaceSwitcher.handle(event) { return true }
-        // A mouse's side buttons go back and forward, as in Chrome and Arc (Safari leaves them to the page, which rarely
-        // uses them). On release, and the press is taken too, so the page never sees half of it.
-        // In a split, the page under the pointer is the one that goes, made the one you're in first as a click
-        // would, not whichever pane you were last in (#170).
-        if event.type == .otherMouseDown || event.type == .otherMouseUp, event.buttonNumber == 3 || event.buttonNumber == 4 {
-            if event.type == .otherMouseDown, root.tiles != nil { focusPane(at: event.locationInWindow) }
-            if event.type == .otherMouseUp { event.buttonNumber == 3 ? goBack(nil) : goForward(nil) }
-            return true
+        // A mouse's side buttons go back and forward (`BrowserWindow.SideButton`). In a split, the page under the
+        // pointer is the one that goes, made the one you're in first as a click would, not whichever pane you were
+        // last in (#170).
+        if BrowserWindow.SideButton(event.type, button: event.buttonNumber) == .press, root.tiles != nil {
+            focusPane(at: event.locationInWindow)
         }
         if event.type == .leftMouseDown, root.tiles != nil { focusPane(at: event.locationInWindow) }
         // A click anywhere else finishes a name being typed into a sidebar row, as in Finder: rows don't take focus,
@@ -2638,7 +2669,25 @@ extension BrowserWindowController: SidebarDelegate {
     /// Bookmarks a tab, undoably. A grouped tab pins its group unless `keepingGroup` is false.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID, keepingGroup: Bool = true) {
         Tutorial.complete("pin")
-        pageChange(String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: keepingGroup) }
+        let name = keepingGroup && tabManager.pinsGroup(tab) ? Self.pinGroupUndoName : String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")
+        pageChange(name) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: keepingGroup) }
+    }
+
+    private static var pinGroupUndoName: String { String(localized: "Pin Group", comment: "Undo action name, shown in the Edit menu as Undo Pin Group.") }
+
+    /// A tab group's row dropped among the pinned pages (#325): the whole group pins there as one folder, undoably.
+    /// `folder`: the folder the gap is in, if any.
+    func listPinGroup(_ id: UUID, at index: Int, in spaceID: UUID, folder parent: UUID?) {
+        guard !tabManager.isPrivate else { return }
+        let tabs = tabManager.tabs(inGroup: id)
+        confirmProfileCrossing(tabs.flatMap(tabManager.panes(of:)), to: spaceID) { [weak self] in
+            guard let self else { return }
+            Tutorial.complete("pin")
+            pageChange(Self.pinGroupUndoName) { [tabManager] in
+                guard let folder = tabManager.pinGroup(id, at: index, in: spaceID), let parent else { return }
+                Library.shared.moveFolder(folder.id, to: index, in: spaceID, parent: .some(parent))
+            }
+        }
     }
 
     /// Turns a bookmark back into a tab, undoably. Half of a pinned split unpins the pair.
@@ -2730,6 +2779,38 @@ extension BrowserWindowController: SidebarDelegate {
         let pages = open ? [] : folders.pages(in: id)
         let tucking = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
         Library.shared.setFolderOpen(id, open, tucking: tucking)
+    }
+    /// Expand All / Collapse All for a folder and its subfolders (#343).
+    func setFolderTreeOpen(_ id: UUID, _ open: Bool) {
+        let pages = open ? [] : Library.shared.allBookmarkIDs(inFolder: id)
+        let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        Library.shared.setFolderTreeOpen(id, open, shown: Set(shown))
+    }
+    /// Open All in Tabs confirms above this many pages.
+    static let openAllAsksPast = 10
+    /// Opens every page in the folder and its subfolders, showing the first (#343).
+    /// ⌘Z closes them again.
+    func openAllInTabs(_ folderID: UUID) {
+        guard let folder = Library.shared.folder(folderID) else { return }
+        let pages = Library.shared.allBookmarkIDs(inFolder: folderID).compactMap { Library.shared.bookmark($0) }
+        guard let first = pages.first else { return }
+        let open = { [weak self] in
+            guard let self else { return }
+            self.pageChange(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { [tabManager] in
+                tabManager.together { for page in pages { _ = tabManager.pageTab(for: page) } }
+                tabManager.openBookmark(first)
+            }
+        }
+        let opening = pages.filter { tabManager.bookmarkTab(for: $0.id) == nil }.count
+        guard opening > Self.openAllAsksPast else { open(); return }
+        let message = Library.shared.subfolderIDs(of: folderID).isEmpty
+            ? String(localized: "Every pinned tab in “\(folder.name)” opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once, from a folder with no folders inside. The folder's name.")
+            : String(localized: "Every pinned tab in “\(folder.name)” and the folders inside it opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once. The folder's name.")
+        ConfirmSheet.show(in: root.overlay, title: String(localized: "Open \(opening) tabs?", comment: "Title of the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once (more than 10)."),
+                          message: message,
+                          confirmTitle: String(localized: "Open All", comment: "Button in the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once.")) { confirmed in
+            if confirmed { open() }
+        }
     }
     func listSetGroupOpen(_ id: UUID, _ open: Bool) {
         // Folding isn't undoable, as for folders.
@@ -2835,10 +2916,6 @@ extension BrowserWindowController: SidebarDelegate {
             controller.sidebarUndo.setActionName(Self.openInMiniName)
         }
         sidebarUndo.setActionName(Self.openInMiniName)
-    }
-
-    static var openInMiniTitle: String {
-        String(localized: "Open in Zigzag Mini", comment: "Item in a tab's context menu in the sidebar: moves the tab's page into a Zigzag Mini window (the small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.")
     }
 
     private static var openInMiniName: String {
@@ -3228,6 +3305,12 @@ extension BrowserWindowController: SidebarDelegate {
             default: return nil
             }
         }
+    }
+
+    /// A tab's part of a split row gets its own tab's menu; a pinned page's part, the row's.
+    func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu? {
+        if let page, page.bookmarkID == nil, tabManager.split(for: page) != nil { return SidebarMenus.tabMenu(for: page, controller: self) }
+        return listMenu(for: item)
     }
 
     func listMenu(for item: SidebarItem) -> NSMenu? {

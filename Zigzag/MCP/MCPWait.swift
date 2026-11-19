@@ -97,8 +97,7 @@ final class MCPWait {
                 }
             })
             loading = webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
-                let isLoading = webView.isLoading
-                MainActor.assumeIsolated { self?.loadingChanged(isLoading) }
+                MainActor.assumeIsolated { self?.loadingChanged(webView.isLoading) }
             }
             // A page still on its way is waited for first: what to look for is on the page it brings.
             if !webView.isLoading { watch() }

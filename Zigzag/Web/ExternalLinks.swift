@@ -3,9 +3,9 @@ import WebKit
 
 /// Links for other apps (zoommtg:, itms-apps:, steam:, mailto:). A page doesn't get to open an app on your Mac by
 /// itself: everyday links you click (mail, phone, FaceTime) open at once, anything else asks first, naming the app.
-/// Open is for this time; Always Open lets the site open that app straight away from then on, as in Chrome. Open
-/// apps is a permission like the camera's (#192): Allow or Block for the whole site is chosen in Site Controls or
-/// Settings › Privacy, and Block means nothing on the site opens an app, not even a link you click.
+/// Open is for this time; with Always allow checked the site opens that app straight away from then on, as in Chrome;
+/// Cancel puts it off. Open apps is a permission like the camera's (#192): Allow or Block for the whole site is chosen in
+/// Site Controls or Settings › Privacy, and Block means nothing on the site opens an app, not even a link you click.
 @MainActor
 enum ExternalLinks {
     /// What the web view handles itself; everything else is for another app.
@@ -161,20 +161,16 @@ enum ExternalLinks {
         // did nothing in Mini). A pop-up's window comes forward so the question isn't hidden.
         if popup != nil { promptHost.window?.makeKeyAndOrderFront(nil) }
         Task { @MainActor in
-            let answer = await PermissionPrompt.ask(host: SitePermissions.askerName(origin), origin: origin, answerKey: key, what: name, symbol: "arrow.up.forward.app",
-                                                    icon: NSWorkspace.shared.icon(forFile: app.path), in: promptHost,
-                                                    tab: tab, title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
-                                                    actions: [.deny, .allow], canRemember: saves,
-                                                    answered: {
-                                                        stored().map { PermissionAnswer(action: $0.action, remember: $0.remember) }
-                                                    })
+            let answer = await ask(app: name, icon: NSWorkspace.shared.icon(forFile: app.path), origin: origin, answerKey: key,
+                                   in: promptHost, tab: tab, canRemember: saves,
+                                   answered: { stored().map { PermissionAnswer(action: $0.action, remember: $0.remember) } })
             asked.asking.remove(key)
             guard let answer else {
                 asked.putOff[key] = Date().addingTimeInterval(60)
                 return
             }
             // This time holds for the page until it navigates; Always is kept for the site where allowed (https, no
-            // foreign frame, not private). Both are per app, Don't Allow included, so refusing one link doesn't block
+            // foreign frame, not private). Both are per app, so a no kept for one link (an older answer) doesn't block
             // every app on the site.
             if let origin {
                 SitePermissions.rememberAnswer(answer, subject: Self.storageSubject(for: answer, scheme: scheme),
@@ -186,6 +182,39 @@ enum ExternalLinks {
                 openApp()
             }
         }
+    }
+
+    /// The words of "Open Claude?": who asks and what happens, Remember naming the site and the app, and Cancel
+    /// then Open Claude.
+    struct Question: Equatable {
+        let title: String
+        let detail: String
+        let rememberTitle: String
+        let actions: [String]
+    }
+
+    static func question(app name: String, site: String) -> (question: Question, actions: [PermissionAction]) {
+        let open = PermissionAction(id: PermissionAction.allow.id,
+                                    title: String(localized: "Open \(name)", comment: "A page's question to open an app, without its question mark. The placeholder is the app's name, like “zoom.us”."),
+                                    isDeny: false, isProminent: true)
+        let actions = [PermissionAction.cancel, open]
+        let question = Question(
+            title: open.title,
+            detail: String(localized: "\(site) wants to open the \(name) app.", comment: "Under a page's question to open an app: the site, then the app's name, like “claude.ai wants to open the Claude app.”."),
+            rememberTitle: String(localized: "Always allow \(site) to open \(name)", comment: "Checkbox on a page's question to open an app: the site may open this app without asking from now on. The placeholders are the site and the app's name."),
+            actions: actions.map(\.id))
+        return (question, actions)
+    }
+
+    /// Asks to open `name`. Nil is Cancel, Esc or a click away; an allow with `remember` is Always.
+    static func ask(app name: String, icon: NSImage?, origin: String?, answerKey: String?, in host: PromptHost, tab: Tab?,
+                    canRemember: Bool, answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
+        let site = SitePermissions.askerName(origin)
+        let (question, actions) = question(app: name, site: site.withoutWWW)
+        return await PermissionPrompt.ask(host: site, origin: origin, answerKey: answerKey, what: name, symbol: "arrow.up.forward.app",
+                                          icon: icon, in: host, tab: tab, title: question.title, actions: actions,
+                                          canRemember: canRemember, rememberTitle: question.rememberTitle, detail: question.detail,
+                                          answered: answered)
     }
 
     /// The page's address for an app link. A tab Zigzag sends to an app link (an extension's tabs.update, e.g.
@@ -233,7 +262,7 @@ enum ExternalLinks {
 
     /// The kept Allow, Block, or Always Open app; nil asks. A foreign frame (`foreign`) only gets Block.
     static func decision(page: String?, foreign: Bool, stored: String?) -> String? {
-        guard let page, let stored else { return nil }
+        guard page != nil, let stored else { return nil }
         if stored == "deny" { return "deny" }
         return foreign ? nil : stored
     }

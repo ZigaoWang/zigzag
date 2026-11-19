@@ -76,25 +76,62 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         settingOn && !needsOnboarding && ["http", "https"].contains(url.scheme?.lowercased() ?? "")
     }
 
-    /// True only for the first external link opened here.
-    nonisolated static func takeLinksNote(in defaults: UserDefaults) -> Bool {
-        guard !defaults.bool(forKey: "MiniLinksExplained") else { return false }
-        defaults.set(true, forKey: "MiniLinksExplained")
-        return true
+    /// Whether the note on the first external link is still to come.
+    nonisolated static func needsLinksNote(in defaults: UserDefaults) -> Bool {
+        !defaults.bool(forKey: "MiniLinksExplained")
     }
 
-    /// On the first external link, explains ⌘O to move it into a tab and where to turn this off.
+    /// The note answered: it never shows again, and Use Tabs Instead turns the setting off.
+    nonisolated static func answerLinksNote(useTabs: Bool, in defaults: UserDefaults) {
+        defaults.set(true, forKey: "MiniLinksExplained")
+        if useTabs { defaults.set(false, forKey: "OpensExternalLinksInMini") }
+    }
+
+    /// Undo on the toast after Use Tabs Instead.
+    nonisolated static func undoUseTabs(in defaults: UserDefaults) {
+        defaults.set(true, forKey: "OpensExternalLinksInMini")
+    }
+
+    /// The note on the first external link, while it's up.
+    private var linksNote: MiniLinksNote?
+
+    /// On the first external link: what Zigzag Mini is, ⌘O, and the choice of tabs instead.
     private func explainLinks() {
-        guard Self.takeLinksNote(in: .standard) else { return }
+        guard Self.needsLinksNote(in: .standard) else { return }
         // After the window's open animation.
         DispatchQueue.main.asyncAfter(deadline: .now() + Tokens.Motion.enter * Tokens.Motion.debugSlowdown + 0.3) { [weak self] in
-            guard let self, !self.movedOut, !self.isLeaving, !self.isClosing else { return }
-            self.promptToast(String(localized: "Links from other apps open in Zigzag Mini. Turn this off in Settings.", comment: "Toast shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. Settings means Settings › Zigzag Mini, where this can be turned off. Zigzag Mini is a name, kept in Latin letters."),
-                             symbol: "macwindow", duration: 10,
-                             action: (String(localized: "Open in Zigzag", comment: "Button in the toast shown the first time a link from another app opens in Zigzag Mini: moves the page into a tab, as ⌘O does."),
-                                      { [weak self] in self?.openInZigzag() }),
-                             lines: 3)
+            guard let self, !self.movedOut, !self.isLeaving, !self.isClosing, Self.needsLinksNote(in: .standard),
+                  !Self.all.contains(where: { $0.linksNote != nil }) else { return }
+            let note = MiniLinksNote(accent: self.promptAccent)
+            note.anchor = { [weak self] in
+                guard let self, !self.strip.openButton.isHidden else { return nil }
+                return self.overlay.convert(self.strip.openButton.bounds, from: self.strip.openButton)
+            }
+            note.onAnswer = { [weak self] useTabs in self?.answerLinksNote(useTabs: useTabs) }
+            self.linksNote = note
+            note.show(over: self.overlay)
         }
+    }
+
+    private func answerLinksNote(useTabs: Bool) {
+        guard let note = linksNote else { return }
+        linksNote = nil
+        note.takeDown()
+        Self.answerLinksNote(useTabs: useTabs, in: .standard)
+        guard useTabs else { return }
+        moveOut { target in
+            Toast.show(String(localized: "Links from other apps will open as tabs.", comment: "Toast in the browser window after Use Tabs Instead on the note shown the first time a link from another app opened in Zigzag Mini. The page has moved into a tab."),
+                       action: (String(localized: "Undo", comment: "Toast button"), { MiniWindowController.undoUseTabs(in: .standard) }),
+                       duration: Toast.undoDuration, in: target)
+        }
+    }
+
+    /// The page left or the window closed with the note up: it goes quietly, as Got It.
+    private func settleLinksNote() {
+        guard let note = linksNote else { return }
+        linksNote = nil
+        note.takeDown(instantly: true)
+        Self.answerLinksNote(useTabs: false, in: .standard)
     }
 
     /// Opens at the last user-set size, as Little Arc does, never below the minimum; the default until then.
@@ -213,7 +250,11 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         window.contentView = root
-        window.eventInterceptor = { [weak self] event in self?.noteEscape(event) ?? false }
+        window.eventInterceptor = { [weak self] event in
+            guard let self else { return false }
+            if self.linksNote?.takes(event) == true { return true }
+            return self.noteEscape(event)
+        }
         window.setAccessibilityTitle(Self.name)
         // A waiting question while the window isn't key: the edge glows, and clicking it brings the window forward.
         root.attentionWaiting = { [weak self] in self?.questionsWaitingForPage ?? 0 }
@@ -574,6 +615,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if text == "close" { findBar.hide() } else { findBar.show(query: text.isEmpty ? nil : text) }
     }
 
+    /// mininote gotit|tabs: answers the links note as its buttons do.
+    func debugLinksNote(_ answer: String) {
+        guard linksNote != nil else { return }
+        answerLinksNote(useTabs: answer == "tabs")
+    }
+
     func debugEscape() {
         if commandBar.isVisible { commandBar.debugEscape() } else { cancelOperation(nil) }
     }
@@ -603,14 +650,21 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window
     /// fades away first, then the page is there.
-    @objc func openInZigzag(_ sender: Any? = nil) {
+    @objc func openInZigzag(_ sender: Any? = nil) { moveOut() }
+
+    /// `then`: runs in the browser window the page went to.
+    private func moveOut(then: ((BrowserWindowController) -> Void)? = nil) {
         guard tab.url != nil, !movedOut, !isLeaving else { return }
         commandBar.dismiss(restoringFocus: false)
         linkStatus.hide()
-        fadeAway { [weak self] in self?.moveIntoZigzag() }
+        fadeAway { [weak self] in
+            guard let target = self?.moveIntoZigzag() else { return }
+            then?(target)
+        }
     }
 
-    private func moveIntoZigzag() {
+    @discardableResult
+    private func moveIntoZigzag() -> BrowserWindowController {
         let target = Self.browserWindow()
         // Site routes (#286): move the page itself when the space shares the profile, else reopen it there with that
         // space's sign-ins.
@@ -623,7 +677,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
             target.tabManager.newTab(url: url, spaceID: routed, by: .zigzag)
             target.window?.makeKeyAndOrderFront(nil)
             target.toastRouted(to: routed)
-            return
+            return target
         }
         let spaceID = routed ?? space.id
         letGo()
@@ -632,11 +686,13 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         window?.close()
         target.window?.makeKeyAndOrderFront(nil)
         if let routed { target.toastRouted(to: routed) }
+        return target
     }
 
     /// The page is leaving for a browser window: this window lets go of it, and closing leaves it open.
     private func letGo() {
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
+        settleLinksNote()
         movedOut = true
         madeFindBar?.hide()
         pageGone.send()
@@ -752,6 +808,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         returnTo = nil
         isClosing = true
+        settleLinksNote()
         madeFindBar?.hide()
         if SitePanel.isOpen(in: window) { SitePanel.closeCurrent() }
         pageGone.send()
@@ -1444,7 +1501,17 @@ extension MiniWindowController: PromptHost {
     var promptFrontTab: Tab? { movedOut || isClosing ? nil : tab }
     func promptHolds(_ tab: Tab) -> Bool { tab === self.tab && !movedOut && !isClosing }
     /// Its page is front only while the window is key: questions asked meanwhile wait and the edge glows.
-    func promptShows(_ tab: Tab) -> Bool { promptHolds(tab) && window?.isKeyWindow == true }
+    func promptShows(_ tab: Tab) -> Bool {
+        #if DEBUG
+        // A test copy kept behind is never key.
+        if Self.debugPromptsShow { return promptHolds(tab) }
+        #endif
+        return promptHolds(tab) && window?.isKeyWindow == true
+    }
+    #if DEBUG
+    /// Debug bridge: questions show in Zigzag Mini though its window isn't key.
+    static var debugPromptsShow = false
+    #endif
     var promptIsPrivate: Bool { false }
     var promptAccent: NSColor { Brand.Theme.of(space).accent }
     /// The page never changes; only key state does, which is when a held question shows (see `promptShows`).
@@ -1477,5 +1544,143 @@ enum AppSwitching {
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication, app != .current else { return }
             MainActor.assumeIsolated { lastOtherApp = app }
         }
+    }
+}
+
+// MARK: - The first link's note
+
+/// Shown the first time a link from another app opens in Zigzag Mini, pointing at Open in: what Zigzag Mini is for,
+/// how to keep the page, and a choice to keep tabs instead. It stays until answered; Return and Esc are Got It.
+final class MiniLinksNote: FloatingPanelView {
+    private let title = Label(String(localized: "Links from other apps open here", comment: "Title of the note shown once in Zigzag Mini (the small window for one page), the first time a link from another app opens there. The note points at the Open in button."),
+                              font: Tokens.Font.body(.semibold), color: Tokens.Color.textPrimary)
+    private let line = Label(String(localized: "Glance, then get back to what you were doing. To keep the page, use this button or press ⌘O.", comment: "Text of the note shown once in Zigzag Mini, the first time a link from another app opens there. The note points at the Open in button, which (like ⌘O) moves the page into a tab of a browser window."),
+                             font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
+    private let buttons = DialogButtons()
+    private let useTabs = PillButton(title: String(localized: "Use Tabs Instead", comment: "Button on the note shown the first time a link from another app opens in Zigzag Mini: links from other apps open as tabs from now on, and this page moves into a tab."), style: .quiet)
+    private let gotIt = PillButton(title: String(localized: "Got It", comment: "Button on the note shown the first time a link from another app opens in Zigzag Mini: puts the note away and keeps using Zigzag Mini."), style: .prominent)
+    /// True for Use Tabs Instead.
+    var onAnswer: ((Bool) -> Void)?
+    /// The button it points at, in the overlay's coordinates.
+    var anchor: () -> NSRect? = { nil }
+    private var shownAt = Date.distantFuture
+    /// Typed or clicked in the page since it came up: Return is the page's from then on.
+    private var pageTouched = false
+    private var frameToken: NSObjectProtocol?
+
+    private static let pad = CardOverThePage.pad
+    private static let width: CGFloat = 320
+    /// From the window's edges.
+    private static let margin = Tokens.Space.x2
+
+    init(accent: NSColor) {
+        super.init(frame: .zero)
+        for label in [title, line] {
+            label.usesSingleLineMode = false
+            label.maximumNumberOfLines = 0
+            label.lineBreakMode = .byWordWrapping
+            label.cell?.wraps = true
+            label.cell?.truncatesLastVisibleLine = false
+        }
+        gotIt.tint = accent
+        buttons.trailing = [useTabs, gotIt]
+        [title, line, buttons].forEach(addSubview)
+        // No click for the first half second, so one meant for the page can't land on a button.
+        useTabs.onClick = { [weak self] _ in self?.clicked(useTabs: true) }
+        gotIt.onClick = { [weak self] _ in self?.clicked(useTabs: false) }
+        radius = Tokens.Radius.panel
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel(title.stringValue)
+        onLayout = { [weak self] in self?.layoutContent() }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func show(over overlay: NSView) {
+        overlay.addSubview(self)
+        place()
+        // Follows the button as the window resizes, once the strip has laid out.
+        overlay.postsFrameChangedNotifications = true
+        frameToken = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification, object: overlay, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.place()
+                DispatchQueue.main.async { self?.place() }
+            }
+        }
+        shownAt = Date()
+        // Out of the button it points at.
+        growsFrom = CGPoint(x: (arrowX ?? bounds.midX) / max(1, bounds.width), y: 0)
+        present(arrival: .pop)
+        Announcement.post(title.stringValue + ". " + line.stringValue, priority: .high)
+    }
+
+    func takeDown(instantly: Bool = false) {
+        frameToken.map(NotificationCenter.default.removeObserver)
+        frameToken = nil
+        onAnswer = nil
+        dismiss(instantly: instantly)
+    }
+
+    private func clicked(useTabs: Bool) {
+        guard Toast.acceptsAction(shownAt: shownAt) else { return }
+        onAnswer?(useTabs)
+    }
+
+    /// From the window, before the page: Esc is Got It, and Return too until the page has been typed or clicked in.
+    func takes(_ event: NSEvent) -> Bool {
+        guard !dismissing, superview != nil else { return false }
+        if event.type == .leftMouseDown || event.type == .rightMouseDown {
+            if !bounds.contains(convert(event.locationInWindow, from: nil)) { pageTouched = true }
+            return false
+        }
+        guard event.type == .keyDown else { return false }
+        let plain = event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+        // The command bar or the find bar has the keys.
+        let typing = window?.firstResponder is NSText
+        let isReturn = event.keyCode == 36 || event.keyCode == 76
+        if plain, !typing, event.keyCode == 53 || (isReturn && !pageTouched) {
+            onAnswer?(false)
+            return true
+        }
+        if plain { pageTouched = true }
+        return false
+    }
+
+    private func textHeight(_ label: Label, width: CGFloat) -> CGFloat {
+        ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width + Label.inset * 2, height: 1000)).height ?? label.lineHeight)
+    }
+
+    /// The title's top, so its caps start `pad` below the arrow, as the text starts `pad` in.
+    private var titleTop: CGFloat {
+        let font = title.font ?? Tokens.Font.body(.semibold)
+        let line = title.lineHeight
+        let capTop = line / 2 + Label.capsBelowMiddle(of: font, lineHeight: line) - font.capHeight / 2
+        let scale = window?.backingScaleFactor ?? 2
+        return ((Self.arrowHeight + Self.pad - capTop) * scale).rounded() / scale
+    }
+
+    private func height(for width: CGFloat) -> CGFloat {
+        let text = width - Self.pad * 2
+        return titleTop + textHeight(title, width: text) + 2 + textHeight(line, width: text) + Tokens.Space.x4 + DialogButtons.height + Self.pad
+    }
+
+    /// Under the button, inside the window, the arrow on the button's middle.
+    private func place() {
+        guard let room = superview?.bounds else { return }
+        let width = min(Self.width, room.width - Self.margin * 2)
+        let target = anchor() ?? NSRect(x: room.maxX - Self.margin - width / 2, y: room.minY, width: 0, height: 0)
+        let x = min(max(room.minX + Self.margin, round(target.midX - width / 2)), room.maxX - Self.margin - width)
+        let y = max(room.minY, target.maxY) + Tokens.Space.x1
+        frame = NSRect(x: x, y: y, width: width, height: height(for: width))
+        arrowX = target.midX - x
+        needsLayout = true
+    }
+
+    private func layoutContent() {
+        let pad = Self.pad, text = bounds.width - pad * 2
+        title.frame = NSRect(x: pad - Label.inset, y: titleTop, width: text + Label.inset * 2, height: textHeight(title, width: text))
+        line.frame = NSRect(x: pad - Label.inset, y: title.frame.maxY + 2, width: text + Label.inset * 2, height: textHeight(line, width: text))
+        buttons.frame = NSRect(x: pad, y: bounds.height - pad - DialogButtons.height, width: text, height: DialogButtons.height)
     }
 }

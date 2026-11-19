@@ -366,8 +366,8 @@ final class KeyCap: NSView {
         layer?.cornerRadius = Tokens.Radius.small
         layer?.cornerCurve = .continuous
         layer?.borderWidth = Tokens.Metric.hairline
-        // Globe key as the globe symbol, as the menu bar draws it, not an emoji.
-        let symbol = symbol ?? (key == Shortcuts.globe ? "globe" : nil)
+        // Globe key as the globe symbol, as the menu bar draws it, not an emoji; Hyper (⌃⌥⇧⌘) as a sparkle.
+        let symbol = symbol ?? (key == Shortcuts.globe ? "globe" : key == Shortcuts.hyper ? "sparkle" : nil)
         label.stringValue = key
         label.alignment = .center
         iconView.image = symbol.map { Tokens.Symbol.image($0, size: Tokens.Symbol.inline) }

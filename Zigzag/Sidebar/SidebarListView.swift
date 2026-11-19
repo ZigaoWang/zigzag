@@ -18,6 +18,8 @@ protocol SidebarListDelegate: AnyObject {
     func listSetGroupOpen(_ id: UUID, _ open: Bool)
     func listRenameGroup(_ id: UUID, to name: String)
     func listMoveGroup(_ id: UUID, to index: Int, in spaceID: UUID)
+    /// A group's row dropped among the pinned pages: the whole group pins there as one folder (#325).
+    func listPinGroup(_ id: UUID, at index: Int, in spaceID: UUID, folder: UUID?)
     func listAddToGroup(_ tabs: [Tab], group: UUID)
     func listRenameFolder(_ id: UUID, to name: String)
     /// Puts a pinned page at the end of a folder, or takes it out of any (nil).
@@ -28,6 +30,8 @@ protocol SidebarListDelegate: AnyObject {
     func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?)
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
     func listMenu(for item: SidebarItem) -> NSMenu?
+    /// The menu for a row of several pages, `page` being the one under the pointer.
+    func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu?
     /// The menu for several picked rows at once.
     func listMenu(forMarked items: [SidebarItem]) -> NSMenu?
     /// Returns the space under a window point while dragging (the space dots), highlighting it.
@@ -82,6 +86,7 @@ protocol SidebarListDelegate: AnyObject {
 extension SidebarListDelegate {
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { listMove(tab, to: index, in: spaceID, nesting: .fit, grouping: .fit) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { listUnbookmark(bookmarkID, to: index, under: nil, group: nil) }
+    func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu? { listMenu(for: item) }
 }
 
 enum SidebarItem: Hashable {
@@ -247,7 +252,7 @@ final class SidebarListView: NSView {
         let spaceID = spaceOverride ?? manager.currentSpaceID
         let bookmarks = Library.shared.bookmarks(in: spaceID)
         let collapsed = Self.isCollapsed(spaceID)
-        // Collapsed, the section still shows the pinned page you're on, so where you are never disappears.
+        // Folded, the section still shows the pinned page you're on, so where you are never disappears.
         let folders = Library.shared.folders(in: spaceID)
         rowDepth = [:]
         folderPageCounts = [:]
@@ -257,15 +262,11 @@ final class SidebarListView: NSView {
         // A pinned page that's open shows even inside a shut folder or a collapsed section, as in Arc: you see what's
         // open without opening every folder on the way to it. The page you're on is always open.
         let isOpen: (UUID) -> Bool = { manager.bookmarkTab(for: $0) != nil }
-        if collapsed {
-            result += bookmarks.filter { $0.id == current || isOpen($0.id) }.map { .bookmark($0.id) }
-        } else {
-            let pinned = Self.pinnedRows(bookmarks: bookmarks.map(\.id).filter { !riders.contains($0) }, folders: folders,
-                                         current: current, isOpen: isOpen)
-            result += pinned.rows
-            rowDepth = pinned.depth
-            folderPageCounts = pinned.pageCounts
-        }
+        let pinned = Self.pinnedRows(bookmarks: bookmarks.map(\.id).filter { !riders.contains($0) }, folders: folders,
+                                     current: current, folded: collapsed, isOpen: isOpen)
+        result += pinned.rows
+        rowDepth = pinned.depth
+        folderPageCounts = pinned.pageCounts
         let hasPinnedRows = result.contains { if case .bookmark = $0 { true } else if case .folder = $0 { true } else { false } }
         // The line above today's tabs, which carries Clear: there when there are pinned tabs above it or tabs to clear.
         let tabs = manager.tabs(in: spaceID)
@@ -326,8 +327,9 @@ final class SidebarListView: NSView {
     /// A folder sits where its first page is, its pages and subfolders after it, each level set in one step. A shut
     /// folder hides all that's inside it but the page you're on and its pages opened since it was shut (#94): the ones
     /// open when you shut it, it hides too (#154). An empty folder sits at the top of where it is, where you'll see it
-    /// and can drop pages in. `bookmarks` leaves out the pages that ride in another's row.
-    static func pinnedRows(bookmarks: [UUID], folders: [BookmarkFolder], current: UUID?,
+    /// and can drop pages in. `bookmarks` leaves out the pages that ride in another's row. `folded`: the section is
+    /// folded, so only open pages and the page you're on show, each under the folders on its way (#325).
+    static func pinnedRows(bookmarks: [UUID], folders: [BookmarkFolder], current: UUID?, folded: Bool = false,
                            isOpen: (UUID) -> Bool) -> (rows: [SidebarItem], depth: [SidebarItem: Int], pageCounts: [UUID: Int]) {
         var result: [SidebarItem] = []
         var rowDepth: [SidebarItem: Int] = [:]
@@ -356,6 +358,22 @@ final class SidebarListView: NSView {
         let holding = folders.holdingPages
         let inside = Dictionary(grouping: folders, by: \.parentID)
         let tucked = Dictionary(folders.compactMap { f in f.tucked.map { (f.id, Set($0)) } }, uniquingKeysWith: { a, _ in a })
+        if folded {
+            var shown: Set<UUID> = []
+            for id in bookmarks {
+                let chain = path(to: folderOf[id])
+                // Hidden in a shut folder on purpose, it stays hidden here too.
+                let tuckedAway = chain.contains { byID[$0]?.isOpen == false && tucked[$0]?.contains(id) == true }
+                guard id == current || (isOpen(id) && !tuckedAway) else { continue }
+                while !stack.isEmpty, stack.count > chain.count || Array(chain.prefix(stack.count)) != stack { stack.removeLast() }
+                for folder in chain.dropFirst(stack.count) {
+                    if shown.insert(folder).inserted { result.append(.folder(folder)); rowDepth[.folder(folder)] = stack.count }
+                    stack.append(folder)
+                }
+                result.append(.bookmark(id)); rowDepth[.bookmark(id)] = stack.count
+            }
+            return (result, rowDepth, folderPageCounts)
+        }
         func enter(_ id: UUID) {
             if firstShut == nil { result.append(.folder(id)); rowDepth[.folder(id)] = stack.count }
             stack.append(id)
@@ -919,8 +937,10 @@ final class SidebarListView: NSView {
         case .folder(let id):
             let row = FolderRowView()
             row.onClick = { [weak self] _ in
-                guard let open = Library.shared.folder(id)?.isOpen else { return }
-                self?.delegate?.listSetFolderOpen(id, !open)
+                guard let self, let open = Library.shared.folder(id)?.isOpen else { return }
+                // In a folded section, it unfolds the section.
+                if let space = self.shownSpaceID, Self.isCollapsed(space) { self.toggleCollapsed(); return }
+                self.delegate?.listSetFolderOpen(id, !open)
             }
             row.onRename = { [weak self] name in self?.delegate?.listRenameFolder(id, to: name) }
             row.onRightClick = { [weak self] _ in self?.delegate?.listMenu(for: item) }
@@ -998,7 +1018,7 @@ final class SidebarListView: NSView {
                 guard let tab = row?.tab else { return }
                 self?.delegate?.listSetNestedTabsCollapsed(tab, !tab.isCollapsed)
             }
-            row.onRightClick = { [weak self] _ in self?.menu(for: item) }
+            row.onRightClick = { [weak self, weak row] event in self?.menu(for: item, row: row, event: event) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
@@ -1051,7 +1071,7 @@ final class SidebarListView: NSView {
                 if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id) } else { unload() }
             }
             row.onMiddleClick = unload
-            row.onRightClick = { [weak self] _ in self?.menu(for: item) }
+            row.onRightClick = { [weak self, weak row] event in self?.menu(for: item, row: row, event: event) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
@@ -1111,7 +1131,8 @@ final class SidebarListView: NSView {
         case .folder(let id):
             guard let row = view as? FolderRowView, let folder = Library.shared.folder(id) else { return }
             let count = folderPageCounts[id] ?? Library.shared.allBookmarkIDs(inFolder: id).count
-            row.configure(name: folder.name, open: folder.isOpen, count: count, icon: folder.icon)
+            let folded = shownSpaceID.map(Self.isCollapsed) ?? false
+            row.configure(name: folder.name, open: folder.isOpen && !folded, count: count, icon: folder.icon)
             row.setAccessibilityDisclosureLevel(rowDepth[item] ?? 0)
         case .tabGroup(let id):
             guard let row = view as? FolderRowView, let group = manager.group(id) else { return }
@@ -1306,9 +1327,13 @@ final class SidebarListView: NSView {
         refreshRows()
     }
 
-    private func menu(for item: SidebarItem) -> NSMenu? {
+    private func menu(for item: SidebarItem, row: TabRowView? = nil, event: NSEvent? = nil) -> NSMenu? {
         if marked.count > 1, marked.contains(item) { return delegate?.listMenu(forMarked: marked) }
         clearMarks()
+        // In a row of several pages, the part right-clicked.
+        if let row, let event, row.pages.count > 1 {
+            return delegate?.listMenu(for: item, page: row.page(at: row.convert(event.locationInWindow, from: nil)))
+        }
         return delegate?.listMenu(for: item)
     }
 
@@ -1422,6 +1447,9 @@ final class SidebarListView: NSView {
     var headerView: NSView? { rows[.header] }
 
     #if DEBUG
+    /// The rows the list holds, top to bottom, laid out or not.
+    var debugItems: [SidebarItem] { items }
+
     /// Every row as it's laid out: a name a test can find it by, and where it is in the window.
     func debugRows() -> [(String, NSRect)] {
         guard let manager else { return [] }
@@ -1447,8 +1475,14 @@ final class SidebarListView: NSView {
     }
     #endif
     func folderRow(_ id: UUID) -> NSView? { madeRow(.folder(id)) }
+    func groupRow(_ id: UUID) -> NSView? { madeRow(.tabGroup(id)) }
     /// A tab's or pinned page's row, scrolled into sight, for something to open beside it.
-    func tabRow(_ id: UUID) -> NSView? { shownRow(.tab(id)) }
+    func tabRow(_ id: UUID) -> NSView? {
+        if let row = shownRow(.tab(id)) { return row }
+        // A page of a split or tile group: the group's row.
+        guard let item = rows.first(where: { ($0.value as? TabRowView)?.pages.contains { $0.id == id } == true })?.key else { return nil }
+        return shownRow(item)
+    }
     func bookmarkRow(_ id: UUID) -> NSView? { shownRow(.bookmark(id)) }
 
     /// A row scrolled into sight, to type in.
@@ -1536,23 +1570,36 @@ final class SidebarListView: NSView {
 
     private static let collapsedKey = "CollapsedBookmarkSpaces"
 
-    static func isCollapsed(_ spaceID: UUID) -> Bool {
-        (UserDefaults.standard.stringArray(forKey: collapsedKey) ?? []).contains(spaceID.uuidString)
+    #if DEBUG
+    /// Folded sections kept in memory instead of the defaults, for tests and the debug bridge.
+    static var debugCollapsed: Set<String>?
+    #endif
+
+    private static var collapsedSpaces: Set<String> {
+        get {
+            #if DEBUG
+            if let debugCollapsed { return debugCollapsed }
+            #endif
+            return Set(UserDefaults.standard.stringArray(forKey: collapsedKey) ?? [])
+        }
+        set {
+            #if DEBUG
+            if debugCollapsed != nil { debugCollapsed = newValue; return }
+            #endif
+            UserDefaults.standard.set(Array(newValue), forKey: collapsedKey)
+        }
     }
+
+    static func isCollapsed(_ spaceID: UUID) -> Bool { collapsedSpaces.contains(spaceID.uuidString) }
 
     /// Opens or folds a space's pinned section (opened again for a new folder, so it shows).
     static func setCollapsed(_ spaceID: UUID, _ collapsed: Bool) {
-        var set = Set(UserDefaults.standard.stringArray(forKey: collapsedKey) ?? [])
-        if collapsed { set.insert(spaceID.uuidString) } else { set.remove(spaceID.uuidString) }
-        UserDefaults.standard.set(Array(set), forKey: collapsedKey)
+        if collapsed { collapsedSpaces.insert(spaceID.uuidString) } else { collapsedSpaces.remove(spaceID.uuidString) }
     }
 
     private func toggleCollapsed() {
         guard let manager, !Library.shared.bookmarks(in: manager.currentSpaceID).isEmpty else { return }
-        var set = Set(UserDefaults.standard.stringArray(forKey: Self.collapsedKey) ?? [])
-        let id = manager.currentSpaceID.uuidString
-        if set.contains(id) { set.remove(id) } else { set.insert(id) }
-        UserDefaults.standard.set(Array(set), forKey: Self.collapsedKey)
+        Self.setCollapsed(manager.currentSpaceID, !Self.isCollapsed(manager.currentSpaceID))
         reload(animated: true)
     }
 
@@ -1569,6 +1616,9 @@ final class SidebarListView: NSView {
 
     /// The row showing a pinned page (a pinned split's row for either of its pages).
     func row(forBookmark id: UUID) -> NSView? { madeRow(.bookmark(Self.rowID(id))) }
+
+    /// The folder's row, if visible.
+    func row(forFolder id: UUID) -> NSView? { madeRow(.folder(id)) }
 
     private func observeHover(_ row: TabRowView) {
         row.hoverChanged = { [weak self, weak row] hovering in
@@ -1885,8 +1935,7 @@ final class SidebarListView: NSView {
         if carriedRowShown, let block = drag.carried.compactMap({ shownFrames[$0] }).reduce(nil, { $0?.union($1) ?? $1 }) {
             if y > block.maxY { y -= block.height + rowGap } else if y >= block.minY { y = block.minY }
         }
-        let isGroup = if case .tabGroup = drag.item { true } else { false }
-        return target(at: y, allowsPinned: manager?.isPrivate == false && !isGroup, carried: drag.carried)
+        return target(at: y, allowsPinned: manager?.isPrivate == false, carried: drag.carried)
     }
 
     /// The row as one side of a split drop (see TabManager.canSplit); nil for rows that aren't a page.
@@ -2337,6 +2386,10 @@ final class SidebarListView: NSView {
         case (.tabGroup(let id), .tabs):
             delegate?.listMoveGroup(id, to: listIndex, in: space)
             return rows[.tabGroup(id)]
+        case (.tabGroup(let id), .bookmarks):
+            delegate?.listPinGroup(id, at: drag.targetIndex, in: space, folder: gapFolder)
+            landing = groupTabs.first?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)).flatMap { madeRow(.folder($0.id)) }
+            return landing
         case (.tab, .tabs):
             if let tab { delegate?.listMove(tab, to: listIndex, in: space, nesting: .under(gapParent), grouping: .into(gapGroup)) }
         case (.tab, .bookmarks):

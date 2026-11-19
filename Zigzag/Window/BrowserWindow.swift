@@ -195,11 +195,34 @@ final class BrowserWindow: NSWindow {
             UndoClock.lastPageInput = Date()
         }
         if let eventInterceptor, eventInterceptor(event) { return }
+        if let side = SideButton(event.type, button: event.buttonNumber) {
+            if let action = side.action { windowController?.tryToPerform(action, with: nil) }
+            return
+        }
         if movesWindow(for: event) { return }
         if event.type == .scrollWheel, pdfView(at: event.locationInWindow)?.takesSwipe(event) == true { return }
         if routeTitlebarEvent(event) { return }
         if swallowsPanelPress(event) { return }
         super.sendEvent(event)
+    }
+
+    /// Side buttons go back and forward in every page window, as in Chrome; on release, with the press taken too (#345).
+    enum SideButton: Equatable {
+        case press, back, forward
+
+        init?(_ type: NSEvent.EventType, button: Int) {
+            guard type == .otherMouseDown || type == .otherMouseUp, button == 3 || button == 4 else { return nil }
+            self = type == .otherMouseDown ? .press : button == 3 ? .back : .forward
+        }
+
+        /// The window controller's action: each window's own Back and Forward.
+        var action: Selector? {
+            switch self {
+            case .press: nil
+            case .back: #selector(MiniWindowController.goBack(_:))
+            case .forward: #selector(MiniWindowController.goForward(_:))
+            }
+        }
     }
 
     /// A press on a floating panel's own surface (a gap between its rows, a label, its corner) stays the panel's: the

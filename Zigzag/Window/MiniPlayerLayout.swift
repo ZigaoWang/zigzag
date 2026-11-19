@@ -93,6 +93,13 @@ nonisolated enum MiniPlayerLayout {
         playingSound && !followed && !inFullScreen
     }
 
+    /// Whether a page still counts as on screen while its window is covered by other windows or on another desktop:
+    /// while it plays sound and for `nextItemWait` after (`quiet`: how long since it stopped). Covered, WebKit counts
+    /// it as hidden, as it does a page out of the window (#199).
+    static func ignoresCover(playingSound: Bool, quiet: TimeInterval?) -> Bool {
+        playingSound || quiet.map { $0 < nextItemWait } == true
+    }
+
     /// Whether it's playing a picture big enough to be the thing on the page.
     static func plays(_ video: PageVideo) -> Bool {
         video.isPlaying && !video.hasEnded && video.natural.width > 0 && video.natural.height > 0

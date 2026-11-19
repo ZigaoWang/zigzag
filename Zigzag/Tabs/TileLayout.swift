@@ -482,6 +482,5 @@ nonisolated struct PaneZoom: Equatable, Sendable {
             return nil
         }
         return index
-        return index
     }
 }

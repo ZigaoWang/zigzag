@@ -470,7 +470,13 @@ enum PictureInPicture {
 enum PageRetirement {
     private static var retiring: [WKWebView] = []
 
-    static func retire(_ webView: WKWebView) {
+    /// `endingPasskeys`: a waiting passkey request is ended before the page closes, in case closing leaves it with macOS (#348).
+    static func retire(_ webView: WKWebView, endingPasskeys: Bool = Passkeys.available) {
+        guard endingPasskeys else { queue(webView); return }
+        Passkeys.endRequests(in: webView) { queue(webView) }
+    }
+
+    private static func queue(_ webView: WKWebView) {
         retiring.append(webView)
         guard retiring.count == 1 else { return }
         DispatchQueue.main.async { MainActor.assumeIsolated { closeRetired() } }

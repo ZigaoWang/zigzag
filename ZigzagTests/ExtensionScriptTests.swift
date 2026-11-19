@@ -2,6 +2,7 @@ import Foundation
 import JavaScriptCore
 import SQLite3
 import Testing
+import WebKit
 @testable import Zigzag
 
 extension ExtensionScriptTests {
@@ -527,6 +528,49 @@ struct ExtensionScriptTests {
         #expect(context.evaluateScript("chrome.storage.sync.MAX_ITEMS").toInt32() == 512)
     }
 
+    @Test func storageCallsAnswerInTheOrderMade() {
+        // WebKit answers a get before an earlier set; Strongbox reads its settings back right after saving them (#350).
+        #expect(ExtensionBridgeScript.differences.contains(ExtensionBridgeScript.storageInOrder))
+        #expect(ExtensionStore.contentScriptsFirst.contains(ExtensionBridgeScript.storageInOrder))
+        let context = JSContext()!
+        context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
+        context.evaluateScript("""
+        var __timers = [];
+        var setTimeout = (f) => { __timers.push(f); return __timers.length; };
+        var __flush = () => { const t = __timers.splice(0); t.forEach((f) => f()); };
+        var __store = {}, __reads = 0;
+        var chrome = { runtime: { id: 'x' }, storage: { sync: {
+          set(items, callback) {
+            const saved = new Promise((resolve) => setTimeout(() => { Object.assign(__store, items); resolve(); }));
+            if (!callback) return saved;
+            saved.then(() => callback());
+          },
+          get(keys, callback) {
+            __reads++;
+            const values = JSON.parse(JSON.stringify(__store));
+            if (!callback) return Promise.resolve(values);
+            Promise.resolve().then(() => callback(values));
+          },
+        } } };
+        """)
+        context.evaluateScript(ExtensionBridgeScript.storageInOrder)
+        context.evaluateScript("""
+        var __seen = [];
+        chrome.storage.sync.get(null); chrome.storage.sync.get(null);
+        var __readsAtOnce = __reads;
+        chrome.storage.sync.set({ on: true });
+        chrome.storage.sync.get(['on']).then((v) => __seen.push('promise ' + v.on));
+        chrome.storage.sync.set({ off: true }, () => __seen.push('saved'));
+        chrome.storage.sync.get(null, (v) => __seen.push('callback ' + v.off));
+        """)
+        for _ in 0..<6 { context.evaluateScript("__flush()") }
+        #expect(context.evaluateScript("__readsAtOnce").toInt32() == 2)
+        #expect(context.evaluateScript("__seen.join()").toString() == "promise true,saved,callback true")
+        // Idle again: a read goes straight to WebKit.
+        context.evaluateScript("var __before = __reads; chrome.storage.sync.get(null); var __after = __reads;")
+        #expect(context.evaluateScript("__after - __before").toInt32() == 1)
+    }
+
     /// A fake extension world for webkit-differences.js: the background or one of its pages in a tab, with ports
     /// that the test carries between the two.
     private static let fakeWorld = """
@@ -754,13 +798,61 @@ struct ExtensionScriptTests {
         return context
     }
 
-    @Test func extensionPagesSizeUnsizedIconsAsChromeDoes() {
-        // Sound Booster's mute button: an <svg> with no width in a flex row, which WebKit draws at no size (#45).
+    @Test func extensionPagesGetNoRuleSizingTheirIcons() {
+        // WebKit sizes an <svg> as Chrome does; a `width: 100%` rule stretched Dashlane's icons (#340).
         let context = Self.workerWorld(worker: false, setup: """
         var __styles = [];
         var document = { createElement: () => ({ textContent: '' }), documentElement: { prepend: (node) => __styles.push(node.textContent) } };
         """)
-        #expect(context.evaluateScript("__styles.join()").toString() == ":where(svg:not([width])) { width: 100%; }")
+        #expect(context.evaluateScript("__styles.length").toInt32() == 0)
+        #expect(context.evaluateScript("__styles.join()").toString() == "")
+    }
+
+    private final class PageLoad: NSObject, WKNavigationDelegate {
+        var done: CheckedContinuation<Void, Never>?
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
+    }
+
+    /// Sizes Chrome gives these icons, measured in Chrome at the same width.
+    @MainActor @Test func extensionPageIconsGetChromesSizes() async throws {
+        let context = Self.workerWorld(worker: false, setup: """
+        var __styles = [];
+        var document = { createElement: () => ({ textContent: '' }), documentElement: { prepend: (node) => __styles.push(node.textContent) } };
+        """)
+        let injected = context.evaluateScript("__styles.join('\\n')").toString() ?? ""
+        let shape = #"viewBox="0 0 24 24"><rect width="24" height="24"/></svg>"#
+        let html = """
+        <style>\(injected)</style><style>body { margin: 0; width: 320px; font: 14px sans-serif } .icon { height: 24px }</style>
+        <div id="dashlane" style="display: flex; align-items: center"><svg class="icon" \(shape)<h2 style="margin: 0; font-size: 16px; line-height: 20px">Your logins on this site</h2></div>
+        <div id="height-attribute" style="display: flex; align-items: center"><svg height="20" \(shape)<span>Label</span></div>
+        <div id="em" style="display: flex; align-items: center"><svg style="height: 1em" \(shape)<span>Label</span></div>
+        <div id="mute"><button style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0"><svg \(shape)</button></div>
+        <div id="padded"><button style="width: 32px; height: 32px; padding: 4px; border: 0"><svg \(shape)</button></div>
+        """
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        let loading = PageLoad()
+        webView.navigationDelegate = loading
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString(html, baseURL: nil)
+        }
+        withExtendedLifetime(loading) {}
+        let sizes = try #require(try await webView.evaluateJavaScript("""
+        JSON.stringify(Object.fromEntries([...document.querySelectorAll('body > div')].map((row) => {
+          const box = (node) => { const r = node.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; };
+          return [row.id, { icon: box(row.querySelector('svg')), text: row.querySelector('h2') ? box(row.querySelector('h2')) : null }];
+        })))
+        """) as? String)
+        let rows = try #require(try JSONSerialization.jsonObject(with: Data(sizes.utf8)) as? [String: [String: Any]])
+        let icon = { (id: String) in rows[id]?["icon"] as? [Int] }
+        // Dashlane's webcard (#340): the icon keeps its square and the heading stays on one line.
+        #expect(icon("dashlane") == [24, 24])
+        #expect((rows["dashlane"]?["text"] as? [Int])?.last == 20)
+        #expect(icon("height-attribute") == [20, 20])
+        #expect(icon("em") == [14, 14])
+        // Sound Booster's mute button (#45): an icon with no size fills its button.
+        #expect(icon("mute") == [32, 32])
+        #expect(icon("padded") == [24, 24])
     }
 
     @Test func tabsComeWithTheirSiteIcons() {

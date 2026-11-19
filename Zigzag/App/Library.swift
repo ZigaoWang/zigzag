@@ -52,6 +52,31 @@ extension Array where Element == BookmarkFolder {
         return ids
     }
 
+    /// Pinned pages in a folder and its subfolders, in list order.
+    nonisolated func pages(in id: UUID, ordered order: [UUID]) -> [UUID] {
+        let inside = pages(in: id)
+        return order.filter { inside.contains($0) }
+    }
+
+    /// Whether the folder or any subfolder is open (or shut, for `open` false).
+    nonisolated func anyInTree(of id: UUID, isOpen open: Bool) -> Bool {
+        let tree = Set(descendants(of: id) + [id])
+        return contains { tree.contains($0.id) && $0.isOpen == open }
+    }
+
+    /// Opens or shuts a folder and all its subfolders; shutting hides their pages in `shown`.
+    nonisolated func folding(_ id: UUID, open: Bool, shown: Set<UUID> = []) -> [BookmarkFolder] {
+        let tree = Set(descendants(of: id) + [id])
+        return map { folder in
+            guard tree.contains(folder.id) else { return folder }
+            var folder = folder
+            let tucking = open ? [] : pages(in: folder.id).intersection(shown)
+            folder.isOpen = open
+            folder.tucked = tucking.isEmpty ? nil : tucking.sorted { $0.uuidString < $1.uuidString }
+            return folder
+        }
+    }
+
     /// The folders with a pinned page in them or in a folder inside them.
     nonisolated var holdingPages: Set<UUID> {
         let parent = Dictionary(map { ($0.id, $0.parentID) }, uniquingKeysWith: { a, _ in a })
@@ -295,6 +320,25 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             // At night the color is already deep and rich: only a touch, so the frame stays dark under light text.
             let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             return a.blended(withFraction: CGFloat(dark ? amount * 0.3 : amount), of: b) ?? a
+        }
+    }
+
+    /// `a` moved `share` of the way to `b`, alpha included, light and dark alike: a look partway through a swipe.
+    static func mix(_ a: NSColor, _ b: NSColor, by share: CGFloat) -> NSColor {
+        let t = min(max(share, 0), 1)
+        if t == 0 { return a }
+        if t == 1 { return b }
+        return NSColor(name: nil) { appearance in
+            var x: NSColor?, y: NSColor?
+            appearance.performAsCurrentDrawingAppearance {
+                x = a.usingColorSpace(.sRGB)
+                y = b.usingColorSpace(.sRGB)
+            }
+            guard let x, let y else { return t < 0.5 ? a : b }
+            return NSColor(srgbRed: x.redComponent + (y.redComponent - x.redComponent) * t,
+                           green: x.greenComponent + (y.greenComponent - x.greenComponent) * t,
+                           blue: x.blueComponent + (y.blueComponent - x.blueComponent) * t,
+                           alpha: x.alphaComponent + (y.alphaComponent - x.alphaComponent) * t)
         }
     }
 
@@ -1202,8 +1246,7 @@ final class Library {
     /// Every pinned page in a folder and its subfolders, in the list's order.
     func allBookmarkIDs(inFolder id: UUID) -> [UUID] {
         guard let s = spaceIndex(ofFolder: id) else { return [] }
-        let inside = (spaces[s].folders ?? []).pages(in: id)
-        return spaces[s].bookmarks.map(\.id).filter { inside.contains($0) }
+        return (spaces[s].folders ?? []).pages(in: id, ordered: spaces[s].bookmarks.map(\.id))
     }
 
     /// Every folder inside this one, at any depth.
@@ -1260,6 +1303,13 @@ final class Library {
         guard let s = spaceIndex(ofFolder: id), let f = spaces[s].folders?.firstIndex(where: { $0.id == id }) else { return }
         spaces[s].folders?[f].isOpen = open
         spaces[s].folders?[f].tucked = open || tucking.isEmpty ? nil : tucking.sorted { $0.uuidString < $1.uuidString }
+        commit()
+    }
+
+    /// Opens or shuts a folder and all its subfolders; shutting hides their pages in `shown`.
+    func setFolderTreeOpen(_ id: UUID, _ open: Bool, shown: Set<UUID> = []) {
+        guard let s = spaceIndex(ofFolder: id), let folders = spaces[s].folders else { return }
+        spaces[s].folders = folders.folding(id, open: open, shown: shown)
         commit()
     }
 
