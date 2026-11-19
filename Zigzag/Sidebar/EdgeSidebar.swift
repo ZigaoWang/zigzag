@@ -121,6 +121,13 @@ final class EdgeSidebar {
                 }
             }
         })
+        // Another app or another space is a change of context: the panel goes, and the peek closes with it.
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.hide(animated: false) }
+        })
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.hide(animated: false) }
+        })
         if Self.isOn { start() }
     }
 

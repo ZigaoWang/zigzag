@@ -161,6 +161,8 @@ final class SidebarListView: NSView {
     var spaceOverride: UUID?
     /// The tab the peek popout is showing: a temporary highlight, separate from the browser's selection.
     var peekTabID: UUID?
+    /// The row a pick came from, on screen: the peek grows from it and shrinks back into it.
+    private(set) var lastPickedRowFrame: NSRect?
 
     func setPeek(_ id: UUID?) {
         guard peekTabID != id else { return }
@@ -1007,6 +1009,7 @@ final class SidebarListView: NSView {
                 }
                 if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
+                self.lastPickedRowFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
                 self.pick(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
                 _ = id
             }
@@ -1058,6 +1061,7 @@ final class SidebarListView: NSView {
                         opening = pinned.ids[part]
                     } else if part == 1, let partner = row.partner, partner.bookmarkID == nil {
                         // The tab split beside it, riding in this row.
+                        self.lastPickedRowFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
                         self.pick(partner)
                         return
                     }

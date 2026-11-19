@@ -38,6 +38,20 @@ struct EdgePeekTests {
         #expect(page.height >= 0)
     }
 
+    @Test func theSidebarKeepsThePeekOpen() {
+        #expect(EdgePeekFocusPolicy.keepsOpen(newKey: .sidebar, menuOpen: false))
+    }
+
+    @Test func aThirdPartySwitcherClosesThePeek() {
+        #expect(!EdgePeekFocusPolicy.keepsOpen(newKey: .none, menuOpen: false))
+        #expect(!EdgePeekFocusPolicy.keepsOpen(newKey: .other, menuOpen: false))
+    }
+
+    @Test func anOwnedSheetOrMenuKeepsItOpen() {
+        #expect(EdgePeekFocusPolicy.keepsOpen(newKey: .owned, menuOpen: false))
+        #expect(EdgePeekFocusPolicy.keepsOpen(newKey: .none, menuOpen: true))
+    }
+
     @Test func theToolbarShowsTheStateItIsGiven() {
         let toolbar = EdgePeekToolbar(frame: .zero)
         toolbar.update(state: EdgePeekToolbarState(address: "youtube.com/watch?v=1", canGoBack: true,

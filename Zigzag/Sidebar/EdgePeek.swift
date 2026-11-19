@@ -2,6 +2,20 @@ import AppKit
 import WebKit
 
 /// Where the edge Peek's page sits: the rest of the screen beside the sidebar, its top and bottom the sidebar card's.
+/// What keeps the popout out when it loses key: the sidebar itself (to pick another tab) and our own menus or
+/// sheets. Everything else, including a third-party switcher that takes key without activating an app, closes it.
+enum EdgePeekFocusPolicy {
+    enum NewKey { case none, sidebar, owned, other }
+
+    static func keepsOpen(newKey: NewKey, menuOpen: Bool) -> Bool {
+        if menuOpen { return true }
+        switch newKey {
+        case .sidebar, .owned: return true
+        case .none, .other: return false
+        }
+    }
+}
+
 enum EdgePeekLayout {
     /// The page area beside the sidebar, inside the screen's own margins.
     static func pageFrame(beside sidebar: NSRect, in screen: NSRect, onRight: Bool) -> NSRect {
@@ -49,6 +63,10 @@ final class EdgePeek {
     private var spaceObserver: NSObjectProtocol?
     private var appObserver: NSObjectProtocol?
     private var activationObserver: NSObjectProtocol?
+    private var keyLostObserver: NSObjectProtocol?
+    /// The row the popout came from, on screen: it grows from it and shrinks back into it.
+    private var sourceFrame: NSRect?
+    private var isClosing = false
 
     private var headerHeight: CGFloat { Tokens.Pane.height }
     private static let inset = Tokens.Metric.peekInset
@@ -92,27 +110,41 @@ final class EdgePeek {
 
         let screen = NSScreen.screens.first { $0.visibleFrame.intersects(sidebarFrame) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        panel.setFrame(EdgePeekLayout.pageFrame(beside: sidebarFrame, in: visible,
-                                                onRight: EdgeSidebar.shared.panelOnRight), display: false)
+        let pageFrame = EdgePeekLayout.pageFrame(beside: sidebarFrame, in: visible,
+                                                 onRight: EdgeSidebar.shared.panelOnRight)
+        sourceFrame = controller.edgeSidebarForDisplay().sidebar.list.lastPickedRowFrame
+        panel.setFrame(sourceFrame ?? pageFrame, display: false)
         // The panel keeps the sidebar out while the page is attached, whatever the pointer does.
         EdgeSidebar.shared.holdForPeek(true)
         card.layoutSubtreeIfNeeded()
         layout()
         isVisible = true
+        isClosing = false
         panel.orderFrontRegardless()
         panel.makeKey()
+        if let sourceFrame {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.28
+                context.timingFunction = Tokens.Motion.easeOut
+                panel.animator().setFrame(pageFrame, display: true)
+            }
+        }
         if let webView = tab.webView { panel.makeFirstResponder(webView) }
 
         // The browser coming forward, or going away, takes the page back with it.
         if let window = controller.window {
             keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
                                                                  object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.close() }
+                MainActor.assumeIsolated { self?.close(duration: 0.15) }
             }
             closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification,
                                                                   object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.dismiss() }
             }
+        }
+        keyLostObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification,
+                                                                  object: panel, queue: .main) { [weak self] _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { self?.focusChanged() } }
         }
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
@@ -149,23 +181,23 @@ final class EdgePeek {
         outsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self, self.isVisible, MenuPanel.current == nil else { return }
-                if self.panel?.frame.contains(NSEvent.mouseLocation) != true { self.close() }
+                if self.panel?.frame.contains(NSEvent.mouseLocation) != true { self.close(duration: 0.15) }
             }
         }
         outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.isVisible else { return event }
             if MenuPanel.current != nil || RunLoop.current.currentMode == .eventTracking { return event }
-            if event.window !== self.panel && event.window !== EdgeSidebar.shared.panelWindow { self.close() }
+            if event.window !== self.panel && event.window !== EdgeSidebar.shared.panelWindow { self.close(duration: 0.15) }
             return event
         }
         // Moving to another app or desktop is moving away: the page goes back rather than following the focus.
         activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                                   object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.close() }
+            MainActor.assumeIsolated { self?.close(duration: 0.15) }
         }
         spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
                                                                           object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.close() }
+            MainActor.assumeIsolated { self?.close(duration: 0.15) }
         }
         appObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
                                                                         object: nil, queue: .main) { [weak self] note in
@@ -197,6 +229,7 @@ final class EdgePeek {
         refreshToolbar()
         refreshGround()
         token = newTab.changed.observe { [weak self] _ in self?.refreshToolbar() }
+        sourceFrame = controller?.edgeSidebarForDisplay().sidebar.list.lastPickedRowFrame
         layout()
         if let webView = newTab.webView { panel?.makeFirstResponder(webView) }
     }
@@ -298,16 +331,56 @@ final class EdgePeek {
 
     // MARK: Closing
 
-    /// Puts the page back and takes the card away.
-    func close() {
-        guard isVisible else { return }
-        let tab = self.tab
+    /// Puts the page back and takes the card away, shrinking into the row it came from.
+    func close(duration: TimeInterval = 0.26) {
+        guard isVisible, !isClosing else { return }
         let controller = self.controller
-        if let tab { restore(tab) }
-        teardown()
-        if let controller, let webView = controller.selectedWebView {
-            controller.window?.makeFirstResponder(webView)
+        guard duration > 0, let panel, let source = sourceFrame else {
+            if let tab { restore(tab) }
+            teardown()
+            if let controller, let webView = controller.selectedWebView {
+                controller.window?.makeFirstResponder(webView)
+            }
+            return
         }
+        isClosing = true
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = Tokens.Motion.easeOut
+            panel.animator().setFrame(source, display: true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.isClosing else { return }
+                self.isClosing = false
+                let controller = controller
+                if let tab = self.tab { self.restore(tab) }
+                self.teardown()
+                if let controller, let webView = controller.selectedWebView {
+                    controller.window?.makeFirstResponder(webView)
+                }
+            }
+        }
+    }
+
+    /// The popout is no longer the key window: keep it only for the sidebar or our own menus and sheets.
+    private func focusChanged() {
+        guard isVisible, !isClosing else { return }
+        let key = NSApp.keyWindow
+        if key === panel { return }
+        let newKey: EdgePeekFocusPolicy.NewKey
+        if key == nil {
+            newKey = .none
+        } else if key === EdgeSidebar.shared.panelWindow {
+            newKey = .sidebar
+        } else if key is EdgeCommandBarPopup || key is NSSavePanel || key?.sheetParent != nil {
+            newKey = .owned
+        } else {
+            newKey = .other
+        }
+        guard !EdgePeekFocusPolicy.keepsOpen(newKey: newKey, menuOpen: MenuPanel.current != nil) else { return }
+        EdgeSidebar.shared.hide(animated: false)
+        close(duration: 0.15)
     }
 
     /// The browser window is going: the page goes with it, not held by a card.
@@ -320,10 +393,14 @@ final class EdgePeek {
     private func teardown() {
         controller?.setEdgePeek(nil)
         isVisible = false
+        isClosing = false
+        sourceFrame = nil
         token = nil
         self.tab = nil
         controller = nil
         origin = nil
+        if let keyLostObserver { NotificationCenter.default.removeObserver(keyLostObserver) }
+        keyLostObserver = nil
         if let escMonitor { NSEvent.removeMonitor(escMonitor) }
         escMonitor = nil
         if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
@@ -347,7 +424,7 @@ final class EdgePeek {
     /// Opens the page as the browser's tab: same holder, same page, now in its pane and the window in front.
     func openAsTab() {
         guard let tab, let controller else { return }
-        close()
+        close(duration: 0)
         controller.tabManager.select(tab)
         controller.bringForwardForEdge(keepingPanel: true)
     }
