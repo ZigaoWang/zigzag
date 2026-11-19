@@ -38,6 +38,16 @@ struct EdgePeekTests {
         #expect(page.height >= 0)
     }
 
+    @Test func theToolbarShowsTheStateItIsGiven() {
+        let toolbar = EdgePeekToolbar(frame: .zero)
+        toolbar.update(state: EdgePeekToolbarState(address: "youtube.com/watch?v=1", canGoBack: true,
+                                                   canGoForward: false, isLoading: true))
+        #expect(toolbar.addressField.stringValue == "youtube.com/watch?v=1")
+        #expect(toolbar.backButton.isEnabled)
+        #expect(!toolbar.forwardButton.isEnabled)
+        #expect(toolbar.reloadButton.isLoading)
+    }
+
     @Test func anOffsetScreenKeepsThePageOnIt() {
         let offset = NSRect(x: 1512, y: 0, width: 1280, height: 800)
         let sidebar = NSRect(x: 1512 + 1000, y: 16, width: 264, height: 768)

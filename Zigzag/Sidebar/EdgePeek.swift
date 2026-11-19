@@ -32,7 +32,7 @@ final class EdgePeek {
     private var panel: EdgeSidebarPanel?
     private var card: FloatingPanelView?
     private var clip: FlippedView?
-    private let header = PeekHeaderView(frame: .zero)
+    private let toolbar = EdgePeekToolbar(frame: .zero)
     private let content = NSView()
     private weak var controller: BrowserWindowController?
     private(set) var tab: Tab?
@@ -50,12 +50,10 @@ final class EdgePeek {
     private var appObserver: NSObjectProtocol?
     private var activationObserver: NSObjectProtocol?
 
-    private var headerHeight: CGFloat { Tokens.Metric.peekHeaderHeight }
+    private var headerHeight: CGFloat { Tokens.Pane.height }
     private static let inset = Tokens.Metric.peekInset
 
     private init() {
-        header.closeButton.onClick = { [weak self] _ in self?.close() }
-        header.expandButton.onClick = { [weak self] _ in self?.openAsTab() }
         content.wantsLayer = true
         content.layer?.masksToBounds = true
         content.layer?.cornerCurve = .continuous
@@ -87,9 +85,9 @@ final class EdgePeek {
         holder.autoresizingMask = [.width, .height]
         content.addSubview(holder)
 
-        refreshHeader()
+        refreshToolbar()
         refreshGround()
-        token = tab.changed.observe { [weak self] _ in self?.refreshHeader() }
+        token = tab.changed.observe { [weak self] _ in self?.refreshToolbar() }
 
         let screen = NSScreen.screens.first { $0.visibleFrame.intersects(sidebarFrame) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -116,9 +114,32 @@ final class EdgePeek {
             }
         }
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
             if event.keyCode == 53 {
-                self?.close()
+                self.close()
                 return nil
+            }
+            let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+            if mods == .command, let characters = event.charactersIgnoringModifiers?.lowercased() {
+                switch characters {
+                case "l":
+                    self.toolbar.focusAddress()
+                    return nil
+                case "r":
+                    self.tab?.webView?.reload()
+                    return nil
+                case "t":
+                    EdgeSidebar.shared.newTabInPlace()
+                    return nil
+                case "w":
+                    if let tab = self.tab, let controller = self.controller {
+                        controller.tabManager.close(tab)
+                        self.dismiss()
+                    }
+                    return nil
+                default:
+                    break
+                }
             }
             return event
         }
@@ -132,7 +153,7 @@ final class EdgePeek {
         }
         outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.isVisible else { return event }
-            if MenuPanel.current != nil { return event }
+            if MenuPanel.current != nil || RunLoop.current.currentMode == .eventTracking { return event }
             if event.window !== self.panel && event.window !== EdgeSidebar.shared.panelWindow { self.close() }
             return event
         }
@@ -171,9 +192,9 @@ final class EdgePeek {
         holder.frame = content.bounds
         holder.autoresizingMask = [.width, .height]
         content.addSubview(holder)
-        refreshHeader()
+        refreshToolbar()
         refreshGround()
-        token = newTab.changed.observe { [weak self] _ in self?.refreshHeader() }
+        token = newTab.changed.observe { [weak self] _ in self?.refreshToolbar() }
         layout()
         if let webView = newTab.webView { panel?.makeFirstResponder(webView) }
     }
@@ -204,8 +225,9 @@ final class EdgePeek {
         card.showsDesktop = true
         card.radius = Tokens.Radius.large
         card.onLayout = { [weak self] in self?.layout() }
+        configureToolbar()
         let clip = FlippedView()
-        clip.addSubview(header)
+        clip.addSubview(toolbar)
         clip.addSubview(content)
         card.addSubview(clip)
         panel.contentView = card
@@ -217,7 +239,7 @@ final class EdgePeek {
     private func layout() {
         guard let card, let clip else { return }
         clip.frame = card.bounds
-        header.frame = NSRect(x: 0, y: 0, width: card.bounds.width, height: headerHeight)
+        toolbar.frame = NSRect(x: 0, y: 0, width: card.bounds.width, height: headerHeight)
         content.frame = NSRect(x: Self.inset, y: headerHeight,
                                width: max(0, card.bounds.width - Self.inset * 2),
                                height: max(0, card.bounds.height - headerHeight - Self.inset))
@@ -227,19 +249,49 @@ final class EdgePeek {
 
     // MARK: Header
 
-    private func refreshHeader() {
+    private func configureToolbar() {
+        toolbar.onBack = { [weak self] in self?.tab?.webView?.goBack() }
+        toolbar.onForward = { [weak self] in self?.tab?.webView?.goForward() }
+        toolbar.onReload = { [weak self] in
+            guard let tab = self?.tab else { return }
+            if tab.isLoading { tab.webView?.stopLoading() } else { tab.webView?.reload() }
+        }
+        toolbar.onAddress = { [weak self] text in self?.navigate(to: text) }
+        toolbar.onExtensions = { [weak self] button in self?.showExtensions(from: button) }
+        toolbar.onExpand = { [weak self] in self?.openAsTab() }
+    }
+
+    private func refreshToolbar() {
         guard let tab else { return }
-        header.host.stringValue = tab.url.map(HistoryStore.normalizedHost) ?? tab.displayTitle
-        header.host.lineBreakMode = AddressView.lineBreak(forName: header.host.stringValue)
-        header.icon.image = tab.favicon
-        header.icon.isLoading = tab.isLoading
+        toolbar.update(state: EdgePeekToolbarState(
+            address: tab.url?.absoluteString ?? "",
+            canGoBack: tab.webView?.canGoBack ?? false,
+            canGoForward: tab.webView?.canGoForward ?? false,
+            isLoading: tab.isLoading))
+    }
+
+    private func navigate(to text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let candidate = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+        guard let url = URL(string: candidate),
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return }
+        tab?.load(url)
+    }
+
+    private func showExtensions(from button: IconButton) {
+        let menu = NSMenu()
+        let item = NSMenuItem(title: String(localized: "Extensions", comment: "The peek's extensions menu title."),
+                              action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        menu.addItem(item)
+        menu.popUp(positioning: nil, at: NSPoint(x: button.bounds.midX, y: button.bounds.minY), in: button)
     }
 
     private func refreshGround() {
         let color = tab?.pageColor
         card?.tintStrength = color == nil ? nil : 1
         card?.surfaceTint = color
-        header.ground = color
     }
 
     // MARK: Closing

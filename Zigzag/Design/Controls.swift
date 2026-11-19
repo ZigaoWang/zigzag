@@ -551,6 +551,13 @@ final class IconButton: InteractiveView {
     /// How big a full-color image is drawn; a site's icon by default.
     var imageSide = Tokens.Metric.favicon { didSet { needsLayout = true } }
     var tint: NSColor = Tokens.Color.icon { didSet { stateDidChange(animated: false) } }
+    /// A page load in progress: the same button becomes Stop, as the browser's reload does.
+    var isLoading = false { didSet {
+        guard isLoading != oldValue else { return }
+        symbol = isLoading ? "stop.fill" : "arrow.clockwise"
+        toolTip = isLoading ? String(localized: "Stop", comment: "Tooltip of the address bar's button while a page loads.")
+            : String(localized: "Reload", comment: "Tooltip of the address bar's reload button.")
+    } }
     var radius: CGFloat = Tokens.Radius.control { didSet { layer?.cornerRadius = radius } }
     var showsFillAtRest = false { didSet { stateDidChange(animated: false) } }
     /// The symbol's size; a button that lives on through a change of the sidebar's size takes the new one.
