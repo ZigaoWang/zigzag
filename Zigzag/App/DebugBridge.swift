@@ -701,8 +701,13 @@ enum DebugBridge {
         case "newtabnote":
             let frame = controller.newTabNote.debugFrame.map(NSStringFromRect) ?? "none"
             try? "\(frame)\n\(controller.tabManager.selectedTab?.displayTitle ?? "-")".write(toFile: arg, atomically: true, encoding: .utf8)
-        // topbar on|off: Settings › Appearance › Address bar above the page.
-        case "topbar": BrowserRootView.addressAbovePage = arg == "on"
+        // topbar off|autohide|always|on: Settings › Appearance › Address bar above the page.
+        case "topbar":
+            switch arg {
+            case "on", "always": BrowserRootView.addressBarPlace = .always
+            case "autohide": BrowserRootView.addressBarPlace = .autohide
+            default: BrowserRootView.addressBarPlace = .off
+            }
         // sidebarside right|left: Settings › Appearance › Sidebar on the right.
         case "sidebarside": BrowserRootView.sidebarOnRight = arg == "right"
         // sideframes: where the sidebar, the page and the traffic lights are, in the debug log.

@@ -2952,7 +2952,7 @@
       }
     },
     "Always" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.\nAddress bar above the page: the bar stays above the page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3529,6 +3529,17 @@
         }
       }
     },
+    "Autohide" : {
+      "comment" : "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动隐藏"
+          }
+        }
+      }
+    },
     "Automatic" : {
       "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.\nA choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.",
       "localizations" : {
@@ -3635,17 +3646,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复为 Zigzag 的快捷键"
-          }
-        }
-      }
-    },
-    "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
-      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
           }
         }
       }
@@ -12874,7 +12874,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nAddress bar above the page: the address stays in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18992,6 +18992,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开启后，网站发来第一个文件时会先询问是否允许。允许过的网站会记住答案；关闭后，下载会和以前一样直接保存。"
+          }
+        }
+      }
+    },
+    "The bar sits above the page and hides as you scroll down, coming back at the top or on any scroll up. Off keeps the address in the sidebar; Always leaves the bar in place." : {
+      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地址栏位于页面上方，向下滚动时隐藏，回到顶部或向上滚动时重新出现。“关闭”保留边栏中的地址栏，“始终”让地址栏一直显示。"
           }
         }
       }

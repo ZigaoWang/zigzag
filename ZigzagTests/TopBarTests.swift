@@ -611,4 +611,113 @@ struct TopBarTests {
             }
         }
     }
+
+    // MARK: Autohide (#359)
+
+    @Test func autohideWaitsForThePersonAndFollowsTheTopAndUp() {
+        let bar = TopBarView.height
+        // A page scrolling itself (a lazy feed, a chat jumping to a message) never moves the bar.
+        #expect(AddressBarAutohide.decide(y: 600, previousY: 0, hidden: false, barHeight: bar,
+                                          trusted: false, editing: false, held: false) == .keep)
+        #expect(AddressBarAutohide.decide(y: 300, previousY: 500, hidden: true, barHeight: bar,
+                                          trusted: false, editing: false, held: false) == .keep)
+        // Down past its height puts it away; at the top or on any scroll up it comes back.
+        #expect(AddressBarAutohide.decide(y: bar + 12, previousY: 0, hidden: false, barHeight: bar,
+                                          trusted: true, editing: false, held: false) == .hide)
+        #expect(AddressBarAutohide.decide(y: 20, previousY: 0, hidden: false, barHeight: bar,
+                                          trusted: true, editing: false, held: false) == .keep)
+        #expect(AddressBarAutohide.decide(y: 0, previousY: 500, hidden: true, barHeight: bar,
+                                          trusted: true, editing: false, held: false) == .show)
+        #expect(AddressBarAutohide.decide(y: 400, previousY: 500, hidden: true, barHeight: bar,
+                                          trusted: true, editing: false, held: false) == .show)
+    }
+
+    @Test func autohideLeavesTheBarWhileAPageFieldIsTypedIn() {
+        let bar = TopBarView.height
+        // A scroll while typing doesn't take the bar; if one did, the field brings it back.
+        #expect(AddressBarAutohide.decide(y: bar + 100, previousY: 0, hidden: false, barHeight: bar,
+                                          trusted: true, editing: true, held: false) == .keep)
+        #expect(AddressBarAutohide.decide(y: 300, previousY: 400, hidden: true, barHeight: bar,
+                                          trusted: true, editing: true, held: false) == .show)
+        // A menu, a sheet, the pointer on the bar: the bar keeps its place.
+        #expect(AddressBarAutohide.decide(y: bar + 100, previousY: 0, hidden: false, barHeight: bar,
+                                          trusted: true, editing: false, held: true) == .keep)
+        #expect(AddressBarAutohide.decide(y: 0, previousY: 400, hidden: true, barHeight: bar,
+                                          trusted: true, editing: false, held: true) == .keep)
+    }
+
+    @Test func autohidePutsTheBarAwayAndTakesItsRoomOutOfThePage() {
+        withBorderless(false) {
+            let sidebar = SidebarView()
+            let root = BrowserRootView(sidebar: sidebar)
+            root.frame = window
+            sidebar.holdsAddress = false
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            root.barHoldsAddress = true
+            root.autohidesBar = true
+            root.showsTopBar = true
+            root.layoutSubtreeIfNeeded()
+            let shownPage = root.cardFrame
+            let shownFavorites = sidebar.favorites.frame.minY
+            #expect(root.barOnScreen && root.topBar.frame.minY == inset)
+
+            root.setBarPutAway(true, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.barPutAway && !root.barOnScreen)
+            // The bar sits just above the window; the page takes the row it had.
+            #expect(root.topBar.frame.maxY == 0)
+            #expect(root.cardFrame.minY == inset && root.cardFrame.height == shownPage.height + bar)
+            // The sidebar's rows stay where they were: its top row is not under the pointer's reach any more than before.
+            #expect(sidebar.favorites.frame.minY == shownFavorites)
+
+            root.setBarPutAway(false, animated: false)
+            root.layoutSubtreeIfNeeded()
+            #expect(root.barOnScreen && root.cardFrame == shownPage)
+            #expect(sidebar.favorites.frame.minY == shownFavorites)
+        }
+    }
+
+    @Test func turningAutohideOffBringsTheBarBack() {
+        withBorderless(false) {
+            let sidebar = SidebarView()
+            let root = BrowserRootView(sidebar: sidebar)
+            root.frame = window
+            sidebar.holdsAddress = false
+            root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
+            root.barHoldsAddress = true
+            root.autohidesBar = true
+            root.showsTopBar = true
+            root.layoutSubtreeIfNeeded()
+            root.setBarPutAway(true, animated: false)
+            #expect(root.barPutAway)
+            // The setting goes back to Off or Always while the bar is away: the bar comes back with it.
+            root.autohidesBar = false
+            root.layoutSubtreeIfNeeded()
+            #expect(!root.barPutAway && root.barOnScreen)
+            #expect(root.topBar.frame.minY == inset)
+            // The same when the address goes back to the sidebar first, as the setting changes it.
+            root.autohidesBar = true
+            root.setBarPutAway(true, animated: false)
+            root.barHoldsAddress = false
+            root.autohidesBar = false
+            root.layoutSubtreeIfNeeded()
+            #expect(!root.barPutAway)
+        }
+    }
+
+    @Test func autohideIsOnlyForABarThatHoldsTheAddress() {
+        let sidebar = SidebarView()
+        let root = BrowserRootView(sidebar: sidebar)
+        root.frame = window
+        root.autohidesBar = true
+        root.barHoldsAddress = false
+        root.showsTopBar = true
+        root.layoutSubtreeIfNeeded()
+        root.setBarPutAway(true, animated: false)
+        #expect(!root.barPutAway)
+        root.barHoldsAddress = true
+        root.autohidesBar = false
+        root.setBarPutAway(true, animated: false)
+        #expect(!root.barPutAway)
+    }
 }

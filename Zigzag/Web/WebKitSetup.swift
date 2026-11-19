@@ -83,6 +83,7 @@ enum WebKitSetup {
             for script in PageScripts.all + Reader.scripts { configuration.userContentController.addUserScript(script) }
             // Runs in its own world, invisible to the page.
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
+            configuration.userContentController.add(ScrollMessages.shared, contentWorld: .defaultClient, name: ScrollMessages.messageName)
             configuration.userContentController.addUserScript(PasswordCapture.script)
             configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
             configuration.userContentController.addUserScript(Autofill.script)
@@ -170,7 +171,7 @@ enum PageScripts {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
         [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark,
-         commandClickedLinks]
+         commandClickedLinks, ScrollMessages.script]
     }
 
     /// ⌘-click on a web link always opens a new tab, whatever the page's script does (#317). YouTube's script
@@ -248,6 +249,58 @@ enum PageScripts {
         .map(l => ({ href: l.href, sizes: l.getAttribute('sizes') || '', rel: l.rel, type: l.type || '' }));
     })();
     """
+}
+
+/// Where the page is, on the person's own scrolls, for Autohide (#359): the bar goes after a scroll down and comes
+/// back at the top or on any scroll up. A page that scrolls itself (a lazy feed, a chat jumping to a message) says
+/// `trusted: false`; the window ignores it. Only the main frame's scroll counts, and only a report's last place is
+/// kept: a page can scroll faster than the window needs to know.
+final class ScrollMessages: NSObject, WKScriptMessageHandler {
+    static let shared = ScrollMessages()
+    static let messageName = "zigzagScroll"
+
+    static let script = WKUserScript(source: """
+    (() => {
+      if (window.__zigzagScroll) return;
+      window.__zigzagScroll = true;
+      let edge = 0, reported = 0;
+      const root = document.scrollingElement || document.documentElement;
+      const y = () => Math.max(0, window.scrollY || root.scrollTop || 0);
+      // A field has the focus: the bar stays where it is while the person types (a page's own field counts too).
+      const editing = () => {
+        const el = document.activeElement;
+        if (!el) return false;
+        if (el.isContentEditable) return true;
+        const tag = el.localName;
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
+      };
+      window.addEventListener('scroll', (event) => {
+        if (!event.isTrusted) return;
+        const target = event.target;
+        // A page's own elements scroll inside it all the time; only the page itself moves the bar.
+        if (target !== document && target !== document.documentElement && target !== root) return;
+        // A scroll can arrive as a burst (one wheel turn, one momentum frame after another). The first is the
+        // person's. Anything within a moment of it may be the page laying out in steps, so it doesn't count.
+        const now = Date.now();
+        if (now - edge > 100) { reported = 0; edge = now; }
+        try {
+          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted: reported === 0, editing: editing() });
+        } catch (e) {}
+        reported += 1;
+      }, { capture: true, passive: true });
+    })();
+    """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.messageName,
+              let webView = message.webView as? BrowserWebView, let tab = webView.owner,
+              let body = message.body as? [String: Any], let y = (body["y"] as? NSNumber)?.doubleValue,
+              let controller = webView.window?.windowController as? BrowserWindowController,
+              let selected = controller.tabManager.selectedTab,
+              controller.tabManager.panes(of: selected).contains(where: { $0 === tab }) else { return }
+        controller.pageScrolled(to: CGFloat(y), trusted: (body["trusted"] as? Bool) ?? false,
+                                editing: (body["editing"] as? Bool) ?? false)
+    }
 }
 
 /// Receives messages from our page scripts and routes them to the tab that sent them.
