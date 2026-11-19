@@ -25,6 +25,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Folders from an import start collapsed, so a bookmarks file with a hundred folders is a short list instead of a long scroll. Folders you already had stay as they were. Thanks to [mrfragger](https://github.com/mrfragger). ([#343](https://github.com/ZigaoWang/zigzag/issues/343))
 - Open All in Tabs opens a folder's pages as new tabs, where your new tabs go, and they all start loading so each is ready when you get to it. It used to open the pinned tabs in place, which looked like nothing happened. The pinned tabs stay as they are, and ⌘Z still closes the new tabs. Thanks to [mrfragger](https://github.com/mrfragger). ([#343](https://github.com/ZigaoWang/zigzag/issues/343))
 
+### Fixed
+- Peek's scroll bar stays slim on Macs that always show scroll bars, instead of a wide gray track along the card's edge. A page that styles its own scroll bars keeps them, and with scroll bars shown only while scrolling, and in tabs, pages keep the Mac's own, as in Safari.
+
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, cookies you can keep when clearing, and fixes for passkeys, Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
