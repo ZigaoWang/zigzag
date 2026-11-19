@@ -355,7 +355,7 @@ enum SidebarMenus {
         // First item, as in Safari's bookmark folders.
         var open: [NSMenuItem] = []
         if !Library.shared.allBookmarkIDs(inFolder: folder.id).isEmpty {
-            open.append(Item(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { controller.openAllInTabs(folder.id) })
+            open.append(Item(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every page in the folder and the folders inside it as new tabs.")) { controller.openAllInTabs(folder.id) })
         }
         var view = [Item(folder.isOpen ? String(localized: "Close Folder", comment: "Item in a folder's context menu in the sidebar.") : String(localized: "Open Folder", comment: "Item in a folder's context menu in the sidebar.")) { controller.listSetFolderOpen(folder.id, !folder.isOpen) }]
         // Only with subfolders, and only when it would change something.

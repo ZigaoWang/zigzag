@@ -402,7 +402,8 @@ struct ShutFolderRowsTests {
     }
 }
 
-/// Big imports and folder-wide actions (#343): imported folders start shut and a space's folders fold at once.
+/// Big imports and folder-wide actions (#343): imported folders start shut, a space's folders fold at once, and
+/// Open All in Tabs opens the pages as new tabs.
 @MainActor
 struct FolderBulkTests {
     /// The first space with pages filed by these paths, as an import does; the library is restored after.
@@ -441,6 +442,37 @@ struct FolderBulkTests {
             controller.collapseAllFolders(view)
             #expect(Library.shared.folders(in: space).allSatisfy { !$0.isOpen })
             #expect(!controller.validateMenuItem(view))
+        }
+    }
+
+    @Test func openAllOpensThePagesAsNewTabsInOrderAndUndoes() throws {
+        try inSpace([["Work"], ["Work", "Docs"], ["Other"], ["Work"]]) { space, pages in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let existing = Tab(url: URL(string: "http://127.0.0.1:9/bulk/here")!, title: "Here", spaceID: space)
+            manager.adopt([existing], in: space)
+            manager.select(existing)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let work = try #require(Library.shared.folders(in: space).first { $0.name == "Work" })
+
+            controller.openAllInTabs(work.id)
+            let opened = manager.currentTabs.filter { $0 !== existing }
+            // Regular tabs side by side, in the folder's list order, the folder inside it too.
+            let inWork = Library.shared.allBookmarkIDs(inFolder: work.id).compactMap { Library.shared.bookmark($0)?.url }
+            #expect(Set(inWork) == Set([pages[0], pages[1], pages[3]].map(\.url)))
+            #expect(opened.map(\.url) == inWork)
+            #expect(opened.allSatisfy { $0.bookmarkID == nil })
+            let at = try #require(manager.currentTabs.firstIndex { $0 === opened.first })
+            #expect(Array(manager.currentTabs[at...].prefix(3)).map(\.id) == opened.map(\.id))
+            // The first shows; the rest are loading already.
+            #expect(manager.selectedTab === opened.first)
+            #expect(opened.allSatisfy { $0.webView != nil })
+            // The pinned pages stay as they were.
+            #expect(pages.allSatisfy { manager.bookmarkTab(for: $0.id) == nil })
+
+            controller.sidebarUndo.undo()
+            #expect(manager.currentTabs.map(\.id) == [existing.id])
         }
     }
 }

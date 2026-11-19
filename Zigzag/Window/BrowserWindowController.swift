@@ -2800,27 +2800,25 @@ extension BrowserWindowController: SidebarDelegate {
     }
     /// Open All in Tabs confirms above this many pages.
     static let openAllAsksPast = 10
-    /// Opens every page in the folder and its subfolders, showing the first (#343).
-    /// ⌘Z closes them again.
+    /// Opens every page in the folder and its subfolders as new tabs, in list order, where new tabs go; the first
+    /// shows (#343). The pinned pages stay as they are. ⌘Z closes the new tabs again.
     func openAllInTabs(_ folderID: UUID) {
         guard let folder = Library.shared.folder(folderID) else { return }
         let pages = Library.shared.allBookmarkIDs(inFolder: folderID).compactMap { Library.shared.bookmark($0) }
-        guard let first = pages.first else { return }
+        guard !pages.isEmpty else { return }
         let open = { [weak self] in
             guard let self else { return }
-            self.pageChange(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { [tabManager] in
-                tabManager.together { for page in pages { _ = tabManager.pageTab(for: page) } }
-                tabManager.openBookmark(first)
+            self.pageChange(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every page in the folder and the folders inside it as new tabs.")) { [tabManager] in
+                tabManager.newTabs(pages.map { ($0.url, $0.title) })
             }
         }
-        let opening = pages.filter { tabManager.bookmarkTab(for: $0.id) == nil }.count
-        guard opening > Self.openAllAsksPast else { open(); return }
+        guard pages.count > Self.openAllAsksPast else { open(); return }
         let message = Library.shared.subfolderIDs(of: folderID).isEmpty
-            ? String(localized: "Every pinned tab in “\(folder.name)” opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once, from a folder with no folders inside. The folder's name.")
-            : String(localized: "Every pinned tab in “\(folder.name)” and the folders inside it opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once. The folder's name.")
-        ConfirmSheet.show(in: root.overlay, title: String(localized: "Open \(opening) tabs?", comment: "Title of the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once (more than 10)."),
+            ? String(localized: "Each page in “\(folder.name)” opens in a new tab.", comment: "Message of the sheet that asks before Open All in Tabs opens many tabs at once, from a folder with no folders inside. The folder's name.")
+            : String(localized: "Each page in “\(folder.name)” and the folders inside it opens in a new tab.", comment: "Message of the sheet that asks before Open All in Tabs opens many tabs at once. The folder's name.")
+        ConfirmSheet.show(in: root.overlay, title: String(localized: "Open \(pages.count) tabs?", comment: "Title of the sheet that asks before Open All in Tabs opens many tabs from a folder at once (more than 10)."),
                           message: message,
-                          confirmTitle: String(localized: "Open All", comment: "Button in the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once.")) { confirmed in
+                          confirmTitle: String(localized: "Open All", comment: "Button in the sheet that asks before Open All in Tabs opens many tabs from a folder at once.")) { confirmed in
             if confirmed { open() }
         }
     }
