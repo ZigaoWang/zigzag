@@ -713,6 +713,11 @@ final class Tab: NSObject {
             webView.removeObserver(self, forKeyPath: "_isPlayingAudio")
             observingAudio = false
         }
+        videosToken = nil
+        coverWait?.cancel()
+        coverWait = nil
+        ignoresCover = false
+        soundStopped = nil
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
@@ -1399,6 +1404,7 @@ final class Tab: NSObject {
             webView.addObserver(self, forKeyPath: "_isPlayingAudio", options: [.new], context: nil)
             observingAudio = true
         }
+        watchVideos(of: webView)
     }
 
     override nonisolated func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
@@ -1432,22 +1438,41 @@ final class Tab: NSObject {
 
     /// The wait, once the page stops playing, before a covered window hides it again.
     private var coverWait: DispatchWorkItem?
+    /// A covered window doesn't hide the page now (`ignoresCover`).
+    private var ignoresCover = false
+    /// When its sound stopped, while a covered window still doesn't hide it.
+    private var soundStopped: Date?
+    /// The page's videos, which turn it back to hidden in a covered window while one plays.
+    private var videosToken: SignalToken?
 
-    /// A page playing sound stays on screen to WebKit while its window is covered (an installed app's behind other
-    /// apps, most often), and for a while after it stops, so a playlist's next song can load and start (#199).
+    /// A page playing sound with no video showing (a music player) stays on screen to WebKit while its window is
+    /// covered (an installed app's behind other apps, most often), and for a while after it stops, so a playlist's
+    /// next song can load and start (#199). `_isPlayingAudio` leaves out a silent Web Audio graph.
     private func refreshCoverWatch() {
         guard Self.watchesCover, let webView else { return }
         coverWait?.cancel()
         coverWait = nil
-        if isPlayingAudio { Self.setWatchesCover(false, of: webView); return }
-        let stopped = Date()
-        let wait = DispatchWorkItem { [weak self, weak webView] in
-            guard let self, let webView, self.webView === webView,
-                  !MiniPlayerLayout.ignoresCover(playingSound: self.isPlayingAudio, quiet: Date().timeIntervalSince(stopped)) else { return }
-            Self.setWatchesCover(true, of: webView)
+        let video = PageVideos.shared.playing(in: webView, any: true) != nil
+        if isPlayingAudio, !video { soundStopped = nil } else if ignoresCover, soundStopped == nil { soundStopped = Date() }
+        let quiet = soundStopped.map { Date().timeIntervalSince($0) }
+        let ignores = MiniPlayerLayout.ignoresCover(playingSound: isPlayingAudio, showingVideo: video, quiet: quiet)
+        if ignores != ignoresCover {
+            ignoresCover = ignores
+            Self.setWatchesCover(!ignores, of: webView)
         }
+        guard ignores else { soundStopped = nil; return }
+        guard let quiet else { return }
+        let wait = DispatchWorkItem { [weak self] in self?.refreshCoverWatch() }
         coverWait = wait
-        DispatchQueue.main.asyncAfter(deadline: .now() + MiniPlayerLayout.nextItemWait, execute: wait)
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, MiniPlayerLayout.nextItemWait - quiet), execute: wait)
+    }
+
+    private func watchVideos(of webView: BrowserWebView) {
+        guard Self.watchesCover else { return }
+        videosToken = PageVideos.shared.reported.observe { [weak self, weak webView] page in
+            guard let self, let webView, page === webView, self.webView === webView else { return }
+            self.refreshCoverWatch()
+        }
     }
 
     /// The page and icon links the tab's icon came from, so the second look at the same page (on commit, then on
