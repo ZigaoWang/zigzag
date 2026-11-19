@@ -50,6 +50,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 密码扩展可以从自己的弹出窗口填写网站自身的登录框（HTTP 基本认证）了。以前 Zigzag 的登录框出现后，再在扩展里选登录信息不会有任何反应；现在登录框还开着时，第一个由扩展给出的用户名和密码会直接登录并关掉登录框。感谢 [Tuszy42](https://github.com/Tuszy42)。([#387](https://github.com/ZigaoWang/zigzag/issues/387))
 - 扩展在 Peek 里的网页上和在标签页里一样好用了。以前 Peek 里的网页对扩展来说不算标签页，像 SponsorBlock 这样的扩展能在网页上运行，却收不到后台的回复，也不知道自己在哪个标签页里。现在它是所在窗口的一个标签页，Peek 打开时就是当前标签页，打开、变化和关闭时扩展都会知道；“作为标签页打开”后仍是同一个标签页。在无痕浏览窗口中，只有你允许的扩展能看到它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#374](https://github.com/ZigaoWang/zigzag/issues/374))
 - 同一个网站在每个标签页、固定标签页、收藏和 Zigzag Mini 里显示的图标都一样了。以前两个 GitHub 标签页可能一个显示章鱼猫，另一个显示 GitHub 的圆角主屏幕图标，取决于哪个先加载。现在网站自己的图标总是优先于主屏幕图标，主屏幕图标只在网站没有自己的图标时才用；网页换了图标（比如 GitHub 在深色模式下会换），标签页上的图标也会跟着换。([#386](https://github.com/ZigaoWang/zigzag/issues/386))
+- 在边栏里选中几个标签页后按住 Delete 键，只会关闭它们一次，剩下的按键不会再传到网页里，以免删掉文本框里的文字。边栏里的 Delete 键只对用 ⌘ 或 ⇧ 点按选中的行起作用；普通点按一个标签页后，按键仍然交给网页，要关闭它请按 ⌘W。感谢 [Lakeland97](https://github.com/Lakeland97)。([#375](https://github.com/ZigaoWang/zigzag/issues/375))
 
 ## [0.9.3] - 2026-11-18
 
