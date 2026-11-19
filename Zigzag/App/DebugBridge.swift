@@ -362,6 +362,14 @@ enum DebugBridge {
         }
     }
 
+    /// Which page has the keyboard: the peek's, the selected tab's, or something else.
+    static func responderName(in controller: BrowserWindowController) -> String {
+        let responder = controller.window?.firstResponder
+        if let peek = controller.peek.tab?.webView, responder === peek { return "peek" }
+        if let page = controller.selectedWebView, responder === page { return "tab" }
+        return responder.map { String(describing: type(of: $0)) } ?? "nil"
+    }
+
     /// One event of a trackpad flick: when, its gesture and momentum phases (CGEvent's values), and how far it moves.
     struct FlickStep { var time: Double; var phase: Int64; var momentum: Int64; var dx: Double }
 
@@ -1579,6 +1587,75 @@ enum DebugBridge {
             let screen = window.convertPoint(toScreen: NSPoint(x: f[0], y: window.frame.height - f[1]))
             cg.location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
             if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
+        case "trackpad":
+            // trackpad x y dx dy [steps]: a two-finger trackpad scroll at a point (window points, top left), its began,
+            // changed and ended phases 16 ms apart, handed to the window inside the app only; dy > 0 scrolls up.
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 4, let window = controller.window else { break }
+            let screen = window.convertPoint(toScreen: NSPoint(x: f[0], y: window.frame.height - f[1]))
+            let location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
+            let steps = f.count > 4 ? Int(f[4]) : 12
+            let phases: [Int64] = [1] + Array(repeating: 2, count: max(1, steps)) + [4]
+            for (i, phase) in phases.enumerated() {
+                let dx = phase == 2 ? Int32(f[2]) : 0, dy = phase == 2 ? Int32(f[3]) : 0
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: dx, wheel3: 0) else { continue }
+                cg.location = location
+                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: Double(dy))
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(dx))
+                cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
+                cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: Double(dx))
+                cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+                cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+                cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds) + UInt64(i) * 16_000_000
+                if let event = NSEvent(cgEvent: cg) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
+                }
+            }
+        case "pageclick":
+            // pageclick x y [shift|cmd]: a left click at a point (window points, top left) handed to the window, taken
+            // by a page even with the copy behind other apps. Then logs which page has the keyboard.
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 2, let window = controller.window else { break }
+            var flags: NSEvent.ModifierFlags = []
+            if arg.contains("shift") { flags.insert(.shift) }
+            if arg.contains("cmd") { flags.insert(.command) }
+            BrowserWebView.takesFirstMouse = true
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: NSPoint(x: f[0], y: window.frame.height - f[1]), modifierFlags: flags,
+                                                  timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                  context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
+                    window.sendEvent(event)
+                }
+            }
+            BrowserWebView.takesFirstMouse = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { debugLog("pageclick responder \(DebugBridge.responderName(in: controller))") }
+        case "pointermove":
+            // pointermove x y: a pointer move (window points, top left) given to every page tracking area under it, as
+            // the window server does, then logs which pages heard it and which ignore the pointer.
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 2, let window = controller.window,
+                  let event = NSEvent.mouseEvent(with: .mouseMoved, location: NSPoint(x: f[0], y: window.frame.height - f[1]), modifierFlags: [],
+                                                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                 context: nil, eventNumber: 0, clickCount: 0, pressure: 0) else { break }
+            var heard: [String] = []
+            func walk(_ view: NSView) {
+                if let page = view as? WKWebView {
+                    let moved = #selector(NSResponder.mouseMoved(with:))
+                    let inside = page.visibleRect.contains(page.convert(event.locationInWindow, from: nil))
+                    for area in page.trackingAreas where inside && area.options.contains(.mouseMoved) {
+                        guard let owner = area.owner as? NSObject, owner.responds(to: moved) else { continue }
+                        owner.perform(moved, with: event)
+                        let name = page === controller.peek.tab?.webView ? "peek" : page === controller.selectedWebView ? "tab" : "page"
+                        heard.append(name + (PeekController.isCovered(page) ? "(ignores)" : ""))
+                    }
+                }
+                view.subviews.forEach(walk)
+            }
+            if let frame = window.contentView?.superview { walk(frame) }
+            debugLog("pointermove heard by \(heard)")
+        case "responder": debugLog("responder \(responderName(in: controller))")
         case "dragpath":
             // dragpath x y1 y2: an in-app press at y1 dragged to y2 and let go (window points, top left).
             let n = arg.split(separator: " ").compactMap { Double($0) }
