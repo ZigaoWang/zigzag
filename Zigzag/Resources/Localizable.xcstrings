@@ -4206,23 +4206,6 @@
         }
       }
     },
-    "Rule %lld · %@ · %@" : {
-      "comment" : "Winning rule in Site Controls.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Rule %1$lld · %2$@ · %3$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "规则 %1$lld · %2$@ · %3$@"
-          }
-        }
-      }
-    },
     "Reorder or remove rule %lld" : {
       "comment" : "Drag handle and menu for a space rule.",
       "localizations" : {

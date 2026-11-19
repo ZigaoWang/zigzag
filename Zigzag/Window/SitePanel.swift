@@ -1121,13 +1121,9 @@ final class SitePanel: FloatingPanelView {
         let route = Library.shared.siteRoute(for: url)
         let site = route?.site ?? SiteRoutes.site(of: url) ?? self.site
         let selected = route.flatMap { route in spaces.firstIndex { $0.id == route.spaceID }.map { $0 + 1 } } ?? 0
-        let position = route.flatMap { rule in Library.shared.siteRoutes.firstIndex { $0.id == rule.id } }
         return .choice(String(localized: "Open in", comment: "Destination space in Site Controls."),
                        options: [Self.anySpace] + spaces.map(\.name), selected: selected,
-                       status: { _ in
-                           guard let position, let route else { return nil }
-                           return String(localized: "Rule \(position + 1) · \(route.match.title) · \(site)", comment: "Winning rule in Site Controls.")
-                       }) { [weak self] index in
+                       status: { _ in route?.scopeDescription }) { [weak self] index in
             if index > 0, spaces.indices.contains(index - 1) {
                 var updated = route ?? SiteRoutes.Route(match: .domain, site: site, spaceID: spaces[index - 1].id)
                 updated.spaceID = spaces[index - 1].id
