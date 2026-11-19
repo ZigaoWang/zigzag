@@ -7869,7 +7869,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开位置"
+            "value" : "打开于"
           }
         }
       }
@@ -7880,7 +7880,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开位置"
+            "value" : "打开于"
           }
         }
       }
