@@ -240,8 +240,14 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     var clearGlass: Bool? = nil
     /// Whether this Mac has clear glass (Liquid Glass, macOS 26 and later).
     static var hasClearGlass: Bool { if #available(macOS 26.0, *) { true } else { false } }
-    /// Clear glass, the default where the Mac has it; frosted when chosen, or before macOS 26.
-    var usesClearGlass: Bool { Self.hasClearGlass && clearGlass != false && !PowerSaving.isOn }
+    /// Whether the window may use it: not for now, and the space editor's Frosted/Clear switch is away with it.
+    /// Behind Liquid Glass, as behind a see-through window, macOS puts the window on screen 80 times a second on a
+    /// 120 Hz display however fast its page draws, so a scroll steps unevenly, two frames of every three. The
+    /// frosted glass shows the desktop through at the full rate, so it stands in; the choice is kept for when clear
+    /// glass can keep up too.
+    static let offersClearGlass = false
+    /// Clear glass, where the Mac has it and the window may use it; frosted when chosen, or before macOS 26.
+    var usesClearGlass: Bool { Self.offersClearGlass && Self.hasClearGlass && clearGlass != false && !PowerSaving.isOn }
     /// Shown beside its name and in the space switcher: an SF Symbol's name, or an emoji. Nil: a dot.
     var icon: String? = nil
     /// The browser profile this space was made for by an import (`ImportBatch.BrowserProfile.key`), so importing that

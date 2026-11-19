@@ -1501,7 +1501,7 @@ final class SpaceLookEditor: NSView {
         effects.isOpen = showsEffects
         for view in [colorsLabel, chips[0], clearLabel, clearSlider, grainLabel, grainSlider] as [NSView] { view.isHidden = !showsEffects }
         // Frosted or clear only matters once the space is see-through.
-        let glassShown = showsEffects && space.isSeeThrough && SpaceInfo.hasClearGlass
+        let glassShown = showsEffects && space.isSeeThrough && SpaceInfo.hasClearGlass && SpaceInfo.offersClearGlass
         for view in [glassLabel, glassSwitch] as [NSView] { view.isHidden = !glassShown }
         if glassShown != showsGlass { showsGlass = glassShown; onResize?() }
         if !showsEffects { chips[1].isHidden = true; addSlot.isHidden = true }

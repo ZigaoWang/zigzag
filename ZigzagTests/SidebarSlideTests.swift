@@ -90,6 +90,20 @@ struct SidebarSlideTests {
         #expect(!SidebarContainer.usesLiquidGlass(isGlass: false, windowGlass: clear, hasClearGlass: true))
     }
 
+    @Test func theWindowStaysOpaqueBehindASeeThroughSpace() {
+        // Made see-through, macOS put the window on screen 80 times a second on a 120 Hz display, whatever its page
+        // drew; the frosting shows the desktop through an opaque window just the same.
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        let frame = SpaceFrameView()
+        window.contentView = frame
+        var space = SpaceInfo(name: "Clear", color: .sky)
+        space.translucency = 1
+        #expect(space.isSeeThrough && !space.usesClearGlass)
+        frame.paint(space, isPrivate: false, animated: false)
+        #expect(window.isOpaque)
+        #expect(frame.windowGlass?.isClear != true)
+    }
+
     @Test func theWindowKeepsTheGlassItShows() {
         let frame = SpaceFrameView()
         frame.setGlass(true, clear: true, tint: .systemPink)
