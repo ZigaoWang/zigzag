@@ -156,7 +156,7 @@ final class TabPreviewController {
     /// preview is up and takes it away once the pointer has really left.
     private var watchTimer: Timer?
     /// A click in the sidebar puts the preview away at once.
-    private var clickMonitor: Any?
+    nonisolated(unsafe) private var clickMonitor: Any?
     #if DEBUG
     /// The debug bridge's hover: this row counts as under the pointer, wherever the real one is.
     weak var debugRow: NSView?
