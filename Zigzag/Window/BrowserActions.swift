@@ -805,7 +805,7 @@ enum ZoomLevels {
 }
 
 /// Calls on WebKit's private inspector object, each checked first, so a name WebKit drops does nothing rather than crash.
-private extension NSObject {
+extension NSObject {
     func callIfPresent(_ name: String) {
         let selector = NSSelectorFromString(name)
         if responds(to: selector) { perform(selector) }

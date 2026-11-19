@@ -235,6 +235,7 @@ enum DebugBridge {
             sendSwipe(arg, to: window, at: NSPoint(x: window.frame.width / 2, y: window.frame.height / 2))
         case "miniborderless": BrowserRootView.isBorderless = arg == "on"
         case "miniclose": mini?.window?.performClose(nil)
+        case "miniendsheet": if let window = mini?.window, let sheet = window.attachedSheet { window.endSheet(sheet, returnCode: .cancel) }
         case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
         case "minisidebutton": if let window = mini?.window { sendSideButton(arg, to: window) }
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
@@ -423,6 +424,71 @@ enum DebugBridge {
         }
     }
 
+    /// sip state <path> (the newest pop-up window: JSON), sip js <script>, sip endsheet (cancels its sheet), sip open
+    /// (Open in New Tab), sip copy, sip select (its address, selected), sip shot <path> (its drawing, as a PNG), sip menu
+    /// <char> [cmd|shift|opt|ctrl] [send] (the menu item for that shortcut with the pop-up as if key: what takes it and
+    /// whether it's on; send runs it). None brings Zigzag forward.
+    private static func runSignInPopup(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        let rest = f.count > 1 ? f[1] : ""
+        guard let popup = PopupWindowController.all.max(by: { ($0.window?.windowNumber ?? 0) < ($1.window?.windowNumber ?? 0) }),
+              let window = popup.window else { debugLog("sip: no pop-up"); return }
+        switch f.first ?? "" {
+        case "state":
+            var state = popup.debugState
+            state["window"] = window.windowNumber
+            state["sheet"] = window.attachedSheet.map { "\(type(of: $0))" } ?? "none"
+            state["sheetWindow"] = window.attachedSheet?.windowNumber ?? 0
+            state["firstResponder"] = window.firstResponder.map { "\(type(of: $0))" } ?? "nil"
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: rest)) }
+        case "js":
+            popup.webView.evaluateJavaScript(rest) { result, error in
+                debugLog("sip js => \(String(describing: result).prefix(500)) \(error.map { String(describing: $0) } ?? "")")
+            }
+        case "endsheet": if let sheet = window.attachedSheet { window.endSheet(sheet, returnCode: .cancel) }
+        case "open": popup.openInTab()
+        case "copy": popup.copyPageURL(nil)
+        case "select": popup.debugSelectAddress()
+        case "shot":
+            guard let view = window.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: rest))
+        case "menu":
+            let g = rest.split(separator: " ").map(String.init)
+            guard let ch = g.first else { break }
+            var flags: NSEvent.ModifierFlags = []
+            for m in g.dropFirst() {
+                switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
+            }
+            func find(_ menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if let sub = item.submenu, let found = find(sub) { return found }
+                    if item.keyEquivalent == ch, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == flags { return item }
+                }
+                return nil
+            }
+            let pretended = DebugKeyWindow.window
+            DebugKeyWindow.pretend(window)
+            defer { DebugKeyWindow.pretend(pretended) }
+            guard let item = NSApp.mainMenu.flatMap(find), let action = item.action else { debugLog("sip menu \(rest): no item"); break }
+            var chain: [AnyObject] = []
+            var next: NSResponder? = window.firstResponder
+            while let r = next { chain.append(r); next = r.nextResponder }
+            if let delegate = window.delegate, !chain.contains(where: { $0 === delegate }) { chain.append(delegate) }
+            chain.append(NSApp)
+            if let delegate = NSApp.delegate { chain.append(delegate) }
+            let found = chain.first { $0.responds(to: action) }
+            let valid: Bool = {
+                guard let found else { return false }
+                if let v = found as? NSMenuItemValidation { return v.validateMenuItem(item) }
+                return true
+            }()
+            debugLog("sip menu \(rest): item=\(item.title) target=\(found.map { "\(type(of: $0))" } ?? "nil") enabled=\(valid)")
+            if g.contains("send"), let found, valid { NSApp.sendAction(action, to: found, from: item) }
+        default: debugLog("sip: unknown \(arg)")
+        }
+    }
+
     /// windowsdump <path>: every window's views, without bringing any forward (that would exit page full screen). Popup
     /// commands, which never bring the browser forward (that closes the popup): popupwinstate <path> (JSON),
     /// popupwinclick <x> <y> (points from top left), popupwintype <text> (to the key window), popupwinjs <path>
@@ -602,6 +668,7 @@ enum DebugBridge {
         if name == "windowsdump" { dumpWindows(to: arg); return }
         if name == "webapp" { runWebApp(arg); return }
         if name == "keepontop" || name == "windowmenu" { runKeepOnTop(name, arg); return }
+        if name == "sip" { runSignInPopup(arg); return }
         // mcp on|off|reset|state <path>: Settings › Automation › Let AI apps use Zigzag, Reset Key, and the server's state (JSON).
         if name == "mcp" {
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
