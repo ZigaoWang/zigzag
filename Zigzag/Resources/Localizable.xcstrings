@@ -957,7 +957,7 @@
       }
     },
     "%@: %@" : {
-      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.\nAn automation's notice over the page: the rule's name, then what it did. The placeholders are the rule's name and one of the “handed this link to …” lines.\nRule number followed by its coverage warning.",
+      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.\nAn automation's notice over the page: the rule's name, then what it did. The placeholders are the rule's name and one of the “handed this link to …” lines.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4228,13 +4228,13 @@
         }
       }
     },
-    "Move Above Rule %lld" : {
-      "comment" : "Move a space rule above the rule hiding it.",
+    "Move Above %@" : {
+      "comment" : "Moves a space rule above the earlier rule that covers it. The placeholder is that rule's address, like github.com.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "移到第 %lld 条规则上方"
+            "value" : "移到 %@ 上方"
           }
         }
       }
@@ -4261,35 +4261,35 @@
         }
       }
     },
-    "Rule %lld covers every URL this rule matches." : {
-      "comment" : "Below a space rule made unreachable by an earlier rule.",
+    "Never used: %@ above covers all of it." : {
+      "comment" : "Below a space rule that an earlier rule covers completely. The placeholder is the earlier rule's address, like github.com.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第 %lld 条规则已经覆盖了此规则匹配的所有网址。"
+            "value" : "不会生效：上面的 %@ 已经包含了它。"
           }
         }
       }
     },
-    "Blocks rule %lld." : {
-      "comment" : "Below a space rule that makes one later rule unreachable.",
+    "Covers all of %@ below, so that rule is never used." : {
+      "comment" : "Below a space rule that covers a later rule completely. The placeholder is the later rule's address, like github.com/org1.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此规则完全覆盖了第 %lld 条规则。"
+            "value" : "包含了下面的 %@，那条规则不会生效。"
           }
         }
       }
     },
-    "Blocks rules %@." : {
-      "comment" : "Below a space rule that makes several later rules unreachable. The argument lists their positions.",
+    "Covers all of %@ below, so those rules are never used." : {
+      "comment" : "Below a space rule that covers several later rules completely. The placeholder lists their addresses.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此规则完全覆盖了第 %@ 条规则。"
+            "value" : "包含了下面的 %@，那些规则不会生效。"
           }
         }
       }

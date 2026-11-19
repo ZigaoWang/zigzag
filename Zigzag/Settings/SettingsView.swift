@@ -2539,8 +2539,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     private func updateRouteWarnings() {
         let rows = routeRows.map(\.row)
-        let coverage = SiteRoutes.coverage(in: rows.map(\.ruleForValidation))
-        for (row, result) in zip(rows, coverage) { row.setWarning(result.warning) }
+        let rules = rows.map(\.ruleForValidation)
+        for (row, result) in zip(rows, SiteRoutes.coverage(in: rules)) { row.setWarning(result.warning(in: rules)) }
     }
 
     private func reloadSpaces() {

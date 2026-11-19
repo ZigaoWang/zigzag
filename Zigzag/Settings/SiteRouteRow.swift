@@ -120,7 +120,7 @@ final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable,
         if routes.count > 1 { menu.addItem(.separator()) }
         SiteRouteReorderMenu.addMoves(to: menu, for: id, in: routes.map(\.id)) { library.moveRoute(id, before: $0) }
         if let i = SiteRoutes.blocker(for: saved, in: routes) {
-            menu.addItem(SidebarMenus.Item(String(localized: "Move Above Rule \(i + 1)", comment: "Move a space rule above the rule hiding it.")) {
+            menu.addItem(SidebarMenus.Item(String(localized: "Move Above \(routes[i].site)", comment: "Moves a space rule above the earlier rule that covers it. The placeholder is that rule's address, like github.com.")) {
                 library.moveRoute(id, before: routes[i].id)
             })
         }
@@ -170,9 +170,7 @@ final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable,
     }
 
     func setWarning(_ warning: String?) {
-        message.stringValue = field.isInvalid ? mode.inputHint : warning.map {
-            String(localized: "\(rowName): \($0)", comment: "Rule number followed by its coverage warning.")
-        } ?? ""
+        message.stringValue = field.isInvalid ? mode.inputHint : warning ?? ""
         message.textColor = field.isInvalid ? Tokens.Color.destructive : Tokens.Color.caution
         message.isHidden = message.stringValue.isEmpty
         setAccessibilityHelp(message.stringValue)

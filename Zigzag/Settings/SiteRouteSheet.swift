@@ -56,7 +56,7 @@ enum SiteRouteSheet {
                 var rules = library.siteRoutes
                 let index = rules.firstIndex { $0.id == rule.id } ?? rules.count
                 if index == rules.count { rules.append(rule) } else { rules[index] = rule }
-                if let warning = SiteRoutes.coverage(in: rules)[index].warning { preview.stringValue += "\n" + warning }
+                if let warning = SiteRoutes.coverage(in: rules)[index].warning(in: rules) { preview.stringValue += "\n" + warning }
                 return true
             }) { confirmed in
                 if confirmed, let rule = draft(), isNew || library.siteRoutes.contains(where: { $0.id == rule.id }) { library.saveRoute(rule) }
@@ -130,16 +130,17 @@ extension SiteRoutes.Route {
 }
 
 extension SiteRoutes.Coverage {
-    var warning: String? {
-        if let blockedBy {
-            return String(localized: "Rule \(blockedBy + 1) covers every URL this rule matches.", comment: "Below a space rule made unreachable by an earlier rule.")
+    /// Names the other rules by their address: the list shows no numbers.
+    func warning(in rules: [SiteRoutes.Route]) -> String? {
+        if let blockedBy, rules.indices.contains(blockedBy) {
+            return String(localized: "Never used: \(rules[blockedBy].site) above covers all of it.", comment: "Below a space rule that an earlier rule covers completely. The placeholder is the earlier rule's address, like github.com.")
         }
-        guard let first = blocks.first else { return nil }
-        if blocks.count == 1 {
-            return String(localized: "Blocks rule \(first + 1).", comment: "Below a space rule that makes one later rule unreachable.")
+        let covered = blocks.filter(rules.indices.contains).map { rules[$0].site }
+        guard let first = covered.first else { return nil }
+        if covered.count == 1 {
+            return String(localized: "Covers all of \(first) below, so that rule is never used.", comment: "Below a space rule that covers a later rule completely. The placeholder is the later rule's address, like github.com/org1.")
         }
-        let numbers = Words.list(blocks.map { ($0 + 1).formatted(.number.locale(Words.locale)) })
-        return String(localized: "Blocks rules \(numbers).", comment: "Below a space rule that makes several later rules unreachable. The argument lists their positions.")
+        return String(localized: "Covers all of \(Words.list(covered)) below, so those rules are never used.", comment: "Below a space rule that covers several later rules completely. The placeholder lists their addresses.")
     }
 }
 
