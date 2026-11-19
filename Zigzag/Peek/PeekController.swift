@@ -79,8 +79,9 @@ final class PeekController {
         }
     }
     private var escMonitor: Any?
-    /// The pages under the card, which ignore the pointer while it's up.
-    private var covered = NSHashTable<WKWebView>.weakObjects()
+    /// Every page a Peek covers, with the window it's covered in: a page that leaves that window (shown in another
+    /// window that shares tabs, moved there) takes the pointer again at once (`pageMoved`).
+    private static let covered = NSMapTable<WKWebView, NSWindow>.weakToWeakObjects()
 
     private func stopEsc() {
         if let escMonitor { NSEvent.removeMonitor(escMonitor) }
@@ -199,16 +200,40 @@ final class PeekController {
 
     /// Pointer moves reach every page under the pointer, covered or not: the ones under the card ignore them.
     private func coverPages() {
-        guard let controller else { return }
-        for case let page? in controller.root.paneCards.map(\.webView) where page !== tab?.webView && !covered.contains(page) {
-            Self.covers(page, true)
-            covered.add(page)
+        guard let controller, let window = controller.window else { return }
+        for case let page? in controller.root.paneCards.map(\.webView) where page !== tab?.webView && page.window === window {
+            cover(page, in: window)
         }
     }
 
+    private func cover(_ page: WKWebView, in window: NSWindow) {
+        Self.covers(page, true)
+        Self.covered.setObject(window, forKey: page)
+    }
+
+    /// Gives the pointer back to every page this window's Peek covered, wherever it is now.
     private func uncoverPages() {
-        covered.allObjects.forEach { Self.covers($0, false) }
-        covered.removeAllObjects()
+        let window = controller?.window
+        for page in Self.covered.keyEnumerator().allObjects.compactMap({ $0 as? WKWebView }) {
+            let at = Self.covered.object(forKey: page)
+            guard at == nil || at === window else { continue }
+            Self.covers(page, false)
+            Self.covered.removeObject(forKey: page)
+        }
+    }
+
+    /// A page came into a window or left one. Out of the window whose Peek covered it, it takes the pointer again;
+    /// into a window with Peek up, it's under the card there.
+    static func pageMoved(_ page: WKWebView) {
+        // Only Peek covers pages, so one covered with no Peek in its window behind it is let go too.
+        let at = covered.object(forKey: page)
+        if at.map({ $0 !== page.window }) ?? isCovered(page) {
+            covers(page, false)
+            covered.removeObject(forKey: page)
+        }
+        guard let window = page.window, let peek = (window.windowController as? BrowserWindowController)?.peek,
+              peek.isVisible, let peeked = peek.tab?.webView, page !== peeked, !page.isDescendant(of: peek.panel) else { return }
+        peek.cover(page, in: window)
     }
 
     /// WebKit's switch for a covered page: no pointer moves, hover, clicks or drops.

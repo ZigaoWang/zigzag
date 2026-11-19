@@ -4015,10 +4015,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let kept = KeptCookies.sites(in: profile.id)
         let addKept = PillButton(title: String(localized: "Add Site…", comment: "Button beside “Keep cookies for these sites” in Settings › Privacy: opens the sheet that adds a site whose cookies are kept."))
         addKept.onClick = { [weak self] _ in if let self { KeptCookiesSheet.add(in: self, profile: profile.id) } }
+        // Site controls offer Keep cookies only while quitting clears them (#383).
+        func keptDetail(clearsOnQuit: Bool) -> String {
+            kept.isEmpty && clearsOnQuit
+                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
+                : String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed.")
+        }
         let keptRow = FormRow(title: String(localized: "Keep cookies for these sites", comment: "A setting in Settings › Privacy: the sites whose cookies Clear Cookies… and quitting leave alone, listed under it."),
-                              detail: kept.isEmpty
-                                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
-                                : String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed."),
+                              detail: keptDetail(clearsOnQuit: KeptCookies.clearsOnQuit(in: profile.id)),
                               control: addKept)
         keptRow.keywords = String(localized: "cookies keep exceptions signed in sign-in allow sites", comment: "Words that find the Keep cookies for these sites setting. Not shown.")
         privacyGroup.add(keptRow)
@@ -4032,7 +4036,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             privacyGroup.add(row)
         }
         let quitToggle = Toggle(isOn: KeptCookies.clearsOnQuit(in: profile.id))
-        quitToggle.onChange = { KeptCookies.setClearsOnQuit($0, in: profile.id) }
+        quitToggle.onChange = { [weak self, weak keptRow] on in
+            KeptCookies.setClearsOnQuit(on, in: profile.id)
+            keptRow?.detailText = keptDetail(clearsOnQuit: on)
+            self?.layoutDocument()
+        }
         let quitRow = FormRow(title: String(localized: "Clear cookies when Zigzag quits", comment: "A setting in Settings › Privacy: every site's cookies and data are cleared as Zigzag quits, except the sites kept."),
                               detail: String(localized: "Each time you quit, every other site’s cookies and data are cleared, so you start signed out of them next time.", comment: "Explanation under “Clear cookies when Zigzag quits” in Settings › Privacy: every site but the ones kept."),
                               control: quitToggle)

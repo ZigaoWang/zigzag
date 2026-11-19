@@ -65,6 +65,8 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     private var changes = 0
     private var settling = false
     private var clickMonitor: Any?
+    /// The window was on screen when the fields went in, so it being gone by the ask means it closed or was hidden.
+    private var shownInVisibleWindow = false
     /// The system's list took the front (Zigzag stopped being the active app), so coming back means it closed.
     private(set) var opened = false
     private let timeout: TimeInterval
@@ -119,8 +121,13 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
         overlay.addSubview(anchor)
         debugLog("syspasswords present")
         guard let window = overlay.window, window.makeFirstResponder(passwordField) else { finish(.cancelled(.unavailable)); return }
+        shownInVisibleWindow = window.isVisible
         let center = NotificationCenter.default
         observers = [
+            // The window closing takes the fields with it: nothing is asked of a closed window.
+            center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.finish(.cancelled(.dismissed)) }
+            },
             center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.opened = true }
             },
@@ -145,8 +152,9 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     }
 
     private func askNow(_ ask: @MainActor (NSTextField) -> Bool) {
-        // The focus moved on while AutoFill caught up: you've moved on.
-        guard let window = anchor.window, Self.owns(window.firstResponder, [passwordField]) else { finish(.cancelled(.dismissed)); return }
+        // The focus moved on while AutoFill caught up, or the window closed or went away: you've moved on.
+        guard anchor.superview != nil, let window = anchor.window, !shownInVisibleWindow || window.isVisible,
+              Self.owns(window.firstResponder, [passwordField]) else { finish(.cancelled(.dismissed)); return }
         guard ask(passwordField) else { finish(.cancelled(.unavailable)); return }
         if let openCheck { after(openCheck) { if !$0.opened { $0.giveUpIfEmpty(.unavailable) } } }
     }

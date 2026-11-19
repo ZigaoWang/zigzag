@@ -8,6 +8,8 @@ enum KeptCookies {
     static var defaults: UserDefaults = .standard
     /// A profile's kept sites changed, from Site Controls or Settings.
     static let changed = Signal<Void>()
+    /// A profile's Clear cookies when Zigzag quits changed.
+    static let clearingChanged = Signal<UUID>()
 
     // MARK: Sites
 
@@ -90,6 +92,7 @@ enum KeptCookies {
     static func setClearsOnQuit(_ on: Bool, in profile: UUID) {
         if on { defaults.set(true, forKey: ProfileKey.clearsCookiesOnQuit.name(in: profile)) }
         else { defaults.removeObject(forKey: ProfileKey.clearsCookiesOnQuit.name(in: profile)) }
+        clearingChanged.send(profile)
     }
 
     /// How long quitting waits for the clearing, at most.

@@ -39,6 +39,41 @@ import WebKit
         }
     }
 
+    /// Shown in another window that shares tabs (#162), the page under the card is clickable there at once; back under
+    /// the card, it's covered again.
+    @Test func aCoveredPageMovedToAnotherWindowTakesThePointer() throws {
+        try inWindow { controller, under in
+            let page = try #require(under.webView)
+            let holder = try #require(under.pageHolder)
+            let home = try #require(holder.superview)
+            _ = try #require(controller.peek.show(url: nil, configuration: nil, opener: under))
+            #expect(PeekController.isCovered(page))
+            let other = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+            other.isReleasedWhenClosed = false
+            defer { other.close() }
+            other.contentView?.addSubview(holder)
+            #expect(page.window === other)
+            #expect(!PeekController.isCovered(page))
+            home.addSubview(holder)
+            #expect(PeekController.isCovered(page))
+            controller.peek.close()
+            #expect(!PeekController.isCovered(page))
+        }
+    }
+
+    /// A page left covered with no Peek over it takes the pointer as soon as it moves.
+    @Test func aPageCoveredByNothingIsLetGo() throws {
+        try inWindow { _, under in
+            let page = try #require(under.webView)
+            let holder = try #require(under.pageHolder)
+            let home = try #require(holder.superview)
+            PeekController.covers(page, true)
+            holder.removeFromSuperview()
+            home.addSubview(holder)
+            #expect(!PeekController.isCovered(page))
+        }
+    }
+
     @Test func openingAsTabGivesThePointerBack() throws {
         try inWindow { controller, under in
             let page = try #require(under.webView)

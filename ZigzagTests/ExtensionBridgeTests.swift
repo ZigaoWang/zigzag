@@ -150,11 +150,11 @@ extension ExtensionBridgeTests {
             try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), requestID: id)
         }
         await #expect(throws: BridgeError.self) {
-            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), authorize: { false })
+            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), authorize: { _ in false })
         }
         let duringSetup = UUID()
         await #expect(throws: BridgeError.self) {
-            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), requestID: duringSetup) {
+            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), requestID: duringSetup) { _ in
                 bridge.cancel(duringSetup, extensionID: "test")
                 return true
             }
@@ -471,10 +471,10 @@ extension ExtensionBridgeTests {
         defer { server.listener.cancel() }
         let requests = ExtensionFetchRequests(), id = UUID()
         await #expect(throws: BridgeError.self) {
-            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), authorize: { false })
+            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), authorize: { _ in false })
         }
         await #expect(throws: (any Error).self) {
-            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), requestID: id) {
+            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), requestID: id) { _ in
                 requests.cancel(id, extensionID: "test")
                 return true
             }
@@ -521,6 +521,98 @@ extension ExtensionBridgeTests {
         let response = try #require(try await ExtensionFetchRequests().response(["method": method], url: localURL.appendingPathComponent("redirect"), extensionID: "test", store: .nonPersistent()) as? [String: Any])
         #expect(response["redirected"] as? Bool == true)
         #expect(response["url"] as? String == localURL.appendingPathComponent("unexpected").absoluteString)
+    }
+
+    /// Default credentials (YouMind's sign-in check): a redirect to another site the extension may reach is followed
+    /// here with that site's cookies, once, never handed to WebKit to send again.
+    @Test(arguments: ["GET", "POST"])
+    func defaultCredentialRedirectsToAnotherReachableSiteAreFollowedOnce(method: String) async throws {
+        let target = try SessionTestServer()
+        let targetURL = try await target.start()
+        defer { target.listener.cancel() }
+        let server = try SessionTestServer(redirectTarget: targetURL.appendingPathComponent("me").absoluteString)
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/", .init("SameSite"): "Lax"])))
+        let options: [String: Any] = method == "POST" ? ["method": method, "body": "{}"] : ["method": method]
+        let response = try #require(try await ExtensionFetchRequests().direct(options,
+            url: url.appendingPathComponent("redirect"), extensionID: "test", store: store) { _ in true } as? [String: Any])
+        #expect(response["redirected"] as? Bool == true)
+        #expect(response["url"] as? String == targetURL.appendingPathComponent("me").absoluteString)
+        let body = String(decoding: Data(base64Encoded: try #require(response["body"] as? String)) ?? Data(), as: UTF8.self)
+        #expect(body.contains("\"signedIn\":true"))
+        #expect(server.requests.withLock { $0 } == 1)
+        #expect(target.requests.withLock { $0 } == 1)
+    }
+
+    /// A site the extension may not reach gets no cookies and must allow it by CORS; each hop is checked as it's made.
+    @Test func defaultCredentialRedirectsAreCheckedHopByHop() async throws {
+        let target = try SessionTestServer()
+        let targetURL = try await target.start()
+        defer { target.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/", .init("SameSite"): "Lax"])))
+        for (path, allowed) in [("open", true), ("me", false)] {
+            let server = try SessionTestServer(redirectTarget: targetURL.appendingPathComponent(path).absoluteString)
+            let url = try await server.start()
+            defer { server.listener.cancel() }
+            let port = url.port
+            let send = { try await ExtensionFetchRequests().direct([:], url: url.appendingPathComponent("redirect"), extensionID: "test", store: store) { $0.port == port } }
+            if allowed {
+                let response = try #require(try await send() as? [String: Any])
+                let body = String(decoding: Data(base64Encoded: try #require(response["body"] as? String)) ?? Data(), as: UTF8.self)
+                #expect(body.contains("\"signedIn\":false"))
+            } else {
+                await #expect(throws: BridgeError.self) { try await send() }
+            }
+            #expect(server.requests.withLock { $0 } == 1)
+        }
+        #expect(target.requests.withLock { $0 } == 2)
+        // Within the site too: a hop to a path the extension can't reach goes no further.
+        let local = try SessionTestServer()
+        let localURL = try await local.start()
+        defer { local.listener.cancel() }
+        await #expect(throws: BridgeError.self) {
+            try await ExtensionFetchRequests().direct([:], url: localURL.appendingPathComponent("redirect"), extensionID: "test", store: store) { $0.path != "/unexpected" }
+        }
+        #expect(local.requests.withLock { $0 } == 1)
+    }
+
+    /// What default credentials can't carry here goes to WebKit's fetch before anything is sent.
+    @Test func defaultCredentialFetchDecidesBeforeSending() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let requests = ExtensionFetchRequests()
+        for (options, target) in [([String: Any](), URL(string: "http://remote.example/api")!),
+                                  (["headers": [["Accept", "text/event-stream"]]], url),
+                                  (["method": "GET", "body": "x"], url),
+                                  (["method": "POST", "body": String(repeating: "x", count: ExtensionFetchRequests.responseLimit + 1)], url)] {
+            let answer = try await requests.direct(options, url: target, extensionID: "test", store: .nonPersistent()) { _ in true }
+            #expect((answer as? [String: Any])?["fallback"] as? Bool == true)
+        }
+        #expect(server.requests.withLock { $0 } == 0)
+        // A slow read isn't cut short: it ends when its extension lets go of it.
+        let id = UUID()
+        let slow = Task { _ = try await requests.direct([:], url: url.appendingPathComponent("pending"), extensionID: "test", store: .nonPersistent(), requestID: id) { _ in true } }
+        for _ in 0..<300 where server.requests.withLock({ $0 }) == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(server.requests.withLock { $0 } == 1)
+        requests.cancel(id, extensionID: "test")
+        await #expect(throws: (any Error).self) { try await slow.value }
+    }
+
+    /// The SameSite check is read once per host until the profile's cookies change.
+    @Test func sameSiteCheckIsKeptUntilCookiesChange() async throws {
+        let store = WKWebsiteDataStore.nonPersistent()
+        let url = try #require(URL(string: "https://account.example/api/me"))
+        let check = SameSiteCookieCheck()
+        #expect(await check.has(url, in: store) == false)
+        #expect(check.count == 1)
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "s", .value: "1", .domain: "account.example", .path: "/", .secure: "TRUE", .sameSitePolicy: "lax"])))
+        for _ in 0..<200 where check.count > 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(check.count == 0)
+        #expect(await check.has(url, in: store))
     }
 
     /// An extension asking for sites only as optional (Raindrop) reaches a server without CORS headers once "On All
@@ -890,6 +982,7 @@ nonisolated private final class SessionTestServer: @unchecked Sendable {
                 return
             }
             let redirect = path == "/redirect"
+            let open = path == "/open" ? "Access-Control-Allow-Origin: *\r\n" : ""
             let signedIn = text.components(separatedBy: "\r\n").contains { $0.lowercased().hasPrefix("cookie:") && $0.contains("session=synthetic") }
             let body = path == "/binary" ? Data([0, 255, 128, 65])
                 : path == "/echo" ? Data(bytes[boundary.upperBound..<(boundary.upperBound + length)])
@@ -899,7 +992,7 @@ nonisolated private final class SessionTestServer: @unchecked Sendable {
                 && text.components(separatedBy: "\r\n").contains { $0.lowercased().hasPrefix("cookie:") && $0.contains("logout_token=test-session") && !$0.contains("session=forged") }
             let status = redirect ? "302 Found" : path == "/logout" && !logoutOK ? "403 Forbidden" : "200 OK"
             let deleted = path == "/logout" ? "Set-Cookie: logout_token=; Max-Age=0; Path=/; HttpOnly\r\n" : ""
-            let headers = redirect ? "Location: \(redirectTarget)\r\n" : deleted + "Set-Cookie: refreshed=synthetic; Path=/; SameSite=Lax; HttpOnly\r\n"
+            let headers = redirect ? "Location: \(redirectTarget)\r\n" : open + deleted + "Set-Cookie: refreshed=synthetic; Path=/; SameSite=Lax; HttpOnly\r\n"
             let response = "HTTP/1.1 \(status)\r\nContent-Type: application/octet-stream\r\nCache-Control: public, max-age=3600\r\n\(headers)Content-Length: \(body.count)\r\nConnection: close\r\n\r\n"
             connection.send(content: Data(response.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
         }

@@ -219,6 +219,7 @@ enum DebugBridge {
         case "mininote": mini?.debugLinksNote(arg)
         case "minispace": mini?.debugSpace(arg)
         case "minicopy": mini?.copyPageURL(nil)
+        case "minihover": mini?.debugHoverStrip(arg)
         case "minisite": mini?.showSiteControls()
         case "minifind": mini?.debugFind(arg)
         case "miniresize":
@@ -1586,6 +1587,14 @@ enum DebugBridge {
             }
         case "edgedrag": controller.root.debugEdgeDrag(arg)
         case "spacedrag": controller.sidebar.debugSpaceDrag(arg)
+        case "chromestate": controller.sidebar.debugChromeState(arg)
+        case "fakesound":
+            // fakesound <tab index|selected|title word> <playing|muted|off>: the tab's speaker as if, with no sound played.
+            let f = arg.split(separator: " ").map(String.init)
+            let tabs = controller.tabManager.currentTabs
+            let tab = f.first.flatMap(Int.init).flatMap { tabs.indices.contains($0) ? tabs[$0] : nil }
+                ?? (f.first == "selected" ? controller.tabManager.selectedTab : controller.tabManager.allTabs.first { $0.title.contains(f.first ?? "-") })
+            if f.count == 2, let tab { tab.debugShowSound(playing: f[1] == "playing", muted: f[1] == "muted") }
         case "sidebarwidth":
             // sidebarwidth <points>: as a drag of the sidebar's edge would leave it, within its narrowest and widest.
             if let n = Double(arg) {
@@ -2687,6 +2696,8 @@ enum DebugBridge {
         // keptcookies clear | add | quit on|off | top: Settings › Privacy's kept cookies (#334). keptcookiesstate <path>:
         // each profile's kept sites and quit choice, as JSON.
         case "keptcookies": controller.tabManager.selectedTab?.settingsView?.debugKeptCookies(arg)
+        // clearsonquit on|off: Clear cookies when Zigzag quits for the front window's profile, without Settings open.
+        case "clearsonquit": KeptCookies.setClearsOnQuit(arg == "on", in: controller.tabManager.profile.id)
         case "keptcookiesstate":
             let state = Profiles.shared.all.map { ["profile": $0.id.uuidString, "sites": KeptCookies.sites(in: $0.id).sorted(), "clearsOnQuit": KeptCookies.clearsOnQuit(in: $0.id)] as [String: Any] }
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }

@@ -90,6 +90,13 @@ struct SiteSignInTests {
         #expect(BridgeWebRequest.answer(from: ["authCredentials": ["password": "no name"]]) == .none)
     }
 
+    @Test func privateSignInsLogNoSite() {
+        for answer: BridgeWebRequest.Answer in [.credentials(username: "u", password: "p"), .cancel, .none] {
+            #expect(!BridgeWebRequest.logLine(answer, host: "secret.example", isPrivate: true, asked: "A").contains("secret.example"))
+            #expect(BridgeWebRequest.logLine(answer, host: "open.example", isPrivate: false, asked: "A").contains("open.example"))
+        }
+    }
+
     /// A bridge whose questions go to `reply` instead of extensions, which answers as each extension would.
     private func bridge(listening: Set<String>, reply: @escaping (BridgeWebRequest, String, String) -> Void) -> (BridgeWebRequest, () -> [String]) {
         let bridge = BridgeWebRequest(host: Profiles.shared.default.extensions)

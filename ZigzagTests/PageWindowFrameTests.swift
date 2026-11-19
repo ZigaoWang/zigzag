@@ -116,6 +116,42 @@ struct PageWindowFrameTests {
         #expect(PopupWindowController.movableURL(nil) == nil)
     }
 
+    /// A pop-up's page opens in a space of its own profile, keeping its sign-in: the opener's when it's on that
+    /// profile, else one of the profile's, else a new one on it. Never the current space of another profile.
+    @Test func openInNewTabStaysInThePagesProfile() {
+        let library = Library.shared
+        let before = library.snapshot
+        defer { library.restore(before) }
+        let home = library.spaces[0].id
+        let manager = TabManager(spaceID: home)
+        defer { manager.invalidate() }
+        let homeProfile = library.profileID(ofSpace: home)
+        // The opener's space, on the page's profile.
+        #expect(PopupWindowController.space(for: homeProfile, opener: home, manager: manager) == home)
+        // Another profile with a space: that space, not the one you're in.
+        let other = library.addProfile(name: "Popup tab Work"), bare = library.addProfile(name: "Popup tab Bare")
+        defer {
+            library.removeProfile(other.id); library.finishedRemovingProfile(other.id)
+            library.removeProfile(bare.id); library.finishedRemovingProfile(bare.id)
+        }
+        let work = library.addSpace(name: "Work", profile: other.id)
+        #expect(PopupWindowController.space(for: other.id, opener: home, manager: manager) == work.id)
+        #expect(PopupWindowController.space(for: other.id, opener: nil, manager: manager) == work.id)
+        // A profile with no space gets one of its own.
+        let made = PopupWindowController.space(for: bare.id, opener: home, manager: manager)
+        #expect(made != home && made != work.id)
+        #expect(library.profileID(ofSpace: made) == bare.id)
+    }
+
+    /// ⇧⌘C copies only a web or file address, as the strip's Copy Link does.
+    @Test func copyLinkIsForWebAddressesOnly() {
+        let popup = popup()
+        defer { popup.discardHeldPage() }
+        let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.copyPageURL(_:)), keyEquivalent: "c")
+        #expect(!popup.validateMenuItem(item))
+        #expect(!popup.canOpenInTab)
+    }
+
     /// Open in New Tab with no address leaves the pop-up as it is: a sign-in is never moved by accident.
     @Test func openInTabWithNoAddressStays() {
         let popup = popup()

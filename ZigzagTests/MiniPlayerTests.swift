@@ -450,12 +450,18 @@ struct MiniPlayerTests {
 
     @Test func aPagePlayingSoundStaysOnScreenInACoveredWindow() {
         // Covered, WebKit counts the page as hidden and won't start a playlist's next song (#199).
-        #expect(MiniPlayerLayout.ignoresCover(playingSound: true, quiet: nil))
+        #expect(MiniPlayerLayout.ignoresCover(playingSound: true, showingVideo: false, quiet: nil))
         // Between two songs it's still counted as on screen.
-        #expect(MiniPlayerLayout.ignoresCover(playingSound: false, quiet: 5))
+        #expect(MiniPlayerLayout.ignoresCover(playingSound: false, showingVideo: false, quiet: 5))
         // Quiet for a while, or never played: a covered window hides it again, as ever.
-        #expect(!MiniPlayerLayout.ignoresCover(playingSound: false, quiet: MiniPlayerLayout.nextItemWait))
-        #expect(!MiniPlayerLayout.ignoresCover(playingSound: false, quiet: nil))
+        #expect(!MiniPlayerLayout.ignoresCover(playingSound: false, showingVideo: false, quiet: MiniPlayerLayout.nextItemWait))
+        #expect(!MiniPlayerLayout.ignoresCover(playingSound: false, showingVideo: false, quiet: nil))
+    }
+
+    @Test func aCoveredWindowStillHidesAPlayingVideo() {
+        // A covered video would keep drawing every frame, so it's hidden as before #199.
+        #expect(!MiniPlayerLayout.ignoresCover(playingSound: true, showingVideo: true, quiet: nil))
+        #expect(!MiniPlayerLayout.ignoresCover(playingSound: false, showingVideo: true, quiet: 5))
     }
 
     @Test func aPlaylistHasTimeForItsNextSong() {

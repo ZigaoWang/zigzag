@@ -227,25 +227,28 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         button.glyphInk = glyph.ink
     }
 
+    /// Playing and muted share one place: the speaker's body on the same pixels in both, set by the playing glyph's ink.
     private static func speakerGlyph(muted: Bool) -> (image: NSImage, ink: CGSize, size: CGSize) {
-        let name = muted ? "speaker.slash" : "speaker.wave.2"
         let point = Tokens.Sidebar.rowText
-        let key = "row speaker \(name) \(point)"
-        if let made = speakerGlyphs[key] { return made }
-        let config = NSImage.SymbolConfiguration(pointSize: point, weight: .regular, scale: .small)
-        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
-        image.isTemplate = true
-        let made = (image, Tokens.Symbol.inkOffset(of: image, key: key), Tokens.Symbol.inkSize(of: image, key: key))
-        speakerGlyphs[key] = made
-        return made
+        let key = "row speaker \(point)"
+        if speakerGlyphs[key] == nil {
+            let config = NSImage.SymbolConfiguration(pointSize: point, weight: .regular, scale: .small)
+            let names = ["speaker.wave.2", "speaker.slash"], keys = names.map { "row speaker \($0) \(point)" }
+            let images = names.map { name in
+                let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
+                image.isTemplate = true
+                return image
+            }
+            let inks = Tokens.Symbol.sharedInkOffsets(of: images, keys: keys, reference: 0)
+            let size = Tokens.Symbol.inkSize(of: images[0], key: keys[0])
+            speakerGlyphs[key] = [(images[0], inks[0], size), (images[1], inks[1], size)]
+        }
+        return speakerGlyphs[key]![muted ? 1 : 0]
     }
-    private static var speakerGlyphs: [String: (image: NSImage, ink: CGSize, size: CGSize)] = [:]
+    private static var speakerGlyphs: [String: [(image: NSImage, ink: CGSize, size: CGSize)]] = [:]
 
-    /// The ink size of the glyph a speaker shows now.
-    private static func speakerInk(_ button: IconButton) -> CGSize {
-        let muted = speakerGlyph(muted: true)
-        return button.glyph === muted.image ? muted.size : speakerGlyph(muted: false).size
-    }
+    /// The ink size the speaker is placed by: the playing glyph's, in both states.
+    private static func speakerInk(_ button: IconButton) -> CGSize { speakerGlyph(muted: false).size }
     var onClose: (() -> Void)?
 
     /// Whether tabs are nested under this one, and shown or folded away; nil when none are.
@@ -1056,23 +1059,31 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         }
     }
 
-    /// A speaker right after its title's text, as browsers put it with the page, not with the close button: its ink the
-    /// favicon's gap after the text and centered on the title's caps, the button round it a full row button to press.
+    /// A speaker right after its title's text, as browsers put it with the page, not with the close button: in the
+    /// title's line as a symbol in text is, a word space after it, the button round it a full row button to press.
     /// A long title fades before it instead, so it never goes past `end`.
     private func placeSpeaker(_ speaker: IconButton, after title: Label, end: CGFloat) {
         let scale = window?.backingScaleFactor ?? 2
         func pixel(_ v: CGFloat) -> CGFloat { (v * scale).rounded() / scale }
         let side = speaker.frame.width, ink = Self.speakerInk(speaker)
-        let gap = Tokens.Sidebar.iconGap
+        let gap = Tokens.Sidebar.inlineGlyphGap
         let textStart = title.frame.minX + Label.inset
         let inkStart = min(textStart + title.inkWidth + gap, end - (side + ink.width) / 2)
         let x = pixel(max(textStart, inkStart) + ink.width / 2 - side / 2)
-        let below = Label.capsBelowMiddle(of: title.font ?? Tokens.Font.sidebarRow(), lineHeight: title.frame.height)
+        let font = title.font ?? Tokens.Font.sidebarRow()
+        let below = Label.capsBelowMiddle(of: font, lineHeight: title.frame.height)
         let capsMiddle = title.frame.midY + (isFlipped ? below : -below)
-        speaker.frame.origin = NSPoint(x: x, y: pixel(capsMiddle - speaker.frame.height / 2))
+        // Titles are mostly lowercase, so the eye reads them between the x-height and the caps: the glyph's middle
+        // goes halfway between those two middles, a little under the caps' own.
+        let lower = Self.speakerDrop(capHeight: font.capHeight, xHeight: font.xHeight)
+        let middle = capsMiddle + (isFlipped ? lower : -lower)
+        speaker.frame.origin = NSPoint(x: x, y: pixel(middle - speaker.frame.height / 2))
         let textEnd = x + side / 2 - ink.width / 2 - gap
         title.frame.size.width = max(0, min(title.frame.width, textEnd + Label.inset - title.frame.minX))
     }
+
+    /// How far under the caps' middle a symbol in a title's line has its middle: halfway to the x-height's middle.
+    static func speakerDrop(capHeight: CGFloat, xHeight: CGFloat) -> CGFloat { max(0, capHeight - xHeight) / 4 }
 
     /// Whether the close button covers the last split part instead of reserving room.
     private var overlaysPartEnd = false

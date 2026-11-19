@@ -218,6 +218,8 @@ enum Tokens {
         /// From a row's edge to its icon, and from the icon to its title's first letter.
         static let rowInset: CGFloat = 6
         static let iconGap: CGFloat = Space.x2
+        /// From a title's last letter to a symbol in its line (a tab's speaker): a word space at the title's size.
+        static let inlineGlyphGap: CGFloat = 4.5
         /// The corners of small things in the sidebar: a row's fill, a favorite, a button.
         static let rowRadius: CGFloat = Radius.control
         /// A row's own small buttons (a tab's close and mute): a 20pt target, an 11pt glyph.
@@ -327,6 +329,10 @@ enum Tokens {
         static let favicon: CGFloat = 16
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
+        /// A slim window strip's buttons (Zigzag Mini, pop-ups, installed apps): the address's height, so every
+        /// hover box sits as far from the strip's edges as from the next one (`stripGap`).
+        static let stripButton: CGFloat = addressHeight
+        static let stripGap: CGFloat = Space.x1
         /// The least room a pane's address keeps before its strip folds its own buttons away (as the sidebar's
         /// address keeps for its host).
         static let addressMinWidth: CGFloat = 72
@@ -600,6 +606,16 @@ enum Tokens {
             return box
         }
         @MainActor private static var inkBoxes: [String: CGRect] = [:]
+
+        /// Offsets (as `inkOffset`) for symbols that take turns in one place (a speaker playing and muted): each is
+        /// drawn with its alignment rect's origin, its baseline's start, where the others' is, so what they share (the
+        /// speaker's body) stays on the same pixels. The ink centered is `reference`'s, or with none, all of theirs.
+        @MainActor static func sharedInkOffsets(of images: [NSImage], keys: [String], reference: Int? = nil) -> [CGSize] {
+            let origins = images.map { CGPoint(x: $0.alignmentRect.minX - $0.size.width / 2, y: $0.alignmentRect.minY - $0.size.height / 2) }
+            let boxes = zip(images, keys).enumerated().map { i, pair in inkBox(of: pair.0, key: pair.1).offsetBy(dx: -origins[i].x, dy: -origins[i].y) }
+            let middle = reference.map { boxes[$0] } ?? boxes.dropFirst().reduce(boxes[0]) { $0.union($1) }
+            return origins.map { CGSize(width: middle.midX + $0.x, height: middle.midY + $0.y) }
+        }
     }
 
     // MARK: - Motion (five roles, one curve family)
@@ -1469,6 +1485,7 @@ enum Tokens {
     /// space's color, gradient or see-through, each is a lighter step of that same color, never a gray laid over it.
     enum Chrome {
         private static func white(_ alpha: CGFloat) -> NSColor { Color.hex(0xFFFFFF, alpha: alpha) }
+        private static func black(_ alpha: CGFloat) -> NSColor { Color.hex(0x000000, alpha: alpha) }
 
         /// The tab you're on: by day a near-white card lifted by one soft shadow (`cardShadow`, `Shadow.lift`), its edge
         /// only just there, so it reads as a card rather than an outline; at night a lighter step of the space's color.
@@ -1484,15 +1501,16 @@ enum Tokens {
         static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.035),
             highLight: Color.hex(0x000000, alpha: 0.3), highDark: white(0.3))
         static let cardShadow = Color.dynamic(light: Color.hex(0x1E2A44, alpha: 0.10), dark: Color.hex(0x000000, alpha: 0.3))
-        /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
-        static let hover = Color.dynamic(light: white(0.38), dark: white(0.05),
-            highLight: white(0.62), highDark: white(0.10))
+        /// A row or a toolbar button under the pointer. By day a shade, not a white wash: white can't show on a white or
+        /// near-white space. About the same step on every space, light or dark; pressed, a step more.
+        static let hover = Color.dynamic(light: black(0.06), dark: white(0.065),
+            highLight: black(0.12), highDark: white(0.12))
         /// New Tab under the pointer: a lighter wash than a tab's, so the one quiet row stays quiet.
-        static let quietHover = Color.dynamic(light: white(0.22), dark: white(0.03),
-            highLight: white(0.45), highDark: white(0.07))
-        /// Pressed: a step darker than hover, as a thing pushed in is (`showSink`).
-        static let pressed = Color.dynamic(light: white(0.28), dark: white(0.035),
-            highLight: white(0.5), highDark: white(0.08))
+        static let quietHover = Color.dynamic(light: black(0.035), dark: white(0.04),
+            highLight: black(0.08), highDark: white(0.08))
+        /// Pressed: a step further from the space than hover (`showSink`).
+        static let pressed = Color.dynamic(light: black(0.10), dark: white(0.10),
+            highLight: black(0.16), highDark: white(0.16))
         /// The address and the favorites: a soft field of the space's color, no line around it.
         static let field = Color.dynamic(light: white(0.45), dark: white(0.065),
             highLight: white(0.72), highDark: white(0.12))

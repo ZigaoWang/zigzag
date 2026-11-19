@@ -80,12 +80,18 @@ final class BridgeWebRequest: BridgeNamespace {
         let hint = contexts.first.flatMap { context in tab.map { Self.tabHint($0, for: context) } }
         let answer = await ask(Self.details(challenge, tabHint: hint), of: ids)
         let names = ids.map { host.displayName(for: $0) }.joined(separator: ", ")
-        switch answer {
-        case .credentials: ExtensionLog.write("site sign-in for \(challenge.host): an extension answered (asked \(names))")
-        case .cancel: ExtensionLog.write("site sign-in for \(challenge.host): an extension cancelled it (asked \(names))")
-        case .none: ExtensionLog.write("site sign-in for \(challenge.host): no extension answered (asked \(names))")
-        }
+        ExtensionLog.write(Self.logLine(answer, host: challenge.host, isPrivate: isPrivate, asked: names))
         return answer
+    }
+
+    /// The extensions log's line for a sign-in; a private tab's site is left out.
+    static func logLine(_ answer: Answer, host: String, isPrivate: Bool, asked names: String) -> String {
+        let site = isPrivate ? "a private page" : host
+        switch answer {
+        case .credentials: return "site sign-in for \(site): an extension answered (asked \(names))"
+        case .cancel: return "site sign-in for \(site): an extension cancelled it (asked \(names))"
+        case .none: return "site sign-in for \(site): no extension answered (asked \(names))"
+        }
     }
 
     /// Puts `details` to each extension, and waits for the first that answers, all of them saying nothing, or `timeout`.
