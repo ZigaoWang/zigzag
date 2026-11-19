@@ -115,7 +115,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.zoomScrim.onClick = { [weak self] in self?.unzoomPane() }
         root.onTilesChange = { [weak self] shape, final in
             guard let self, final, let tab = self.tabManager.selectedTab else { return }
-            self.tabManager.setTileRatios(column: shape.column, row: shape.row, for: tab)
+            self.tabManager.setTileShape(shape, for: tab)
             self.onStateChange?()
         }
 

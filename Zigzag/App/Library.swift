@@ -88,6 +88,10 @@ nonisolated struct PinnedSplit: Codable, Sendable {
     var regions: [TileRegion]? = nil
     /// The other line's share: in a group of more, of the height above the line between the rows.
     var otherRatio = 0.5
+    /// A group's own lines (#316): the line between the columns in the top row and in the bottom, then the line
+    /// between the rows in the left column and in the right; nil for two, or a group saved before its rows had lines
+    /// of their own.
+    var shares: [Double]? = nil
 
     init(left: UUID, right: UUID) {
         self.left = left
@@ -104,6 +108,7 @@ nonisolated struct PinnedSplit: Codable, Sendable {
         vertical = pair.vertical
         regions = more.isEmpty ? nil : pair.regions
         otherRatio = pair.otherRatio
+        shares = more.isEmpty ? nil : pair.shares
     }
 
     init(from decoder: Decoder) throws {
@@ -120,6 +125,7 @@ nonisolated struct PinnedSplit: Codable, Sendable {
            Set([left, right] + more).count == more.count + 2 {
             self.more = more
             self.regions = regions
+            shares = ((try? c.decodeIfPresent([Double].self, forKey: .shares)) ?? nil).flatMap { $0.count == 4 ? $0 : nil }
         }
     }
 
@@ -134,10 +140,11 @@ nonisolated struct PinnedSplit: Codable, Sendable {
             try c.encode(more, forKey: .more)
             try c.encode(regions, forKey: .regions)
             try c.encode(otherRatio, forKey: .otherRatio)
+            try c.encodeIfPresent(shares, forKey: .shares)
         }
     }
 
-    private enum CodingKeys: String, CodingKey { case left, right, ratio, vertical, more, regions, otherRatio }
+    private enum CodingKeys: String, CodingKey { case left, right, ratio, vertical, more, regions, otherRatio, shares }
 
     /// Its pages, in order.
     var ids: [UUID] { [left, right] + more }
@@ -158,6 +165,7 @@ nonisolated struct PinnedSplit: Codable, Sendable {
             guard let regions, regions.count == tabIDs.count, TileShape.isValid(regions) else { return nil }
             pair.more = Array(tabIDs.dropFirst(2))
             pair.regions = regions
+            pair.shares = shares
         }
         return pair
     }

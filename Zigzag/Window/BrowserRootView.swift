@@ -245,16 +245,23 @@ final class SidebarContainer: NSView {
 
 /// Invisible strip for resizing: between sidebar and page, and between split panes.
 final class ResizeHandle: NSView {
+    /// The segment or corner this handle stands for, in a tile group (#316, #309).
+    var segment: TileShape.Segment?
+    var corner: TileShape.Corner?
     var onBegin: (() -> Void)?
     var onDrag: ((CGFloat) -> Void)?
+    /// Both coordinates at once, for a corner: dragging it moves a line each way (#309).
+    var onDragPoint: ((NSPoint) -> Void)?
     var onEnd: (() -> Void)?
     var onDoubleClick: (() -> Void)?
     /// Drags up and down (reporting y in window coordinates) instead of sideways.
     var isVertical = false { didSet { window?.invalidateCursorRects(for: self) } }
+    /// Drags both ways, as a corner does.
+    var dragsBothWays = false { didSet { window?.invalidateCursorRects(for: self) } }
     private var startX: CGFloat = 0
 
     override func resetCursorRects() {
-        addCursorRect(bounds, cursor: isVertical ? .rowResize : .columnResize)
+        addCursorRect(bounds, cursor: dragsBothWays ? .crosshair : isVertical ? .rowResize : .columnResize)
     }
 
     override var mouseDownCanMoveWindow: Bool { false }
@@ -266,7 +273,7 @@ final class ResizeHandle: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        onDrag?(isVertical ? event.locationInWindow.y : event.locationInWindow.x)
+        if let onDragPoint { onDragPoint(event.locationInWindow) } else { onDrag?(isVertical ? event.locationInWindow.y : event.locationInWindow.x) }
     }
 
     override func mouseUp(with event: NSEvent) { onEnd?() }
@@ -333,9 +340,33 @@ final class BrowserRootView: SpaceFrameView {
     var paneCards: [PageCardView] { [card, secondCard, thirdCard, fourthCard] }
     /// The cards beside the first, there only in split view.
     private var extraCards: [PageCardView] { [secondCard, thirdCard, fourthCard] }
-    /// The strips between panes you drag to resize them: the line between the columns, and between the rows.
-    private let columnHandle = ResizeHandle()
-    private let rowHandle = ResizeHandle()
+    /// The strips between panes you drag to resize them (#316): one per segment of the line between the columns or
+    /// between the rows, keyed by the panes they divide, and the squares where a line each way meet (#309).
+    private var dividerHandles: [DividerKey: ResizeHandle] = [:]
+    private var cornerHandles: [CornerKey: ResizeHandle] = [:]
+    /// The segment or corner being dragged: the handle keeps to it as the shape moves under the pointer.
+    private var draggedSegment: TileShape.Segment?
+    private var draggedCorner: TileShape.Corner?
+
+    private struct DividerKey: Hashable {
+        var axis: TileShape.Segment.Axis
+        var first: Int
+        var second: Int
+        init(_ segment: TileShape.Segment) {
+            axis = segment.axis
+            first = segment.first
+            second = segment.second
+        }
+    }
+
+    private struct CornerKey: Hashable {
+        var rows: [Int]
+        var columns: [Int]
+        init(_ corner: TileShape.Corner) {
+            rows = corner.rows
+            columns = corner.columns
+        }
+    }
     /// How the panes share the page area, a split's two or a tile group's three or four; nil with one page.
     private(set) var tiles: TileShape? { didSet { if tiles != oldValue { needsLayout = true } } }
     /// Share of the page area the left (or top) pane takes; nil when not split. Set alone, it makes a split of two.
@@ -560,51 +591,8 @@ final class BrowserRootView: SpaceFrameView {
             extra.isHidden = true
             addSubview(extra)
         }
-        rowHandle.isVertical = true
-        for handle in [columnHandle, rowHandle] {
-            handle.isHidden = true
-            addSubview(handle)
-        }
         topBar.isHidden = true
         addSubview(topBar)
-        // Never so narrow (or short) that a pane's header loses its buttons: a share of the window, and points too.
-        columnHandle.onDrag = { [weak self] x in
-            guard let self, var shape = self.tiles else { return }
-            let area = self.cardFrame
-            shape.column = TileShape.clamped((x - area.minX) / area.width, length: area.width, minimum: Self.minimumPaneWidth)
-            self.tiles = shape
-            self.layoutSubtreeIfNeeded()
-            self.onTilesChange?(shape, false)
-        }
-        rowHandle.onDrag = { [weak self] value in
-            guard let self, var shape = self.tiles else { return }
-            let area = self.cardFrame
-            // Window y runs bottom-up; this view is flipped.
-            let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
-            shape.row = TileShape.clamped((y - area.minY) / area.height, length: area.height, minimum: Self.minimumPaneHeight)
-            self.tiles = shape
-            self.layoutSubtreeIfNeeded()
-            self.onTilesChange?(shape, false)
-        }
-        for handle in [columnHandle, rowHandle] {
-            handle.onEnd = { [weak self] in
-                guard let self, let shape = self.tiles else { return }
-                self.onTilesChange?(shape, true)
-            }
-        }
-        // Even again: the panes glide to halves rather than jumping.
-        columnHandle.onDoubleClick = { [weak self] in
-            guard let self, var shape = self.tiles else { return }
-            shape.column = 0.5
-            self.setTiles(shape, animated: true)
-            self.onTilesChange?(shape, true)
-        }
-        rowHandle.onDoubleClick = { [weak self] in
-            guard let self, var shape = self.tiles else { return }
-            shape.row = 0.5
-            self.setTiles(shape, animated: true)
-            self.onTilesChange?(shape, true)
-        }
         addSubview(resizeHandle)
         attentionEdge.isHidden = true
         attentionEdge.onClick = { [weak self] in
@@ -927,12 +915,7 @@ final class BrowserRootView: SpaceFrameView {
                 extra.isHidden = !leavingCards.contains(ObjectIdentifier(extra))
             }
         }
-        let lines = tiles?.dividers(in: cardFrame, gap: paneGap, slop: 2)
-        // While a pane is enlarged the lines between the panes rest under the dimming.
-        columnHandle.isHidden = lines?.column == nil || zoomedPane != nil
-        rowHandle.isHidden = lines?.row == nil || zoomedPane != nil
-        if let column = lines?.column { columnHandle.frame = column }
-        if let row = lines?.row { rowHandle.frame = row }
+        placeDividers()
         splitDropHint.frame = cardFrame
         if let zoomed = zoomedPane, tiles != nil, paneCards.indices.contains(zoomed) {
             paneCards[zoomed].band = 0
@@ -946,6 +929,124 @@ final class BrowserRootView: SpaceFrameView {
             let attached = sidebarVisible && Self.isBorderless
             sidePanel.setShape(radius: isEdgeToEdge ? 0 : attached ? PageCardView.attachedRadius(in: window) : Tokens.Radius.card, squareRight: (false, false))
         }
+    }
+
+    /// A strip for each segment of the lines between the panes, and a square where a line each way meet (#316, #309).
+    /// While a pane is enlarged the lines rest under the dimming.
+    private func placeDividers() {
+        let area = cardFrame
+        let segments = zoomedPane == nil ? tiles?.segments(in: area, gap: paneGap, slop: 2) ?? [] : []
+        let corners = zoomedPane == nil ? tiles?.corners(in: area, gap: paneGap, slop: 2) ?? [] : []
+        var live: Set<DividerKey> = []
+        var madeDivider = false
+        for segment in segments {
+            let key = DividerKey(segment)
+            live.insert(key)
+            let handle: ResizeHandle
+            if let existing = dividerHandles[key] {
+                handle = existing
+            } else {
+                handle = makeDividerHandle()
+                dividerHandles[key] = handle
+                madeDivider = true
+            }
+            handle.segment = segment
+            let vertical = segment.axis == .column
+            if handle.isVertical != vertical { handle.isVertical = vertical }
+            handle.isHidden = false
+            handle.frame = segment.frame
+        }
+        if madeDivider {
+            for handle in cornerHandles.values { addSubview(handle, positioned: .above, relativeTo: nil) }
+        }
+        if draggedSegment == nil {
+            for key in dividerHandles.keys.filter({ !live.contains($0) }) {
+                // Kept for its key to come back with a group changed back: hidden, the pointer passes it by.
+                dividerHandles[key]?.isHidden = true
+                dividerHandles[key]?.segment = nil
+            }
+        }
+        var meeting: Set<CornerKey> = []
+        for corner in corners {
+            let key = CornerKey(corner)
+            meeting.insert(key)
+            let handle = cornerHandles[key] ?? makeCornerHandle()
+            cornerHandles[key] = handle
+            handle.corner = corner
+            handle.isHidden = false
+            handle.frame = corner.frame
+        }
+        if draggedCorner == nil {
+            for key in cornerHandles.keys.filter({ !meeting.contains($0) }) {
+                cornerHandles[key]?.isHidden = true
+                cornerHandles[key]?.corner = nil
+                cornerHandles.removeValue(forKey: key)
+            }
+        }
+    }
+
+    /// A strip you drag to move its line, between the two panes either side (#316).
+    private func makeDividerHandle() -> ResizeHandle {
+        let handle = ResizeHandle()
+        handle.onBegin = { [weak self, weak handle] in self?.draggedSegment = handle?.segment }
+        handle.onDrag = { [weak self] value in
+            guard let self, let segment = self.draggedSegment, var shape = self.tiles else { return }
+            let area = self.cardFrame
+            if segment.axis == .column {
+                shape.moveColumnLine(in: segment.row, to: (value - area.minX) / area.width,
+                                     length: area.width, minimum: Self.minimumPaneWidth)
+            } else {
+                // Window y runs bottom-up; this view is flipped.
+                let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
+                shape.moveRowLine(in: segment.column, to: (y - area.minY) / area.height,
+                                  length: area.height, minimum: Self.minimumPaneHeight)
+            }
+            self.tiles = shape
+            self.layoutSubtreeIfNeeded()
+            self.onTilesChange?(shape, false)
+        }
+        handle.onEnd = { [weak self] in self?.endTilesDrag() }
+        handle.onDoubleClick = { [weak self] in self?.evenOutTiles() }
+        handle.isHidden = true
+        addSubview(handle)
+        return handle
+    }
+
+    /// A square where a strip each way meet: dragging it moves both, so the pane at the corner grows both ways (#309).
+    private func makeCornerHandle() -> ResizeHandle {
+        let handle = ResizeHandle()
+        handle.dragsBothWays = true
+        handle.onBegin = { [weak self, weak handle] in self?.draggedCorner = handle?.corner }
+        handle.onDragPoint = { [weak self] point in
+            guard let self, let corner = self.draggedCorner, var shape = self.tiles else { return }
+            let area = self.cardFrame
+            shape.moveCorner(corner, to: self.convert(point, from: nil), in: area,
+                             minimumWidth: Self.minimumPaneWidth, minimumHeight: Self.minimumPaneHeight)
+            self.tiles = shape
+            self.layoutSubtreeIfNeeded()
+            self.onTilesChange?(shape, false)
+        }
+        handle.onEnd = { [weak self] in
+            self?.draggedCorner = nil
+            self?.endTilesDrag()
+        }
+        handle.onDoubleClick = { [weak self] in self?.evenOutTiles() }
+        handle.isHidden = true
+        addSubview(handle)
+        return handle
+    }
+
+    private func endTilesDrag() {
+        draggedSegment = nil
+        if let tiles { onTilesChange?(tiles, true) }
+    }
+
+    /// Even again: every line at the middle, the panes gliding there rather than jumping.
+    private func evenOutTiles() {
+        guard var shape = tiles else { return }
+        shape.evenOut()
+        setTiles(shape, animated: true)
+        onTilesChange?(shape, true)
     }
 
     var sidebarFrame: NSRect {

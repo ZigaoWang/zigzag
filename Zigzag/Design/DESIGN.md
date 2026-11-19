@@ -409,8 +409,11 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   ⇧ still picks rows), the strip's button (with zoom, swap and the layout, into ⋯ first) or View › Zoom Pane, ⇧⌘↩.
   Esc, a click beside it, zooming it again or going to another pane puts it back; so does any change to the group.
   Nothing is saved. The row lights the zoomed part with the pressed fill. With Reduce Motion, a crossfade.
-- **Tiling** (`TileLayout.swift`): two to four panes on a 2×2 grid, halves and quarters, with a line between the
-  columns and one between the rows, each dragged on its own and run only where it divides panes. A tab dragged over
+- **Tiling** (`TileLayout.swift`): two to four panes on a 2×2 grid, halves and quarters, each line run only where it
+  divides panes. Each row has its own line between the columns and each column its own between the rows (#316), so the
+  panes can have sizes of their own; where a line each way meet, a corner square drags both (#309), and a double-click
+  puts every line back in the middle. A grid of four keeps one line between its rows, since four rectangles covering
+  the page can't hold both pairs apart. A tab dragged over
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
   page alone, the left or right half, as always), and a quarter that can't split takes the tab in its place. The drop
   hint shows where it lands, in the split's one style, named for the place ("Open Top Left") on a toast's pill so it

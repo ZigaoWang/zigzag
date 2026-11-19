@@ -98,6 +98,182 @@ struct TileLayoutTests {
         #expect(grid.column?.height == area.height && grid.row?.width == area.width)
     }
 
+    // MARK: Sizes of their own (#316, #309)
+
+    @Test func eachRowKeepsItsOwnLineBetweenTheColumns() {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        // The top row's line moves; the bottom row's stays where it was.
+        shape.moveColumnLine(in: 0, to: 0.3, length: area.width, minimum: 100)
+        let frames = shape.frames(in: area, gap: 10)
+        #expect(frames[0] == CGRect(x: 100, y: 50, width: 297, height: 295))
+        #expect(frames[1] == CGRect(x: 407, y: 50, width: 693, height: 295))
+        #expect(frames[2] == CGRect(x: 100, y: 355, width: 495, height: 295))
+        #expect(frames[3] == CGRect(x: 605, y: 355, width: 495, height: 295))
+        #expect(shape.columnShares == [0.3, 0.5])
+        // Nothing overlaps, and together they still reach every edge.
+        for i in 0..<4 { for j in (i + 1)..<4 { #expect(!frames[i].intersects(frames[j])) } }
+        #expect(frames.map(\.minX).min() == area.minX && frames.map(\.maxX).max() == area.maxX)
+        #expect(frames.map(\.minY).min() == area.minY && frames.map(\.maxY).max() == area.maxY)
+    }
+
+    @Test func eachColumnKeepsItsOwnLineBetweenTheRows() {
+        var shape = TileShape(regions: [.left, .topRight, .bottomRight])
+        // The right column's line moves; the left page still runs the whole height.
+        shape.moveRowLine(in: 1, to: 0.4, length: area.height, minimum: 100)
+        let frames = shape.frames(in: area, gap: 0)
+        #expect(frames[0] == CGRect(x: 100, y: 50, width: 500, height: 600))
+        #expect(frames[1] == CGRect(x: 600, y: 50, width: 500, height: 240))
+        #expect(frames[2] == CGRect(x: 600, y: 290, width: 500, height: 360))
+        #expect(shape.rowShares == [0.5, 0.4])
+        #expect(frames[0].maxX == frames[1].minX && frames[2].maxY == area.maxY)
+    }
+
+    @Test func aGridsLineBetweenTheRowsRunsAcrossBothColumns() {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.moveRowLine(in: 1, to: 0.7, length: area.height, minimum: 100)
+        let frames = shape.frames(in: area, gap: 10)
+        // Four rectangles covering the area cannot keep both pairs of lines apart: the row line is one.
+        #expect(frames[0].height == 413 && frames[1].height == 413)
+        #expect(frames[2].height == 177 && frames[3].height == 177)
+        #expect(frames[1].minY == frames[0].minY && frames[3].minY == frames[2].minY)
+        #expect(shape.rowShares == [0.7, 0.7])
+    }
+
+    @Test func linesKeepTheirShareOfTheArea() {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.moveColumnLine(in: 0, to: 0.3, length: area.width, minimum: 100)
+        // A smaller window lays the same sizes out again, in its own points.
+        let small = CGRect(x: 0, y: 0, width: 500, height: 300)
+        let frames = shape.frames(in: small, gap: 10)
+        #expect(frames[0] == CGRect(x: 0, y: 0, width: 147, height: 145))
+        #expect(frames[1] == CGRect(x: 157, y: 0, width: 343, height: 145))
+        #expect(frames[2] == CGRect(x: 0, y: 155, width: 245, height: 145))
+        #expect(frames[3] == CGRect(x: 255, y: 155, width: 245, height: 145))
+    }
+
+    @Test func aSegmentRunsWhereTwoPagesMeet() throws {
+        let pair = TileShape(regions: [.left, .right]).segments(in: area, gap: 8, slop: 2)
+        #expect(pair.count == 1)
+        let line = try #require(pair.first)
+        #expect(line.axis == .column && line.first == 0 && line.second == 1)
+        #expect(line.frame == CGRect(x: 594, y: 50, width: 12, height: 600))
+        #expect(TileShape(regions: [.left, .right]).corners(in: area, gap: 8, slop: 2).isEmpty)
+        let stacked = TileShape(regions: [.top, .bottom]).segments(in: area, gap: 8, slop: 2)
+        #expect(stacked.count == 1 && stacked[0].axis == .row && stacked[0].column == 0)
+        // A half and two quarters: a segment in the top row and one in the bottom, and one between the quarters.
+        let three = TileShape(regions: [.left, .topRight, .bottomRight])
+        let strips = three.segments(in: area, gap: 8, slop: 2)
+        #expect(strips.count == 3)
+        #expect(strips.filter { $0.axis == .column }.map(\.row).sorted() == [0, 1])
+        #expect(strips.filter { $0.axis == .row }.map(\.column) == [1])
+        let corners = three.corners(in: area, gap: 8, slop: 2)
+        #expect(corners.count == 1 && corners[0].rows == [0, 1] && corners[0].columns == [1])
+    }
+
+    @Test func aSegmentMovesOnlyTheTwoPagesItDivides() throws {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        let strips = shape.segments(in: area, gap: 10, slop: 2)
+        #expect(strips.count == 4)
+        let segment = try #require(strips.first { $0.axis == .column && $0.row == 0 })
+        #expect(segment.first == 0 && segment.second == 1)
+        #expect(segment.frame.height == 295 && segment.frame.width == 14)
+        shape.moveColumnLine(in: segment.row, to: 0.3, length: area.width, minimum: 100)
+        let frames = shape.frames(in: area, gap: 10)
+        // Only the top left and top right changed; the bottom row is as it was.
+        #expect(frames[0].width == 297 && frames[1].maxX == area.maxX && frames[1].width == 693)
+        #expect(frames[2] == CGRect(x: 100, y: 355, width: 495, height: 295))
+        #expect(frames[3] == CGRect(x: 605, y: 355, width: 495, height: 295))
+        #expect(shape.columnShares == [0.3, 0.5])
+    }
+
+    @Test func aCornerMovesEveryLineThatMeetsThere() throws {
+        let shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        let corners = shape.corners(in: area, gap: 10, slop: 2)
+        #expect(corners.count == 1)
+        let corner = try #require(corners.first)
+        // From the even grid both rows' lines between the columns and both columns' between the rows meet here.
+        #expect(corner.rows == [0, 1] && corner.columns == [0, 1])
+        var moved = shape
+        moved.moveCorner(corner, to: CGPoint(x: area.minX + 0.4 * area.width, y: area.minY + 0.35 * area.height),
+                         in: area, minimumWidth: 100, minimumHeight: 100)
+        #expect(moved.columnShares == [0.4, 0.4] && moved.rowShares == [0.35, 0.35])
+        let frames = moved.frames(in: area, gap: 10)
+        #expect(frames[0] == CGRect(x: 100, y: 50, width: 396, height: 206))
+        #expect(frames[1] == CGRect(x: 506, y: 50, width: 594, height: 206))
+        #expect(frames[2] == CGRect(x: 100, y: 266, width: 396, height: 384))
+        #expect(frames[3] == CGRect(x: 506, y: 266, width: 594, height: 384))
+    }
+
+    @Test func evenAgainPutsEveryLineInTheMiddle() {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.moveColumnLine(in: 0, to: 0.3, length: area.width, minimum: 100)
+        shape.moveRowLine(in: 0, to: 0.7, length: area.height, minimum: 100)
+        shape.evenOut()
+        #expect(shape.columnShares == [0.5, 0.5] && shape.rowShares == [0.5, 0.5])
+        let even = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        #expect(shape.frames(in: area, gap: 10) == even.frames(in: area, gap: 10))
+    }
+
+    @Test func everyLineKeepsEachPageUsable() throws {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        // The top row's line stops where its pages are still wide enough, and leaves the bottom row's alone.
+        shape.moveColumnLine(in: 0, to: 0.01, length: area.width, minimum: 260)
+        #expect(abs(shape.columnShares[0] - 0.26) < 1e-9)
+        #expect(shape.columnShares[1] == 0.5)
+        // The grid's one line between the rows stops where a page is still tall enough.
+        shape.moveRowLine(in: 1, to: 0.99, length: area.height, minimum: 260)
+        let tallest = 1 - 260.0 / area.height
+        #expect(abs(shape.rowShares[0] - tallest) < 1e-9 && shape.rowShares[1] == shape.rowShares[0])
+        // A corner both ways, each against its own minimum.
+        var grid = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        let corner = try #require(grid.corners(in: area, gap: 10, slop: 2).first)
+        grid.moveCorner(corner, to: CGPoint(x: area.maxX, y: area.maxY), in: area, minimumWidth: 260, minimumHeight: 260)
+        #expect(abs(grid.columnShares[0] - 0.74) < 1e-9 && grid.columnShares[1] == grid.columnShares[0])
+        #expect(abs(grid.rowShares[0] - tallest) < 1e-9)
+        // Still four separate pages, still covering the area.
+        let frames = grid.frames(in: area, gap: 10)
+        for i in 0..<4 { for j in (i + 1)..<4 { #expect(!frames[i].intersects(frames[j])) } }
+        #expect(frames.map(\.minX).min() == area.minX && frames.map(\.maxX).max() == area.maxX)
+        #expect(frames.map(\.minY).min() == area.minY && frames.map(\.maxY).max() == area.maxY)
+    }
+
+    @Test func aGroupsOwnLinesComeBackAsTheyWereSaved() throws {
+        var shape = TileShape(regions: [.left, .topRight, .bottomRight])
+        shape.moveRowLine(in: 1, to: 0.3, length: area.height, minimum: 100)
+        let ids = [UUID(), UUID(), UUID()]
+        let group = try #require(Pair(ids: ids, shape: shape))
+        #expect(group.shares == [0.5, 0.5, 0.5, 0.3])
+        #expect(group.shape == shape)
+        let back = try JSONDecoder().decode(Pair.self, from: JSONEncoder().encode(group))
+        #expect(back.shape.columnShares == shape.columnShares && back.shape.rowShares == shape.rowShares)
+        // The pinned group keeps them too, and opens with them.
+        let pinned = try #require(PinnedSplit(ids, as: group))
+        #expect(pinned.shares == group.shares)
+        let reopened = try JSONDecoder().decode(PinnedSplit.self, from: JSONEncoder().encode(pinned))
+        #expect(reopened.shares == group.shares)
+        let pair = try #require(reopened.pair(of: ids))
+        #expect(pair.shape.columnShares == shape.columnShares && pair.shape.rowShares == shape.rowShares)
+        // A group saved before its rows had lines of their own opens with the even ones.
+        let old = #"{"left":"\#(ids[0].uuidString)","right":"\#(ids[1].uuidString)","more":["\#(ids[2].uuidString)"],"regions":["left","topRight","bottomRight"],"ratio":0.6}"#
+        let older = try JSONDecoder().decode(Pair.self, from: Data(old.utf8))
+        #expect(older.shape.columnShares == [0.6, 0.6] && older.shape.rowShares == [0.5, 0.5])
+    }
+
+    @Test func movingTheLinesSavesThemWithoutMovingThePages() throws {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.moveColumnLine(in: 1, to: 0.7, length: area.width, minimum: 100)
+        let group = try #require(Pair(ids: [UUID(), UUID(), UUID(), UUID()], shape: shape))
+        var moved = group
+        moved.setLines(of: shape)
+        #expect(moved.regions == group.regions && moved.ids == group.ids)
+        #expect(moved.shape.columnShares == [0.5, 0.7] && moved.shape.rowShares == [0.5, 0.5])
+        #expect(moved.ratio == group.ratio && moved.otherRatio == group.otherRatio)
+        // The old way of moving the lines still keeps the one line each, as a split always had.
+        var three = try #require(Pair(ids: [UUID(), UUID(), UUID()], shape: TileShape(regions: [.left, .topRight, .bottomRight])))
+        three.setRatios(column: 0.4, row: 0.25)
+        #expect(three.shape.columnShares == [0.4, 0.4] && three.shape.rowShares == [0.25, 0.25])
+    }
+
     @Test func aDividerKeepsEveryPaneUsable() {
         #expect(abs(TileShape.clamped(0.05, length: 1000, minimum: 260) - 0.26) < 1e-9)
         #expect(abs(TileShape.clamped(0.95, length: 1000, minimum: 260) - 0.74) < 1e-9)

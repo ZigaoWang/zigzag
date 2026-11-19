@@ -9,8 +9,9 @@ final class PagePicture {
     let layer = CALayer()
     private let panes = (0..<TileShape.maxPanes).map { _ in CALayer() }
     private let images = (0..<TileShape.maxPanes).map { _ in CALayer() }
-    /// The hairlines between the pages: between the columns, and between the rows.
-    private let dividers = [CALayer(), CALayer()]
+    /// The hairlines between the pages: one per stretch of the line between the columns, and one per stretch of the
+    /// line between the rows (#316), so a group whose rows have lines of their own draws each where it is.
+    private let dividers = (0..<4).map { _ in CALayer() }
     private var shape: TileShape?
     /// Each page's picture's size, in points.
     private var sizes: [CGSize?] = Array(repeating: nil, count: TileShape.maxPanes)
@@ -70,10 +71,13 @@ final class PagePicture {
                 panes[i].isHidden = i >= frames.count
                 if i < frames.count { fill(i, in: up(frames[i])) }
             }
-            let lines = shape?.dividers(in: b, gap: 1, slop: 0)
-            for (line, frame) in zip(dividers, [lines?.column, lines?.row]) {
-                line.isHidden = frame == nil
-                if let frame { line.frame = up(frame) }
+            // A hairline per stretch of a line, where it is: each row's line between the columns and each column's
+            // between the rows, drawn in the gap (#316).
+            let segments = shape?.segments(in: b, gap: 1, slop: 0) ?? []
+            for (i, line) in dividers.enumerated() {
+                guard i < segments.count else { line.isHidden = true; continue }
+                line.isHidden = false
+                line.frame = up(segments[i].frame)
             }
         }
     }

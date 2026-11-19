@@ -1673,6 +1673,10 @@ final class TabManager {
         /// The other line's share: in a group of more, of the height above the line between the rows; with two,
         /// kept for when a third comes.
         var otherRatio: Double = 0.5
+        /// A group's own lines (#316): the line between the columns in the top row and in the bottom, then the line
+        /// between the rows in the left column and in the right. Nil for two, whose one line each `ratio` and
+        /// `vertical` say, and for a group saved before its rows had lines of their own.
+        var shares: [Double]? = nil
 
         init(left: UUID, right: UUID) {
             self.left = left
@@ -1693,7 +1697,12 @@ final class TabManager {
                Set([left, right] + more).count == more.count + 2 {
                 self.more = more
                 self.regions = regions
+                shares = ((try? c.decodeIfPresent([Double].self, forKey: .shares)) ?? nil).flatMap { $0.count == 4 ? $0 : nil }
             }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case left, right, ratio, vertical, more, regions, otherRatio, shares
         }
     }
 
@@ -1932,6 +1941,14 @@ final class TabManager {
     func setTileRatios(column: CGFloat, row: CGFloat, for tab: Tab) {
         guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return }
         splits[index].setRatios(column: min(max(column, 0.2), 0.8), row: min(max(row, 0.2), 0.8))
+        rememberPinnedLayout(splits[index])
+    }
+
+    /// Where each of a tile group's lines between its pages is, as the page area's shares (#316): each row's line
+    /// between the columns and each column's between the rows.
+    func setTileShape(_ shape: TileShape, for tab: Tab) {
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return }
+        splits[index].setLines(of: shape)
         rememberPinnedLayout(splits[index])
     }
 
