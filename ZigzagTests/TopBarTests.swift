@@ -666,6 +666,9 @@ struct TopBarTests {
             #expect(root.barPutAway && !root.barOnScreen)
             // The bar sits just above the window; the page takes the row it had.
             #expect(root.topBar.frame.maxY == 0)
+            // Its controls travel with it: the URL pill and the buttons don't stay over the page.
+            #expect(root.topBar.convert(root.topBar.pill.frame, to: root).maxY <= 0)
+            #expect(root.topBar.convert(sidebar.addressButtons[0].frame, to: root).maxY <= 0)
             #expect(root.cardFrame.minY == inset && root.cardFrame.height == shownPage.height + bar)
             // The sidebar's rows stay where they were: its top row is not under the pointer's reach any more than before.
             #expect(sidebar.favorites.frame.minY == shownFavorites)

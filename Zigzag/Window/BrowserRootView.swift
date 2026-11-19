@@ -1180,7 +1180,9 @@ final class BrowserRootView: SpaceFrameView {
     private func placeTopBar() {
         let bar = topBarSlideFrame ?? topBarPlacementFrame
         topBar.frame = bar
-        topBar.rowTop = topBarFrame.minY - bar.minY
+        // While the sidebar slides, the bar is held over both its old and new places, and its controls sit where the
+        // bar will be. Put away for Autohide, the bar takes its controls with it: none stays over the page.
+        topBar.rowTop = barPutAway ? 0 : topBarFrame.minY - bar.minY
         (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
         // Center the site pill over the page, as in split panes.
         topBar.addressCenter = pageAreaFrame.midX - bar.minX
