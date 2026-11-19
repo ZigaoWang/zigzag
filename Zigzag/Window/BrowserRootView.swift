@@ -982,7 +982,8 @@ final class BrowserRootView: SpaceFrameView {
             }
             handle.segment = segment
             let isColumn = segment.axis == .column
-            handle.isVertical = !isColumn
+            let vertical = !isColumn
+            if handle.isVertical != vertical { handle.isVertical = vertical }
             handle.line = isColumn ? leading : segment.frame.height - reach
             handle.isHidden = false
             handle.frame = segment.frame
