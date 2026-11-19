@@ -496,7 +496,15 @@ extension BrowserWindowController: NSMenuItemValidation {
             unbookmarkWithUndo(bookmarkID, to: 0)
             Toast.show(String(localized: "Unsaved", comment: "Toast after a saved page is taken out of Pinned, back among the tabs."), symbol: "star.slash", in: self)
         }
+        refreshSavedState(of: tab)
         return true
+    }
+
+    /// The star shows the selected tab's saved state. Saving reloads the list and the favorites, not the address row,
+    /// so the row is told directly here (#326).
+    private func refreshSavedState(of tab: Tab) {
+        guard tab === tabManager.selectedTab else { return }
+        sidebar.update(tab: tab)
     }
 
     /// Every save ends here (#326), so no two ways in can drift: `request` says whether it was the quick save or the
@@ -505,22 +513,27 @@ extension BrowserWindowController: NSMenuItemValidation {
     func save(_ tab: Tab, request: SavePath.Request, at index: Int? = nil, then done: (() -> Void)? = nil) -> Bool {
         guard !tabManager.isPrivate, let page = SavePath.Page(tab: tab) else { return false }
         guard request == .picker else {
+            // A saved page's quick save is its unsave, as the star and ⌘D have always toggled.
+            if tab.bookmarkID != nil { return toggleSavedState(of: tab) }
             // A tab in a group saves as the group, as it has since #325: one folder, one undo.
             if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
                 bookmarkWithUndo(tab, at: index, in: tab.spaceID)
                 Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star", in: self)
+                refreshSavedState(of: tab)
                 done?()
                 return true
             }
             // No sheet, no question: the end of this space's Pinned pages.
             guard save(page, to: SavePath.quickPlace(in: tab.spaceID)) else { return false }
             Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star", in: self)
+            refreshSavedState(of: tab)
             done?()
             return true
         }
         SavePlaceSheet.show(page: page, spaceID: tab.spaceID, in: root.overlay) { [weak self] answer in
             guard let self, self.save(page, to: answer.place, named: answer.name) else { return }
             Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star", in: self)
+            self.refreshSavedState(of: tab)
             done?()
         }
         return true

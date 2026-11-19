@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -231,6 +232,29 @@ import Testing
             let saved = SavePath.save(try #require(SavePath.Page(tab: tab)), to: place, in: manager)
             #expect(library.isFavorite(saved?.id ?? UUID()))
             #expect(library.bookmarks(in: space).isEmpty)
+        }
+    }
+
+    // MARK: The star's two looks
+
+    /// The star and ⌘D are one quick action: unsaved saves, saved unsaves, and the star shows it at once.
+    @Test func theQuickSaveTogglesAndTheStarFollows() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let tab = Tab(url: URL(string: "https://example.com/toggle")!, spaceID: space)
+            manager.adopt([tab], in: space)
+            manager.select(tab)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+
+            controller.saveFromStar()
+            #expect(tab.bookmarkID != nil)
+            #expect(controller.sidebar.address.isSaved)
+
+            controller.saveFromStar()
+            #expect(tab.bookmarkID == nil)
+            #expect(!controller.sidebar.address.isSaved)
         }
     }
 
