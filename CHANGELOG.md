@@ -13,6 +13,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - ⇧-clicking a file on GitHub opens it in Peek instead of moving the tab, and ⌥-clicking a link a page follows itself downloads it. A page that uses ⇧- or ⌥-click itself, like selecting a range of rows, still gets the click. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#322](https://github.com/ZigaoWang/zigzag/issues/322))
 - The first ⌘, after Zigzag starts opens Settings right away instead of after a few seconds. Opening it read what every section lists, like website data, extensions and installed apps; now a section is read when you first open it or search. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#357](https://github.com/ZigaoWang/zigzag/issues/357))
+- With your pinned tabs folded away, the pinned pages that are open show under their folder's name, set in as when unfolded, instead of one by one. A group pinned while they were folded looked like it had split into separate pins; it shows as its one folder now. Folders with no open page stay out of sight. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 
 ## [0.9.3] - 2026-11-18
 
