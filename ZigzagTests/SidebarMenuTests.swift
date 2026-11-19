@@ -163,7 +163,7 @@ struct SidebarRowMenuTests {
         try inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
             #expect(titles(menu) == ["Reload Page", "Duplicate Tab", "Copy Link", "-",
-                                     "Pin Tab", "Add to Favorites", "New Group with Tab", "-",
+                                     "Save Page", "New Group with Tab", "-",
                                      "Open in Split View", "Move To", "-",
                                      "Rename", "Change Icon…", "-",
                                      "Close Tab", "Close Tabs Below", "Close Other Tabs"])
@@ -187,7 +187,7 @@ struct SidebarRowMenuTests {
             // Nothing below the last tab to close.
             #expect(!titles(SidebarMenus.tabMenu(for: tabs[1], controller: controller)).contains("Close Tabs Below"))
             let keyed: [(String, Selector)] = [("Reload Page", #selector(BrowserWindowController.reloadPage(_:))), ("Copy Link", #selector(BrowserWindowController.copyPageURL(_:))),
-                                               ("Pin Tab", #selector(BrowserWindowController.toggleBookmark(_:))), ("Close Tab", #selector(BrowserWindowController.closeTab(_:)))]
+                                               ("Save Page", #selector(BrowserWindowController.savePage(_:))), ("Close Tab", #selector(BrowserWindowController.closeTab(_:)))]
             for (title, action) in keyed {
                 let bar = Shortcuts.allItems.first { $0.action == action }
                 let item = try #require(menu.items.first { $0.title == title })
@@ -204,7 +204,7 @@ struct SidebarRowMenuTests {
             controller.tabManager.select(tabs[1])
             let menu = SidebarMenus.bookmarkMenu(for: try #require(Library.shared.bookmark(id)), controller: controller)
             #expect(titles(menu) == ["Copy Link", "-",
-                                     "Unpin Tab", "Add to Favorites", "Add to New Folder", "Move to Space", "-",
+                                     "Unsave Page", "In Every Space", "Add to New Folder", "Move to Space", "-",
                                      "Open in Split View", "-",
                                      "Rename", "Change Icon…", "-",
                                      "Unload Page", "Remove Pinned Page"])
@@ -217,9 +217,9 @@ struct SidebarRowMenuTests {
             let id = try #require(tabs[0].bookmarkID)
             Library.shared.updateBookmark(id, url: URL(string: "https://example.com/home")!)
             let menu = SidebarMenus.bookmarkMenu(for: try #require(Library.shared.bookmark(id)), controller: controller)
-            #expect(Array(titles(menu).prefix(4)) == ["Back to Pinned Page", "Set Current Page as Pinned", "Separate from Pinned Tab", "-"])
+            #expect(Array(titles(menu).prefix(4)) == ["Back to Pinned Page", "Save This Page Instead", "Separate from Pinned Tab", "-"])
             // Kept: the pinned address becomes the page it shows now, and there's nothing to go back to.
-            try run(menu.items.first { $0.title == "Set Current Page as Pinned" })
+            try run(menu.items.first { $0.title == "Save This Page Instead" })
             #expect(Library.shared.bookmark(id)?.url == tabs[0].url)
             #expect(!titles(SidebarMenus.bookmarkMenu(for: try #require(Library.shared.bookmark(id)), controller: controller)).contains("Back to Pinned Page"))
         }
@@ -232,7 +232,7 @@ struct SidebarRowMenuTests {
             // The right half of the row: its own menu, not the left page's.
             let menu = try #require(controller.listMenu(for: .tab(tabs[0].id), page: tabs[1]))
             #expect(Array(titles(menu).prefix(2)) == ["Separate Split View", "-"])
-            #expect(titles(menu).contains("Pin Split View"))
+            #expect(titles(menu).contains("Save Split View"))
             #expect(!titles(menu).contains("Remove from Split View"))
             #expect(!titles(menu).contains("Open in Split View"))
             try run(menu.items.first)
@@ -274,14 +274,14 @@ struct SidebarRowMenuTests {
     @Test func pickedRowsOrganizeThenClose() {
         inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.markedMenu(for: [.tab(tabs[0].id), .tab(tabs[1].id)], controller: controller)
-            #expect(titles(menu) == ["Pin 2 Tabs", "Add 2 to Favorites", "Add 2 to New Folder", "Group 2 Tabs", "Move 2 to Space", "-", "Close 2 Tabs"])
+            #expect(titles(menu) == ["Save 2 Pages", "Add 2 to New Folder", "Group 2 Tabs", "Move 2 to Space", "-", "Close 2 Tabs"])
         }
     }
 
-    @Test func aPrivateWindowsTabKeepsOutOfPinsAndWindows() throws {
+    @Test func aPrivateWindowsTabKeepsOutOfSavesAndWindows() throws {
         try inWindow(["A", "B"], isPrivate: true) { controller, tabs, _ in
             let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
-            #expect(!titles(menu).contains("Pin Tab") && !titles(menu).contains("Add to Favorites"))
+            #expect(!titles(menu).contains("Save Page") && !titles(menu).contains("In Every Space"))
             let places = try #require(menu.items.first { $0.title == "Move To" }?.submenu)
             #expect(!titles(places).contains("New Window") && !titles(places).contains("Zigzag Mini"))
         }

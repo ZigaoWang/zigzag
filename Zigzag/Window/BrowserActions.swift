@@ -505,6 +505,13 @@ extension BrowserWindowController: NSMenuItemValidation {
     func save(_ tab: Tab, request: SavePath.Request, at index: Int? = nil, then done: (() -> Void)? = nil) -> Bool {
         guard !tabManager.isPrivate, let page = SavePath.Page(tab: tab) else { return false }
         guard request == .picker else {
+            // A tab in a group saves as the group, as it has since #325: one folder, one undo.
+            if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
+                bookmarkWithUndo(tab, at: index, in: tab.spaceID)
+                Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star", in: self)
+                done?()
+                return true
+            }
             // No sheet, no question: the end of this space's Pinned pages.
             guard save(page, to: SavePath.quickPlace(in: tab.spaceID)) else { return false }
             Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star", in: self)
@@ -770,8 +777,13 @@ extension BrowserWindowController: NSMenuItemValidation {
                 : String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge.")
             return true
         case #selector(savePage(_:)):
-            // ⌘D: the quick save, into this space's Pinned pages, with no question (#326).
-            item.title = String(localized: "Save Page", comment: "File menu item, with ⌘D: saves the page you're on, into the space you're in, without asking.")
+            // ⌘D: the quick save, into this space's Pinned pages, with no question (#326). A whole group or split
+            // view saves as one, so the item says which.
+            let unsaved = tab?.bookmarkID == nil
+            let pair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
+            item.title = unsaved && tab.map(tabManager.pinsGroup) == true ? String(localized: "Save Group", comment: "Menu bar item: saves the whole group of tabs the tab is in, as a folder.")
+                : unsaved && pair ? String(localized: "Save Split View", comment: "Menu bar item: saves both pages of the split view.")
+                : String(localized: "Save Page", comment: "File menu item, with ⌘D: saves the page you're on, into the space you're in, without asking.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(savePageToFolder(_:)):
             // ⇧⌘D: the same save, asking where in the space it goes. One word for the verb, everywhere.

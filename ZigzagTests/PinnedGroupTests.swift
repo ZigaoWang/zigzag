@@ -250,16 +250,16 @@ import Testing
         }
     }
 
-    /// ⌘D (File › Pin Group) on a tab of a group pins the group as one folder, and ⌘Z brings the group back.
-    @Test func commandDPinsTheWholeGroupAndUndoes() throws {
+    /// ⌘D (File › Save Group) on a tab of a group saves the group as one folder, and ⌘Z brings the group back.
+    @Test func commandDSavesTheWholeGroupAndUndoes() throws {
         try inWindow(["0", "1", "2"]) { controller, tabs, space in
             let manager = controller.tabManager
             let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
             manager.select(tabs[1])
-            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleBookmark(_:)), keyEquivalent: "d")
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.savePage(_:)), keyEquivalent: "d")
             #expect(controller.validateMenuItem(item))
-            #expect(item.title == String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder."))
-            controller.toggleBookmark(item)
+            #expect(item.title == String(localized: "Save Group", comment: "Menu bar item: saves the whole group of tabs the tab is in, as a folder."))
+            controller.savePage(item)
             let folder = try #require(tabs[1].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
             #expect(folder.name == "Reading")
             #expect(folder.bookmarkIDs == tabs.compactMap(\.bookmarkID))
@@ -392,9 +392,9 @@ import Testing
             let manager = controller.tabManager
             let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
             manager.select(tabs[2])
-            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleBookmark(_:)), keyEquivalent: "d")
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.savePage(_:)), keyEquivalent: "d")
             #expect(controller.validateMenuItem(item))
-            controller.toggleBookmark(item)
+            controller.savePage(item)
             let folder = try expectShownAsOneFolder(controller, tabs, space, named: "Reading")
             controller.sidebarUndo.undo()
             #expect(Library.shared.folder(folder.id) == nil)
