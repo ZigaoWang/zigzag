@@ -447,17 +447,16 @@ final class FavoriteTile: InteractiveView {
         addSubview(button)
         return button
     }()
-    /// While its page plays sound, or is muted: a speaker in the top-left corner, the chip the × is, as a tab's row
-    /// has one beside its title. Clicking it mutes the page, or unmutes it.
+    /// While its page plays sound, or is muted: a small speaker badge on the icon's bottom corner, the icon cut away
+    /// round it so the tile shows as a ring (`FaviconView.speakerCut`), as a status sits on an avatar. Its target is
+    /// the ×'s size round it. Clicking it mutes the page, or unmutes it.
     private lazy var audioButton: IconButton = {
         let button = IconButton(symbol: "speaker.wave.2", size: Self.closeSide, symbolSize: Tokens.Sidebar.favoriteCloseGlyph,
                                 toolTip: String(localized: "Mute Tab", comment: "Tooltip of the speaker on a favorite whose page plays sound."))
         button.tint = Tokens.Color.textSecondary
         button.wantsLayer = true
         button.radius = Self.closeSide / 2
-        button.showsFillAtRest = true
-        button.layer?.borderWidth = Tokens.Metric.hairline
-        button.layer?.borderColor = cgColor(Tokens.Color.controlEdge)
+        button.layer?.insertSublayer(audioDisc, at: 0)
         button.onClick = { [weak self] _ in
             guard let tab = self?.tab else { return }
             tab.setMuted(!tab.isMuted)
@@ -466,6 +465,22 @@ final class FavoriteTile: InteractiveView {
         addSubview(button)
         return button
     }()
+    /// The badge itself: a disc of the selected card's light, under the speaker's glyph.
+    private let audioDisc = CALayer()
+
+    /// The speaker's glyph for the badge, its ink in the disc's middle.
+    private static func speakerGlyph(muted: Bool) -> (image: NSImage, ink: CGSize) {
+        let name = muted ? "speaker.slash" : "speaker.wave.2"
+        let key = "favorite speaker \(name)"
+        if let made = speakerGlyphs[key] { return made }
+        let config = NSImage.SymbolConfiguration(pointSize: Tokens.Sidebar.favoriteSpeakerGlyph, weight: .semibold, scale: .small)
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
+        image.isTemplate = true
+        let made = (image, Tokens.Symbol.inkOffset(of: image, key: key))
+        speakerGlyphs[key] = made
+        return made
+    }
+    private static var speakerGlyphs: [String: (image: NSImage, ink: CGSize)] = [:]
 
     /// Developer Mode (#141): the icon of a favorite whose open page is in it has the chip a tab's row has
     /// (`FaviconView.developerBadge`), and its tooltip says so, with the host.
@@ -481,8 +496,13 @@ final class FavoriteTile: InteractiveView {
         let shows = tab.map { $0.isPlayingAudio || $0.isMuted } ?? false
         guard shows || !audioButton.isHidden else { return }
         audioButton.isHidden = !shows
+        if !shows { icon.speakerCut = nil }
         let muted = tab?.isMuted == true
-        audioButton.symbol = muted ? "speaker.slash" : "speaker.wave.2"
+        let glyph = Self.speakerGlyph(muted: muted)
+        if audioButton.glyph !== glyph.image {
+            audioButton.glyph = glyph.image
+            audioButton.glyphInk = glyph.ink
+        }
         audioButton.toolTip = muted ? String(localized: "Unmute Tab", comment: "Tooltip of the speaker on a favorite whose page is muted.")
             : String(localized: "Mute Tab", comment: "Tooltip of the speaker on a favorite whose page plays sound.")
         needsLayout = true
@@ -723,8 +743,25 @@ final class FavoriteTile: InteractiveView {
         }
         let side = Self.closeSide, edge = Self.closeInset
         closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
-        if !audioButton.isHidden { audioButton.frame = NSRect(x: edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side) }
+        if !audioButton.isHidden { layoutSpeaker() }
         layoutNumber()
+    }
+
+    /// The speaker badge on the icon's bottom corner, its button centered on it.
+    private func layoutSpeaker() {
+        let side = icon.frame.width
+        let chip = (side * Tokens.Sidebar.favoriteSpeakerShare * 2).rounded() / 2
+        let leading = icon.developerBadge != nil || icon.originalIcon != nil
+        let cut = FaviconView.speakerFrame(side: side, chip: chip, leading: leading)
+        icon.speakerCut = cut
+        let disc = convert(cut, from: icon)
+        let target = Self.closeSide
+        audioButton.frame = NSRect(x: disc.midX - target / 2, y: disc.midY - target / 2, width: target, height: target)
+        Tokens.Motion.withoutAnimation {
+            audioDisc.frame = CGRect(x: (target - chip) / 2, y: (target - chip) / 2, width: chip, height: chip)
+            audioDisc.cornerRadius = chip / 2
+            audioDisc.backgroundColor = cgColor(Tokens.Chrome.card)
+        }
     }
 
     /// The number tucked into the top-right corner, as far in as the ×: the digit alone, as the × is one mark, so it
@@ -765,6 +802,7 @@ final class FavoriteTile: InteractiveView {
             layer?.borderWidth = isSelected || isOpen ? Tokens.Metric.hairline : 0
             layer?.borderColor = cgColor(isSelected ? Tokens.Chrome.cardEdge : Tokens.Chrome.openEdge)
             setCardShadow(isSelected)
+            audioDisc.backgroundColor = cgColor(Tokens.Chrome.card)
         }
         setCardRim(isSelected)
     }

@@ -259,6 +259,9 @@ enum Tokens {
         static let favoriteClose: CGFloat = 14
         static let favoriteCloseGlyph: CGFloat = 7
         static let favoriteCloseInset: CGFloat = 3
+        /// A favorite's speaker badge: its side as a share of the icon's, and its glyph's point size.
+        static let favoriteSpeakerShare: CGFloat = 0.55
+        static let favoriteSpeakerGlyph: CGFloat = 8
 
         /// The top row: the traffic lights' center line, from the sidebar's top, and every toolbar glyph's.
         static let lightsCenter: CGFloat = 22
@@ -563,6 +566,9 @@ enum Tokens {
             let box = inkBox(of: image, key: key)
             return CGSize(width: box.midX, height: box.midY)
         }
+
+        /// The size of an image's ink; `key` names it for the cache.
+        @MainActor static func inkSize(of image: NSImage, key: String) -> CGSize { inkBox(of: image, key: key).size }
 
         @MainActor private static func inkBox(of image: NSImage, key: String) -> CGRect {
             if let known = inkBoxes[key] { return known }

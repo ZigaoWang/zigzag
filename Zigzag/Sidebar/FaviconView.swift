@@ -61,6 +61,17 @@ final class FaviconView: NSView {
         }
     }
     private var renderedOriginal: (side: CGFloat, scale: CGFloat, image: NSImage)?
+    /// A round badge laid on the icon from outside it (a favorite's speaker), in the icon's own coordinates: the icon
+    /// is cut away round it by `speakerGap`, so the ground shows as a ring. Nil: none.
+    var speakerCut: CGRect? { didSet { if oldValue != speakerCut { needsLayout = true } } }
+    static let speakerGap: CGFloat = 1.5
+
+    /// Where a speaker badge of `chip` points sits on an icon of `side`: the bottom-trailing corner as the Developer
+    /// Mode chip's, reaching as far past it, or the bottom-leading one while that chip (or an away icon) has the corner.
+    static func speakerFrame(side: CGFloat, chip: CGFloat, leading: Bool) -> CGRect {
+        let out = (chip * Tokens.Sidebar.developerBadgeOverhang * 2).rounded() / 2
+        return CGRect(x: leading ? -out : side + out - chip, y: -out, width: chip, height: chip)
+    }
     /// The globe a site without an icon shows, for a badge.
     static var globeIcon: NSImage { globe }
     /// A question waits for this page but can't show (background tab or hidden window): a filled dot at the developer chip's
@@ -165,15 +176,19 @@ final class FaviconView: NSView {
     /// The chip on its corner, drawn again only when its size, the screen or its color changes; and the gap cut out
     /// of the icon round it (the rest of the cut reaching well past the sleeping ring).
     private func layoutBadge() {
-        guard developerBadge != nil || originalIcon != nil, bounds.width > 0 else { body.mask = nil; return }
+        let hasBadge = developerBadge != nil || originalIcon != nil
+        guard hasBadge || speakerCut != nil, bounds.width > 0 else { body.mask = nil; return }
         let frame = Self.badgeFrame(side: bounds.width)
-        badge.frame = frame
         let gap = Tokens.Sidebar.developerBadgeGap
         let reach = bounds.insetBy(dx: -bounds.width, dy: -bounds.height)
         let path = CGMutablePath()
         path.addRect(reach)
-        let round = developerBadge == nil ? Self.originalRadius(side: frame.width) + gap : frame.width / 2 + gap
-        path.addRoundedRect(in: frame.insetBy(dx: -gap, dy: -gap), cornerWidth: round, cornerHeight: round)
+        if hasBadge {
+            badge.frame = frame
+            let round = developerBadge == nil ? Self.originalRadius(side: frame.width) + gap : frame.width / 2 + gap
+            path.addRoundedRect(in: frame.insetBy(dx: -gap, dy: -gap), cornerWidth: round, cornerHeight: round)
+        }
+        if let speaker = speakerCut { path.addEllipse(in: speaker.insetBy(dx: -Self.speakerGap, dy: -Self.speakerGap)) }
         let scale = window?.backingScaleFactor ?? 2
         badgeCut.frame = body.bounds
         badgeCut.path = path
@@ -181,6 +196,7 @@ final class FaviconView: NSView {
         badgeCut.contentsScale = scale
         body.contentsScale = scale
         if body.mask !== badgeCut { body.mask = badgeCut }
+        guard hasBadge else { return }
         guard let color = developerBadge else {
             guard let original = originalIcon else { return }
             if let last = renderedOriginal, last.side == frame.width, last.scale == scale, last.image === original { return }
