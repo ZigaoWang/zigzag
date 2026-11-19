@@ -40,6 +40,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Space icons at the bottom of the sidebar no longer move down when you click them. They show hover and press like the buttons beside them, and give a little around their middle as those do.
 - A download rule that sends to a service names the place first and the method after it in brackets, as in "Files ending in .torrent go to 127.0.0.1 (load.start)", instead of "load.start · 127.0.0.1". The notice over the page says it the same way, and a site's kept answer under a rule reads "youtube.com: Hand Off". Thanks to [Lakeland97](https://github.com/Lakeland97). ([#367](https://github.com/ZigaoWang/zigzag/issues/367))
 - The full-screen switch in Site Controls and Settings › Privacy › Sites is called Keep full screen in the window instead of Full screen fills the page, and under it Site Controls says what happens on the site now: Videos fill the page, not the screen, or Videos fill your screen. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#385](https://github.com/ZigaoWang/zigzag/issues/385))
+- 1Password and other password extensions can fill a site's own sign-in sheet (HTTP Basic auth) from their popup. When you picked a login in the extension after Zigzag's sheet showed, nothing happened; now the first name and password an extension gives while the sheet is up signs you in and closes the sheet. Thanks to [Tuszy42](https://github.com/Tuszy42). ([#387](https://github.com/ZigaoWang/zigzag/issues/387))
 
 ## [0.9.3] - 2026-11-18
 

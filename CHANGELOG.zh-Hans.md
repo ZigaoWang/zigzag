@@ -47,6 +47,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 点侧边栏底部的空间图标时，图标不会再往下移了。鼠标移上去和按下时的样子和旁边的按钮一样，按下时也是从中间稍微缩一点。
 - 发送到服务的下载规则，现在先写地址，方法放在后面的括号里，比如“以 .torrent 结尾的文件交给 127.0.0.1（load.start）”，不再是“load.start · 127.0.0.1”。网页上方的提示也这样写，规则下面网站保留的选择显示为“youtube.com：转交”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#367](https://github.com/ZigaoWang/zigzag/issues/367))
 - “网站设置”和“设置 › 隐私 › 网站”里的全屏开关改名为“全屏时留在窗口内”，不再叫“全屏幕只填满网页”；“网站设置”里开关下面会写明现在在这个网站上会怎样：“视频只铺满网页，不占满屏幕”或“视频铺满整个屏幕”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#385](https://github.com/ZigaoWang/zigzag/issues/385))
+- 1Password 等密码扩展可以从自己的弹出窗口填写网站自身的登录框（HTTP 基本认证）了。以前 Zigzag 的登录框出现后，再在扩展里选登录信息不会有任何反应；现在登录框还开着时，第一个由扩展给出的用户名和密码会直接登录并关掉登录框。感谢 [Tuszy42](https://github.com/Tuszy42)。([#387](https://github.com/ZigaoWang/zigzag/issues/387))
 
 ## [0.9.3] - 2026-11-18
 
