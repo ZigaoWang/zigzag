@@ -1206,6 +1206,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var keyToken: NSObjectProtocol?
 
     init(pane: SettingsPane = .general) {
+        let timing = SettingsTiming.begin("init"); defer { timing.end() }
         self.pane = pane.shown(manyProfiles: Library.shared.hasManyProfiles)
         super.init(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
         // Its own layer, so it paints the page's surface rather than showing whatever is under it.
@@ -1252,6 +1253,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() {
         layer?.backgroundColor = cgColor(Tokens.Color.surface)
+        SettingsTiming.drew()
+        // Drawn: what the sections asked for is read after this frame, not before it.
+        if !sectionsToRead.isEmpty, !readIsQueued {
+            readIsQueued = true
+            DispatchQueue.main.async { [weak self] in self?.readWaitingSections() }
+        }
         columnWash.color = Brand.Theme.for(self).wash
     }
 
@@ -1260,6 +1267,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Building
 
     private func build() {
+        let timing = SettingsTiming.begin("build"); defer { timing.end() }
         buildSiteData()
         // The column of sections, under the page's title.
         column.addSubview(columnTitle)
@@ -1739,9 +1747,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         header.leading = paneTitle
         header.trailing = [settingSearch]
 
-        reloadPrivacy()
-        reloadListedSiteData()
-
         scroll.drawsBackground = false
         scroll.automaticallyAdjustsContentInsets = false
         scroll.hasVerticalScroller = true
@@ -1753,9 +1758,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // The header's hairline shows once the page has scrolled under it, as History's does.
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
-        reloadSpaces()
-        reloadProfiles()
-        reloadExtensions()
         show(pane)
     }
 
@@ -1932,6 +1934,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if let item = items.first(where: { $0.isSelected }) { column.scrollToVisible(item.frame.insetBy(dx: 0, dy: -Tokens.Space.x2)) }
         refreshTitle()
         if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
+        readSoon([pane])
         if pane == .shortcuts { reloadShortcuts() }
         if pane == .extensions { findAppExtensions() }
         layoutDocument()
@@ -1947,6 +1950,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Shown again (its tab chosen, or moved to another window): what may have changed elsewhere is read afresh.
     override func viewDidMoveToWindow() {
+        let timing = SettingsTiming.begin("viewDidMoveToWindow"); defer { timing.end() }
         super.viewDidMoveToWindow()
         needsDisplay = true
         if let keyToken { NotificationCenter.default.removeObserver(keyToken) }
@@ -2096,9 +2100,61 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         (window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
     }
 
+    // MARK: Reading a section's rows
+
+    /// The sections whose rows were read from disk, WebKit or the extension host. Each is read the first time it's
+    /// shown or searched, after the page has drawn, so opening Settings waits for none of them (#357).
+    private var readSections: Set<SettingsPane> = []
+    /// Sections asked for and not read yet.
+    private var sectionsToRead: Set<SettingsPane> = []
+    private var readIsQueued = false
+
+    /// Privacy and Website Data are read together: one list makes both.
+    private static func readKey(_ pane: SettingsPane) -> SettingsPane { pane == .websiteData ? .privacy : pane }
+
+    private func isRead(_ pane: SettingsPane) -> Bool { readSections.contains(Self.readKey(pane)) }
+
+    /// Reads these sections' rows once the page has drawn.
+    private func readSoon(_ panes: [SettingsPane]) {
+        sectionsToRead.formUnion(panes.map(Self.readKey).filter { !readSections.contains($0) })
+        if !sectionsToRead.isEmpty { needsDisplay = true }
+    }
+
+    /// Reads the sections asked for, then lays the page out again, its scroll kept.
+    private func readWaitingSections() {
+        readIsQueued = false
+        let panes = sectionsToRead
+        sectionsToRead = []
+        guard !panes.isEmpty else { return }
+        readSections.formUnion(panes)
+        let timing = SettingsTiming.begin("readSections"); defer { timing.end() }
+        layingOutOnce {
+            for pane in SettingsPane.allCases where panes.contains(pane) {
+                switch pane {
+                case .general: reloadWebApps()
+                case .spaces: reloadSpaces()
+                case .profiles: reloadProfiles()
+                case .extensions: reloadExtensions()
+                case .privacy: reloadPrivacy(); reloadListedSiteData()
+                default: break
+                }
+            }
+            layoutDocument()
+        }
+    }
+
+    private func counted(_ read: String) {
+        #if DEBUG
+        debugReads[read, default: 0] += 1
+        #endif
+    }
+
     // MARK: Groups
 
     private func reloadExtensions() {
+        guard isRead(.extensions) else { return }
+        let timing = SettingsTiming.begin("reloadExtensions"); defer { timing.end() }
+        counted("extensions")
         extensionsGroup.removeAllRows()
         defer { if pane == .extensions || isSearching { layoutDocument() } }
         guard #available(macOS 15.4, *) else { return }
@@ -2338,6 +2394,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The profiles there are, each with what it holds and the ways to change it. The first has no trash: there's
     /// always one profile.
     private func reloadProfiles() {
+        guard isRead(.profiles) else { return }
+        let timing = SettingsTiming.begin("reloadProfiles"); defer { timing.end() }
         profilesGroup.removeAllRows()
         let library = Library.shared
         for profile in library.profiles {
@@ -2373,8 +2431,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Data on this Mac from a profile that's in no list: a Profiles.json put back from an older backup, or one
     /// that couldn't be read, leaves it. Shown so it can be made a profile again or deleted, never deleted unasked.
     private func reloadUnlisted() {
+        guard isRead(.profiles) else { return }
+        counted("orphans")
         Task { @MainActor [weak self] in
+            let orphans = SettingsTiming.begin("orphans")
             let found = await Profiles.shared.orphans()
+            orphans.end()
             // The same data as is listed: its rows stay as they are.
             guard let self, self.unlistedListing.shown != found else { return }
             self.unlistedListing.show(found)
@@ -2443,6 +2505,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     private func reloadSpaces() {
+        guard isRead(.spaces) else { return }
+        let timing = SettingsTiming.begin("reloadSpaces"); defer { timing.end() }
         reloadRoutes()
         spacesGroup.removeAllRows()
         spaceRows = Library.shared.spaces.map { space in
@@ -2654,6 +2718,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Every shortcut, read from the menu bar itself so the list is always right.
     private func reloadShortcuts() {
+        let timing = SettingsTiming.begin("reloadShortcuts"); defer { timing.end() }
         var groups: [(String, FormGroup)] = []
         for top in NSApp.mainMenu?.items ?? [] {
             guard let menu = top.submenu else { continue }
@@ -2705,6 +2770,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         moveSectionSelection(animated: false)
         refreshTitle()
         reloadShortcuts()
+        if isSearching { readSoon(SettingsPane.allCases) }
         // "Find a setting" finds sites by name too: the list is read if no pane with it has been shown yet.
         if isSearching, siteDataList.model == nil || siteDataList.model?.state == .idle { reloadSiteData() }
         layoutDocument()
@@ -2802,7 +2868,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     func debugFind(_ text: String) {
         settingSearch.stringValue = text
         searchChanged()
+        debugReadNow()
     }
+
+    /// How many times each slow read has run: site data, extensions, profile orphans, web apps, privacy.
+    private(set) var debugReads: [String: Int] = [:]
+
+    /// Reads the sections waiting for the page to draw, as the next frame would.
+    func debugReadNow() { readWaitingSections() }
 
     /// flags find <text> | all | top: Settings › Developer › Feature Flags searched, Show All opened, or scrolled to.
     func debugFlags(_ arg: String) {
@@ -3205,6 +3278,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var madeParts: [String: NSView] = [:]
 
     private var hasExtensions: Bool {
+        // Before the rows are read, from what's installed, without starting the profile's extensions.
+        guard isRead(.extensions) else { return !profile.installs.installedIDs.isEmpty }
         if #available(macOS 15.4, *) { return !profile.extensions.installed.isEmpty }
         return false
     }
@@ -3776,6 +3851,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// History, website data, and every per-site decision you've made, in one place. Each button says what it
     /// did, right where you clicked.
     private func reloadPrivacy() {
+        guard isRead(.privacy) else { return }
+        let timing = SettingsTiming.begin("reloadPrivacy"); defer { timing.end() }
+        counted("privacy")
         // Capture one profile: rows must change it even if the window switches, and it's read once.
         let profile = self.profile
         privacyGroup.removeAllRows()
@@ -4184,6 +4262,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// What websites keep, read again where it's listed (with more than one profile that's Website Data, and
     /// Privacy has no use for it): when the pane is shown, not each time a site's permission changes.
     private func reloadListedSiteData() {
+        guard isRead(.privacy) else { return }
         if !(pane == .privacy && hasManyProfiles) { reloadSiteData() }
     }
 
@@ -4288,6 +4367,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The profile's list: kept from the last time it was shown, and read again in the background, so it shows
     /// at once and never empties while it's looked at. Only read where it's listed.
     private func reloadSiteData() {
+        let timing = SettingsTiming.begin("reloadSiteData"); defer { timing.end() }
+        counted("siteData")
         let profile = profile
         let model = siteDataModels[profile.id] ?? {
             let model = SiteDataModel(source: WebKitSiteData(store: profile.store))
@@ -4352,6 +4433,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Settings › General › Installed Apps: each site installed as an app, with its toolbar's switch and Remove, which
     /// asks first.
     private func reloadWebApps() {
+        guard isRead(.general) else { return }
+        let timing = SettingsTiming.begin("reloadWebApps"); defer { timing.end() }
+        counted("webApps")
         webAppsGroup.removeAllRows()
         let store = WebAppStore.shared
         store.pruneMissing()
