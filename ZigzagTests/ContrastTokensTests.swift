@@ -44,15 +44,15 @@ struct ContrastTokensTests {
         ("Chrome.card", Tokens.Chrome.card, 0xFFFFFF, 0.96, 0xFFFFFF, 0.18),
         ("Chrome.cardHover", Tokens.Chrome.cardHover, 0xFFFFFF, 1, 0xFFFFFF, 0.21),
         ("Chrome.cardEdge", Tokens.Chrome.cardEdge, 0x000000, 0.035, 0xFFFFFF, 0.035),
-        ("Chrome.hover", Tokens.Chrome.hover, 0xFFFFFF, 0.38, 0xFFFFFF, 0.05),
-        ("Chrome.quietHover", Tokens.Chrome.quietHover, 0xFFFFFF, 0.22, 0xFFFFFF, 0.03),
-        ("Chrome.pressed", Tokens.Chrome.pressed, 0xFFFFFF, 0.28, 0xFFFFFF, 0.035),
+        ("Chrome.hover", Tokens.Chrome.hover, 0x000000, 0.06, 0xFFFFFF, 0.065),
+        ("Chrome.quietHover", Tokens.Chrome.quietHover, 0x000000, 0.035, 0xFFFFFF, 0.04),
+        ("Chrome.pressed", Tokens.Chrome.pressed, 0x000000, 0.10, 0xFFFFFF, 0.10),
         ("Chrome.field", Tokens.Chrome.field, 0xFFFFFF, 0.45, 0xFFFFFF, 0.065),
         ("Chrome.fieldHover", Tokens.Chrome.fieldHover, 0xFFFFFF, 0.62, 0xFFFFFF, 0.095),
         ("Chrome.fieldPressed", Tokens.Chrome.fieldPressed, 0xFFFFFF, 0.52, 0xFFFFFF, 0.08),
         ("Chrome.key", Tokens.Chrome.key, 0xFFFFFF, 0.5, 0xFFFFFF, 0.07),
         ("Chrome.keyEdge", Tokens.Chrome.keyEdge, 0x000000, 0.07, 0xFFFFFF, 0.09),
-        ("Chrome.openEdge", Tokens.Chrome.openEdge, 0x000000, 0.1, 0xFFFFFF, 0.16),
+        ("Chrome.openEdge", Tokens.Chrome.openEdge, 0x000000, 0.035, 0xFFFFFF, 0.03),
     ]
 
     /// A color as drawn by day or at night, with Increase Contrast forced on or off whatever the Mac says.
@@ -130,6 +130,46 @@ struct ContrastTokensTests {
                     let after = Brand.contrast(resolved(ink, dark: dark, high: true), ground)
                     #expect(after >= before, "\(color.name) \(dark ? "dark" : "light")")
                 }
+            }
+        }
+    }
+
+    /// CIELAB lightness of an opaque sRGB color.
+    func lightness(_ c: NSColor) -> Double {
+        let y = 0.2126 * OKLab.decode(c.redComponent) + 0.7152 * OKLab.decode(c.greenComponent) + 0.0722 * OKLab.decode(c.blueComponent)
+        return y > 216.0 / 24389 ? 116 * cbrt(y) - 16 : y * 24389 / 27
+    }
+
+    /// Light frames: white, the curated colors, the Sky and Paper looks, a barely tinted one. Dark: the curated colors
+    /// at night, black, the Espresso and Slate looks.
+    var lightFrames: [(String, NSColor)] {
+        [("white", SpaceColor.paint(hue: 0, depth: 0, tint: 0)), ("pale", SpaceColor.paint(hue: 0.6, depth: 0.01, tint: 0.3)),
+         ("paper", SpaceColor.paint(hue: 0.11, depth: 0.1, tint: 0.55)), ("sky look", SpaceColor.paint(hue: 0.6, depth: 0.04, tint: 0.6)),
+         ("sky look end", SpaceColor.paint(hue: 0.6, depth: 0.34, tint: 0.6))]
+            + SpaceColor.allCases.filter { $0 != .ink }.map { ($0.name, resolved($0.background, dark: false, high: false)) }
+    }
+
+    var darkFrames: [(String, NSColor)] {
+        [("black", SpaceColor.paint(hue: 0, depth: 1, tint: 0)), ("espresso", SpaceColor.paint(hue: 0.07, depth: 0.8, tint: 0.45)),
+         ("espresso end", SpaceColor.paint(hue: 0.07, depth: 0.93, tint: 0.45)), ("slate", SpaceColor.paint(hue: 0.62, depth: 0.76, tint: 0.35)),
+         ("slate end", SpaceColor.paint(hue: 0.62, depth: 0.9, tint: 0.35))]
+            + SpaceColor.allCases.filter { $0 != .snow }.map { ($0.name, resolved($0.background, dark: true, high: false)) }
+    }
+
+    /// Hover and pressed show on every space, white and black included, by about as much on each; pressed shows more
+    /// than hover, and the selected card stands apart from both.
+    @Test func hoverShowsOnEverySpace() {
+        for dark in [false, true] {
+            for (name, frame) in dark ? darkFrames : lightFrames {
+                func step(_ wash: NSColor) -> Double { abs(lightness(over(resolved(wash, dark: dark, high: false), frame)) - lightness(frame)) }
+                let hover = step(Tokens.Chrome.hover), pressed = step(Tokens.Chrome.pressed), quiet = step(Tokens.Chrome.quietHover)
+                let card = lightness(over(resolved(Tokens.Chrome.card, dark: dark, high: false), frame))
+                let hovered = lightness(over(resolved(Tokens.Chrome.hover, dark: dark, high: false), frame))
+                let what = "\(name) \(dark ? "dark" : "light"): hover \(String(format: "%.1f", hover)) pressed \(String(format: "%.1f", pressed)) quiet \(String(format: "%.1f", quiet))"
+                #expect((3.5...8).contains(hover), "\(what)")
+                #expect(pressed > hover + 1.5, "\(what)")
+                #expect(quiet >= 2 && quiet < hover, "\(what)")
+                #expect(abs(card - hovered) > 4, "\(what) card \(String(format: "%.1f", card))")
             }
         }
     }

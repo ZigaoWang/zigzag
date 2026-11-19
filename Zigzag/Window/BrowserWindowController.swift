@@ -362,6 +362,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Many at once (`TabManager.together`): once, when they're all done.
             if tabManager.isBatching { break }
             sidebar.list.reload(animated: window?.isVisible == true)
+            newTabNote.listChanged()
             // A favorite opened or closed: its tile shows it.
             reloadFavorites()
             numberHints?.placesChanged()
@@ -579,7 +580,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showTopBar()
     }
 
-    /// Settings › Appearance › Sidebar on the right, or View › Move Sidebar to Right: the sidebar slides over to the
+    /// Settings › Appearance › Sidebar position, or View › Move Sidebar to Right: the sidebar slides over to the
     /// other edge and the pages glide the other way. What was open beside the sidebar is put away first.
     @objc func placeSidebarSide() {
         let onRight = BrowserRootView.sidebarOnRight
@@ -687,6 +688,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.refreshRows()
         }
         reloadFavorites()
+        newTabNote.listChanged()
         sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
         updateWindowTitle()
         refreshExtensionActions()
@@ -708,7 +710,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let installs = installs
         let access = installs.siteAccess(id)
         let tab = tabManager.selectedTab
-        let site = ContentBlocker.site(of: tab?.url)
+        // A private window's site isn't offered: choosing it would keep it.
+        let site = tabManager.isPrivate ? nil : ContentBlocker.site(of: tab?.url)
         let all = SidebarMenus.Item(String(localized: "On All Sites", comment: "Site Access choice: the extension works on every site.")) { installs.setSiteAccess(id, .all); tab?.reload() }
         all.state = access == .all && !tabManager.profile.extensions.asksForSitesOnlyOptionally(id) ? .on : .off
         let click = SidebarMenus.Item(String(localized: "When You Click It", comment: "Site Access choice: the extension works on a site only after its button is clicked.")) { installs.setSiteAccess(id, .click, sites: []); tab?.reload() }
@@ -1470,7 +1473,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         var attention = false
         var pins: [AddressView.Pin] = []
         var animated = false
-        // Extensions don't run in a private window: no host, so nothing to show.
+        // In a private window, only extensions allowed there (ExtensionHost.pinnedActions).
         if #available(macOS 15.4, *), let host = tab?.extensionHost ?? tabManager.extensionHost {
             attention = host.needsAttention(for: tab)
             pins = host.pinnedActions(for: tab).map { addressPin(for: $0, host: host) }
@@ -1538,7 +1541,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         menu.addItem(title)
         if let options = context.optionsPageURL {
             menu.addItem(SidebarMenus.Item(String(localized: "Settings", comment: "Item in an extension's menu: opens the extension's own settings page."), symbol: "gearshape") { [weak self] in
-                self?.tabManager.newTab(url: options, title: context.webExtension.displayName)
+                guard let self else { return }
+                // From a private window, in an everyday one: the page keeps the extension's own data.
+                guard self.tabManager.isPrivate else { self.tabManager.newTab(url: options, title: context.webExtension.displayName); return }
+                let everyday = WindowManager.shared.controllers.first { !$0.tabManager.isPrivate } ?? WindowManager.shared.newWindow(showCommandBar: false)
+                everyday.tabManager.newTab(url: options, spaceID: everyday.tabManager.space(for: profile), title: context.webExtension.displayName)
+                everyday.window?.makeKeyAndOrderFront(nil)
             })
         }
         menu.addItem(siteAccessItem(for: id))
@@ -2780,29 +2788,37 @@ extension BrowserWindowController: SidebarDelegate {
         let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
         Library.shared.setFolderTreeOpen(id, open, shown: Set(shown))
     }
+    /// Collapse All Folders / Expand All Folders for a space's pinned folders (#343).
+    func setAllFoldersOpen(in spaceID: UUID, _ open: Bool) {
+        let pages = open ? [] : Library.shared.bookmarks(in: spaceID).map(\.id)
+        let shown = pages.filter { page in WindowManager.shared.controllers.contains { $0.tabManager.bookmarkTab(for: page) != nil } }
+        Library.shared.setAllFoldersOpen(in: spaceID, open, shown: Set(shown))
+    }
+    /// Whether any of the space's pinned folders is open (or shut, for `open` false).
+    static func hasFolders(in spaceID: UUID, isOpen open: Bool) -> Bool {
+        Library.shared.folders(in: spaceID).contains { $0.isOpen == open }
+    }
     /// Open All in Tabs confirms above this many pages.
     static let openAllAsksPast = 10
-    /// Opens every page in the folder and its subfolders, showing the first (#343).
-    /// ⌘Z closes them again.
+    /// Opens every page in the folder and its subfolders as new tabs, in list order, where new tabs go; the first
+    /// shows (#343). The pinned pages stay as they are. ⌘Z closes the new tabs again.
     func openAllInTabs(_ folderID: UUID) {
         guard let folder = Library.shared.folder(folderID) else { return }
         let pages = Library.shared.allBookmarkIDs(inFolder: folderID).compactMap { Library.shared.bookmark($0) }
-        guard let first = pages.first else { return }
+        guard !pages.isEmpty else { return }
         let open = { [weak self] in
             guard let self else { return }
-            self.pageChange(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { [tabManager] in
-                tabManager.together { for page in pages { _ = tabManager.pageTab(for: page) } }
-                tabManager.openBookmark(first)
+            self.pageChange(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every page in the folder and the folders inside it as new tabs.")) { [tabManager] in
+                tabManager.newTabs(pages.map { ($0.url, $0.title) })
             }
         }
-        let opening = pages.filter { tabManager.bookmarkTab(for: $0.id) == nil }.count
-        guard opening > Self.openAllAsksPast else { open(); return }
+        guard pages.count > Self.openAllAsksPast else { open(); return }
         let message = Library.shared.subfolderIDs(of: folderID).isEmpty
-            ? String(localized: "Every pinned tab in “\(folder.name)” opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once, from a folder with no folders inside. The folder's name.")
-            : String(localized: "Every pinned tab in “\(folder.name)” and the folders inside it opens.", comment: "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once. The folder's name.")
-        ConfirmSheet.show(in: root.overlay, title: String(localized: "Open \(opening) tabs?", comment: "Title of the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once (more than 10)."),
+            ? String(localized: "Each page in “\(folder.name)” opens in a new tab.", comment: "Message of the sheet that asks before Open All in Tabs opens many tabs at once, from a folder with no folders inside. The folder's name.")
+            : String(localized: "Each page in “\(folder.name)” and the folders inside it opens in a new tab.", comment: "Message of the sheet that asks before Open All in Tabs opens many tabs at once. The folder's name.")
+        ConfirmSheet.show(in: root.overlay, title: String(localized: "Open \(pages.count) tabs?", comment: "Title of the sheet that asks before Open All in Tabs opens many tabs from a folder at once (more than 10)."),
                           message: message,
-                          confirmTitle: String(localized: "Open All", comment: "Button in the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once.")) { confirmed in
+                          confirmTitle: String(localized: "Open All", comment: "Button in the sheet that asks before Open All in Tabs opens many tabs from a folder at once.")) { confirmed in
             if confirmed { open() }
         }
     }

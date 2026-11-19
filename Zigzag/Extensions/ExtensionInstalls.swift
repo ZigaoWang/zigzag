@@ -26,8 +26,10 @@ final class ExtensionInstalls {
         var accessSites: [String]?
         /// Sites where it's off regardless of site access, set from EnergyWatch's high-energy notice.
         var offSites: [String]?
+        /// Allowed in private windows (#353). Nil is off, as in Chrome.
+        var allowsPrivate: Bool?
 
-        fileprivate static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites"]
+        static let keys = ["enabled", "grantedPermissions", "grantedMatchPatterns", "bridgeRecorded", "siteAccess", "accessSites", "offSites", "allowsPrivate"]
 
         /// What another profile starts with when it gets this extension too: what was approved here and where it
         /// may run, so it gets nothing it wasn't allowed without the install sheet. Sites it was clicked on stay
@@ -37,6 +39,8 @@ final class ExtensionInstalls {
             next.enabled = enabled
             if siteAccess == .click { next.accessSites = nil }
             next.offSites = nil
+            // Private windows are asked for again in each profile.
+            next.allowsPrivate = nil
             return next
         }
     }
@@ -118,6 +122,14 @@ final class ExtensionInstalls {
     func siteAccess(_ id: String) -> SiteAccess { state(id)?.siteAccess ?? .all }
     func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
     func offSites(_ id: String) -> [String] { state(id)?.offSites ?? [] }
+    func allowsPrivate(_ id: String) -> Bool { state(id)?.allowsPrivate ?? false }
+
+    /// Lets it run in private windows, or keeps it out; it starts again either way, as in Chrome.
+    func setAllowsPrivate(_ id: String, _ allowed: Bool) {
+        guard allowsPrivate(id) != allowed else { return }
+        update(id) { $0.allowsPrivate = allowed ? true : nil }
+        profile.extensions.applyPrivateAccess(id)
+    }
 
     /// Turns the extension off or back on for one site and its subdomains.
     func setOff(_ id: String, on site: String, _ off: Bool) {
@@ -255,4 +267,10 @@ struct Remembered<Value> {
         self.value = value
         self.generation = generation
     }
+}
+
+/// Who sees private windows (#353): everyday browsing is every extension's to see; a private window's tabs, pages and
+/// downloads only an extension allowed in private windows sees.
+enum PrivateAccess {
+    static func sees(isPrivate: Bool, allowed: Bool) -> Bool { !isPrivate || allowed }
 }

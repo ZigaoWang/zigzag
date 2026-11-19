@@ -355,7 +355,7 @@ enum SidebarMenus {
         // First item, as in Safari's bookmark folders.
         var open: [NSMenuItem] = []
         if !Library.shared.allBookmarkIDs(inFolder: folder.id).isEmpty {
-            open.append(Item(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.")) { controller.openAllInTabs(folder.id) })
+            open.append(Item(String(localized: "Open All in Tabs", comment: "Item in a folder's context menu in the sidebar: opens every page in the folder and the folders inside it as new tabs.")) { controller.openAllInTabs(folder.id) })
         }
         var view = [Item(folder.isOpen ? String(localized: "Close Folder", comment: "Item in a folder's context menu in the sidebar.") : String(localized: "Open Folder", comment: "Item in a folder's context menu in the sidebar.")) { controller.listSetFolderOpen(folder.id, !folder.isOpen) }]
         // Only with subfolders, and only when it would change something.
@@ -502,6 +502,13 @@ enum SidebarMenus {
         if id == controller.tabManager.currentSpaceID {
             menu.addItem(Item(String(localized: "New Folder", comment: "Item in a space's context menu.")) { controller.newFolder() })
         }
+        // Every pinned folder at once, each only when it would change something (#343).
+        if BrowserWindowController.hasFolders(in: id, isOpen: true) {
+            menu.addItem(Item(collapseAllFoldersTitle) { controller.setAllFoldersOpen(in: id, false) })
+        }
+        if BrowserWindowController.hasFolders(in: id, isOpen: false) {
+            menu.addItem(Item(expandAllFoldersTitle) { controller.setAllFoldersOpen(in: id, true) })
+        }
         // How every space's name shows, large or a plain heading, right where you see it. A setting, so it stands
         // apart from the actions, as a menu's checkmark items do.
         menu.addItem(.separator())
@@ -514,6 +521,13 @@ enum SidebarMenus {
             SpaceEditor.confirmDelete(spaceID: id, in: controller)
         })
         return menu
+    }
+
+    static var collapseAllFoldersTitle: String {
+        String(localized: "Collapse All Folders", comment: "Item in the View menu and in a space's context menu in the sidebar: shuts every pinned folder in the space.")
+    }
+    static var expandAllFoldersTitle: String {
+        String(localized: "Expand All Folders", comment: "Item in the View menu and in a space's context menu in the sidebar: opens every pinned folder in the space.")
     }
 
     /// Use Default Colors, beside Edit Space…: the colors the space was made with, back in one step that ⌘Z undoes.

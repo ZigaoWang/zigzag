@@ -573,9 +573,6 @@ class FloatingPanelView: NSView {
     /// Left presses on the panel's bare surface, which the window otherwise swallows (used to drag the command bar).
     var onBarePress: ((NSEvent) -> Void)?
 
-    /// For panels that act as buttons (the new tab note): the window delivers surface press and release to it.
-    var takesPress: Bool { false }
-
     private static func handlesPress(_ view: NSView) -> Bool {
         if let field = view as? NSTextField, isLabel(field) { return false }
         if view is NSControl || view is NSText || view is NSScroller || view is WKWebView { return true }
@@ -867,7 +864,7 @@ class FloatingPanelView: NSView {
 
 /// A brief confirmation pill at the top of the page ("Link Copied", "90%"). Shown at once, gone in a moment;
 /// pressing the same shortcut again updates it in place instead of stacking another.
-class ToastView: FloatingPanelView {
+final class ToastView: FloatingPanelView {
     let icon = NSImageView()
     let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     let actionButton = PillButton(style: .plain)
