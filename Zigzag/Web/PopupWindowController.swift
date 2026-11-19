@@ -348,9 +348,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               certificateException: CertificateExceptions.isShowingException(in: webView),
                                               hasCertificate: !(shownURL != nil && shownURL == errorShownFor))
         header.show(url: shownURL, secure: !connection.warns)
-        let hasURL = Self.movableURL(shownURL) != nil
-        copyButton.isEnabled = hasURL
-        openButton.isEnabled = hasURL
+        copyButton.isEnabled = Self.movableURL(shownURL) != nil
+        openButton.isEnabled = canOpenInTab
     }
 
     // MARK: Its page, as a tab's
@@ -361,26 +360,47 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return url
     }
 
-    /// Reopens the page as a tab in the opener's window and space, then closes the popup (WebKit can't move a live page).
+    /// The profile whose sign-ins the page has; nil for a private page or one in no profile's store.
+    private var profile: Profile? { isPrivate ? nil : Profiles.shared.profile(ofStore: webView.configuration.websiteDataStore) }
+
+    /// Whether the page can move into a tab and keep its sign-in: a web or file address, in a private window's store
+    /// or a profile's. One in a store no tab has would sign in afresh, so it stays a pop-up.
+    var canOpenInTab: Bool { Self.movableURL(shownURL) != nil && (isPrivate || profile != nil) }
+
+    /// Reopens the page as a tab in the opener's window, in a space of the page's own profile, then closes the popup
+    /// (WebKit can't move a live page). Never in another profile's space, where its sign-in isn't.
     func openInTab() {
         guard let url = Self.movableURL(shownURL ?? webView.url), !isClosed else { return }
         let manager = WindowManager.shared
-        let parent = manager.controller(for: parentWindow).flatMap { $0.tabManager.isPrivate == isPrivate ? $0 : nil }
+        let store = webView.configuration.websiteDataStore
         let target: BrowserWindowController
-        if let parent {
-            target = parent
-        } else if isPrivate {
-            target = manager.newWindow(showCommandBar: false, isPrivate: true)
+        var space: UUID?
+        if isPrivate {
+            // The private window whose store it shares keeps its sign-in.
+            target = manager.controllers.first { $0.tabManager.privateStore === store }
+                ?? manager.newWindow(showCommandBar: false, isPrivate: true)
         } else {
-            target = MiniWindowController.browserWindow()
+            guard let profile else { return }
+            target = manager.controller(for: parentWindow).flatMap { $0.tabManager.isPrivate ? nil : $0 } ?? MiniWindowController.browserWindow()
+            let openerSpace = opener.flatMap { tab in target.tabManager.allTabs.contains { $0 === tab } ? tab.spaceID : nil }
+            space = Self.space(for: profile.id, opener: openerSpace, manager: target.tabManager)
         }
-        let inTarget = opener.flatMap { tab in target.tabManager.allTabs.contains { $0 === tab } ? tab : nil }
-        let profile = Profiles.shared.profile(ofStore: webView.configuration.websiteDataStore)
-        let space = inTarget?.spaceID ?? (isPrivate ? nil : profile.flatMap { target.tabManager.space(for: $0) })
+        let inTarget = opener.flatMap { tab in target.tabManager.allTabs.contains { $0 === tab } && tab.spaceID == space ? tab : nil }
         if let space { target.tabManager.switchToSpace(space) }
         target.tabManager.newTab(url: url, spaceID: space, opener: inTarget, by: .you)
         window?.close()
         target.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Where a page of `profile` opens as a tab: the opener's space when it's on that profile, else one of that
+    /// profile's, else a new space on it.
+    static func space(for profile: UUID, opener: UUID?, manager: TabManager) -> UUID {
+        let library = Library.shared
+        if let opener, library.space(opener) != nil, library.profileID(ofSpace: opener) == profile { return opener }
+        if library.profileID(ofSpace: manager.currentSpaceID) == profile { return manager.currentSpaceID }
+        let spaces = library.spaces(in: profile).map(\.id)
+        if let space = spaces.first(where: { !manager.tabs(in: $0).isEmpty }) ?? spaces.first { return space }
+        return library.addSpace(profile: profile).id
     }
 
     /// ⌘O with the popup in front, as in Zigzag Mini: Open in New Tab.
@@ -388,7 +408,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     /// The strip's Copy Link, ⇧⌘C, and the address's right-click menu.
     @objc func copyPageURL(_ sender: Any?) {
-        guard let url = shownURL else { return }
+        // A web or file address, as Copy Link in the strip and its right-click menu; never a blank or extension page's.
+        guard let url = Self.movableURL(shownURL) else { return }
         CleanLink.write(url, title: webView.title)
         Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
     }
@@ -831,8 +852,8 @@ extension PopupWindowController: NSMenuItemValidation {
         switch item.action {
         case #selector(openDocument(_:)):
             item.title = Self.openInTabTitle
-            return Self.movableURL(shownURL) != nil
-        case #selector(copyPageURL(_:)): return shownURL != nil
+            return canOpenInTab
+        case #selector(copyPageURL(_:)): return Self.movableURL(shownURL) != nil
         case #selector(goBack(_:)): return webView.canGoBack
         case #selector(goForward(_:)): return webView.canGoForward
         case #selector(stopLoading(_:)): return webView.isLoading
