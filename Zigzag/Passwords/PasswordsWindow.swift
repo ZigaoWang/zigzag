@@ -32,7 +32,7 @@ final class PasswordsWindowController: NSWindowController, NSWindowDelegate {
         window.contentView = view
         let controller = PasswordsWindowController(window: window)
         window.delegate = controller
-        window.setFrameAutosaveName("Passwords")
+        if !AppDelegate.isHostingTests { window.setFrameAutosaveName("Passwords") }
         if !window.setFrameUsingName("Passwords") { window.center() }
         shared = controller
         controller.showWindow(nil)
