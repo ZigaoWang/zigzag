@@ -11041,7 +11041,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更大的边栏"
+            "value" : "放大边栏"
           }
         }
       }
@@ -17939,7 +17939,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "边栏大小 %@，常用大小"
+            "value" : "边栏大小 %@，默认大小"
           }
         }
       }
@@ -18192,7 +18192,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更小的边栏"
+            "value" : "缩小边栏"
           }
         }
       }
@@ -21492,7 +21492,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "常用大小"
+            "value" : "默认大小"
           }
         }
       }
