@@ -1479,7 +1479,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             BrowserRootView.addressBarPlace = places[index]
         }
         let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
-                                 detail: String(localized: "The bar sits above the page and hides as you scroll down, coming back at the top or on any scroll up. Off keeps the address in the sidebar; Always leaves the bar in place.",
+                                 detail: String(localized: "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top.",
                                                       comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
                                  control: addressPlaceMenu)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
