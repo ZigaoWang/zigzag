@@ -1721,6 +1721,7 @@ extension Tab: WKWebExtensionTab {
     /// The window the tab's in: its own host when that window holds it (most often), else a look through them all.
     /// Asked for every tab each time an extension lists tabs, so the quick answer comes first.
     private var windowController: BrowserWindowController? {
+        if let peekWindow { return peekWindow }
         if let host = host as? BrowserWindowController, host.tabManager.tab(with: id) === self { return host }
         return WindowManager.shared.controllers.first { $0.tabManager.tab(with: id) === self }
     }
@@ -1732,11 +1733,17 @@ extension Tab: WKWebExtensionTab {
 
     /// The Zigzag Mini it's the page of, while it is.
     private var miniWindow: MiniWindowController? { (host as? MiniWindowController).flatMap { $0.tab === self ? $0 : nil } }
+    /// The window whose Peek shows it, while it does.
+    fileprivate var peekWindow: BrowserWindowController? {
+        guard isPeek, let window = host as? BrowserWindowController, window.peekedTab === self else { return nil }
+        return window
+    }
 
     func window(for context: WKWebExtensionContext) -> (any WKWebExtensionWindow)? { miniWindow ?? windowController }
     func indexInWindow(for context: WKWebExtensionContext) -> Int {
-        // Counted among `tabs(for:)`: the tabs in it.
+        // Counted among `tabs(for:)`: the tabs in it, the Peek last.
         guard let window = windowController else { return 0 }
+        if window === peekWindow { return window.tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && window.holds($0) }.count }
         return window.tabManager.extensionPlace(of: self, seenBy: Tab.seers(context)) { $0.isSeen(by: context) && window.holds($0) } ?? 0
     }
     /// The profile a context's extensions run with; it decides which tabs it sees.
@@ -1758,7 +1765,12 @@ extension Tab: WKWebExtensionTab {
         return controller !== profile.startedExtensions?.controller
     }
     func isLoadingComplete(for context: WKWebExtensionContext) -> Bool { !isLoading }
-    func isSelected(for context: WKWebExtensionContext) -> Bool { miniWindow != nil || windowController?.tabManager.selectedTab === self }
+    func isSelected(for context: WKWebExtensionContext) -> Bool {
+        if miniWindow != nil || peekWindow != nil { return true }
+        guard let window = windowController, window.tabManager.selectedTab === self else { return false }
+        // Under a Peek, the peeked page is its window's active tab.
+        return window.peekedTab.map { !$0.isSeen(by: context) } ?? true
+    }
     func isPinned(for context: WKWebExtensionContext) -> Bool { bookmarkID != nil }
     func isPlayingAudio(for context: WKWebExtensionContext) -> Bool { isPlayingAudio }
     func isMuted(for context: WKWebExtensionContext) -> Bool { isMuted }
@@ -1768,7 +1780,7 @@ extension Tab: WKWebExtensionTab {
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         miniWindow?.window?.makeKeyAndOrderFront(nil)
-        windowController?.tabManager.select(self)
+        if peekWindow == nil { windowController?.tabManager.select(self) }
         completionHandler(nil)
     }
 
@@ -1787,7 +1799,7 @@ extension Tab: WKWebExtensionTab {
 
     func close(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {
         miniWindow?.window?.close()
-        windowController?.tabManager.close(self)
+        if let peekWindow { peekWindow.peek.close() } else { windowController?.tabManager.close(self) }
         completionHandler(nil)
     }
 
@@ -1817,13 +1829,17 @@ extension BrowserWindowController: WKWebExtensionWindow {
     /// With shared tabs (#162), only the ones in this window; an extension sees each tab in one window (where it's shown
     /// or last was).
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {
-        hides(from: context) ? [] : tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && self.holds($0) }
+        guard !hides(from: context) else { return [] }
+        let tabs = tabManager.extensionTabs(seenBy: Tab.seers(context)) { $0.isSeen(by: context) && self.holds($0) }
+        guard let peeked = peekedTab, peeked.isSeen(by: context) else { return tabs }
+        return tabs + [peeked]
     }
 
     /// The tab you're on if it's on the extension's profile; else the one you left selected in a space that is,
     /// since Chrome's extensions expect a window to have an active tab.
     func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? {
         guard !hides(from: context) else { return nil }
+        if let peeked = peekedTab, peeked.isSeen(by: context) { return peeked }
         if let tab = tabManager.selectedTab, tab.isSeen(by: context) { return tab }
         return Library.shared.spaces.lazy.compactMap { self.tabManager.selectedTab(in: $0.id) }.first { $0.isSeen(by: context) }
     }

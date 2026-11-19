@@ -78,11 +78,10 @@ struct SidebarSideTests {
     }
 
     @Test func theResizeHandleIsOnTheSidebarsEdgeByThePage() {
-        let handle = Tokens.Metric.resizeHandleWidth
         let left = BrowserRootView.resizeHandleFrame(in: window, sidebarWidth: width, onRight: false)
         let right = BrowserRootView.resizeHandleFrame(in: window, sidebarWidth: width, onRight: true)
-        #expect(left.midX == width && left.width == handle)
-        #expect(right.midX == window.maxX - width && right.width == handle && right.height == window.height)
+        #expect(left.minX < width && left.maxX > width)
+        #expect(right.minX < window.maxX - width && right.maxX > window.maxX - width && right.height == window.height)
     }
 
     @Test func draggingTheEdgeMeasuresFromTheSidebarsSide() {

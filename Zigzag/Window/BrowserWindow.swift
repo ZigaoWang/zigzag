@@ -179,7 +179,25 @@ final class BrowserWindow: NSWindow {
         super.noResponder(for: eventSelector)
     }
 
+    /// Set when Delete closes picked sidebar rows: the rest of that press, held down, goes nowhere (#375).
+    var holdsBackDeleteRepeats = false
+
+    /// Whether a key is the rest of a Delete press that closed picked rows, and whether to keep holding them back.
+    nonisolated static func holdsBack(_ type: NSEvent.EventType, keyCode: UInt16, isRepeat: Bool, holding: Bool) -> (drop: Bool, keep: Bool) {
+        guard holding else { return (false, false) }
+        switch type {
+        case .keyDown: return isRepeat && SidebarListView.isDeleteKey(keyCode) ? (true, true) : (false, false)
+        case .keyUp: return SidebarListView.isDeleteKey(keyCode) ? (true, false) : (false, true)
+        default: return (false, true)
+        }
+    }
+
     override func sendEvent(_ event: NSEvent) {
+        if holdsBackDeleteRepeats, event.type == .keyDown || event.type == .keyUp {
+            let (drop, keep) = Self.holdsBack(event.type, keyCode: event.keyCode, isRepeat: event.isARepeat, holding: true)
+            holdsBackDeleteRepeats = keep
+            if drop { return }
+        }
         if event.type == .keyDown, !event.modifierFlags.contains(.command), firstResponder is WKWebView {
             UndoClock.lastPageEdit = Date()
             UndoClock.lastPageInput = Date()
