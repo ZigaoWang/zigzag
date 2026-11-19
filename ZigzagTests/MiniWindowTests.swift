@@ -169,10 +169,43 @@ struct MiniWindowTests {
             strip.layout()
             let row = [strip.backButton, strip.forwardButton, strip.reloadButton, strip.spaceChip, strip.title,
                        strip.siteButton, strip.pinButton, strip.copyButton, strip.openButton].map(\.frame).filter { $0.width > 0 }
-            for (a, b) in zip(row, row.dropFirst()) { #expect(a.maxX <= b.minX + 0.5, "at \(width)") }
+            // Every hover box keeps room from the next, never touching it.
+            for (a, b) in zip(row, row.dropFirst()) { #expect(a.maxX + Tokens.Pane.stripGap <= b.minX + 0.5, "at \(width)") }
             #expect(strip.reloadButton.frame.minX > strip.trafficLightsWidth)
             #expect(strip.openButton.frame.maxX <= width)
+            // As far from the strip's top as from its bottom, and as from the next box.
+            for frame in row {
+                #expect(frame.minY == Tokens.Pane.stripGap && strip.bounds.height - frame.maxY == Tokens.Pane.stripGap, "at \(width)")
+            }
         }
+    }
+
+    /// Editing the address, the field fills the room between the space and the buttons, never under either.
+    @Test func theAddressFieldStaysInItsSlot() {
+        let strip = MiniStripView()
+        strip.trafficLightsWidth = 52
+        strip.openButton.show("Open in A Space With a Long Name", keys: "⌘O")
+        strip.isEditing = true
+        let minimum = Tokens.Metric.miniWindowMinSize.width
+        for width in stride(from: minimum, through: 1400, by: 20) {
+            strip.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.miniStripHeight)
+            strip.layout()
+            let field = strip.anchor.frame
+            // Its narrowest; in a window too narrow for that beside the buttons, they step aside for the strip's end.
+            #expect(field.width >= MiniStripView.narrowestField, "at \(width)")
+            #expect(field.maxX <= width - Tokens.Pane.stripGap, "at \(width)")
+            #expect(field.minY == Tokens.Pane.stripGap && field.height == Tokens.Pane.addressHeight, "at \(width)")
+            #expect(field.minX >= strip.reloadButton.frame.maxX + Tokens.Space.x2, "at \(width)")
+            if !strip.spaceChip.isHidden { #expect(field.minX >= strip.spaceChip.frame.maxX + Tokens.Space.x2, "at \(width)") }
+            for button in [strip.siteButton, strip.pinButton, strip.copyButton, strip.openButton] where !button.isHidden {
+                #expect(field.maxX + Tokens.Space.x2 <= button.frame.minX + 0.5, "at \(width)")
+            }
+        }
+        // Done editing, everything is back.
+        strip.isEditing = false
+        strip.frame = NSRect(x: 0, y: 0, width: minimum, height: Tokens.Metric.miniStripHeight)
+        strip.layout()
+        #expect(!strip.siteButton.isHidden && !strip.pinButton.isHidden && !strip.copyButton.isHidden)
     }
 
     /// Site Controls (#225) ends the strip's room as it ends the address in a browser window: right before Keep on
@@ -186,10 +219,7 @@ struct MiniWindowTests {
             strip.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.miniStripHeight)
             strip.layout()
             #expect(strip.siteButton.frame.width > 0, "at \(width)")
-            #expect(strip.siteButton.frame.maxX == strip.pinButton.frame.minX, "at \(width)")
-            // Editing the address always opens a field wide enough to use; where the strip has room, clear of the buttons.
-            #expect(strip.anchor.frame.width >= MiniStripView.narrowestField, "at \(width)")
-            if width >= 640 { #expect(strip.anchor.frame.maxX <= strip.siteButton.frame.minX - Tokens.Space.x2, "at \(width)") }
+            #expect(strip.siteButton.frame.maxX + Tokens.Pane.stripGap == strip.pinButton.frame.minX, "at \(width)")
             #expect(strip.title.frame.width == 0 || strip.title.frame.maxX <= strip.siteButton.frame.minX + 0.5, "at \(width)")
             // Concentric with the window's corner: as far in from the right as from the top.
             #expect(strip.openButton.frame.maxX == width - strip.openButton.frame.minY, "at \(width)")

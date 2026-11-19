@@ -246,16 +246,17 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         content.addSubview(holder)
         header.frame = NSRect(x: 0, y: 0, width: size.width, height: Self.headerHeight)
         header.autoresizingMask = [.width]
-        let pin = Tokens.Pane.button
+        let pin = Tokens.Pane.button, gap = Tokens.Pane.stripGap
+        // As far in from the right edge as from the top, with room between the buttons' hover boxes.
         let buttonY = round((Self.headerHeight - pin) / 2)
-        openButton.frame = NSRect(x: size.width - Tokens.Space.x2 - pin, y: buttonY, width: pin, height: pin)
-        copyButton.frame = NSRect(x: openButton.frame.minX - pin, y: buttonY, width: pin, height: pin)
-        pinButton.frame = NSRect(x: copyButton.frame.minX - pin, y: buttonY, width: pin, height: pin)
+        openButton.frame = NSRect(x: size.width - buttonY - pin, y: buttonY, width: pin, height: pin)
+        copyButton.frame = NSRect(x: openButton.frame.minX - gap - pin, y: buttonY, width: pin, height: pin)
+        pinButton.frame = NSRect(x: copyButton.frame.minX - gap - pin, y: buttonY, width: pin, height: pin)
         for button in [pinButton, copyButton, openButton] {
             button.autoresizingMask = [.minXMargin]
             content.addSubview(button)
         }
-        header.trailingInset = pin * 3 + Tokens.Space.x2
+        header.trailingInset = size.width - pinButton.frame.minX
         copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
         openButton.onClick = { [weak self] _ in self?.openInTab() }
         header.onCopy = { [weak self] in self?.copyPageURL(nil) }

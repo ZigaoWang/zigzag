@@ -621,6 +621,8 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         answerLinksNote(useTabs: answer == "tabs")
     }
 
+    func debugHoverStrip(_ name: String) { strip.debugHover(name) }
+
     func debugEscape() {
         if commandBar.isVisible { commandBar.debugEscape() } else { cancelOperation(nil) }
     }
@@ -958,13 +960,21 @@ extension MiniWindowController: CommandBarHost {
     func commandBarWillShow() {
         linkStatus.hide()
         strip.title.isHidden = true
+        strip.isEditing = true
+        strip.layoutSubtreeIfNeeded()
     }
 
     func commandBarRestoreFocus() {
         if let webView = tab.webView { window?.makeFirstResponder(webView) }
     }
 
-    func commandBarDidHide() { strip.title.isHidden = false }
+    func commandBarDidHide() {
+        strip.title.isHidden = false
+        strip.isEditing = false
+    }
+
+    /// The field takes the strip's light or dark, not the window's: it sits in the strip.
+    var commandBarAppearance: NSAppearance? { strip.effectiveAppearance }
 
     /// What you choose opens here, in place of this page; an open tab is gone to in its browser window.
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool {
@@ -1129,7 +1139,7 @@ final class MiniStripView: NSView {
     let siteButton = MiniStripView.button("slider.horizontal.3", toolTip: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."))
 
     static func button(_ symbol: String, toolTip: String) -> IconButton {
-        let button = IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
+        let button = IconButton(symbol: symbol, size: Tokens.Pane.stripButton, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
         // On the page's color: the neutral fills, which show on any color.
         button.isOnPage = true
         return button
@@ -1171,57 +1181,76 @@ final class MiniStripView: NSView {
     }
     #endif
 
+    /// While the address is being edited the space's name gives the field room, rather than lying under it.
+    var isEditing = false { didSet { if isEditing != oldValue { needsLayout = true } } }
+
     override func layout() {
         super.layout()
-        let mid = bounds.height / 2
-        let h = Tokens.Pane.addressHeight, b = Tokens.Pane.button
-        let y = round(mid - h / 2)
-        // Back, forward and reload right after the lights, as in an installed app's strip and a split view's pane.
+        // Every button and pill is the address's height, as far from the strip's top and bottom as from each other.
+        let h = Tokens.Pane.addressHeight, b = Tokens.Pane.stripButton, gap = Tokens.Pane.stripGap
+        let y = round((bounds.height - h) / 2)
+        // Back, forward and reload right after the lights, as in an installed app's strip.
         var x = Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Space.x2
         for button in [backButton, forwardButton, reloadButton] {
-            button.frame = NSRect(x: x, y: round(mid - b / 2), width: b, height: b)
-            x += b
+            button.frame = NSRect(x: x, y: y, width: b, height: b)
+            x += b + gap
         }
-        let left = x + Tokens.Space.x1
+        let left = x - gap + Tokens.Space.x2
         // Open in sits in the window's top right corner concentric with it: as far in from the right edge as from the
         // top, a pill whose curve runs alongside the window's own (`MiniOpenButton`).
-        let right = bounds.width - round((bounds.height - h) / 2)
+        let right = bounds.width - y
+        let icons = b * 3 + gap * 2 + Tokens.Space.x2
         // Narrow, the shortcut goes first, then the space's name shortens.
         openButton.showsKeys = true
-        if right - left < spaceChip.fittingWidth + b * 3 + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
-        let openWidth = min(openButton.fittingWidth, max(0, right - left - b * 3))
+        if right - left < spaceChip.fittingWidth + icons + openButton.fittingWidth + Tokens.Space.x4 { openButton.showsKeys = false }
+        let openWidth = min(openButton.fittingWidth, max(0, right - left - icons))
         openButton.frame = NSRect(x: right - openWidth, y: y, width: openWidth, height: h)
-        copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x1 - b, y: round(mid - b / 2), width: b, height: b)
-        pinButton.frame = NSRect(x: copyButton.frame.minX - b, y: round(mid - b / 2), width: b, height: b)
+        copyButton.frame = NSRect(x: openButton.frame.minX - Tokens.Space.x2 - b, y: y, width: b, height: b)
+        pinButton.frame = NSRect(x: copyButton.frame.minX - gap - b, y: y, width: b, height: b)
         // Site Controls first of the strip's end, as it ends the address in a browser window.
-        siteButton.frame = NSRect(x: pinButton.frame.minX - b, y: round(mid - b / 2), width: b, height: b)
+        siteButton.frame = NSRect(x: pinButton.frame.minX - gap - b, y: y, width: b, height: b)
         let buttons = siteButton.frame.minX
-        // At the narrowest the space's name gives way before anything overlaps; Open in still names the space.
-        var chipWidth = max(0, min(spaceChip.fittingWidth, buttons - Tokens.Space.x2 - left))
+        // At the narrowest the space's name gives way before anything overlaps; Open in still names the space. While
+        // editing it also leaves the field its narrowest.
+        let field = isEditing ? Self.narrowestField + Tokens.Space.x2 : 0
+        var chipWidth = max(0, min(spaceChip.fittingWidth, buttons - Tokens.Space.x2 - left - field))
         if chipWidth < Tokens.Space.x8 { chipWidth = 0 }
         spaceChip.frame = NSRect(x: left, y: y, width: chipWidth, height: h)
+        spaceChip.isHidden = chipWidth == 0
         // The site stays in the middle of the window, as wide on both sides as the room beside it allows; with too
         // little room it steps aside.
         let half = max(0, min(bounds.midX - spaceChip.frame.maxX, buttons - bounds.midX) - Tokens.Space.x2)
         var width = title.width(in: half * 2)
         if width < Tokens.Space.x10 { width = 0 }
         title.frame = NSRect(x: round(bounds.midX - width / 2), y: y, width: width, height: h)
+        // With no room it has no width, and its not-secure mark mustn't show over the buttons.
+        title.alphaValue = width > 0 ? 1 : 0
         // Editing the address opens in the room between the space and Site Controls, centered on the window where it
-        // can be, so it never covers half the space's name or crowds the buttons.
-        let fieldLeft = (spaceChip.frame.width > 0 ? spaceChip.frame.maxX : left) + Tokens.Space.x2
-        let fieldRight = buttons - Tokens.Space.x2
-        let room = max(0, fieldRight - fieldLeft)
-        if room >= Self.narrowestField {
-            let field = min(Tokens.Metric.miniAddressWidth, room)
-            let fieldX = min(max(fieldLeft, round(bounds.midX - field / 2)), fieldRight - field)
-            anchor.frame = NSRect(x: fieldX, y: y, width: field, height: h)
-        } else {
-            // A narrow window leaves too little room there: the field takes the strip from after reload to before the
-            // buttons at its end, over the space's name, which it covers whole rather than in part.
-            let start = left, end = max(start + Self.narrowestField, fieldRight)
-            anchor.frame = NSRect(x: start, y: y, width: min(end, bounds.width - Tokens.Sidebar.lightsX) - start, height: h)
+        // can be, and never past either.
+        var fieldLeft = (chipWidth > 0 ? spaceChip.frame.maxX : left - Tokens.Space.x2) + Tokens.Space.x2
+        var fieldRight = buttons - Tokens.Space.x2
+        // Too narrow even so: the buttons beside it step aside while you type, rather than lie under the field.
+        let crowded = isEditing && fieldRight - fieldLeft < Self.narrowestField
+        for view in [siteButton, pinButton, copyButton, openButton] as [NSView] { view.isHidden = crowded }
+        if crowded {
+            spaceChip.isHidden = true
+            fieldLeft = left
+            fieldRight = right
         }
+        let room = max(0, fieldRight - fieldLeft)
+        let fieldWidth = min(Tokens.Metric.miniAddressWidth, room)
+        let fieldX = min(max(fieldLeft, round(bounds.midX - fieldWidth / 2)), fieldRight - fieldWidth)
+        anchor.frame = NSRect(x: fieldX, y: y, width: fieldWidth, height: h)
     }
+
+    #if DEBUG
+    /// minihover <name>|off: shows one of the strip's controls as under the pointer, for screenshots.
+    func debugHover(_ name: String) {
+        let views: [String: InteractiveView] = ["back": backButton, "forward": forwardButton, "reload": reloadButton, "space": spaceChip,
+                                                "title": title, "site": siteButton, "pin": pinButton, "copy": copyButton, "open": openButton]
+        for (key, view) in views { view.isHovered = key == name }
+    }
+    #endif
 }
 
 /// The space Open in moves the page to, after the traffic lights: its icon, when it has one, and name, quiet, in

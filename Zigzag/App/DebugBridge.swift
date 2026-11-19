@@ -219,6 +219,7 @@ enum DebugBridge {
         case "mininote": mini?.debugLinksNote(arg)
         case "minispace": mini?.debugSpace(arg)
         case "minicopy": mini?.copyPageURL(nil)
+        case "minihover": mini?.debugHoverStrip(arg)
         case "minisite": mini?.showSiteControls()
         case "minifind": mini?.debugFind(arg)
         case "miniresize":

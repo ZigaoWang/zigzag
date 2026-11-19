@@ -327,6 +327,10 @@ enum Tokens {
         static let favicon: CGFloat = 16
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
+        /// A slim window strip's buttons (Zigzag Mini, pop-ups, installed apps): the address's height, so every
+        /// hover box sits as far from the strip's edges as from the next one (`stripGap`).
+        static let stripButton: CGFloat = addressHeight
+        static let stripGap: CGFloat = Space.x1
         /// The least room a pane's address keeps before its strip folds its own buttons away (as the sidebar's
         /// address keeps for its host).
         static let addressMinWidth: CGFloat = 72

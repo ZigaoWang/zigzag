@@ -29,6 +29,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A page's own Print button works in pop-up windows, like the one on an Apple Store invoice, and ⌘P prints in pop-up windows, Zigzag Mini and installed apps too. Pop-up windows didn't answer the page's request to print, and File › Print had nothing to print in those windows, so it only beeped.
 - Passwords… in the password menu opens the Mac's list of passwords every time, and clicking away or pressing Escape closes it. It could close a moment after opening and then not open again, or stay over the page and keep coming back. Thanks to [frarees](https://github.com/frarees). ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - Switching away from a tab on Settings › Developer no longer freezes Zigzag for a couple of seconds. Its preview drew every feature flag's switch and shadow, also the ones scrolled out of sight, and its rows measured their switch several times each. ([#379](https://github.com/ZigaoWang/zigzag/issues/379)) Thanks to [hungraw](https://github.com/hungraw).
+- The buttons in Zigzag Mini's top strip have room between them, so their highlights no longer run together, and the address you edit there stays between the space's name and the buttons instead of running under them. In a narrow window the buttons step aside while you type. Pop-up windows and installed apps space their buttons the same way.
 
 ## [0.9.3] - 2026-11-18
 
