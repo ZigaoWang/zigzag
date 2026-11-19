@@ -157,6 +157,29 @@ struct SiteRoutesTests {
         #expect(changes.last == SiteRoutes.Route(id: draft.id, match: .path, site: "github.com/org2", spaceID: media, isEnabled: false))
     }
 
+    @Test func recognizedRulesAndFuturePayloadsSurviveEditingAndRelaunch() throws {
+        let known = SiteRoutes.Route(site: "example.test", spaceID: work)
+        let other = SiteRoutes.Route(site: "other.test", spaceID: media)
+        let encoder = JSONEncoder()
+        let first = try JSONSerialization.jsonObject(with: encoder.encode(known))
+        let last = try JSONSerialization.jsonObject(with: encoder.encode(other))
+        let future: [String: Any] = ["match": "future-type", "payload": [true, NSNull(), ["priority": UInt64.max]] as [Any]]
+        let fixture = try JSONSerialization.data(withJSONObject: [first, future, last])
+        var list = try JSONDecoder().decode(SiteRoutes.StoredRules.self, from: fixture)
+        #expect(list.rules == [known, other])
+        list.rules[0].site = "changed.test"
+        let saved = try JSONEncoder().encode(list)
+        let items = try #require(JSONSerialization.jsonObject(with: saved) as? [NSDictionary])
+        #expect(items[1] == future as NSDictionary)
+        #expect(try JSONDecoder().decode(SiteRoutes.StoredRules.self, from: saved).rules == list.rules)
+
+        let futureOnly = try JSONSerialization.data(withJSONObject: [future])
+        let untouched = try JSONDecoder().decode(SiteRoutes.StoredRules.self, from: futureOnly)
+        #expect(untouched.rules.isEmpty)
+        let roundTrip = try JSONSerialization.jsonObject(with: JSONEncoder().encode(untouched)) as? [NSDictionary]
+        #expect(roundTrip == [future as NSDictionary])
+    }
+
     // MARK: Deciding
 
     @Test func whatYouDoYourselfIsRouted() {

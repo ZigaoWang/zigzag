@@ -575,13 +575,17 @@ final class Library {
     private struct Stored: Codable {
         var spaces: [SpaceInfo]
         var favorites: [Bookmark]?
-        var siteRoutes: [SiteRoutes.Route]?
+        var siteRoutes: SiteRoutes.StoredRules?
         var favoriteSplits: [PinnedSplit]?
         var searchEngine: SearchEngine
         var importedFromArc: Bool?
     }
 
-    private(set) var siteRoutes: [SiteRoutes.Route] = []
+    private var storedRoutes = SiteRoutes.StoredRules()
+    private(set) var siteRoutes: [SiteRoutes.Route] {
+        get { storedRoutes.rules }
+        set { storedRoutes.rules = newValue }
+    }
     private(set) var spaces: [SpaceInfo]
     /// Favorites: tiles at the top of the sidebar, the same in every space of a profile. Every profile's are here,
     /// each profile's in its own order; whose a favorite is, is in `directory`. `favorites(in:)` is one profile's.
@@ -614,7 +618,7 @@ final class Library {
         savedDirectory = directory
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = Self.keepingDefaultColors(stored.spaces.map(\.upgraded))
-            siteRoutes = stored.siteRoutes ?? SiteRoutes.migrated(from: spaces)
+            storedRoutes = stored.siteRoutes ?? SiteRoutes.StoredRules(SiteRoutes.migrated(from: spaces))
             // The rules are what counts now. The old lists are only written for an older Zigzag.
             for i in spaces.indices { spaces[i].routedSites = nil }
             favorites = stored.favorites ?? []
@@ -643,7 +647,7 @@ final class Library {
 
     func saveNow() {
         saveDebouncer.cancel()
-        JSONStore.save(Stored(spaces: SiteRoutes.withLegacySites(spaces, from: siteRoutes), favorites: favorites, siteRoutes: siteRoutes, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
+        JSONStore.save(Stored(spaces: SiteRoutes.withLegacySites(spaces, from: siteRoutes), favorites: favorites, siteRoutes: storedRoutes, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
                               searchEngine: searchEngine, importedFromArc: importedFromArc), to: Paths.library)
         // Only what reached the disk counts as saved: a write that failed is tried again with the next save.
         if directory != savedDirectory, JSONStore.save(directory, to: Paths.profiles) { savedDirectory = directory }

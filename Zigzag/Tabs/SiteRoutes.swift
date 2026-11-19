@@ -39,6 +39,70 @@ enum SiteRoutes {
         }
     }
 
+    /// On disk this is one ordered array. Keep future rules in their slots while this version edits the rules it knows.
+    struct StoredRules: Codable {
+        var rules: [Route]
+        private var future: [(index: Int, value: StoredValue)] = []
+
+        init(_ rules: [Route] = []) { self.rules = rules }
+
+        private enum Key: String, CodingKey { case match }
+
+        init(from decoder: Decoder) throws {
+            rules = []
+            var entries = try decoder.unkeyedContainer()
+            while !entries.isAtEnd {
+                let index = entries.currentIndex
+                let entry = try entries.superDecoder()
+                let fields = try entry.container(keyedBy: Key.self)
+                let type = try fields.decode(String.self, forKey: .match)
+                if Match(rawValue: type) == nil {
+                    // Even a future payload we cannot represent must not prevent the library from opening.
+                    if let value = try? StoredValue(from: entry) { future.append((index, value)) }
+                } else {
+                    rules.append(try Route(from: entry))
+                }
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var entries = encoder.unkeyedContainer()
+            var known = rules.makeIterator()
+            for item in future {
+                while entries.count < item.index, let rule = known.next() { try entries.encode(rule) }
+                try entries.encode(item.value)
+            }
+            while let rule = known.next() { try entries.encode(rule) }
+        }
+
+        // A future rule can have fields this version has never seen, including nested objects.
+        private indirect enum StoredValue: Codable {
+            case null, bool(Bool), string(String), number(Decimal), array([Self]), object([String: Self])
+
+            init(from decoder: Decoder) throws {
+                let value = try decoder.singleValueContainer()
+                if value.decodeNil() { self = .null }
+                else if let bool = try? value.decode(Bool.self) { self = .bool(bool) }
+                else if let string = try? value.decode(String.self) { self = .string(string) }
+                else if let number = try? value.decode(Decimal.self) { self = .number(number) }
+                else if let array = try? value.decode([Self].self) { self = .array(array) }
+                else { self = .object(try value.decode([String: Self].self)) }
+            }
+
+            func encode(to encoder: Encoder) throws {
+                var value = encoder.singleValueContainer()
+                switch self {
+                case .null: try value.encodeNil()
+                case .bool(let v): try value.encode(v)
+                case .string(let v): try value.encode(v)
+                case .number(let v): try value.encode(v)
+                case .array(let v): try value.encode(v)
+                case .object(let v): try value.encode(v)
+                }
+            }
+        }
+    }
+
     /// How a page was opened. Only user actions are routed, so a sign-in redirect never leaves its tab.
     enum Arrival: Equatable, Sendable {
         /// A link from another app: the default-browser path.
