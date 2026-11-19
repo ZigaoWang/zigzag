@@ -315,7 +315,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         if floating {
             let panel = MiniPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
                                   backing: .buffered, defer: false)
-            panel.level = .floating
+            panel.level = .statusBar
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
             panel.isOpaque = false
             panel.backgroundColor = .clear
