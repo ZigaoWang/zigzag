@@ -24495,6 +24495,50 @@
           }
         }
       }
+    },
+    "Trusted Certificates" : {
+      "comment" : "A heading in Settings › Developer: local servers whose certificate you chose to trust, so Zigzag doesn’t warn again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受信任的证书"
+          }
+        }
+      }
+    },
+    "Local servers whose certificate you chose to trust. Zigzag doesn’t warn again while a server shows that certificate. Removing a server brings the warning back." : {
+      "comment" : "Under Trusted Certificates in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你选择信任其证书的本地服务器。只要服务器继续使用该证书，Zigzag 就不会再次发出警告。移除某个服务器后会重新显示警告。"
+          }
+        }
+      }
+    },
+    "Add a Local Server" : {
+      "comment" : "Title of the sheet that opens a local server so its certificate can be trusted, from Settings › Developer › Trusted Certificates.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加本地服务器"
+          }
+        }
+      }
+    },
+    "Zigzag opens the server in a new tab. If its certificate isn’t trusted, choose Visit this site anyway on the warning. Only servers on this Mac or your network can be added." : {
+      "comment" : "Under the title of the sheet that opens a local server to trust its certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 会在新标签页中打开这个服务器。如果它的证书不受信任，请在警告页上选择“仍然访问此网站”。只有这台 Mac 上或你的网络中的服务器才能添加。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -5,6 +5,7 @@ import WebKit
 
 /// A certificate let through on the warning page: bound to itself, for a while, never without one or for an HSTS site, and said to be not secure.
 @MainActor
+@Suite(.serialized)
 struct CertificateTrustTests {
     @Test func anExceptionIsForItsCertificateOnly() {
         let store = WKWebsiteDataStore.nonPersistent()
@@ -16,6 +17,7 @@ struct CertificateTrustTests {
         #expect(!CertificateExceptions.hasException(for: "router.local", in: store))
         #expect(CertificateExceptions.allow("Router.Local", certificate: leaf, in: store))
         #expect(CertificateExceptions.allows("router.local", leaf: leaf, in: store))
+        #expect(!CertificateExceptions.allows("router.local", port: 8443, leaf: leaf, in: store))
         #expect(!CertificateExceptions.allows("router.local", leaf: other, in: store))
         #expect(!CertificateExceptions.allows("router.local", leaf: nil, in: store))
         #expect(!CertificateExceptions.allows("router.local", leaf: Data(), in: store))
@@ -342,5 +344,135 @@ struct CertificateProblemTests {
         #expect(lines.joined() == fingerprint)
         #expect(CertificateDetails.fingerprintLines(fingerprint, perLine: 32) == fingerprint)
         #expect(CertificateDetails.fingerprintLines(fingerprint, perLine: 16).components(separatedBy: "\n").count == 2)
+    }
+}
+
+// MARK: - Remembered local servers
+
+extension CertificateTrustTests {
+    private func withDefaults(_ body: (UserDefaults) throws -> Void) rethrows {
+        let name = "CertificateMemoryTests-\(UUID().uuidString)"
+        let saved = CertificateExceptions.defaults
+        let defaults = UserDefaults(suiteName: name)!
+        CertificateExceptions.defaults = defaults
+        defer {
+            CertificateExceptions.defaults = saved
+            defaults.removePersistentDomain(forName: name)
+        }
+        try body(defaults)
+    }
+
+    private func withStore(_ body: (WKWebsiteDataStore) throws -> Void) rethrows {
+        let id = UUID()
+        let store = WKWebsiteDataStore(forIdentifier: id)
+        defer { Task { try? await WKWebsiteDataStore.remove(forIdentifier: id) } }
+        try body(store)
+    }
+
+    @Test func aLocalServersCertificateIsRemembered() {
+        withDefaults { _ in
+            withStore { store in
+                let leaf = Data([1, 2, 3])
+                #expect(CertificateExceptions.allow("10.0.0.10", port: 8443, certificate: leaf, in: store))
+                #expect(CertificateExceptions.rememberedSites.map(\.name) == ["10.0.0.10:8443"])
+                #expect(CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: leaf, in: store))
+                // A remembered choice has no time limit, unlike the ones that last a launch.
+                #expect(CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: leaf, in: store, now: Date(timeIntervalSinceNow: 60 * 60 * 24 * 400)))
+                // Another window, next launch, reads it too.
+                let otherID = UUID()
+                let other = WKWebsiteDataStore(forIdentifier: otherID)
+                defer { Task { try? await WKWebsiteDataStore.remove(forIdentifier: otherID) } }
+                #expect(CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: leaf, in: other))
+                // A private window never reads what a normal one remembered.
+                #expect(!CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: leaf, in: .nonPersistent()))
+                // Another certificate for the same host isn't the one trusted.
+                #expect(!CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: Data([9]), in: store))
+                // Another port on the same host is another server, with its own choice.
+                #expect(!CertificateExceptions.allows("10.0.0.10", port: 8081, leaf: leaf, in: store))
+                // Removing it brings the warning back, in this window too.
+                CertificateExceptions.forgetRemembered(host: "10.0.0.10", port: 8443)
+                #expect(CertificateExceptions.rememberedSites.isEmpty)
+                #expect(!CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: leaf, in: store))
+            }
+        }
+    }
+
+    @Test func twoPortsOnOneHostKeepTheirOwnCertificates() {
+        withDefaults { _ in
+            withStore { store in
+                let first = Data([1, 1, 1]), second = Data([2, 2, 2])
+                #expect(CertificateExceptions.allow("10.0.0.10", port: 8443, certificate: first, in: store))
+                #expect(CertificateExceptions.allow("10.0.0.10", port: 8081, certificate: second, in: store))
+                #expect(CertificateExceptions.rememberedSites.map(\.name) == ["10.0.0.10:8081", "10.0.0.10:8443"])
+                #expect(CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: first, in: store))
+                #expect(CertificateExceptions.allows("10.0.0.10", port: 8081, leaf: second, in: store))
+                #expect(!CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: second, in: store))
+                // Removing one service leaves the other one trusted.
+                CertificateExceptions.forgetRemembered(host: "10.0.0.10", port: 8443)
+                #expect(CertificateExceptions.rememberedSites.map(\.name) == ["10.0.0.10:8081"])
+                #expect(!CertificateExceptions.allows("10.0.0.10", port: 8443, leaf: first, in: store))
+                #expect(CertificateExceptions.allows("10.0.0.10", port: 8081, leaf: second, in: store))
+                // Clearing the site's data removes every port it has.
+                CertificateExceptions.forget(in: store, site: "10.0.0.10")
+                #expect(CertificateExceptions.rememberedSites.isEmpty)
+                #expect(!CertificateExceptions.allows("10.0.0.10", port: 8081, leaf: second, in: store))
+            }
+        }
+    }
+
+    @Test func aPublicSiteIsTrustedForThisLaunchOnly() {
+        withDefaults { _ in
+            withStore { store in
+                let leaf = Data([4, 5, 6])
+                #expect(CertificateExceptions.allow("example.com", certificate: leaf, in: store))
+                #expect(CertificateExceptions.rememberedSites.isEmpty)
+                #expect(CertificateExceptions.allows("example.com", leaf: leaf, in: store))
+                #expect(CertificateExceptions.allows("example.com", leaf: leaf, in: store, now: Date(timeIntervalSinceNow: 60)))
+                #expect(!CertificateExceptions.allows("example.com", leaf: leaf, in: store, now: Date(timeIntervalSinceNow: CertificateExceptions.lifetime + 1)))
+            }
+        }
+    }
+
+    @Test func addSiteAcceptsOnlyLocalHTTPS() throws {
+        let first = try #require(TrustedCertificateSheet.url(from: "https://10.0.0.10:8443"))
+        #expect(first.scheme == "https" && first.host() == "10.0.0.10" && first.port == 8443)
+        // A typed address without a scheme is https.
+        let second = try #require(TrustedCertificateSheet.url(from: "nas.local:8443"))
+        #expect(second.scheme == "https" && second.host() == "nas.local" && second.port == 8443)
+        let loopback = try #require(TrustedCertificateSheet.url(from: "https://[::1]:8443"))
+        #expect(loopback.host() == "::1" && loopback.port == 8443)
+        // Plain http, a public name and a sign-in are refused.
+        #expect(TrustedCertificateSheet.url(from: "http://10.0.0.10:8080") == nil)
+        #expect(TrustedCertificateSheet.url(from: "https://example.com") == nil)
+        #expect(TrustedCertificateSheet.url(from: "https://user:pass@10.0.0.10:8443") == nil)
+        #expect(TrustedCertificateSheet.url(from: " ") == nil)
+    }
+
+    @Test func onlyLocalServersAreRemembered() {
+        withDefaults { _ in
+            withStore { store in
+                #expect(CertificateExceptions.mayRemember(host: "127.0.0.1", in: store))
+                #expect(CertificateExceptions.mayRemember(host: "10.0.0.10", in: store))
+                #expect(CertificateExceptions.mayRemember(host: "nas.local", in: store))
+                #expect(!CertificateExceptions.mayRemember(host: "example.com", in: store))
+                #expect(!CertificateExceptions.mayRemember(host: "127.0.0.1", in: .nonPersistent()))
+            }
+        }
+    }
+
+    @Test func clearingOneSiteTakesItsSavedCertificatesToo() {
+        withDefaults { _ in
+            withStore { store in
+                let leaf = Data([7, 8, 9])
+                #expect(CertificateExceptions.allow("nas.local", port: 8443, certificate: leaf, in: store))
+                #expect(CertificateExceptions.allow("app.nas.local", port: 8443, certificate: leaf, in: store))
+                #expect(CertificateExceptions.allow("other.local", port: 8443, certificate: leaf, in: store))
+                CertificateExceptions.forget(in: store, site: "nas.local")
+                #expect(CertificateExceptions.rememberedSites.map(\.name) == ["other.local:8443"])
+                #expect(!CertificateExceptions.allows("nas.local", port: 8443, leaf: leaf, in: store))
+                #expect(!CertificateExceptions.allows("app.nas.local", port: 8443, leaf: leaf, in: store))
+                #expect(CertificateExceptions.allows("other.local", port: 8443, leaf: leaf, in: store))
+            }
+        }
     }
 }

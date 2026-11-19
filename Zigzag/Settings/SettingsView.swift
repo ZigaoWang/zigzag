@@ -976,8 +976,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let developerBarToggle = Toggle()
     private let developerTrustToggle = Toggle()
     private let localServersGroup = FormGroup()
+    /// Local servers whose certificate you chose to trust for good, with Remove for each.
+    private let trustedCertificatesGroup = FormGroup()
+    private let trustedCertificatesAddSite = PillButton(title: String(localized: "Add Site…", comment: "Button beside Trusted Certificates in Settings › Developer: opens the sheet that opens a local server so its certificate can be trusted."))
     private let addSiteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site."))
     private var developerToken: SignalToken?
+    private var trustedCertificatesToken: SignalToken?
     /// Kept cookies' sites, changed in Site Controls or here (#334).
     private var keptCookiesToken: SignalToken?
     /// Clear Cookies…, Add Site… and the quit switch, for the debug bridge.
@@ -1434,6 +1438,19 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         reloadDevelopmentSites()
         reloadPageSizes()
+        // A local server's certificate trusted on its warning page, here or in another window: the list follows.
+        trustedCertificatesAddSite.onClick = { [weak self] _ in
+            guard let self else { return }
+            TrustedCertificateSheet.add(in: self) { [weak self] url in
+                self?.browser?.open(url, disposition: .foregroundTab, allowSwitch: false)
+            }
+        }
+        trustedCertificatesToken = CertificateExceptions.changed.observe { [weak self] in
+            guard let self else { return }
+            self.reloadTrustedCertificates()
+            if self.pane == .developer || self.isSearching { self.layoutDocument() }
+        }
+        reloadTrustedCertificates()
         flagSearch.isOutlined = true
         flagSearch.isPill = true
         flagSearch.field.delegate = self
@@ -2949,6 +2966,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private static var downloadTestHeading: String { String(localized: "Test a Rule", comment: "A heading in Settings › Downloads, over the address field that shows which rule would take it.") }
     private static var connectHeading: String { String(localized: "Connect an App", comment: "A heading in Settings › Automation: how to connect an AI app to Zigzag over MCP.") }
     private static var localServersHeading: String { String(localized: "Local Servers", comment: "A heading in Settings › Developer: development servers running on this Mac.") }
+    private static var trustedCertificatesHeading: String { String(localized: "Trusted Certificates", comment: "A heading in Settings › Developer: local servers whose certificate you chose to trust, so Zigzag doesn't warn again.") }
     private static var pageSizesHeading: String { String(localized: "Page Sizes", comment: "A heading in Settings › Developer: the sizes the developer tools offer for a page.") }
     private static var developmentSitesHeading: String { String(localized: "Sites in Developer Mode", comment: "A heading in Settings › Developer: the sites the developer tools show on.") }
     private static var featureFlagsHeading: String { String(localized: "Feature Flags", comment: "A heading in Settings › Developer, as Safari's Develop menu names them: WebKit's switches for new and experimental features.") }
@@ -3007,7 +3025,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .extensions: [(installedHeading, extensionsGroup), (Self.appExtensionsHeading, appExtensionsGroup), (Self.otherProfilesHeading, otherProfilesGroup)]
         case .shortcuts: shortcutGroups.map { ($0.0, $0.1) }
         case .automation: [(nil, aiGroup), (Self.connectHeading, connectGroup), (Self.scriptsHeading, scriptsGroup)]
-        case .developer: [(nil, developerToolsGroup), (Self.developmentSitesHeading, developmentSitesGroup), (Self.pageSizesHeading, pageSizesGroup), (Self.localServersHeading, localServersGroup)]
+        case .developer: [(nil, developerToolsGroup), (Self.developmentSitesHeading, developmentSitesGroup), (Self.localServersHeading, localServersGroup), (Self.trustedCertificatesHeading, trustedCertificatesGroup), (Self.pageSizesHeading, pageSizesGroup)]
         }
     }
 
@@ -3064,7 +3082,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // A section: a quiet label low in its slot, standing in for a divider, then the group. A button that acts on the
         // whole group (New Space, Reset All) sits at the label's right, lined up with the rows' own controls.
-        func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
+        func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil, groupTopInset: CGFloat = 0) {
             var accessory = accessory
             // The sites' list has its search and Remove All by its heading, narrower on a narrow page.
             if group === siteDataGroup {
@@ -3089,6 +3107,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
                 y += slot
             }
+            y += groupTopInset
             group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight(for: contentWidth))
             group.needsLayout = true
             place(group)
@@ -3182,8 +3201,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(nil, developerToolsGroup)
             section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton)
             note(String(localized: "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too.", comment: "Under the list in Settings › Developer."))
-            section(Self.pageSizesHeading, pageSizesGroup, accessory: addSizeButton)
             section(Self.localServersHeading, localServersGroup)
+            section(Self.trustedCertificatesHeading, trustedCertificatesGroup, accessory: trustedCertificatesAddSite, groupTopInset: 7)
+            note(String(localized: "Local servers whose certificate you chose to trust. Zigzag doesn’t warn again while a server shows that certificate. Removing a server brings the warning back.",
+                        comment: "Under Trusted Certificates in Settings › Developer."))
+            section(Self.pageSizesHeading, pageSizesGroup, accessory: addSizeButton)
             guard DeveloperTools.isOn, let flags = FeatureFlags.flags, !flags.isEmpty else { break }
             // Feature Flags (#173): its name set as a heading over the groups by status, with Reset to Defaults and
             // its own search at its right; a line saying when a change takes effect, with Reload All Tabs; then
@@ -4372,6 +4394,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             remove.onClick = { _ in DevelopmentSites.remove(site) }
             let favicon = URL(string: "http://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
             developmentSitesGroup.add(FormRow(title: site, icon: favicon, control: remove))
+        }
+    }
+
+    /// Settings › Developer's list of local servers whose certificate is trusted across launches, with Remove.
+    private func reloadTrustedCertificates() {
+        trustedCertificatesGroup.removeAllRows()
+        for site in CertificateExceptions.rememberedSites {
+            let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Developer: takes the site or the page size off its list."))
+            remove.setAccessibilityLabel(String(localized: "Remove \(site.name)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a local server whose certificate is trusted, like 10.0.0.10:8443."))
+            remove.onClick = { _ in CertificateExceptions.forgetRemembered(site) }
+            trustedCertificatesGroup.add(FormRow(title: site.name, icon: SettingsIcon.symbol("lock"), control: remove))
         }
     }
 
