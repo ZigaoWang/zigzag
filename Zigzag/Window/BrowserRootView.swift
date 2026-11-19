@@ -543,6 +543,9 @@ final class BrowserRootView: SpaceFrameView {
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
     private let resizeHandle = ResizeHandle()
+    /// The strips and squares between the panes (#316, #309), under the page's own surfaces (a question, the command
+    /// bar) and the bar above it.
+    private let tileHandles = PassthroughView()
     /// Glow on the sidebar edge while a question waits that this window can't show.
     private let attentionEdge = AttentionEdge()
     private var attentionToken: SignalToken?
@@ -598,6 +601,7 @@ final class BrowserRootView: SpaceFrameView {
             extra.isHidden = true
             addSubview(extra)
         }
+        addSubview(tileHandles)
         topBar.isHidden = true
         addSubview(topBar)
         addSubview(resizeHandle)
@@ -942,6 +946,7 @@ final class BrowserRootView: SpaceFrameView {
     /// While a pane is enlarged the lines rest under the dimming.
     private func placeDividers() {
         let area = cardFrame
+        tileHandles.frame = bounds
         let segments = zoomedPane == nil ? tiles?.segments(in: area, gap: paneGap, slop: 2) ?? [] : []
         let corners = zoomedPane == nil ? tiles?.corners(in: area, gap: paneGap, slop: 2) ?? [] : []
         var live: Set<DividerKey> = []
@@ -964,7 +969,7 @@ final class BrowserRootView: SpaceFrameView {
             handle.frame = segment.frame
         }
         if madeDivider {
-            for handle in cornerHandles.values { addSubview(handle, positioned: .above, relativeTo: nil) }
+            for handle in cornerHandles.values { tileHandles.addSubview(handle, positioned: .above, relativeTo: nil) }
         }
         if draggedSegment == nil {
             for key in dividerHandles.keys.filter({ !live.contains($0) }) {
@@ -1015,7 +1020,7 @@ final class BrowserRootView: SpaceFrameView {
         handle.onEnd = { [weak self] in self?.endTilesDrag() }
         handle.onDoubleClick = { [weak self] in self?.evenOutTiles() }
         handle.isHidden = true
-        addSubview(handle)
+        tileHandles.addSubview(handle)
         return handle
     }
 
@@ -1039,7 +1044,7 @@ final class BrowserRootView: SpaceFrameView {
         }
         handle.onDoubleClick = { [weak self] in self?.evenOutTiles() }
         handle.isHidden = true
-        addSubview(handle)
+        tileHandles.addSubview(handle)
         return handle
     }
 
