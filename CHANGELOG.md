@@ -27,6 +27,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - Peek's scroll bar stays slim on Macs that always show scroll bars, instead of a wide gray track along the card's edge. A page that styles its own scroll bars keeps them, and with scroll bars shown only while scrolling, and in tabs, pages keep the Mac's own, as in Safari.
+- The page under Peek no longer reacts to the pointer while Peek is open. Moving over the card hovered links and started video previews on the page beneath it, and the link shown at the bottom could be that page's; now only the page in Peek sees the pointer, as in a tab. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#374](https://github.com/ZigaoWang/zigzag/issues/374))
 
 ## [0.9.3] - 2026-11-18
 

@@ -79,6 +79,8 @@ final class PeekController {
         }
     }
     private var escMonitor: Any?
+    /// The pages under the card, which ignore the pointer while it's up.
+    private var covered = NSHashTable<WKWebView>.weakObjects()
 
     private func stopEsc() {
         if let escMonitor { NSEvent.removeMonitor(escMonitor) }
@@ -190,8 +192,38 @@ final class PeekController {
                 return nil
             }
         }
+        coverPages()
         controller.window?.makeFirstResponder(webView)
         return webView
+    }
+
+    /// Pointer moves reach every page under the pointer, covered or not: the ones under the card ignore them.
+    private func coverPages() {
+        guard let controller else { return }
+        for case let page? in controller.root.paneCards.map(\.webView) where page !== tab?.webView && !covered.contains(page) {
+            Self.covers(page, true)
+            covered.add(page)
+        }
+    }
+
+    private func uncoverPages() {
+        covered.allObjects.forEach { Self.covers($0, false) }
+        covered.removeAllObjects()
+    }
+
+    /// WebKit's switch for a covered page: no pointer moves, hover, clicks or drops.
+    static func covers(_ page: WKWebView, _ on: Bool) {
+        let set = NSSelectorFromString("_setIgnoresNonWheelEvents:")
+        guard page.responds(to: set) else { return }
+        typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(page.method(for: set), to: SetBool.self)(page, set, on)
+    }
+
+    static func isCovered(_ page: WKWebView) -> Bool {
+        let get = NSSelectorFromString("_ignoresNonWheelEvents")
+        guard page.responds(to: get) else { return false }
+        typealias GetBool = @convention(c) (AnyObject, Selector) -> Bool
+        return unsafeBitCast(page.method(for: get), to: GetBool.self)(page, get)
     }
 
     private func tabChanged(_ change: Tab.Change) {
@@ -279,6 +311,7 @@ final class PeekController {
         scrim.hide(evenFromKeyboard: true)
         let closing = tab
         tab = nil
+        uncoverPages()
         shrink { closing?.close() }
         if let controller, let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
     }
@@ -290,6 +323,7 @@ final class PeekController {
         token = nil
         self.tab = nil
         tab.isPeek = false
+        uncoverPages()
         // Promoted before it finished loading: it never gets the peek's "painted" step, so it draws its own
         // background from here on, like any tab.
         tab.webView?.setValue(true, forKey: "drawsBackground")
