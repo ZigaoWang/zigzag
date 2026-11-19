@@ -1035,9 +1035,24 @@ final class BridgeExtensionFetch: BridgeNamespace {
         guard let context = host.context(for: extensionID) else { throw BridgeError("The extension is no longer loaded.") }
         // Without host access, ordinary WebKit fetch decides what is available through the site's CORS policy.
         guard Self.allows(url, context: context) else { return ["fallback": true] }
+        // With default credentials WebKit's own fetch sends every cookie but SameSite ones, so it needs no help without them.
+        if options.string("credentials") == "same-origin", !(await Self.keepsSameSiteCookies(url, in: host.profile.store)) {
+            return ["fallback": true]
+        }
         return try await requests.response(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID) {
             host.context(for: extensionID) === context && Self.allows(url, context: context)
         }
+    }
+
+    /// Whether the profile has a SameSite Lax or Strict cookie for the URL's host, the kind WebKit leaves out.
+    static func keepsSameSiteCookies(_ url: URL, in store: WKWebsiteDataStore) async -> Bool {
+        let cookies: [HTTPCookie]
+        if #available(macOS 27.0, *) {
+            cookies = await store.httpCookieStore.cookies(for: url)
+        } else {
+            cookies = ExtensionWrite.scoped(await store.httpCookieStore.allCookies(), to: url)
+        }
+        return cookies.contains { [.sameSiteLax, .sameSiteStrict].contains($0.sameSitePolicy) }
     }
 
     func release(_ extensionID: String) { requests.release(extensionID) }
@@ -1250,6 +1265,15 @@ nonisolated enum ExtensionWrite {
         return true
     }
 
+    /// The cookies whose domain covers the URL's host.
+    static func scoped(_ cookies: [HTTPCookie], to url: URL) -> [HTTPCookie] {
+        let host = url.host()?.lowercased() ?? ""
+        return cookies.filter { cookie in
+            let domain = cookie.domain.lowercased()
+            return domain == host || (domain.hasPrefix(".") && (host == String(domain.dropFirst()) || host.hasSuffix(domain)))
+        }
+    }
+
     /// Cookies that go back to the profile: those the server set or changed, and those it deleted.
     typealias Apply = @MainActor @Sendable (_ set: [HTTPCookie], _ deleted: [HTTPCookie]) async -> Void
 
@@ -1266,12 +1290,7 @@ nonisolated enum ExtensionWrite {
         let jar = configuration.httpCookieStorage!
         jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
         // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.
-        let host = url.host()?.lowercased() ?? ""
-        let scoped = cookies.filter { cookie in
-            let domain = cookie.domain.lowercased()
-            return domain == host || (domain.hasPrefix(".") && (host == String(domain.dropFirst()) || host.hasSuffix(domain)))
-        }
-        jar.setCookies(scoped, for: url, mainDocumentURL: url)
+        jar.setCookies(scoped(cookies, to: url), for: url, mainDocumentURL: url)
         try Task.checkCancellation()
         guard await authorize() else { throw BridgeError("The extension can no longer access this URL.") }
         let transfer = ExtensionWriteTransfer(limit: ExtensionFetchRequests.responseLimit)

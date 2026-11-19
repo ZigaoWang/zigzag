@@ -21,6 +21,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 按住 ⇧ 点链接仍然交给网页处理，所以在一排本身是链接的行上按住 ⇧ 选取一段，和以前一样好用；但网页如果随后把当前标签页送到这个链接，比如 GitHub 的文件列表，它会在“速览”卡片中打开，不再移动当前标签页。按住 ⌥ 也一样：网页原本会跳转的链接改为下载。感谢 [Lakeland97](https://github.com/Lakeland97)。([#322](https://github.com/ZigaoWang/zigzag/issues/322))
 - Zigzag 启动后第一次按 ⌘, 会马上打开设置，不再要等好几秒。以前打开设置时会把每个部分要列的内容都读一遍，比如网站数据、扩展和已安装的 App；现在只在你第一次打开某个部分或搜索时才读取。感谢 [Lakeland97](https://github.com/Lakeland97)。([#357](https://github.com/ZigaoWang/zigzag/issues/357))
 - 固定标签页收起时，打开着的固定页面会显示在所在文件夹的名字下面，和展开时一样缩进，而不是一个个单独列出。以前收起时固定一个分组，看起来像散成了几个单独的固定标签页；现在会显示成它那一个文件夹。没有打开页面的文件夹仍然隐藏。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
+- 像 YouMind 这样在后台检查登录状态的扩展，在它的网站上登录后就能认出你已登录，和在 Chrome 里一样。扩展向自己的网站查询账户时如果没写明要带上 Cookie，WebKit 会漏掉网站的 SameSite Cookie，而大多数登录用的正是这种 Cookie，所以扩展一直停在登录页面。
 
 ## [0.9.3] - 2026-11-18
 
