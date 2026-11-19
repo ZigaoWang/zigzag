@@ -38,6 +38,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 停在“设置 › 开发者”的标签页切换走时，Zigzag 不会再卡住一两秒了。之前标签页的预览会把每个功能标志的开关和阴影都画一遍，连滚到看不见的也一样，而且每一行都会把自己的开关量好几次。([#379](https://github.com/ZigaoWang/zigzag/issues/379)) 感谢 [hungraw](https://github.com/hungraw)。
 - Zigzag Mini 顶栏的按钮之间留出了间距，悬停时的底色不会再连成一片；在那里编辑网址时，输入框也只占空间名称和按钮之间的位置，不会再盖住它们。窗口很窄时，输入期间按钮会先让开。弹出窗口和安装的应用里的按钮也一样留出了间距。
 - 网站控制里的“保留 Cookie”只在设置 › 隐私里打开“退出 Zigzag 时清除 Cookie”时才显示。没打开时，除非你按“清除 Cookie…”，否则什么都不会清除，这个开关看起来像没用；这种情况下用设置里的“为这些网站保留 Cookie”列表就行。网站控制开着的时候切换这个设置，它会马上跟着变。感谢 [Lakeland97](https://github.com/Lakeland97)。([#383](https://github.com/ZigaoWang/zigzag/issues/383))
+- 打开深色网页后，被 Zigzag 画成深色的网页（比如 Shopify 的结账页）上方的栏也是深色的，不会再变成白色。以前网页有一部分样式没能变暗时，下面那层白色背景决定了栏的颜色，虽然网页本身看起来是深色的。感谢 [Lakeland97](https://github.com/Lakeland97)。([#250](https://github.com/ZigaoWang/zigzag/issues/250))
 
 ## [0.9.3] - 2026-11-18
 
