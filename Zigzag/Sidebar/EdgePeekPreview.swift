@@ -3,7 +3,7 @@ import AppKit
 /// The edge sidebar's own hover preview: a still card beside the row, after a short hover, drawn in a panel of its
 /// own because the edge panel is over another app and the browser window's overlay is not on screen with it.
 enum EdgePeekPreviewPolicy {
-    static let delay: TimeInterval = 0.35
+    static let delay: TimeInterval = Tokens.Motion.previewDelay
 
     static func shouldShow(hovered: Bool, peekVisible: Bool) -> Bool { hovered && !peekVisible }
 }
@@ -14,6 +14,7 @@ final class EdgePeekPreview {
     private var panel: NSPanel?
     private var card: TabPreviewView?
     private var pending: DispatchWorkItem?
+    private var clickMonitor: Any?
     private static let width: CGFloat = 236
     private static let height: CGFloat = 176
     private static let gap = Tokens.Space.x3
@@ -39,6 +40,8 @@ final class EdgePeekPreview {
     func hide() {
         pending?.cancel()
         pending = nil
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        clickMonitor = nil
         panel?.orderOut(nil)
     }
 
@@ -46,6 +49,15 @@ final class EdgePeekPreview {
         guard EdgePeekPreviewPolicy.shouldShow(hovered: true, peekVisible: EdgePeek.shared.isVisible) else { return }
         makePanel()
         guard let panel, let card else { return }
+        if clickMonitor == nil {
+            clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+                MainActor.assumeIsolated {
+                    guard let self, self.panel?.isVisible == true else { return }
+                    if event.window === EdgeSidebar.shared.panelWindow { self.hide() }
+                }
+                return event
+            }
+        }
         let screen = NSScreen.screens.first { $0.visibleFrame.intersects(row) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
         // On the page's side of the row, never over the sidebar it belongs to.
