@@ -3611,9 +3611,8 @@ extension BrowserWindowController {
     /// A tab, favorite or page picked in the edge sidebar: its window comes forward on it, and the panel goes at once.
     private func pickFromEdgeSidebar(_ tab: Tab) {
         EdgeSidebar.shared.picked()
-        tabManager.select(tab)
-        window?.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+        // The page comes with it: a Peek over the app in front, not the browser window coming forward.
+        EdgePeek.shared.show(tab: tab, from: self)
     }
 
     /// Zigzag comes forward for something in the edge sidebar. The panel goes with it, unless what was picked hangs
