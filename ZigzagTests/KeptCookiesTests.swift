@@ -176,6 +176,18 @@ struct KeptCookiesTests {
         }
     }
 
+    /// Site Controls follows the switch while open (#383).
+    @Test func turningClearingAtQuitSaysWhichProfile() async {
+        await withDefaults {
+            var heard: [UUID] = []
+            let token = KeptCookies.clearingChanged.observe { heard.append($0) }
+            KeptCookies.setClearsOnQuit(true, in: profile)
+            KeptCookies.setClearsOnQuit(false, in: profile)
+            token.cancel()
+            #expect(heard == [profile, profile])
+        }
+    }
+
     @Test func quittingWaitsForTheClearing() async {
         let store = FakeStore(["github.com", "example.com"])
         var calls = 0

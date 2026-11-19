@@ -456,6 +456,8 @@ enum ArcImporter {
                     var folder = BookmarkFolder(name: (node["title"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                                                 ?? String(localized: "Folder", comment: "Name of an imported folder that had none."))
                     folder.parentID = parent
+                    // Shut, as other imports' folders come (#343).
+                    folder.isOpen = false
                     let at = folders.count
                     folders.append(folder)
                     for child in node["childrenIds"] as? [String] ?? [] {

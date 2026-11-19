@@ -117,6 +117,8 @@ protocol CommandBarHost: AnyObject {
     /// Over a small field in a slim strip (Zigzag Mini's), the bar opens at that field's own size, inside the strip,
     /// rather than at the sidebar address's height, which would hang below the strip and cover what sits beside it.
     var commandBarFitsAnchor: Bool { get }
+    /// The light or dark of what the fitted field sits in (the strip), when it isn't the window's.
+    var commandBarAppearance: NSAppearance? { get }
     /// The browser window's tabs, for open tabs among the results and for completing what you type; nil if there's none.
     var commandBarTabs: TabManager? { get }
     /// Browser windows: the bar can be dragged and keeps its place.
@@ -141,6 +143,7 @@ protocol CommandBarHost: AnyObject {
 extension CommandBarHost {
     var commandBarCentersOnAnchor: Bool { false }
     var commandBarFitsAnchor: Bool { false }
+    var commandBarAppearance: NSAppearance? { nil }
     var commandBarIsMovable: Bool { false }
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool { false }
     func commandBarDidHide() {}
@@ -311,8 +314,11 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // From the address: the sidebar's own size, so the text doesn't change as you click in; the centered bar for
         // a new tab is large. Regular weight both ways: what you type reads as text, not a heading.
         // Light type, the space name's voice: the sidebar's size over the address, large and airy for a new tab.
-        let font = Tokens.Font.voice(isAnchored ? Tokens.Font.sidebarRow().pointSize : 22)
+        // In a slim strip's field, the strip's own address size, so it fits the field's height.
+        let fits = isAnchored && host.commandBarFitsAnchor
+        let font = Tokens.Font.voice(fits ? Tokens.Pane.addressText : isAnchored ? Tokens.Font.sidebarRow().pointSize : 22)
         field.font = font
+        panel.appearance = fits ? host.commandBarAppearance : nil
         let placeholder = mode == .history ? String(localized: "Search history", comment: "Placeholder of the command bar's field while it searches history.") : String(localized: "Search or enter address", comment: "Placeholder of the command bar's field.")
         field.placeholderAttributedString = NSAttributedString(string: placeholder,
                                                                attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
@@ -569,7 +575,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private func layoutPanel() {
         let b = panel.bounds
         // Over the address with nothing below it, it keeps the field's corners; with suggestions, the panel's.
-        panel.radius = isAnchored && results.isEmpty ? Tokens.Sidebar.addressRadius : Tokens.Radius.panel
+        let fitted = isAnchored && host?.commandBarFitsAnchor == true
+        // In a slim strip, the strip's own corners, as its other fields and buttons have.
+        panel.radius = isAnchored && results.isEmpty ? (fitted ? Tokens.Radius.control : Tokens.Sidebar.addressRadius) : Tokens.Radius.panel
         let fieldHeight = self.fieldHeight
         let inset = Self.listInset
         // The glass lines up with the rows under it: its middle over their icons, the text where their titles start.

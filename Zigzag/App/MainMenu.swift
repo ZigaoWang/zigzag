@@ -171,6 +171,8 @@ enum MainMenu {
             item(String(localized: "Switch Space…", comment: "View menu item: lists the spaces to pick one with the arrow keys."), #selector(C.showSpaceSwitcher(_:)), "s", [.command, .option]),
             item(String(localized: "New Space", comment: "View menu item."), #selector(C.newSpace(_:)), "n", [.command, .option]),
             item(String(localized: "Edit Space…", comment: "View menu item."), #selector(C.renameSpace(_:)), ""),
+            item(SidebarMenus.collapseAllFoldersTitle, #selector(C.collapseAllFolders(_:)), ""),
+            item(SidebarMenus.expandAllFoldersTitle, #selector(C.expandAllFolders(_:)), ""),
             .separator(),
             item(String(localized: "Actual Size", comment: "View menu item."), #selector(C.actualSize(_:)), "0"),
             item(String(localized: "Zoom In", comment: "View menu item."), #selector(C.zoomIn(_:)), "+"),

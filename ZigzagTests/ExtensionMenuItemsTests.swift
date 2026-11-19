@@ -82,6 +82,17 @@ struct ExtensionMenuItemsTests {
         #expect(plan.removed.first === existing.last)
         #expect(plan.added.isEmpty && plan.adopted.isEmpty)
     }
+
+    /// In a private tab only extensions allowed there are listed: theirs stay, anyone else's WebKit put in go (#353).
+    @Test func aPrivateTabShowsOnlyAllowedExtensions() {
+        let existing = webKitMenu() + [item("Translate this page")]
+        let plan = ExtensionMenuItems.plan(existing: existing, extensions: [("bitwarden", [item("Bitwarden", under: ["Autofill login", "Copy username", "Generate password"])])],
+                                           isPrivate: true)
+        #expect(plan.adopted.map(\.id) == ["bitwarden"])
+        #expect(plan.removed.count == 1)
+        #expect(plan.removed.first === existing.last)
+        #expect(plan.added.isEmpty)
+    }
     // MARK: Kept across relaunches (#239)
 
     /// Downie adds items on install only; Zigzag persists them like Chrome, with every change.

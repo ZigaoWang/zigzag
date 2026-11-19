@@ -184,4 +184,10 @@ struct ExtensionStormTests {
         state.offSites = ["youtube.com"]
         #expect(state.carried(enabled: true).offSites == nil)
     }
+
+    @MainActor @Test func privatePagesAreNotNamedInTheLog() {
+        let url = URL(string: "https://secret.example.com/page")
+        #expect(ExtensionStorms.loggedSite(url, isPrivate: true) == "a private page")
+        #expect(ExtensionStorms.loggedSite(url, isPrivate: false) == "secret.example.com")
+    }
 }

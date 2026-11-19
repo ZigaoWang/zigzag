@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import WebKit
@@ -21,6 +22,67 @@ struct PageLinkTests {
         }
         // A local page may link to the file beside it.
         #expect(Tab.route(forPageLink: URL(string: "file:///tmp/b.html")!, from: URL(string: "file:///tmp/a.html")) == .load)
+    }
+
+    /// What a click on a link opens: a new tab (⌘, in front with ⇧), a peek (⇧), a download (⌥), or the page's own
+    /// navigation. ⌘ is taken from the page outright; ⇧ and ⌥ are the page's, and count only once the page sends this
+    /// tab to that same link right after the click (#322, #317).
+    @Test func aClicksModifierDecidesWhereALinkOpens() {
+        func activation(_ flags: NSEvent.ModifierFlags, type: WKNavigationType = .linkActivated,
+                        button: Int = 0, mainFrame: Bool = true, followed: Tab.LinkActivation? = nil) -> Tab.LinkActivation {
+            Tab.linkActivation(type: type, isMainFrame: mainFrame, modifiers: flags, buttonNumber: button, followed: followed)
+        }
+        #expect(activation([]) == .page)
+        #expect(activation(.command) == .newTab(inFront: false))
+        #expect(activation([.command, .shift]) == .newTab(inFront: true))
+        #expect(activation(.shift) == .peek)
+        #expect(activation(.option) == .download)
+        // ⌘ is read before ⌥: ⌥⌘ opens a tab, as in Chrome.
+        #expect(activation([.command, .option]) == .newTab(inFront: false))
+        // A middle click opens a tab of its own, with or without a modifier.
+        #expect(activation([], button: 4) == .newTab(inFront: false))
+        #expect(activation(.shift, button: 4) == .newTab(inFront: true))
+        // Only a link activation in the main frame: a frame's link and a page's own navigation are the page's.
+        #expect(activation(.shift, type: .other) == .page)
+        #expect(activation(.command, type: .formSubmitted) == .page)
+        #expect(activation(.shift, mainFrame: false) == .page)
+        // Control is not one of the modifiers a click opens elsewhere with: ⌃-click is the page's context menu.
+        #expect(activation(.control) == .page)
+        // A page's own navigation is the click's only when it follows that very click: ⇧ peeks, ⌥ downloads, and a
+        // plain navigation of the page's own stays the page's.
+        #expect(activation([], type: .other, followed: .peek) == .peek)
+        #expect(activation([], type: .other, followed: .download) == .download)
+        #expect(activation([], type: .other, followed: .page) == .page)
+        // The guard every page gets takes ⌘ from the page, and reports ⇧ and ⌥ so the navigation after them is known.
+        let guardScript = PageScripts.modifiedLinkClicks.source
+        #expect(guardScript.contains("metaKey") && guardScript.contains("shiftKey") && guardScript.contains("altKey"))
+        #expect(guardScript.contains("stopImmediatePropagation"))
+        #expect(guardScript.contains("zigzagLinkClick"))
+    }
+
+    /// A ⇧-click on a link the page then sends this tab to is a peek, taken once: the same link, within the window.
+    @Test func aShiftClickThePageFollowsIsAPeekOnce() {
+        let tab = Tab(url: URL(string: "https://example.com/")!, spaceID: UUID())
+        tab.modifiedClickFollowed(URL(string: "https://example.com/watch?v=1")!, peek: true, download: false)
+        #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == .peek)
+        // Taken once: a second navigation to the same link is the page's own.
+        #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == nil)
+        // Another link is another navigation.
+        tab.modifiedClickFollowed(URL(string: "https://example.com/watch?v=1")!, peek: true, download: false)
+        #expect(tab.followedActivation(for: URL(string: "https://example.com/other")!) == nil)
+        // ⌥ is the download.
+        tab.modifiedClickFollowed(URL(string: "https://example.com/file.zip")!, peek: false, download: true)
+        #expect(tab.followedActivation(for: URL(string: "https://example.com/file.zip")!) == .download)
+        // Nothing for a click that carried neither.
+        tab.modifiedClickFollowed(URL(string: "https://example.com/plain")!, peek: false, download: false)
+        #expect(tab.followedActivation(for: URL(string: "https://example.com/plain")!) == nil)
+    }
+
+    /// The mark goes when the moment passes: a page navigation a while after a ⇧-click is the page's own, not a peek.
+    @Test func aClickMarkGoesOnceTheMomentHasPassed() {
+        let tab = Tab(url: URL(string: "https://example.com/")!, spaceID: UUID())
+        tab.followedClick = (URL(string: "https://example.com/watch?v=1")!, .peek, Date().addingTimeInterval(-Tab.followedClickWindow - 1))
+        #expect(tab.followedActivation(for: URL(string: "https://example.com/watch?v=1")!) == nil)
     }
 
     @Test func blockAlwaysHolds() {

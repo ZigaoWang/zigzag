@@ -19,6 +19,31 @@ struct SpaceSwitchLookTests {
 
     private func close(_ a: [CGFloat], _ b: [CGFloat]) -> Bool { zip(a, b).allSatisfy { abs($0 - $1) < 0.01 } }
 
+    /// A space key answers the pointer as the toolbar's buttons do: the hover and pressed washes, and a press around
+    /// its middle, never a move down.
+    @Test func aSpaceKeyHoversAndPressesInPlace() {
+        let key = SpaceDotView(spaceID: UUID())
+        key.frame = NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button)
+        key.icon = "🔥"
+        let light = NSAppearance(named: .aqua)!
+        key.appearance = light
+        #expect(key.pressScales && !key.pressSinks)
+        #expect(key.layer?.backgroundColor == nil || rgba(key.layer?.backgroundColor)[3] == 0)
+        key.isHovered = true
+        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.hover, in: light)))
+        key.isPressed = true
+        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.pressed, in: light)))
+        let layer = key.layer!
+        // Scaled around its middle: the middle stays where it was.
+        let t = layer.transform
+        let center = CGPoint(x: key.bounds.midX, y: key.bounds.midY)
+        let anchor = CGPoint(x: layer.anchorPoint.x * key.bounds.width, y: layer.anchorPoint.y * key.bounds.height)
+        let moved = CGPoint(x: anchor.x + (center.x - anchor.x) * t.m11 + t.m41, y: anchor.y + (center.y - anchor.y) * t.m22 + t.m42)
+        #expect(abs(moved.x - center.x) < 0.01 && abs(moved.y - center.y) < 0.01, "\(moved)")
+        key.isPressed = false
+        key.isHovered = false
+    }
+
     @Test func mixGoesPartWayInLightAndDark() {
         let red = NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
         let blue = NSColor(srgbRed: 0, green: 0, blue: 1, alpha: 0.5)

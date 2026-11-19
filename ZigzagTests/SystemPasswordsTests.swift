@@ -180,7 +180,7 @@ struct SystemPasswordsTests {
 
     @Test func theFieldsGoOverThePageFieldAndAway() async throws {
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil)
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
         var asked = false
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 40, y: 60, width: 280, height: 32), in: overlay, restoringFocusTo: stand, ask: { field in
@@ -204,7 +204,7 @@ struct SystemPasswordsTests {
 
     @Test func whatAutoFillPutsInIsReadThenEmptied() async throws {
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil)
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         picker.usernameField.stringValue = "sam@example.com"
@@ -225,7 +225,7 @@ struct SystemPasswordsTests {
 
     @Test func onlyAPasswordStillComesBack() async throws {
         let (_, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil)
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         picker.passwordField.stringValue = "fake-pass"
@@ -238,7 +238,7 @@ struct SystemPasswordsTests {
 
     @Test func itGivesUpAfterAWhile() async throws {
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker(timeout: 0.2, openCheck: nil)
+        let picker = SystemPasswordPicker(timeout: 0.2, openCheck: nil, settle: 0, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         try await wait(0.5)
@@ -249,14 +249,14 @@ struct SystemPasswordsTests {
 
     @Test func aListThatNeverOpensTakesTheFieldsAway() async throws {
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: 0.2)
+        let picker = SystemPasswordPicker(openCheck: 0.2, settle: 0, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in false }) { outcome = $0 }
         guard case .cancelled(.unavailable) = outcome else { Issue.record("expected unavailable"); return }
         #expect(picker.anchor.superview == nil)
         #expect(window.firstResponder === stand)
         // Asked, but the list never took the front.
-        let quiet = SystemPasswordPicker(openCheck: 0.2)
+        let quiet = SystemPasswordPicker(openCheck: 0.2, settle: 0, dismissSystem: {})
         var second: SystemPasswordPicker.Outcome?
         quiet.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { second = $0 }
         try await wait(0.5)
@@ -268,7 +268,7 @@ struct SystemPasswordsTests {
         // The Mac's list can open inside Zigzag's window and take the focus from the fields as it does: that ended
         // the request at once, so the list flashed and went (reported after 0.8.1).
         let (window, overlay, stand) = host()
-        let picker = SystemPasswordPicker()
+        let picker = SystemPasswordPicker(settle: 0, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         window.makeFirstResponder(nil)
@@ -282,7 +282,7 @@ struct SystemPasswordsTests {
     @Test func escapeOrTabCancels() async throws {
         let (window, overlay, stand) = host()
         for command in [#selector(NSResponder.cancelOperation(_:)), #selector(NSResponder.insertTab(_:))] {
-            let picker = SystemPasswordPicker(openCheck: nil)
+            let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
             var outcome: SystemPasswordPicker.Outcome?
             picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
             let editor = try #require(picker.passwordField.currentEditor() as? NSTextView)
@@ -295,7 +295,7 @@ struct SystemPasswordsTests {
 
     @Test func aSecondRequestReplacesTheFirst() async throws {
         let (_, overlay, stand) = host()
-        let picker = SystemPasswordPicker(openCheck: nil)
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
         var first: SystemPasswordPicker.Outcome?
         var second: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { first = $0 }
@@ -304,6 +304,133 @@ struct SystemPasswordsTests {
         #expect(second == nil)
         #expect(picker.anchor.superview === overlay)
         picker.cancel()
+    }
+
+    @Test func theListIsAskedForOnceAutoFillHasCaughtUp() async throws {
+        // Asked the moment the field was focused, AppKit's own update for the field closed the list a frame
+        // after it opened (#378).
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0.2, dismissSystem: {})
+        var asked = 0
+        var focusedWhenAsked = false
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { field in
+            asked += 1
+            focusedWhenAsked = field.currentEditor() != nil
+            return true
+        }) { outcome = $0 }
+        #expect(asked == 0)
+        #expect(picker.passwordField.currentEditor() != nil)
+        try await wait(0.4)
+        #expect(asked == 1)
+        #expect(focusedWhenAsked)
+        #expect(outcome == nil)
+        picker.cancel()
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func focusMovingOnBeforeTheAskAsksNothing() async throws {
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0.2, dismissSystem: {})
+        var asked = false
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in asked = true; return true }) { outcome = $0 }
+        window.makeFirstResponder(stand)
+        try await wait(0.4)
+        #expect(!asked)
+        guard case .cancelled(.dismissed) = outcome else { Issue.record("expected dismissed, got \(String(describing: outcome))"); return }
+        #expect(picker.anchor.superview == nil)
+    }
+
+    @Test func aWindowClosedBeforeTheAskAsksNothing() async throws {
+        // Closed during the wait for AutoFill, the window is never asked for its list (#378).
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0.2, dismissSystem: {})
+        var asked = false
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in asked = true; return true }) { outcome = $0 }
+        window.close()
+        try await wait(0.4)
+        #expect(!asked)
+        guard case .cancelled(.dismissed) = outcome else { Issue.record("expected dismissed, got \(String(describing: outcome))"); return }
+        #expect(!picker.isPresented)
+    }
+
+    @Test func theMacsListClosesWithTheFields() async throws {
+        // Left behind, it stayed over the page and came back each time the window became key (#378).
+        let (window, overlay, stand) = host()
+        var dismissed = 0
+        let tracked = SystemPasswordPicker(timeout: 0.6, openCheck: nil, settle: 0, dismissSystem: { dismissed += 1 })
+        var outcome: SystemPasswordPicker.Outcome?
+        let rect = NSRect(x: 0, y: 0, width: 200, height: 30)
+        // Taken away by hand.
+        tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
+        tracked.cancel()
+        #expect(dismissed == 1)
+        // Escape.
+        tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
+        let editor = try #require(tracked.passwordField.currentEditor() as? NSTextView)
+        #expect(tracked.control(tracked.passwordField, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:))))
+        #expect(dismissed == 2)
+        // A login picked.
+        tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
+        tracked.passwordField.stringValue = "fake-pass"
+        tracked.fieldsDidChange()
+        try await wait(0.4)
+        guard case .filled = outcome else { Issue.record("expected a fill, got \(String(describing: outcome))"); return }
+        #expect(dismissed == 3)
+        // Left open.
+        tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
+        try await wait(1)
+        guard case .cancelled(.timedOut) = outcome else { Issue.record("expected a timeout, got \(String(describing: outcome))"); return }
+        #expect(dismissed == 4)
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func focusGoesBackBeforeTheFieldsLeaveTheWindow() async throws {
+        // AppKit closes its AutoFill for a field that gives up the focus; a field already gone never does.
+        let (window, overlay, stand) = host()
+        var firstResponderOnDismiss: NSResponder?
+        var inWindowOnDismiss = false
+        var picker: SystemPasswordPicker!
+        picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {
+            firstResponderOnDismiss = window.firstResponder
+            inWindowOnDismiss = picker.anchor.superview != nil
+        })
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
+        picker.cancel()
+        #expect(firstResponderOnDismiss === stand)
+        #expect(inWindowOnDismiss)
+    }
+
+    @Test func appKitHasTheCallThatClosesItsAutoFill() throws {
+        let type = try #require(NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type)
+        #expect(type.responds(to: NSSelectorFromString("sharedInstance")))
+        #expect(type.instancesRespond(to: NSSelectorFromString("_dismissAutoFill")))
+        // With nothing showing, it does nothing.
+        SystemPasswordPicker.dismissSystemAutoFill()
+    }
+
+    @Test func itOpensAgainEveryTime() async throws {
+        let (window, overlay, stand) = host()
+        var dismissed = 0
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: { dismissed += 1 })
+        for round in 1...5 {
+            var asked = false
+            var outcome: SystemPasswordPicker.Outcome?
+            picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { field in
+                asked = field.currentEditor() != nil
+                return true
+            }) { outcome = $0 }
+            #expect(asked)
+            #expect(picker.isPresented)
+            let editor = try #require(picker.passwordField.currentEditor() as? NSTextView)
+            _ = picker.control(picker.passwordField, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:)))
+            guard case .cancelled(.dismissed) = outcome else { Issue.record("round \(round): expected dismissed"); return }
+            #expect(dismissed == round)
+            #expect(!picker.isPresented)
+            #expect(window.firstResponder === stand)
+        }
     }
 
     @Test func typingIsNeverTakenForAFill() throws {

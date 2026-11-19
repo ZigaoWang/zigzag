@@ -596,14 +596,13 @@ final class IconButton: InteractiveView {
             let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
             imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
         } else {
-            // Over a video, the glyph's own ink goes in the middle of the circle (a play triangle leans right in
-            // its image).
-            let ink = isOverMedia ? glyphInk : .zero
+            // The glyph's own ink goes in the middle (a play triangle leans right in its image).
+            let ink = glyphInk
             imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
         }
     }
 
-    /// Where the glyph's ink sits from its image's middle, for `isOverMedia`; set with the glyph.
+    /// Where the glyph's ink sits from its image's middle; set with the glyph.
     var glyphInk: CGSize = .zero { didSet { needsLayout = true } }
 
     /// Chosen, it's the soft card (`applyRowStyle`) rather than the hover fill: a choice among many, like an icon
@@ -1244,6 +1243,105 @@ final class ChoicePill: InteractiveView {
         label.textColor = isOn ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         check.image = Tokens.Symbol.image(isOn ? "checkmark" : "plus", size: Tokens.Symbol.inline)
         check.contentTintColor = isOn ? tint : Tokens.Color.textTertiary
+    }
+}
+
+/// A checkbox and its words, the whole row taking the click. Off, a white box with a hairline like a secondary
+/// button; on, the box fills with the accent and shows a bold check. The words wrap to two lines when narrow.
+final class Checkbox: InteractiveView {
+    private let label: Label
+    private let box = NSView()
+    private let check = NSImageView()
+    var onChange: ((Bool) -> Void)?
+    var isOn = false { didSet { if oldValue != isOn { stateDidChange(animated: false) } } }
+    /// Nil takes its window's accent.
+    var tint: NSColor? { didSet { stateDidChange(animated: false) } }
+    var title: String {
+        get { label.stringValue }
+        set {
+            label.stringValue = newValue
+            setAccessibilityLabel(newValue)
+            needsLayout = true
+        }
+    }
+
+    static let side: CGFloat = 14
+    static let boxRadius: CGFloat = Tokens.Radius.small
+    /// Box to words.
+    static let gap: CGFloat = Tokens.Space.x2
+
+    init(title: String = "") {
+        label = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        super.init(frame: .zero)
+        label.lineBreakMode = .byWordWrapping
+        label.usesSingleLineMode = false
+        label.maximumNumberOfLines = 2
+        box.wantsLayer = true
+        box.layer?.cornerRadius = Self.boxRadius
+        box.layer?.cornerCurve = .continuous
+        check.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .bold))
+        check.imageScaling = .scaleNone
+        box.addSubview(check)
+        [box, label].forEach { addSubview($0) }
+        layer?.cornerRadius = Self.boxRadius
+        onClick = { [weak self] _ in
+            guard let self, self.isEnabled else { return }
+            self.isOn.toggle()
+            self.onChange?(self.isOn)
+        }
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(title)
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
+
+    private var textX: CGFloat { Self.side + Self.gap }
+
+    /// One line's width: the box, the gap and the words.
+    var fittingWidth: CGFloat { ceil(textX + label.inkWidth) }
+
+    /// One line, or two when the words don't fit in `width`.
+    func height(for width: CGFloat) -> CGFloat {
+        let room = width - textX
+        guard label.inkWidth > room else { return max(Self.side, label.lineHeight) }
+        let wrapped = label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: room + Label.inset * 2, height: 200)).height ?? label.lineHeight
+        return max(Self.side, ceil(wrapped))
+    }
+
+    override func layout() {
+        super.layout()
+        let line = label.lineHeight
+        // The box sits on the first line's caps.
+        let scale = window?.backingScaleFactor ?? 2
+        let below = Label.capsBelowMiddle(of: label.font ?? Tokens.Font.body(), lineHeight: line)
+        let y = ((line / 2 + below - Self.side / 2) * scale).rounded() / scale
+        box.frame = NSRect(x: 0, y: max(0, y), width: Self.side, height: Self.side)
+        let size = check.image?.size ?? .zero
+        check.frame = NSRect(x: round((Self.side - size.width) / 2), y: round((Self.side - size.height) / 2), width: size.width, height: size.height)
+        label.frame = NSRect(x: textX - Label.inset, y: 0, width: bounds.width - textX + Label.inset * 2, height: bounds.height)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let accent = tint ?? Brand.Theme.for(self).accent
+        let fill: NSColor
+        if isOn {
+            fill = isPressed ? (accent.shadow(withLevel: 0.15) ?? accent) : isHovered ? (accent.highlight(withLevel: 0.08) ?? accent) : accent
+        } else {
+            fill = isPressed ? Tokens.Color.controlPressed : isHovered ? Tokens.Color.controlHover : Tokens.Color.controlFill
+        }
+        box.layer?.set(backgroundColor: cgColor(fill), animated: false)
+        Tokens.Motion.withoutAnimation {
+            box.layer?.borderWidth = isOn ? 0 : Tokens.Metric.hairline
+            box.layer?.borderColor = cgColor(Tokens.Color.controlEdge)
+        }
+        check.isHidden = !isOn
+        check.contentTintColor = tint.map(Brand.ink(on:)) ?? Brand.Theme.for(self).onAccent
+        label.textColor = isEnabled ? Tokens.Color.textPrimary : Tokens.Color.textDisabled
+        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 }
 
