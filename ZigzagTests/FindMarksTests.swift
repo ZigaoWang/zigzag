@@ -127,6 +127,24 @@ struct FindMarksTests {
         #expect(try await pageScript(webView, "return window.heard") as? Int == 0)
     }
 
+    /// Text WebKit paints no highlight on (a button's, a flex box's, unselectable text) is boxed, and the boxes go
+    /// when find closes (#329).
+    @Test func textWithoutHighlightsIsBoxed() async throws {
+        let (webView, window) = await page("""
+        <p>kiwi</p><button>kiwi</button><div style="display:flex">kiwi</div><div>kiwi<div>block</div></div>
+        <p><span style="-webkit-user-select:none">kiwi</span></p><p><a href=#>kiwi</a></p>
+        """)
+        defer { window.close() }
+        let before = try await pageScript(webView, "return document.documentElement.outerHTML") as? String
+        _ = try #require(await PageFind.find("kiwi", in: webView, backwards: false, showsIndicator: false))
+        #expect(try #require(await FindMarks.mark("kiwi", in: webView)).count == 6)
+        #expect(try await findState(webView, "boxed") as? Int == 4)
+        #expect(try await findState(webView, "highlights") as? Int == 2)
+        FindMarks.clear(in: webView)
+        #expect(try await findState(webView, "boxed") as? Int == 0)
+        #expect(try await pageScript(webView, "return document.documentElement.outerHTML") as? String == before)
+    }
+
     /// Going through the matches, the one WebKit lands on is the one marked stronger, both ways, wrapping around.
     @Test func theCurrentMatchFollowsTheFind() async throws {
         let (webView, window) = await page("<p>one apple</p><p>two apple</p><p>three apple</p>")
@@ -275,6 +293,30 @@ struct FindMarksTests {
         let looks = try #require(try await findState(webView, "looks") as? Int)
         #expect(looks >= 1 && looks <= 3)
         #expect(heard == 0)
+        FindMarks.clear(in: webView)
+    }
+
+    /// A match the page draws again is marked again within a second or so, even on a busy page (#329).
+    @Test func aRedrawnMatchIsMarkedAgainSoon() async throws {
+        let (webView, window) = await page("""
+        <p id=clock>0</p><div id=list><a href=#>plum</a></div>
+        <script>let n = 0; setInterval(() => { document.getElementById('clock').firstChild.data = String(++n); }, 100);</script>
+        """)
+        defer { window.close() }
+        FindMarks.install(in: webView)
+        _ = await PageFind.find("plum", in: webView, backwards: false, showsIndicator: false)
+        #expect(try #require(await FindMarks.mark("plum", in: webView)).count == 1)
+        // Busy long enough to be looked at only every few seconds.
+        try? await Task.sleep(for: .seconds(2.5))
+        _ = try await pageScript(webView, "document.getElementById('list').innerHTML = '<a href=#>plum</a>'")
+        let marked = "return globalThis.__zigzagFind.ranges.length === 1 && !globalThis.__zigzagFind.ranges[0].collapsed"
+        let end = Date().addingTimeInterval(1.2)
+        var again = false
+        while Date() < end, !again {
+            again = try await webView.runOwnScript(marked, asFunction: true) as? Bool == true
+            if !again { try? await Task.sleep(for: .milliseconds(50)) }
+        }
+        #expect(again)
         FindMarks.clear(in: webView)
     }
 

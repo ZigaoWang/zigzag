@@ -1,11 +1,9 @@
 import AppKit
 
-/// Saved state of every window and tab, written often so a crash loses nothing.
-///
-/// While windows share a space's tabs (#162), the first window of those sharing them carries the whole list (each
-/// space's tabs, the open pages of pinned tabs and favorites, the splits, the groups) and the others only their own
-/// place, space and chosen tab in each space: the way Zigzag 0.8.7 beta 1 saved them, which an older Zigzag, or this
-/// one with sharing off, reads back as windows with tabs of their own (`givingWindowsTheirOwnTabs`).
+/// Saved state of every window and tab, written often so a crash loses nothing. With shared tabs (#162), the first
+/// sharing window carries the full list (tabs, open pinned and favorite pages, splits, groups) and the others only
+/// their frame, space and selected tab per space, the 0.8.7 beta 1 format, which older builds or sharing off read as
+/// separate windows (`givingWindowsTheirOwnTabs`).
 nonisolated struct SessionState: Codable, Sendable {
     nonisolated struct TabState: Codable, Sendable {
         var id: UUID
@@ -21,7 +19,7 @@ nonisolated struct SessionState: Codable, Sendable {
         /// have neither, and their tabs come back at the top level.
         var parentID: UUID? = nil
         var collapsed: Bool? = nil
-        /// The group of tabs it's in (#209); older sessions have none.
+        /// Its tab group (#209); nil in older sessions.
         var groupID: UUID? = nil
     }
 
@@ -45,7 +43,7 @@ nonisolated struct SessionState: Codable, Sendable {
         var bookmarkTabs: [BookmarkTabState]
         var isFullScreen: Bool?
         var splits: [TabManager.SplitPair]?
-        /// The window's groups of tabs (#209), their names and whether they're open. Nil: none (older sessions too).
+        /// Tab groups (#209) with names and open state; nil when none or in older sessions.
         var tabGroups: [TabGroup]? = nil
     }
 
@@ -150,14 +148,14 @@ final class WindowManager {
         controllers.first { $0.window === window }
     }
 
-    /// The window a tab is in: the one that made it, or, while windows share their tabs (#162), the one that has it on
-    /// screen or last had; else the first that lists it. What extensions, scripts and prompts go by.
+    /// A tab's window: its creator, or with shared tabs (#162) the one showing it or that last did, else the first
+    /// listing it. Extensions, scripts and prompts use this.
     func window(of tab: Tab) -> BrowserWindowController? {
         if let host = tab.host as? BrowserWindowController, !host.tabManager.isInvalidated, host.tabManager.tab(with: tab.id) === tab { return host }
         return controllers.first { $0.tabManager.tab(with: tab.id) === tab }
     }
 
-    /// Every open tab once, however many windows list it.
+    /// Each open tab once, however many windows list it.
     var openTabs: [Tab] {
         var seen = Set<ObjectIdentifier>()
         return controllers.flatMap { controller -> [Tab] in
@@ -166,14 +164,14 @@ final class WindowManager {
         }
     }
 
-    /// The tabs everyday windows share while Settings › Tabs says so (#162): those of the first open one.
+    /// With Settings › Tabs sharing on (#162), the first open everyday window's tabs.
     private var sharedStore: TabStore? {
         guard TabStore.windowsShareTabs else { return nil }
         return controllers.first { !$0.tabManager.isPrivate && !$0.tabManager.isInvalidated }?.tabManager.store
     }
 
-    /// Settings › Tabs turned sharing on or off: the everyday windows' tabs join up in one list, or each window takes
-    /// the tabs it has (`TabStore.share`, `unshare`). No tab is lost either way.
+    /// Sharing toggled: windows' tabs merge into one list, or each keeps its own (`TabStore.share`, `unshare`). No tab
+    /// is lost.
     func tabSharingChanged() {
         let everyday = controllers.filter { !$0.tabManager.isPrivate }.map(\.tabManager)
         if TabStore.windowsShareTabs { TabStore.share(everyday) } else { TabStore.unshare(everyday) }
@@ -231,7 +229,7 @@ final class WindowManager {
             restored.window?.makeKeyAndOrderFront(nil)
             return restored
         }
-        // While windows share their tabs (#162), an everyday window shows those of the others; a private one has its own.
+        // With shared tabs (#162), everyday windows share; private ones have their own.
         let shared = isPrivate ? nil : sharedStore
         let manager = TabManager(spaceID: spaceID ?? keyController?.tabManager.currentSpaceID, isPrivate: isPrivate, store: shared)
         if let shared, let front = (keyController.flatMap { $0.tabManager.store === shared ? $0 : nil }) ?? controllers.first(where: { $0.tabManager.store === shared }) {
@@ -286,7 +284,7 @@ final class WindowManager {
         // Keep the last window's tabs for next launch even if it is closed before quitting.
         // (A private window open alongside doesn't count: it isn't saved.)
         if !controller.tabManager.isPrivate, controllers.filter({ !$0.tabManager.isPrivate }).count == 1 { saveNow(synchronously: true) }
-        // Windows sharing their tabs (#162): closing one closes none of them, and there's nothing to reopen.
+        // With shared tabs (#162), closing a window closes no tabs, so nothing to reopen.
         let isLastView = controller.tabManager.isLastView
         // Kept to reopen (⇧⌘T's sibling in the File menu), with each tab's back/forward list. Never private windows.
         if isLastView, !controller.tabManager.isPrivate, controller.tabManager.allTabs.contains(where: { $0.url != nil }) {
@@ -297,7 +295,7 @@ final class WindowManager {
         }
         controllers.removeAll { $0 === controller }
         if lastKey === controller { lastKey = nil }
-        // Its tabs go to the windows still showing them first, so extensions see them move there, not close with it.
+        // Hand its tabs to windows still showing them first, so extensions see a move, not a close.
         if !isLastView { controller.tabManager.invalidate() }
         if #available(macOS 15.4, *) { ExtensionCenter.windowClosed(controller) }
         controller.tabManager.invalidate()
@@ -338,81 +336,21 @@ final class WindowManager {
             MiniWindowController.open(url: url, fromAnotherApp: true)
             return
         }
-        // Asked before the link opens, which ends onboarding.
-        let mayOffer = fromAnotherApp && offersMini(url)
         // A link opened before onboarding was finished: you're browsing now, so the next launch restores this window
         // instead of starting over with the welcome (and then saving over what you opened).
         if Self.needsOnboarding { UserDefaults.standard.set(true, forKey: "ImportOfferDismissed") }
         let key = keyController.flatMap { $0.tabManager.isPrivate ? nil : $0 }
         if let controller = key ?? controllers.last(where: { !$0.tabManager.isPrivate }) ?? restoreIfNoWindows() {
-            // A site you chose a space for opens there (#286).
+            // Routed sites open in their space (#286).
             if fromAnotherApp, controller.openRouted(url, arrival: .otherApp, by: .zigzag) {
                 controller.window?.makeKeyAndOrderFront(nil)
                 return
             }
-            // Only a new tab is offered Zigzag Mini: a tab already open on the page is simply gone to.
-            let isNew = controller.tabManager.existingTab(for: url) == nil
             controller.open(url, disposition: .foregroundTab)
             controller.window?.makeKeyAndOrderFront(nil)
-            if mayOffer, isNew { offerMini(in: controller) }
         } else {
-            let controller = newWindow(url: url)
-            if mayOffer { offerMini(in: controller) }
+            newWindow(url: url)
         }
-    }
-
-    /// Whether a link from another app that opens as a tab offers Zigzag Mini instead (`offerMini`).
-    func offersMini(_ url: URL) -> Bool {
-        MiniWindowController.offersMini(for: url, settingOn: MiniWindowController.opensExternalLinks,
-                                        asked: MiniWindowController.miniOffered, needsOnboarding: Self.needsOnboarding)
-    }
-
-    /// The first link from another app that opens as a new tab, while such links still go to tabs: one offer, in that
-    /// window, to send them to Zigzag Mini from now on, this page first. Asked once, whatever the answer (#246).
-    /// It waits its turn: until the page has loaded and no other toast is up (the offer to translate a page in another
-    /// language comes as it loads, and would take its place), while the page is still the one in front. A page that
-    /// never gives it room leaves it for the next link.
-    func offerMini(in controller: BrowserWindowController) {
-        guard let tab = controller.tabManager.selectedTab else { return }
-        func attempt(_ left: Int, quietBefore: Bool) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self, weak controller, weak tab] in
-                guard let self, let controller, let tab, !MiniWindowController.miniOffered, !MiniWindowController.opensExternalLinks else { return }
-                let quiet = !tab.isLoading && !Toast.isShowing(in: controller)
-                switch MiniWindowController.offerTurn(quiet: quiet, quietBefore: quietBefore,
-                                                      inFront: controller.tabManager.selectedTab === tab && controller.window?.isVisible == true) {
-                case .now: self.showMiniOffer(for: tab, in: controller)
-                case .wait: if left > 0 { attempt(left - 1, quietBefore: quiet) }
-                case .never: break
-                }
-            }
-        }
-        attempt(30, quietBefore: false)
-    }
-
-    private func showMiniOffer(for tab: Tab, in controller: BrowserWindowController) {
-        MiniWindowController.miniOffered = true
-        Toast.show(String(localized: "Open links from other apps in Zigzag Mini?", comment: "Toast shown once, the first time a link from another app opens as a new tab: offers to open such links in Zigzag Mini (the small window for one page) from now on. Zigzag Mini is a name, kept in Latin letters."),
-                   symbol: "macwindow",
-                   action: (String(localized: "Use Zigzag Mini", comment: "Button in the toast offering to open links from other apps in Zigzag Mini: turns that on and moves this page into a Zigzag Mini window. Zigzag Mini is a name, kept in Latin letters."),
-                            { [weak controller, weak tab] in
-                                guard let controller, let tab, controller.canOpenInMini(tab) else {
-                                    MiniWindowController.opensExternalLinks = true
-                                    return
-                                }
-                                // One ⌘Z takes the whole choice back: the page to its tab, and links to tabs again.
-                                let undo = controller.sidebarUndo
-                                undo.beginUndoGrouping()
-                                Self.setOpensLinksInMini(true, in: controller)
-                                controller.openInMini(tab)
-                                undo.endUndoGrouping()
-                            }),
-                   duration: 10, closes: true, in: controller)
-    }
-
-    /// Turns links from other apps in Zigzag Mini on or off, as a step ⌘Z in `controller` takes back.
-    private static func setOpensLinksInMini(_ on: Bool, in controller: BrowserWindowController) {
-        MiniWindowController.opensExternalLinks = on
-        controller.sidebarUndo.registerUndo(withTarget: controller) { setOpensLinksInMini(!on, in: $0) }
     }
 
     /// A page from another app goes to Zigzag Mini rather than a tab here.
@@ -432,9 +370,8 @@ final class WindowManager {
         // Private windows are never written down.
         let saved = controllers.filter { !$0.tabManager.isPrivate }
         guard !saved.isEmpty else { return }
-        // Gathered here, where the windows and tabs are; encoded and written on the writer's queue, and only when
-        // it says something the file doesn't already (a page rewriting its address back and forth).
-        // Windows sharing their tabs (#162): the first of them carries the list, the others only what they chose.
+        // Collected here; encoded and written on the writer's queue, only when changed (a page can flip its address
+        // back and forth). With shared tabs (#162), the first window carries the list, the others only their selection.
         var listed = Set<ObjectIdentifier>()
         let state = SessionState(windows: saved.map { windowState($0, withTabs: listed.insert(ObjectIdentifier($0.tabManager.store)).inserted) })
         // Back/forward lists live in their own files: opaque and occasionally large. Only changed ones are
@@ -480,7 +417,7 @@ final class WindowManager {
     /// Runs off the main thread: writes changed back/forward lists and removes ones for closed tabs.
     nonisolated private static func writeTabStates(_ writes: [(URL, Data)], keeping keep: Set<UUID>, in directory: URL) {
         for (url, data) in writes {
-            // In a folder only you can open, and readable by you alone: a tab's back and forward list is history.
+            // Owner-only folder and file: back and forward lists are history.
             guard (try? data.write(to: url, options: .atomic)) != nil else { continue }
             Paths.makePrivate(url)
         }
@@ -490,8 +427,8 @@ final class WindowManager {
         }
     }
 
-    /// `withTabs`: false for a window sharing its tabs with one saved before it (#162), which carries them; this one
-    /// keeps only its place, its space and the tab it chose in each.
+    /// `withTabs` false: a window sharing tabs with one saved before it (#162); keeps only its frame, space and
+    /// selected tabs.
     private func windowState(_ controller: BrowserWindowController, withTabs: Bool = true) -> SessionState.WindowState {
         let manager = controller.tabManager
         let fullScreen = controller.window?.styleMask.contains(.fullScreen) == true
@@ -515,7 +452,7 @@ final class WindowManager {
                                         tabGroups: Self.savedGroups(spaces, in: manager))
     }
 
-    /// The groups the saved tabs are in, top to bottom; nil when there are none.
+    /// Saved tabs' groups, top to bottom; nil when none.
     private static func savedGroups(_ spaces: [SessionState.SpaceTabs], in manager: TabManager) -> [TabGroup]? {
         var seen: Set<UUID> = []
         let groups = spaces.flatMap(\.tabs).compactMap { tab in tab.groupID.flatMap { seen.insert($0).inserted ? manager.group($0) : nil } }
@@ -534,8 +471,8 @@ final class WindowManager {
         sessionWaiting = false
         finishSaving()
         guard let saved = JSONStore.load(SessionState.self, from: Paths.session), !saved.windows.isEmpty else { return false }
-        // While windows share their tabs (#162), every saved window's tabs come back in one list, each tab once,
-        // whichever way they were saved; otherwise each window has its own.
+        // With shared tabs (#162), every window's tabs restore into one list, each once, however saved; otherwise per
+        // window.
         let shares = TabStore.windowsShareTabs
         let state = shares ? saved : saved.givingWindowsTheirOwnTabs()
         var allIDs = Set<UUID>()
@@ -566,8 +503,7 @@ final class WindowManager {
         }
     }
 
-    /// The windows Reopen Closed Window can bring back, newest first, for History › Recently Closed: each with its
-    /// tabs' count and the tab it was showing.
+    /// Reopenable closed windows, newest first, for History › Recently Closed, with tab count and shown tab.
     var recentlyClosedWindows: [(id: UUID, tabCount: Int, shown: SessionState.TabState?)] {
         let open = openTabIDs
         return closedWindows.reversed().filter { !isBack($0.state, open: open) }.map { closed in
@@ -579,7 +515,7 @@ final class WindowManager {
         }
     }
 
-    /// Brings back one closed window, picked in History › Recently Closed.
+    /// Reopens a closed window from History › Recently Closed.
     func reopenClosedWindow(_ id: UUID) {
         guard let index = closedWindows.firstIndex(where: { $0.id == id }) else { return }
         let closed = closedWindows.remove(at: index)
@@ -594,9 +530,8 @@ final class WindowManager {
         return ids.contains(where: open.contains)
     }
 
-    /// One window from saved state; returns its tabs' ids. `history` stands in for back/forward lists not on disk.
-    /// `store`: the tabs it shares with other windows (#162); a tab already among them isn't made twice, and the
-    /// window chooses the one there.
+    /// Restores one window and returns its tab ids. `history` replaces back/forward lists missing on disk. `store`:
+    /// tabs shared with other windows (#162); existing tabs aren't duplicated and the window selects the shared one.
     @discardableResult
     private func restoreWindow(_ windowState: SessionState.WindowState, history: [UUID: Data] = [:], store: TabStore? = nil) -> Set<UUID> {
             let (manager, allIDs) = restoredTabs(windowState, history: history, store: store)
@@ -610,14 +545,14 @@ final class WindowManager {
             return allIDs
     }
 
-    /// A saved window's tabs, splits and chosen tabs, before the window is made, and the tabs' ids.
+    /// A saved window's tabs, splits and selections, restored before the window is created, plus the tab ids.
     func restoredTabs(_ windowState: SessionState.WindowState, history: [UUID: Data] = [:], store: TabStore? = nil) -> (TabManager, Set<UUID>) {
             var allIDs = Set<UUID>()
             let manager = TabManager(spaceID: windowState.currentSpaceID, store: store)
             let present = Set(manager.allTabs.map(\.id))
-            // A pinned page's open page another window brought back first: the one there stands in for this one's.
+            // A pinned page another window already restored: reuse that tab.
             var sameAs: [UUID: UUID] = [:]
-            // Before the tabs, so the tabs find the groups they're in.
+            // Groups before tabs so tabs find theirs.
             manager.restoreGroups(windowState.tabGroups ?? [])
             var selection: [UUID: UUID] = [:]
             // A space that's gone (the library couldn't be read and started over) keeps its tabs: they join the space
@@ -652,8 +587,8 @@ final class WindowManager {
                 manager.adoptBookmarkTab(tab, bookmarkID: bookmarkState.bookmarkID)
                 allIDs.insert(tab.id)
             }
-            // The splits and the tab you were on before the window is made, so it's drawn showing them from its very
-            // first frame: made first, it drew a blank address and no page, and showed that for a moment as it opened.
+            // Splits and selection before the window is created, so its first frame shows them; otherwise it briefly
+            // drew a blank address and no page.
             manager.restoreSplits(windowState.splits ?? [])
             manager.restoreSelection(selection.mapValues { sameAs[$0] ?? $0 }, currentSpaceID: windowState.currentSpaceID)
             return (manager, allIDs)
@@ -694,8 +629,8 @@ final class WindowManager {
 }
 
 extension BrowserWindowController {
-    /// Whether a tab this window lists is in it (to extensions, scripts, the mini player): always, unless other
-    /// windows share its tabs (#162), and then if it's the one that has the tab (`WindowManager.window(of:)`).
+    /// Whether this window holds a listed tab (for extensions, scripts, the mini player): always, unless tabs are
+    /// shared (#162), then only if it's the tab's window (`WindowManager.window(of:)`).
     func holds(_ tab: Tab) -> Bool {
         !tabManager.store.isShared || WindowManager.shared.window(of: tab) === self
     }

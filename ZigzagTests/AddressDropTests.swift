@@ -9,8 +9,7 @@ struct AddressDropTests {
         AddressDrop.destination(urls: urls, text: text, engine: .duckDuckGo)?.url.absoluteString
     }
 
-    /// Text that's an address without a scheme goes over http if https can't reach it, as typed; a link and a search
-    /// go where they say.
+    /// A schemeless address carries an http fallback; links and searches don't.
     @Test func anAddressWithoutASchemeCarriesItsHTTPFallback() {
         #expect(AddressDrop.destination(urls: [], text: "localtest.me:3600", engine: .duckDuckGo)?.httpFallback == true)
         #expect(AddressDrop.destination(urls: [URL(string: "https://localtest.me:3600")!], text: "localtest.me:3600", engine: .duckDuckGo)?

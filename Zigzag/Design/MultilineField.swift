@@ -1,8 +1,7 @@
 import AppKit
 
-/// A field for several lines of plain text (a script's arguments, a JSON body): `FilledField`'s fill, corners and
-/// focus ring around a scrolling text view, in the body type, with the Mac's smart quotes and dashes off so what you
-/// type is what's kept.
+/// A multiline plain text field (script arguments, JSON bodies) with `FilledField`'s look and smart quotes and dashes
+/// off.
 final class MultilineField: NSView, NSTextViewDelegate {
     private let scroll = NSScrollView()
     private let textView: NSTextView
@@ -13,10 +12,10 @@ final class MultilineField: NSView, NSTextViewDelegate {
         set { textView.string = newValue; needsLayout = true }
     }
 
-    /// Hears each change typed or pasted, with the text as it is now.
+    /// Called on every edit with the current text.
     var onChange: ((String) -> Void)?
 
-    /// `font`: the body type unless given (code, in a monospaced face).
+    /// `font`: body by default (monospaced for code).
     init(text: String, font: NSFont = Tokens.Font.body()) {
         let storage = NSTextStorage()
         let layout = NSLayoutManager()
@@ -64,7 +63,7 @@ final class MultilineField: NSView, NSTextViewDelegate {
         onChange?(textView.string)
     }
 
-    /// Puts the keyboard in it, once it's in a window.
+    /// Focuses it once in a window.
     func focus() { window?.makeFirstResponder(textView) }
 
     override func setAccessibilityLabel(_ label: String?) {
@@ -74,7 +73,7 @@ final class MultilineField: NSView, NSTextViewDelegate {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        // The ring follows the keyboard, as on a one-line field.
+        // Focus ring follows the first responder, as on one-line fields.
         responderWatch = window?.observe(\.firstResponder, options: [.new]) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.updateColors() }
         }

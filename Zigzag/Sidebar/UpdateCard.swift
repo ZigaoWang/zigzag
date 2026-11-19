@@ -1,19 +1,17 @@
 import AppKit
 
-/// The update, at the foot of the sidebar: its one home. One you asked for comes in here, "Downloading update" over
-/// the version and how much has come, with a bar that fills; then "Preparing update" while Sparkle unpacks and
-/// checks it; then "Update ready" over the version, with a Restart that restarts into it with everything back and a
-/// close button that puts it away until Zigzag restarts (the update still installs when Zigzag quits). It goes from
-/// one to the next in place. Two lines on a row's columns, so the version is always whole; while it's ready, a click
-/// anywhere on it restarts, as Restart does.
+/// Update progress at the bottom of the sidebar. A requested update shows "Downloading update" with version, amount
+/// and a bar, then "Preparing update" while Sparkle unpacks and verifies, then "Update ready" with Restart and a close
+/// button (hides it until relaunch; it still installs on quit). States change in place. While ready, clicking anywhere
+/// restarts.
 final class UpdateCard: InteractiveView {
     private let icon = NSImageView()
     private let title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
     private let version = Label("", font: UpdateCard.detailFont, color: Tokens.Color.textSecondary)
-    /// How much has come, at the version's line's end: "12 of 40 MB", in figures that don't shift as they count.
+    /// Downloaded amount, "12 of 40 MB", in tabular figures.
     private let amount = Label("", font: UpdateCard.amountFont, color: Tokens.Color.textSecondary)
     private let bar = UpdateBar()
-    /// The version and the amount under the title: a section label's size, regular, in quiet ink.
+    /// Version and amount under the title: section label size, regular, secondary ink.
     private static var detailFont: NSFont { .systemFont(ofSize: Tokens.Sidebar.labelText) }
     private static var amountFont: NSFont { .monospacedDigitSystemFont(ofSize: Tokens.Sidebar.labelText, weight: .regular) }
     let restartButton = RestartPill(title: String(localized: "Restart", comment: "Button that restarts Zigzag into an update that's ready: on the sidebar's update card, in a toast and in Settings › General."))
@@ -21,7 +19,7 @@ final class UpdateCard: InteractiveView {
     let hideButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Not Now", comment: "Tooltip and VoiceOver action of the close button on the sidebar's update card: puts the card away; the update installs when Zigzag quits."))
     var onRestart: (() -> Void)?
     var onHide: (() -> Void)?
-    /// Floating over the page with the sidebar hidden: the panel under it is its ground, so it has no field of its own.
+    /// Over the page with the sidebar hidden: the panel is its background, so no field of its own.
     var isFloating = false { didSet { stateDidChange(animated: false) } }
     private(set) var state: UpdateCardState?
     private var sizeObserver: NSObjectProtocol?
@@ -58,7 +56,7 @@ final class UpdateCard: InteractiveView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// How tall the card is for `state`: two lines when it's ready, and the bar under them while it comes in.
+    /// Card height for `state`: two lines when ready, plus the bar while downloading.
     static func height(for state: UpdateCardState?) -> CGFloat {
         state?.isReady == false ? Tokens.Sidebar.updateCardBusyHeight : Tokens.Sidebar.updateCardHeight
     }
@@ -93,7 +91,7 @@ final class UpdateCard: InteractiveView {
         setAccessibilityLabel(sentence)
         setAccessibilityCustomActions(ready ? actions : [])
         if !ready { isHovered = false }
-        // A new step: the words cross-fade where they are, as the bar or the buttons come and go.
+        // New state: cross-fade the text while the bar or buttons change.
         if let old, old.isReady != ready || Self.step(old) != Self.step(state), let layer, window != nil, !Tokens.Motion.isFromKey {
             let fade = CATransition()
             fade.type = .fade
@@ -113,20 +111,27 @@ final class UpdateCard: InteractiveView {
         }
     }
 
-    /// "12 of 40 MB": whole megabytes, so the count never grows a decimal its total doesn't have.
+    /// "9.4 of 18.2 MB", one decimal as Finder shows; whole kilobytes below a megabyte.
     static func amount(_ received: UInt64, of total: UInt64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = .useMB
-        formatter.countStyle = .file
-        formatter.allowsNonnumericFormatting = false
-        // Whole megabytes; what's come is rounded down, so it reads as all there only once it is.
-        func megabytes(_ bytes: UInt64, _ rule: FloatingPointRoundingRule) -> Int64 {
-            Int64((Double(bytes) / 1_000_000).rounded(rule)) * 1_000_000
+        let inMB = total >= 1_000_000
+        let step: Double = inMB ? 100_000 : 1_000
+        let unitSize: Double = inMB ? 1_000_000 : 1_000
+        let number = NumberFormatter()
+        number.numberStyle = .decimal
+        number.minimumFractionDigits = inMB ? 1 : 0
+        number.maximumFractionDigits = inMB ? 1 : 0
+        // Round the downloaded amount down, so it only reads complete when it is.
+        func figure(_ bytes: UInt64, _ rule: FloatingPointRoundingRule) -> String {
+            let value = (Double(bytes) / step).rounded(rule) * step / unitSize
+            return number.string(from: NSNumber(value: value)) ?? "\(value)"
         }
-        let whole = formatter.string(fromByteCount: megabytes(total, .toNearestOrAwayFromZero))
-        formatter.includesUnit = false
-        let part = formatter.string(fromByteCount: megabytes(min(received, total), .down))
-        return String(localized: "\(part) of \(whole)", comment: "On the sidebar's update card while an update downloads: how much has come of how much, like 12 of 40 MB.")
+        let unit = ByteCountFormatter()
+        unit.allowedUnits = inMB ? .useMB : .useKB
+        unit.countStyle = .file
+        unit.includesCount = false
+        let whole = figure(total, .toNearestOrAwayFromZero) + " " + unit.string(fromByteCount: Int64(total))
+        let part = figure(min(received, total), .down)
+        return String(localized: "\(part) of \(whole)", comment: "On the sidebar's update card while an update downloads: how much has come of how much, like 9.4 of 18.2 MB.")
     }
 
     private lazy var actions: [NSAccessibilityCustomAction] = [
@@ -149,14 +154,13 @@ final class UpdateCard: InteractiveView {
     override func layout() {
         super.layout()
         let ready = state?.isReady != false
-        // The words, and the bar under them while it comes in, set by their capitals: the title's tops to the
-        // bar's foot (or the version's baseline) in the middle, as much room above as below.
+        // Text (and the bar while downloading) centered vertically by caps: title cap top to bar bottom (or version baseline).
         let titleFont = title.font ?? Tokens.Font.sidebarRow(), detailFont = version.font ?? Self.detailFont
         let lines = titleFont.capHeight + Self.lineGap + detailFont.capHeight
         let block = lines + (ready ? 0 : Self.barGap + UpdateBar.height)
         let top = (bounds.height - block) / 2
         let margin = top
-        // The icon beside the two lines, in the middle of them.
+        // Icon centered beside the two lines.
         let size = Tokens.Sidebar.favicon
         icon.frame = NSRect(x: SidebarRowView.inset, y: pixel(top + lines / 2 - size / 2), width: size, height: size)
         let b = Tokens.Sidebar.rowButton
@@ -166,8 +170,7 @@ final class UpdateCard: InteractiveView {
         let restart = NSRect(x: hide.minX - Self.buttonGap - pill, y: y, width: pill, height: b)
         hideButton.frame = hide
         restartButton.frame = restart
-        // On the text column; up to Restart, whose own room either side of its word is the gap before it, or, while
-        // it comes in, as far from the right edge as the words are from the top.
+        // Text column ends at Restart (its padding is the gap), or while downloading, inset from the right like the top inset.
         let x = icon.frame.maxX + SidebarRowView.titleOffset
         let end = ready ? restart.minX : bounds.width - margin + Label.inset
         let width = max(0, end - x)
@@ -177,7 +180,7 @@ final class UpdateCard: InteractiveView {
         amount.frame = NSRect(x: end - amountWidth, y: lineY(amount, capsMiddle: detailY), width: amountWidth, height: amount.lineHeight)
         let versionEnd = amount.isHidden ? end : amount.frame.minX - Tokens.Space.x2 + Label.inset * 2
         version.frame = NSRect(x: x, y: lineY(version, capsMiddle: detailY), width: max(0, versionEnd - x), height: version.lineHeight)
-        // The bar under the words, from the text's first letter to where the amount ends.
+        // Bar from the text's first letter to the amount's end.
         bar.frame = NSRect(x: x + Label.inset, y: pixel(top + lines + Self.barGap), width: max(0, end - Label.inset - (x + Label.inset)), height: UpdateBar.height)
         title.fadeTail()
         version.fadeTail()
@@ -188,17 +191,17 @@ final class UpdateCard: InteractiveView {
         return (value * scale).rounded() / scale
     }
 
-    /// Where a line goes for its capitals' middle to land at `capsMiddle`, on the screen's pixels.
+    /// Line origin that puts its cap middle at `capsMiddle`, pixel-aligned.
     private func lineY(_ label: Label, capsMiddle: CGFloat) -> CGFloat {
         let below = Label.capsBelowMiddle(of: label.font ?? Tokens.Font.sidebarRow(), lineHeight: label.lineHeight)
         return pixel(capsMiddle - label.lineHeight / 2 - below)
     }
 
-    /// Between Restart and the close button, as between a row's buttons.
+    /// Gap between Restart and close, as between row buttons.
     private static let buttonGap: CGFloat = 2
-    /// From the title's baseline to the tops of the version's capitals.
+    /// Title baseline to version cap top.
     private static let lineGap: CGFloat = 5
-    /// From the version's baseline to the bar.
+    /// Version baseline to bar.
     private static let barGap: CGFloat = 7
 
     override func stateDidChange(animated: Bool) {
@@ -207,8 +210,7 @@ final class UpdateCard: InteractiveView {
         version.textColor = theme.quietInk
         amount.textColor = theme.quietInk
         bar.tint(track: theme.quietInk, fill: theme.accent)
-        // The Now Playing card's look, a soft field of the space's color; under the pointer only while there's
-        // something to click.
+        // Same field as the Now Playing card (space tint); hover only while clickable.
         let ready = state?.isReady != false
         let fill = !ready ? Tokens.Chrome.field : isPressed ? Tokens.Chrome.fieldPressed : isHovered ? Tokens.Chrome.fieldHover : Tokens.Chrome.field
         let ground = isFloating && (!ready || !isHovered) ? nil : cgColor(fill)
@@ -222,15 +224,14 @@ final class UpdateCard: InteractiveView {
     }
 }
 
-/// The update card's progress: a thin rounded bar, a soft tint of the card's quiet ink for its track and the space's
-/// accent filling it, easing to each new amount. With no amount (preparing, or before the size is known), a short
-/// piece of it slides across, as the Mac's own bars do when they can't say how long.
+/// Thin rounded progress bar: secondary ink track, space accent fill, eased to each value. With no value (preparing or
+/// unknown size) a short segment slides across, like macOS indeterminate bars.
 final class UpdateBar: NSView {
     static let height: CGFloat = 4
     private let track = CALayer()
     private let fill = CALayer()
 
-    /// 0 to 1, or nil for the sliding piece.
+    /// 0 to 1, or nil for indeterminate.
     var share: Double? = nil {
         didSet { apply(from: oldValue) }
     }
@@ -276,7 +277,7 @@ final class UpdateBar: NSView {
         let w = bounds.width, h = bounds.height
         guard w > 0 else { return }
         guard let share else {
-            // The sliding piece: a quarter of the track, across and round again.
+            // Indeterminate: a quarter-width segment looping across.
             let piece = round(w * 0.28)
             Tokens.Motion.withoutAnimation { fill.frame = CGRect(x: 0, y: 0, width: piece, height: h) }
             guard fill.animation(forKey: "slide") == nil, window != nil else { return }
@@ -304,8 +305,7 @@ final class UpdateBar: NSView {
     }
 }
 
-/// The update card's Restart: a word in the space's accent, medium, as tall as a row's buttons, with a soft wash of
-/// the accent under the pointer; its word centered by its capitals, as much room either side as above and below.
+/// Restart button: accent-colored medium text, row-button height, accent wash on hover, caps-centered with equal padding.
 final class RestartPill: InteractiveView {
     private let label: Label
     let title: String
@@ -332,7 +332,7 @@ final class RestartPill: InteractiveView {
         needsLayout = true
     }
 
-    /// Its word, with as much room either side as above its capitals and below its baseline.
+    /// Equal padding around the word: sides match space above caps and below baseline.
     var fittingWidth: CGFloat {
         let font = label.font ?? Self.font
         let room = round((Tokens.Sidebar.rowButton - font.capHeight) / 2)

@@ -134,8 +134,7 @@ struct ContrastTokensTests {
         }
     }
 
-    /// An off switch stands out from the page it's on, at night as by day: at night its track is a lighter gray than
-    /// the page, as macOS's own is, never a darker one that sinks into it.
+    /// The off switch track is lighter than the page at night, as in macOS.
     @Test func offSwitchStandsOutAtNight() {
         for ground in [Tokens.Color.surface, Tokens.Color.formBackground, Tokens.Color.panelBackground] {
             let page = resolved(ground, dark: true, high: false)

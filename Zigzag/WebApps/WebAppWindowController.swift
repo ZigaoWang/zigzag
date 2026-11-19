@@ -36,13 +36,11 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     private lazy var linkStatus = LinkStatusController(overlay: overlay)
     private var tokens: [SignalToken] = []
     private let pageGone = Signal<Void>()
-    /// Sent when this window becomes, or stops being, the one you're in: its one page's "in front" turning on and off,
-    /// which is when a held question of its own goes up or is put away.
+    /// Fires when this window gains or loses key, which shows or hides its held question.
     private let promptFrontChanged = Signal<Void>()
     private var isClosing = false
 
-    /// How many questions are waiting for this page while it can't be shown here: the window isn't the one you're in,
-    /// or isn't on screen. That is what the edge glow is for.
+    /// Questions waiting while the window isn't key or on screen; drives the edge glow.
     private var questionsWaitingForPage: Int {
         guard let window, !isClosing else { return 0 }
         guard PendingQuestions.waits(tabID: tab.id, isFront: window.isKeyWindow, windowVisible: window.isVisible) else { return 0 }
@@ -109,8 +107,7 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
         strip.menuEntries = root.dragStrip.menuEntries
         root.card.show(tab.ensureWebView())
         root.card.hidePlaceholder()
-        // A question waiting for this page while the window isn't the one you're in: the edge glows, and clicking it
-        // brings the window forward, where the question goes up.
+        // A question waiting while not key: the edge glows, and a click brings the window forward to show it.
         root.attentionWaiting = { [weak self] in self?.questionsWaitingForPage ?? 0 }
         root.attentionClicked = { [weak self] in self?.bringForward() }
         refreshStrip()
@@ -173,12 +170,12 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowDidBecomeKey(_ notification: Notification) {
-        // Now the window you're in, a question held for this page goes up.
+        // Became key: show a held question.
         promptFrontChanged.send()
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        // No longer the window you're in, a question goes back to waiting, and the edge glows.
+        // Lost key: the question waits and the edge glows.
         promptFrontChanged.send()
     }
 
@@ -394,13 +391,12 @@ extension WebAppWindowController: PromptHost {
     var focusedPaneFrame: NSRect { overlay.bounds }
     var promptFrontTab: Tab? { isClosing ? nil : tab }
     func promptHolds(_ tab: Tab) -> Bool { tab === self.tab && !isClosing }
-    /// Its one page is in front only while this window is the one you're in: a question asked while you're elsewhere
-    /// waits, and the window's edge glows until you come to it, rather than going up unseen.
+    /// The page counts as front only while the window is key; otherwise questions wait and the edge glows instead of
+    /// showing unseen.
     func promptShows(_ tab: Tab) -> Bool { promptHolds(tab) && window?.isKeyWindow == true }
     var promptIsPrivate: Bool { false }
     var promptAccent: NSColor { Brand.Theme.of(space).accent }
-    /// Its one page never changes places; what changes is whether this is the window you're in, which is when a held
-    /// question goes up (see `promptShows`).
+    /// The page never moves; key state decides when a held question shows (`promptShows`).
     func observePromptTabs(_ body: @escaping () -> Void) -> SignalToken? {
         let gone = pageGone.observe { _ in body() }
         let front = promptFrontChanged.observe { _ in body() }
@@ -426,12 +422,11 @@ final class WebAppRootView: ColorView {
     let dragStrip = WebAppDragStrip()
     let overlay = PassthroughView()
     let barLayer = PassthroughView()
-    /// Along the edge the sidebar would be on, while a question waits for this page and this isn't the window you're
-    /// in: there is no sidebar here to wear the dot, so the window's own edge says it instead.
+    /// Glows along the sidebar side while a question waits and the window isn't key; there's no sidebar dot here.
     let attentionEdge = AttentionEdge()
-    /// How many questions are waiting for this page while it can't be shown here (0 when it can).
+    /// Waiting questions while they can't show (0 when they can).
     var attentionWaiting: (() -> Int)?
-    /// Clicking the glow: come to the window, where the question goes up.
+    /// Click on the glow: bring the window forward.
     var attentionClicked: (() -> Void)?
 
     private var tokens: [SignalToken] = []
@@ -456,14 +451,13 @@ final class WebAppRootView: ColorView {
         attentionEdge.isHidden = true
         attentionEdge.onClick = { [weak self] in self?.attentionClicked?() }
         card.isEdgeToEdge = true
-        // A question arriving (or being answered) can bring the edge glow on, or take it away.
+        // Questions arriving or answered toggle the glow.
         tokens.append(PendingQuestions.changed.observe { [weak self] _ in self?.needsLayout = true })
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Whether this is the window you're in decides whether a waiting question shows or glows, so the glow follows the
-    /// window's key state as well as the questions themselves.
+    /// Key state decides show vs glow, so track it along with the questions.
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         let centre = NotificationCenter.default

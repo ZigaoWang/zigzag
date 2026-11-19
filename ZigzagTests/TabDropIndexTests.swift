@@ -35,7 +35,7 @@ struct TabDropIndexTests {
     }
 }
 
-/// ⌘A with rows picked picks the rest of the section they're in; with none, every tab (#302).
+/// ⌘A with rows selected selects the rest of their section; with none, every tab (#302).
 struct PickAllTests {
     let a = UUID(), b = UUID(), c = UUID(), d = UUID()
     var all: [SidebarItem] { [.bookmark(a), .bookmark(b), .tab(c), .tab(d)] }
@@ -113,7 +113,7 @@ struct ClearTabsTests {
     }
 
     @Test func aSplitIsAsRecentAsItsNewestPage() {
-        // The page you had focus on in the split was seen a minute ago; the other half hours ago. Neither goes.
+        // The focused split page was seen a minute ago, its partner hours ago; neither closes.
         let result = clearing([a, b, c, d, e], current: a, groups: [[c, d]], minutes: [a: 0, b: 1, c: 1, d: 500, e: 500])
         #expect(result.ids == [e] && result.kind == .unused)
     }
@@ -121,7 +121,7 @@ struct ClearTabsTests {
     @Test func aSplitLeftAloneClosesWhole() {
         let result = clearing([a, b, c, d], current: a, groups: [[c, d]], minutes: [a: 0, b: 1, c: 400, d: 500])
         #expect(result.ids == [c, d] && result.kind == .unused)
-        // A tile group of three too.
+        // A three-tile group too.
         let group = clearing([a, b, c, d, e], current: a, groups: [[c, d, e]], minutes: [a: 0, b: 1, c: 400, d: 500, e: 450])
         #expect(group.ids == [c, d, e])
     }
@@ -129,7 +129,7 @@ struct ClearTabsTests {
     @Test func aSplitWithAnythingPlayingStaysWhole() {
         let result = clearing([a, b, c, d], current: a, groups: [[c, d]], busy: [d], minutes: [a: 0, b: 1, c: 400, d: 500])
         #expect(result.ids == [b] && result.kind == .others)
-        // Not even the other half goes at the end.
+        // Not even the other half at the end.
         #expect(clearing([c, d], current: c, groups: [[c, d]], busy: [d], minutes: [:]).ids.isEmpty)
     }
 
@@ -142,17 +142,17 @@ struct ClearTabsTests {
     }
 
     @Test func aTabBesideAPinnedPageStays() {
-        // `p` is a pinned page, not among the tabs: the tab beside it is never cleared, stale or not.
+        // `p` is a pinned page; its tab partner is never cleared.
         let result = clearing([a, b, c], current: a, groups: [[p, c]], minutes: [a: 0, b: 1, c: 500])
         #expect(result.ids == [b] && result.kind == .others)
-        // On the pinned page, its tab is yours; the rest go.
+        // On the pinned page, its partner tab is current; the rest go.
         #expect(clearing([c, d], current: p, groups: [[p, c]], minutes: [c: 500, d: 1]).ids == [d])
-        // And at the end there's nothing to close.
+        // Nothing to close at the end.
         #expect(clearing([c], current: p, groups: [[p, c]], minutes: [c: 500]).ids.isEmpty)
     }
 
     @Test func pinnedSplitsAreNeverCleared() {
-        // A split of two pinned pages has no tab in the list: it changes nothing.
+        // A split of two pinned pages changes nothing.
         let q = UUID()
         let result = clearing([a, b, c], current: a, groups: [[p, q]], minutes: [a: 0, b: 1, c: 500])
         #expect(result.ids == [c])
@@ -160,10 +160,10 @@ struct ClearTabsTests {
     }
 
     @Test func aNestUsedLatelyStaysWhole() {
-        // The parent was left hours ago, but a tab nested under it a minute ago: both stay.
+        // Old parent, recent child: both stay.
         let fresh = clearing([a, p, b, c], current: a, parents: [b: p], minutes: [a: 0, p: 500, b: 1, c: 400])
         #expect(fresh.ids == [c] && fresh.kind == .unused)
-        // A parent you used, its folded-away tabs left alone: they stay with it.
+        // A used parent keeps its collapsed children.
         let folded = clearing([a, p, b, c], current: a, parents: [b: p], minutes: [a: 0, p: 1, b: 500, c: 400])
         #expect(folded.ids == [c])
     }
@@ -174,13 +174,13 @@ struct ClearTabsTests {
     }
 
     @Test func theNestYoureInIsYours() {
-        // On a tab nested under one left hours ago: that parent is part of what you're doing.
+        // On a child of an old parent: the parent counts as current.
         let result = clearing([p, a, b, c], current: a, parents: [a: p], minutes: [p: 500, a: 0, b: 1, c: 400])
         #expect(result.ids == [c])
     }
 
     @Test func everyTabButYoursIncludesYourNest() {
-        // Nothing left you've drifted from: "the other tabs" means every one, nested with yours or not.
+        // Nothing stale: "other tabs" means all of them.
         let result = clearing([p, a, b], current: a, parents: [a: p], minutes: [p: 1, a: 0, b: 2])
         #expect(result.ids == [p, b] && result.kind == .others)
     }
@@ -188,12 +188,12 @@ struct ClearTabsTests {
     @Test func aNestWithSomethingPlayingStays() {
         let result = clearing([a, b, p, c], current: a, parents: [c: p], busy: [c], minutes: [a: 0, b: 1, p: 400, c: 500])
         #expect(result.ids == [p, b] && result.kind == .others)
-        // Once it's every tab but yours, only the one playing stays.
+        // Every tab but yours: only the playing one stays.
         #expect(!result.ids.contains(c))
     }
 
     @Test func aSplitAndANestTogether() {
-        // A split whose half has a tab nested under it: one unit, as recent as that tab.
+        // A split with a nested child is one unit, as recent as the child.
         let result = clearing([a, b, c, d, e, f], current: a, groups: [[c, d]], parents: [e: d],
                               minutes: [a: 0, b: 1, c: 400, d: 500, e: 2, f: 300])
         #expect(result.ids == [f])
@@ -201,7 +201,7 @@ struct ClearTabsTests {
 
     @Test func unitsKeepListOrder() {
         #expect(TabManager.units([a, b, c, d], groups: [[d, b]], parents: [c: a]) == [[a, c], [b, d]])
-        // A pinned page in a group isn't a tab: left out.
+        // Pinned pages in a group aren't tabs.
         #expect(TabManager.units([a, b], groups: [[p, b]], parents: [:]) == [[a], [b]])
     }
 
@@ -221,16 +221,16 @@ struct ClearTabsTests {
         tabs[3].lastActivated = now.addingTimeInterval(-500 * 60)
         let (closing, kind) = manager.tabsToClear(in: space, now: now)
         #expect(Set(closing.map(\.id)) == [tabs[2].id, tabs[3].id] && kind == .unused)
-        // Closed, then brought back as Undo does: side by side again, on the same sides, where they were.
+        // Closed, then restored as Undo does: same sides, same place.
         let ids = manager.closeLeavingSpaceEmpty(closing)
         #expect(manager.tabs(in: space).count == 2)
         let back = ids.reversed().compactMap { manager.reopenClosedTab($0, select: false) }
         guard back.count == 2 else { Issue.record("not back"); return }
-        // The last closed comes back first: the right half, then the left.
+        // Last closed comes back first: right half, then left.
         let pair = manager.split(for: back[0])
         #expect(pair?.left == back[1].id && pair?.right == back[0].id)
         #expect(manager.tabs(in: space).map(\.id) == [tabs[0].id, tabs[1].id, back[1].id, back[0].id])
-        // As stale as before, so Clear would close them again, whole.
+        // Still stale, so Clear closes them again as a whole.
         #expect(Set(manager.tabsToClear(in: space, now: now).tabs.map(\.id)) == Set(back.map(\.id)))
         manager.tabs(in: space).forEach { $0.close() }
     }
@@ -255,7 +255,7 @@ struct ClearTabsTests {
     }
 
     @MainActor @Test func aRestoredTabKeepsWhenYouLastSawIt() throws {
-        // What the session saves and reads back at launch: the time you last looked at it, not the launch.
+        // The session saves the last-viewed time, not launch time.
         let seen = Date().addingTimeInterval(-3 * 24 * 60 * 60)
         let tab = Tab(url: URL(string: "https://example.com"), title: "Example", spaceID: UUID(), lastActivated: seen)
         let state = SessionState.TabState(tab)
@@ -295,12 +295,12 @@ struct KeptByActivityTests {
     }
 
     @Test func aTabLeftMinutesAgoIsNeverUnused() {
-        // Left one a minute ago, another seven: neither is one you haven't used in a while.
+        // 1 and 7 minutes: neither is stale.
         #expect(kept(minutes: [1, 7]) == 2)
         #expect(kept(minutes: [1, 6, 7]) == 3)
-        // A tab just opened in the background and never looked at doesn't make the ones of a quarter hour ago stale.
+        // A never-viewed background tab doesn't make 15-minute-old tabs stale.
         #expect(kept(minutes: [0.1, 15, 16]) == 3)
-        // Half an hour against a minute is a break.
+        // 30 minutes against 1 is a break.
         #expect(kept(minutes: [0.1, 1, 30, 40]) == 2)
     }
 

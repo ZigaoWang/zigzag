@@ -75,7 +75,7 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         if (!isolated) return false;
         for (const [e, before] of isolated.marked) { if (before === null) e.removeAttribute(mark); else e.setAttribute(mark, before); }
         isolated.styles.forEach((s) => s.remove());
-        // The video's own controls back, where they were among its attributes: the ones after it go behind it again.
+        // Restores the controls attribute in its original position, reinserting the attributes after it.
         const c = isolated.controls;
         if (c && !c.attr.ownerElement && !c.target.hasAttribute('controls')) {
           c.target.setAttributeNode(c.attr);
@@ -92,9 +92,8 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         if (whole && target.isConnected) return true;
         unisolate();
         const marked = [], styles = [];
-        // A video with the browser's own controls would show them over the card when paused, and no style reaches
-        // WebKit's newer ones: they're turned off while it's in the card (#230). Not when a src comes after them,
-        // as putting that back in its place would load the video again.
+        // Native controls would show over the card when paused, and no style reaches WebKit's newer ones, so they're
+        // off while in the card (#230). Not when a src follows them, since restoring that would reload the video.
         let controls = null;
         const attr = target.localName === 'video' ? target.getAttributeNode('controls') : null;
         if (attr) {

@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -87,7 +87,7 @@ struct CarriedExtensionStateTests {
     }
 }
 
-/// A store package is read off the main actor, and only up to the cap.
+/// Store packages are read off the main actor, up to the cap.
 struct ExtensionPackageFetchTests {
     @Test func aPackageIsReadUpToTheCap() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-package-\(UUID().uuidString)")
@@ -98,5 +98,89 @@ struct ExtensionPackageFetchTests {
         #expect(whole == bytes)
         let (capped, _) = try await ExtensionStore.fetch(file, limit: 100_000)
         #expect(capped == nil)
+    }
+}
+
+/// Settings › Extensions' Site access rows change the same answers as the address menu's Site Access (#324).
+@MainActor
+struct SettingsSiteAccessTests {
+    private let id = "site-access-settings-test"
+
+    private func withInstalls(_ body: (ExtensionInstalls) throws -> Void) rethrows {
+        let library = Library.shared
+        let info = library.addProfile(name: "Site access test")
+        let installs = Profiles.shared.profile(info.id).installs
+        defer {
+            installs.remove(id)
+            library.removeProfile(info.id)
+            library.finishedRemovingProfile(info.id)
+        }
+        installs.save(ExtensionInstalls.State(grantedPermissions: [], grantedMatchPatterns: ["<all_urls>"]), for: id)
+        try body(installs)
+    }
+
+    private func rows(_ installs: ExtensionInstalls, heard: @escaping (String?) -> Void = { _ in }) -> [FormRow] {
+        ExtensionSiteAccessRows.make(id: id, name: "Test", installs: installs, add: {}, changed: heard)
+    }
+
+    private func menu(in row: FormRow) throws -> DropdownButton {
+        try #require(row.control.subviews.compactMap { $0 as? DropdownButton }.first)
+    }
+
+    private var click: NSEvent {
+        NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+                           context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+    }
+
+    @Test func theMenuSetsSiteAccess() throws {
+        try withInstalls { installs in
+            var heard: [String?] = []
+            let shown = rows(installs) { heard.append($0) }
+            #expect(shown.count == 1)
+            let menu = try menu(in: shown[0])
+            #expect(menu.selectedIndex == 0)
+            menu.onSelect?(1)
+            #expect(installs.siteAccess(id) == .click)
+            menu.onSelect?(2)
+            #expect(installs.siteAccess(id) == .sites && installs.accessSites(id).isEmpty)
+            menu.onSelect?(0)
+            #expect(installs.siteAccess(id) == .all && installs.state(id)?.accessSites == nil)
+            #expect(heard.count == 3 && heard.allSatisfy { $0 == nil })
+            #expect(try self.menu(in: rows(installs)[0]).selectedIndex == 0)
+        }
+    }
+
+    @Test func specificSitesAreAddedAndRemoved() throws {
+        try withInstalls { installs in
+            installs.chooseSiteAccess(id, .sites)
+            installs.addAccessSite(id, "github.com")
+            installs.addAccessSite(id, "example.com")
+            installs.addAccessSite(id, "github.com")
+            #expect(installs.accessSites(id) == ["github.com", "example.com"])
+            var heard: [String?] = []
+            let shown = rows(installs) { heard.append($0) }
+            #expect(Array(shown.map(\.debugTitle).dropFirst()) == ["github.com", "example.com"])
+            #expect(try menu(in: shown[0]).selectedIndex == 2)
+            let remove = try #require(shown[2].control as? IconButton)
+            remove.onClick?(click)
+            #expect(installs.accessSites(id) == ["github.com"])
+            #expect(heard == ["example.com"])
+            // Another choice starts over: back on Specific Sites, the list is empty.
+            installs.chooseSiteAccess(id, .click)
+            installs.chooseSiteAccess(id, .sites)
+            #expect(installs.accessSites(id).isEmpty)
+        }
+    }
+
+    @Test func theAddressMenusSitesShowInSettings() throws {
+        try withInstalls { installs in
+            installs.setSiteAccess(id, .sites, sites: ["news.example"])
+            #expect(rows(installs).map(\.debugTitle).last == "news.example")
+            // Sites clicked on with When You Click It aren't a list to edit.
+            installs.setSiteAccess(id, .click, sites: ["bank.example"])
+            #expect(rows(installs).count == 1)
+            installs.addAccessSite(id, "github.com")
+            #expect(installs.siteAccess(id) == .sites && installs.accessSites(id) == ["github.com"])
+        }
     }
 }

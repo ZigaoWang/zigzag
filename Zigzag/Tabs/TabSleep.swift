@@ -27,7 +27,7 @@ nonisolated enum TabSleep {
         var isFavorite = false
         /// From a site kept awake in its site controls.
         var keptAwake = false
-        /// Its page is on its way: let it arrive first (#305).
+        /// Loading: let it finish first (#305).
         var isLoading = false
     }
 

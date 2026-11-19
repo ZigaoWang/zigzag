@@ -243,8 +243,8 @@ enum DarkPages {
         DarkSeen.site(site(of: url), in: nativeScope(of: store)).flatMap { $0.isNative ? $0 : nil }
     }
 
-    /// The dark the site a page at `url` in this store is going to drew itself in, in this look, where dark pages left
-    /// it alone (`DarkSeen.Site.looks`); nil if it wasn't seen dark in it.
+    /// The site's own dark background in `look`, recorded when dark pages left it alone (`DarkSeen.Site.looks`); nil
+    /// if it wasn't seen dark.
     static func ownLook(for store: WKWebsiteDataStore?, url: URL?, look: NSAppearance.Name) -> NSColor? {
         let kept = DarkSeen.site(site(of: url), in: nativeScope(of: store))?.looks?[look.rawValue]
         return kept.flatMap(color(hex:)).flatMap { isDark($0) ? $0 : nil }
@@ -477,8 +477,8 @@ enum DarkPages {
         // dark on its own shows its own dark past its edges, the one the bar above it takes (#134): WebKit's own color
         // there is the page's root's, which can be white under a dark page.
         let ground = seen(for: store, url: url)?.color.flatMap(color(hex:)).flatMap { isDark($0) ? $0 : nil } ?? background(black: pureBlack)
-        // Where they aren't wanted, a site seen dark on its own in this look loads on that dark, and the bar above it
-        // takes it, rather than WebKit's white (#250): a dark site turned Off flashed white as it came.
+        // When dark pages aren't wanted, a site known to be dark loads on its own dark (and the bar above uses it)
+        // instead of WebKit's white (#250); otherwise a dark site set to Off flashed white.
         let backdrop = wanted ? nil : loadingGround(tab?.darkPage, site: site(of: url), seen: ownLook(for: store, url: url, look: look))
         webView.underPageBackgroundColor = wanted ? underPage(tab?.darkPage, site: site(of: url), ground: ground) : backdrop
         // No white of WebKit's own under the page (#134): a new web view's first frame, or one bringing back a tab that
@@ -542,9 +542,8 @@ enum DarkPages {
         return state.color
     }
 
-    /// Behind a page where dark pages aren't wanted, for a site seen dark on its own in the look it's asked for
-    /// (`seen`, `ownLook`): that dark until the page has been looked at, then its own dark as the page script saw it,
-    /// or WebKit's own (nil) once it's found light. Nil for any other site, which is left to WebKit as it always was.
+    /// Backdrop when dark pages aren't wanted, for a site seen dark in this look (`seen`, `ownLook`): that color
+    /// until the page is checked, then the page script's color, or nil once it's found light. Nil for other sites.
     static func loadingGround(_ state: State?, site: String?, seen: NSColor?) -> NSColor? {
         guard let seen else { return nil }
         guard let state, state.looked, state.site == site else { return seen }
@@ -617,7 +616,7 @@ enum DarkPages {
         /// The mark the page's own dark look set on its root by script (`DarkSeen.Site.marker`): "" for none, nil when
         /// the page didn't say.
         var marker: String? = nil
-        /// The page has been looked at; false while it's still coming in, when nothing it says of how it looks holds yet.
+        /// False while the page is still loading and its look isn't known yet.
         var looked: Bool = true
     }
 
@@ -639,7 +638,7 @@ enum DarkPages {
             if let before, site != before { site.date = Date() }
             after = site
         } else if state.darkened {
-            // Seen light, it's no longer one seen dark; what it draws itself in where dark pages leave it alone stays.
+            // Seen light: no longer dark, but its recorded looks stay.
             if let before, before.onlyLooks == true {
                 after = before
             } else {
@@ -652,9 +651,8 @@ enum DarkPages {
         return (before?.isNative == true) != (after?.isNative == true)
     }
 
-    /// What a page in this store found where dark pages left it alone, asked for `look`: a site that drew itself dark
-    /// in it is kept with that dark for the look (`DarkSeen.Site.looks`), one that drew itself light lets it go (#250).
-    /// Only once the page has been looked at, and never from a private window.
+    /// Records the site's own look when dark pages left it alone (#250): dark keeps that color for `look`
+    /// (`DarkSeen.Site.looks`), light drops it. Only after the page is checked, never from a private window.
     static func learnLook(_ state: State, look: NSAppearance.Name, in scope: String?) {
         guard let scope, !state.site.isEmpty, state.looked, !state.darkened else { return }
         let before = DarkSeen.site(state.site, in: scope)
@@ -670,7 +668,7 @@ enum DarkPages {
         var site = before ?? DarkSeen.Site(color: nil, marker: nil, onlyLooks: true, date: Date())
         site.looks = looks.isEmpty ? nil : looks
         site.date = Date()
-        // Kept for its looks alone, it goes with the last of them.
+        // A site kept only for its looks goes with the last one.
         DarkSeen.set(state.site, site.onlyLooks == true && site.looks == nil ? nil : site, in: scope)
     }
 
@@ -687,7 +685,7 @@ enum DarkPages {
             generation += 1
             install(in: webView)
         }
-        // Left alone, how the site draws itself in the look it was asked for, for its next page to load on (#250).
+        // Left alone: record its own look for the next load (#250).
         if !wanted, !standsBack(for: webView), isUntouched(webView), let look = webView.appearance?.name {
             learnLook(state, look: look, in: nativeScope(of: webView.configuration.websiteDataStore))
         }
@@ -710,16 +708,15 @@ enum DarkPages {
 
     // MARK: Fetching for Dark Reader
 
-    /// Whether something a page's Dark Reader can't fetch itself may be fetched for it: only from the web, never this
-    /// Mac or its network, by the address as written (in any of its spellings) and by every address its name
-    /// resolves to (`IconAddress.mayFetchForPage`). Checked again for every redirect.
-    /// `proxied`: the fetch goes through the profile's own proxy.
+    /// Whether something Dark Reader can't fetch itself may be fetched for the page: public web only, never this Mac
+    /// or its network, checked by the written address (any spelling) and every resolved address
+    /// (`IconAddress.mayFetchForPage`). Rechecked on every redirect. `proxied`: through the profile's proxy.
     nonisolated static func fetchable(_ url: URL?, proxied: Bool = false) async -> Bool {
         guard let url else { return false }
         return await IconAddress.mayFetchForPage(url, proxied: proxied ? true : nil)
     }
 
-    /// Follows a redirect only to where the fetch itself could have gone.
+    /// Allows a redirect only to where the fetch itself could go.
     nonisolated private final class Redirects: NSObject, URLSessionTaskDelegate, Sendable {
         let proxied: Bool
         init(proxied: Bool) { self.proxied = proxied }
@@ -755,8 +752,8 @@ enum DarkPages {
 
     nonisolated private static let session = URLSession(configuration: configuration())
 
-    /// A style sheet or picture, as its type and its bytes in base64, or nil: neither, too big, or not there.
-    /// `proxies`: the profile's own (an extension's), which the fetch goes through as the page's requests do.
+    /// A style sheet or image as type and base64, or nil if neither, too big or missing. `proxies`: the profile's own
+    /// (an extension's), used as for page requests.
     nonisolated static func fetch(_ url: URL, proxies: [ProxyConfiguration] = []) async -> [String: String]? {
         var request = URLRequest(url: url)
         request.setValue("text/css,image/*,*/*;q=0.1", forHTTPHeaderField: "Accept")

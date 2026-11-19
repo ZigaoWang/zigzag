@@ -87,9 +87,9 @@ final class DeskFrameView: NSView {
     private let paint = NSView()
     /// Liquid Glass for a clear space, once one asks for it.
     private var clearGlass: NSView?
-    /// What was last painted, to paint again in the new colors when the appearance changes.
+    /// Last paint, repainted on appearance change.
     private var painted: (space: SpaceInfo, isPrivate: Bool)?
-    /// Called after the appearance (light or dark) changed and the frame was painted again.
+    /// Called after an appearance change repaint.
     var appearanceChanged: (() -> Void)?
 
     override init(frame: NSRect) {
@@ -119,7 +119,7 @@ final class DeskFrameView: NSView {
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        // The wash's colors were resolved for the old appearance.
+        // Colors were resolved for the old appearance.
         if let painted { paint(painted.space, isPrivate: painted.isPrivate) }
         appearanceChanged?()
     }
@@ -501,7 +501,7 @@ final class DeskController {
         guard let controller, let manager else { return }
         let root = controller.root
         let size = root.cardFrame.size
-        // A picture taken in the other appearance (light or dark) counts as none: the page looks different now.
+        // A snapshot from the other appearance is stale.
         let dark = root.effectiveAppearance.isDark
         let pages = Library.shared.spaces.flatMap { manager.tabs(in: $0.id) }.filter {
             Tab.needsPictureOutOfSight(hasWebView: $0.webView != nil, onScreen: $0.webView?.window != nil, loaded: $0.hasLoadedOnce,
@@ -528,12 +528,11 @@ final class DeskController {
         }
     }
 
-    /// Light or dark changed while the desk is up: pages draw in the new colors, so their pictures are retaken, the
-    /// page under the desk and the loaded pages out of sight alike.
+    /// Appearance changed while the desk is up: retake every page's snapshot.
     private func appearanceChanged() {
         guard isVisible else { return }
         pictureUnseenPages()
-        // A moment first, for the page under the desk to draw in its new colors.
+        // Give the page a moment to redraw first.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { MainActor.assumeIsolated { [weak self] in self?.recaptureCurrentPage() } }
     }
 

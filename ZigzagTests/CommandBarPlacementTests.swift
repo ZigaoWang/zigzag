@@ -3,12 +3,11 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// Where the ⌘T bar sits: its default place, dragging it onto the guides, keeping it inside the window, and
-/// remembering it as fractions of the window.
+/// ⌘T bar placement: default, snapping, clamping to the window, saved as window fractions.
 struct CommandBarPlacementTests {
     private static let minimum: CGFloat = 200
 
-    /// A window `width` by `height` with a 240pt sidebar on the left (or none), the page inset 8pt as the card is.
+    /// A `width` x `height` window with a left sidebar of `sidebar` points and the page inset 8pt.
     private func placement(_ width: CGFloat, _ height: CGFloat, sidebar: CGFloat = 240) -> CommandBarPlacement {
         let bounds = NSRect(x: 0, y: 0, width: width, height: height)
         let page = NSRect(x: sidebar + 8, y: 8, width: width - sidebar - 16, height: height - 16)
@@ -20,7 +19,7 @@ struct CommandBarPlacementTests {
         let origin = p.origin(for: .standard)
         #expect(p.width == Tokens.Metric.commandBarWidth)
         #expect(origin.x == floor(720 - p.width / 2))
-        // 18% of the 884pt page, below its top.
+        // 18% of the 884pt page from its top.
         #expect(origin.y == CGFloat(167))
         #expect(p.guideX == CGFloat(720))
         #expect(p.guideY == origin.y)
@@ -29,7 +28,7 @@ struct CommandBarPlacementTests {
     @Test func narrowWindowKeepsTheDefaultBesideTheSidebar() {
         let p = placement(900, 700)
         let origin = p.origin(for: .standard)
-        // The page is 644 wide: the bar narrows to keep 32pt each side, starting right of the sidebar.
+        // 644pt page: 32pt margins, right of the sidebar.
         #expect(p.width == CGFloat(580))
         #expect(origin.x == CGFloat(280))
     }
@@ -73,7 +72,7 @@ struct CommandBarPlacementTests {
         let right = p.drag(to: NSPoint(x: 5000, y: 5000))
         #expect(right.origin.x == 1440 - CommandBarPlacement.edgeMargin - p.width)
         #expect(right.origin.y == 900 - CommandBarPlacement.edgeMargin - Self.minimum)
-        // Moved down, its list may reach the window's bottom rather than the page's.
+        // Moved down, the list may extend to the window bottom.
         #expect(p.bottom(for: right.position) == 900)
         #expect(p.bottom(for: .standard) == 892)
     }
@@ -83,10 +82,10 @@ struct CommandBarPlacementTests {
         let drag = small.drag(to: NSPoint(x: 100, y: 400))
         let large = placement(2000, 1400)
         let there = large.origin(for: drag.position)
-        // The same fractions of the window: its middle and top at the same share across and down.
+        // Same fractions of the window across sizes.
         #expect(abs((there.x + large.width / 2) / 2000 - (drag.origin.x + small.width / 2) / 1000) < 0.001)
         #expect(abs(there.y / 1400 - drag.origin.y / 700) < 0.001)
-        // Somewhere too low for a shorter window: kept inside it.
+        // Too low for a shorter window: clamped.
         let short = placement(1000, 300)
         #expect(short.origin(for: CommandBarPlacement.Position(centerX: 0.5, top: 0.95)).y == 300 - CommandBarPlacement.edgeMargin - Self.minimum)
     }
@@ -103,7 +102,7 @@ struct CommandBarPlacementTests {
         #expect(CommandBarPlacement.load(from: defaults) == CommandBarPlacement.Position(centerX: nil, top: 0.4))
         CommandBarPlacement.save(.standard, to: defaults)
         #expect(defaults.object(forKey: CommandBarPlacement.defaultsKey) == nil)
-        // Nonsense in the setting is the default.
+        // Invalid values fall back to the default.
         defaults.set(["x": 7.0, "top": -1.0], forKey: CommandBarPlacement.defaultsKey)
         #expect(CommandBarPlacement.load(from: defaults) == .standard)
     }

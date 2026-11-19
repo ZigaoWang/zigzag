@@ -71,8 +71,8 @@ nonisolated enum WebApps {
         var url: URL
     }
 
-    /// Of `profiles`, the one an app with this id and address was made on: an id is the profile and address it was
-    /// made from, so an app whose marker was given another address, or one not on a web address, matches none.
+    /// The profile among `profiles` this app id was made on. An id encodes profile and address, so a changed address or
+    /// a non-web one matches none.
     static func profile(madeID id: String, url: URL, among profiles: [UUID]) -> UUID? {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else { return nil }
         return profiles.first { makeID(url: url, profileID: $0) == id }
@@ -212,7 +212,7 @@ final class WebAppStore {
         guard let (action, id) = WebAppLink.parse(link) else { return }
         switch action {
         case .open:
-            // Only a web address: a record or app that says otherwise isn't one Zigzag made.
+            // Web addresses only; anything else isn't a Zigzag app.
             guard let app = shared.app(id) ?? shared.recover(id), ["http", "https"].contains(app.url.scheme?.lowercased() ?? "") else { return }
             WebAppWindowController.show(app, from: sender)
         case .close:
@@ -220,8 +220,8 @@ final class WebAppStore {
         }
     }
 
-    /// An app Zigzag made whose record is gone (the list was lost): read back from the app itself, on the profile it
-    /// was made for. Its id has to be the one Zigzag gives that address on one of your profiles.
+    /// Recovers a Zigzag-made app whose record is lost, reading it from the app bundle on its profile. Its id must
+    /// match what Zigzag gives that address on one of your profiles.
     func recover(_ id: String) -> WebApp? {
         let host = Bundle.main.bundleIdentifier ?? ""
         guard let bundle = NSWorkspace.shared.urlForApplication(withBundleIdentifier: WebApps.bundleIdentifier(host: host, id: id)),

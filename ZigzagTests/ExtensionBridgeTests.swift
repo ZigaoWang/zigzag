@@ -498,6 +498,53 @@ extension ExtensionBridgeTests {
         #expect(response["url"] as? String == localURL.appendingPathComponent("unexpected").absoluteString)
     }
 
+    /// An extension asking for sites only as optional (Raindrop) reaches a server without CORS headers once "On All
+    /// Sites" is chosen, as Chrome does with host access; by default, or for another site listed, it's blocked (#324).
+    @Test func chosenAllSitesGivesOptionalHostAccessPastCORS() async throws {
+        let server = try SessionTestServer()
+        let target = try await server.start()
+        defer { server.listener.cancel() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":[],"optional_host_permissions":["*://*/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("<!doctype html><title>page</title>".utf8).write(to: folder.appendingPathComponent("page.html"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+
+        func fetched(_ access: ExtensionInstalls.SiteAccess?, sites: [String] = []) async throws -> String {
+            let controller = WKWebExtensionController(configuration: .nonPersistent())
+            let context = WKWebExtensionContext(for: ext)
+            try controller.load(context)
+            defer { try? controller.unload(context) }
+            for pattern in ExtensionHost.siteAccessPatterns(access, approved: [], optional: ext.optionalPermissionMatchPatterns, sites: sites) {
+                context.setPermissionStatus(.grantedExplicitly, for: pattern)
+            }
+            #expect(BridgeExtensionFetch.allows(target, context: context) == (access == .all))
+            let page = WKWebView(frame: .zero, configuration: try #require(context.webViewConfiguration))
+            page.load(URLRequest(url: context.baseURL.appendingPathComponent("page.html")))
+            for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(100)) }
+            #expect(page.title == "page")
+            return try await page.callAsyncJavaScript("""
+                try { const response = await fetch(target, { credentials: 'omit' }); return String(response.status) + ' ' + await response.text(); }
+                catch (error) { return error.name; }
+                """, arguments: ["target": target.absoluteString], in: nil, contentWorld: .page) as? String ?? ""
+        }
+        #expect(try await fetched(nil) == "TypeError")
+        #expect(try await fetched(.sites, sites: ["example.com"]) == "TypeError")
+        #expect(try await fetched(.all) == #"200 {"signedIn":false}"#)
+    }
+
+    @Test func siteAccessChoicesGrantWhatTheySay() throws {
+        let required = try WKWebExtension.MatchPattern(string: "https://api.example/*")
+        let optional: Set = [try WKWebExtension.MatchPattern(string: "*://*/*")]
+        #expect(ExtensionHost.siteAccessPatterns(nil, approved: [required], optional: optional, sites: []) == [required])
+        #expect(Set(ExtensionHost.siteAccessPatterns(.all, approved: [required], optional: optional, sites: [])) == optional.union([required]))
+        #expect(ExtensionHost.siteAccessPatterns(.click, approved: [required], optional: optional, sites: []).isEmpty)
+        #expect(Set(ExtensionHost.siteAccessPatterns(.sites, approved: [], optional: optional, sites: ["raindrop.io"]))
+            == Set(ExtensionHost.patterns(for: "raindrop.io")))
+    }
+
     /// A name an extension gives a download stays a plain file name inside Downloads.
     @Test func downloadNamesCantClimbOut() {
         #expect(BridgeDownloads.safeName("../../evil/report.pdf") == "report.pdf")
@@ -535,18 +582,15 @@ extension ExtensionBridgeTests {
     }
 }
 
-/// `runtime.getContexts`, as Chrome answers it: its background, its offscreen page, its popup and its side panel,
-/// with Chrome's filters over them. Claude's side panel opens only when it finds itself there as its tab's side panel,
-/// by its whole address (#112). Only what Zigzag can name truthfully is reported: no tab, document or incognito
-/// identity it doesn't have.
+/// `runtime.getContexts` like Chrome: background, offscreen, popup, side panel, with filters. Claude's side panel checks its full URL (#112). Only truthful fields are reported.
 struct ExtensionContextsTests {
     private let id = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
     private let base = "webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn/"
     private var baseURL: URL { URL(string: base)! }
-    /// The extension's origin, as Chrome reports it: its actual scheme, query and all.
+    /// The extension origin as Chrome reports it.
     private var origin: String { String(base.dropLast()) }
 
-    /// A popup's page as WebKit holds it. Its address is the page's own, not a path rebuilt by anyone else.
+    /// A popup with its real URL, not a rebuilt path.
     private final class PopupPage: WKWebView {
         private let address: URL?
         override var url: URL? { address }
@@ -557,7 +601,7 @@ struct ExtensionContextsTests {
         required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
     }
 
-    /// The pages an extension has open: its background, its offscreen page, and a side panel opened for one tab.
+    /// Background, offscreen page, and a side panel for one tab.
     private var contexts: [Context] {
         [Context(type: .background, contextID: "background", documentURL: URL(string: base + "zigzag-entry.js")),
          Context(type: .offscreenDocument, contextID: "offscreen", documentURL: URL(string: base + "offscreen.html")),
@@ -612,7 +656,7 @@ struct ExtensionContextsTests {
         #expect(declared.documentURL?.absoluteString == base + "background.html")
         #expect(declared.frameID == 0)
         #expect(declared.tabID == -1)
-        // Scripts alone: the page Chrome generates for them.
+        // Scripts only: Chrome's generated page.
         let generated = try #require(BridgeContexts.background(manifest: ["manifest_version": 2, "background": ["scripts": ["background.js"]]],
                                                                baseURL: baseURL, contextID: "background"))
         #expect(generated.documentURL?.absoluteString == base + "_generated_background_page.html")
@@ -639,7 +683,7 @@ struct ExtensionContextsTests {
         #expect(BridgeContexts.matching(all, filter: ["tabIds": [7]]).map(\.contextID) == ["panel"])
         #expect(BridgeContexts.matching(all, filter: ["windowIds": [3]]).map(\.contextID) == ["panel", "popup"])
         #expect(BridgeContexts.matching(all, filter: ["contextTypes": ["POPUP", "BACKGROUND"]]).map(\.contextID) == ["worker", "popup"])
-        // Every field given narrows the answer, and every value within one widens it.
+        // Each filter field narrows; values within one widen.
         #expect(BridgeContexts.matching(all, filter: ["windowIds": [3], "contextTypes": ["POPUP"]]).map(\.contextID) == ["popup"])
         #expect(BridgeContexts.matching(all, filter: ["windowIds": [4]]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: [:]).count == 3)
@@ -649,11 +693,11 @@ struct ExtensionContextsTests {
         let worker = Context(type: .background, contextID: "worker", frameID: -1)
         let popup = Context(type: .popup, contextID: "popup", documentURL: URL(string: base + "popup.html"))
         let all = [worker, popup]
-        // An explicit empty list matches nothing, where leaving the field out matches everything.
+        // An empty list matches nothing; an absent field matches everything.
         #expect(BridgeContexts.matching(all, filter: ["contextIds": []]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: ["documentUrls": []]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: ["contextTypes": []]).isEmpty)
-        // A document field leaves out a context that has no document.
+        // A document filter skips contexts without a document.
         #expect(BridgeContexts.matching(all, filter: ["documentUrls": [base + "popup.html"]]).map(\.contextID) == ["popup"])
         #expect(BridgeContexts.matching(all, filter: ["documentIds": ["anything"]]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: ["documentOrigins": [origin]]).map(\.contextID) == ["popup"])
@@ -665,12 +709,12 @@ struct ExtensionContextsTests {
         let first = names.name(of: panel, extensionID: "one")
         #expect(names.name(of: panel, extensionID: "one") == first)
         #expect(names.name(of: NSObject(), extensionID: "one") != first)
-        // Two popups showing the same page are two contexts, with two names.
+        // Two popups on the same page are two contexts.
         let url = URL(string: base + "popup.html")!
         let one = PopupPage(url), two = PopupPage(url)
         let oneID = names.name(of: one, extensionID: "one")
         #expect(names.name(of: two, extensionID: "one") != oneID)
-        // A context that closes is forgotten, so one that opens again is a new one.
+        // Closed contexts are forgotten; reopening gives a new ID.
         names.keeping([names.name(of: two, extensionID: "one")], extensionID: "one")
         #expect(names.name(of: one, extensionID: "one") != oneID)
     }
@@ -680,12 +724,12 @@ struct ExtensionContextsTests {
         let first = NSObject(), second = NSObject()
         let firstID = names.name(of: first, extensionID: "one")
         let secondID = names.name(of: second, extensionID: "two")
-        // Two extensions may hold the same page object; their names are their own.
+        // Names are per extension.
         #expect(names.name(of: first, extensionID: "two") != firstID)
-        // One extension's sweep keeps its own live contexts and forgets none of the other's.
+        // One extension's sweep doesn't touch another's.
         names.keeping([firstID], extensionID: "one")
         #expect(names.name(of: second, extensionID: "two") == secondID)
-        // And it does not resurrect the other's closed context either.
+        // Nor revive its closed context.
         names.keeping([], extensionID: "two")
         #expect(names.name(of: second, extensionID: "two") != secondID)
     }
@@ -701,13 +745,12 @@ struct ExtensionContextsTests {
             #expect(context.documentID == nil)
             #expect(context.dictionary["documentId"] == nil)
         }
-        // What can be named is there.
         #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html")
         #expect(panel.dictionary["tabId"] as? Int == 770)
     }
 
     @Test func aPopupKeepsItsQueryString() throws {
-        // The address is the page's own (`WKWebView.url`), not the path `shownPopupPage` gives tab capture.
+        // The URL is `WKWebView.url`, not the path `shownPopupPage` gives tab capture.
         let address = try #require(URL(string: base + "popup.html?tabId=770&view=side"))
         let page = PopupPage(address)
         let names = ContextNames()
@@ -716,7 +759,7 @@ struct ExtensionContextsTests {
         #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html?tabId=770&view=side")
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html?tabId=770&view=side"]]).count == 1)
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html"]]).isEmpty)
-        // Its identity is the page itself, not its address.
+        // Identity is the page object, not its URL.
         #expect(names.name(of: page, extensionID: "one") == popup.contextID)
     }
 }
@@ -853,8 +896,7 @@ struct ExtensionNumberTests {
 }
 
 extension ExtensionBridgeTests {
-    /// A background's WebSocket reaches this Mac, a site its manifest's host_permissions name, or an optional one
-    /// once granted; wss://host counts as https://host.
+    /// Background WebSockets need local, host_permissions, or granted optional hosts; wss://host counts as https://host.
     @Test func backgroundSocketsNeedHostAccess() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -881,7 +923,7 @@ extension ExtensionBridgeTests {
 }
 
 extension ExtensionBridgeTests {
-    /// downloads.search's filenameRegex runs away from the main thread and gives up on a pattern that takes too long.
+    /// downloads.search filenameRegex runs off the main thread with a timeout.
     @Test func downloadSearchPatternsGiveUp() async {
         let names = ["/Users/me/Downloads/report.pdf", "/Users/me/Downloads/photo.png", String(repeating: "a", count: 40) + "!"]
         #expect(await BridgeDownloads.matching(#"\.pdf$"#, in: names) == [0])
@@ -892,7 +934,7 @@ extension ExtensionBridgeTests {
         #expect(Date().timeIntervalSince(started) < 5)
     }
 
-    /// An extension's lines in extensions.log stay one line each, and short.
+    /// Extension log lines stay single-line and short.
     @Test func extensionLogLinesStayShort() {
         #expect(ExtensionLog.entry("socket to example.com closed") == "socket to example.com closed")
         #expect(ExtensionLog.entry("name\n2026-01-01 Zigzag: fake line\r\u{2028}x") == "name 2026-01-01 Zigzag: fake line  x")
@@ -900,11 +942,21 @@ extension ExtensionBridgeTests {
         #expect(long.unicodeScalars.count == ExtensionLog.lineLimit + 1 && long.hasSuffix("…"))
     }
 
-    /// The sound taps take chunks of the size they send, not any a page posts.
+    /// Sound tap chunks are capped at the sent size.
     @Test func tapChunksAreCapped() {
         #expect(BridgeTabCapture.acceptsChunk(pcm: String(repeating: "A", count: 44_000), rate: 48_000))
         #expect(!BridgeTabCapture.acceptsChunk(pcm: String(repeating: "A", count: BridgeTabCapture.maxChunkCharacters + 1), rate: 48_000))
         #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: 0))
         #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: .infinity))
+    }
+
+    /// A per-tab side panel shows there even when off globally (ChatGPT).
+    @Test func sidePanelTabOptionWinsOverEveryTab() {
+        if #available(macOS 15.4, *) {
+            #expect(BridgeSidePanel.isEnabled(everywhere: false, forTab: true))
+            #expect(!BridgeSidePanel.isEnabled(everywhere: true, forTab: false))
+            #expect(!BridgeSidePanel.isEnabled(everywhere: false, forTab: nil))
+            #expect(BridgeSidePanel.isEnabled(everywhere: true, forTab: nil))
+        }
     }
 }

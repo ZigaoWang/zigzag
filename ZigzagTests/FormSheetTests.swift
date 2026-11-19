@@ -38,14 +38,13 @@ struct FormSheetTests {
     }
 
     @Test func tabReachesAFieldNestedBesideItsButton() {
-        // The App and Script rows put their field in a stack with a Choose… button, so the field is not the row
-        // itself; Tab has to find it there all the same.
+        // App and Script rows wrap the field in a stack with a Choose… button; Tab must still find it.
         let field = FilledField(placeholder: "App")
         let stack = NSStackView(views: [field, PillButton(title: "Choose…")])
         let row = FormSheet.Row(label: "App", view: stack)
         let candidates = FormSheet.focusCandidates(rows: [row])
         #expect(candidates.contains { $0 === field.field })
-        // One field, one stop: the row does not also count as itself.
+        // One field, one stop: the row isn't counted too.
         #expect(candidates.filter { $0 === stack }.isEmpty)
 
     }
@@ -64,9 +63,7 @@ struct FormSheetTests {
         #expect(action(53, composing: true) == .pass)
     }
 
-    /// A form whose main button can't be pressed says why, in two places: the words are on the button itself as its
-    /// tooltip, and the pointer over it tells the form's owner to mark the fields holding it up. A live button says
-    /// nothing, so nothing is marked for no reason.
+    /// A form that can't be confirmed puts the reason in the button's tooltip and, on hover, has the owner mark the blocking fields. A live button says nothing.
     @Test func aFormThatCannotBeConfirmedSaysWhatHoldsItUp() throws {
         var confirmable = false
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 320), styleMask: [.borderless], backing: .buffered, defer: false)
@@ -83,13 +80,13 @@ struct FormSheetTests {
         #expect(!confirm.isEnabled)
         #expect(confirm.toolTip == "Give it a name.")
 
-        // The pointer over the dead button: the form hears it, so the owner can mark what is holding it up.
+        // Hovering the disabled button tells the owner to mark the blocking fields.
         confirm.isHovered = true
         #expect(hovered == true)
         confirm.isHovered = false
         #expect(hovered == false)
 
-        // Nothing holding it up: the button is live and has nothing to answer for.
+        // Nothing blocking: live and silent.
         confirmable = true
         sheet.revalidate()
         #expect(confirm.isEnabled)
@@ -98,8 +95,7 @@ struct FormSheetTests {
 }
 
 private extension NSView {
-    /// This view and everything under it of `kind`, outermost first. A test's own copy of the sheet's search: the
-    /// app's is `fileprivate` to the form it serves, and one test is no reason to widen that.
+    /// This view and its descendants of `kind`, outermost first. A copy of the form's `fileprivate` search.
     func selfAndDescendants<T: NSView>(of kind: T.Type) -> [T] {
         ((self as? T).map { [$0] } ?? []) + subviews.flatMap { $0.selfAndDescendants(of: kind) }
     }

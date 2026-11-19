@@ -41,15 +41,14 @@ struct DeveloperModeRowTests {
         }
     }
 
-    /// The waiting dot takes the chip's own corner, and moves to the icon's other top corner while the chip is there,
-    /// so the two states never draw over each other.
+    /// The waiting dot moves to the other top corner while the developer chip shows.
     @MainActor @Test func theWaitingDotKeepsClearOfTheDeveloperChip() {
         for side: CGFloat in [14, 16, 18, 20, 22] {
             #expect(FaviconView.attentionFrame(side: side, overBadge: false) == FaviconView.badgeFrame(side: side))
             let clear = FaviconView.attentionFrame(side: side, overBadge: true)
             #expect(clear.size == FaviconView.badgeFrame(side: side).size)
             #expect(clear.intersects(FaviconView.badgeFrame(side: side)) == false)
-            // Mirrored to the top corner: same trailing edge, above the icon's middle.
+            // Mirrored: same trailing edge, above the icon's middle.
             #expect(clear.minX == FaviconView.badgeFrame(side: side).minX)
             #expect(clear.minY > side - clear.height - 3.5 && clear.minY < side)
         }

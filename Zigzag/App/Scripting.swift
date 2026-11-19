@@ -39,9 +39,8 @@ enum Scripting {
     /// The window in front, for a command that names no tab or window.
     static var frontWindow: BrowserWindowController? { windows.first }
 
-    /// A window's tabs as a script lists them, in the sidebar's order: the favorites' open pages, then space by space
-    /// its pinned tabs' open pages and its tabs. While windows share their tabs (#162), a window lists those that are
-    /// in it, the ones it has on screen or last had, so each tab is listed once.
+    /// A window's tabs in sidebar order. With shared tabs (#162), only the ones this window shows or last showed, so
+    /// each is listed once.
     static func tabs(of manager: TabManager) -> [Tab] {
         let all = ordered(favorites: Library.shared.favorites.map(\.id),
                           spaces: Library.shared.spaces.map { ($0.id, $0.bookmarks.map(\.id)) },

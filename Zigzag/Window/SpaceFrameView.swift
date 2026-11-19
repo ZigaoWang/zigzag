@@ -23,12 +23,7 @@ class SpaceFrameView: ColorView {
                 window?.appearance = name.flatMap(NSAppearance.init(named:))
             }
         }
-        // Reduce Transparency in System Settings: a see-through space shows its color solid instead.
-        let clear = !isPrivate && space.isSeeThrough && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-        // Solid, the space's own color at full strength; see-through, thinned over the frosting.
-        let reduced = space.isSeeThrough && !clear
-        let color = isPrivate ? SpaceColor.graphite.background : reduced ? space.background : space.frameColor
-        let end = isPrivate ? nil : reduced ? space.background2 : space.frameColor2
+        let (color, end, clear) = Self.frameColors(of: space, isPrivate: isPrivate)
         // See-through: the window lets the frosted desktop through, and the space's color washes over it, thinner the
         // more shows.
         window?.isOpaque = !clear
@@ -39,6 +34,36 @@ class SpaceFrameView: ColorView {
         setColor(clear ? .clear : color, animated: animated, duration: Tokens.Motion.large)
         setGradient(from: color, to: clear ? end ?? color : end, angle: space.gradientAngle, animated: animated)
         setGrain(isPrivate ? 0 : space.grain ?? 0, animated: animated)
+        return (color, end)
+    }
+
+    /// What a space lays on the frame: its color, where its gradient ends, and whether the desktop shows through.
+    static func frameColors(of space: SpaceInfo, isPrivate: Bool) -> (color: NSColor, end: NSColor?, clear: Bool) {
+        // Reduce Transparency in System Settings: a see-through space shows its color solid instead.
+        let clear = !isPrivate && space.isSeeThrough && !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        // Solid, the space's own color at full strength; see-through, thinned over the frosting.
+        let reduced = space.isSeeThrough && !clear
+        let color = isPrivate ? SpaceColor.graphite.background : reduced ? space.background : space.frameColor
+        let end = isPrivate ? nil : reduced ? space.background2 : space.frameColor2
+        return (color, end, clear)
+    }
+
+    /// Partway through a swipe: `space`'s color, gradient and grain `share` of the way to `next`'s, following the
+    /// fingers. The mode and the glass stay `space`'s until the switch lands, so nothing restyles mid-swipe.
+    @discardableResult
+    func paint(_ space: SpaceInfo, toward next: SpaceInfo, share: CGFloat) -> (color: NSColor, end: NSColor?) {
+        let a = Self.frameColors(of: space, isPrivate: false), b = Self.frameColors(of: next, isPrivate: false)
+        let color = SpaceInfo.mix(a.color, b.color, by: share)
+        let end = a.end == nil && b.end == nil ? nil : SpaceInfo.mix(a.end ?? a.color, b.end ?? b.color, by: share)
+        // A fade still running from the last switch would hold its color over this one.
+        layer?.removeAnimation(forKey: "backgroundColor")
+        gradientLayer.removeAllAnimations()
+        grainLayer.removeAllAnimations()
+        if a.clear { setGlass(true, clear: space.usesClearGlass, tint: SpaceInfo.mix(space.frameColor, next.frameColor, by: share)) }
+        setColor(a.clear ? .clear : color, animated: false)
+        setGradient(from: color, to: a.clear ? end ?? color : end, angle: share < 0.5 ? space.gradientAngle : next.gradientAngle, animated: false)
+        let t = Double(min(max(share, 0), 1))
+        setGrain((space.grain ?? 0) * (1 - t) + (next.grain ?? 0) * t, animated: false)
         return (color, end)
     }
 

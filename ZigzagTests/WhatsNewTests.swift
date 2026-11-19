@@ -222,8 +222,7 @@ struct WhatsNewTests {
         }
     }
 
-    /// The notes go when another tab or space comes in front, not on every "selection" the tabs send: a split's
-    /// other pane closing behind them keeps the same tab in front.
+    /// Notes close when another tab or space comes forward, not on every selection event; closing a split's other pane keeps the same tab in front.
     @Test func notesStayWhileTheSameTabIsInFront() {
         let space = Library.shared.spaces[0].id
         let manager = TabManager(spaceID: space)

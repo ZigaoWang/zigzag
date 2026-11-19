@@ -14,15 +14,14 @@ protocol TabHost: AnyObject {
     func tabWantsToBeShown(_ tab: Tab)
     /// Swiped back or forward in its page: in a split, that page becomes the one you're in, as a click on it would.
     func tabWantsFocus(_ tab: Tab)
-    /// A link you clicked or opened in a new tab: true when a route sent it to another space (#286), which opened
-    /// it there, so the page here stays as it is. Only a browser window routes.
+    /// True when a route (#286) opened the link in another space. Only browser windows route.
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool
 }
 
 extension TabHost {
     func tabWantsFocus(_ tab: Tab) {}
     func tab(_ tab: Tab, routesLink url: URL, arrival: SiteRoutes.Arrival, inBackground: Bool) -> Bool { false }
-    /// Sends a tab to an address without naming who sent it: a page's own link, and every caller but a rule.
+    /// Loads an address with no sender: page links and every caller except a rule.
     func tab(_ tab: Tab, openURL url: URL, disposition: OpenDisposition) {
         self.tab(tab, openURL: url, disposition: disposition, by: .page)
     }
@@ -76,14 +75,13 @@ final class Tab: NSObject {
     var parentID: UUID?
     /// The tabs under this one are folded away in the sidebar.
     var isCollapsed = false
-    /// The group of tabs it's in (#209); nil for none. Pinned pages and favorites never have one. TabManager keeps it
-    /// right (see TabGroups).
+    /// Its tab group (#209), or nil. Pinned tabs and favorites never have one; TabManager maintains it (see TabGroups).
     var groupID: UUID?
 
     private(set) var url: URL? {
         didSet {
             refreshDevelopment()
-            // Another site can have an icon of its own (`SiteIcons`).
+            // A new site may have its own icon (`SiteIcons`).
             if SiteIcons.site(of: url) != SiteIcons.site(of: oldValue) { refreshChosenIcon() }
         }
     }
@@ -134,14 +132,13 @@ final class Tab: NSObject {
     private var pageIsGet = true
     /// The main frame's last response was a PDF, at this address: known before the page can be asked.
     private var pdfResponseURL: URL?
-    /// The name that response gave the PDF (`Content-Disposition`), if it gave one.
+    /// The PDF name from `Content-Disposition`, if any.
     private var pdfResponseName: String?
-    /// That response said the PDF is bigger than Zigzag's viewer takes: WebKit's own viewer shows it, and its bytes
-    /// are never copied into the app or fetched again.
+    /// The PDF is over Zigzag's viewer limit: WebKit's viewer shows it and its bytes are never copied or refetched.
     private var pdfResponseTooLarge = false
     /// Settings, over the page while the tab is at zigzag://settings; nil for any other page.
     private(set) var settingsView: SettingsView?
-    /// Reader's article, while it covers this tab's page: the tab's picture is of it, as you see it.
+    /// Reader's web view while it covers the page; snapshots use it.
     weak var readerWebView: WKWebView?
     /// The profile Settings was asked to show before this tab had its page: shown once it has.
     private var settingsProfileAsked: UUID?
@@ -151,8 +148,8 @@ final class Tab: NSObject {
     private(set) var snapshot: NSImage? {
         didSet { snapshotIsDark = snapshot == nil ? nil : webView?.effectiveAppearance.isDark }
     }
-    /// Whether the page was dark (the app's appearance) when its picture was taken; nil when that isn't known, as
-    /// for a picture read back from disk. A picture taken in the other appearance is stale: the overview retakes it.
+    /// Whether the app was dark when the snapshot was taken; nil when unknown (read from disk). A mismatch makes it
+    /// stale.
     private(set) var snapshotIsDark: Bool?
     var lastActivated: Date
     let createdAt: Date
@@ -241,11 +238,9 @@ final class Tab: NSObject {
     /// What you answered the page's questions (camera, location, notifications) while it's open: asked again once
     /// it loads another page or reloads, as a site set to Ask is.
     var permissionAnswers = PagePermissionAnswers()
-    /// WebRTC allowed or blocked for a site in this tab alone, by origin: a private window's choice, never kept
-    /// (`WebRTCProtection`).
+    /// Per-tab WebRTC choice by origin, for private windows; never saved (`WebRTCProtection`).
     var webRTCHere: [String: Bool] = [:]
-    /// JavaScript allowed or not for a site in this tab alone, by site: a private window's choice, never kept
-    /// (`SiteJavaScript`).
+    /// Per-tab JavaScript choice by site, for private windows; never saved (`SiteJavaScript`).
     var javaScriptHere: [String: Bool] = [:]
     /// From a site you've let send notifications: kept awake and out of the archive, so they keep coming.
     var notifiesUser: Bool {
@@ -260,19 +255,16 @@ final class Tab: NSObject {
     /// it, as Safari and Chrome do.
     var returnsToOpener: Bool {
         guard !canGoBack, !isPeek, bookmarkID == nil, let opener, !opener.isClosed else { return false }
-        // Dragged into another window, the page it came from is no longer beside it. (Windows sharing their tabs
-        // list it beside it all the same, #162.)
+        // In another window the opener is no longer beside it (shared tabs still count, #162).
         return opener.spaceID == spaceID && (opener.host === host || (store != nil && opener.store === store))
     }
     var canGoBackOrReturn: Bool { canGoBack || returnsToOpener }
 
-    /// The window it belongs to: the one that made it, or, while windows share their tabs (#162), the one that last
-    /// showed it. Its links open there, and extensions see it there.
+    /// The window that made it, or with shared tabs (#162) the one that last showed it. Links and extensions use it.
     weak var host: TabHost?
-    /// The tabs it's among (`TabStore`): its window's, or every window's while windows share their tabs.
+    /// Its `TabStore`: the window's, or the shared one.
     weak var store: TabStore?
-    /// While windows share their tabs (#162): the window that has its page on screen, or last had. Another window on
-    /// this tab shows that it's there.
+    /// With shared tabs (#162): the window showing its page now or last.
     weak var shownBy: TabManager?
     /// When its page last stopped unexpectedly, to tell a one-off from a page that keeps stopping.
     private var crashes: [Date] = []
@@ -291,9 +283,8 @@ final class Tab: NSObject {
     private var certificateWarningNonce: String?
     let changed = Signal<Change>()
 
-    /// The page showing came with a certificate you chose to trust on the warning page ("Visit anyway"): the
-    /// connection is not secure, and the address and Site Controls say so for as long as it's in use, after the
-    /// choice runs out too.
+    /// The page uses a certificate trusted via "Visit anyway": shown as not secure while in use, even after the
+    /// exception expires.
     var usesCertificateException: Bool { CertificateExceptions.isShowingException(in: webView) }
 
     #if DEBUG
@@ -383,15 +374,14 @@ final class Tab: NSObject {
     var landingUntil: Date?
     var pinnedLanding: URL?
 
-    /// Pinned or made a favorite while its page is still on its way: where that load ends up (a redirect, as
-    /// en.wikipedia.org to its Main Page) counts as the saved page too, as when a pinned page is opened. However long
-    /// the load takes, then the usual while after it, for a page that sends itself on.
+    /// Pinned while loading: the final URL after redirects (e.g. en.wikipedia.org to its Main Page) also counts as the
+    /// saved page, until the load ends plus the usual grace period.
     func settleLandingIfLoading() {
         guard isLoading else { return }
         landingUntil = .distantFuture
     }
 
-    /// Where the page is, as it lands, while a pinned page is settling in (`landingUntil`).
+    /// Records the URL while a pinned page settles (`landingUntil`).
     private func noteLanding(_ url: URL?) {
         if let until = landingUntil, Date() < until, let url { pinnedLanding = url }
     }
@@ -399,8 +389,7 @@ final class Tab: NSObject {
     /// An icon you gave the tab (an SF Symbol's name, or an emoji), drawn instead of its site's. The page of a pinned
     /// tab or a favorite shows that one's icon instead (`chosenIcon`).
     var customIcon: String? { didSet { if oldValue != customIcon { refreshChosenIcon() } } }
-    /// The icon you chose that stands for it, or the one set for its site (`SiteIcons`), or nil for the site's own.
-    /// Kept up to date (`refreshChosenIcon`), and says `.favicon` when it changes, as a new site icon does.
+    /// The chosen icon, or the site's (`SiteIcons`); nil for the favicon. Posts `.favicon` on change.
     private(set) var chosenIcon: String?
 
     /// A development tab (#141): Developer tools is on and the page it shows is on a site you develop
@@ -424,8 +413,7 @@ final class Tab: NSObject {
         if settingsChanged, developer.needsReload(from: DeveloperState()) { reloadForDeveloperChoices() }
     }
 
-    /// Loads the page again for a change to what the developer tools chose for it, unless it waits for the rule
-    /// that keeps its images off (`PageImages.defersReload`), which loads it again once the rule is in.
+    /// Reloads for a developer tools change, unless `PageImages.defersReload` reloads once the rule is in.
     private func reloadForDeveloperChoices() {
         if let webView, PageImages.defersReload(of: webView) { return }
         reload()
@@ -448,9 +436,7 @@ final class Tab: NSObject {
         }
     }
 
-    /// Disable Images is one choice for a page and the tabs it opened, or that opened it: they share the rule that
-    /// keeps their images off (`PageImages`). Turned on or off here, it is in each of them too, and their pages load
-    /// again as this one does.
+    /// Disable Images is shared with the tabs this one opened or was opened by (`PageImages`); they reload too.
     private func shareImagesChoice() {
         guard let webView else { return }
         for other in PageImages.sharing(with: webView) {
@@ -487,8 +473,7 @@ final class Tab: NSObject {
         changed.send(.favicon)
     }
 
-    /// A pinned page's or favorite's page shows the icon given to that page, whatever the tab had of its own; any
-    /// other tab shows its own. Without one, the icon set for its site (`site`), if any.
+    /// A pinned tab or favorite uses its bookmark's icon; other tabs their own; else the site's icon.
     static func chosenIcon(own: String?, bookmarkID: UUID?, site: String? = nil, bookmark: (UUID) -> Bookmark?) -> String? {
         guard let bookmarkID else { return own ?? site }
         return bookmark(bookmarkID)?.icon ?? site
@@ -527,7 +512,7 @@ final class Tab: NSObject {
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
         let configuration = pendingConfiguration ?? extensionConfiguration ?? WebKitSetup.makeConfiguration(for: profile)
         pendingConfiguration = nil
-        // A page's new window would share its opener's preferences otherwise: its WebRTC switch, its styles.
+        // Otherwise a page's new window shares its opener's preferences (WebRTC, styles).
         if fromWebKit { WebKitSetup.separatePreferences(of: configuration) }
         if extensionConfiguration != nil {
             configuration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
@@ -597,8 +582,7 @@ final class Tab: NSObject {
         DarkPages.attach(to: webView)
         PageFullScreen.attach(to: webView)
         PageImages.join(webView)
-        // A page another opened shares its images rule: it starts with that page's Disable Images, so its menu says
-        // what its pages get (`shareImagesChoice`).
+        // A page opened by another inherits its Disable Images (`shareImagesChoice`).
         if fromWebKit, !developer.imagesOff,
            PageImages.sharing(with: webView).contains(where: { ($0 as? BrowserWebView)?.owner?.developer.imagesOff == true }) {
             developer.imagesOff = true
@@ -651,8 +635,7 @@ final class Tab: NSObject {
         guard sleepTicket == ticket, self.webView === webView else { return }
         sleepTicket += 1
         guard state?.hasTypedText != true else { return }
-        // A page on its way (a site sending it on after the Mac wakes) is let finish: the next look tries again (#305).
-        // Not one stuck in a loop.
+        // Let a loading page finish (a redirect after wake, #305); retry next time. Not one stuck in a loop.
         guard !webView.isLoading || reason == EnergyWatch.sleepReason else { return }
         captureSnapshot { [weak self] in
             guard let self, self.webView === webView else { return }
@@ -731,7 +714,7 @@ final class Tab: NSObject {
 
     private func tearDown(_ webView: BrowserWebView) {
         Autofill.shared.forget(webView)
-        // The pages it shared its rules with keep their images.
+        // Tabs that shared the rule keep their images.
         PageImages.set(false, in: webView)
         setPDFViewer(nil)
         if settingsView != nil {
@@ -782,8 +765,8 @@ final class Tab: NSObject {
         changed.send(.language)
     }
 
-    /// `httpFallback`: `url` is https Zigzag chose for an address given without a scheme, so if it can't be reached
-    /// the same address goes over http, once (`CommandRanker.Destination`).
+    /// `httpFallback`: `url` is https chosen for a scheme-less address; retry once over http if unreachable
+    /// (`CommandRanker.Destination`).
     func load(_ url: URL, by sender: LoadSender = .zigzag, httpFallback: Bool = false) {
         leavePage(for: url)
         // Extension pages and websites need differently set up web views; crossing over swaps it.
@@ -791,7 +774,7 @@ final class Tab: NSObject {
             self.url = url
             changed.send(.url)
             tearDown(webView)
-            // The new web view loads it as its first load, for whoever sent it.
+            // The new web view loads it first, with this sender.
             firstLoad = FirstLoad(sender: sender, httpFallback: httpFallback)
             ensureWebView()
             return
@@ -816,15 +799,13 @@ final class Tab: NSObject {
         case zigzag
         /// A page: its window.open(), a link it opened in a new tab or a card, a link in its article or PDF.
         case page
-        /// A download rule, opening the address its action asked for. A load with this one on it is never caught by a
-        /// rule again, so a rule can't take what it just opened — the address would otherwise go round for ever.
+        /// A download rule opening its action's address. Rules never catch this load, or it would loop.
         case rule
     }
 
-    /// What a page may send a tab to on its own: only the web. An app's link goes to ExternalLinks, which asks (and
-    /// holds to the site's Block); a file on your Mac, a script address, an extension's page or one of Zigzag's own
-    /// is refused, except a local page linking to another file beside it. So is a data: address: WebKit keeps a page
-    /// from opening one as a page of its own, and Zigzag loading it (⌘-click, Peek) would get it past that.
+    /// Where a page may navigate a tab on its own: only the web. App links go to ExternalLinks (which asks); local
+    /// files, javascript:, extension and Zigzag pages are refused, except a local page linking to a file beside it.
+    /// data: too: WebKit blocks top-level data: navigation and loading it ourselves (⌘-click, Peek) would bypass that.
     enum PageLinkRoute: Equatable { case load, app, refuse }
 
     static func route(forPageLink url: URL, from page: URL?) -> PageLinkRoute {
@@ -865,54 +846,46 @@ final class Tab: NSObject {
     /// Its web view was made by WebKit for a page's new window, so that page (its opener) can script it: every
     /// address it goes to waits until it commits, Zigzag's own loads too.
     private var openedByPage = false
-    /// Zigzag itself is loading this tab (the address bar, a link from elsewhere): its address shows at once. `.you`
-    /// when you typed or chose it, so an app's link opens without asking. Never `.page`: a page's own load is nil.
-    /// Carries the address it was for: only the main frame's decision for that address is Zigzag's (or yours), never
-    /// one the page had on its way when you pressed Return.
+    /// Zigzag's own pending load (address bar, external link), so its address shows at once. `.you` for typed or chosen
+    /// addresses, so app links open without asking. Never `.page`. Only the main-frame decision for this URL counts.
     private var ownLoadPending: OwnLoad?
-    /// True while the page in this tab got here because a download rule opened it: that rule must not take the
-    /// navigation it just made, and that includes a download the navigation turns into. Cleared when the page
-    /// commits, fails, or becomes a download.
+    /// True while the page was opened by a download rule, so the rule can't take that navigation or its download.
+    /// Cleared on commit, failure or download.
     private var openedByRule = false
-    /// The address a download rule last sent this tab to. A navigation that fails is often only the one the rule's
-    /// own load replaced, which would clear `openedByRule` while the rule's load is still on its way; this outlives
-    /// that, so the address the rule opened is never offered to a rule again until a page arrives here.
+    /// The last address a download rule opened. Outlives `openedByRule`, which a failed replaced navigation can clear
+    /// early.
     private var ruleOpenedURL: URL?
-    /// The address whose handoff question was last put off in this tab. A link put off loads, and when it turns out
-    /// to be a file its response and its download would otherwise ask the same question again.
+    /// The address whose handoff question was last declined, so its response and download don't ask again.
     private var ruleDeclinedURL: URL?
-    /// True when the handoff question for this navigation or download was put off. WebKit still makes the download,
-    /// and the download manager must not put the same question up a second time for it.
+    /// The handoff question was declined; the download manager must not ask again for WebKit's download.
     private var declinedRuleDownload = false
     struct OwnLoad: Equatable {
         let sender: LoadSender
         let url: URL
     }
-    /// How the address this tab was made with is loaded when its web view is: who it came from (a link a page opened
-    /// in a new tab is the page's), and whether it may go over http if https can't reach it.
+    /// How the tab's initial address loads: the sender (a page's new-tab link is the page's) and whether http fallback
+    /// applies.
     var firstLoad = FirstLoad()
     struct FirstLoad: Equatable {
         var sender: LoadSender = .zigzag
         /// An address given without a scheme (`CommandRanker.Destination`).
         var httpFallback = false
     }
-    /// The address over http this tab tries once if the one it's loading over https can't be reached, for an address
-    /// you gave Zigzag without a scheme (`CommandRanker.Destination`), as other browsers do. It belongs to that
-    /// address: a load of another one, the main frame's next decision for another one (a redirect, a page's own
-    /// navigation, Back), or a page arriving ends it, so it never stands in for a navigation it wasn't given for.
+    /// One-time http retry for a scheme-less address loaded over https (`CommandRanker.Destination`), as other browsers
+    /// do. Ends on another load, a main-frame decision for another URL, or a commit.
     private var pendingHTTPFallback: HTTPFallback?
     struct HTTPFallback: Equatable {
         /// The address tried first.
         let secure: URL
         /// The same address over http.
         let plain: URL
-        /// Who sent the load, who sends the one over http too.
+        /// The sender, reused for the http load.
         let sender: LoadSender
     }
     /// Where Zigzag itself is taking this tab back or forward (its buttons, a swipe, the keyboard, restored history):
     /// the only Back or Forward that may land on one of Zigzag's own pages. A page's history.back() may not.
     private var ownHistoryTarget: URL?
-    /// What its pages may save, and which responses are shown (the same as a pop-up window's).
+    /// Download policy for its pages (same as pop-up windows').
     private let downloads = DownloadPolicy()
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
@@ -962,10 +935,8 @@ final class Tab: NSObject {
         load(url, in: webView, by: .zigzag)
     }
 
-    /// Loads a page in this tab's web view for `sender`: only Zigzag's own loads, and yours, count as its own.
-    /// `httpFallback`: try the same address over http once if this one, over https, can't be reached. Without it, a
-    /// fallback already pending holds only for the same address (loaded again: asked for as another browser, after
-    /// a crash).
+    /// `httpFallback`: retry once over http if https is unreachable. Without it, a pending fallback holds only for the
+    /// same address (a reload).
     private func load(_ url: URL, in webView: WKWebView, by sender: LoadSender, httpFallback: Bool = false) {
         ownLoadPending = sender == .page ? nil : OwnLoad(sender: sender, url: url)
         if httpFallback {
@@ -976,25 +947,22 @@ final class Tab: NSObject {
         Self.load(url, in: webView)
     }
 
-    /// Who sent the main frame's navigation to `request`: Zigzag's (or your) pending load only when it's for that
-    /// very address. WebKit may tidy the address on the way (a lowercased host, a "/" for an empty path, no :443,
-    /// no "." or ".." in the path).
+    /// The sender of a main-frame navigation: the pending own load only if it's for the same URL. WebKit may normalize
+    /// it (lowercase host, "/" path, no :443, no dot segments).
     static func ownSender(of pending: OwnLoad?, for request: URL?) -> LoadSender? {
         guard let pending, let request else { return nil }
         return sameAddress(pending.url, request) ? pending.sender : nil
     }
 
-    /// The address over http to go to instead, when the load `pending` was for failed the way a server that doesn't
-    /// speak https fails (`ErrorPage.fallsBackToHTTP`): at the address it was for (WebKit may have tidied it), never
-    /// after a redirect elsewhere, and never for a site that asked to be reached only securely (HSTS), which WebKit
-    /// would take back to https anyway. Nil otherwise, and the error page shows.
+    /// The http URL to retry after a failure that looks like a server without https (`ErrorPage.fallsBackToHTTP`), only
+    /// at the original address and never for HSTS sites (WebKit would upgrade anyway). Nil shows the error page.
     static func fallbackURL(for pending: HTTPFallback?, after error: NSError, failing: URL?, strictTransport: Bool) -> URL? {
         guard let pending, let failing, failing.scheme?.lowercased() == "https", sameAddress(pending.secure, failing), !strictTransport,
               ErrorPage.fallsBackToHTTP(ErrorPage.kind(of: error, url: failing)) else { return nil }
         return pending.plain
     }
 
-    /// An https address as http, the rest of it as it was (port, path, query, fragment); nil for any other.
+    /// The https URL as http, otherwise unchanged; nil for other schemes.
     static func overHTTP(_ url: URL) -> URL? {
         guard url.scheme?.lowercased() == "https", var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         parts.scheme = "http"
@@ -1018,7 +986,7 @@ final class Tab: NSObject {
         return left == right
     }
 
-    /// A path with its "." and ".." taken out, as a browser does before it asks (RFC 3986, 5.2.4).
+    /// Removes "." and ".." segments (RFC 3986, 5.2.4).
     nonisolated static func withoutDotSegments(_ path: String) -> String {
         var output: [Substring] = []
         let segments = path.split(separator: "/", omittingEmptySubsequences: false)
@@ -1080,10 +1048,8 @@ final class Tab: NSObject {
         }
     }
 
-    /// What a local page may read: its folder, for its pictures and styles beside it. Not when it sits loose in
-    /// Downloads, or the folder Settings saves downloads to, which hold everything you've ever downloaded: there
-    /// only the file, unless it was saved as a whole page with its "_files" folder. Nor when it sits in your home
-    /// folder, or above it (`/`, /Users): its folder would be every file you have.
+    /// Read access for a local page: its folder. For files loose in Downloads or the download folder, only the file
+    /// (unless a saved page with "_files"). Never the home folder or above.
     static func readAccess(for file: URL, downloadFolders: [URL] = Tab.downloadFolders,
                            home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)) -> URL {
         let folder = file.deletingLastPathComponent()
@@ -1109,8 +1075,8 @@ final class Tab: NSObject {
         let changedPage = url != self.url
         self.url = url
         self.navigatedSinceSave = true
-        // A page that changes its address without loading (YouTube, GitHub, Gmail) goes in history too, but not as a
-        // visit: the page did it, and could do it a hundred times to rank itself first when you type.
+        // Same-document URL changes (YouTube, GitHub, Gmail) go in history but don't count as visits, so a page can't
+        // boost its own ranking.
         if changedPage, !wv.isLoading { self.recordHistory(url, title: nil, countsVisit: false) }
         // Its language too, once the new page has drawn: it never finishes loading to be read then (#218).
         if changedPage, !wv.isLoading { self.checkLanguage(of: wv, after: 1.5) }
@@ -1160,8 +1126,8 @@ final class Tab: NSObject {
             if let now = webView.setPageAudioMuted(muted) {
                 isMuted = now
             } else {
-                // No page muting in this WebKit: each sound the page plays, now and later, is muted instead.
-                // In the world the document-start part runs in, where the page can't redefine what it calls.
+                // This WebKit has no page muting, so each media element is muted instead, in the document-start world
+                // where the page can't override it.
                 webView.runOwnScript(Self.elementMuting(muted))
                 isMuted = muted
             }
@@ -1226,14 +1192,14 @@ final class Tab: NSObject {
         // Settings likewise: the picture is of what covers the page, not the empty page under it.
         if let image = pdfViewer.flatMap({ $0.window != nil ? $0.snapshot() : nil }) ?? settingsView.flatMap({ $0.window != nil ? $0.snapshot() : nil }) {
             snapshot = image
-            // In the window's look, as what covers the page draws.
+            // Window appearance, as covering views draw in it.
             snapshotIsDark = webView.window?.effectiveAppearance.isDark
             if keep, !isPrivate { SnapshotStore.save(image, for: id) }
             changed.send(.snapshot)
             completion?()
             return
         }
-        // In Reader, the article over the page is what you see, so the switcher and the tab overview show it.
+        // In Reader, snapshot the article.
         let shown = readerWebView.flatMap { $0.window != nil && $0.bounds.width > 0 ? $0 : nil } ?? webView
         let config = WKSnapshotConfiguration()
         config.afterScreenUpdates = false
@@ -1253,8 +1219,8 @@ final class Tab: NSObject {
     /// only in a window. Its holder is put in `host` for a moment, at `size`, under everything else, to be drawn and
     /// pictured, then let go, unless something else took it meanwhile (you went to its tab).
     func captureSnapshotOutOfSight(in host: NSView, size: NSSize, _ completion: @escaping () -> Void) {
-        // Settings or Zigzag's PDF viewer, over the page: pictured as it is, set in the window for a moment, so it
-        // draws in the window's light or dark.
+        // Settings or the PDF viewer over the page: briefly placed in the window so it draws in the window's
+        // appearance.
         let cover: NSView? = pdfViewer ?? settingsView
         if let cover, cover.window == nil, host.window != nil, size.width > 0, size.height > 0 {
             let home = cover.superview, frame = cover.frame, resizing = cover.autoresizingMask
@@ -1297,8 +1263,7 @@ final class Tab: NSObject {
         // A moment in the window first, for it to draw.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak webView] in
             guard let self, let webView, webView.window != nil else { letGo(); completion(); return }
-            // The look the page was drawn in, read while it's in the window: its own (Dark Pages sets one), or
-            // without one the window's, which it no longer has once let go.
+            // Read while still in the window: the page's own appearance (Dark Pages sets one) or the window's.
             let dark = webView.effectiveAppearance.isDark
             webView.takeSnapshot(with: config) { [weak self] image, _ in
                 letGo()
@@ -1319,14 +1284,13 @@ final class Tab: NSObject {
         hasWebView && !onScreen && loaded && !hasPicture
     }
 
-    /// Whether the picture was taken in the other appearance (light or dark) from `dark`, so it no longer shows the
-    /// page as it looks now. Unknown counts as current.
+    /// Whether the snapshot was taken in the other appearance. Unknown counts as current.
     nonisolated static func pictureIsStale(takenDark: Bool?, dark: Bool) -> Bool {
         takenDark.map { $0 != dark } ?? false
     }
 
-    /// Against the look the tab draws in now: a page its own (the app's light or dark, or Dark Pages'), whatever the
-    /// window's (a private window is always dark); Settings or the PDF viewer over it, the window's, `windowDark`.
+    /// Compared with the page's appearance (app or Dark Pages), or the window's when Settings or the PDF viewer covers
+    /// it.
     func snapshotIsStale(windowDark: Bool) -> Bool {
         let covered = pdfViewer != nil || settingsView != nil
         let dark = covered ? windowDark : webView?.effectiveAppearance.isDark ?? windowDark
@@ -1345,18 +1309,17 @@ final class Tab: NSObject {
     /// Only showing an error page ("Can't find…") for where it tried to go: there's no page to go back to.
     var showsErrorPage: Bool { url != nil && url == errorShownFor }
 
-    /// `countsVisit`: false for an address the page changed itself without loading, which is kept (with when you were
-    /// there) but adds nothing to how high it ranks when you type.
+    /// `countsVisit`: false for same-document URL changes; kept in history without raising its rank.
     private func recordHistory(_ url: URL, title: String?, countsVisit: Bool = true) {
         // Zigzag's own pages (History, Settings) aren't visits, and neither is a page that failed to load.
         guard !isPrivate, url != lastRecorded, url != errorShownFor, !HistoryPage.isInternal(url) else { return }
         lastRecorded = url
-        // A PDF has no title of its own: it goes by the name it came with, as its tab does (`pdfName`).
+        // PDFs have no title; use the response name (`pdfName`).
         let named = (title ?? "").isEmpty && pdfResponseURL == url ? pdfName(of: url) : title
         profile.history.recordVisit(url: url, title: named, count: Self.visitCount(countsVisit: countsVisit))
     }
 
-    /// What a page counts for in History's ranking: a load is a visit; an address the page changed itself, none.
+    /// 1 for a load, 0 for a same-document change.
     static func visitCount(countsVisit: Bool) -> Int { countsVisit ? 1 : 0 }
 
     // MARK: Observation
@@ -1399,8 +1362,7 @@ final class Tab: NSObject {
                     self.isLoading = wv.isLoading
                     // Nothing on its way any more (a download, a load that stopped without a word).
                     if !wv.isLoading { self.isLeavingPage = false }
-                    // The load it was pinned during is over, however it ended: the usual while for a page that sends
-                    // itself on (`settleLandingIfLoading`).
+                    // Load ended: start the usual grace period (`settleLandingIfLoading`).
                     if !wv.isLoading, self.landingUntil == .distantFuture { self.landingUntil = Date().addingTimeInterval(8) }
                     self.changed.send(.loading)
                     // Back and Forward can bring a PDF back from memory without a finished load: check here too.
@@ -1471,11 +1433,10 @@ final class Tab: NSObject {
     /// The page last committed here: the site the tab's icon belongs to.
     private var committedURL: URL? { didSet { refreshDevelopment() } }
 
-    /// What a tab wears while an error page ("This Connection Isn't Private", "Can't find…") stands in for its page:
-    /// a warning, never the icon of the page that was there before, nor the site's own, as if it had loaded.
+    /// Tab icon while an error page is shown: a warning, never the previous page's or site's icon.
     static let errorPageIcon = Tokens.Symbol.image("exclamationmark.triangle", size: Tokens.Symbol.row)
 
-    /// The icon a page wears straight away: the warning on an error page, else the one kept for its site.
+    /// Warning for an error page, else the site's cached icon.
     static func immediateIcon(for url: URL, errorPage: Bool) -> NSImage? {
         errorPage ? errorPageIcon : FaviconStore.shared.cachedIcon(for: url)
     }
@@ -1495,7 +1456,7 @@ final class Tab: NSObject {
 
     fileprivate func refreshFavicon() {
         guard let webView, let pageURL = webView.url else { return }
-        // An error page has no icon of its own to look for; the warning stays.
+        // Error pages keep the warning.
         if showsErrorPage {
             favicon = Self.immediateIcon(for: pageURL, errorPage: true)
             changed.send(.favicon)
@@ -1527,18 +1488,15 @@ final class Tab: NSObject {
 extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
-        // Zigzag's own load is over with the main frame's next decision, whatever it is (WebKit may have tidied the
-        // address past matching, or put an error page in its place), so it's never left waiting. Only a decision for
-        // its address counts as its own, whatever comes of it (a download, an app's link): never one the page had on
-        // its way.
+        // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
+        // own.
         let decidesMainFrame = navigationAction.targetFrame?.isMainFrame == true
         let ownSender = decidesMainFrame ? Self.ownSender(of: ownLoadPending, for: navigationAction.request.url) : nil
         let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
-            // A download this page or its rule already asked about is not asked twice. A load a rule opened is the
-            // rule's own page, so no rule may take it, whether it becomes a page or a download. A new navigation the
-            // page or you start clears that; a redirect keeps it.
+            // Reset per navigation; redirects keep it. A rule's own load can't be taken by a rule, as a page or a
+            // download.
             declinedRuleDownload = false
             if ownSender == .rule {
                 openedByRule = true
@@ -1546,39 +1504,37 @@ extension Tab: WKNavigationDelegate {
             } else if [.linkActivated, .formSubmitted, .backForward, .reload].contains(navigationAction.navigationType) {
                 openedByRule = false
             }
-            // A link clicked again is a new question, even for the address that was put off a moment ago.
+            // A new click re-asks even for a just-declined address.
             if userInitiated, navigationAction.navigationType == .linkActivated { ruleDeclinedURL = nil }
             ownLoadPending = nil
             ownHistoryTarget = nil
-            // A fallback over http is for the address it was given for: any other the main frame goes to ends it.
+            // The http fallback ends when the main frame goes elsewhere.
             if let pending = pendingHTTPFallback, !(navigationAction.request.url.map { Self.sameAddress(pending.secure, $0) } ?? false) {
                 pendingHTTPFallback = nil
             }
         }
-        // A download link you click saves. One a script starts on its own saves too (an export that's ready), but not
-        // a stream of them (`DownloadPolicy`, the same as a pop-up window's). A click inside a frame lets that frame
-        // hand over a file a moment later (a download page's hidden frame).
+        // Clicked downloads save. Script-started ones save too, but not a burst (`DownloadPolicy`). A click in a frame
+        // lets it hand over a file shortly after (hidden download frames).
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: userInitiated || ownLoad,
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
-            // A rule for downloads may take it instead: then WebKit makes no download at all.
+            // A download rule may take it; then WebKit makes no download.
             if policy == .download, let target = navigationAction.request.url,
                await handOffIfWanted(target, request: navigationAction.request, appliesToLinks: false, webView: webView,
                                      wasClicked: userInitiated,
                                      pageOrigin: askingOrigin(navigationAction, webView: webView)) {
                 return (.cancel, preferences)
             }
-            // No rule took it: whether this site may save files at all is asked once, and remembered per site. A
-            // download the page started on its own never asks, though a stored answer still decides it.
+            // No rule: ask once per site whether it may download. Unprompted downloads never ask, but a stored answer
+            // applies.
             if policy == .download, let target = navigationAction.request.url,
                await !mayDownload(target, in: webView, retry: navigationAction.request, asking: userInitiated || ownLoad) {
                 return (.cancel, preferences)
             }
             if policy == .cancel {
-                // The page started this one on its own. Allow Once asks for it again from the same page, which is the
-                // gesture the flow policy wanted to see — and a request that can't be asked for again (a POST) leaves
-                // the notice as it was, rather than fetching something else in its place.
+                // Unprompted download. Allow Once re-requests it from the page to provide the gesture; a request that
+                // can't be repeated (POST) leaves the notice as is.
                 let origin = SiteOrigin.of(webView.url) ?? SiteOrigin.of(navigationAction.request.url)
-                // The site was never asked here, so Allow Once re-fetches the file without answering for the page.
+                // Never asked: Allow Once refetches without storing an answer.
                 refusedDownload(in: webView, action: origin.flatMap {
                     askAgain(origin: $0, request: navigationAction.request, in: webView, keepAnswer: false)
                 })
@@ -1587,9 +1543,8 @@ extension Tab: WKNavigationDelegate {
         }
 
         guard let url = navigationAction.request.url else { return (.cancel, preferences) }
-        // The page's own scripts, as Settings › Privacy › JavaScript and the site's choice say (`SiteJavaScript`), for
-        // the page being gone to; a frame's follow the page it's in, as WebKit decides each frame on its own. An error
-        // page Zigzag puts in its place keeps its own.
+        // JavaScript per Settings and site choice (`SiteJavaScript`), for the main frame's target; frames follow their
+        // page, as WebKit decides per frame. Zigzag's error pages keep their own.
         SiteJavaScript.apply(to: preferences, for: decidesMainFrame ? url : webView.url, here: javaScriptHere,
                              errorPage: decidesMainFrame && ErrorPage.pending.contains(webView))
         // JavaScript turned off with the developer tools is off for a development page: decided for the page being
@@ -1613,9 +1568,8 @@ extension Tab: WKNavigationDelegate {
             }
         }
 
-        // A rule for links you click may take the address before anything is fetched, so a YouTube link reaches mpv
-        // or a magnet reaches rTorrent without a page loading first. Redirects, reloads, history and a page's own
-        // scripted navigation are left alone.
+        // A link rule may take the click before anything loads (YouTube to mpv, magnet to rTorrent). Redirects,
+        // reloads, history and scripted navigation are skipped.
         if userInitiated, navigationAction.navigationType == .linkActivated, navigationAction.targetFrame?.isMainFrame ?? true,
            await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, webView: webView,
                                  wasClicked: true,
@@ -1673,8 +1627,7 @@ extension Tab: WKNavigationDelegate {
         // where WebKit holds it to what the page may reach.
         if isLinkClick && isMainFrame && Self.route(forPageLink: url, from: self.url) == .load {
             let flags = navigationAction.modifierFlags
-            // A site you chose a space for opens there (#286): a click, or a link to a new tab. Not a peek (⇧) or a
-            // download (⌥), and never what the page does on its own.
+            // Site routes (#286) apply to clicks and new-tab links; not peek (⇧), download (⌥) or page-initiated.
             let opensTab = navigationAction.buttonNumber == 4 || flags.contains(.command)
             if userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
                host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
@@ -1705,13 +1658,13 @@ extension Tab: WKNavigationDelegate {
             // The page's ad blocking follows where it's going: allowed sites load without it. Only now, once it's
             // going there: a link opened elsewhere leaves this page's blocking as it was.
             if !showsExtensionPage { ContentBlocker.apply(to: webView, for: url) }
-            // The site's zapped elements, hidden from the document's start (`PageBoosts`).
+            // The site's zapped elements, hidden from document start (`PageBoosts`).
             PageBoosts.prepare(webView, for: showsExtensionPage ? nil : url, privateStore: privateStore,
                                errorPage: ErrorPage.pending.contains(webView))
-            // WebRTC on or off for where it's going, before its page is made (`WebRTCProtection`).
+            // Set WebRTC for the destination before its page is created (`WebRTCProtection`).
             WebRTCProtection.apply(to: webView, for: url, in: self)
-            // Back and Forward go to pages you've had; anything else the page started waits to show. A reload waits
-            // too: one can be redirected elsewhere, and a site's that never arrives mustn't put that name over this page.
+            // Only back/forward and own loads show the address before commit. Reloads wait too: a redirect that never
+            // commits mustn't show its name.
             addressWaitsForCommit = openedByPage || (!ownLoad && navigationAction.navigationType != .backForward)
         }
         // The community lists' scriptlets for the document's site, in place before it starts (a frame's follow the
@@ -1733,9 +1686,8 @@ extension Tab: WKNavigationDelegate {
         ownLoad || ownHistory || (fromInternalPage && !isBackForward)
     }
 
-    /// The site a URL belongs to, so mail.google.com and accounts.google.com count as one: its registrable domain by
-    /// the Public Suffix List (bbc.co.uk, and myapp.vercel.app, which is someone else's site from evil.vercel.app).
-    /// A host with none (an address, a single name, a public suffix itself) is its own site.
+    /// Registrable domain by the Public Suffix List (bbc.co.uk; myapp.vercel.app is separate from evil.vercel.app). A
+    /// host without one (IP, single label, a suffix itself) is its own site.
     nonisolated static func site(of url: URL) -> String? {
         guard var host = url.host()?.lowercased(), !host.isEmpty else { return nil }
         if host.hasSuffix(".") { host.removeLast() }
@@ -1779,22 +1731,19 @@ extension Tab: WKNavigationDelegate {
         let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
         let policy = downloads.decide(mimeType: mime, contentDisposition: disposition.lowercased(), canShowMIMEType: navigationResponse.canShowMIMEType,
                                       isMainFrame: navigationResponse.isForMainFrame)
-        // WebRTC follows the page that's to show, where a redirect took it; one that isn't shown leaves the page
-        // that stays as it was.
+        // WebRTC follows the shown page after redirects; a response that isn't shown changes nothing.
         if navigationResponse.isForMainFrame {
             WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, in: self)
         }
-        // A main frame's file held back: one nobody asked for, too soon after another (`DownloadPolicy`).
+        // A main-frame file blocked by `DownloadPolicy`.
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload(in: webView) }
         #if DEBUG
         if policy == .download {
             debugLog("download chosen: mime=\(mime) canShow=\(navigationResponse.canShowMIMEType) mainFrame=\(navigationResponse.isForMainFrame) attachment=\(!disposition.isEmpty)")
         }
         #endif
-        // A server-sent file (Content-Disposition: attachment, or a type WebKit can't show) may be for another app.
-        // Cancelling here means no download row and no blank tab, so the tab that was opened just for it goes.
-        // `decide` has already held a frame's file back unless that frame was just clicked, so a `.download` here is
-        // the page's own or one a click asked for.
+        // A server-sent file (attachment, or a type WebKit can't show) may go to another app. Cancelling here avoids a
+        // download row and a blank tab. `decide` already held back unclicked frame files.
         if policy == .download, let target = response.url {
             let filename = DownloadTokens.filename(for: target, suggested: Self.filename(from: disposition) ?? "")
             let wasClicked = downloads.mainFrameWasClicked && navigationResponse.isForMainFrame
@@ -1804,33 +1753,29 @@ extension Tab: WKNavigationDelegate {
                 closeIfOnlyADownload(webView)
                 return .cancel
             }
-            // A rule didn't take it, so whether this site may save files at all is what decides. The request that
-            // earned the response is not handed over here, and guessing one would turn a form's POST into a GET, so
-            // this path says what happened without offering to ask again. A response nobody clicked for never asks.
+            // No rule took it: the site's download permission decides. The request isn't available here and a guess
+            // would turn a POST into a GET, so no retry is offered. Unclicked responses never ask.
             if await !mayDownload(target, in: webView, asking: wasClicked) { return .cancel }
         }
         return policy
     }
 
-    /// A download the page started on its own, refused: noted, and said where the page is, never silently.
+    /// Shows a toast for a blocked download.
     private func refusedDownload(in webView: WKWebView, text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click",
                                  action: (title: String, run: () -> Void)? = nil) {
         Diagnostics.note("Download refused", site: url?.host(), note, isPrivate: isPrivate)
         guard let host = webView.window?.windowController as? PromptHost else { return }
-        // A notice with something to offer stays long enough to read and act on, and can be put away; one that only
-        // says what happened goes soon after it has been read.
+        // Toasts with an action stay longer and can be dismissed.
         host.promptToast(text, symbol: "arrow.down.circle", duration: action == nil ? 3 : 6,
                          action: action, closes: action != nil)
     }
 
-    /// Whether this site may save a file. False means it may not — said over the page — so the caller cancels the
-    /// download. Asked once per site: "This time" holds for this page, "Always" is kept for the site. `retry` is the
-    /// request the notice offers to ask for again, where it can be asked for at all.
+    /// Whether the site may download; false means cancel (a toast explains). Asked once per site: "This time" for the
+    /// page, "Always" saved. `retry`: the request to offer again, if repeatable.
     private func mayDownload(_ url: URL, in webView: WKWebView, retry: URLRequest? = nil, asking: Bool = true) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
-            // A file on this Mac has no site to ask about and nowhere to keep an answer. A page a site made
-            // (about:blank, data:) has an origin it cannot name, so with asking on it is not allowed to save what it
-            // was given; with asking off it saves as it always did.
+            // Local files have no site to ask about. A page without a nameable origin (about:blank, data:) can't
+            // download when asking is on; with asking off it downloads as before.
             if SitePermissions.pageWithoutSiteMayDownload(isFile: (webView.url ?? url).isFileURL) { return true }
             refusedDownload(in: webView, text: DownloadPolicy.blockedText,
                             note: "A page with no site of its own tried to save a file")
@@ -1845,18 +1790,16 @@ extension Tab: WKNavigationDelegate {
         return allowed
     }
 
-    /// What a blocked download's notice offers. By then the file has been refused and WebKit's own "no" can't be taken
-    /// back, so Allow Once asks for it again — through the tab's own page, which is the session the site expects — and
-    /// keeps that answer for the page, the same as "This time" on the question. What comes back is tracked like any
-    /// other download, so it lands where the rules and the site's own settings say, and shows in the downloads list.
+    /// A blocked download's Allow Once. WebKit's refusal is final, so it re-requests through the tab's page (the site's
+    /// session) and allows it for the page, like "This time". The result is tracked like any download.
     private func askAgain(origin: String, request: URLRequest?, in webView: WKWebView,
                           keepAnswer: Bool = true) -> (title: String, run: () -> Void)? {
         guard let request, DownloadPolicy.canBeAskedAgain(request) else { return nil }
         return (String(localized: "Allow Once", comment: "Button in the notice saying a site’s download was blocked: asks the site for the file again and saves it."),
                 { [weak self, weak webView] in
                     guard let webView else { return }
-                    // A site's own block keeps its say: this answer is for the page only, and only where the site
-                    // question was the thing that refused the file.
+                    // Allow for this page only, and only when the site question blocked it; a site's Block still
+                    // applies.
                     if keepAnswer { SitePermissions.allowThisDownload(origin: origin, tab: self) }
                     webView.startDownload(using: request) { download in
                         DownloadManager.shared.track(download, window: webView.window)
@@ -1864,7 +1807,7 @@ extension Tab: WKNavigationDelegate {
                 })
     }
 
-    /// The name in a Content-Disposition header, extended or plain, if it has one.
+    /// The filename in a Content-Disposition header (extended or plain).
     nonisolated static func filename(from disposition: String) -> String? {
         if let star = disposition.range(of: "filename*=", options: .caseInsensitive) {
             let rest = disposition[star.upperBound...]
@@ -1879,23 +1822,21 @@ extension Tab: WKNavigationDelegate {
         return value.isEmpty ? nil : value
     }
 
-    /// The site that asked: the frame's own when the navigation came from one, or the page's. A link in an ad iframe
-    /// is asked about and answered as the ad's site, not the page's.
+    /// The requesting origin: the frame's if the navigation came from one, else the page's (an ad iframe asks as the
+    /// ad).
     private func askingOrigin(_ action: WKNavigationAction, webView: WKWebView) -> String? {
         SiteOrigin.of(action.sourceFrame.securityOrigin) ?? SiteOrigin.of(webView.url ?? self.url)
     }
 
-    /// Runs the first rule that catches `url`, if there is one. True means the rule took it: the navigation is
-    /// cancelled. Cookies come from this tab's own store, and the space is the one it sits in.
+    /// Runs the first matching rule. True means it took the URL and the navigation is cancelled. Uses this tab's cookie
+    /// store and space.
     private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, webView: WKWebView,
                                  filename: String? = nil, mime: String = "", wasClicked: Bool = false,
                                  pageOrigin: String? = nil) async -> Bool {
-        // Zigzag's own pages and an extension's are never a rule's to take. A page a rule opened is the rule's own
-        // doing: the rule that took the address must not take it again, whether the page becomes a load or a download.
+        // Zigzag and extension pages are never handed off. A rule-opened page can't be taken again by its rule.
         guard !openedByRule, !wasOpenedByRule(url), !wasDeclined(url) else { return false }
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Self.isExtensionPage(url) else { return false }
-        // A link has no file name; a download's own name is what an earlier file-type destination matches, so the
-        // handoff scan must see it and stand aside for that destination.
+        // Links have no filename; a download's name lets an earlier file-type destination match first.
         let handoffName = appliesToLinks ? "" : (filename ?? DownloadTokens.filename(for: url, suggested: ""))
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
                                                     isPrivate: isPrivate) else { return false }
@@ -1907,7 +1848,7 @@ extension Tab: WKNavigationDelegate {
                                               window: host?.hostWindow, tab: self, wasClicked: wasClicked)
         let decision = await DownloadHandoff.decide(rule, request: handoff, tab: self, forDownload: !appliesToLinks)
         handoff.place = decision.place
-        // A question put off for a download leaves the file to Zigzag, and the download manager must not ask again.
+        // Declined for a download: Zigzag keeps the file and the download manager must not ask again.
         if decision.declined {
             ruleDeclinedURL = url
             if !appliesToLinks { declinedRuleDownload = true }
@@ -1916,31 +1857,30 @@ extension Tab: WKNavigationDelegate {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-            // A rule that was matched but didn't take it — an Open URL rule whose question was put off — leaves the
-            // link or the download as it was, exactly as if no rule had matched. A download it left behind must not
-            // be offered to the same rule again by the download manager.
+            // A matched rule that didn't take it (declined Open URL) acts as no match; the download manager must not
+            // offer it to the same rule again.
             if case .noMatch = outcome {
                 if !appliesToLinks { declinedRuleDownload = true }
                 return false
             }
-            // A tab opened just for this link has nothing left to show.
+            // Close a tab opened only for this link.
             closeIfOnlyADownload(webView)
             return true
         case .browser:
             return false
         case .cancel:
-            // Don't Allow: a link asked for goes nowhere, and a download is not saved either.
+            // Don't Allow: neither loads nor downloads.
             return true
         }
     }
 
-    /// Whether `url` is the address whose handoff question was last put off in this tab.
+    /// Whether `url` is the last declined handoff address.
     private func wasDeclined(_ url: URL?) -> Bool {
         guard let url, let declined = ruleDeclinedURL else { return false }
         return Self.sameAddress(declined, url)
     }
 
-    /// Whether `url` is the address a download rule last sent this tab to.
+    /// Whether `url` is the last address a download rule opened.
     private func wasOpenedByRule(_ url: URL?) -> Bool {
         guard let url, let opened = ruleOpenedURL else { return false }
         return Self.sameAddress(opened, url)
@@ -1977,14 +1917,15 @@ extension Tab: WKNavigationDelegate {
         isLeavingPage = true
         // The page is going: a socket it opened to this Mac goes with it.
         localReceivers?.closeAllSockets()
+        // Ended while the page is still in its process: the next page may get a new one (#348).
+        if Passkeys.available { Passkeys.endRequests(in: webView) {} }
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         isLeavingPage = false
-        // A page arrived: nothing is left to fall back from.
+        // Page committed: no fallback needed.
         pendingHTTPFallback = nil
-        // The rule-opened page is here, so its own links and downloads are its own again; a question declined for
-        // this navigation has been answered by the page arriving.
+        // The rule-opened page arrived, so its links and downloads are normal again.
         openedByRule = false
         ruleOpenedURL = nil
         ruleDeclinedURL = nil
@@ -1992,7 +1933,7 @@ extension Tab: WKNavigationDelegate {
         forgetPageErrors()
         // The new page is here: its address shows.
         addressWaitsForCommit = false
-        // Before the address shows: a pinned page landing where it was sent is never "moved on" in between.
+        // Before the address updates, so a pinned page isn't marked as moved on.
         noteLanding(webView.url)
         if webView.url != url { followAddress(of: webView) }
         // Answers to the last page's questions were for that page: this one asks again.
@@ -2025,17 +1966,15 @@ extension Tab: WKNavigationDelegate {
             changed.send(.snapshot)
         }
         if let url = webView.url {
-            // A new page from another site never wears the last one's icon, even where the address showed it before
-            // it came (Zigzag's own loads): the site's own if it's known, otherwise the globe until the page offers one.
-            // Nor does a page that came after an error page (Try Again) keep its warning.
+            // A new site never keeps the previous icon: the site's cached one, else the globe. A page after an error
+            // page drops the warning too.
             if !Self.keepsIcon(from: committedURL, to: url) || showsErrorPage {
                 favicon = FaviconStore.shared.cachedIcon(for: url)
                 iconSource = nil
                 changed.send(.favicon)
             }
             committedURL = url
-            // How the developer tools have a page drawn (its styles, its outlines) goes to the new one, now that the
-            // tab knows whether this is a development page: never to the one it left while this was on its way.
+            // Apply developer tools styles to the new page now that it's known whether it's a development page.
             if !developer.isUnchanged { applyDeveloperStateToPage() }
             // A private window's zoom isn't saved for the site, so it lasts while you stay on that site in this tab.
             let host = HistoryStore.normalizedHost(url)
@@ -2046,7 +1985,7 @@ extension Tab: WKNavigationDelegate {
             zoomHost = host
             if isSearchTab, !SearchFolding.isSearchResultsPage(url) { isSearchTab = false }
             errorShownFor = ErrorPage.consume(webView) ? url : nil
-            // An error page in place of the page: the warning, whatever icon was showing.
+            // Error page: show the warning icon.
             if showsErrorPage {
                 favicon = Self.immediateIcon(for: url, errorPage: true)
                 iconSource = nil
@@ -2091,8 +2030,7 @@ extension Tab: WKNavigationDelegate {
         languageCheck += 1
         let check = languageCheck
         let url = webView.url
-        // History and Settings list other pages' titles in their own languages, and an error page is in yours: none
-        // of them is a page in another language to translate.
+        // History, Settings and error pages aren't foreign-language pages to translate.
         guard PageTranslator.readsLanguage(of: url, errorPage: url != nil && url == errorShownFor) else {
             if foreignLanguage != nil {
                 foreignLanguage = nil
@@ -2119,30 +2057,29 @@ extension Tab: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         isLeavingPage = false
         addressWaitsForCommit = false
-        // A page that never arrived leaves no rule-opened or declined navigation to carry to the next one.
+        // Failed load: clear rule-opened and declined state.
         openedByRule = false
         declinedRuleDownload = false
-        // Over http instead: the address stays as you gave it until that load shows its own.
+        // Retrying over http; the address stays until that load shows.
         if fallBackToHTTP(after: error as NSError, in: webView) { return }
-        // It never came: the address goes back to the page still showing.
+        // Restore the address of the page still showing.
         if webView.url != url { followAddress(of: webView) }
         handle(error, in: webView)
     }
 
-    /// Cancelled loads, frame-load-interrupted (downloads, policy changes) and media WebKit plays itself (a direct
-    /// .mp4 or .mp3 link, reported as "plug-in handled load") are not failures.
+    /// Not failures: cancelled, frame-load-interrupted (downloads, policy) and media WebKit plays itself (direct .mp4
+    /// or .mp3, "plug-in handled load").
     private static func isFailure(_ error: NSError) -> Bool {
         !(error.code == NSURLErrorCancelled || (error.domain == "WebKitErrorDomain" && [102, 204].contains(error.code)))
     }
 
-    /// The address a load failed at: the error's, else the tab's.
+    /// The error's failing URL, else the tab's.
     private func failingURL(of error: NSError) -> URL? {
         (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL) ?? url
     }
 
-    /// An address you gave without a scheme that https couldn't reach (`Tab.fallbackURL`): the same address over
-    /// http, once, in place of the error page, as other browsers do, started once WebKit is done with this failure.
-    /// Any other failure ends the fallback; one that isn't a failure (the ask-again cancels by policy) leaves it.
+    /// Retries a scheme-less address over http once instead of the error page (`Tab.fallbackURL`), as other browsers
+    /// do, after WebKit finishes this failure. Other failures end the fallback; non-failures (policy cancels) keep it.
     private func fallBackToHTTP(after error: NSError, in webView: WKWebView) -> Bool {
         guard let pending = pendingHTTPFallback, Self.isFailure(error) else { return false }
         pendingHTTPFallback = nil
@@ -2231,21 +2168,20 @@ extension Tab: WKUIDelegate {
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Zigzag's own Open in New Tab, New Window or Peek always opens; a page's own request needs a click or your say.
         if BrowserWebView.pendingDisposition(for: webView) == nil, !PopupNotice.isUserInitiated(navigationAction) {
-            // A page's own pop-up: a destination remembered for the site opens there with no question, otherwise the
-            // banner asks and nothing opens now. Zigzag's own pages never open this way.
+            // Page pop-up: a saved destination for the site opens without asking, else the banner asks and nothing
+            // opens yet. Zigzag pages never open this way.
             guard Self.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
-            // A blank `window.open()` is a page link too: an allowed site keeps the open-blank-then-navigate pattern
-            // sign-ins and payments use. WebKit hands it over as a scheme-less address, not nil.
+            // A blank `window.open()` counts too, so allowed sites keep the open-blank-then-navigate pattern sign-ins
+            // and payments use. WebKit passes a scheme-less URL, not nil.
             let (target, isBlank) = PopupNotice.popupTarget(navigationAction.request.url)
-            // A page's pop-up is a page link like any other, kept answer or not: an app's address asks its own
-            // question, and anything the web may not open top-level (data:, a script, a file) opens nowhere.
+            // Pop-ups route like page links: app URLs ask, and anything the web can't open top-level (data:,
+            // javascript:, file) opens nowhere.
             switch PopupNotice.route(target, from: url) {
             case .refuse:
                 Diagnostics.note("Refused a page's pop-up", site: url?.host(), "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             case .app:
-                // A frame's pop-up stays blocked quietly, as before the card: an ad in an iframe does not get an
-                // app question the page itself would have to answer for.
+                // Frame pop-ups stay silently blocked, so an iframe ad can't raise an app question.
                 guard navigationAction.sourceFrame.isMainFrame else {
                     Diagnostics.note("Blocked a frame's pop-up", site: url?.host(),
                                      "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
@@ -2256,9 +2192,8 @@ extension Tab: WKUIDelegate {
             case .open:
                 break
             }
-            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included,
-            // but only Allow and Zigzag Mini may open those: This Tab or New Tab from a frame or a blank window would
-            // move the page without a click.
+            // A saved destination covers the whole site, including frame and blank pop-ups, but only Allow and Zigzag
+            // Mini open those: This Tab or New Tab would navigate without a click.
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(url)) {
                 let destination = PopupNotice.destination(for: stored)
                 guard PopupNotice.storedDestinationMayOpen(destination, forBlankOrFrame: isBlank || !navigationAction.sourceFrame.isMainFrame) else {
@@ -2268,12 +2203,11 @@ extension Tab: WKUIDelegate {
                 case .deny:
                     return nil
                 case .automatic:
-                    // A legacy allow, or Allow in Site Controls: a plain window.open opens a real tab and a sized one
-                    // a real pop-up, exactly as a site that was allowed pop-ups opened them before the card.
+                    // Legacy allow or Site Controls Allow: plain window.open opens a tab, a sized one a pop-up, as
+                    // before the card.
                     return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
                 case .viewer:
-                    // WebKit is still offering the pop-up here, so it is made the real thing: `window.opener` and
-                    // everything the page does with the new window keep working.
+                    // Return a real window while WebKit still offers it, so `window.opener` keeps working.
                     return PopupWindowController.open(configuration: configuration, features: windowFeatures, parent: webView.window, opener: self)
                 case .thisTab, .newTab:
                     if let promptHost = host as? PromptHost {
@@ -2282,8 +2216,8 @@ extension Tab: WKUIDelegate {
                     return nil
                 }
             }
-            // Only the page itself asks, and only for an address: a frame's pop-up — an ad in an iframe, say — is
-            // blocked without a word, and there is nothing to ask about a blank window yet.
+            // Only the main frame asks, and only for an address; frame pop-ups are blocked silently and blank windows
+            // have nothing to ask about yet.
             guard !isBlank, navigationAction.sourceFrame.isMainFrame else {
                 Diagnostics.note("Blocked a frame's or a blank pop-up", site: url?.host(),
                                  "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
@@ -2297,8 +2231,8 @@ extension Tab: WKUIDelegate {
             _ = BrowserWebView.takePendingDisposition(for: webView)
             return nil
         }
-        // A link a rule wants never becomes a window: it goes straight to its app, so no blank tab is left behind.
-        // Zigzag's own Open in New Window or Tab still opens: you asked for a window, not for the rule.
+        // A link a rule wants goes straight to its app, never a blank window. Zigzag's Open in New Window or Tab still
+        // opens.
         if BrowserWebView.pendingDisposition(for: webView) == nil,
            let url = navigationAction.request.url, PopupNotice.isUserInitiated(navigationAction),
            let rule = DownloadHandoff.firstMatch(url, appliesToLinks: true, isPrivate: isPrivate) {
@@ -2311,7 +2245,7 @@ extension Tab: WKUIDelegate {
         return host?.tab(self, createWebViewWith: configuration, for: navigationAction, features: windowFeatures)
     }
 
-    /// A new-window link a rule caught: the handoff is asynchronous, so the window is simply never made.
+    /// Rule caught a new-window link; the handoff is async, so no window is created.
     private func handOffInNewWindow(_ rule: DownloadRule, url: URL, request: URLRequest, webView: WKWebView,
                                     pageOrigin: String?, wasClicked: Bool) {
         let referrer = request.value(forHTTPHeaderField: "Referer").flatMap { URL(string: $0) } ?? self.url
@@ -2328,11 +2262,10 @@ extension Tab: WKUIDelegate {
             case .handOff:
                 let outcome = await DownloadHandoff.perform(rule, request: handoff)
                 if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-                // Put off, or nowhere to open it: the link opens the new tab it was going to open anyway, since this
-                // path has already refused the window WebKit asked for.
+                // Declined or nowhere to open: open the tab it would have opened, since the window was already refused.
                 if case .noMatch = outcome { self.host?.tab(self, openURL: url, disposition: .foregroundTab) }
             case .browser:
-                // The window WebKit asked for was refused, so the link opens the tab it was going to open anyway.
+                // The window was refused, so open the link in a tab.
                 self.host?.tab(self, openURL: url, disposition: .foregroundTab)
             case .cancel:
                 break
@@ -2419,8 +2352,7 @@ extension Tab: WKUIDelegate {
     // The completion-handler form: its Swift async name differs between SDKs, and a near miss is never called.
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo,
                  type: WKMediaCaptureType, decisionHandler: @escaping @MainActor (WKPermissionDecision) -> Void) {
-        // The camera and microphone work without WebRTC: WebRTC is offered only when the page reaches for a call
-        // (`WebRTCProtection`), never in place of this question.
+        // Camera and microphone don't need WebRTC; it's only offered when a page starts a call (`WebRTCProtection`).
         Task { decisionHandler(await SitePermissions.request(origin: origin, type: type, window: host?.hostWindow, isPrivate: isPrivate, tab: self)) }
     }
 
@@ -2451,8 +2383,7 @@ extension Tab {
         }
         // The response said PDF: the viewer goes up now, while WebKit still loads it (the page can't be asked till then).
         if pdfResponseURL == url { showPDF(url, in: webView, userAgent: nil, fresh: fresh) }
-        // Asked of the document in Zigzag's own world, with no click to it; the user agent is the web view's, never
-        // the page's word for it (`runOwnScript`).
+        // Runs in Zigzag's world, without a user gesture (`runOwnScript`).
         webView.runOwnScript(Self.pdfCheckScript) { [weak self, weak webView] answer in
             MainActor.assumeIsolated {
                 guard let self, let webView, webView === self.webView, webView.url == url else { return }
@@ -2469,12 +2400,12 @@ extension Tab {
         }
     }
 
-    /// What the PDF at `url` is called until it says more: the name its response gave it, else its file's, else its site.
+    /// The PDF's name until it has a title: the response's, else the file's, else the site.
     fileprivate func pdfName(of url: URL) -> String {
         HistoryStore.pdfName(of: url, suggested: pdfResponseURL == url ? pdfResponseName : nil)
     }
 
-    /// What asks the page whether it's a PDF.
+    /// Asks the page whether it's a PDF.
     static let pdfCheckScript = "document.contentType"
 
     /// The page at `url` is a PDF: Zigzag's viewer over it, unless it's showing already (and this isn't a new load).

@@ -83,7 +83,7 @@ struct BrandContrastTests {
         }
     }
 
-    /// `top` (with its alpha, times `alpha`) laid over the opaque `ground`.
+    /// `top` (alpha times `alpha`) composited over opaque `ground`.
     func over(_ top: NSColor, _ ground: NSColor, alpha: CGFloat = 1) -> NSColor {
         let a = top.alphaComponent * alpha
         return NSColor(srgbRed: top.redComponent * a + ground.redComponent * (1 - a), green: top.greenComponent * a + ground.greenComponent * (1 - a),
@@ -91,22 +91,21 @@ struct BrandContrastTests {
     }
 
     @Test func disabledControlsStillRead() {
-        // A control that can't be used now still says what it is: its words at least 3:1, in light and dark, on a
-        // panel and on a page.
+        // Disabled controls keep text at 3:1 or better, light and dark, on panels and pages.
         for dark in [false, true] {
             for ground in [Tokens.Color.panelBackground, Tokens.Color.formBackground] {
                 let bg = resolved(ground, dark: dark)
-                // Words alone (a quiet button) take the disabled ink, unfaded.
+                // Text-only buttons use the disabled ink, not faded.
                 let words = over(resolved(Tokens.Color.textDisabled, dark: dark), bg)
                 #expect(Brand.contrast(words, bg) >= 3, "quiet \(dark) \(bg)")
-                // A button with a fill is faded whole: its words on its fill, both over the ground at `Opacity.disabled`.
+                // Filled buttons fade as a whole to `Opacity.disabled`.
                 let fill = over(resolved(Tokens.Color.controlFill, dark: dark), bg)
                 let ink = over(resolved(Tokens.Color.textPrimary, dark: dark), fill)
                 let shownFill = over(fill, bg, alpha: Tokens.Opacity.disabled), shownInk = over(ink, bg, alpha: Tokens.Opacity.disabled)
                 #expect(Brand.contrast(shownInk, shownFill) >= 3, "plain \(dark) \(bg): \(Brand.contrast(shownInk, shownFill))")
             }
         }
-        // A quiet button that can't be used takes that ink and isn't faded on top of it.
+        // A disabled quiet button isn't faded on top of the ink.
         let quiet = PillButton(title: "Use Default Colors", style: .quiet)
         quiet.isEnabled = false
         let label = quiet.subviews.compactMap { $0 as? Label }.first
@@ -121,8 +120,7 @@ struct BrandContrastTests {
     }
 
     @Test func aTintedButtonsTextReadsOnItsTint() {
-        // A prominent button given a tint (a site's question, What's New) takes text that reads on that tint: the
-        // space's accent is pale at night, where white on it fell to 2.6:1.
+        // Tinted prominent buttons pick readable text; white on the pale night accent was 2.6:1.
         for step in 0..<36 {
             let accent = Brand.Theme(hue: Double(step) / 36).accent
             let button = PillButton(title: "Allow", style: .prominent)
@@ -134,7 +132,7 @@ struct BrandContrastTests {
                 #expect(ratio >= 4.5, "hue \(step * 10)° \(dark ? "dark" : "light"): \(String(format: "%.2f", ratio)):1")
             }
         }
-        // Any other fill gets the better of white and a deep ink: white on a deep one, deep on a pale one.
+        // Other fills pick white or deep ink, whichever contrasts more.
         for fill in [NSColor.systemBlue, .systemRed, Brand.ribbon, Brand.navy, .white, .black] {
             for dark in [false, true] {
                 let f = resolved(fill, dark: dark), ink = resolved(Brand.ink(on: fill), dark: dark)
@@ -145,7 +143,7 @@ struct BrandContrastTests {
         #expect(Brand.contrast(resolved(Brand.ink(on: Brand.navy), dark: true), Brand.navy) >= 4.5)
     }
 
-    /// Text in its own color over `ground`, as drawn: its alpha laid over the ground.
+    /// `ink` composited over `ground`.
     private func over(_ ink: NSColor, _ ground: NSColor) -> NSColor {
         let i = ink.usingColorSpace(.sRGB)!, g = ground.usingColorSpace(.sRGB)!
         func mix(_ a: CGFloat, _ b: CGFloat) -> CGFloat { b + (a - b) * i.alphaComponent }
@@ -153,8 +151,7 @@ struct BrandContrastTests {
                        blue: mix(i.blueComponent, g.blueComponent), alpha: 1)
     }
 
-    /// Back and Skip in the welcome window (the ribbon at 0.75, `Onboard.quietLight`) while an import runs: fainter
-    /// than when they can be used, never the neutral gray, and still 3:1 on the welcome's blue, its lit corner too.
+    /// Disabled Back and Skip in the welcome window stay 3:1 on its blue, including the lit corner.
     @Test func disabledTextInItsOwnColorStaysReadable() {
         let ink = Brand.ribbon.withAlphaComponent(0.75)
         let button = TextButton(title: "Back", font: Tokens.Font.body(.medium))

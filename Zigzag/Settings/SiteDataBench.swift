@@ -54,7 +54,7 @@ enum SiteDataBench {
         try? await Task.sleep(for: .milliseconds(300))
 
         // The main thread's longest wait between turns, from a timer that wants one every millisecond.
-        var last = CFAbsoluteTimeGetCurrent(), longest = 0.0
+        nonisolated(unsafe) var last = CFAbsoluteTimeGetCurrent(), longest = 0.0
         let watch = Timer(timeInterval: 0.001, repeats: true) { _ in
             let now = CFAbsoluteTimeGetCurrent()
             longest = max(longest, now - last)

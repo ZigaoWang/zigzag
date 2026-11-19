@@ -114,8 +114,7 @@ struct PanelFieldPressTests {
     }
 }
 
-/// A click on the new tab note reaches it through the window: the window keeps presses on a panel's bare surface
-/// from everything, and kept them from the note too, so a click on it never went to the tab.
+/// Clicks on the new tab note pass through the window; the bare-panel-surface rule used to swallow them.
 @MainActor
 struct NewTabNoteClickTests {
     @Test func aClickThroughTheWindowReachesTheNote() {
@@ -140,7 +139,7 @@ struct NewTabNoteClickTests {
             window.sendEvent(event!)
         }
         #expect(clicks == 1)
-        // Still a panel's surface: the press never moves the window or reaches what's behind.
+        // Still a panel surface: the press never moves the window or reaches what's behind.
         #expect(FloatingPanelView.isBareSurface(note))
     }
 }

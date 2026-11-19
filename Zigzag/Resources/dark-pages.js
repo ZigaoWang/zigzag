@@ -377,8 +377,8 @@
     settled = settled === true;
     wanted = choice();
     // Not wanted, it's still looked at, for the bar above it: a page dark on its own gives it its dark (#134).
-    // A dark app laid over a root and body that paint nothing is dark at its top and in its middle alike; a light
-    // page with a dark bar across its top (star-history.com) is light.
+    // A dark app over an unpainted root and body is dark at both the top and middle; a light page with a dark top bar
+    // (star-history.com) is light.
     if (!wanted) { dropPrepaint(); releaseMark(); apply(false); if (styled()) native = isDarkOnItsOwn(settled) || !!quietDark(true); send(); return; }
     if (forced()) { native = null; apply(true); return; }
     if (styled()) { native = isDarkOnItsOwn(settled); dropPrepaint(); }
@@ -403,7 +403,7 @@
   const colorOf = () => {
     const body = document.body;
     let c = body ? backgroundOf(body) : null;
-    // Nothing painted under a page dark on its own: the dark it shows, not Dark Reader's.
+    // Nothing painted under a natively dark page: use its dark, not Dark Reader's.
     if (!c && native === true && !darkened) c = quietDark();
     if (!c) c = darkened || native === true ? rgba(theme().darkSchemeBackgroundColor) : { r: 255, g: 255, b: 255, a: 1 };
     // A page dark on its own whose root and body paint white or nothing (a dark app laid over them): the dark at its
@@ -412,7 +412,7 @@
     return hex(c);
   };
   // The quiet dark at the page's top, else its middle: what's seen under the bar. Not a button's green.
-  // `both`: only when the top and the middle are both a quiet dark (the top's then).
+  // `both`: only when top and middle are both a quiet dark (returns the top's).
   const quietDark = (both) => {
     if (!document.body) return null;
     let found = null;
@@ -429,7 +429,7 @@
   // Only the top page tells Zigzag; a frame's look is the page's business.
   const send = () => {
     if (!isTop || retired) return;
-    // `looked`: whether it's been looked at yet, before which `native` says nothing.
+    // `looked`: whether checked yet; until then `native` is unset.
     const message = { darkened, native: native === true, color: colorOf(), site, wanted, looked: native !== null };
     if (native === true && !darkened) { const mark = markNow(); if (mark !== undefined) message.marker = mark; }
     const key = JSON.stringify(message);

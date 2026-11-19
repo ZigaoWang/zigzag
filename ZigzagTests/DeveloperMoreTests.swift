@@ -3,8 +3,7 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// The rest of the developer tools (#141): JavaScript, images and styles off, the user agent, outlines, and the other
-/// browsers.
+/// Developer tools (#141): JavaScript, images, styles, user agent, outlines, other browsers.
 @MainActor
 @Suite(.serialized)
 struct DeveloperMoreTests {
@@ -34,7 +33,7 @@ struct DeveloperMoreTests {
         try await body()
     }
 
-    /// A one-pixel PNG for any address: an image a page can load without the network.
+    /// Serves a one-pixel PNG for any URL.
     private final class OnePixel: NSObject, WKURLSchemeHandler {
         static let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")!
         func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
@@ -65,7 +64,7 @@ struct DeveloperMoreTests {
         let plain = DeveloperState()
         var images = plain
         images.imagesOff = true
-        // The rule on images is read as a page loads: off or back on, the page loads again.
+        // The images rule applies at load, so toggling reloads.
         #expect(images.needsReload(from: plain) && plain.needsReload(from: images))
         var styles = plain
         styles.stylesOff = true
@@ -80,9 +79,9 @@ struct DeveloperMoreTests {
         #expect(DeveloperTool.images.isChecked(in: state))
         state.stylesOff = true
         #expect(DeveloperTool.styles.isChecked(in: state))
-        // A page without its styles has none for print, and keeps none of the outlines' style.
+        // Styles off disables print styles and outlines.
         #expect(!DeveloperTool.printStyles.applies(in: state) && !DeveloperTool.outlines.applies(in: state))
-        // Under ⋯, both say something is in effect.
+        // ⋯ shows both as active.
         #expect(DeveloperTool.hasChoiceInEffect(among: DeveloperBarTools.moreTools, in: state))
     }
 
@@ -94,9 +93,9 @@ struct DeveloperMoreTests {
         #expect(preferences.value(forKey: PageStyles.key) as? Bool == false)
         PageStyles.set(true, in: preferences)
         #expect(preferences.value(forKey: PageStyles.key) as? Bool == true)
-        // WebKit lists it as the app's own to set: Settings' Feature Flags never shows or sets it.
+        // App-owned preference: Feature Flags never lists it.
         #expect(FeatureFlags.flags?.contains { $0.key.lowercased() == PageStyles.key.lowercased() } != true)
-        // A preference this WebKit doesn't have is passed over.
+        // Unknown preferences are skipped.
         WebKitSetup.setIfAvailable(false, key: "noSuchPreferenceAnywhere", in: WKPreferences())
         #expect(!WebKitSetup.hasPreference("noSuchPreferenceAnywhere"))
     }
@@ -109,19 +108,18 @@ struct DeveloperMoreTests {
         #expect(json[0]["trigger"]?["if-top-url"] as? [String] == [#"^https?://([^/]*\.)?localhost[:/]"#, #"^https?://([^/]*\.)?127\.0\.0\.1[:/]"#, #"^https?://([^/]*\.)?app\.localtest\.me[:/]"#])
         #expect(PageImages.topURL(for: "::1") == #"^https?://\[::1\][:/]"#)
         #expect(json[0]["action"]?["type"] as? String == "block")
-        // Named for its version: another list is another rule, the same list the same one.
+        // Identifier tracks the list content.
         let name = PageImages.identifier(for: rules)
         #expect(name.hasPrefix(PageImages.prefix))
         let same = try #require(PageImages.rules(for: ["localhost", "127.0.0.1", "app.localtest.me"]))
         let other = try #require(PageImages.rules(for: ["localhost"]))
         #expect(name == PageImages.identifier(for: same) && name != PageImages.identifier(for: other))
-        // Nothing listed, no rule: WebKit compiles no empty condition. A host no page could have is left out.
+        // Empty list: no rule (WebKit rejects an empty condition); impossible hosts are dropped.
         #expect(PageImages.rules(for: []) == nil)
         #expect(PageImages.rules(for: ["Bücher.de"]) == nil)
     }
 
-    /// A page at `base` with one image from `zztest:`, loaded with `rules`; the image's width once it settled, 0 when
-    /// it didn't load.
+    /// Width of a `zztest:` image on a page at `base` loaded with `rules`; 0 if it didn't load.
     private func imageWidth(at base: String, rules: String) async throws -> Int {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
@@ -129,7 +127,7 @@ struct DeveloperMoreTests {
         let store = try #require(WKContentRuleListStore.default())
         let name = "zigzag-test-images-\(UUID().uuidString)"
         let list = try #require(try await store.compileContentRuleList(forIdentifier: name, encodedContentRuleList: rules))
-        // Compiled into the app's own store: gone again once the page has said what it got.
+        // Compiled into the app store, removed afterward.
         defer { store.removeContentRuleList(forIdentifier: name) { _ in } }
         configuration.userContentController.add(list)
         let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 200, height: 200), configuration: configuration)
@@ -142,7 +140,7 @@ struct DeveloperMoreTests {
         return try await webView.evaluateJavaScript("document.images[0].naturalWidth") as? Int ?? -1
     }
 
-    /// The test lists compiled into the app's store.
+    /// Test lists in the app's store.
     private func testLists() async -> Set<String> {
         let all = await WKContentRuleListStore.default().availableIdentifiers() ?? []
         return Set(all.filter { $0.hasPrefix("zigzag-test-images-") })
@@ -155,15 +153,15 @@ struct DeveloperMoreTests {
         #expect(try await imageWidth(at: "http://app.localhost/", rules: rules) == 0)
         #expect(try await imageWidth(at: "http://127.0.0.1:8080/", rules: rules) == 0)
         #expect(try await imageWidth(at: "http://[::1]:8080/", rules: rules) == 0)
-        // Any other site's page has its images, whatever it shares the rule with.
+        // Other sites keep their images.
         #expect(try await imageWidth(at: "https://example.com/", rules: rules) == 1)
         #expect(try await imageWidth(at: "https://notlocalhost.com/", rules: rules) == 1)
-        // Each page's list leaves the store with it: none of this run's stays behind.
+        // No test lists are left behind.
         for _ in 0..<100 where await !testLists().isSubset(of: before) { try await Task.sleep(for: .milliseconds(20)) }
         #expect(await testLists().isSubset(of: before))
     }
 
-    /// Waits for the rule on `webView`'s scripts and rules to be `on`, as it's compiled or looked up.
+    /// Waits until `webView`'s rule state is `on`.
     private func rule(_ on: Bool, in webView: WKWebView) async throws -> Bool {
         for _ in 0..<200 where PageImages.isOn(in: webView) != on { try await Task.sleep(for: .milliseconds(20)) }
         return PageImages.isOn(in: webView) == on
@@ -179,31 +177,31 @@ struct DeveloperMoreTests {
             PageImages.sitesChanged()
         }
         PageImages.sitesChanged()
-        // A page and its pop-up share one set of scripts and rules.
+        // A page and its popup share scripts and rules.
         var page: WKWebView? = WKWebView(frame: .zero)
         let popUp = WKWebView(frame: .zero, configuration: page!.configuration)
         #expect(popUp.configuration.userContentController === page!.configuration.userContentController)
         PageImages.set(true, in: page!)
         #expect(PageImages.isOff(in: page!) && !PageImages.isOff(in: popUp))
         #expect(try await rule(true, in: popUp))
-        // The page goes while its images are off: the rule goes with it.
+        // Closing the page with images off removes the rule.
         PageImages.set(false, in: page!)
         page = nil
         #expect(try await rule(false, in: popUp))
-        // On again in the one left, once, and off.
+        // On, then off, in the remaining one.
         PageImages.set(true, in: popUp)
         PageImages.set(true, in: popUp)
         #expect(try await rule(true, in: popUp))
         PageImages.set(false, in: popUp)
         #expect(!PageImages.isOn(in: popUp))
-        // The list changes: the rule is the new list's, in place of the one before.
+        // A new list replaces the rule.
         PageImages.set(true, in: popUp)
         #expect(try await rule(true, in: popUp))
         DevelopmentSites.add("app.localtest.me")
         PageImages.sitesChanged()
         #expect(!PageImages.isOn(in: popUp))
         #expect(try await rule(true, in: popUp))
-        // Nothing listed: nothing to block anywhere.
+        // Empty list: nothing to block.
         DevelopmentSites.sites = []
         PageImages.sitesChanged()
         #expect(!PageImages.isOn(in: popUp))
@@ -216,16 +214,16 @@ struct DeveloperMoreTests {
             let webView = tab.ensureWebView()
             DevelopmentSites.add("waiting.localtest.me")
             PageImages.sitesChanged()
-            // Images off while the rule for the new list isn't in: no load yet, the page waits for it.
+            // Images off before the new rule compiles: reload waits.
             tab.developer.imagesOff = true
             #expect(PageImages.isOff(in: webView))
             #expect(!PageImages.isOn(in: webView) && PageImages.defersReload(of: webView))
             let ready = try await rule(true, in: webView)
             #expect(ready)
-            // In: a change loads it again at once.
+            // Rule ready: reloads immediately.
             #expect(!PageImages.defersReload(of: webView))
             tab.close()
-            // A closed tab lets go of it.
+            // A closed tab releases it.
             #expect(!PageImages.isOff(in: webView) && !PageImages.isOn(in: webView))
         }
     }
@@ -236,14 +234,14 @@ struct DeveloperMoreTests {
             let webView = tab.ensureWebView()
             DevelopmentSites.add("emptied.localtest.me")
             PageImages.sitesChanged()
-            // Images off while the rule for the new list is being made: the page waits for it.
+            // Images off while the rule compiles: the page waits.
             tab.developer.imagesOff = true
             #expect(PageImages.isWaiting(webView))
-            // The list is emptied meanwhile: no rule will come, and nothing waits for one.
+            // List emptied meanwhile: nothing waits.
             DevelopmentSites.sites = []
             PageImages.sitesChanged()
             #expect(!PageImages.isWaiting(webView))
-            // Nor once the rule being made is done and the list is worked toward again.
+            // Still nothing after compiling finishes.
             try await Task.sleep(for: .milliseconds(300))
             #expect(!PageImages.isWaiting(webView))
             tab.close()
@@ -258,12 +256,11 @@ struct DeveloperMoreTests {
             tab.developer.stylesOff = true
             tab.developer.printStyles = true
             #expect(preferences.value(forKey: PageStyles.key) as? Bool == false && webView.mediaType == "print")
-            // The address the web view goes to is off the list, as when you leave for another site: the page still
-            // showing stays as it's drawn until the new one comes.
+            // The web view's URL leaves the list: the current page stays as drawn until the next arrives.
             DevelopmentSites.sites = ["127.0.0.1"]
             tab.applyDeveloperState()
             #expect(preferences.value(forKey: PageStyles.key) as? Bool == false && webView.mediaType == "print")
-            // The new page arrives, off the list: it has its styles.
+            // The new page, off the list, has styles.
             tab.refreshDevelopment()
             #expect(preferences.value(forKey: PageStyles.key) as? Bool == true && webView.mediaType == nil)
             tab.close()
@@ -275,21 +272,21 @@ struct DeveloperMoreTests {
             let opener = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
             let openerView = opener.ensureWebView()
             opener.developer.imagesOff = true
-            // WebKit hands the new tab a configuration with the opener's scripts and rules, the images rule with them.
+            // WebKit gives the new tab the opener's configuration, including the images rule.
             let handed = openerView.configuration.copy() as! WKWebViewConfiguration
             #expect(handed.userContentController === openerView.configuration.userContentController)
             let opened = Tab(url: nil, spaceID: UUID(), configuration: handed)
             let openedView = opened.ensureWebView()
             #expect(PageImages.sharing(with: openedView).contains { $0 === openerView })
-            // It starts with the opener's choice, so its menu says what its pages get.
+            // It inherits the opener's setting.
             #expect(opened.developer.imagesOff)
-            // Turned back on in the tab opened: on in both, and the rule goes.
+            // Turned on in the child: on in both, rule removed.
             opened.developer.imagesOff = false
             #expect(!opener.developer.imagesOff && !PageImages.isOff(in: openerView))
-            // And the other way: off in the opener is off in the tab it opened.
+            // And off in the opener is off in the child.
             opener.developer.imagesOff = true
             #expect(opened.developer.imagesOff)
-            // A tab of its own shares nothing with them.
+            // An unrelated tab shares nothing.
             let other = Tab(url: URL(string: "http://localhost:1/"), spaceID: UUID())
             let otherView = other.ensureWebView()
             #expect(!other.developer.imagesOff && PageImages.sharing(with: otherView).isEmpty)
@@ -303,22 +300,22 @@ struct DeveloperMoreTests {
 
     @Test func aPageAnotherOpenedHasPreferencesOfItsOwn() {
         withDefaults {
-            // The page that opens it has styles off; WebKit hands over a configuration sharing its preferences.
+            // Opener has styles off; WebKit shares its preferences.
             let configuration = WKWebViewConfiguration()
             let opener = configuration.preferences
             PageStyles.set(false, in: opener)
             configuration.preferences.minimumFontSize = 3
-            // Whatever the site, and whatever the opener chose: a tab from it never shares them.
+            // A child tab never shares them, for any site or opener choice.
             for site in ["https://example.com/", "http://localhost:1/"] {
                 let handed = configuration.copy() as! WKWebViewConfiguration
                 #expect(handed.preferences === opener)
                 let tab = Tab(url: URL(string: site), spaceID: UUID(), configuration: handed)
                 let own = tab.ensureWebView().configuration.preferences
                 #expect(own !== opener)
-                // As WebKit has it for what the developer tools change, the same in all else.
+                // Matches WebKit's defaults for developer-tool settings.
                 #expect(own.value(forKey: PageStyles.key) as? Bool == true)
                 #expect(own.minimumFontSize == 3)
-                // The page that opened it keeps its own.
+                // The opener keeps its own.
                 PageStyles.set(false, in: own)
                 PageStyles.set(true, in: own)
                 #expect(opener.value(forKey: PageStyles.key) as? Bool == false)
@@ -395,7 +392,7 @@ struct DeveloperMoreTests {
         state = DeveloperState()
         state.userAgent = .chrome
         #expect(underMore(state))
-        // What a button above the page shows for itself isn't under ⋯, until the button gives way into it.
+        // Bar buttons aren't repeated under ⋯ until they overflow.
         state = DeveloperState()
         state.appearance = .dark
         #expect(!underMore(state) && underMore(state, shown: 0))

@@ -35,8 +35,8 @@ nonisolated enum Paths {
     static let tabState = privateDirectory("TabState")
     static let snapshots = privateDirectory("Snapshots")
 
-    /// A folder only you can open (0700), for what shows where you've been: pictures of pages and their back and
-    /// forward lists. One made by an older Zigzag, readable by everyone, is closed up too.
+    /// An owner-only folder (0700) for browsing traces: page snapshots and back/forward lists. Tightens folders older
+    /// builds left world-readable.
     static func privateDirectory(_ name: String, in base: URL = support) -> URL {
         let dir = base.appendingPathComponent(name, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
@@ -44,40 +44,39 @@ nonisolated enum Paths {
         return dir
     }
 
-    /// A file just written there, readable by you alone (0600).
+    /// Makes a file owner-only (0600).
     static func makePrivate(_ file: URL) { chmod(file.path, 0o600) }
 
     // MARK: Scripts
 
-    /// Where a Run Script rule's scripts live: one place, beside the rest of Zigzag's data, which Show Scripts Folder
-    /// opens in Finder. Not in Documents: Zigzag isn't sandboxed, so reading there would raise the system's
-    /// Documents prompt, and a Documents folder synced to iCloud can drop a script's executable bit.
+    /// Run Script rules' scripts folder, beside Zigzag's data; Show Scripts Folder opens it. Not in Documents: Zigzag
+    /// isn't sandboxed, so that would trigger the Documents prompt, and iCloud-synced Documents can drop the executable
+    /// bit.
     private static let scriptsFolder = support.appendingPathComponent("Scripts", isDirectory: true)
 
-    /// That folder, made when it's first read: the sheet lists what's in it and a rule's bare file name means it.
+    /// Created on first access; bare script names refer to it.
     static var scripts: URL {
         try? FileManager.default.createDirectory(at: scriptsFolder, withIntermediateDirectories: true)
         return scriptsFolder
     }
 
-    /// The file a rule named, without touching the disk: a bare file name is in the scripts folder, and a leading `/`
-    /// or `~` is taken as it stands, for a script kept somewhere else.
+    /// The script a rule names, without disk access: bare names are in the scripts folder; a leading `/` or `~` is used
+    /// as is.
     static func script(named name: String) -> URL {
         let expanded = (name as NSString).expandingTildeInPath
         guard !expanded.hasPrefix("/") else { return URL(fileURLWithPath: expanded) }
         return scriptsFolder.appendingPathComponent(expanded)
     }
 
-    /// What a rule stores for a file picked in the open panel: a script in the folder is **named** rather than pathed,
-    /// so the rule reads `yt-dlp.sh` and keeps working; anything else keeps its full path.
+    /// Stored form for a picked file: scripts in the folder by name (so the rule reads `yt-dlp.sh`), others by full
+    /// path.
     static func scriptName(for url: URL) -> String {
         let picked = url.standardizedFileURL
         guard picked.deletingLastPathComponent() == scriptsFolder.standardizedFileURL else { return picked.path }
         return picked.lastPathComponent
     }
 
-    /// The scripts in that folder, by file name, as Finder lists them: what the sheet's menu offers. Folders and
-    /// hidden files aren't scripts, so they aren't offered.
+    /// Scripts in the folder by name, Finder-sorted, for the sheet's menu. Skips folders and hidden files.
     static func scriptNames() -> [String] {
         let names = (try? FileManager.default.contentsOfDirectory(atPath: scriptsFolder.path)) ?? []
         return names

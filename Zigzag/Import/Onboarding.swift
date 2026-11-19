@@ -851,12 +851,12 @@ private final class BrowserRow: InteractiveView {
 
     private static let rowHeight: CGFloat = 50
     private static let pad = Tokens.Space.x4
-    /// Where a row's name and line start (as drawn: the labels keep their own inset): past the checkbox and the icon.
+    /// Text start in a row: past the checkbox and icon (labels keep their own inset).
     static let textInset: CGFloat = pad + 18 + Tokens.Space.x3 + 30 + Tokens.Space.x3 + Label.inset
 
     func height(for width: CGFloat) -> CGFloat {
         guard !problem.stringValue.isEmpty else { return Self.rowHeight }
-        // Measured at the width it's laid out at, so a long problem is never cut short.
+        // Measured at the layout width so long problems aren't cut off.
         let h = ceil(problem.sizeThatFits(NSSize(width: width - (Self.textInset - Label.inset) - Self.pad, height: 200)).height)
         return Self.rowHeight + h + Tokens.Space.x3
     }
@@ -1296,8 +1296,8 @@ private final class BringPicker: StepContent {
     private func pickFile() {
         guard let window, !isImporting else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.commaSeparatedText, .zip]
-        panel.message = String(localized: "Choose a password export (a .csv file) or Safari’s exported browsing data (a .zip file).",
+        panel.allowedContentTypes = [.commaSeparatedText, .zip, .html]
+        panel.message = String(localized: "Choose a password export (a .csv file), a bookmarks export (an .html file) or Safari’s exported browsing data (a .zip file).",
                                comment: "Message of the open panel from the welcome window’s Import a password file… link.")
         panel.prompt = String(localized: "Import", comment: "Main button in the Import window.")
         panel.beginSheetModal(for: window) { [weak self] response in
@@ -1312,8 +1312,7 @@ private final class BringPicker: StepContent {
         return list + linkHeight + (hint.stringValue.isEmpty ? 0 : hint.lineHeight + Tokens.Space.x3)
     }
 
-    /// The note that nothing was found: its own lines' height, so the card around it keeps the same room above
-    /// and below it.
+    /// The empty note's height, so the card keeps equal padding.
     private func emptyHeight(for width: CGFloat) -> CGFloat {
         ceil(empty.sizeThatFits(NSSize(width: width, height: .greatestFiniteMagnitude)).height)
     }
@@ -1333,7 +1332,7 @@ private final class BringPicker: StepContent {
             let h = row.height(for: width)
             row.frame = NSRect(x: 0, y: ry, width: width, height: h)
             ry += h
-            // The line starts where the rows' words do, past the checkbox and the icon.
+            // Separators start at the rows' text.
             if i < separators.count { separators[i].frame = NSRect(x: BrowserRow.textInset, y: ry, width: width - BrowserRow.textInset, height: Tokens.Metric.hairline) }
         }
         scroll.isHidden = rows.isEmpty
@@ -1341,8 +1340,7 @@ private final class BringPicker: StepContent {
         scroll.frame = NSRect(x: pad, y: 0, width: width, height: min(ry, max(room, 0)))
         list.frame = NSRect(x: 0, y: 0, width: width, height: ry)
         if rows.isEmpty {
-            // Its capitals, not its line box, in the middle of the card's equal padding (a wrapped note's lines
-            // lean the same way).
+            // Center the caps in the card's padding, not the line box.
             let height = emptyHeight(for: width), font = empty.font ?? Tokens.Font.body()
             let line = ceil(font.ascender - font.descender + font.leading)
             let scale = window?.backingScaleFactor ?? 2

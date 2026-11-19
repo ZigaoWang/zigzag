@@ -54,9 +54,7 @@ struct LocalizationTests {
         #expect(stale.isEmpty, "Stale in the catalog, run scripts/sync-strings.sh: \(stale.sorted().prefix(20))")
     }
 
-    /// Simplified Chinese puts a space between Chinese characters and Latin letters or digits ("Zigzag 里", "2019 的
-    /// Mac"), never next to full-width punctuation, as Apple's own Chinese does. Placeholders are left as they are,
-    /// since what fills them may be Chinese.
+    /// zh-Hans spaces Chinese from Latin letters and digits ("Zigzag 里", "2019 的 Mac"), never beside full-width punctuation, like Apple's. Placeholders are skipped.
     @Test func chineseSpacesLatinAndDigits() throws {
         let strings = try Self.catalog()
         let gap = try NSRegularExpression(pattern: #"[\u4E00-\u9FFF][A-Za-z0-9]|[A-Za-z0-9][\u4E00-\u9FFF]"#)
@@ -107,19 +105,19 @@ struct LocalizationTests {
         #expect(found.isEmpty, "Not localizable:\n\(found.joined(separator: "\n"))")
     }
 
-    /// Sentences are joined as their language spaces them: no space after a full-width stop, one after an English one.
+    /// Sentences join per language: no space after a full-width stop, one after an English one.
     @MainActor @Test func sentencesJoinWithoutASpaceAfterAFullWidthStop() {
         #expect(Words.sentences("图片和视频保持原样。", "使用 Dark Reader。") == "图片和视频保持原样。使用 Dark Reader。")
         #expect(Words.sentences("绝不替你同意！", "使用 Autoconsent。") == "绝不替你同意！使用 Autoconsent。")
         #expect(Words.sentences("Never says yes.", "Uses Autoconsent.") == "Never says yes. Uses Autoconsent.")
         #expect(Words.sentences("", "Uses Autoconsent.") == "Uses Autoconsent.")
         #expect(Words.sentences("Never says yes.", nil) == "Never says yes.")
-        // A closing quote is English's too: after one, the space stays, unless a full-width stop is just inside it.
+        // After an English closing quote the space stays, unless a full-width stop is inside it.
         #expect(Words.sentences("It says “Allow.”", "Then reload.") == "It says “Allow.” Then reload.")
         #expect(Words.sentences("它说“允许。”", "然后重新载入。") == "它说“允许。”然后重新载入。")
     }
 
-    /// Two localized sentences are never glued with a plain space in code: `Words.sentences` spaces them.
+    /// Localized sentences are never joined with a literal space; use `Words.sentences`.
     @Test func noSentencesGluedWithASpace() {
         let pattern = try! NSRegularExpression(pattern: #"\+\s*" "\s*\+\s*String\(localized:"#)
         let root = Self.repo.appendingPathComponent("Zigzag")

@@ -2,14 +2,11 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// Windows that share a space's tabs, as in Arc, while Settings › Tabs says so (#162): each window is a view of one
-/// list, with its own space and its own tab on screen; a page is on screen in one window at a time. Turning it on
-/// joins the windows' tabs up, turning it off gives each window the tabs it has, and neither loses a tab. A session
-/// comes back with each tab once.
+/// Arc-style shared tabs across windows (#162): one list, each window with its own space and tab, a page on screen in one window at a time. Toggling never loses tabs; sessions restore each tab once.
 @MainActor struct SharedTabsTests {
     private var space: UUID { Library.shared.spaces[0].id }
 
-    /// Two windows sharing one list, closed when the test is done.
+    /// Two windows sharing one list, closed after the test.
     private func shared(_ body: (TabManager, TabManager) throws -> Void) rethrows {
         let store = TabStore()
         let a = TabManager(spaceID: space, store: store)
@@ -21,7 +18,7 @@ import Testing
         try body(a, b)
     }
 
-    /// Two windows with tabs of their own, closed when the test is done.
+    /// Two windows with separate tabs, closed after the test.
     private func own(_ body: (TabManager, TabManager) throws -> Void) rethrows {
         let a = TabManager(spaceID: space)
         let b = TabManager(spaceID: space)
@@ -65,13 +62,13 @@ import Testing
             let one = a.newTab(url: nil, spaceID: space)
             let two = b.newTab(url: nil, spaceID: space)
             b.select(one)
-            // B has it on screen now; A, still on it, says it's in another window.
+            // B shows it now; A says it's in another window.
             #expect(b.selectedTab === one)
             #expect(!b.isShownElsewhere(one))
             #expect(a.selectedTab === one)
             #expect(a.isShownElsewhere(one))
             #expect(!a.mayShow(one))
-            // B goes on to another tab: the page is free, and A shows it again.
+            // B moves on: A shows it again.
             b.select(two)
             #expect(!a.isShownElsewhere(one))
             #expect(a.mayShow(one))
@@ -88,9 +85,9 @@ import Testing
             #expect(two.isClosed)
             #expect(a.tab(with: two.id) == nil && b.tab(with: two.id) == nil)
             #expect(ids(a) == [one.id])
-            // B was on it: it goes on to another tab, one A isn't showing if there is one.
+            // B moves to another tab, preferring one A isn't showing.
             #expect(b.selectedTab?.isClosed != true)
-            // ⇧⌘T in the other window brings it back, once.
+            // ⇧⌘T in the other window reopens it once.
             #expect(a.canReopenClosedTab)
             let back = a.reopenClosedTab(select: false)
             #expect(back != nil)
@@ -132,17 +129,17 @@ import Testing
         a.close(one)
         b.close(two)
         hidden.close(secret)
-        // History › Recently Closed, from either window: both tabs, newest first, each once; never the private one.
+        // Recently Closed from either window: both tabs, newest first, once each; never private ones.
         #expect(a.recentlyClosedTabs.map(\.id) == [two.id, one.id])
         #expect(b.recentlyClosedTabs.map(\.id) == a.recentlyClosedTabs.map(\.id))
         #expect(!a.recentlyClosedTabs.contains { $0.id == secret.id })
-        // Reopened from one window, it's gone from the list in both, and open in both, once.
+        // Reopened from one window: removed from the list in both, open once.
         let back = b.reopenClosedTab(one.id, select: false)
         #expect(back != nil)
         #expect(a.recentlyClosedTabs.map(\.id) == [two.id])
         #expect(a.tabs(in: space).filter { $0.url == one.url }.count == 1)
         #expect(a.tab(with: back!.id) === back)
-        // Closing one of the sharing windows leaves tabs open elsewhere: it isn't a window to reopen.
+        // Closing one sharing window isn't a closed window to reopen.
         #expect(!b.isLastView)
     }
 
@@ -186,7 +183,7 @@ import Testing
             guard let other = Library.shared.spaces.dropFirst().first?.id else { return }
             let here = a.newTab(url: nil, spaceID: space, select: false)
             let there = b.newTab(url: nil, spaceID: other, select: false)
-            // A space is one profile's: a window on another profile's space never lists this one's tabs.
+            // Spaces belong to a profile; other profiles' windows never list these tabs.
             #expect(!a.tabs(in: other).contains { $0 === here })
             #expect(!b.tabs(in: space).contains { $0 === there })
             #expect(a.tabs(in: other).map(\.id) == [there.id])
@@ -205,7 +202,7 @@ import Testing
             let before = ids(a) + ids(b)
             TabStore.share([a, b])
             #expect(a.store === b.store)
-            // Each space's tabs, window after window.
+            // Each space's tabs, window by window.
             #expect(ids(a) == before)
             #expect(ids(b) == ids(a))
             #expect(a.selectedTab === mine[1])
@@ -232,14 +229,14 @@ import Testing
             #expect(all.count == tabs.count)
             #expect(Set(all) == Set(tabs.map(\.id)))
             #expect(tabs.allSatisfy { !$0.isClosed })
-            // Each window keeps the tab it's on.
+            // Each window keeps its selected tab.
             #expect(a.selectedTab === tabs[0] && a.tab(with: tabs[0].id) === tabs[0])
             #expect(b.selectedTab === tabs[2] && b.tab(with: tabs[2].id) === tabs[2])
-            // A split stays whole, in one window.
+            // A split stays in one window.
             let pairIn = [a, b].filter { $0.split(for: tabs[3]) != nil }
             #expect(pairIn.count == 1)
             #expect(pairIn.first?.tab(with: tabs[4].id) === tabs[4])
-            // A nested tab whose parent went elsewhere is at the top level, never under a tab it doesn't have.
+            // A child whose parent moved elsewhere goes to the top level.
             for manager in [a, b] {
                 for tab in manager.tabs(in: space) { if let parent = tab.parentID { #expect(manager.tab(with: parent) != nil) } }
             }
@@ -275,7 +272,7 @@ import Testing
         let tabs = ["mail", "docs", "left", "right"].map(tabState)
         var pair = TabManager.SplitPair(left: tabs[2].id, right: tabs[3].id)
         pair.ratio = 0.4
-        // As saved while sharing: the first window has the list, the second only what it chose.
+        // Saved while sharing: the first window has the list, the second only its selection.
         let first = window(tabs, selected: tabs[0].id, splits: [pair])
         let second = window([], selected: tabs[2].id)
         let store = TabStore()
@@ -295,7 +292,7 @@ import Testing
     @Test func windowsSavedWithTabsOfTheirOwnComeBackSharingWithoutDuplicates() {
         let mine = ["mail", "docs"].map(tabState)
         let theirs = ["news", "recipes"].map(tabState)
-        // The same tab saved in both (a session written twice over): it comes back once.
+        // A tab saved in both windows restores once.
         let first = window(mine + [theirs[0]], selected: mine[1].id)
         let second = window(theirs, selected: theirs[1].id, splits: [TabManager.SplitPair(left: theirs[0].id, right: theirs[1].id)])
         let store = TabStore()

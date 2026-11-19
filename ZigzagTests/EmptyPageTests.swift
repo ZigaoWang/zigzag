@@ -4,8 +4,7 @@ import Testing
 import UniformTypeIdentifiers
 @testable import Zigzag
 
-/// The empty page: a soft wash of the space's own color, a lighter sidebar, and the picture chosen for it, kept as
-/// Zigzag's own copy at the size the screen needs.
+/// The empty page: a tinted wash, a lighter sidebar, and a resized copy of the chosen picture.
 struct EmptyPageTests {
     private static let light = NSAppearance(named: .aqua)!
     private static let dark = NSAppearance(named: .darkAqua)!
@@ -27,7 +26,7 @@ struct EmptyPageTests {
             for appearance in [Self.light, Self.dark] {
                 #expect(resolved(ground, appearance) == resolved(Brand.Theme.of(space).wash, appearance))
             }
-            // The sidebar's own family: the wash leans toward the frame's hue, by day and at night.
+            // The wash leans toward the frame's hue, day and night.
             for appearance in [Self.light, Self.dark] {
                 let wash = resolved(ground, appearance), frame = resolved(space.background, appearance)
                 if frame.saturationComponent > 0.05, wash.saturationComponent > 0.01 {
@@ -43,11 +42,11 @@ struct EmptyPageTests {
             let space = SpaceInfo(name: "S", color: color)
             let ground = EmptyPage.ground(for: space, isPrivate: false)
             let day = resolved(ground, Self.light), night = resolved(ground, Self.dark)
-            // Lighter than the sidebar by day, never quite white, and calm: hardly any chroma.
+            // Day: lighter than the sidebar, not white, low chroma.
             #expect(luminance(day) > luminance(resolved(space.background, Self.light)))
             #expect(luminance(day) < 0.999)
             #expect(day.saturationComponent < 0.12)
-            // Deep at night, a step under the sidebar's own deep tint, as dark as a page there: never a bright color.
+            // Night: darker than the sidebar, page-dark, never bright.
             #expect(luminance(night) < luminance(resolved(space.background, Self.dark)))
             #expect(night.brightnessComponent < 0.25)
         }
@@ -81,7 +80,7 @@ struct EmptyPageTests {
         return dir
     }
 
-    /// A plain PNG of `width` by `height` pixels.
+    /// A PNG of `width` x `height` pixels.
     private func picture(width: Int, height: Int, in dir: URL) -> URL {
         let space = CGColorSpace(name: CGColorSpace.sRGB)!
         let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space,
@@ -97,12 +96,12 @@ struct EmptyPageTests {
 
     @Test func keptSizeStillCoversTheScreenAndNeverGrows() {
         let screen = CGSize(width: 3024, height: 1964)
-        // A large landscape picture shrinks until its height meets the screen's.
+        // A large landscape shrinks to the screen height.
         #expect(SpaceBackground.keptLongestSide(of: CGSize(width: 6000, height: 4000), covering: screen) == 3024)
-        // A panorama keeps enough width that its short side still covers the screen's height.
+        // A panorama keeps enough width for its height to cover the screen.
         #expect(SpaceBackground.keptLongestSide(of: CGSize(width: 8000, height: 1000), covering: screen) == 8000)
         #expect(SpaceBackground.keptLongestSide(of: CGSize(width: 12000, height: 3000), covering: screen) == 7856)
-        // A small one is kept as it is.
+        // Small pictures are kept as is.
         #expect(SpaceBackground.keptLongestSide(of: CGSize(width: 800, height: 600), covering: screen) == 800)
         #expect(SpaceBackground.keptLongestSide(of: .zero, covering: screen) == 0)
     }
@@ -115,11 +114,11 @@ struct EmptyPageTests {
         let name = try #require(SpaceBackground.store(source, for: id, screen: CGSize(width: 1000, height: 800), in: folder))
         #expect(name.hasPrefix(id.uuidString))
         #expect(name.hasSuffix(".jpg"))
-        // A copy: the original going away leaves it.
+        // A copy: removing the original leaves it.
         try FileManager.default.removeItem(at: source)
         #expect(SpaceBackground.isKept(name, in: folder))
         let image = try #require(SpaceBackground.load(name, in: folder))
-        // Shrunk so its 2000 high fits 800 high: 1600 by 800, still covering the 1000 wide screen.
+        // 2000 high scaled to 800: 1600x800, still covering the 1000 wide screen.
         #expect(image.width == 1600)
         #expect(image.height == 800)
     }
@@ -142,7 +141,7 @@ struct EmptyPageTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let source = picture(width: 120, height: 80, in: dir)
         let name = try #require(SpaceBackground.store(source, for: UUID(), screen: CGSize(width: 100, height: 100), in: folder))
-        // A name that isn't a plain file in the folder never deletes anything.
+        // Paths outside the folder never delete anything.
         SpaceBackground.remove("../" + source.lastPathComponent, in: folder)
         #expect(FileManager.default.fileExists(atPath: source.path))
         SpaceBackground.remove(name, in: folder)
@@ -166,7 +165,7 @@ struct EmptyPageTests {
         space.backgroundImage = "abc.jpg"
         let data = try JSONEncoder().encode(space)
         #expect(try JSONDecoder().decode(SpaceInfo.self, from: data).backgroundImage == "abc.jpg")
-        // A library from before has none.
+        // Older libraries have none.
         let older = try JSONDecoder().decode(SpaceInfo.self, from: Data(#"{"id":"\#(UUID().uuidString)","name":"Old","color":"sky","bookmarks":[]}"#.utf8))
         #expect(older.backgroundImage == nil)
     }

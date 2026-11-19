@@ -283,7 +283,7 @@ final class BrowserRootView: SpaceFrameView {
     /// With no tab open, the page card stays, empty, its own color apart from the sidebar's, with the wordmark on
     /// it (#210): the window still reads as a sidebar and a page, as it does with a page open.
     let emptyHint = EmptySpaceMark()
-    /// Under the wordmark, on the card: the space's soft wash, or its picture (`EmptyPage`). Read only while empty.
+    /// Behind the wordmark: the space's tint or picture (`EmptyPage`). Only read while empty.
     let emptyBackdrop = EmptyPageBackdrop()
     var isEmpty = false {
         didSet {
@@ -291,7 +291,7 @@ final class BrowserRootView: SpaceFrameView {
             // The bar above the page takes the page's color, and there's none now.
             refreshGlassFrame()
             emptyBackdrop.isActive = isEmpty
-            // A change of state in place, eased; opening a window or restoring one, it's simply there.
+            // Animate in-place changes; a new or restored window shows it immediately.
             guard window?.isVisible == true else {
                 emptyHint.alphaValue = isEmpty ? 1 : 0
                 emptyBackdrop.alphaValue = isEmpty ? 1 : 0
@@ -304,12 +304,19 @@ final class BrowserRootView: SpaceFrameView {
         }
     }
 
-    /// The empty page as `space` has it: its wash and its picture, none of either in a private window.
+    /// Shows `space`'s empty page tint and picture; none in a private window.
     func showEmptyPage(of space: SpaceInfo, isPrivate: Bool, animated: Bool) {
-        // The picture as the library has it: a look being dragged in the editor is a copy from when it opened.
+        // Use the library's copy: one being edited is a snapshot from when the editor opened.
         let kept = Library.shared.space(space.id) ?? space
         emptyBackdrop.show(ground: EmptyPage.ground(for: space, isPrivate: isPrivate),
                            picture: EmptyPage.picture(for: kept, isPrivate: isPrivate), animated: animated && window?.isVisible == true)
+    }
+
+    /// Partway through a swipe: the empty page's wash `share` of the way to `next`'s. Its picture changes on landing.
+    func showEmptyPage(of space: SpaceInfo, toward next: SpaceInfo, share: CGFloat) {
+        let kept = Library.shared.space(space.id) ?? space
+        let ground = SpaceInfo.mix(EmptyPage.ground(for: space, isPrivate: false), EmptyPage.ground(for: next, isPrivate: false), by: share)
+        emptyBackdrop.show(ground: ground, picture: EmptyPage.picture(for: kept, isPrivate: false), animated: false)
     }
 
     /// Desk view hides the pages while their picture flies into or out of a card, so the two never show at once.
@@ -505,7 +512,7 @@ final class BrowserRootView: SpaceFrameView {
     /// Highlights where a dragged tab would open beside the current page.
     let splitDropHint = SplitDropHint()
     private let resizeHandle = ResizeHandle()
-    /// The glow along the sidebar's edge while a question is waiting that this window can't show.
+    /// Glow on the sidebar edge while a question waits that this window can't show.
     private let attentionEdge = AttentionEdge()
     private var attentionToken: SignalToken?
     /// Floating surfaces (command bar, previews, peek) live here, above everything.
@@ -610,7 +617,7 @@ final class BrowserRootView: SpaceFrameView {
         attentionEdge.onClick = { [weak self] in
             guard let self else { return }
             self.setSidebarVisible(true, animated: true)
-            // Bring the tab the question is for to the front, so the banner it is waiting for comes up.
+            // Select the tab the question is for so its banner shows.
             if let waiting = self.waitingTabs.first,
                let tabs = (self.window?.windowController as? BrowserWindowController)?.tabManager {
                 tabs.select(waiting)
@@ -629,7 +636,7 @@ final class BrowserRootView: SpaceFrameView {
                 }
             }
         }
-        // A question arriving (or being answered) can bring the edge glow on, or take it away.
+        // Questions arriving or answered toggle the glow.
         attentionToken = PendingQuestions.changed.observe { [weak self] _ in self?.needsLayout = true }
         resizeHandle.onBegin = { [weak self] in
             guard let self else { return }
@@ -968,8 +975,8 @@ final class BrowserRootView: SpaceFrameView {
         return sidebarOnRight ? sidebar.minX - Tokens.Space.x2 - width : sidebar.maxX + Tokens.Space.x2
     }
 
-    /// The resize handle, on the sidebar's edge that faces the page.
-    /// Where the waiting glow goes while the sidebar is hidden: the window's own edge on the sidebar's side.
+    /// The resize handle, on the sidebar's page-facing edge.
+    /// Glow frame while the sidebar is hidden: the window edge on the sidebar's side.
     static func attentionEdgeFrame(in bounds: NSRect, onRight: Bool) -> NSRect {
         AttentionEdge.frame(forPage: bounds, sidebarOnRight: onRight)
     }
@@ -1021,9 +1028,8 @@ final class BrowserRootView: SpaceFrameView {
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         resizeHandle.frame = Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
-        // The glow sits on the window's edge where the sidebar comes back from, while the sidebar is out of sight and a
-        // question is waiting. Not at the resize handle: with the sidebar hidden that is the sidebar's width into the
-        // page, a line through what you are reading.
+        // With the sidebar hidden, the glow goes on the window edge, not at the resize handle, which would sit inside
+        // the page.
         attentionEdge.frame = Self.attentionEdgeFrame(in: bounds, onRight: sidebarOnRight)
         let waiting = waitingTabs
         attentionEdge.waiting = waiting.count
@@ -1036,8 +1042,7 @@ final class BrowserRootView: SpaceFrameView {
     /// goes with the sidebar, and the bar above the page moves down and up by its inset as it does.
     private var frameComesWithSidebar: Bool { !Self.isBorderless && window?.styleMask.contains(.fullScreen) == true }
 
-    /// The tabs in this window with a question waiting that nothing here is showing: a background tab, or a hidden
-    /// window. They are what the sidebar's edge glows for while the sidebar is out of sight.
+    /// Tabs with a waiting question that nothing shows (background tab, hidden window); the glow is for them.
     private var waitingTabs: [Tab] {
         guard let tabs = (window?.windowController as? BrowserWindowController)?.tabManager.allTabs else { return [] }
         let host = window?.windowController as? PromptHost
@@ -1071,7 +1076,7 @@ final class BrowserRootView: SpaceFrameView {
         topBar.frame = bar
         topBar.rowTop = topBarFrame.minY - bar.minY
         (topBar.leadingInset, topBar.trailingInset) = TopBarView.insets(bar: bar, page: pageAreaFrame, window: bounds, onCard: addressEndsOnCard)
-        // The site's pill over the page's middle, as a split pane's is over its pane's.
+        // Center the site pill over the page, as in split panes.
         topBar.addressCenter = pageAreaFrame.midX - bar.minX
         let frames = tileFrames
         let over = liftedCards.map { lifted in paneCards.firstIndex { $0 === lifted }.flatMap { frames.indices.contains($0) ? frames[$0] : nil } ?? frames[0] }
@@ -1856,11 +1861,11 @@ final class SplitDropHint: NSView {
 /// so it reads as pressed in on any color, black and white included. Nothing to click or dismiss; ⌘T and the
 /// sidebar's New Tab are where a tab comes from.
 final class EmptySpaceMark: NSView {
-    /// Room around the letters for the shadow they cast on a picture, so it isn't cut at the view's edge.
+    /// Margin for the text shadow on pictures, so it isn't clipped.
     static let margin: CGFloat = 6
     static let size = NSSize(width: 28 * WordmarkView.aspect + margin * 2, height: 28 + margin * 2)
-    /// On the space's picture (`EmptyPageBackdrop`) an engraving can't read over every picture: the letters are
-    /// laid on it instead, in white with one soft shadow (`Color.markOnPicture`).
+    /// On a space picture (`EmptyPageBackdrop`) the engraving isn't legible, so the text draws white with a soft shadow
+    /// (`Color.markOnPicture`).
     var onPicture = false { didSet { if onPicture != oldValue { needsDisplay = true } } }
 
     override init(frame: NSRect) {

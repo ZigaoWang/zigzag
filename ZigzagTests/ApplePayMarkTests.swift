@@ -3,8 +3,7 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// The Apple Store's checkout drew the Apple Pay logo over the Apple logo and Pay in text (#235): on apple.com, with
-/// Apple Pay coming from Apple's script for other browsers, only the text is drawn.
+/// Apple Store checkout drew both the Apple Pay logo and "Pay" text (#235); on apple.com only the text shows.
 @MainActor
 struct ApplePayMarkTests {
     private final class Loading: NSObject, WKNavigationDelegate {
@@ -12,7 +11,7 @@ struct ApplePayMarkTests {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
     }
 
-    /// The checkout's Apple Pay option and its own rules for it, as the store has them.
+    /// Checkout markup and CSS for Apple Pay, as apple.com serves them.
     private static func checkout(_ classes: String) -> String {
         """
         <html class="\(classes)"><head><style>
@@ -43,7 +42,7 @@ struct ApplePayMarkTests {
         #expect(await logo(Self.checkout("supports-applepay-ac"), at: "https://secure.store.apple.com/shop/checkout") == "none")
     }
 
-    /// Safari's Apple Pay, when WebKit gives it: the logo stays, and is the only mark.
+    /// With native Apple Pay the logo stays as the only mark.
     @Test func theLogoStaysWithoutTheTextMark() async {
         let drawn = await logo(Self.checkout("supports-applepay"), at: "https://www.apple.com/shop/checkout")
         #expect(drawn?.contains("apple-pay-logo-black") == true)

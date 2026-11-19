@@ -161,9 +161,7 @@ struct PageHolderTests {
         #expect(Tab.needsPictureOutOfSight(hasWebView: true, onScreen: page.window != nil, loaded: true, hasPicture: false))
     }
 
-    /// A page draws in its own look (the app's, or Dark Pages'), which a window can differ from (a private window is
-    /// always dark): its picture is checked against that, or the overview would take every picture in a private
-    /// window on a light Mac for stale, and retake it each time it opens.
+    /// Snapshots are checked against the page's appearance, not the window's; otherwise a private window (always dark) on a light Mac would retake every one.
     @Test func aPictureTakenOutOfSightIsCurrentInAWindowOfAnotherLook() async throws {
         let tab = tab()
         let page = tab.ensureWebView()
@@ -183,7 +181,7 @@ struct PageHolderTests {
         }
         try #require(tab.snapshot != nil)
         #expect(page.window == nil)
-        // Drawn in the page's own look, not the window's; and current, asked from that window.
+        // Drawn in the page's appearance, and current when asked from that window.
         #expect(tab.snapshotIsDark == page.effectiveAppearance.isDark)
         #expect(!tab.snapshotIsStale(windowDark: !appDark))
         #expect(!tab.snapshotIsStale(windowDark: appDark))

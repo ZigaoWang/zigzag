@@ -187,29 +187,27 @@ final class HistoryStore {
         }
     }
 
-    /// What a visited page is called where History lists it: its title, or for a file on your Mac or a PDF from the
-    /// web, which have no title of their own, its file's name; failing both, its site.
+    /// A visit's History title: the page title; for local files and web PDFs (which have none), the file name; else
+    /// the site.
     nonisolated static func shownTitle(_ title: String, url: URL) -> String {
         if !title.isEmpty { return title }
         return fileName(of: url) ?? url.host() ?? url.absoluteString
     }
 
-    /// A file's name, for a page that's a file (one on your Mac, a PDF from the web); nil for any other page.
+    /// For local files and web PDFs; nil otherwise.
     nonisolated static func fileName(of url: URL) -> String? {
         guard url.isFileURL || url.pathExtension.lowercased() == "pdf" else { return nil }
         let name = url.lastPathComponent
         return name.isEmpty || name == "/" ? nil : name
     }
 
-    /// What a PDF from the web is called, having no title of its own: the name its server gave it
-    /// (`Content-Disposition`'s filename, as `suggested`), else its file's name where the address has one
-    /// (`fileName(of:)`), else its site. A PDF at /download?id=5 is never called "download".
+    /// A web PDF's name: the server's (`Content-Disposition` filename, `suggested`), else the address's file name
+    /// (`fileName(of:)`), else the site. A PDF at /download?id=5 is never called "download".
     nonisolated static func pdfName(of url: URL, suggested: String?) -> String {
         if let suggested = suggested?.trimmingCharacters(in: .whitespacesAndNewlines), !suggested.isEmpty { return suggested }
         return fileName(of: url) ?? url.host() ?? ""
     }
 
-    /// The file name a response's `Content-Disposition` gives, when it gives one.
     nonisolated static func suggestedName(of response: URLResponse) -> String? {
         guard let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
               disposition.range(of: "filename", options: .caseInsensitive) != nil else { return nil }
@@ -236,8 +234,8 @@ final class HistoryStore {
     /// from the same `asker` took over: it's stopped where it was, as its answer would only be dropped.
     func search<T: Sendable>(_ query: String, limit: Int, asker: Int, then: @escaping @Sendable ([HistoryEntry]) -> T) async -> T? {
         guard let reader else { return then(search(query, limit: limit)) }
-        // Its place in line is taken now, as it's asked: two asked a moment apart can come back from the wait below in
-        // either order, and the later one taking the older place would be dropped as typed over, with no answer at all.
+        // Claim the ticket now: two reads close together can return from the wait below in either order, and the
+        // later one taking an older ticket would be dropped as superseded with no answer.
         let ticket = reader.claim(asker)
         // What was recorded just before is in by then.
         await database.written()
@@ -564,8 +562,7 @@ nonisolated final class HistoryReader: @unchecked Sendable {
         await read(asker: asker, ticket: ticket, { HistoryStore.runSearch(words, limit: limit, in: $0) }, then: then)
     }
 
-    /// A read's place in line for `asker`, taken as it's asked: the newest from now on, and the same asker's last
-    /// read, still going, is stopped, since its answer would be dropped.
+    /// Claims the newest ticket for `asker` and cancels its previous read, whose answer would be dropped anyway.
     func claim(_ asker: Int) -> Int {
         lock.withLock {
             tickets += 1
@@ -575,8 +572,8 @@ nonisolated final class HistoryReader: @unchecked Sendable {
         }
     }
 
-    /// Any read, the same way: `lookup` on this connection (nil when the file can't be opened), then `then` on its
-    /// answer. `ticket`: its place in line, if it was claimed when asked; else it's claimed now.
+    /// Runs `lookup` on this connection (nil when the file can't be opened), then `then` with its result. `ticket`:
+    /// claimed at ask time, else claimed now.
     func read<R, T: Sendable>(asker: Int, ticket: Int? = nil, _ lookup: @escaping @Sendable (OpaquePointer?) -> R, then: @escaping @Sendable (R) -> T) async -> T? {
         let ticket = ticket ?? claim(asker)
         return await withCheckedContinuation { continuation in
