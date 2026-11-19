@@ -297,3 +297,110 @@ struct PinnedSpaceNameTests {
         _ = tab
     }
 }
+
+/// The sidebar's hot screen edge (#363): the panel against the screen's edge on the sidebar's side, the pointer read
+/// top-down as in a window, and only the screen under the pointer considered.
+@MainActor
+struct EdgeSidebarLayoutTests {
+    /// A visible frame below the menu bar, beside the Dock's side of the screen left alone.
+    let screen = NSRect(x: 0, y: 25, width: 1440, height: 875)
+    let width: CGFloat = 240
+
+    @Test func thePanelRunsDownTheScreensEdgeOnTheSidebarsSide() {
+        let left = EdgeSidebarLayout.frame(in: screen, width: width, onRight: false)
+        let right = EdgeSidebarLayout.frame(in: screen, width: width, onRight: true)
+        #expect(left == NSRect(x: 0, y: 25, width: 240, height: 875))
+        #expect(right == NSRect(x: 1200, y: 25, width: 240, height: 875))
+        // The visible frame's whole height: never over the menu bar or the Dock.
+        #expect(left.minY == screen.minY && left.height == screen.height)
+    }
+
+    @Test func thePanelIsNeverWiderThanTheScreen() {
+        #expect(EdgeSidebarLayout.frame(in: screen, width: 2000, onRight: true) == screen)
+        #expect(EdgeSidebarLayout.frame(in: screen, width: -40, onRight: false).width == 0)
+    }
+
+    @Test func thePointerIsReadTopDownFromTheTopOfTheScreen() {
+        // The visible frame's top-left corner is the zone's origin; over the menu bar it's above the top.
+        #expect(EdgeSidebarLayout.point(NSPoint(x: 0, y: 900), in: screen) == NSPoint(x: 0, y: 0))
+        #expect(EdgeSidebarLayout.point(NSPoint(x: 10, y: 25), in: screen) == NSPoint(x: 10, y: 875))
+        #expect(EdgeSidebarLayout.point(NSPoint(x: 10, y: 930), in: screen).y == -30)
+        // A screen away from the origin keeps its own left edge at zero.
+        let second = NSRect(x: 1440, y: 0, width: 1920, height: 1080)
+        #expect(EdgeSidebarLayout.point(NSPoint(x: 2000, y: 1080), in: second) == NSPoint(x: 560, y: 0))
+    }
+
+    @Test func theEdgeOpensInItsStripAndKeepsOnlyWhatItSummoned() {
+        // Top-down, in the zone's own terms: y measured down from the screen's top.
+        func point(_ x: CGFloat, _ y: CGFloat) -> NSPoint { NSPoint(x: x, y: y) }
+        let left = EdgeSidebarLayout.zone(in: screen, width: width, onRight: false)
+        #expect(left.opens(at: point(2, 400)))
+        #expect(!left.opens(at: point(400, 400)))
+        #expect(left.keeps(at: point(2, 400)))
+        #expect(left.keeps(at: point(120, 400)))
+        #expect(!left.keeps(at: point(300, 400)))
+        #expect(left.isPast(point(-1000, 400)))
+        #expect(!left.isPast(point(120, 400)))
+
+        // On the right the strip is at the screen's right edge, and the sidebar's own side counts as kept.
+        let right = EdgeSidebarLayout.zone(in: screen, width: width, onRight: true)
+        #expect(right.opens(at: point(1438, 400)))
+        #expect(!right.opens(at: point(2, 400)))
+        #expect(right.keeps(at: point(1438, 400)))
+        #expect(right.keeps(at: point(1300, 400)))
+        #expect(!right.keeps(at: point(1000, 400)))
+    }
+
+    @Test func onlyTheScreenUnderThePointerIsConsidered() {
+        let second = NSRect(x: 1440, y: 0, width: 1920, height: 1080)
+        let screens = [screen, second]
+        #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 100, y: 100), in: screens) == 0)
+        #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 2000, y: 100), in: screens) == 1)
+        // Over the menu bar, where no visible frame reaches: on none, so no edge.
+        #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 2000, y: 1100), in: screens) == nil)
+    }
+}
+
+/// The hot screen edge's switch (#363): off until turned on, one change heard per actual change, and the key left as
+/// it was found.
+@Suite(.serialized)
+@MainActor
+struct EdgeSidebarSettingTests {
+    private func restoring(_ body: () -> Void) {
+        let saved = UserDefaults.standard.object(forKey: EdgeSidebar.defaultsKey) as? Bool
+        defer {
+            if let saved { UserDefaults.standard.set(saved, forKey: EdgeSidebar.defaultsKey) }
+            else { UserDefaults.standard.removeObject(forKey: EdgeSidebar.defaultsKey) }
+        }
+        body()
+    }
+
+    @Test func theSwitchIsOffUntilTurnedOn() {
+        restoring {
+            UserDefaults.standard.removeObject(forKey: EdgeSidebar.defaultsKey)
+            #expect(!EdgeSidebar.isOn)
+            EdgeSidebar.isOn = true
+            #expect(EdgeSidebar.isOn)
+            #expect(UserDefaults.standard.bool(forKey: EdgeSidebar.defaultsKey))
+        }
+    }
+
+    @Test func aChangeIsHeardOnceAndOnlyWhenItChanges() {
+        restoring {
+            UserDefaults.standard.removeObject(forKey: EdgeSidebar.defaultsKey)
+            nonisolated final class Count: @unchecked Sendable { var heard = 0 }
+            let count = Count()
+            let token = NotificationCenter.default.addObserver(forName: EdgeSidebar.changed, object: nil, queue: nil) { _ in count.heard += 1 }
+            defer { NotificationCenter.default.removeObserver(token) }
+
+            EdgeSidebar.isOn = true
+            #expect(count.heard == 1)
+            EdgeSidebar.isOn = true
+            #expect(count.heard == 1)
+            EdgeSidebar.isOn = false
+            #expect(count.heard == 2)
+            EdgeSidebar.isOn = false
+            #expect(count.heard == 2)
+        }
+    }
+}

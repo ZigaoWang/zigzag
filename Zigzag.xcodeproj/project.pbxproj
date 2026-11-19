@@ -72,6 +72,7 @@
 		C0C1E3340000000000000003 /* KeptCookiesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000004 /* KeptCookiesSheet.swift */; };
 		C0C1E3340000000000000005 /* KeptCookiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000006 /* KeptCookiesTests.swift */; };
 		C297C0DE0000000000000001 /* ClientCertificates.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000002 /* ClientCertificates.swift */; };
+		C297C0DE0000000000000363 /* EdgeSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000364 /* EdgeSidebar.swift */; };
 		C297C0DE0000000000000003 /* ClientCertificatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000004 /* ClientCertificatesTests.swift */; };
 		C1EA411C0000000000000001 /* CleanLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EA411C0000000000000002 /* CleanLink.swift */; };
 		C1EA411C0000000000000003 /* CleanLinkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EA411C0000000000000004 /* CleanLinkTests.swift */; };
@@ -628,6 +629,7 @@
 		C0C1E3340000000000000004 /* KeptCookiesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesSheet.swift; sourceTree = "<group>"; };
 		C0C1E3340000000000000006 /* KeptCookiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesTests.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000002 /* ClientCertificates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificates.swift; sourceTree = "<group>"; };
+		C297C0DE0000000000000364 /* EdgeSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeSidebar.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000004 /* ClientCertificatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificatesTests.swift; sourceTree = "<group>"; };
 		C1EA411C0000000000000002 /* CleanLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanLink.swift; sourceTree = "<group>"; };
 		C1EA411C0000000000000004 /* CleanLinkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanLinkTests.swift; sourceTree = "<group>"; };
@@ -1269,6 +1271,7 @@
 			isa = PBXGroup;
 			children = (
 				C1D2E3F40516273849A5B6C7 /* AttentionEdge.swift */,
+				C297C0DE0000000000000364 /* EdgeSidebar.swift */,
 				192303361A76A758A8F9346F /* FaviconView.swift */,
 				CC0E8F62B17A23075DFB3BF5 /* FavoritesView.swift */,
 				6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */,
@@ -2309,6 +2312,7 @@
 				3A01F2505087356C0221A1D0 /* DownloadsPanel.swift in Sources */,
 				6FF18123789D7B94380C69D5 /* EmojiSearch.swift in Sources */,
 				CD77ADCA81FF68CE94D13F63 /* EnergyWatch.swift in Sources */,
+				C297C0DE0000000000000363 /* EdgeSidebar.swift in Sources */,
 				0CDD41C7E897852C45B38991 /* ErrorPage.swift in Sources */,
 				FC7890AF73B47C398FD5A153 /* ExtensionBridge.swift in Sources */,
 				8EA92F19466027B9503E537A /* ExtensionCenter.swift in Sources */,

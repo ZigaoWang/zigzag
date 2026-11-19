@@ -178,6 +178,11 @@ final class SidebarListView: NSView {
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
     private var drag: DragState?
+    /// A tab or page picked with a click: the edge sidebar sets this to bring its window forward. The window's own
+    /// list leaves it nil, and its delegate selects as before.
+    var onPickTab: ((Tab) -> Void)?
+    /// Whether rows can be dragged out. The edge sidebar's list can't: a drag would leave the panel.
+    var allowsDragging = true
     /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
     private(set) var marked: [SidebarItem] = [] {
         didSet {
@@ -986,7 +991,7 @@ final class SidebarListView: NSView {
                 }
                 if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
-                self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
+                self.pick(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
                 _ = id
             }
             // In a row of several pages, the part double-clicked is the page renamed.
@@ -1037,7 +1042,7 @@ final class SidebarListView: NSView {
                         opening = pinned.ids[part]
                     } else if part == 1, let partner = row.partner, partner.bookmarkID == nil {
                         // The tab split beside it, riding in this row.
-                        self.delegate?.listSelect(partner)
+                        self.pick(partner)
                         return
                     }
                 }
@@ -1840,8 +1845,13 @@ final class SidebarListView: NSView {
     /// Where a tab from another window would land, for a screen point over this list.
     func dropIndex(at screenPoint: NSPoint) -> Int { dropTarget(at: screenPoint, allowsPinned: false).index }
 
+    /// A page picked with a click: the edge sidebar's own hook, or the window's delegate.
+    private func pick(_ tab: Tab) {
+        if let onPickTab { onPickTab(tab) } else { delegate?.listSelect(tab) }
+    }
+
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
-        guard let window, let manager, item.isDraggable else { return false }
+        guard allowsDragging, let window, let manager, item.isDraggable else { return false }
         delegate?.listHover(nil, row: nil, bookmark: nil)
         // Dragging one of several picked rows carries them all, landing together in list order.
         let picked = marked.count > 1 && marked.contains(item) ? marked : [item]

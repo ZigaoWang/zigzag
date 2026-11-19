@@ -22,7 +22,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     let tabManager: TabManager
     let sidebar = SidebarView()
+    /// The live second sidebar the hot screen edge shows (#363), made the first time it comes out.
+    private var edgeSidebar: SidebarView?
+    private var edgeContainer: SidebarContainer?
     let root: BrowserRootView
+
+    /// The window's sidebar and, once the hot edge has made it, the mirror it shows: one change reaches both. The
+    /// window's own sidebar is never moved, hidden or frozen by the edge.
+    private func bothSidebars(_ change: (SidebarView) -> Void) {
+        change(sidebar)
+        if let edgeSidebar { change(edgeSidebar) }
+    }
     var browserWindow: BrowserWindow { window as! BrowserWindow }
 
     private var tokens: [SignalToken] = []
@@ -209,12 +219,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // quitting.
         sidebar.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         sidebar.updateCard.onHide = { Updater.shared.dismissCard() }
-        sidebar.setUpdateCard(Updater.shared.cardState)
+        bothSidebars { $0.setUpdateCard(Updater.shared.cardState) }
         tokens.append(Updater.changed.observe { [weak self] in
             guard let self else { return }
             // Closed in this window: hide like a closed card; fade in others.
             let hiding = Updater.shared.readiness.isDismissed && self.window?.isKeyWindow == true
-            self.sidebar.setUpdateCard(Updater.shared.cardState, hiding: hiding)
+            self.bothSidebars { $0.setUpdateCard(Updater.shared.cardState, hiding: hiding) }
             self.placeFloatingUpdate(hiding: hiding)
         })
         sidebar.reloadButton.onClick = { [weak self] _ in
@@ -255,7 +265,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
         // Fading is slow; checking once a minute is plenty.
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.sidebar.list.refreshRows() }
+            MainActor.assumeIsolated { self?.bothSidebars { $0.list.refreshRows() } }
         }
         fadeTimer?.tolerance = 10
 
@@ -263,10 +273,10 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Private windows are always dark and say so, so you never wonder which one you're in.
             window.appearance = NSAppearance(named: .darkAqua)
             sidebar.list.privateLabel = true
-            sidebar.isPrivate = true
+            bothSidebars { $0.isPrivate = true }
         }
         applySpaceColor(animated: false)
-        sidebar.reloadSpaces(current: tabManager.currentSpaceID)
+        bothSidebars { $0.reloadSpaces(current: tabManager.currentSpaceID) }
         sidebar.onMoveSpace = { [weak self] id, index in
             guard let self, !self.tabManager.isPrivate else { return }
             self.libraryChange(String(localized: "Move Space", comment: "What Edit › Undo undoes after a space is dragged to a new place.")) {
@@ -338,7 +348,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         reloadFavorites()
         sidebar.currentSpaceID = tabManager.currentSpaceID
-        sidebar.list.reload(animated: false)
+        bothSidebars { $0.list.reload(animated: false) }
         showSelectedTab()
         downloadsChanged()
         window.eventInterceptor = { [weak self] event in self?.intercept(event) ?? false }
@@ -361,7 +371,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         case .structure:
             // Many at once (`TabManager.together`): once, when they're all done.
             if tabManager.isBatching { break }
-            sidebar.list.reload(animated: window?.isVisible == true)
+            bothSidebars { $0.list.reload(animated: window?.isVisible == true) }
             // A favorite opened or closed: its tile shows it.
             reloadFavorites()
             numberHints?.placesChanged()
@@ -397,7 +407,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let snapshot = sidebar.list.isDragging ? sidebar.listSnapshot() : nil
         lastSpaceID = tabManager.currentSpaceID
         sidebar.currentSpaceID = tabManager.currentSpaceID
-        sidebar.reloadSpaces(current: tabManager.currentSpaceID)
+        bothSidebars { $0.reloadSpaces(current: tabManager.currentSpaceID) }
         sidebar.transitionList(direction: CGFloat((newIndex - oldIndex).signum()), from: old, snapshot: snapshot)
         // The slide goes to Core Animation first, so it carries on from the fingers at once: the new color (and with
         // it light or dark, which restyles everything) follows a moment later, and the page after that (tens of
@@ -511,15 +521,17 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         // The tiles are the profile's of the space you're in.
         let favorites = Library.shared.favorites(in: tabManager.profile.id)
         let tabs = Dictionary(uniqueKeysWithValues: favorites.compactMap { favorite in tabManager.bookmarkTab(for: favorite.id).map { (favorite.id, $0) } })
-        sidebar.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
-        sidebar.needsLayout = true
+        bothSidebars {
+            $0.favorites.reload(favorites: Library.shared.favoriteTiles(in: tabManager.profile.id), selectedID: tabManager.selectedTab?.isFavorite == true ? tabManager.selectedTab?.bookmarkID : nil, tabs: tabs)
+            $0.needsLayout = true
+        }
     }
 
     private func libraryChanged() {
         // The list and favorites reload once already: the tab manager hears the same change first and sends
         // `.structure` (`tabManagerChanged`).
         applySpaceColor(animated: true)
-        sidebar.reloadSpaces(current: tabManager.currentSpaceID)
+        bothSidebars { $0.reloadSpaces(current: tabManager.currentSpaceID) }
     }
 
     private func historyMenu(back: Bool) -> NSMenu? { Self.historyMenu(of: selectedWebView, back: back) }
@@ -569,7 +581,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let above = BrowserRootView.addressAbovePage
         guard sidebar.holdsAddress == above else { return }
         if window?.isVisible == true { closeFloatingPanels() }
-        sidebar.holdsAddress = !above
+        bothSidebars { $0.holdsAddress = !above }
         if above {
             root.topBar.hold(buttons: sidebar.addressButtons, address: sidebar.address)
             let tab = tabManager.selectedTab
@@ -675,16 +687,16 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         miniPlayer.tabsChanged()
         // Back on the tab whose video went to the mini player: return it to the page.
         AutoPictureInPicture.shared.reconsider()
-        sidebar.update(tab: tab)
+        bothSidebars { $0.update(tab: tab) }
         root.topBar.showPage(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         paintTopBar()
         // A collapsed pinned section and a folded tab group (#209) show the current tab, so they update with the
         // selection.
         let space = tabManager.currentSpaceID
         if SidebarListView.isCollapsed(space) || tabManager.groups(in: space).contains(where: { !$0.isOpen }) {
-            sidebar.list.reload(animated: true)
+            bothSidebars { $0.list.reload(animated: true) }
         } else {
-            sidebar.list.refreshRows()
+            bothSidebars { $0.list.refreshRows() }
         }
         reloadFavorites()
         sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
@@ -1396,7 +1408,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         }
         let byID = Dictionary(tabs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let shown = nowPlayingChoice.pick(from: candidates).compactMap { byID[$0] }
-        sidebar.setNowPlaying(shown.map { (tab: $0, paused: isPausedForNowPlaying($0)) }, hiding: hiding)
+        bothSidebars { $0.setNowPlaying(shown.map { (tab: $0, paused: isPausedForNowPlaying($0)) }, hiding: hiding) }
     }
 
     /// Paused from its card, or a video stopped in the mini player.
@@ -1569,11 +1581,11 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 refreshExtensionActions()
                 updateHandoff()
                 // A pinned tab that moved on shows it right away.
-                if tab.bookmarkID != nil { sidebar.list.refreshRows() }
+                if tab.bookmarkID != nil { bothSidebars { $0.list.refreshRows() } }
                 // Remove the translation offer for the previous page.
                 withdrawStaleTranslationOffer()
             }
-            sidebar.update(tab: tab)
+            bothSidebars { $0.update(tab: tab) }
             root.topBar.showPage(url: tab.url, notSecure: tab.isNotSecure)
             paintTopBar()
             updateWindowTitle()
@@ -2032,7 +2044,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let mine = manager.items(isPrivate: tabManager.isPrivate)
         let active = mine.filter { $0.state == .downloading }
         let progress = active.isEmpty ? 1 : active.map(\.fractionCompleted).reduce(0, +) / Double(active.count)
-        sidebar.updateDownloads(active: active.count, hasAny: !mine.isEmpty, progress: progress)
+        bothSidebars { $0.updateDownloads(active: active.count, hasAny: !mine.isEmpty, progress: progress) }
     }
 
     /// The file's own icon lifts off where you clicked and arcs into the Downloads button, which answers with a
@@ -2218,7 +2230,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let held = root.showsTopBar && holdsToggle
         root.topBar.showsSidebarButton = root.showsTopBar && !docked
         root.topBar.sidebarOnRight = onRight
-        sidebar.isOnRight = onRight
+        bothSidebars { $0.isOnRight = onRight }
         // The sidebar's own, where the docked sidebar puts it.
         root.topBar.heldSidebarButtonOrigin = held && docked
             ? NSPoint(x: dockedMinX + sidebar.sidebarButton.frame.minX, y: Tokens.Sidebar.lightsCenter + root.sidebarTopRowDrop - SidebarView.toolbarButton / 2) : nil
@@ -2294,6 +2306,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
 
     func windowDidBecomeKey(_ notification: Notification) {
         updateHandoff()
+        // The hot screen edge brings out the sidebar of the window you were last in (#363).
+        EdgeSidebar.shared.noteFocused(self)
         // Brand moments in other windows (Settings, Passwords) follow the space in front.
         Brand.themeChanged.send(())
         layoutTrafficLights()
@@ -2301,6 +2315,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        EdgeSidebar.shared.windowClosed(self)
         fadeTimer?.invalidate()
         numberHints?.stop()
         Autofill.shared.forget(windowOf: window)
@@ -2633,7 +2648,7 @@ extension BrowserWindowController: SidebarDelegate {
     /// move doesn't ask: it only puts back what was.
     func confirmProfileCrossing(_ tabs: [Tab], to spaceID: UUID, then move: @escaping () -> Void) {
         // Not moved after all: a row dragged there goes back to where it was.
-        ProfileSheets.confirmCrossing(tabs, to: spaceID, in: root.overlay, cancelled: { [weak self] in self?.sidebar.list.reload(animated: true) }, then: move)
+        ProfileSheets.confirmCrossing(tabs, to: spaceID, in: root.overlay, cancelled: { [weak self] in self?.bothSidebars { $0.list.reload(animated: true) } }, then: move)
     }
 
     /// The same question for a pinned page, whose open page goes where it does.
@@ -2865,7 +2880,7 @@ extension BrowserWindowController: SidebarDelegate {
     /// A folder just made shows, with its name ready to type.
     func revealNewFolder(_ id: UUID) {
         if SidebarListView.isCollapsed(tabManager.currentSpaceID) { SidebarListView.setCollapsed(tabManager.currentSpaceID, false) }
-        sidebar.list.reload(animated: true)
+        bothSidebars { $0.list.reload(animated: true) }
         DispatchQueue.main.async { [weak self] in self?.sidebar.list.renameFolder(id) }
     }
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID, nesting: TabManager.Nesting, grouping: TabManager.Grouping) {
@@ -3324,14 +3339,36 @@ extension BrowserWindowController: SidebarDelegate {
         }
     }
 
-    func sidebarOpenCommandBar() { commandBar.show(mode: .editCurrent) }
+    func sidebarOpenCommandBar() {
+        // From the edge sidebar: Zigzag comes forward to be typed in, and the panel makes way for the bar.
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        commandBar.show(mode: .editCurrent)
+    }
     func sidebarSwitchSpace(_ id: UUID) { tabManager.switchToSpace(id) }
-    func sidebarAddMenu() -> [MenuPanel.Entry] { SidebarMenus.addPanel(controller: self) }
-    func sidebarBlankMenu() -> [MenuPanel.Entry] { SidebarMenus.blankPanel(controller: self) }
+    func sidebarAddMenu() -> [MenuPanel.Entry] {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge(keepingPanel: true) }
+        return SidebarMenus.addPanel(controller: self)
+    }
+    func sidebarBlankMenu() -> [MenuPanel.Entry] {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge(keepingPanel: true) }
+        return SidebarMenus.blankPanel(controller: self)
+    }
     /// Same as ⌘T: the new tab command bar, or an extension's new tab page.
-    func sidebarDoubleClickedBlank() { if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) } }
-    func sidebarShowDownloads(from view: NSView) { DownloadsPanel.show(from: view, in: self) }
+    func sidebarDoubleClickedBlank() {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
+        if !(commandBar.isVisible && commandBar.mode == .newTab) { newTab(nil) }
+    }
+    func sidebarShowDownloads(from view: NSView) {
+        if EdgeSidebar.shared.isShowing {
+            // The button that asked is in the panel, which is going: the window's own shows where the list will.
+            bringForwardForEdge()
+            DownloadsPanel.show(from: sidebar.downloadsButton, in: self)
+        } else {
+            DownloadsPanel.show(from: view, in: self)
+        }
+    }
     func sidebarSpaceMenu(for id: UUID) -> NSMenu? {
+        if EdgeSidebar.shared.isShowing { bringForwardForEdge(keepingPanel: true) }
         let menu = SidebarMenus.spaceMenu(for: id, controller: self)
         return menu.items.isEmpty ? nil : menu
     }
@@ -3412,5 +3449,139 @@ extension BrowserWindowController: CommandBarHost {
 
     func commandBarRestoreFocus() {
         if let selectedWebView { window?.makeFirstResponder(selectedWebView) }
+    }
+}
+
+// MARK: The sidebar at the screen's edge (#363)
+
+extension BrowserWindowController {
+    /// The whole sidebar the hot screen edge brings out: the window's own sidebar, mirrored. Made once, on first use,
+    /// and kept live from then on. It is never the window's sidebar, so nothing in the window moves or changes.
+    func edgeSidebarForDisplay() -> (sidebar: SidebarView, container: SidebarContainer) {
+        if let edgeSidebar, let edgeContainer { return (edgeSidebar, edgeContainer) }
+        let mirror = SidebarView(frame: .zero)
+        mirror.delegate = self
+        // A click picks a tab; a drag would leave the panel, so its rows stay put.
+        mirror.list.allowsDragging = false
+        mirror.list.onPickTab = { [weak self] tab in self?.pickFromEdgeSidebar(tab) }
+        wireEdgeSidebar(mirror)
+        let container = SidebarContainer(sidebar: mirror)
+        edgeSidebar = mirror
+        edgeContainer = container
+        return (mirror, container)
+    }
+
+    /// The width the window's sidebar is at now, which the panel's card takes: not a copy of the setting, which a drag
+    /// on the sidebar's edge may have moved past.
+    var edgeSidebarWidth: CGFloat { max(root.sidebarWidth, Tokens.Metric.sidebarMinWidth) }
+    var edgeSidebarOnRight: Bool { root.sidebarOnRight }
+
+    /// The window's look for the panel's card: the same tint, gradient, grain and glass, copied when it comes out.
+    var edgeSidebarLook: (tint: NSColor, gradient: (end: NSColor, angle: Double)?, grain: Double, glass: WindowGlass?) {
+        let container = root.sidebarContainer
+        return (container.tint, container.gradient, container.grain, container.windowGlass)
+    }
+
+    /// Brings the mirror up to the window's sidebar as it is now, before the panel shows it.
+    func prepareEdgeSidebar() {
+        guard let edgeSidebar else { return }
+        edgeSidebar.isPrivate = tabManager.isPrivate
+        edgeSidebar.isOnRight = root.sidebarOnRight
+        edgeSidebar.holdsAddress = sidebar.holdsAddress
+        edgeSidebar.trafficLightsWidth = 0
+        edgeSidebar.currentSpaceID = tabManager.currentSpaceID
+        reloadFavorites()
+        downloadsChanged()
+        updateNowPlaying()
+        edgeSidebar.update(tab: tabManager.selectedTab)
+        edgeSidebar.list.reload(animated: false)
+        edgeSidebar.setUpdateCard(Updater.shared.cardState)
+        edgeSidebar.address.setCapture(camera: tabManager.selectedTab?.isUsingCamera ?? false,
+                                      microphone: tabManager.selectedTab?.isUsingMicrophone ?? false)
+    }
+
+    /// The mirror's clicks: the window's own, except that anything which changes the window's page brings Zigzag
+    /// forward first, and a tab picked in it puts the panel away.
+    private func wireEdgeSidebar(_ mirror: SidebarView) {
+        mirror.updateCard.onRestart = { Updater.shared.restartToUpdate() }
+        mirror.updateCard.onHide = { Updater.shared.dismissCard() }
+
+        mirror.backButton.onClick = { [weak self] _ in self?.bringForwardForEdge(); self?.goBack(nil) }
+        mirror.forwardButton.onClick = { [weak self] _ in self?.bringForwardForEdge(); self?.goForward(nil) }
+        mirror.backButton.onRightClick = { [weak self] _ in self?.bringForwardForEdge(); return self?.historyMenu(back: true) }
+        mirror.forwardButton.onRightClick = { [weak self] _ in self?.bringForwardForEdge(); return self?.historyMenu(back: false) }
+        mirror.reloadButton.onClick = { [weak self] _ in
+            self?.bringForwardForEdge()
+            guard let tab = self?.tabManager.selectedTab else { return }
+            tab.isLoading ? tab.stopLoading() : tab.reload()
+        }
+        // The panel is the sidebar: this is its hide button, not the window's.
+        mirror.sidebarButton.onClick = { _ in EdgeSidebar.shared.hide() }
+
+        mirror.address.onMiddleClick = { [weak self] in self?.bringForwardForEdge(); self?.closeTab(nil) }
+        mirror.address.readerButton.onClick = { [weak self] _ in self?.bringForwardForEdge(); self?.toggleReader() }
+        mirror.address.drop.onDrop = { [weak self] destination in
+            guard let self else { return false }
+            bringForwardForEdge()
+            open(destination.url, disposition: .currentTab, httpFallback: destination.httpFallback)
+            return true
+        }
+        let sitePanel = { [weak self] in
+            guard let self else { return }
+            // The site panel is at home in the window, under its own address; the panel makes way for it.
+            bringForwardForEdge()
+            SitePanel.toggle(in: self, from: sidebar.address)
+        }
+        mirror.address.onRightClick = { _ in sitePanel(); return nil }
+        mirror.address.siteControlsButton.onClick = { _ in sitePanel() }
+        mirror.address.siteControlsButton.onRightClick = { _ in sitePanel(); return nil }
+
+        mirror.favorites.onOpen = { [weak self] favorite in
+            self?.bringForwardForEdge()
+            self?.tabManager.openBookmark(favorite)
+        }
+        mirror.favorites.onMenu = { [weak self] favorite in
+            guard let self else { return nil }
+            self.bringForwardForEdge(keepingPanel: true)
+            return SidebarMenus.favoriteMenu(for: favorite, controller: self)
+        }
+
+        mirror.onNowPlayingShow = { [weak self] tab in
+            self?.bringForwardForEdge()
+            self?.tabManager.select(tab)
+        }
+        mirror.onNowPlayingToggle = { [weak self] tab in
+            self?.bringForwardForEdge(keepingPanel: true)
+            self?.toggleNowPlaying(tab)
+        }
+        mirror.onNowPlayingHide = { [weak self] tab in self?.hideNowPlaying(tab) }
+        mirror.onNowPlayingMenu = { [weak self] tab in
+            self?.bringForwardForEdge(keepingPanel: true)
+            return self?.nowPlayingMenu(for: tab)
+        }
+
+        mirror.onEditSpace = { [weak self] id in
+            guard let self else { return }
+            // The editor is 300 wide and belongs to the window: Zigzag comes forward with its sidebar, as from any
+            // other menu. Shown from the panel it would be clipped to the sidebar's width.
+            bringForwardForEdge()
+            openSpaceEditor(id)
+        }
+    }
+
+    /// A tab, favorite or page picked in the edge sidebar: its window comes forward on it, and the panel goes at once.
+    private func pickFromEdgeSidebar(_ tab: Tab) {
+        EdgeSidebar.shared.picked()
+        tabManager.select(tab)
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    /// Zigzag comes forward for something in the edge sidebar. The panel goes with it, unless what was picked hangs
+    /// from the panel itself (a menu, the site panel, the space editor), which needs it where it is.
+    func bringForwardForEdge(keepingPanel: Bool = false) {
+        if !keepingPanel { EdgeSidebar.shared.picked() }
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
     }
 }
