@@ -597,6 +597,14 @@ struct SitePanelRowsTests {
         #expect(SitePanelRows.links(c) == [.permissions])
     }
 
+    /// The full-screen row says what it does, and under it where a video goes with the switch as it is (#385).
+    @Test func theFullScreenRowSaysWhereVideosGo() {
+        #expect(SitePanel.fullScreenTitle == String(localized: "Keep full screen in the window"))
+        #expect(SitePanel.fullScreenStatus(true) == String(localized: "Videos fill the page, not the screen"))
+        #expect(SitePanel.fullScreenStatus(false) == String(localized: "Videos fill your screen"))
+        #expect(!SitePanel.fullScreenTitle.contains("fills the page"))
+    }
+
     @Test func rowsThatApplyOnlySomewhere() {
         var c = Context()
         c.fullScreen = true

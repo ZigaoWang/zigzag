@@ -1229,7 +1229,7 @@ final class BrowserRootView: SpaceFrameView {
         })
     }
 
-    /// Moves the sidebar to the window's other edge (Settings › Appearance › Sidebar on the right). Frames are final
+    /// Moves the sidebar to the window's other edge (Settings › Appearance › Sidebar position). Frames are final
     /// at once; the sidebar slides across on the render server while the pages glide over to their new places and
     /// the bar's controls with them, as the sidebar's show and hide moves them. A slid-out sidebar tucks away first.
     func setSidebarOnRight(_ onRight: Bool, animated: Bool) {

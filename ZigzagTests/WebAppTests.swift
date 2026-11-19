@@ -79,6 +79,21 @@ struct WebAppTests {
         #expect(!WebApps.opensInBrowser(URL(string: "mailto:a@b.c")!, from: here, isLinkClick: true))
     }
 
+    /// Open on an installed app's row in Settings (#355) takes the Dock icon's path.
+    @Test func settingsOpenButtonLaunchesTheApp() {
+        let app = WebApp(id: "0123456789abcdef", name: "GitHub", url: URL(string: "https://github.com/")!, profileID: profile,
+                         spaceID: UUID(), bundlePath: "/x.app", created: Date())
+        let saved = SettingsView.openWebApp
+        defer { SettingsView.openWebApp = saved }
+        var opened: [String] = []
+        SettingsView.openWebApp = { opened.append($0.id) }
+        let button = SettingsView.openButton(for: app)
+        #expect(button.title == String(localized: "Open"))
+        #expect(button.accessibilityLabel() == String(localized: "Open “\(app.name)”"))
+        #expect(button.accessibilityPerformPress())
+        #expect(opened == [app.id])
+    }
+
     @Test func stripShowsTheNameOnTheSiteAndTheHostElsewhere() {
         let app = WebApp(id: "0123456789abcdef", name: "GitHub", url: URL(string: "https://github.com/")!, profileID: profile,
                          spaceID: UUID(), bundlePath: "/x.app", created: Date())

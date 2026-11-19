@@ -47,7 +47,7 @@
       }
     },
     "%@ (%@)" : {
-      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.",
+      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.\nWhere a download rule sends links: the service's address, then its method in parentheses, like “127.0.0.1 (load.start)”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -929,7 +929,7 @@
       }
     },
     "%@: %@" : {
-      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.",
+      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.\nUnder a download rule in Settings › Downloads: the sites, then the answer kept for them, like “youtube.com: Hand Off”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3958,6 +3958,39 @@
         }
       }
     },
+    "Keep full screen in the window" : {
+      "comment" : "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏时留在窗口内"
+          }
+        }
+      }
+    },
+    "Left" : {
+      "comment" : "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's left edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左侧"
+          }
+        }
+      }
+    },
+    "Open “%@”" : {
+      "comment" : "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开“%@”"
+          }
+        }
+      }
+    },
     "Remember for this site" : {
       "comment" : "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.",
       "localizations" : {
@@ -3965,6 +3998,61 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "记住对此网站的选择"
+          }
+        }
+      }
+    },
+    "Right" : {
+      "comment" : "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's right edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右侧"
+          }
+        }
+      }
+    },
+    "Sidebar position" : {
+      "comment" : "A setting in Settings › Appearance: which edge of the window the sidebar runs along, Left or Right.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏位置"
+          }
+        }
+      }
+    },
+    "The edge of the window the sidebar runs along. The page sits beside it." : {
+      "comment" : "Explanation under “Sidebar position” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏靠窗口哪一边放，网页在它旁边。"
+          }
+        }
+      }
+    },
+    "Videos fill the page, not the screen" : {
+      "comment" : "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频只铺满网页，不占满屏幕"
+          }
+        }
+      }
+    },
+    "Videos fill your screen" : {
+      "comment" : "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频铺满整个屏幕"
           }
         }
       }
@@ -9484,17 +9572,6 @@
         }
       }
     },
-    "Full screen fills the page" : {
-      "comment" : "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全屏幕只填满网页"
-          }
-        }
-      }
-    },
     "Full screen videos fill" : {
       "comment" : "A setting in Settings › Tabs: whether a video put in full screen covers the whole screen or only the page's area in the window. Followed by The Whole Screen or The Page.",
       "localizations" : {
@@ -13138,7 +13215,7 @@
       }
     },
     "Open" : {
-      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab.",
+      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.\nButton on an installed app's row in Settings › General: opens the app, or brings its window forward.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19425,17 +19502,6 @@
         }
       }
     },
-    "The sidebar sits along the window’s right edge, with the page on its left." : {
-      "comment" : "Explanation under “Sidebar on the right” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏沿窗口右侧边缘放置，页面在它的左边。"
-          }
-        }
-      }
-    },
     "The site couldn’t send it" : {
       "comment" : "Why a download failed, under its name in the downloads panel.",
       "localizations" : {
@@ -24001,7 +24067,7 @@
       }
     },
     "sent this link to %@" : {
-      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.",
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like 127.0.0.1 (aria2.addUri).",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -24045,7 +24111,7 @@
       }
     },
     "sidebar right left side position move" : {
-      "comment" : "Words that find the Sidebar on the right setting with Find a setting in Settings. Not shown.",
+      "comment" : "Words that find the Sidebar position setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

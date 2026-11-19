@@ -596,7 +596,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         showTopBar()
     }
 
-    /// Settings › Appearance › Sidebar on the right, or View › Move Sidebar to Right: the sidebar slides over to the
+    /// Settings › Appearance › Sidebar position, or View › Move Sidebar to Right: the sidebar slides over to the
     /// other edge and the pages glide the other way. What was open beside the sidebar is put away first.
     @objc func placeSidebarSide() {
         let onRight = BrowserRootView.sidebarOnRight

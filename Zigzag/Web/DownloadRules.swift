@@ -419,7 +419,9 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .jsonRPC:
             if rpcMethod.isEmpty { return Kind.jsonRPC.title }
             let host = URL(string: rpcEndpoint)?.host() ?? rpcEndpoint
-            return host.isEmpty ? rpcMethod : "\(rpcMethod) · \(host)"
+            // The place first, the method after it in brackets (#367).
+            return host.isEmpty ? rpcMethod
+                : String(localized: "\(host) (\(rpcMethod))", comment: "Where a download rule sends links: the service's address, then its method in parentheses, like “127.0.0.1 (load.start)”.")
         case .saveToFolder:
             let name = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath).lastPathComponent
             return name.isEmpty ? Kind.saveToFolder.title : name
