@@ -3,7 +3,9 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// ⌘-click on a script-routed link (YouTube) opens a new tab (#317): the page never sees the click.
+/// A modified click on a link: ⌘ is the browser's, so the page whose own script follows links itself (YouTube's video
+/// links, #317) never hears it; ⇧ and ⌥ reach the page, and the link they landed on is reported so the navigation the
+/// page makes right after one is that click's (#322).
 @MainActor
 struct CommandClickedLinksTests {
     /// Cancels every navigation, recording the URL and modifiers.
@@ -18,13 +20,23 @@ struct CommandClickedLinksTests {
         }
     }
 
-    /// Click handlers that cancel and route, like YouTube's router.
+    /// What the page script reports about a ⇧ or ⌥ click: the link it was on, and which of the two was held.
+    private final class Clicks: NSObject, WKScriptMessageHandler {
+        var reported: [[String: Any]] = []
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == "zigzagLinkClick", let body = message.body as? [String: Any] else { return }
+            reported.append(body)
+        }
+    }
+
+    /// Each element's click handler takes the click as YouTube's router does: it cancels it and moves the page.
     private static let html = """
     <style>body { margin: 0 } a, button, div { display: block; width: 100%; height: 100px; margin: 0; padding: 0; border: 0 }</style>
     <a id="video" href="https://example.com/watch?v=1">video</a>
     <div contenteditable="true"><a id="edited" href="https://example.com/edited">edited</a></div>
     <button id="button">button</button>
     <a id="script" href="javascript:void 0">script</a>
+    <a id="file" href="https://example.com/download.zip" download>file</a>
     <script>
       window.heard = [];
       for (const element of document.querySelectorAll('a, button')) element.addEventListener('click', (e) => {
@@ -35,13 +47,15 @@ struct CommandClickedLinksTests {
     </script>
     """
 
-    private func page() async -> (WKWebView, NSWindow, Links) {
+    private func page() async -> (WKWebView, NSWindow, Links, Clicks) {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
-        configuration.userContentController.addUserScript(PageScripts.commandClickedLinks)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
+        configuration.userContentController.addUserScript(PageScripts.modifiedLinkClicks)
+        let clicks = Clicks()
+        configuration.userContentController.add(clicks, contentWorld: .defaultClient, name: "zigzagLinkClick")
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 400), configuration: configuration)
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 600), configuration: configuration)
         window.contentView = webView
         let links = Links()
         webView.navigationDelegate = links
@@ -49,7 +63,7 @@ struct CommandClickedLinksTests {
             links.done = done
             webView.loadHTMLString(Self.html, baseURL: URL(string: "https://example.com/"))
         }
-        return (webView, window, links)
+        return (webView, window, links, clicks)
     }
 
     /// A click `y` CSS pixels from the top with `flags`.
@@ -70,7 +84,7 @@ struct CommandClickedLinksTests {
     }
 
     @Test func aCommandClickOnALinkThePageFollowsItselfOpensTheLink() async throws {
-        let (webView, window, links) = await page()
+        let (webView, window, links, _) = await page()
         try await click(webView, y: 50, flags: .command)
         #expect(try await heard(webView) == [])
         #expect(try await webView.evaluateJavaScript("location.href") as? String == "https://example.com/")
@@ -79,28 +93,54 @@ struct CommandClickedLinksTests {
         withExtendedLifetime(window) {}
     }
 
+    /// ⇧ is the page's (#322): its own script hears the click as it always did, so range-select on a real link keeps
+    /// working, and the script reports the link the click landed on, for the navigation the page makes right after it.
+    @Test func aShiftClickReachesThePageAndIsReported() async throws {
+        let (webView, window, links, clicks) = await page()
+        try await click(webView, y: 50, flags: .shift)
+        #expect(try await heard(webView) == ["video"])
+        #expect(links.clicked.isEmpty)
+        #expect(clicks.reported.count == 1)
+        #expect(clicks.reported.first?["url"] as? String == "https://example.com/watch?v=1")
+        #expect(clicks.reported.first?["shift"] as? Bool == true)
+        #expect(clicks.reported.first?["alt"] as? Bool == false)
+        withExtendedLifetime(window) {}
+    }
+
+    /// ⌥ is the page's too: reported for the download it asks for, and never taken from the page.
+    @Test func anOptionClickReachesThePageAndIsReported() async throws {
+        let (webView, window, links, clicks) = await page()
+        try await click(webView, y: 50, flags: .option)
+        #expect(try await heard(webView) == ["video"])
+        #expect(links.clicked.isEmpty)
+        #expect(clicks.reported.first?["alt"] as? Bool == true)
+        #expect(clicks.reported.first?["shift"] as? Bool == false)
+        withExtendedLifetime(window) {}
+    }
+
     @Test func aPlainClickIsStillThePages() async throws {
-        let (webView, window, links) = await page()
+        let (webView, window, links, clicks) = await page()
         try await click(webView, y: 50, flags: [])
         #expect(try await heard(webView) == ["video"])
         #expect(try await webView.evaluateJavaScript("location.href") as? String == "https://example.com/watch?v=1")
         #expect(links.clicked.isEmpty)
+        #expect(clicks.reported.isEmpty)
         withExtendedLifetime(window) {}
     }
 
-    /// ⌘-clicks on editable text, buttons and script links stay with the page.
-    @Test func otherCommandClicksAreThePages() async throws {
-        let (webView, window, links) = await page()
-        try await click(webView, y: 150, flags: .command)
-        try await click(webView, y: 250, flags: .command)
-        try await click(webView, y: 350, flags: .command)
-        let heard = try await heard(webView)
-        #expect(heard == ["edited", "button", "script"])
+    /// A link in text being edited, a button, a script's link and a link to download have nothing for WebKit to open:
+    /// the page has them, and a ⇧ or ⌥ click on one is not reported either.
+    @Test func otherModifiedClicksAreThePages() async throws {
+        let (webView, window, links, clicks) = await page()
+        for y in [150.0, 250.0, 350.0, 450.0] { try await click(webView, y: y, flags: .command) }
+        #expect(try await heard(webView) == ["edited", "button", "script", "file"])
         #expect(links.clicked.isEmpty)
+        for y in [150.0, 250.0, 350.0, 450.0] { try await click(webView, y: y, flags: .shift) }
+        #expect(clicks.reported.isEmpty)
         withExtendedLifetime(window) {}
     }
 
     @Test func everyPageGetsIt() {
-        #expect(PageScripts.all.contains(PageScripts.commandClickedLinks))
+        #expect(PageScripts.all.contains(PageScripts.modifiedLinkClicks))
     }
 }

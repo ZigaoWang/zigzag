@@ -104,8 +104,10 @@ final class Tab: NSObject {
     /// dark site can keep a white theme color for its header, and WebKit's own background under it can be white too,
     /// which painted the bar white over a dark page. That holds with dark pages off too, where the page script only
     /// looks. A dark page whose script found no dark of its own to give (all of it light at the top) gives none.
-    /// Otherwise the background under the page, else the theme color.
+    /// Darkened, it's never light: a light color then is from before Dark Reader reached it (#250). Otherwise the
+    /// background under the page, else the theme color.
     static func pageColor(dark: DarkPages.State?, under: NSColor?, theme: NSColor?) -> NSColor? {
+        if let dark, dark.darkened, dark.color.map(DarkPages.isDark) != true { return DarkPages.background(black: DarkPages.pureBlack) }
         if let dark, let color = dark.color, dark.darkened || (dark.native && DarkPages.isDark(color)) { return color }
         return under ?? theme
     }
@@ -162,6 +164,8 @@ final class Tab: NSObject {
     var isPeek = false {
         didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
     }
+    /// The last ⇧ or ⌥ link click the page kept, for its own navigation right after (#322).
+    var followedClick: (url: URL, activation: LinkActivation, at: Date)?
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore? { didSet { if privateStore !== oldValue { refreshChosenIcon() } } }
     var isPrivate: Bool { privateStore != nil }
@@ -554,14 +558,7 @@ final class Tab: NSObject {
         webView.allowsMagnification = true
         webView.isInspectable = true
         Self.stopsAutomaticInsets(webView)
-        #if DEBUG
-        // Lets scripted screenshots capture pages while the window is behind other apps.
-        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
-        if webView.responds(to: occlusion) {
-            typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
-            unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, false)
-        }
-        #endif
+        if !Self.watchesCover { Self.setWatchesCover(false, of: webView) }
         #if DEBUG
         if DebugBridge.mutesEverything { isMuted = webView.setPageAudioMuted(true) ?? true }
         #endif
@@ -718,6 +715,11 @@ final class Tab: NSObject {
             webView.removeObserver(self, forKeyPath: "_isPlayingAudio")
             observingAudio = false
         }
+        videosToken = nil
+        coverWait?.cancel()
+        coverWait = nil
+        ignoresCover = false
+        soundStopped = nil
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
@@ -1127,6 +1129,15 @@ final class Tab: NSObject {
         changed.send(.audio)
     }
 
+    #if DEBUG
+    /// The row's speaker as if the page played sound or were muted, with the page itself left as it is (screenshots).
+    func debugShowSound(playing: Bool, muted: Bool) {
+        isPlayingAudio = playing
+        isMuted = muted
+        changed.send(.audio)
+    }
+    #endif
+
     private static let setAutomaticInsets = NSSelectorFromString("_setAutomaticallyAdjustsContentInsets:")
 
     /// The page is placed under Zigzag's own bars, never under the window's title bar, so WebKit isn't to inset it for
@@ -1404,6 +1415,7 @@ final class Tab: NSObject {
             webView.addObserver(self, forKeyPath: "_isPlayingAudio", options: [.new], context: nil)
             observingAudio = true
         }
+        watchVideos(of: webView)
     }
 
     override nonisolated func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
@@ -1411,7 +1423,66 @@ final class Tab: NSObject {
         let playing = (change?[.newKey] as? Bool) ?? false
         MainActor.assumeIsolated {
             self.isPlayingAudio = playing
+            self.refreshCoverWatch()
             self.changed.send(.audio)
+        }
+    }
+
+    // MARK: Covered windows
+
+    /// Whether WebKit hides a page whose window is covered or on another desktop. Debug builds never let it, so
+    /// scripted screenshots capture pages behind other apps; ZIGZAG_REAL_OCCLUSION=1 keeps it, as release builds have it.
+    static let watchesCover: Bool = {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["ZIGZAG_REAL_OCCLUSION"] == "1"
+        #else
+        return true
+        #endif
+    }()
+
+    static func setWatchesCover(_ on: Bool, of webView: WKWebView) {
+        let occlusion = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        guard webView.responds(to: occlusion) else { return }
+        typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(webView.method(for: occlusion), to: SetBool.self)(webView, occlusion, on)
+    }
+
+    /// The wait, once the page stops playing, before a covered window hides it again.
+    private var coverWait: DispatchWorkItem?
+    /// A covered window doesn't hide the page now (`ignoresCover`).
+    private var ignoresCover = false
+    /// When its sound stopped, while a covered window still doesn't hide it.
+    private var soundStopped: Date?
+    /// The page's videos, which turn it back to hidden in a covered window while one plays.
+    private var videosToken: SignalToken?
+
+    /// A page playing sound with no video showing (a music player) stays on screen to WebKit while its window is
+    /// covered (an installed app's behind other apps, most often), and for a while after it stops, so a playlist's
+    /// next song can load and start (#199). `_isPlayingAudio` leaves out a silent Web Audio graph.
+    private func refreshCoverWatch() {
+        guard Self.watchesCover, let webView else { return }
+        coverWait?.cancel()
+        coverWait = nil
+        let video = PageVideos.shared.playing(in: webView, any: true) != nil
+        if isPlayingAudio, !video { soundStopped = nil } else if ignoresCover, soundStopped == nil { soundStopped = Date() }
+        let quiet = soundStopped.map { Date().timeIntervalSince($0) }
+        let ignores = MiniPlayerLayout.ignoresCover(playingSound: isPlayingAudio, showingVideo: video, quiet: quiet)
+        if ignores != ignoresCover {
+            ignoresCover = ignores
+            Self.setWatchesCover(!ignores, of: webView)
+        }
+        guard ignores else { soundStopped = nil; return }
+        guard let quiet else { return }
+        let wait = DispatchWorkItem { [weak self] in self?.refreshCoverWatch() }
+        coverWait = wait
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, MiniPlayerLayout.nextItemWait - quiet), execute: wait)
+    }
+
+    private func watchVideos(of webView: BrowserWebView) {
+        guard Self.watchesCover else { return }
+        videosToken = PageVideos.shared.reported.observe { [weak self, weak webView] page in
+            guard let self, let webView, page === webView, self.webView === webView else { return }
+            self.refreshCoverWatch()
         }
     }
 
@@ -1615,24 +1686,32 @@ extension Tab: WKNavigationDelegate {
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         // Only a link to the web opens elsewhere (a tab, a card): one to a file or a script stays the page's to try,
         // where WebKit holds it to what the page may reach.
-        if isLinkClick && isMainFrame && Self.route(forPageLink: url, from: self.url) == .load {
+        let toTheWeb = Self.route(forPageLink: url, from: self.url) == .load
+        // A page navigation to the link a ⇧ or ⌥ click was just on is that click's; a real link click clears the mark.
+        if isLinkClick { followedClick = nil }
+        let followed = isMainFrame && toTheWeb && navigationAction.navigationType == .other ? followedActivation(for: url) : nil
+        if (isLinkClick || followed != nil) && isMainFrame && toTheWeb {
             let flags = navigationAction.modifierFlags
+            let activation = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: isMainFrame,
+                                                 modifiers: flags, buttonNumber: navigationAction.buttonNumber,
+                                                 followed: followed)
             // Site routes (#286) apply to clicks and new-tab links; not peek (⇧), download (⌥) or page-initiated.
-            let opensTab = navigationAction.buttonNumber == 4 || flags.contains(.command)
-            if userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
+            let opensTab = activation.isNewTab
+            if followed == nil, userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
                host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
                 return (.cancel, preferences)
             }
-            if navigationAction.buttonNumber == 4 /* middle click */ || flags.contains(.command) {
-                host?.tab(self, openURL: url, disposition: flags.contains(.shift) ? .foregroundTab : .backgroundTab)
+            switch activation {
+            case .newTab(let inFront):
+                host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
-            }
-            if flags.contains(.shift) {
+            case .peek:
                 host?.tab(self, openURL: url, disposition: .peek)
                 return (.cancel, preferences)
-            }
-            if flags.contains(.option) {
+            case .download:
                 return (.download, preferences)
+            case .page:
+                break
             }
             // A pinned tab or favorite keeps its site: a link that leaves it opens beside it, in a new tab, so the
             // pinned Gmail is still Gmail when you come back. A site installed as an app sends it to the browser.
@@ -1661,6 +1740,45 @@ extension Tab: WKNavigationDelegate {
         // page it's in, as the blocklist does).
         if !showsExtensionPage { await ContentBlocker.prepareFilters(in: webView, for: url, mainFrame: isMainFrame) }
         return (.allow, preferences)
+    }
+
+    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Peek, ⌥ download, else the
+    /// page. `followed` is a ⇧ or ⌥ click the page kept and then navigated to itself.
+    enum LinkActivation: Equatable {
+        case page, peek, download
+        case newTab(inFront: Bool)
+
+        var isNewTab: Bool { if case .newTab = self { true } else { false } }
+    }
+
+    nonisolated static func linkActivation(type: WKNavigationType, isMainFrame: Bool, modifiers: NSEvent.ModifierFlags,
+                                           buttonNumber: Int, followed: LinkActivation? = nil) -> LinkActivation {
+        guard isMainFrame else { return .page }
+        if type == .linkActivated {
+            // ⌘ wins over ⌥, as in Chrome.
+            if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }
+            if modifiers.contains(.shift) { return .peek }
+            if modifiers.contains(.option) { return .download }
+            return .page
+        }
+        return followed ?? .page
+    }
+
+    /// How long after a ⇧ or ⌥ click the page's navigation still counts as that click's.
+    static let followedClickWindow: TimeInterval = 2
+
+    /// From the page script: a ⇧ or ⌥ click landed on `url` and the page kept it.
+    func modifiedClickFollowed(_ url: URL, peek: Bool, download: Bool) {
+        let activation: LinkActivation = peek ? .peek : download ? .download : .page
+        followedClick = activation == .page ? nil : (url, activation, Date())
+    }
+
+    /// The kept click `url` follows, taken once: same link, within the window.
+    func followedActivation(for url: URL?) -> LinkActivation? {
+        guard let clicked = followedClick, let url, Date().timeIntervalSince(clicked.at) < Self.followedClickWindow,
+              Self.sameAddress(clicked.url, url) else { return nil }
+        followedClick = nil
+        return clicked.activation
     }
 
     /// Whether a "Visit anyway" link came from the certificate warning itself: a click in the main frame of the web

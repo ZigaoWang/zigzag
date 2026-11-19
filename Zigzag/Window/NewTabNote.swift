@@ -1,246 +1,264 @@
 import AppKit
 
 /// With the sidebar hidden, a link opened in a background tab (⌘-click, middle click, Open Link in New Tab) gave no
-/// feedback (#272). A toast-style note slides in from the sidebar's edge with the tab's icon and title. Clicking it
-/// selects the tab; hovering keeps it. Further links update the same note instead of stacking.
+/// feedback (#272). The tab's own sidebar row slides out from the sidebar's edge at the place it has in the list, holds,
+/// then glides back in. Each new tab gets its own row; its title and spinner follow the page as it loads. Clicking one
+/// goes to its tab; hovering any holds them all.
 @MainActor
 final class NewTabNote {
-    /// How long it stays without hover.
+    /// How long each row stays without hover.
     static let duration: TimeInterval = 2.5
 
     private weak var controller: BrowserWindowController?
-    private var view: NewTabNoteView?
-    private weak var tab: Tab?
-    /// The site for a tab WebKit created empty; shown until the page has a title.
-    private var site: URL?
-    private var tabToken: SignalToken?
-    private var hideWork: DispatchWorkItem?
-    /// When it hides, without hover.
-    private var deadline = Date()
-    /// Time left when hover began.
-    private var remaining: TimeInterval?
+    /// Showing, oldest first.
+    private(set) var peeks: [NewTabPeekView] = []
+    /// The pointer is on one of them: every hold waits.
+    private var hovering = false
 
     init(controller: BrowserWindowController) {
         self.controller = controller
     }
 
-    /// Only with the sidebar hidden; docked or floating, the new row shows it already.
+    /// Only with the sidebar hidden; docked or slid out, the new row shows there already.
     static func shows(sidebarVisible: Bool, sidebarFloating: Bool, deskVisible: Bool) -> Bool {
         !sidebarVisible && !sidebarFloating && !deskVisible
     }
 
-    /// The tab's title once it has one, the site's name until then.
-    static func title(of tab: Tab, site: URL?) -> String {
-        if tab.isBlank, let host = site?.host(), !host.isEmpty { return host.withoutWWW }
-        let title = tab.displayTitle
-        if title == tab.url?.host(), let host = tab.url?.host() { return host.withoutWWW }
-        return title
+    /// What a row says while WebKit's empty tab has no page yet: the site it's about to load. Nil once the tab has a
+    /// page, so the row reads the tab's own title, as the sidebar's does.
+    static func placeholder(for tab: Tab, site: URL?) -> String? {
+        guard tab.isBlank, tab.customTitle?.isEmpty ?? true, let host = site?.host(), !host.isEmpty else { return nil }
+        return host
     }
 
     static func announcement(for title: String) -> String {
-        String(localized: "Opened in new tab: \(title)", comment: "Said by VoiceOver when a link opens in a new tab behind the page while the sidebar is hidden. The placeholder is the tab's title, or its site.")
+        String(localized: "Opened \(title) in background", comment: "Said by VoiceOver when a link opens in a new tab behind the page while the sidebar is hidden. The placeholder is the tab's title, or its site.")
     }
 
-    var isShowing: Bool { view?.superview != nil && view?.dismissing == false }
+    var isShowing: Bool { peeks.contains { !$0.dismissing } }
 
     #if DEBUG
-    /// Its frame from the window's top left while shown.
-    var debugFrame: NSRect? {
-        guard isShowing, let view, let window = view.window else { return nil }
-        let r = view.convert(view.bounds, to: nil)
-        return NSRect(x: r.minX, y: window.frame.height - r.maxY, width: r.width, height: r.height)
+    /// Each row's frame from the window's top left, and its title.
+    var debugPeeks: [(NSRect, String)] {
+        peeks.compactMap { peek in
+            guard !peek.dismissing, let window = peek.window else { return nil }
+            let r = peek.convert(peek.bounds, to: nil)
+            return (NSRect(x: r.minX, y: window.frame.height - r.maxY, width: r.width, height: r.height), peek.row.title.stringValue)
+        }
+    }
+
+    /// Clicks the row at `index`, as the pointer would.
+    func debugClick(_ index: Int) {
+        let shown = peeks.filter { !$0.dismissing }
+        guard shown.indices.contains(index) else { return }
+        shown[index].onClick?()
     }
     #endif
 
     /// A background tab opened from a link in this window.
     func show(_ tab: Tab, site: URL? = nil) {
-        guard let controller, Self.shows(sidebarVisible: controller.root.sidebarVisible, sidebarFloating: controller.root.isSidebarFloatingVisible,
-                                         deskVisible: controller.desk.isVisible) else { return }
-        self.tab = tab
-        self.site = site
-        tabToken = tab.changed.observe { [weak self] change in
-            guard [.title, .favicon, .url, .renamed].contains(change) else { return }
-            self?.refresh()
+        guard let controller, !controller.tabManager.isPrivate,
+              Self.shows(sidebarVisible: controller.root.sidebarVisible, sidebarFloating: controller.root.isSidebarFloatingVisible,
+                         deskVisible: controller.desk.isVisible),
+              !peeks.contains(where: { $0.tab === tab }) else { return }
+        let peek = NewTabPeekView(tab: tab, site: site)
+        peek.onClick = { [weak self, weak peek] in self?.go(to: peek?.tab) }
+        peek.onClose = { [weak self, weak peek] in
+            guard let self, let peek else { return }
+            if let tab = peek.tab { self.controller?.closeWithUndo(tab) }
+            self.dismiss(peek)
         }
-        let note: NewTabNoteView
-        let isNew: Bool
-        if let existing = view, existing.superview === controller.root.overlay {
-            note = existing
-            isNew = false
-            if controller.root.overlay.subviews.last !== existing {
-                controller.root.overlay.addSubview(existing, positioned: .above, relativeTo: nil)
-            }
-        } else {
-            note = NewTabNoteView()
-            note.onClick = { [weak self] in self?.goToTab() }
-            note.onHover = { [weak self] inside in self?.hovered(inside) }
-            view = note
-            isNew = true
-        }
-        fill(note)
-        note.slidesFromSide = controller.root.sidebarOnRight ? .maxX : .minX
-        place(note)
-        if isNew {
-            controller.root.overlay.addSubview(note)
-            note.present()
-        } else if note.dismissing {
-            // Caught while hiding: reverse from where it is.
-            note.present()
-        }
-        // Already showing: update it with the new tab and restart its timer, without moving.
-        Announcement.post(Self.announcement(for: note.label.stringValue))
-        remaining = note.isHovered ? Self.duration : nil
-        if !note.isHovered { schedule(Self.duration) }
-        else { hideWork?.cancel(); hideWork = nil }
+        peek.onHover = { [weak self] in self?.hoverChanged() }
+        peek.slidesFromSide = controller.root.sidebarOnRight ? .maxX : .minX
+        peeks.append(peek)
+        controller.root.overlay.addSubview(peek)
+        place()
+        peek.present()
+        Announcement.post(Self.announcement(for: peek.row.title.stringValue))
+        schedule(peek, Self.duration * Tokens.Motion.debugSlowdown)
     }
 
-    /// Hides it if shown.
+    /// Sends every row back in.
     func hide() {
-        hideWork?.cancel()
-        hideWork = nil
-        tabToken = nil
-        remaining = nil
-        guard let view, view.superview != nil, !view.dismissing else { return }
-        view.dismiss()
+        for peek in peeks { dismiss(peek) }
     }
 
-    /// Layout changed: hide if the sidebar came back or slid out, else keep it at its corner.
+    /// Layout changed: gone if the sidebar came back or slid out, else each row follows its place.
     func reposition() {
-        guard let controller, let view, view.superview != nil, !view.dismissing else { return }
+        guard let controller, !peeks.isEmpty else { return }
         guard Self.shows(sidebarVisible: controller.root.sidebarVisible, sidebarFloating: controller.root.isSidebarFloatingVisible,
                          deskVisible: controller.desk.isVisible) else { hide(); return }
-        view.slidesFromSide = controller.root.sidebarOnRight ? .maxX : .minX
-        place(view)
+        for peek in peeks { peek.slidesFromSide = controller.root.sidebarOnRight ? .maxX : .minX }
+        place(animated: true)
     }
 
-    private func fill(_ note: NewTabNoteView) {
-        guard let tab else { return }
-        note.icon.image = tab.displayIcon ?? FaviconView.globeIcon
-        note.label.stringValue = Self.title(of: tab, site: site)
-        note.setAccessibilityLabel(Self.announcement(for: note.label.stringValue))
+    /// The list changed: a row for a tab that closed, or that you went to, goes; the rest follow their places.
+    func listChanged() {
+        guard let controller, !peeks.isEmpty else { return }
+        let selected = controller.tabManager.selectedTab
+        for peek in peeks {
+            let open = peek.tab.map { tab in !tab.isClosed && tab !== selected && controller.tabManager.allTabs.contains { $0 === tab } } ?? false
+            if !open { dismiss(peek) }
+        }
+        place(animated: true)
     }
 
-    /// The page sent its title or icon: update, keeping position.
-    private func refresh() {
-        guard let view, view.superview != nil, !view.dismissing else { return }
-        fill(view)
-        place(view)
+    private func dismiss(_ peek: NewTabPeekView) {
+        peek.hold?.cancel()
+        peek.hold = nil
+        peeks.removeAll { $0 === peek }
+        if !peek.dismissing, peek.superview != nil { peek.dismiss() }
+        hoverChanged()
     }
 
-    /// At the top of the page on the sidebar's side, below any page question (like a toast), away from the bottom link
-    /// status.
-    private func place(_ note: NewTabNoteView) {
+    /// Where each row goes in the overlay: at its tab's row in the hidden sidebar's list, as if the sidebar were out.
+    private func place(animated: Bool = false) {
         guard let controller else { return }
-        let area = Toast.area(in: controller)
-        let size = note.size(maxWidth: min(Self.maxWidth, max(120, area.width - Tokens.Space.x12)))
-        let x = controller.root.sidebarOnRight ? area.maxX - Tokens.Space.x3 - size.width : area.minX + Tokens.Space.x3
-        note.frame = NSRect(x: round(x), y: area.minY + Tokens.Space.x3, width: size.width, height: size.height)
-        note.needsLayout = true
-    }
-
-    /// Long titles are truncated.
-    static let maxWidth: CGFloat = 320
-
-    private func schedule(_ delay: TimeInterval) {
-        hideWork?.cancel()
-        deadline = Date().addingTimeInterval(delay)
-        let work = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated {
-                self?.hideWork = nil
-                self?.hide()
+        let root = controller.root, overlay = root.overlay, list = controller.sidebar.list
+        guard let clip = list.enclosingScrollView?.contentView else { return }
+        // From where the hidden sidebar sits to where it sits slid out.
+        let out = BrowserRootView.sidebarFrame(in: root.bounds, width: root.sidebarWidth, visible: false, revealed: true, onRight: root.sidebarOnRight)
+        let dx = out.minX - root.sidebarContainer.frame.minX
+        let visible = clip.convert(clip.bounds, to: overlay).offsetBy(dx: dx, dy: 0)
+        let rows: [NSRect?] = peeks.map { peek in
+            guard let tab = peek.tab, let frame = list.layoutFrame(ofTab: tab.id) else { return nil }
+            return list.convert(frame, to: overlay).offsetBy(dx: dx, dy: 0)
+        }
+        let height = Tokens.Sidebar.rowHeight
+        let ys = Self.slots(rows: rows.map { $0?.minY }, visible: visible.minY...max(visible.minY, visible.maxY), height: height, gap: Tokens.Sidebar.rowGap)
+        for (i, peek) in peeks.enumerated() {
+            let row = rows[i] ?? NSRect(x: visible.minX, y: 0, width: visible.width, height: height)
+            let target = NSRect(x: row.minX, y: ys[i], width: row.width, height: height)
+            guard peek.frame != target else { continue }
+            if animated, peek.frame.width > 0 {
+                Tokens.Motion.animate(Tokens.Motion.snappy, evenFromKeyboard: true, moves: true) { peek.animator().frame = target }
+            } else {
+                peek.frame = target
             }
         }
-        hideWork = work
+    }
+
+    /// Each row's y (top-down): at its row in the list when that's in sight. One scrolled past or in a closed folder
+    /// (nil) comes out at the nearest end of the list in sight instead, stacked inward in list order, clear of the rest.
+    nonisolated static func slots(rows: [CGFloat?], visible: ClosedRange<CGFloat>, height: CGFloat, gap: CGFloat) -> [CGFloat] {
+        var result = [CGFloat](repeating: 0, count: rows.count)
+        var taken: [CGFloat] = []
+        var above: [Int] = [], below: [Int] = []
+        for (i, y) in rows.enumerated() {
+            if let y, y >= visible.lowerBound, y + height <= visible.upperBound {
+                result[i] = y
+                taken.append(y)
+            } else if let y, y < visible.lowerBound {
+                above.append(i)
+            } else {
+                below.append(i)
+            }
+        }
+        func free(_ y: CGFloat) -> Bool { !taken.contains { abs($0 - y) < height } }
+        // Above: nearest the top, in list order down from it.
+        var y = visible.lowerBound
+        for i in above.sorted(by: { rows[$0]! < rows[$1]! }) {
+            while !free(y), y + height < visible.upperBound { y += height + gap }
+            result[i] = y
+            taken.append(y)
+            y += height + gap
+        }
+        // Below: the last in the list lowest, going up.
+        y = visible.upperBound - height
+        for i in below.sorted(by: { (rows[$0] ?? .infinity) > (rows[$1] ?? .infinity) }) {
+            while !free(y), y > visible.lowerBound { y -= height + gap }
+            result[i] = y
+            taken.append(y)
+            y -= height + gap
+        }
+        return result
+    }
+
+    private func schedule(_ peek: NewTabPeekView, _ delay: TimeInterval) {
+        peek.hold?.cancel()
+        peek.hold = nil
+        guard !hovering else { peek.remaining = delay; return }
+        peek.deadline = Date().addingTimeInterval(delay)
+        peek.remaining = nil
+        let work = DispatchWorkItem { [weak self, weak peek] in
+            MainActor.assumeIsolated {
+                guard let self, let peek else { return }
+                self.dismiss(peek)
+            }
+        }
+        peek.hold = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
-    /// Hover holds it; leaving resumes the remaining time, with a short minimum.
-    private func hovered(_ inside: Bool) {
-        guard let view, view.superview != nil, !view.dismissing else { return }
-        if inside {
-            remaining = max(deadline.timeIntervalSinceNow, 0)
-            hideWork?.cancel()
-            hideWork = nil
-        } else {
-            schedule(max(remaining ?? Self.duration, 1))
-            remaining = nil
+    /// The pointer came onto a row or left them all: every hold waits, then resumes with what it had left (at least a
+    /// second, to move away).
+    private func hoverChanged() {
+        let now = peeks.contains { $0.row.isHovered && !$0.dismissing }
+        guard now != hovering else { return }
+        hovering = now
+        for peek in peeks {
+            if now {
+                peek.remaining = max(peek.deadline.timeIntervalSinceNow, 0)
+                peek.hold?.cancel()
+                peek.hold = nil
+            } else {
+                schedule(peek, max(peek.remaining ?? Self.duration * Tokens.Motion.debugSlowdown, 1))
+            }
         }
     }
 
-    private func goToTab() {
-        defer { hide() }
-        guard let controller, let tab, controller.tabManager.allTabs.contains(where: { $0 === tab }) else { return }
+    /// The tab, with the sidebar slid out at its row.
+    private func go(to tab: Tab?) {
+        guard let controller, let tab, controller.tabManager.allTabs.contains(where: { $0 === tab }) else { hide(); return }
         controller.tabManager.select(tab)
+        hide()
+        _ = controller.sidebar.list.tabRow(tab.id)
+        controller.root.reveal(true)
     }
 }
 
-/// A toast that's a button: handles clicks anywhere and hover.
-final class NewTabNoteView: ToastView {
+/// A new background tab's row out from the hidden sidebar: the sidebar's own tab row, on a panel's surface.
+final class NewTabPeekView: FloatingPanelView {
+    let row = TabRowView()
+    private(set) weak var tab: Tab?
+    private let site: URL?
+    private var token: SignalToken?
     var onClick: (() -> Void)?
-    var onHover: ((Bool) -> Void)?
-    private(set) var isHovered = false
-    private var pressed = false
+    var onClose: (() -> Void)?
+    var onHover: (() -> Void)?
+    /// Its going back in, while it holds.
+    var hold: DispatchWorkItem?
+    /// When it goes back in, without hover.
+    var deadline = Date()
+    /// Time it had left when a hover began.
+    var remaining: TimeInterval?
 
-    override init(frame: NSRect) {
-        super.init(frame: frame)
-        // Site icons come in any size.
-        icon.imageScaling = .scaleProportionallyUpOrDown
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
+    init(tab: Tab, site: URL?) {
+        self.tab = tab
+        self.site = site
+        super.init(frame: .zero)
+        radius = Tokens.Sidebar.rowRadius
+        addSubview(row)
+        row.configure(tab: tab)
+        row.onClick = { [weak self] _ in self?.onClick?() }
+        row.onClose = { [weak self] in self?.onClose?() }
+        row.onMiddleClick = row.onClose
+        row.hoverChanged = { [weak self] _ in self?.onHover?() }
+        token = tab.changed.observe { [weak self] change in
+            if change == .url || change == .title { self?.refreshTitle() }
+        }
+        refreshTitle()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    /// Single line, truncated at the end.
-    override func size(maxWidth: CGFloat) -> NSSize {
-        label.usesSingleLineMode = true
-        label.maximumNumberOfLines = 1
-        label.lineBreakMode = .byTruncatingTail
-        label.cell?.wraps = false
-        radius = Self.height / 2
-        return NSSize(width: min(ceil(fittingWidth), maxWidth), height: Self.height)
+    private func refreshTitle() {
+        guard let tab else { return }
+        row.fixedTitle = NewTabNote.placeholder(for: tab, site: site)
     }
 
-    /// The whole note takes the press, label and icon included.
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        guard !dismissing, frame.contains(point) else { return nil }
-        return self
-    }
-
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    /// The window swallows panel surface presses; this one is a button.
-    override var takesPress: Bool { true }
-
-    override func mouseDown(with event: NSEvent) { pressed = true }
-
-    override func mouseUp(with event: NSEvent) {
-        defer { pressed = false }
-        guard pressed, bounds.contains(convert(event.locationInWindow, from: nil)) else { return }
-        onClick?()
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        onClick?()
-        return true
-    }
-
-    private var tracking: NSTrackingArea?
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let tracking { removeTrackingArea(tracking) }
-        let area = NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self, userInfo: nil)
-        addTrackingArea(area)
-        tracking = area
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        isHovered = true
-        onHover?(true)
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        isHovered = false
-        onHover?(false)
+    override func layout() {
+        super.layout()
+        row.frame = bounds
     }
 }

@@ -614,6 +614,8 @@ extension BrowserWindowController: NSMenuItemValidation {
     @objc func renameSpace(_ sender: Any?) {
         openSpaceEditor(tabManager.currentSpaceID)
     }
+    @objc func collapseAllFolders(_ sender: Any?) { setAllFoldersOpen(in: tabManager.currentSpaceID, false) }
+    @objc func expandAllFolders(_ sender: Any?) { setAllFoldersOpen(in: tabManager.currentSpaceID, true) }
 
     // MARK: Validation
 
@@ -704,6 +706,8 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(installAsApp(_:)): return WebAppInstallSheet.canInstall(tab, isPrivate: tabManager.isPrivate)
         case #selector(moveTabToNewWindow(_:)): return tab != nil && tab?.bookmarkID == nil && !tabManager.isPrivate
         case #selector(newSpace(_:)), #selector(renameSpace(_:)): return !tabManager.isPrivate
+        case #selector(collapseAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: true)
+        case #selector(expandAllFolders(_:)): return !tabManager.isPrivate && Self.hasFolders(in: tabManager.currentSpaceID, isOpen: false)
         case #selector(sharePage(_:)), #selector(savePageAs(_:)), #selector(togglePictureInPicture(_:)): return tab?.url != nil
         case #selector(toggleReader(_:)):
             item.title = isReaderOpen ? String(localized: "Hide Reader", comment: "Menu bar item: closes Reader.") : String(localized: "Show Reader", comment: "Menu bar item: opens the page in Reader.")
@@ -801,7 +805,7 @@ enum ZoomLevels {
 }
 
 /// Calls on WebKit's private inspector object, each checked first, so a name WebKit drops does nothing rather than crash.
-private extension NSObject {
+extension NSObject {
     func callIfPresent(_ name: String) {
         let selector = NSSelectorFromString(name)
         if responds(to: selector) { perform(selector) }

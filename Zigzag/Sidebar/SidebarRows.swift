@@ -175,10 +175,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// Question count when the dots last drew, so one for another row doesn't redraw every row.
     private var waitingQuestions = 0
     let closeButton = TabRowView.rowButton("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
-    /// The speaker beside the page that's playing (or muted): this row's own, and in a split, its partner's beside
-    /// the partner's half. Clicking one mutes or unmutes that page.
-    let audioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
-    let partnerAudioButton = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
+    /// The speaker right after the title of the page that's playing (or muted): this row's own, and in a split, its
+    /// partner's after the partner's title. Clicking one mutes or unmutes that page.
+    let audioButton = TabRowView.speakerButton()
+    let partnerAudioButton = TabRowView.speakerButton()
 
     // Developer Mode (#141): each page of the row that's in it has the mode's chip on its icon's corner
     // (`FaviconView.developerBadge`), as a sleeping page has its ring, so the site you're building is told from the
@@ -215,6 +215,44 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         button.radius = Tokens.Radius.small + 1
         return button
     }
+    /// A page's speaker: a row button in the title's quieter ink, so it reads as part of the page, not a control column.
+    static func speakerButton() -> IconButton {
+        let button = rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
+        button.tint = Tokens.Color.textSecondary
+        showSpeaker(button, muted: false)
+        return button
+    }
+
+    /// The speaker's glyph: the title's size and weight at the small symbol scale, so its ink is the caps' height.
+    static func showSpeaker(_ button: IconButton, muted: Bool) {
+        let glyph = speakerGlyph(muted: muted)
+        guard button.glyph !== glyph.image else { return }
+        button.glyph = glyph.image
+        button.glyphInk = glyph.ink
+    }
+
+    /// Playing and muted share one place: the speaker's body on the same pixels in both, set by the playing glyph's ink.
+    private static func speakerGlyph(muted: Bool) -> (image: NSImage, ink: CGSize, size: CGSize) {
+        let point = Tokens.Sidebar.rowText
+        let key = "row speaker \(point)"
+        if speakerGlyphs[key] == nil {
+            let config = NSImage.SymbolConfiguration(pointSize: point, weight: .regular, scale: .small)
+            let names = ["speaker.wave.2", "speaker.slash"], keys = names.map { "row speaker \($0) \(point)" }
+            let images = names.map { name in
+                let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
+                image.isTemplate = true
+                return image
+            }
+            let inks = Tokens.Symbol.sharedInkOffsets(of: images, keys: keys, reference: 0)
+            let size = Tokens.Symbol.inkSize(of: images[0], key: keys[0])
+            speakerGlyphs[key] = [(images[0], inks[0], size), (images[1], inks[1], size)]
+        }
+        return speakerGlyphs[key]![muted ? 1 : 0]
+    }
+    private static var speakerGlyphs: [String: [(image: NSImage, ink: CGSize, size: CGSize)]] = [:]
+
+    /// The ink size the speaker is placed by: the playing glyph's, in both states.
+    private static func speakerInk(_ button: IconButton) -> CGSize { speakerGlyph(muted: false).size }
     var onClose: (() -> Void)?
 
     /// Whether tabs are nested under this one, and shown or folded away; nil when none are.
@@ -421,7 +459,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             let icon = FaviconView(), title = Label("", font: Tokens.Font.sidebarRow(), color: Tokens.Color.textPrimary)
             title.fadesTail = true
             let divider = ColorView(color: Tokens.Color.separator)
-            let audio = TabRowView.rowButton("speaker.wave.2", toolTip: String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar."))
+            let audio = TabRowView.speakerButton()
             audio.onClick = { [weak self] _ in
                 guard let self, self.extraPages.indices.contains(i), let page = self.extraPages[i] else { return }
                 page.setMuted(!page.isMuted)
@@ -544,8 +582,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             views.icon.isLoading = (page?.isLoading ?? false) && !(page?.isSuspended ?? true)
             views.icon.isUnloaded = showsUnloaded(page)
             views.title.stringValue = titles.indices.contains(i) ? titles[i] : ""
-            let sound = page?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
-            if views.audio.symbol != sound { views.audio.symbol = sound }
+            Self.showSpeaker(views.audio, muted: page?.isMuted == true)
             views.audio.toolTip = page?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
             [views.icon, views.title, views.divider].forEach { $0.isHidden = !shown }
             if renameField != nil, renamingPart == i + 2 { views.title.isHidden = true }
@@ -570,9 +607,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         partnerIcon.image = partner?.displayIcon ?? pinnedPartner?.icon
         partnerIcon.isLoading = (partner?.isLoading ?? false) && !(partner?.isSuspended ?? true)
         partnerIcon.isUnloaded = showsUnloaded(partner)
-        // A symbol set again is drawn again: only when it changes.
-        let partnerSound = partner?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
-        if partnerAudioButton.symbol != partnerSound { partnerAudioButton.symbol = partnerSound }
+        Self.showSpeaker(partnerAudioButton, muted: partner?.isMuted == true)
         partnerAudioButton.toolTip = partner?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         refreshUnloaded()
         refreshAccessories()
@@ -736,8 +771,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     /// The close button (or a pinned tab's unload/back button) shows on hover over the title's faded end, so the title
     /// never shifts. The selected tab keeps it visible, so it reserves the room.
     private var closeOverlays: Bool { !isSplit && !(isSelected && !isBookmark) && !reservesClose && !showsNumber && renameField == nil }
-    /// A speaker or nested-tabs chevron next to it stays put; the button's room is reserved, as on multi-page rows.
-    private var reservesClose: Bool { !isSplit && (showsAudio || showsNested) }
+    /// A nested-tabs chevron next to it stays put; the button's room is reserved, as on multi-page rows.
+    private var reservesClose: Bool { !isSplit && showsNested }
 
     /// Faded after placement (`layoutTitleFade`).
     override var fadesTitleInLayout: Bool { false }
@@ -745,9 +780,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     override var trailingAccessoryWidth: CGFloat {
         let close = closeOverlays ? 0 : reservesClose ? max(endSlot, closeButton.frame.width) : endSlot
         let nested = showsNested ? Tokens.Sidebar.rowButton + (close > 0 ? Self.buttonGap : 0) : 0
-        // In a split each half's speaker sits at that half's end (laid out with the halves).
-        let audio = isSplit ? 0 : showsAudio ? audioButton.frame.width + (close + nested > 0 ? Self.buttonGap : 0) : 0
-        return close + nested + audio
+        // The speaker follows the title (`placeSpeaker`), so it takes no room at the end.
+        return close + nested
     }
 
     func refresh() {
@@ -758,8 +792,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // Why it isn't running (asleep, and what that freed, or not loaded since Zigzag reopened) is in its hover card
         // (`TabPreviewView`), not a tooltip on top of it.
         icon.isUnloaded = showsUnloaded(tab)
-        let sound = tab?.isMuted == true ? "speaker.slash" : "speaker.wave.2"
-        if audioButton.symbol != sound { audioButton.symbol = sound }
+        Self.showSpeaker(audioButton, muted: tab?.isMuted == true)
         audioButton.toolTip = tab?.isMuted == true ? String(localized: "Unmute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.") : String(localized: "Mute Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         refreshUnloaded()
         refreshAccessibilityLabel()
@@ -918,6 +951,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             title.frame.origin.x += 6 + Tokens.Space.x1
             title.frame.size.width = max(0, title.frame.width - 6 - Tokens.Space.x1)
         }
+        if !isSplit, !audioButton.isHidden {
+            // Never in the close button's place, shown or not, so the × comes and goes without moving it.
+            let end = showsNested ? nestedButton.frame.minX : bounds.width - Self.buttonEdge - max(endSlot, closeButton.frame.width)
+            placeSpeaker(audioButton, after: title, end: end - Self.buttonGap)
+        }
         layoutRenameField()
         layoutTitleFade()
     }
@@ -967,7 +1005,6 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             partEdges = []
             // Restore the title hidden for an icon-only split, unless it's being renamed.
             title.isHidden = renameField != nil
-            audioButton.frame.origin = NSPoint(x: end - size.width, y: y)
             return
         }
         // A split shows its pages in one row, equal parts in screen order with hairlines between: icon, faded title, and a
@@ -1005,14 +1042,10 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 icon.frame = NSRect(x: part.start + Self.inset, y: iconY, width: side, height: side)
                 // Same gap from the next hairline as the icon has from its own; the last title ends where a tab's does or at the
                 // reserved close button room.
-                var textEnd = !last ? part.end - Self.inset + Label.inset : keepsRoom ? contentEnd : bounds.width - Self.inset + Label.inset
-                if !audio.isHidden {
-                    let audioEnd = last ? contentEnd : part.end - Self.buttonEdge
-                    audio.frame.origin = NSPoint(x: audioEnd - size.width, y: y)
-                    textEnd = audio.frame.minX - Self.buttonGap
-                }
+                let textEnd = !last ? part.end - Self.inset + Label.inset : keepsRoom ? contentEnd : bounds.width - Self.inset + Label.inset
                 let x = icon.frame.maxX + Self.titleOffset
                 title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd - x), height: titleH)
+                if !audio.isHidden { placeSpeaker(audio, after: title, end: last ? contentEnd : part.end - Self.buttonEdge) }
             } else {
                 // Icons centered in their parts, like a segmented control, with the speaker after while playing.
                 let room = audio.isHidden ? side : side + Self.buttonGap + size.width
@@ -1029,6 +1062,32 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             }
         }
     }
+
+    /// A speaker right after its title's text, as browsers put it with the page, not with the close button: in the
+    /// title's line as a symbol in text is, a word space after it, the button round it a full row button to press.
+    /// A long title fades before it instead, so it never goes past `end`.
+    private func placeSpeaker(_ speaker: IconButton, after title: Label, end: CGFloat) {
+        let scale = window?.backingScaleFactor ?? 2
+        func pixel(_ v: CGFloat) -> CGFloat { (v * scale).rounded() / scale }
+        let side = speaker.frame.width, ink = Self.speakerInk(speaker)
+        let gap = Tokens.Sidebar.inlineGlyphGap
+        let textStart = title.frame.minX + Label.inset
+        let inkStart = min(textStart + title.inkWidth + gap, end - (side + ink.width) / 2)
+        let x = pixel(max(textStart, inkStart) + ink.width / 2 - side / 2)
+        let font = title.font ?? Tokens.Font.sidebarRow()
+        let below = Label.capsBelowMiddle(of: font, lineHeight: title.frame.height)
+        let capsMiddle = title.frame.midY + (isFlipped ? below : -below)
+        // Titles are mostly lowercase, so the eye reads them between the x-height and the caps: the glyph's middle
+        // goes halfway between those two middles, a little under the caps' own.
+        let lower = Self.speakerDrop(capHeight: font.capHeight, xHeight: font.xHeight)
+        let middle = capsMiddle + (isFlipped ? lower : -lower)
+        speaker.frame.origin = NSPoint(x: x, y: pixel(middle - speaker.frame.height / 2))
+        let textEnd = x + side / 2 - ink.width / 2 - gap
+        title.frame.size.width = max(0, min(title.frame.width, textEnd + Label.inset - title.frame.minX))
+    }
+
+    /// How far under the caps' middle a symbol in a title's line has its middle: halfway to the x-height's middle.
+    static func speakerDrop(capHeight: CGFloat, xHeight: CGFloat) -> CGFloat { max(0, capHeight - xHeight) / 4 }
 
     /// Whether the close button covers the last split part instead of reserving room.
     private var overlaysPartEnd = false

@@ -292,33 +292,34 @@ final class FormRow: NSView, SettingsSearchable {
     var textInset: CGFloat { icon.isHidden && !isIndented ? pad : pad + Self.iconSide + Tokens.Space.x3 }
 
     /// Narrow (half of a split, a small window), the control goes under the text instead of squeezing it.
-    private func isStacked(_ width: CGFloat) -> Bool {
-        controlSize.width > 0 && width - pad - controlSize.width - Tokens.Space.x4 - textInset < Self.minimumTextWidth
+    private func isStacked(_ width: CGFloat, _ control: NSSize) -> Bool {
+        control.width > 0 && width - pad - control.width - Tokens.Space.x4 - textInset < Self.minimumTextWidth
     }
     private static let minimumTextWidth: CGFloat = 180
 
-    private func textWidth(for width: CGFloat) -> CGFloat {
-        let control = controlSize.width > 0 && !isStacked(width) ? controlSize.width + Tokens.Space.x4 : 0
-        return max(0, width - pad - control - textInset)
+    private func textWidth(for width: CGFloat, _ control: NSSize) -> CGFloat {
+        let room = control.width > 0 && !isStacked(width, control) ? control.width + Tokens.Space.x4 : 0
+        return max(0, width - pad - room - textInset)
     }
 
     /// Measured at the layout width including inset; narrower, a line that just fits counts as two and leaves a blank
     /// line.
-    private func detailHeight(for width: CGFloat) -> CGFloat {
-        detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width) + Label.inset * 2, height: 400)).height)
+    private func detailHeight(for width: CGFloat, _ control: NSSize) -> CGFloat {
+        detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width, control) + Label.inset * 2, height: 400)).height)
     }
 
     /// The height this row needs at `width`.
     func height(for width: CGFloat) -> CGFloat {
-        let stack = isStacked(width) ? Tokens.Space.x3 + controlSize.height : 0
+        let size = controlSize
+        let stack = isStacked(width, size) ? Tokens.Space.x3 + size.height : 0
         guard !detail.isHidden else { return stack > 0 ? Tokens.Page.groupRowPad * 2 + title.lineHeight + stack : Tokens.Page.groupRowHeight }
-        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width) + stack)
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width, size) + stack)
     }
 
     override func layout() {
         super.layout()
         let size = controlSize
-        let stacked = isStacked(bounds.width)
+        let stacked = isStacked(bounds.width, size)
         control.frame = stacked
             ? NSRect(x: textInset, y: bounds.height - Tokens.Page.groupRowPad - size.height, width: min(size.width, bounds.width - textInset - pad), height: size.height)
             : NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
@@ -327,8 +328,8 @@ final class FormRow: NSView, SettingsSearchable {
             icon.frame = NSRect(x: pad, y: round((bounds.height - side) / 2), width: side, height: side)
         }
         let x = textInset - Label.inset
-        let width = textWidth(for: bounds.width) + Label.inset * 2
-        let detailHeight = detailHeight(for: bounds.width)
+        let width = textWidth(for: bounds.width, size) + Label.inset * 2
+        let detailHeight = detailHeight(for: bounds.width, size)
         let block = title.lineHeight + (detail.isHidden ? 0 : Self.lineGap + detailHeight)
         // A lone title centers its caps, level with the control's text.
         let top = stacked ? Tokens.Page.groupRowPad : detail.isHidden ? title.centeredY(in: bounds.height) : round((bounds.height - block) / 2)
@@ -1207,6 +1208,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var keyToken: NSObjectProtocol?
 
     init(pane: SettingsPane = .general) {
+        let timing = SettingsTiming.begin("init"); defer { timing.end() }
         self.pane = pane.shown(manyProfiles: Library.shared.hasManyProfiles)
         super.init(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
         // Its own layer, so it paints the page's surface rather than showing whatever is under it.
@@ -1253,6 +1255,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() {
         layer?.backgroundColor = cgColor(Tokens.Color.surface)
+        SettingsTiming.drew()
+        // Drawn: what the sections asked for is read after this frame, not before it.
+        if !sectionsToRead.isEmpty, !readIsQueued {
+            readIsQueued = true
+            DispatchQueue.main.async { [weak self] in self?.readWaitingSections() }
+        }
         columnWash.color = Brand.Theme.for(self).wash
     }
 
@@ -1261,6 +1269,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     // MARK: Building
 
     private func build() {
+        let timing = SettingsTiming.begin("build"); defer { timing.end() }
         buildSiteData()
         // The column of sections, under the page's title.
         column.addSubview(columnTitle)
@@ -1747,9 +1756,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         header.leading = paneTitle
         header.trailing = [settingSearch]
 
-        reloadPrivacy()
-        reloadListedSiteData()
-
         scroll.drawsBackground = false
         scroll.automaticallyAdjustsContentInsets = false
         scroll.hasVerticalScroller = true
@@ -1761,9 +1767,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // The header's hairline shows once the page has scrolled under it, as History's does.
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
-        reloadSpaces()
-        reloadProfiles()
-        reloadExtensions()
         show(pane)
     }
 
@@ -1940,6 +1943,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if let item = items.first(where: { $0.isSelected }) { column.scrollToVisible(item.frame.insetBy(dx: 0, dy: -Tokens.Space.x2)) }
         refreshTitle()
         if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
+        readSoon([pane])
         if pane == .shortcuts { reloadShortcuts() }
         if pane == .extensions { findAppExtensions() }
         layoutDocument()
@@ -1955,6 +1959,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Shown again (its tab chosen, or moved to another window): what may have changed elsewhere is read afresh.
     override func viewDidMoveToWindow() {
+        let timing = SettingsTiming.begin("viewDidMoveToWindow"); defer { timing.end() }
         super.viewDidMoveToWindow()
         needsDisplay = true
         if let keyToken { NotificationCenter.default.removeObserver(keyToken) }
@@ -1978,13 +1983,25 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Its picture, for the tab's preview and switcher.
+    /// Its picture, for the tab's preview and switcher. Shadows are off while it's taken: `cacheDisplay` blurs each on the CPU (#379).
     func snapshot() -> NSImage? {
         guard bounds.width > 0, bounds.height > 0, let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return nil }
-        cacheDisplay(in: bounds, to: rep)
+        let shadowed = Self.shadowedLayers(in: self)
+        let opacities = shadowed.map(\.shadowOpacity)
+        Tokens.Motion.withoutAnimation {
+            shadowed.forEach { $0.shadowOpacity = 0 }
+            cacheDisplay(in: bounds, to: rep)
+            zip(shadowed, opacities).forEach { $0.shadowOpacity = $1 }
+        }
         let image = NSImage(size: bounds.size)
         image.addRepresentation(rep)
         return image
+    }
+
+    /// Every layer with a shadow, walking views as well as sublayers.
+    static func shadowedLayers(in view: NSView) -> [CALayer] {
+        func all(_ layer: CALayer) -> [CALayer] { [layer] + (layer.sublayers ?? []).flatMap(all) }
+        return (view.layer.map(all) ?? []).filter { $0.shadowOpacity > 0 } + view.subviews.flatMap(shadowedLayers)
     }
 
     // MARK: The profile shown
@@ -2104,9 +2121,61 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         (window?.windowController as? BrowserWindowController) ?? WindowManager.shared.keyController ?? WindowManager.shared.controllers.first
     }
 
+    // MARK: Reading a section's rows
+
+    /// The sections whose rows were read from disk, WebKit or the extension host. Each is read the first time it's
+    /// shown or searched, after the page has drawn, so opening Settings waits for none of them (#357).
+    private var readSections: Set<SettingsPane> = []
+    /// Sections asked for and not read yet.
+    private var sectionsToRead: Set<SettingsPane> = []
+    private var readIsQueued = false
+
+    /// Privacy and Website Data are read together: one list makes both.
+    private static func readKey(_ pane: SettingsPane) -> SettingsPane { pane == .websiteData ? .privacy : pane }
+
+    private func isRead(_ pane: SettingsPane) -> Bool { readSections.contains(Self.readKey(pane)) }
+
+    /// Reads these sections' rows once the page has drawn.
+    private func readSoon(_ panes: [SettingsPane]) {
+        sectionsToRead.formUnion(panes.map(Self.readKey).filter { !readSections.contains($0) })
+        if !sectionsToRead.isEmpty { needsDisplay = true }
+    }
+
+    /// Reads the sections asked for, then lays the page out again, its scroll kept.
+    private func readWaitingSections() {
+        readIsQueued = false
+        let panes = sectionsToRead
+        sectionsToRead = []
+        guard !panes.isEmpty else { return }
+        readSections.formUnion(panes)
+        let timing = SettingsTiming.begin("readSections"); defer { timing.end() }
+        layingOutOnce {
+            for pane in SettingsPane.allCases where panes.contains(pane) {
+                switch pane {
+                case .general: reloadWebApps()
+                case .spaces: reloadSpaces()
+                case .profiles: reloadProfiles()
+                case .extensions: reloadExtensions()
+                case .privacy: reloadPrivacy(); reloadListedSiteData()
+                default: break
+                }
+            }
+            layoutDocument()
+        }
+    }
+
+    private func counted(_ read: String) {
+        #if DEBUG
+        debugReads[read, default: 0] += 1
+        #endif
+    }
+
     // MARK: Groups
 
     private func reloadExtensions() {
+        guard isRead(.extensions) else { return }
+        let timing = SettingsTiming.begin("reloadExtensions"); defer { timing.end() }
+        counted("extensions")
         extensionsGroup.removeAllRows()
         defer { if pane == .extensions || isSearching { layoutDocument() } }
         guard #available(macOS 15.4, *) else { return }
@@ -2346,6 +2415,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The profiles there are, each with what it holds and the ways to change it. The first has no trash: there's
     /// always one profile.
     private func reloadProfiles() {
+        guard isRead(.profiles) else { return }
+        let timing = SettingsTiming.begin("reloadProfiles"); defer { timing.end() }
         profilesGroup.removeAllRows()
         let library = Library.shared
         for profile in library.profiles {
@@ -2381,8 +2452,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Data on this Mac from a profile that's in no list: a Profiles.json put back from an older backup, or one
     /// that couldn't be read, leaves it. Shown so it can be made a profile again or deleted, never deleted unasked.
     private func reloadUnlisted() {
+        guard isRead(.profiles) else { return }
+        counted("orphans")
         Task { @MainActor [weak self] in
+            let orphans = SettingsTiming.begin("orphans")
             let found = await Profiles.shared.orphans()
+            orphans.end()
             // The same data as is listed: its rows stay as they are.
             guard let self, self.unlistedListing.shown != found else { return }
             self.unlistedListing.show(found)
@@ -2451,6 +2526,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
     private func reloadSpaces() {
+        guard isRead(.spaces) else { return }
+        let timing = SettingsTiming.begin("reloadSpaces"); defer { timing.end() }
         reloadRoutes()
         spacesGroup.removeAllRows()
         spaceRows = Library.shared.spaces.map { space in
@@ -2662,6 +2739,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
     /// Every shortcut, read from the menu bar itself so the list is always right.
     private func reloadShortcuts() {
+        let timing = SettingsTiming.begin("reloadShortcuts"); defer { timing.end() }
         var groups: [(String, FormGroup)] = []
         for top in NSApp.mainMenu?.items ?? [] {
             guard let menu = top.submenu else { continue }
@@ -2713,6 +2791,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         moveSectionSelection(animated: false)
         refreshTitle()
         reloadShortcuts()
+        if isSearching { readSoon(SettingsPane.allCases) }
         // "Find a setting" finds sites by name too: the list is read if no pane with it has been shown yet.
         if isSearching, siteDataList.model == nil || siteDataList.model?.state == .idle { reloadSiteData() }
         layoutDocument()
@@ -2810,7 +2889,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     func debugFind(_ text: String) {
         settingSearch.stringValue = text
         searchChanged()
+        debugReadNow()
     }
+
+    /// How many times each slow read has run: site data, extensions, profile orphans, web apps, privacy.
+    private(set) var debugReads: [String: Int] = [:]
+
+    /// Reads the sections waiting for the page to draw, as the next frame would.
+    func debugReadNow() { readWaitingSections() }
 
     /// flags find <text> | all | top: Settings › Developer › Feature Flags searched, Show All opened, or scrolled to.
     func debugFlags(_ arg: String) {
@@ -3213,6 +3299,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var madeParts: [String: NSView] = [:]
 
     private var hasExtensions: Bool {
+        // Before the rows are read, from what's installed, without starting the profile's extensions.
+        guard isRead(.extensions) else { return !profile.installs.installedIDs.isEmpty }
         if #available(macOS 15.4, *) { return !profile.extensions.installed.isEmpty }
         return false
     }
@@ -3785,6 +3873,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// History, website data, and every per-site decision you've made, in one place. Each button says what it
     /// did, right where you clicked.
     private func reloadPrivacy() {
+        guard isRead(.privacy) else { return }
+        let timing = SettingsTiming.begin("reloadPrivacy"); defer { timing.end() }
+        counted("privacy")
         // Capture one profile: rows must change it even if the window switches, and it's read once.
         let profile = self.profile
         privacyGroup.removeAllRows()
@@ -3860,10 +3951,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let kept = KeptCookies.sites(in: profile.id)
         let addKept = PillButton(title: String(localized: "Add Site…", comment: "Button beside “Keep cookies for these sites” in Settings › Privacy: opens the sheet that adds a site whose cookies are kept."))
         addKept.onClick = { [weak self] _ in if let self { KeptCookiesSheet.add(in: self, profile: profile.id) } }
+        // Site controls offer Keep cookies only while quitting clears them (#383).
+        func keptDetail(clearsOnQuit: Bool) -> String {
+            kept.isEmpty && clearsOnQuit
+                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
+                : String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed.")
+        }
         let keptRow = FormRow(title: String(localized: "Keep cookies for these sites", comment: "A setting in Settings › Privacy: the sites whose cookies Clear Cookies… and quitting leave alone, listed under it."),
-                              detail: kept.isEmpty
-                                ? String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in. Add a site here, or turn on Keep cookies in its site controls.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, while no site is listed.")
-                                : String(localized: "Clear Cookies… and quitting leave them alone, so you stay signed in.", comment: "Explanation under “Keep cookies for these sites” in Settings › Privacy, over the sites listed."),
+                              detail: keptDetail(clearsOnQuit: KeptCookies.clearsOnQuit(in: profile.id)),
                               control: addKept)
         keptRow.keywords = String(localized: "cookies keep exceptions signed in sign-in allow sites", comment: "Words that find the Keep cookies for these sites setting. Not shown.")
         privacyGroup.add(keptRow)
@@ -3877,7 +3972,11 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             privacyGroup.add(row)
         }
         let quitToggle = Toggle(isOn: KeptCookies.clearsOnQuit(in: profile.id))
-        quitToggle.onChange = { KeptCookies.setClearsOnQuit($0, in: profile.id) }
+        quitToggle.onChange = { [weak self, weak keptRow] on in
+            KeptCookies.setClearsOnQuit(on, in: profile.id)
+            keptRow?.detailText = keptDetail(clearsOnQuit: on)
+            self?.layoutDocument()
+        }
         let quitRow = FormRow(title: String(localized: "Clear cookies when Zigzag quits", comment: "A setting in Settings › Privacy: every site's cookies and data are cleared as Zigzag quits, except the sites kept."),
                               detail: String(localized: "Each time you quit, every other site’s cookies and data are cleared, so you start signed out of them next time.", comment: "Explanation under “Clear cookies when Zigzag quits” in Settings › Privacy: every site but the ones kept."),
                               control: quitToggle)
@@ -4193,6 +4292,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// What websites keep, read again where it's listed (with more than one profile that's Website Data, and
     /// Privacy has no use for it): when the pane is shown, not each time a site's permission changes.
     private func reloadListedSiteData() {
+        guard isRead(.privacy) else { return }
         if !(pane == .privacy && hasManyProfiles) { reloadSiteData() }
     }
 
@@ -4297,6 +4397,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// The profile's list: kept from the last time it was shown, and read again in the background, so it shows
     /// at once and never empties while it's looked at. Only read where it's listed.
     private func reloadSiteData() {
+        let timing = SettingsTiming.begin("reloadSiteData"); defer { timing.end() }
+        counted("siteData")
         let profile = profile
         let model = siteDataModels[profile.id] ?? {
             let model = SiteDataModel(source: WebKitSiteData(store: profile.store))
@@ -4361,6 +4463,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Settings › General › Installed Apps: each site installed as an app, with its toolbar's switch and Remove, which
     /// asks first.
     private func reloadWebApps() {
+        guard isRead(.general) else { return }
+        let timing = SettingsTiming.begin("reloadWebApps"); defer { timing.end() }
+        counted("webApps")
         webAppsGroup.removeAllRows()
         let store = WebAppStore.shared
         store.pruneMissing()

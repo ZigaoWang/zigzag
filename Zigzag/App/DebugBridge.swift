@@ -93,7 +93,8 @@ enum DebugBridge {
     }
 
     /// webapp install (the Install as App sheet over the front tab), webapp confirm|cancel (its answer),
-    /// webapp open|close <id> (as the app's small app asks), webapp remove <id>, webapp closeall, webapp removeall, webapp state <path> (JSON: the list,
+    /// webapp open|close <id> (as the app's small app asks), webapp remove <id>, webapp closeall, webapp removeall,
+    /// webapp eval <path> <script>, webapp hide|minimize|offscreen (the first app's window), webapp state <path> (JSON: the list,
     /// the open windows), webapp settings (Settings › General), webapp toolbar on|off (the first app's), webapp front |
     /// browserfront (the menu bar for that window in front), webapp menukey <char> (⌘<char>'s item, run), webapp menu
     /// <path> (the menu bar's items), webapp sidebutton <back|forward> x y (in the first app's window).
@@ -111,6 +112,21 @@ enum DebugBridge {
         case "closeall": WebAppWindowController.all.forEach { $0.window?.close() }
         case "sidebutton": if let window = WebAppWindowController.all.first?.window { sendSideButton(rest, to: window) }
         case "removeall": WebAppStore.shared.apps.forEach { WebAppStore.shared.remove($0.id) }
+        case "eval":
+            // eval <path> <script>: the first app's page runs the script; its result goes to the file.
+            let g = rest.split(separator: " ", maxSplits: 1).map(String.init)
+            guard g.count == 2, let webView = WebAppWindowController.all.first?.tab.webView else { break }
+            webView.evaluateJavaScript(g[1]) { result, error in
+                try? (result.map { "\($0)" } ?? "error \(String(describing: error))").write(toFile: g[0], atomically: true, encoding: .utf8)
+            }
+        case "hide": WebAppWindowController.all.first?.hideWebApp(nil)
+        case "minimize": WebAppWindowController.all.first?.window?.miniaturize(nil)
+        case "offscreen":
+            // offscreen: the first app's window moved wholly past every screen, where macOS counts it as covered.
+            guard let window = WebAppWindowController.all.first?.window else { break }
+            // Not remembered for the app's next window.
+            window.setFrameAutosaveName("")
+            window.setFrame(NSRect(origin: NSPoint(x: -20000, y: -20000), size: window.frame.size), display: false)
         case "toolbar":
             // toolbar on|off: the first app's toolbar, as Settings' switch sets it.
             if let app = WebAppStore.shared.apps.first { WebAppStore.shared.setShowsToolbar(rest == "on", for: app.id) }
@@ -209,6 +225,7 @@ enum DebugBridge {
         case "mininote": mini?.debugLinksNote(arg)
         case "minispace": mini?.debugSpace(arg)
         case "minicopy": mini?.copyPageURL(nil)
+        case "minihover": mini?.debugHoverStrip(arg)
         case "minisite": mini?.showSiteControls()
         case "minifind": mini?.debugFind(arg)
         case "miniresize":
@@ -225,6 +242,7 @@ enum DebugBridge {
             sendSwipe(arg, to: window, at: NSPoint(x: window.frame.width / 2, y: window.frame.height / 2))
         case "miniborderless": BrowserRootView.isBorderless = arg == "on"
         case "miniclose": mini?.window?.performClose(nil)
+        case "miniendsheet": if let window = mini?.window, let sheet = window.attachedSheet { window.endSheet(sheet, returnCode: .cancel) }
         case "miniclosebrowsers": WindowManager.shared.controllers.forEach { $0.window?.performClose(nil) }
         case "minisidebutton": if let window = mini?.window { sendSideButton(arg, to: window) }
         case "minijs": mini?.tab.webView?.evaluateJavaScript(arg, completionHandler: nil)
@@ -338,8 +356,10 @@ enum DebugBridge {
         var phases: [Int64] = [1]
         phases += Array(repeating: 2, count: parts.contains("slow") ? 48 : 12)
         if !parts.contains("noend") { phases.append(4) }
+        // "reverse": the fingers come back over the last half.
+        let turn = parts.contains("reverse") ? phases.count / 2 : phases.count
         for (i, phase) in phases.enumerated() {
-            let d: Int32 = phase == 2 ? dx : 0
+            let d: Int32 = phase == 2 ? (i > turn ? -dx : dx) : 0
             guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { continue }
             cg.location = flipped
             cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phaseless ? 0 : phase)
@@ -350,6 +370,14 @@ enum DebugBridge {
                 DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
             }
         }
+    }
+
+    /// Which page has the keyboard: the peek's, the selected tab's, or something else.
+    static func responderName(in controller: BrowserWindowController) -> String {
+        let responder = controller.window?.firstResponder
+        if let peek = controller.peek.tab?.webView, responder === peek { return "peek" }
+        if let page = controller.selectedWebView, responder === page { return "tab" }
+        return responder.map { String(describing: type(of: $0)) } ?? "nil"
     }
 
     /// One event of a trackpad flick: when, its gesture and momentum phases (CGEvent's values), and how far it moves.
@@ -400,6 +428,71 @@ enum DebugBridge {
                 cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds)
                 if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
             }
+        }
+    }
+
+    /// sip state <path> (the newest pop-up window: JSON), sip js <script>, sip endsheet (cancels its sheet), sip open
+    /// (Open in New Tab), sip copy, sip select (its address, selected), sip shot <path> (its drawing, as a PNG), sip menu
+    /// <char> [cmd|shift|opt|ctrl] [send] (the menu item for that shortcut with the pop-up as if key: what takes it and
+    /// whether it's on; send runs it). None brings Zigzag forward.
+    private static func runSignInPopup(_ arg: String) {
+        let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
+        let rest = f.count > 1 ? f[1] : ""
+        guard let popup = PopupWindowController.all.max(by: { ($0.window?.windowNumber ?? 0) < ($1.window?.windowNumber ?? 0) }),
+              let window = popup.window else { debugLog("sip: no pop-up"); return }
+        switch f.first ?? "" {
+        case "state":
+            var state = popup.debugState
+            state["window"] = window.windowNumber
+            state["sheet"] = window.attachedSheet.map { "\(type(of: $0))" } ?? "none"
+            state["sheetWindow"] = window.attachedSheet?.windowNumber ?? 0
+            state["firstResponder"] = window.firstResponder.map { "\(type(of: $0))" } ?? "nil"
+            if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: rest)) }
+        case "js":
+            popup.webView.evaluateJavaScript(rest) { result, error in
+                debugLog("sip js => \(String(describing: result).prefix(500)) \(error.map { String(describing: $0) } ?? "")")
+            }
+        case "endsheet": if let sheet = window.attachedSheet { window.endSheet(sheet, returnCode: .cancel) }
+        case "open": popup.openInTab()
+        case "copy": popup.copyPageURL(nil)
+        case "select": popup.debugSelectAddress()
+        case "shot":
+            guard let view = window.contentView?.superview, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { break }
+            view.cacheDisplay(in: view.bounds, to: rep)
+            try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: rest))
+        case "menu":
+            let g = rest.split(separator: " ").map(String.init)
+            guard let ch = g.first else { break }
+            var flags: NSEvent.ModifierFlags = []
+            for m in g.dropFirst() {
+                switch m { case "cmd": flags.insert(.command); case "shift": flags.insert(.shift); case "ctrl": flags.insert(.control); case "opt": flags.insert(.option); default: break }
+            }
+            func find(_ menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if let sub = item.submenu, let found = find(sub) { return found }
+                    if item.keyEquivalent == ch, item.keyEquivalentModifierMask.intersection(.deviceIndependentFlagsMask) == flags { return item }
+                }
+                return nil
+            }
+            let pretended = DebugKeyWindow.window
+            DebugKeyWindow.pretend(window)
+            defer { DebugKeyWindow.pretend(pretended) }
+            guard let item = NSApp.mainMenu.flatMap(find), let action = item.action else { debugLog("sip menu \(rest): no item"); break }
+            var chain: [AnyObject] = []
+            var next: NSResponder? = window.firstResponder
+            while let r = next { chain.append(r); next = r.nextResponder }
+            if let delegate = window.delegate, !chain.contains(where: { $0 === delegate }) { chain.append(delegate) }
+            chain.append(NSApp)
+            if let delegate = NSApp.delegate { chain.append(delegate) }
+            let found = chain.first { $0.responds(to: action) }
+            let valid: Bool = {
+                guard let found else { return false }
+                if let v = found as? NSMenuItemValidation { return v.validateMenuItem(item) }
+                return true
+            }()
+            debugLog("sip menu \(rest): item=\(item.title) target=\(found.map { "\(type(of: $0))" } ?? "nil") enabled=\(valid)")
+            if g.contains("send"), let found, valid { NSApp.sendAction(action, to: found, from: item) }
+        default: debugLog("sip: unknown \(arg)")
         }
     }
 
@@ -582,6 +675,7 @@ enum DebugBridge {
         if name == "windowsdump" { dumpWindows(to: arg); return }
         if name == "webapp" { runWebApp(arg); return }
         if name == "keepontop" || name == "windowmenu" { runKeepOnTop(name, arg); return }
+        if name == "sip" { runSignInPopup(arg); return }
         // mcp on|off|reset|state <path>: Settings › Automation › Let AI apps use Zigzag, Reset Key, and the server's state (JSON).
         if name == "mcp" {
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
@@ -701,12 +795,20 @@ enum DebugBridge {
             let levels = TabTree.levels(m.treeNodes(in: m.currentSpaceID))
             let out = m.currentTabs.map { "\(String(repeating: "  ", count: levels[$0.id] ?? 0))\($0.displayTitle)\($0.isCollapsed ? " (folded)" : "")" }
             try? out.joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        // pinfold on|off: folds or opens the current space's pinned section, kept in memory only.
+        case "pinfold":
+            if SidebarListView.debugCollapsed == nil { SidebarListView.debugCollapsed = [] }
+            SidebarListView.setCollapsed(controller.tabManager.currentSpaceID, arg == "on")
+            controller.sidebar.list.reload(animated: false)
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
-        // newtabnote <path>: the new tab note's frame (window points, top left) and the selected tab.
+        // newtabnote <path>: each new tab row out from the hidden sidebar (frame in window points, top left, and title),
+        // then the selected tab.
         case "newtabnote":
-            let frame = controller.newTabNote.debugFrame.map(NSStringFromRect) ?? "none"
-            try? "\(frame)\n\(controller.tabManager.selectedTab?.displayTitle ?? "-")".write(toFile: arg, atomically: true, encoding: .utf8)
+            let rows = controller.newTabNote.debugPeeks.map { "\(NSStringFromRect($0.0)) \($0.1)" }
+            try? (rows + [controller.tabManager.selectedTab?.displayTitle ?? "-"]).joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        // newtabclick <i>: clicks the i-th of those rows.
+        case "newtabclick": controller.newTabNote.debugClick(Int(arg) ?? 0)
         // topbar on|off: Settings › Appearance › Address bar above the page.
         case "topbar": BrowserRootView.addressAbovePage = arg == "on"
         // sidebarside right|left: Settings › Appearance › Sidebar on the right.
@@ -1486,6 +1588,14 @@ enum DebugBridge {
             }
         case "edgedrag": controller.root.debugEdgeDrag(arg)
         case "spacedrag": controller.sidebar.debugSpaceDrag(arg)
+        case "chromestate": controller.sidebar.debugChromeState(arg)
+        case "fakesound":
+            // fakesound <tab index|selected|title word> <playing|muted|off>: the tab's speaker as if, with no sound played.
+            let f = arg.split(separator: " ").map(String.init)
+            let tabs = controller.tabManager.currentTabs
+            let tab = f.first.flatMap(Int.init).flatMap { tabs.indices.contains($0) ? tabs[$0] : nil }
+                ?? (f.first == "selected" ? controller.tabManager.selectedTab : controller.tabManager.allTabs.first { $0.title.contains(f.first ?? "-") })
+            if f.count == 2, let tab { tab.debugShowSound(playing: f[1] == "playing", muted: f[1] == "muted") }
         case "sidebarwidth":
             // sidebarwidth <points>: as a drag of the sidebar's edge would leave it, within its narrowest and widest.
             if let n = Double(arg) {
@@ -1561,6 +1671,89 @@ enum DebugBridge {
             let screen = window.convertPoint(toScreen: NSPoint(x: f[0], y: window.frame.height - f[1]))
             cg.location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
             if let event = NSEvent(cgEvent: cg) { window.sendEvent(event) }
+        case "trackpad":
+            // trackpad x y dx dy [steps]: a two-finger trackpad scroll at a point (window points, top left), its began,
+            // changed and ended phases 16 ms apart, handed to the window inside the app only; dy > 0 scrolls up.
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 4, let window = controller.window else { break }
+            let screen = window.convertPoint(toScreen: NSPoint(x: f[0], y: window.frame.height - f[1]))
+            let location = CGPoint(x: screen.x, y: (NSScreen.screens.first?.frame.height ?? 0) - screen.y)
+            let steps = f.count > 4 ? Int(f[4]) : 12
+            let phases: [Int64] = [1] + Array(repeating: 2, count: max(1, steps)) + [4]
+            for (i, phase) in phases.enumerated() {
+                let dx = phase == 2 ? Int32(f[2]) : 0, dy = phase == 2 ? Int32(f[3]) : 0
+                guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: dy, wheel2: dx, wheel3: 0) else { continue }
+                cg.location = location
+                cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+                cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis1, value: Double(dy))
+                cg.setDoubleValueField(.scrollWheelEventPointDeltaAxis2, value: Double(dx))
+                cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: Double(dy))
+                cg.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: Double(dx))
+                cg.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(window.windowNumber))
+                cg.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(window.windowNumber))
+                cg.timestamp = CGEventTimestamp(DispatchTime.now().uptimeNanoseconds) + UInt64(i) * 16_000_000
+                if let event = NSEvent(cgEvent: cg) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.016) { window.sendEvent(event) }
+                }
+            }
+        case "pageclick":
+            // pageclick x y [shift|cmd]: a left click at a point (window points, top left) handed to the window, taken
+            // by a page even with the copy behind other apps. Then logs which page has the keyboard.
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 2, let window = controller.window else { break }
+            var flags: NSEvent.ModifierFlags = []
+            if arg.contains("shift") { flags.insert(.shift) }
+            if arg.contains("cmd") { flags.insert(.command) }
+            BrowserWebView.takesFirstMouse = true
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let event = NSEvent.mouseEvent(with: type, location: NSPoint(x: f[0], y: window.frame.height - f[1]), modifierFlags: flags,
+                                                  timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                  context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0) {
+                    window.sendEvent(event)
+                }
+            }
+            BrowserWebView.takesFirstMouse = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { debugLog("pageclick responder \(DebugBridge.responderName(in: controller))") }
+        case "pointermove":
+            // pointermove x y: a pointer move (window points, top left) given to every page tracking area under it, as
+            // the window server does, then logs which pages heard it and which ignore the pointer.
+            let f = arg.split(separator: " ").compactMap { Double($0) }
+            guard f.count >= 2, let window = controller.window,
+                  let event = NSEvent.mouseEvent(with: .mouseMoved, location: NSPoint(x: f[0], y: window.frame.height - f[1]), modifierFlags: [],
+                                                 timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                 context: nil, eventNumber: 0, clickCount: 0, pressure: 0) else { break }
+            var heard: [String] = []
+            func walk(_ view: NSView) {
+                if let page = view as? WKWebView {
+                    let moved = #selector(NSResponder.mouseMoved(with:))
+                    let inside = page.visibleRect.contains(page.convert(event.locationInWindow, from: nil))
+                    for area in page.trackingAreas where inside && area.options.contains(.mouseMoved) {
+                        guard let owner = area.owner as? NSObject, owner.responds(to: moved) else { continue }
+                        owner.perform(moved, with: event)
+                        let name = page === controller.peek.tab?.webView ? "peek" : page === controller.selectedWebView ? "tab" : "page"
+                        heard.append(name + (PeekController.isCovered(page) ? "(ignores)" : ""))
+                    }
+                }
+                view.subviews.forEach(walk)
+            }
+            if let frame = window.contentView?.superview { walk(frame) }
+            debugLog("pointermove heard by \(heard)")
+        case "responder": debugLog("responder \(responderName(in: controller))")
+        case "dragpath":
+            // dragpath x y1 y2: an in-app press at y1 dragged to y2 and let go (window points, top left).
+            let n = arg.split(separator: " ").compactMap { Double($0) }
+            guard n.count == 3, let window = controller.window else { break }
+            func event(_ type: NSEvent.EventType, _ y: Double) -> NSEvent? {
+                NSEvent.mouseEvent(with: type, location: NSPoint(x: n[0], y: window.frame.height - y), modifierFlags: [],
+                                   timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                   context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)
+            }
+            event(.leftMouseDown, n[1]).map(window.sendEvent)
+            for step in 2...8 { event(.leftMouseDragged, n[1] + (n[2] - n[1]) * Double(step) / 8).map { NSApp.postEvent($0, atStart: false) } }
+            event(.leftMouseUp, n[2]).map { NSApp.postEvent($0, atStart: false) }
+            event(.leftMouseDragged, n[1] + (n[2] - n[1]) / 8).map(window.sendEvent)
+            debugLog("dragpath \(arg) done")
         case "mouse":
             // mouse <down|drag|up|move|click|rclick> x y [shift|cmd|opt]  (window points, top-left origin)
             let f = arg.split(separator: " ").map(String.init)
@@ -1699,6 +1892,18 @@ enum DebugBridge {
             } else if let row = controller.sidebar.list.row(forFolder: folder.id) {
                 closeNextMenu(after: 4)
                 DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: row.bounds.midY), in: row) }
+            }
+        case "spacemenu":
+            // spacemenu [item]: that item of the right-click menu above the pinned tabs, as choosing it does; no item,
+            // the menu at the space's name, which closes by itself after 4 s.
+            guard let header = controller.sidebar.list.headerView as? SpaceHeaderView, let event = NSApp.currentEvent ?? NSEvent.otherEvent(with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0),
+                  let menu = header.onRightClick?(event) else { break }
+            debugLog("spacemenu => \(menu.items.map { $0.isSeparatorItem ? "-" : $0.title })")
+            if !arg.isEmpty {
+                if case let index = menu.indexOfItem(withTitle: arg), index >= 0 { menu.performActionForItem(at: index) }
+            } else {
+                closeNextMenu(after: 4)
+                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 40, y: header.bounds.midY), in: header) }
             }
         case "folderstate":
             debugLog("folderstate \(Library.shared.folders(in: controller.tabManager.currentSpaceID).map { "\($0.name)=\($0.isOpen ? "open" : "shut")" }) loaded=\(Library.shared.bookmarks(in: controller.tabManager.currentSpaceID).filter { controller.tabManager.bookmarkTab(for: $0.id) != nil }.map(\.title)) selected=\(controller.tabManager.selectedTab?.displayTitle ?? "")")
@@ -2041,6 +2246,11 @@ enum DebugBridge {
         case "endsheet": if let sheet = controller.window?.attachedSheet { controller.window?.endSheet(sheet, returnCode: .cancel) }
         case "zoomin": controller.zoomIn(nil)
         case "zoomreset": controller.actualSize(nil)
+        case "magnify":
+            // magnify <scale>: the front page pinch-zoomed to scale, around its middle.
+            if let webView = controller.selectedWebView, let scale = Double(arg) {
+                webView.setMagnification(scale, centeredAt: NSPoint(x: webView.bounds.midX, y: webView.bounds.midY))
+            }
         case "themes":
             for tab in controller.tabManager.currentTabs {
                 let t = tab.themeColor?.usingColorSpace(.sRGB)
@@ -2487,6 +2697,8 @@ enum DebugBridge {
         // keptcookies clear | add | quit on|off | top: Settings › Privacy's kept cookies (#334). keptcookiesstate <path>:
         // each profile's kept sites and quit choice, as JSON.
         case "keptcookies": controller.tabManager.selectedTab?.settingsView?.debugKeptCookies(arg)
+        // clearsonquit on|off: Clear cookies when Zigzag quits for the front window's profile, without Settings open.
+        case "clearsonquit": KeptCookies.setClearsOnQuit(arg == "on", in: controller.tabManager.profile.id)
         case "keptcookiesstate":
             let state = Profiles.shared.all.map { ["profile": $0.id.uuidString, "sites": KeptCookies.sites(in: $0.id).sorted(), "clearsOnQuit": KeptCookies.clearsOnQuit(in: $0.id)] as [String: Any] }
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }

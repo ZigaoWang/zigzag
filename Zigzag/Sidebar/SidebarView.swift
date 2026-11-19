@@ -652,7 +652,8 @@ final class SpaceDotView: InteractiveView {
     init(spaceID: UUID) {
         self.spaceID = spaceID
         super.init(frame: NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button))
-        pressSinks = true
+        // Pressed as the toolbar's buttons are: around its middle, so the icon never moves off its line.
+        pressScales = true
         layer?.cornerRadius = Tokens.Radius.control
         layer?.addSublayer(dot)
         // Every icon fit to the same square and centered in it, whatever its drawing's own width (a book is wider
@@ -746,8 +747,8 @@ final class SpaceDotView: InteractiveView {
         } else {
             Tokens.Motion.withoutAnimation(apply)
         }
-        // The key itself is what answers the pointer; a drop over it lights it as the drop target.
-        let fill: NSColor? = isDropTarget ? Tokens.Chrome.pressed : nil
+        // The key answers the pointer as the toolbar's buttons do; a drop over it lights it as the drop target.
+        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }
@@ -1369,6 +1370,19 @@ final class SidebarView: NSView {
     }
 
     #if DEBUG
+    /// chromestate <toggle|back|forward|reload|site|downloads|plus|dot<i>> <hover|press|off>: one of the sidebar's
+    /// buttons as if the pointer were on it or pressing it; every other one let go.
+    func debugChromeState(_ arg: String) {
+        let f = arg.split(separator: " ").map(String.init)
+        var all: [String: InteractiveView] = ["toggle": sidebarButton, "back": backButton, "forward": forwardButton, "reload": reloadButton,
+                                              "site": address.siteControlsButton, "downloads": downloadsButton, "plus": newSpaceButton]
+        for (i, dot) in dots.enumerated() { all["dot\(i)"] = dot }
+        for view in all.values { view.isPressed = false; view.isHovered = false }
+        guard f.count == 2, let view = all[f[0]] else { return }
+        view.isHovered = f[1] != "off"
+        view.isPressed = f[1] == "press"
+    }
+
     /// spacedrag begin <i> | move <x> [y] (window points, top-left; y defaults to the bar's middle) | drop | cancel:
     /// the drag a pointer would make, through the same steps.
     func debugSpaceDrag(_ arg: String) {

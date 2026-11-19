@@ -157,7 +157,8 @@
       if (run !== started || !darkened) return;
       started++;
       DarkReader.enable(theme(), fix());
-      requestAnimationFrame(() => { if (darkened) fallback.remove(); });
+      // Its pass done, the page's color is told again as it's drawn now.
+      requestAnimationFrame(() => { if (darkened) { fallback.remove(); send(); } });
       setTimeout(() => { if (darkened) fallback.remove(); }, 1000);
     };
     if (painted) requestAnimationFrame(() => setTimeout(go, 0));
@@ -409,6 +410,9 @@
     // A page dark on its own whose root and body paint white or nothing (a dark app laid over them): the dark at its
     // top, else its middle, which is what's seen under the bar (#134). Only a quiet dark, not a button's green.
     if (native === true && !darkened && lightness(c) >= 0.5 && body) c = quietDark() || c;
+    // Darkened, a light body is one Dark Reader didn't reach (a style sheet it couldn't read) under a page drawn
+    // dark: the dark at its top, else Dark Reader's (#250).
+    if (darkened && lightness(c) >= 0.5) c = quietDark() || rgba(theme().darkSchemeBackgroundColor);
     return hex(c);
   };
   // The quiet dark at the page's top, else its middle: what's seen under the bar. Not a button's green.

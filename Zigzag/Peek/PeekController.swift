@@ -79,6 +79,9 @@ final class PeekController {
         }
     }
     private var escMonitor: Any?
+    /// Every page a Peek covers, with the window it's covered in: a page that leaves that window (shown in another
+    /// window that shares tabs, moved there) takes the pointer again at once (`pageMoved`).
+    private static let covered = NSMapTable<WKWebView, NSWindow>.weakToWeakObjects()
 
     private func stopEsc() {
         if let escMonitor { NSEvent.removeMonitor(escMonitor) }
@@ -101,6 +104,24 @@ final class PeekController {
         scrim.onClick = { [weak self] in self?.close() }
         header.closeButton.onClick = { [weak self] _ in self?.close() }
         header.expandButton.onClick = { [weak self] _ in self?.openAsTab() }
+        // A mouse plugged in or out, or Show scroll bars changed, switches the Mac between the two styles.
+        scrollerStyleObserver = NotificationCenter.default.addObserver(forName: NSScroller.preferredScrollerStyleDidChangeNotification,
+                                                                       object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshScrollbars() }
+        }
+    }
+
+    private var scrollerStyleObserver: NSObjectProtocol?
+
+    isolated deinit {
+        if let scrollerStyleObserver { NotificationCenter.default.removeObserver(scrollerStyleObserver) }
+    }
+
+    /// The slim bar on the peeked page while the Mac shows classic scroll bars, none otherwise (`PeekScrollbars`).
+    private func refreshScrollbars() {
+        guard let tab, let webView = tab.webView, !tab.isLoading else { return }
+        let ground = tab.pageColor ?? webView.underPageBackgroundColor
+        PeekScrollbars.apply(to: webView, style: NSScroller.preferredScrollerStyle, dark: ground.map(PageBar.isDark) ?? false)
     }
 
     private var headerHeight: CGFloat { Tokens.Metric.peekHeaderHeight }
@@ -172,8 +193,62 @@ final class PeekController {
                 return nil
             }
         }
+        coverPages()
         controller.window?.makeFirstResponder(webView)
         return webView
+    }
+
+    /// Pointer moves reach every page under the pointer, covered or not: the ones under the card ignore them.
+    private func coverPages() {
+        guard let controller, let window = controller.window else { return }
+        for case let page? in controller.root.paneCards.map(\.webView) where page !== tab?.webView && page.window === window {
+            cover(page, in: window)
+        }
+    }
+
+    private func cover(_ page: WKWebView, in window: NSWindow) {
+        Self.covers(page, true)
+        Self.covered.setObject(window, forKey: page)
+    }
+
+    /// Gives the pointer back to every page this window's Peek covered, wherever it is now.
+    private func uncoverPages() {
+        let window = controller?.window
+        for page in Self.covered.keyEnumerator().allObjects.compactMap({ $0 as? WKWebView }) {
+            let at = Self.covered.object(forKey: page)
+            guard at == nil || at === window else { continue }
+            Self.covers(page, false)
+            Self.covered.removeObject(forKey: page)
+        }
+    }
+
+    /// A page came into a window or left one. Out of the window whose Peek covered it, it takes the pointer again;
+    /// into a window with Peek up, it's under the card there.
+    static func pageMoved(_ page: WKWebView) {
+        // Only Peek covers pages, so one covered with no Peek in its window behind it is let go too.
+        let at = covered.object(forKey: page)
+        if at.map({ $0 !== page.window }) ?? isCovered(page) {
+            covers(page, false)
+            covered.removeObject(forKey: page)
+        }
+        guard let window = page.window, let peek = (window.windowController as? BrowserWindowController)?.peek,
+              peek.isVisible, let peeked = peek.tab?.webView, page !== peeked, !page.isDescendant(of: peek.panel) else { return }
+        peek.cover(page, in: window)
+    }
+
+    /// WebKit's switch for a covered page: no pointer moves, hover, clicks or drops.
+    static func covers(_ page: WKWebView, _ on: Bool) {
+        let set = NSSelectorFromString("_setIgnoresNonWheelEvents:")
+        guard page.responds(to: set) else { return }
+        typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(page.method(for: set), to: SetBool.self)(page, set, on)
+    }
+
+    static func isCovered(_ page: WKWebView) -> Bool {
+        let get = NSSelectorFromString("_ignoresNonWheelEvents")
+        guard page.responds(to: get) else { return false }
+        typealias GetBool = @convention(c) (AnyObject, Selector) -> Bool
+        return unsafeBitCast(page.method(for: get), to: GetBool.self)(page, get)
     }
 
     private func tabChanged(_ change: Tab.Change) {
@@ -182,7 +257,8 @@ final class PeekController {
         default: break
         }
         switch change {
-        case .loading, .themeColor, .darkPage, .pdf, .settings: refreshGround()
+        case .loading, .themeColor, .pdf, .settings: refreshGround()
+        case .darkPage: refreshGround(); refreshScrollbars()
         default: break
         }
         // Painted: pages that leave their background to the browser get white again.
@@ -191,6 +267,7 @@ final class PeekController {
             // Unless dark pages keep it clear, so the dark under it shows (#134).
             DarkPages.restoreGround(of: webView)
             content.layer?.backgroundColor = nil
+            refreshScrollbars()
         }
     }
 
@@ -259,6 +336,7 @@ final class PeekController {
         scrim.hide(evenFromKeyboard: true)
         let closing = tab
         tab = nil
+        uncoverPages()
         shrink { closing?.close() }
         if let controller, let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
     }
@@ -270,10 +348,15 @@ final class PeekController {
         token = nil
         self.tab = nil
         tab.isPeek = false
+        uncoverPages()
         // Promoted before it finished loading: it never gets the peek's "painted" step, so it draws its own
         // background from here on, like any tab.
         tab.webView?.setValue(true, forKey: "drawsBackground")
-        if let webView = tab.webView { DarkPages.restoreGround(of: webView) }
+        if let webView = tab.webView {
+            DarkPages.restoreGround(of: webView)
+            // A tab keeps the Mac's own scroll bars, as in Safari.
+            PeekScrollbars.remove(from: webView)
+        }
         content.layer?.backgroundColor = nil
         let target = controller.root.cardFrame
         scrim.hide()
@@ -292,4 +375,86 @@ final class PeekController {
 
     func goBack() { tab?.goBack() }
     func goForward() { tab?.goForward() }
+}
+
+/// Peek's slim scroll bar. A Mac that shows classic scroll bars gives every page a wide track, heavy in a small card:
+/// there a peeked page gets a slim bar floating over it instead, unless it styles its own. With overlay scroll bars,
+/// and in tabs, pages keep WebKit's own, as in Safari.
+enum PeekScrollbars {
+    static let styleID = "zigzag-peek-scrollbars"
+
+    /// Only for the Mac's classic scroll bars.
+    static func wanted(for style: NSScroller.Style) -> Bool { style == .legacy }
+
+    /// The slim bar's sheet, its thumb dark on a light page and light on a dark one.
+    static func css(dark: Bool) -> String {
+        let thumb = dark ? "255,255,255" : "0,0,0"
+        return "::-webkit-scrollbar{width:10px;height:10px;background:transparent}"
+            + "::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}"
+            + "::-webkit-scrollbar-thumb{background:rgba(\(thumb),.35);border-radius:6px;border:3px solid transparent;background-clip:content-box}"
+            + "::-webkit-scrollbar-thumb:hover{background-color:rgba(\(thumb),.55)}"
+    }
+
+    static func apply(to webView: WKWebView, style: NSScroller.Style, dark: Bool) {
+        Task { _ = await run(in: webView, want: wanted(for: style), dark: dark) }
+    }
+
+    static func remove(from webView: WKWebView) {
+        Task { _ = await run(in: webView, want: false, dark: false) }
+    }
+
+    /// Adds, updates or removes the bar: "added", "updated", "removed", "own" (the page styles its own) or "none".
+    static func run(in webView: WKWebView, want: Bool, dark: Bool) async -> String? {
+        let width = NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+        let args: [String: Any] = ["id": styleID, "want": want, "css": css(dark: dark), "native": Double(width)]
+        return try? await webView.callAsyncJavaScript(script, arguments: args, in: nil, contentWorld: .defaultClient) as? String
+    }
+
+    // A page styles its own if its root or body sets scrollbar-width or -color, a readable sheet has scrollbar
+    // rules, or its root's bar is wider or narrower than the Mac's.
+    private static let script = """
+    const old = document.getElementById(id);
+    const root = document.documentElement;
+    // WebKit styles a scroll bar as it makes it: the page's are made again for a change to show.
+    const remake = () => {
+      if (!root) return;
+      const x = scrollX, y = scrollY, overflow = root.style.overflow;
+      root.style.overflow = 'hidden';
+      void root.offsetWidth;
+      root.style.overflow = overflow;
+      void root.offsetWidth;
+      scrollTo(x, y);
+    };
+    if (!want) { if (old) { old.remove(); remake(); return 'removed'; } return 'none'; }
+    if (old) { if (old.textContent !== css) { old.textContent = css; remake(); } return 'updated'; }
+    if (!root) return 'none';
+    for (const el of [root, document.body]) {
+      if (!el) continue;
+      const s = getComputedStyle(el);
+      if ((s.scrollbarWidth && s.scrollbarWidth !== 'auto') || (s.scrollbarColor && s.scrollbarColor !== 'auto')) return 'own';
+    }
+    const bar = innerWidth - root.clientWidth;
+    if (bar > 0 && Math.abs(bar - native) > 0.5) return 'own';
+    const styles = (rules) => {
+      for (const r of rules) {
+        if (r.selectorText && r.selectorText.includes('-webkit-scrollbar')) return true;
+        if (r.style && (r.style.getPropertyValue('scrollbar-width') || r.style.getPropertyValue('scrollbar-color'))) return true;
+        let inner = null;
+        try { inner = r.cssRules; } catch (e) {}
+        if (inner && inner.length && styles(inner)) return true;
+      }
+      return false;
+    };
+    for (const sheet of document.styleSheets) {
+      let rules = null;
+      try { rules = sheet.cssRules; } catch (e) { continue; }
+      if (rules && styles(rules)) return 'own';
+    }
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = css;
+    (document.head || root).appendChild(style);
+    remake();
+    return 'added';
+    """
 }

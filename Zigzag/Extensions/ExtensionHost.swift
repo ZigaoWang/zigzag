@@ -691,8 +691,28 @@ final class ExtensionHost: NSObject {
     /// Whether this extension may see private windows' tabs, downloads and pages.
     func seesPrivate(_ id: String) -> Bool { context(for: id)?.hasAccessToPrivateData ?? false }
 
-    /// Sites "When You Click It" got from a click in a private window: kept until Zigzag quits, never written down.
+    /// Sites "When You Click It" got from a click in a private window, never written down. WebKit grants a site to
+    /// the whole extension, not one window, so each is kept only while a private tab here is on it.
     private var privateClickSites: [String: [String]] = [:]
+
+    /// A private tab left a site or closed: click grants no private tab is on any more go.
+    private func dropLeftPrivateClickSites() {
+        guard !privateClickSites.isEmpty else { return }
+        let open = Set(WindowManager.shared.controllers.filter(\.tabManager.isPrivate).flatMap(\.tabManager.allTabs)
+            .filter { $0.profile === profile }.compactMap { ContentBlocker.site(of: $0.url) })
+        let kept = Self.privateClickSites(privateClickSites, stillOpen: open)
+        let changed = Set(privateClickSites.keys).filter { kept[$0] != privateClickSites[$0] }
+        privateClickSites = kept
+        changed.forEach(applySiteAccess)
+    }
+
+    /// The click grants that stay: those on a site a private tab still shows.
+    static func privateClickSites(_ sites: [String: [String]], stillOpen open: Set<String>) -> [String: [String]] {
+        sites.compactMapValues { list in
+            let kept = list.filter(open.contains)
+            return kept.isEmpty ? nil : kept
+        }
+    }
 
     // MARK: Site access
 
@@ -985,7 +1005,7 @@ final class ExtensionHost: NSObject {
             Toast.show(String(localized: "\(attention.title): in its settings, choose Browser, then Add Browser", comment: "Toast when an extension needs a step in its own app. The placeholder is a title like “Connect 1Password to Zigzag”. Browser and Add Browser are names in 1Password's settings."), symbol: "exclamationmark.triangle",
                        action: open, duration: 6, in: controller)
         }
-        // "When you click it": clicking gives it this site from now on.
+        // "When you click it": clicking gives it this site from now on; in a private window, while a private tab is on it.
         if profile.installs.siteAccess(item.id) == .click, let site = ContentBlocker.site(of: tab?.url),
            !profile.installs.accessSites(item.id).contains(site) {
             if tab?.isPrivate == true {
@@ -1152,7 +1172,10 @@ final class ExtensionHost: NSObject {
     // Private tabs are told only while an extension here is allowed in private windows; WebKit keeps them from the rest.
     private func tells(_ tab: Tab) -> Bool { !tab.isPrivate || runsInPrivate }
     func tabOpened(_ tab: Tab) { if tells(tab) { controller.didOpenTab(tab) } }
-    func tabClosed(_ tab: Tab, windowClosing: Bool = false) { if tells(tab) { controller.didCloseTab(tab, windowIsClosing: windowClosing) } }
+    func tabClosed(_ tab: Tab, windowClosing: Bool = false) {
+        if tab.isPrivate { DispatchQueue.main.async { [weak self] in self?.dropLeftPrivateClickSites() } }
+        if tells(tab) { controller.didCloseTab(tab, windowIsClosing: windowClosing) }
+    }
     func tabActivated(_ tab: Tab, previous: Tab?) {
         guard tells(tab) else { return }
         // The tab you left is only news to the extensions that knew it.
@@ -1163,6 +1186,7 @@ final class ExtensionHost: NSObject {
         controller.didMoveTab(tab, from: index, in: window)
     }
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
+        if tab.isPrivate, change == .url { dropLeftPrivateClickSites() }
         guard tells(tab) else { return }
         switch change {
         // An address or sound is told at once, after what was waiting for that tab, so the order is as it happened.
@@ -1237,6 +1261,7 @@ final class ExtensionHost: NSObject {
     func miniFocused(_ mini: MiniWindowController) { controller.didFocusWindow(mini) }
     func miniClosed(_ mini: MiniWindowController) { controller.didCloseWindow(mini) }
     func windowClosed(_ window: BrowserWindowController) {
+        if window.tabManager.isPrivate { DispatchQueue.main.async { [weak self] in self?.dropLeftPrivateClickSites() } }
         guard !window.tabManager.isPrivate || runsInPrivate else { return }
         controller.didCloseWindow(window)
     }

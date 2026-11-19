@@ -99,7 +99,9 @@
       const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
       const method = String(option('method', 'GET')).toUpperCase();
       const body = init && init.body != null ? init.body : isRequest ? input.body : null;
-      if (!['http:', 'https:'].includes(url.protocol) || option('credentials', 'same-origin') !== 'include'
+      // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
+      const credentials = option('credentials', 'same-origin');
+      if (!['http:', 'https:'].includes(url.protocol) || !['include', 'same-origin'].includes(credentials)
           || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
@@ -119,7 +121,7 @@
       }; });
       signal.addEventListener('abort', abort, { once: true });
       try {
-        const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method,
+        const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method, credentials,
           headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect, userAgent: sentUserAgent }]), aborted]);
         signal.throwIfAborted();
         if (answer.fallback) return nativeFetch(input, init);

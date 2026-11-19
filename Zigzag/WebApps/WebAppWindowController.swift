@@ -217,6 +217,10 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
     @objc func reloadPage(_ sender: Any?) { tab.reload() }
     @objc func reloadPageFromOrigin(_ sender: Any?) { tab.reloadFromOrigin() }
     @objc func stopLoading(_ sender: Any?) { tab.stopLoading() }
+    @objc func printPage(_ sender: Any?) {
+        guard let webView = tab.webView else { return }
+        PagePrinting.print(webView, in: window, completion: {})
+    }
 
     @objc func copyPageURL(_ sender: Any?) {
         guard let url = tab.url else { return }
@@ -294,6 +298,8 @@ final class WebAppWindowController: NSWindowController, NSWindowDelegate {
          "store": tab.webView?.configuration.websiteDataStore.identifier?.uuidString ?? "default",
          "frame": window.map { NSStringFromRect($0.frame) } ?? "", "key": window?.isKeyWindow == true,
          "canGoBack": tab.canGoBack, "loading": tab.isLoading, "showsToolbar": root.showsToolbar, "visible": window?.isVisible == true,
+         "occluded": window?.occlusionState.contains(.visible) == false, "playing": tab.isPlayingAudio,
+         "watchesCover": tab.webView?.value(forKey: "_windowOcclusionDetectionEnabled") as? Bool ?? false,
          "bar": root.bar.color.flatMap { $0.usingColorSpace(.sRGB) }.map(DarkPages.hex) ?? ""]
     }
     #endif
@@ -305,6 +311,7 @@ extension WebAppWindowController: NSMenuItemValidation {
         case #selector(goBack(_:)): return tab.canGoBack
         case #selector(goForward(_:)): return tab.canGoForward
         case #selector(stopLoading(_:)): return tab.isLoading
+        case #selector(printPage(_:)): return tab.webView != nil
         case #selector(copyPageURL(_:)), #selector(openInBrowser(_:)): return tab.url != nil
         case #selector(toggleToolbar(_:)):
             item.title = Self.toolbarTitle(showing: current.showsToolbar)
@@ -535,7 +542,7 @@ final class WebAppStripView: NSView {
     private var keyTokens: [NSObjectProtocol] = []
 
     static func button(_ symbol: String, toolTip: String) -> IconButton {
-        let button = IconButton(symbol: symbol, size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
+        let button = IconButton(symbol: symbol, size: Tokens.Pane.stripButton, symbolSize: Tokens.Pane.glyph, toolTip: toolTip)
         // On the page's color, not the frame's: the neutral fills, which show on any color.
         button.isOnPage = true
         return button
@@ -587,12 +594,14 @@ final class WebAppStripView: NSView {
 
     override func layout() {
         super.layout()
-        let mid = bounds.height / 2, b = Tokens.Pane.button
+        let mid = bounds.height / 2, b = Tokens.Pane.stripButton
         var x = Tokens.Sidebar.lightsX + trafficLightsWidth + Tokens.Space.x2
+        // Room between the buttons' hover boxes, as in Zigzag Mini's strip.
         for button in [back, forward, reload] {
             button.frame = NSRect(x: x, y: round(mid - b / 2), width: b, height: b)
-            x += b
+            x += b + Tokens.Pane.stripGap
         }
+        x -= Tokens.Pane.stripGap
         // The name stays in the middle of the window, as wide as the room beside the buttons allows.
         let half = max(0, bounds.midX - x - Tokens.Space.x2)
         let markRoom: CGFloat = mark.isHidden ? 0 : Tokens.Space.x4
