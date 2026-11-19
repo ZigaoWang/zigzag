@@ -23,8 +23,7 @@ struct ShipFixesTests {
         #expect(ImportCoordinator.Choice.retrying([], else: all) == all)
     }
 
-    /// #272: with the sidebar hidden, a link opened in a new tab behind the page says so; docked or slid out, the
-    /// new row in the sidebar does, and over the desk there's no page to say it on.
+    /// #272: with the sidebar hidden, a background new tab shows a note; with it visible the new row does, and over the desk there's no page for it.
     @Test func newTabNoteOnlyWithTheSidebarOutOfSight() {
         #expect(NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: false))
         #expect(!NewTabNote.shows(sidebarVisible: true, sidebarFloating: false, deskVisible: false))
@@ -32,17 +31,36 @@ struct ShipFixesTests {
         #expect(!NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: true))
     }
 
-    /// #272: the note names the site until the page gives its title, then the title.
-    @Test func newTabNoteNamesTheSiteUntilTheTitleComes() {
-        let site = URL(string: "https://www.example.com/a")!
-        // WebKit's empty tab for Open Link in New Tab: the site it's about to load.
+    /// #272: WebKit's empty tab shows the site it's about to load; once the tab has a page, its own title, live.
+    @Test func newTabRowFollowsTheTabsTitle() {
+        let site = URL(string: "https://www.youtube.com/watch?v=1")!
         let empty = Tab(url: nil, spaceID: UUID())
-        #expect(NewTabNote.title(of: empty, site: site) == "example.com")
-        let loading = Tab(url: site, spaceID: UUID())
-        #expect(NewTabNote.title(of: loading, site: nil) == "example.com")
-        let titled = Tab(url: site, title: "Example Domain", spaceID: UUID())
-        #expect(NewTabNote.title(of: titled, site: site) == "Example Domain")
-        #expect(NewTabNote.announcement(for: "Example Domain").contains("Example Domain"))
+        #expect(NewTabNote.placeholder(for: empty, site: site) == "www.youtube.com")
+        #expect(NewTabNote.placeholder(for: Tab(url: site, spaceID: UUID()), site: site) == nil)
+
+        let peek = NewTabPeekView(tab: empty, site: site)
+        #expect(peek.row.title.stringValue == "www.youtube.com")
+        empty.customTitle = "A Video"
+        #expect(peek.row.title.stringValue == "A Video")
+        let titled = Tab(url: site, title: "YouTube", spaceID: UUID())
+        let live = NewTabPeekView(tab: titled, site: site)
+        #expect(live.row.title.stringValue == "YouTube")
+        titled.customTitle = "Another Video"
+        #expect(live.row.title.stringValue == "Another Video")
+        #expect(NewTabNote.announcement(for: "A Video").contains("A Video"))
+    }
+
+    /// #272: each new tab's row comes out at its own place in the list; one scrolled past comes out at that end of the
+    /// list in sight, stacked inward in list order and clear of the others.
+    @Test func newTabRowsEachTakeTheirOwnPlace() {
+        let h: CGFloat = 30, gap: CGFloat = 2, sight: ClosedRange<CGFloat> = 100...400
+        #expect(NewTabNote.slots(rows: [120, 152, 184], visible: sight, height: h, gap: gap) == [120, 152, 184])
+        // Below the fold: up from the bottom, the last lowest.
+        #expect(NewTabNote.slots(rows: [500, 532], visible: sight, height: h, gap: gap) == [338, 370])
+        // Above: down from the top. Nowhere (in a closed folder): the bottom.
+        #expect(NewTabNote.slots(rows: [10, nil], visible: sight, height: h, gap: gap) == [100, 370])
+        // A stacked one steps past a row already there.
+        #expect(NewTabNote.slots(rows: [370, 600], visible: sight, height: h, gap: gap) == [370, 338])
     }
 
     @Test func oldHTTPLoginsFillOnTheSecureSiteOnly() throws {
@@ -209,19 +227,19 @@ struct BookmarkFolderTests {
 
     // MARK: Swiping back and forward
 
-    /// The swipe arrow sits in the gap the page leaves, never over the sidebar, the next pane or the window's edge.
+    /// The swipe arrow stays in the page's gap, never over the sidebar, the next pane or the window edge.
     @Test func swipeArrowStaysInsideTheCard() {
         let page = NSRect(x: 300, y: 0, width: 800, height: 600)
         let size = SwipeArrowView.size, margin = Tokens.Space.x2
-        // Back: a wide gap centers it; a narrow one keeps it a margin in from the card's edge.
+        // Back: centered in a wide gap, a margin from the card edge in a narrow one.
         let wide = SwipeArrowView.frame(in: page, offset: size + margin * 4, back: true)
         #expect(wide.minX == page.minX + margin * 2)
         let narrow = SwipeArrowView.frame(in: page, offset: 10, back: true)
         #expect(narrow.minX == page.minX + margin)
-        // Forward: the same at the right edge, the page pushed left.
+        // Forward: same at the right edge.
         let forward = SwipeArrowView.frame(in: page, offset: -10, back: false)
         #expect(forward.maxX == page.maxX - margin)
-        // Halfway down the page, either way.
+        // Vertically centered either way.
         #expect(narrow.midY == page.midY)
     }
 
@@ -305,14 +323,14 @@ struct BookmarkFolderTests {
 
     /// Runs the swipe script's own decision in JavaScriptCore over made-up elements: `chain` from the one under the
     /// pointer outward, each a JavaScript object literal with its style.
-    private func keeps(_ chain: [String], root: String = "null", ends: String = "[]", deltaX: Double,
-                       prevented: Bool = false) throws -> Bool {
+    private func keeps(_ chain: [String], root: String = "null", ends: String = "[]", view: String = "null",
+                       deltaX: Double, prevented: Bool = false) throws -> Bool {
         let context = try #require(JSContext())
         let result = context.evaluateScript("""
         const chain = [\(chain.joined(separator: ", "))];
         chain.forEach((el, i) => { el.parentElement = chain[i + 1] || null; });
         const style = (el) => Object.assign({ overflowX: 'visible', overflowY: 'visible', overscrollBehaviorX: 'auto', direction: 'ltr' }, el.style);
-        const room = (\(SwipeAnswers.sideways))(chain[0], style, \(root), \(ends));
+        const room = (\(SwipeAnswers.sideways))(chain[0], style, \(root), \(ends), \(view));
         (\(SwipeAnswers.keeps))(room, \(deltaX), \(prevented))
         """)
         #expect(context.exception == nil)
@@ -336,8 +354,10 @@ struct BookmarkFolderTests {
         let rtl = "{ scrollWidth: 3000, clientWidth: 800, scrollLeft: 0, style: { overflowX: 'auto', direction: 'rtl' } }"
         #expect(try keeps([cell, rtl], deltaX: -12))
         #expect(try !keeps([cell, rtl], deltaX: 12))
-        // A page a little too wide by accident doesn't count; a really wide one does.
-        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
+        // A page a little too wide by accident has no room ahead; scrolled along, it has room behind (#377).
+        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 0, style: {} }", deltaX: 12))
+        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 0, style: {} }", deltaX: -12))
+        #expect(try keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
         #expect(try keeps([cell], root: "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
         // Nothing scrolls: a plain page leaves it to the swipe.
         #expect(try !keeps([cell, "{ scrollWidth: 1000, clientWidth: 1000, style: {} }"], deltaX: -12))
@@ -355,6 +375,82 @@ struct BookmarkFolderTests {
         #expect(try !keeps([cell], ends: "[{ style: {} }, { style: {} }]", deltaX: -12))
         // A page that cancels the scrolls itself (Canva) keeps them, whatever scrolls.
         #expect(try keeps([cell], deltaX: -12, prevented: true))
+    }
+
+    @Test func swipeScriptKeepsWhatPansWhenPinchedIn() throws {
+        // Pinched in to twice the size, the visible half pans across a page no wider than the window (#377).
+        let root = "{ scrollWidth: 832, clientWidth: 832, scrollLeft: 0, style: {} }"
+        let panned = "{ scale: 2, pageLeft: 200, width: 416 }"
+        #expect(try keeps([cell], root: root, view: panned, deltaX: -12))
+        #expect(try keeps([cell], root: root, view: panned, deltaX: 12))
+        // At its left edge it goes back; at its right edge it goes forward.
+        #expect(try !keeps([cell], root: root, view: "{ scale: 2, pageLeft: 0, width: 416 }", deltaX: -12))
+        #expect(try !keeps([cell], root: root, view: "{ scale: 2, pageLeft: 416, width: 416 }", deltaX: 12))
+        // Not pinched in: the page's own width decides.
+        #expect(try !keeps([cell], root: root, view: "{ scale: 1, pageLeft: 0, width: 832 }", deltaX: 12))
+    }
+
+    @Test func swipeScriptLeavesAPageAFewPixelsOffAlone() throws {
+        // Nudged a pixel or two by a diagonal scroll: back still goes back.
+        let nudged = "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 3, style: {} }"
+        #expect(try !keeps([cell], root: nudged, deltaX: -12))
+        // Right to left, at its start on the right, 10 pixels too wide: back goes back, forward too.
+        let rtl = "{ scrollWidth: 1010, clientWidth: 1000, scrollLeft: 0, style: { direction: 'rtl' } }"
+        #expect(try !keeps([cell], root: rtl, deltaX: -12))
+        #expect(try !keeps([cell], root: rtl, deltaX: 12))
+        // Scrolled along to its left end, it has room behind it, on the right.
+        let rtlAlong = "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: -40, style: { direction: 'rtl' } }"
+        #expect(try keeps([cell], root: rtlAlong, deltaX: 12))
+        #expect(try !keeps([cell], root: rtlAlong, deltaX: -12))
+        // A really wide one keeps the way it can scroll, either way scrollLeft counts.
+        let wide = "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 0, style: { direction: 'rtl' } }"
+        #expect(try keeps([cell], root: wide, deltaX: -12))
+        #expect(try !keeps([cell], root: wide, deltaX: 12))
+        let legacy = "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 2000, style: { direction: 'rtl' } }"
+        #expect(try keeps([cell], root: legacy, deltaX: -12))
+        #expect(try !keeps([cell], root: legacy, deltaX: 12))
+        // An element right to left, at its start, a few pixels too wide.
+        let box = "{ scrollWidth: 810, clientWidth: 800, scrollLeft: 0, style: { overflowX: 'auto', direction: 'rtl' } }"
+        #expect(try !keeps([cell, box], deltaX: -12))
+    }
+
+    @Test func swipeScriptSkipsAPageThatHidesItsSidewaysScroll() throws {
+        // overflow-x: hidden on the root or the body: the page can't be scrolled sideways, so back goes back.
+        let along = "{ scrollWidth: 1400, clientWidth: 1000, scrollLeft: 200, style: {} }"
+        #expect(try !keeps([cell], root: along, ends: "[{ style: { overflowX: 'hidden' } }, { style: {} }]", deltaX: -12))
+        #expect(try !keeps([cell], root: along, ends: "[{ style: {} }, { style: { overflowX: 'hidden' } }]", deltaX: -12))
+        #expect(try !keeps([cell], root: along, ends: "[{ style: { overflowX: 'clip' } }, { style: {} }]", deltaX: 12))
+        // The body's own overflow doesn't count once the root scrolls itself.
+        #expect(try keeps([cell], root: along, ends: "[{ style: { overflowX: 'auto' } }, { style: { overflowX: 'hidden' } }]", deltaX: -12))
+        // Pinched in, the visible part still pans.
+        let view = "{ scale: 2, pageLeft: 200, width: 500 }"
+        #expect(try keeps([cell], root: along, ends: "[{ style: { overflowX: 'hidden' } }, { style: {} }]", view: view, deltaX: -12))
+    }
+
+    @Test func aFlickIsMeasuredUpToTheRelease() {
+        // 20 points every 8 ms toward back: 2500 points a second.
+        let samples: [(time: TimeInterval, dx: CGFloat)] = (0..<8).map { (time: 1 + Double($0) * 0.008, dx: CGFloat($0) * 20) }
+        let last = samples[7].time
+        #expect(abs(SwipeDecision.speed(samples, at: last, direction: -1) - 2500) < 1)
+        #expect(SwipeDecision.speed(samples, at: last, direction: 1) < 0)
+        // Fingers that stopped before letting go aren't flicking.
+        #expect(SwipeDecision.speed(samples, at: last + SwipeDecision.flickWindow * 2, direction: -1) == 0)
+        #expect(SwipeDecision.speed([], at: last, direction: -1) == 0)
+    }
+
+    @Test func swipeNeedsAThirdOfThePage() {
+        // A third of a narrow page, at most 220 points however wide the window (#377).
+        #expect(SwipeDecision.distance(forWidth: 600) == 200)
+        #expect(SwipeDecision.distance(forWidth: 900) == 220)
+        #expect(SwipeDecision.distance(forWidth: 300) == 160)
+        #expect(SwipeDecision.distance(forWidth: 2000) == 220)
+        // All the way, or a quick flick well started.
+        #expect(SwipeDecision.commits(progress: 1, speed: 0))
+        #expect(SwipeDecision.commits(progress: 0.5, speed: 1000))
+        // Short, slow, or pulled back before letting go: no.
+        #expect(!SwipeDecision.commits(progress: 0.3, speed: 2000))
+        #expect(!SwipeDecision.commits(progress: 0.9, speed: 0))
+        #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }
 
     @Test func swipeScriptLooksPastShadowRoots() throws {
@@ -554,8 +650,7 @@ struct UpdateBackupTests {
         #expect(UpdateBackup.all(in: root).count == 1)
     }
 
-    /// A data folder with nothing in it yet makes no backup, even when another build ran last (a fresh folder, or
-    /// Zigzag installed again after its data was removed), so General never offers to restore one that holds nothing.
+    /// An empty data folder makes no backup, even after another build ran, so General never offers an empty restore.
     @Test func freshDataIsNeverOfferedAsABackup() throws {
         let root = try makeRoot()
         let suite = "zigzag-backup-test-\(UUID().uuidString)"
@@ -566,7 +661,7 @@ struct UpdateBackupTests {
         UpdateBackup.backUpIfUpdated(build: "105", version: "0.9.1", defaults: defaults, root: root)
         #expect(UpdateBackup.all(in: root).isEmpty)
         #expect(defaults.string(forKey: "LastRunBuild") == "105")
-        // An empty backup left by an earlier version isn't offered either.
+        // Nor empty backups from earlier versions.
         let folder = root.appendingPathComponent("Backups", isDirectory: true)
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("2026-11-15T02-00-00Z 0.9.1"), withIntermediateDirectories: true)
         #expect(UpdateBackup.restorable(in: root) == nil)
@@ -591,7 +686,7 @@ struct UpdateBackupTests {
 
     /// A backup from before there were profiles has no Profiles.json: putting it back leaves the one there is, so
     /// spaces stay on their profiles.
-    /// The restore marker names a backup folder, never a path: one that leads out of Backups is ignored.
+    /// The restore marker names a backup folder; paths escaping Backups are ignored.
     @Test func restoreRefusesAPathOutOfTheBackups() throws {
         let root = try makeRoot()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -844,7 +939,7 @@ struct PageTextSubstitutionTests {
     }
 }
 
-/// A spelling or substitution choice made in one page reaches every page already open, not only that one (#296).
+/// Spelling and substitution changes in one page apply to every open page (#296).
 @MainActor
 struct PageTextCheckingTests {
     private func page(_ site: String) async throws -> (WKWebView, NSWindow) {
@@ -888,7 +983,7 @@ struct PageTextCheckingTests {
     }
 
     @Test func correctingFollowsTheMacUntilYouChoose() {
-        // Registered defaults are the whole app's, whichever UserDefaults sets them: only the Mac's own value here.
+        // Registered defaults are app-wide, so only the system value is used here.
         let mac = NSSpellChecker.isAutomaticSpellingCorrectionEnabled
         let registered = UserDefaults.standard.volatileDomain(forName: UserDefaults.registrationDomain)
         #expect(registered[PageTextChecking.spellingCorrectionKey] as? Bool == mac)
@@ -897,7 +992,7 @@ struct PageTextCheckingTests {
         let checking = PageTextChecking(defaults: defaults, center: NotificationCenter(), systemCorrects: { mac })
         checking.start()
         #expect(defaults.bool(forKey: PageTextChecking.spellingCorrectionKey) == mac)
-        // Your choice, once made, stands over the Mac's.
+        // A user choice overrides the system's.
         defaults.set(!mac, forKey: PageTextChecking.spellingCorrectionKey)
         checking.followSystem()
         #expect(defaults.bool(forKey: PageTextChecking.spellingCorrectionKey) == !mac)
@@ -906,7 +1001,7 @@ struct PageTextCheckingTests {
     @Test func aChangedChoiceIsSentToThePagesOnce() async throws {
         let (defaults, name) = scratchDefaults()
         defer { defaults.removePersistentDomain(forName: name) }
-        // The one UserDefaults says a change on.
+        // The notification UserDefaults posts on change.
         let center = NotificationCenter.default
         var posted = 0
         let watch = center.addObserver(forName: NSSpellChecker.didChangeAutomaticSpellingCorrectionNotification, object: nil, queue: nil) { _ in posted += 1 }

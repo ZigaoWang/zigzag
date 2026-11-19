@@ -1,11 +1,10 @@
 import AppKit
 
-/// The soft glow along the sidebar's edge while a question is waiting that the window cannot show: the hairline sits
-/// where the resize handle does, in the space's accent, over a short outer glow. It fades in once and stays — it never
-/// pulses — and clicking it brings the sidebar back and selects the tab the question is for.
+/// Glow on the sidebar edge while a question waits that the window can't show: an accent hairline at the resize
+/// handle over a short outer glow. Fades in once, never pulses; clicking shows the sidebar and selects the tab.
 @MainActor
 final class AttentionEdge: NSView {
-    /// How many tabs are waiting, for the tooltip.
+    /// Waiting tab count, for the tooltip.
     var waiting: Int = 0 { didSet { guard waiting != oldValue else { return }; toolTip = waiting > 0 ? Self.tip(waiting) : nil } }
 
     var onClick: (() -> Void)?
@@ -31,7 +30,7 @@ final class AttentionEdge: NSView {
     override func layout() {
         super.layout()
         let width = min(Tokens.Space.x4, bounds.width)
-        // On whichever edge the sidebar lives: the glow sits against it, its light spilling onto the page.
+        // Against the sidebar's edge, glowing onto the page.
         let x = bounds.width > width ? bounds.width - width : 0
         hairline.frame = NSRect(x: x, y: bounds.minY, width: Tokens.Metric.hairline, height: bounds.height)
         layer?.backgroundColor = cgColor(Tokens.Color.accent.withAlphaComponent(0.16))
@@ -46,13 +45,13 @@ final class AttentionEdge: NSView {
         if !didFadeIn { didFadeIn = true; fadeIn() }
     }
 
-    /// Its colors are set in `layout`: laid out again for the other mode.
+    /// Colors are set in `layout`, which reruns on appearance change.
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         needsLayout = true
     }
 
-    /// In once, then still: something to notice, nothing to watch.
+    /// Fades in once, then stays still.
     private func fadeIn() {
         guard !Tokens.Motion.reduceMotion else { return }
         alphaValue = 0
@@ -68,9 +67,8 @@ final class AttentionEdge: NSView {
 }
 
 extension AttentionEdge {
-    /// Its frame for the page of a window that shows one page and has no sidebar to hang a dot on (Zigzag Mini, a web
-    /// app): a hairline on the window's own edge, on the side `sidebarOnRight` puts the sidebar, its glow spilling
-    /// onto the page. A browser window instead gives it the resize handle's frame, at the sidebar's edge.
+    /// Frame in a single-page window without a sidebar (Zigzag Mini, web apps): a hairline on the window edge on the
+    /// `sidebarOnRight` side. Browser windows use the resize handle's frame instead.
     static func frame(forPage area: NSRect, sidebarOnRight: Bool) -> NSRect {
         NSRect(x: sidebarOnRight ? area.maxX - Tokens.Metric.hairline : area.minX,
                y: area.minY, width: Tokens.Metric.resizeHandleWidth, height: area.height)

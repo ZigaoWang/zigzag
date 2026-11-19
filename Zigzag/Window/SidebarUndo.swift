@@ -178,7 +178,7 @@ extension BrowserWindowController {
 
     /// The pane out of its group, the rest of which stays on screen; ⌘Z here puts it back in its place once it's
     /// back in this window.
-    private func leaveGroupWithUndo(_ tab: Tab) {
+    func leaveGroupWithUndo(_ tab: Tab) {
         pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in the Edit menu as Undo Separate Tabs.")) { [tabManager] in
             if let rest = tabManager.leaveGroup(tab) { tabManager.select(rest) }
         }
@@ -200,7 +200,7 @@ extension BrowserWindowController {
         let before = tab.customIcon
         guard before != icon else { return }
         tab.customIcon = icon
-        // Saved with the session now, not only with the next change to it.
+        // Save with the session now, not only on the next change.
         onStateChange?()
         let id = tab.id
         sidebarUndo.registerUndo(withTarget: self) { controller in

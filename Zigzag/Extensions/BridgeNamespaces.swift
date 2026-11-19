@@ -172,9 +172,8 @@ nonisolated enum ContextType: String {
     case developerTools = "DEVELOPER_TOOLS"
 }
 
-/// One of an extension's contexts, as `runtime.getContexts` describes it. Only what Zigzag can name truthfully is set:
-/// WebKit gives no Chrome tab or document identity, so `tabID` is -1 except for a side panel opened for a tab, and
-/// `documentID` stays empty rather than being made up.
+/// An extension context for `runtime.getContexts`. WebKit has no Chrome tab or document IDs, so `tabID` is -1 except
+/// for a tab's side panel, and `documentID` stays empty rather than invented.
 nonisolated struct Context {
     var type: ContextType
     var contextID: String
@@ -185,14 +184,13 @@ nonisolated struct Context {
     var frameID = 0
     var incognito = false
 
-    /// The document's origin as Chrome reports it: the extension's actual scheme (`webkit-extension://` until the
-    /// scheme is decided), never a translated one.
+    /// Origin with the real scheme (`webkit-extension://` for now), never translated.
     var documentOrigin: String? {
         guard let documentURL, let scheme = documentURL.scheme, let host = documentURL.host() else { return nil }
         return "\(scheme)://\(host)"
     }
 
-    /// Chrome's ExtensionContext, with the fields Zigzag has no truthful value for left out.
+    /// Chrome's ExtensionContext, minus fields Zigzag can't fill truthfully.
     var dictionary: [String: Any] {
         var answer: [String: Any] = ["contextType": type.rawValue, "contextId": contextID, "tabId": tabID,
                                      "windowId": windowID, "frameId": frameID, "incognito": incognito]
@@ -203,8 +201,8 @@ nonisolated struct Context {
     }
 }
 
-/// The fields of Chrome's `ContextFilter`: every field given narrows the answer at once, and within one list any value
-/// matches. An explicit empty list matches nothing, and a document field leaves out a context with no document.
+/// Chrome's `ContextFilter`: fields combine with AND, list values with OR. An empty list matches nothing; a document
+/// field excludes contexts without a document.
 nonisolated struct ContextFilter {
     private let contextIDs: [String]?
     private let documentIDs: [String]?
@@ -242,18 +240,17 @@ nonisolated struct ContextFilter {
     }
 }
 
-/// Chrome's `contextId`: opaque, and the same for as long as a context lives. One that closes is forgotten, so one
-/// that opens again is a new context with a new name. Names are kept per extension: a call from one extension must not
-/// forget another extension's live contexts, and two extensions may hold a page with the same object identity.
+/// Chrome's `contextId`: opaque and stable for a context's lifetime; a reopened context gets a new one. Kept per
+/// extension so one extension's call can't drop another's, and two extensions can hold the same page object.
 nonisolated final class ContextNames {
     private var names: [String: [String: String]] = [:]
 
-    /// The name of a context held by this extension: its background, its offscreen page, its side panel, its popup.
+    /// The ID of this extension's context (background, offscreen, side panel, popup).
     func name(of object: AnyObject, extensionID: String) -> String {
         name("object:\(ObjectIdentifier(object))", extensionID: extensionID)
     }
 
-    /// Forgets every context of this extension that has closed, and no other extension's.
+    /// Drops this extension's closed contexts only.
     func keeping(_ live: Set<String>, extensionID: String) {
         names[extensionID] = (names[extensionID] ?? [:]).filter { live.contains($0.value) }
     }
@@ -296,9 +293,10 @@ final class BridgeContexts: BridgeNamespace {
         if let popup = host.shownPopup(for: extensionID) {
             contexts.append(Self.popup(popup, contextID: names.name(of: popup, extensionID: extensionID)))
         }
-        // A private window has no extension controller, and its side panel is never one to report.
+        // A private window's side panel only to an extension allowed there.
         for controller in WindowManager.shared.controllers
-        where !controller.tabManager.isPrivate && controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
+        where PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate, allowed: context.hasAccessToPrivateData)
+            && controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
             let panel = controller.root.sidePanel
             contexts.append(Context(type: .sidePanel, contextID: names.name(of: panel, extensionID: extensionID), documentURL: panel.webView?.url,
                                     tabID: panel.tabID ?? -1))
@@ -307,13 +305,13 @@ final class BridgeContexts: BridgeNamespace {
         return Self.matching(contexts, filter: args.object(0)).map(\.dictionary)
     }
 
-    /// Chrome's POPUP context for a showing popup: the page's live address, query and all, and no tab of its own.
+    /// POPUP context for a shown popup: live URL with query, no tab.
     static func popup(_ view: WKWebView, contextID: String) -> Context {
         Context(type: .popup, contextID: contextID, documentURL: view.url)
     }
 
-    /// Chrome's context for an extension's background, when its manifest declares one: an MV3 service worker, which
-    /// has no document; or an MV2 background page, declared or the one Chrome generates from its scripts.
+    /// Background context when declared: an MV3 service worker (no document) or an MV2 background page, declared or
+    /// generated from scripts.
     nonisolated static func background(manifest: [String: Any], baseURL: URL, contextID: String) -> Context? {
         guard let background = manifest["background"] as? [String: Any] else { return nil }
         let version = (manifest["manifest_version"] as? NSNumber)?.intValue ?? 2
@@ -328,8 +326,7 @@ final class BridgeContexts: BridgeNamespace {
                        documentURL: URL(string: page ?? "_generated_background_page.html", relativeTo: baseURL)?.absoluteURL)
     }
 
-    /// The contexts a filter keeps, in Chrome's way: every field given narrows the answer, any value in one of its
-    /// lists matches, and a list with nothing in it matches nothing.
+    /// Contexts matching a filter, Chrome's rules (see `ContextFilter`).
     nonisolated static func matching(_ contexts: [Context], filter: [String: Any]) -> [Context] {
         let filter = ContextFilter(filter)
         return contexts.filter(filter.matches)
@@ -358,33 +355,31 @@ final class BridgeRuntime: BridgeNamespace {
 
 // MARK: - Context menu items kept
 
-/// An extension's right-click menu items, kept across relaunches as Chrome keeps them. WebKit forgets them when
-/// Zigzag quits, and an extension whose background only wakes for events adds them once, on install (Downie: its
-/// items were gone from every menu after a relaunch, #239). webkit-differences.js tells this what the extension
-/// creates, changes and removes, and asks once each time the extension starts what to put back.
+/// Extension context menu items, persisted across relaunches like Chrome. WebKit drops them on quit, and an
+/// event-driven background adds them only on install (Downie lost its items after relaunch, #239).
+/// webkit-differences.js reports creates, updates and removes, and asks once per start what to restore.
 @available(macOS 15.4, *)
 @MainActor
 final class BridgeContextMenus: BridgeNamespace {
     static let name = "contextMenusKept"
     static let permission = ""
-    /// The extensions it answers: one profile's.
+    /// One profile's extensions.
     unowned let host: ExtensionHost
-    /// Asked to put its items back since it last started: once per start, so items it removed stay removed.
+    /// Restored since last start; once per start so removed items stay removed.
     private var restored: Set<String> = []
-    /// What each extension has, read from its file once and kept here: an extension that changes an item on every
-    /// selection never has its file read or written each time.
+    /// Items per extension, read from disk once, so an extension updating items on every selection doesn't hit the disk.
     private var cache: [String: Kept] = [:]
-    /// Writes waiting for the extension to stop changing its items for a moment.
+    /// Writes waiting for changes to settle.
     private var pending: [String: DispatchWorkItem] = [:]
     private var quitting: NSObjectProtocol?
-    /// Files are written here, never on the main thread.
+    /// Off the main thread.
     private static let disk = DispatchQueue(label: "app.zigzag.context-menus-kept", qos: .utility)
-    /// How long changes gather before they're written.
+    /// Debounce before writing.
     static let writeDelay: TimeInterval = 1
 
     init(host: ExtensionHost) {
         self.host = host
-        // Quitting within the moment after a change still keeps it.
+        // Quitting right after a change still saves it.
         quitting = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.flush(waiting: true) }
         }
@@ -397,7 +392,7 @@ final class BridgeContextMenus: BridgeNamespace {
         switch fn {
         case "change":
             guard let op = args.first as? String else { throw BridgeError.unsupported(Self.name, fn) }
-            // What was kept for another version is the old one's: the update's own install listener adds its items.
+            // Items saved for an older version are dropped; the update's onInstalled adds new ones.
             if kept.version != version { kept = Kept(version: version, items: []) }
             kept.items = Self.apply(op, args: Array(args.dropFirst()), to: kept.items)
             save(kept, for: extensionID)
@@ -415,18 +410,18 @@ final class BridgeContextMenus: BridgeNamespace {
         }
     }
 
-    /// Turned off or removed: what's waiting is written now, before its folder can go, and read again next time.
+    /// Disabled or removed: flush pending writes before the folder can go; reload next time.
     func release(_ extensionID: String) {
         restored.remove(extensionID)
         flush(extensionID, waiting: true)
         cache[extensionID] = nil
     }
 
-    /// More than any extension's menu has; past it, new items aren't kept (they still show this session).
+    /// Item cap; past it new items aren't saved (they still show this session).
     static let maxItems = 500
-    /// The most one item may take as JSON: a bigger one isn't kept (it still shows this session).
+    /// Per-item JSON cap; bigger items aren't saved (still shown this session).
     static let maxItemBytes = 4 * 1024
-    /// The most one extension's file may take: items past it aren't kept.
+    /// Per-extension file cap; items past it aren't saved.
     static let maxFileBytes = 256 * 1024
 
     private static func size(_ item: [String: Any]) -> Int {
@@ -439,8 +434,8 @@ final class BridgeContextMenus: BridgeNamespace {
         var items: [[String: Any]]
     }
 
-    /// The items with one change made, as chrome.contextMenus makes it. An item without an ID of its own can't be
-    /// told apart from a new one, so it isn't kept (Chrome asks for one from extensions whose background sleeps).
+    /// Applies one chrome.contextMenus change. Items without an ID can't be matched later, so they aren't saved (Chrome
+    /// requires IDs from event-driven backgrounds).
     static func apply(_ op: String, args: [Any], to items: [[String: Any]]) -> [[String: Any]] {
         func id(_ value: Any?) -> String? {
             if let text = value as? String { return text }
@@ -450,7 +445,7 @@ final class BridgeContextMenus: BridgeNamespace {
         switch op {
         case "create":
             guard let properties = args.first as? [String: Any], let new = id(properties["id"]), size(properties) <= maxItemBytes else { return items }
-            // Made again with the same ID: the newer one stands, where the first was.
+            // Same ID again: replace in place.
             if let index = items.firstIndex(where: { id($0["id"]) == new }) {
                 var items = items
                 items[index] = properties
@@ -458,9 +453,8 @@ final class BridgeContextMenus: BridgeNamespace {
             }
             return items.count < maxItems ? items + [properties] : items
         case "update":
-            // Its title stays the one it was made with (with its %s, which the menu fills in with the selection):
-            // a title changed as you go is often about what's on the page or selected ("Search “…”"), and that's
-            // never written to disk. The extension sets it again once it's running.
+            // Keep the original title (with its %s). Titles updated on the fly often contain page or selection text, which must
+            // not hit disk; the extension sets them again once running.
             guard let target = id(args.first), let changes = args.dropFirst().first as? [String: Any] else { return items }
             let kept = changes.filter { $0.key != "id" && $0.key != "title" }
             guard !kept.isEmpty else { return items }
@@ -471,7 +465,7 @@ final class BridgeContextMenus: BridgeNamespace {
             }
         case "remove":
             guard let target = id(args.first) else { return items }
-            // Its items go with it, and theirs.
+            // Remove its children too.
             var gone: Set<String> = [target]
             var remaining = items
             while let index = remaining.firstIndex(where: { id($0["id"]).map(gone.contains) == true || id($0["parentId"]).map(gone.contains) == true }) {
@@ -486,17 +480,15 @@ final class BridgeContextMenus: BridgeNamespace {
         }
     }
 
-    /// What to put back as the extension starts: what it had, unless it's new (it adds its own on install), was
-    /// updated since (its install listener adds the new version's), or runs a background that never sleeps, which
-    /// adds them itself each time it starts, as Chrome expects of it.
+    /// Items to restore on start, except for a new extension (adds its own on install), an updated one (its onInstalled
+    /// adds them), or a persistent background (adds them on every start, as Chrome expects).
     static func toRestore(_ kept: Kept, version: String, isNewInstall: Bool, persistentBackground: Bool) -> [[String: Any]] {
         guard !isNewInstall, !persistentBackground, kept.version == version else { return [] }
         return kept.items
     }
 
-    /// Whether the extension is told Zigzag was updated (onInstalled, "chrome_update", as Chrome tells it after an
-    /// update of its own), so it adds its items again: once, the first time it starts with nothing kept for it. Items
-    /// it added before Zigzag kept them were never seen here, and it adds them only when told it was installed.
+    /// Whether to send onInstalled with "chrome_update" so the extension re-adds its items: once, on its first start with
+    /// nothing saved. Items added before this store existed were never seen here.
     static func addsItemsAgain(neverKept: Bool, isNewInstall: Bool, persistentBackground: Bool) -> Bool {
         neverKept && !isNewInstall && !persistentBackground
     }
@@ -518,7 +510,7 @@ final class BridgeContextMenus: BridgeNamespace {
         return kept
     }
 
-    /// Kept now, written a moment after the last change.
+    /// Kept now, written after the debounce.
     private func save(_ kept: Kept, for extensionID: String) {
         cache[extensionID] = kept
         pending[extensionID]?.cancel()
@@ -527,8 +519,7 @@ final class BridgeContextMenus: BridgeNamespace {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.writeDelay, execute: work)
     }
 
-    /// Writes what's waiting, for one extension or for all of them. `waiting`: before going on (Zigzag quitting,
-    /// the extension going).
+    /// Flushes pending writes, for one extension or all. `waiting`: block until done (quitting, extension removed).
     private func flush(_ only: String? = nil, waiting: Bool = false) {
         for (extensionID, work) in pending where only == nil || only == extensionID {
             work.cancel()
@@ -543,14 +534,14 @@ final class BridgeContextMenus: BridgeNamespace {
         }
     }
 
-    /// The file's contents, as many items as fit in `maxFileBytes`.
+    /// File contents, as many items as fit in `maxFileBytes`.
     static func encoded(_ kept: Kept) -> Data? {
         var items = kept.items
         while true {
             let saved: [String: Any] = ["version": kept.version, "items": items]
             guard JSONSerialization.isValidJSONObject(saved), let data = try? JSONSerialization.data(withJSONObject: saved) else { return nil }
             if data.count <= maxFileBytes || items.isEmpty { return data }
-            // The last made go first; the menu keeps its top.
+            // Drop the newest first; the menu keeps its top items.
             items.removeLast(max(1, items.count / 10))
         }
     }
@@ -560,7 +551,7 @@ final class BridgeContextMenus: BridgeNamespace {
 
 /// `favIconUrl` on the tabs `tabs.query` and `tabs.get` answer, which WebKit leaves out: Sound Booster's popup shows
 /// each tab it boosts by its site's icon, and drew an empty square. Chrome gives it with the tab's address, so here
-/// too: only for a tab open now, not private, whose address the extension may read. The icon is the one Zigzag
+/// too: only for a tab open now, private only for an extension allowed there, whose address the extension may read. The icon is the one Zigzag
 /// shows, as a small PNG data: URL, which any extension page can draw without fetching anything.
 @available(macOS 15.4, *)
 @MainActor
@@ -580,12 +571,14 @@ final class BridgeFavicons: BridgeNamespace {
         guard let context = host.context(for: extensionID) else { return [] }
         let readsAll = context.hasPermission(.tabs)
         // Its own profile's tabs: the only ones it's told about.
-        let open = WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate }.flatMap { window in window.tabManager.allTabs.filter(window.holds) }.compactMap { tab -> OpenTab? in
+        let seesPrivate = context.hasAccessToPrivateData
+        let open = WindowManager.shared.controllers.filter { PrivateAccess.sees(isPrivate: $0.tabManager.isPrivate, allowed: seesPrivate) }
+            .flatMap { window in window.tabManager.allTabs.filter(window.holds) }.compactMap { tab -> OpenTab? in
             guard tab.profile === host.profile, let url = tab.webView?.url ?? tab.url else { return nil }
             return OpenTab(url: url.absoluteString, icon: tab.favicon, isPrivate: tab.isPrivate,
                            mayRead: readsAll || context.hasAccess(to: url, in: tab))
         }
-        return Self.icons(for: asked.map { $0 as? String }, among: open).map { $0.flatMap(dataURL).map { $0 as Any } ?? NSNull() }
+        return Self.icons(for: asked.map { $0 as? String }, among: open, seesPrivate: seesPrivate).map { $0.flatMap(dataURL).map { $0 as Any } ?? NSNull() }
     }
 
     struct OpenTab {
@@ -597,10 +590,10 @@ final class BridgeFavicons: BridgeNamespace {
 
     /// The icon for each address asked about: an open tab's, when one shows it and the extension may read it. Never
     /// one from history or the icon cache, so asking can't tell where you've been.
-    static func icons(for asked: [String?], among open: [OpenTab]) -> [NSImage?] {
+    static func icons(for asked: [String?], among open: [OpenTab], seesPrivate: Bool = false) -> [NSImage?] {
         asked.map { url in
             guard let url else { return nil }
-            return open.first { $0.url == url && !$0.isPrivate && $0.mayRead && $0.icon != nil }?.icon
+            return open.first { $0.url == url && PrivateAccess.sees(isPrivate: $0.isPrivate, allowed: seesPrivate) && $0.mayRead && $0.icon != nil }?.icon
         }
     }
 
@@ -858,7 +851,7 @@ final class BridgeOffscreen: BridgeNamespace {
     unowned let host: ExtensionHost
     init(host: ExtensionHost) { self.host = host }
     private var pages: [String: WKWebView] = [:]
-    /// The extension's offscreen page, if it has one open (for runtime.getContexts).
+    /// Open offscreen page, for runtime.getContexts.
     func page(for extensionID: String) -> WKWebView? { pages[extensionID] }
     /// Off screen, but in a window: a page in no window counts as hidden, and WebKit pauses its sound.
     private var window: NSWindow?
@@ -909,7 +902,7 @@ final class BridgeOffscreen: BridgeNamespace {
             place(page)
             // As in Chrome, done once the page has loaded and its scripts listen: extensions message it right away.
             let loaded = PageLoad()
-            // It stays one of the extension's pages: it can't be sent to a site, where nothing would show it.
+            // Stay on extension pages; a site wouldn't be visible here.
             let stays = ExtensionPageGuard(base: context.baseURL, loaded: loaded)
             stays.attach(to: page)
             page.load(URLRequest(url: url))
@@ -933,9 +926,8 @@ final class BridgeOffscreen: BridgeNamespace {
     }
 }
 
-/// Keeps a side panel or offscreen page on the extension's own pages, which have no address bar to say where they
-/// are: the page itself can't go to a site. A link you click in a side panel opens in a tab instead (`onLink`).
-/// Frames inside the page may still show sites, as in Chrome.
+/// Keeps a side panel or offscreen page on extension pages, since they have no address bar. Clicked links open in a
+/// tab (`onLink`). Frames may still show sites, as in Chrome.
 @MainActor
 final class ExtensionPageGuard: NSObject, WKNavigationDelegate {
     let base: URL
@@ -949,13 +941,13 @@ final class ExtensionPageGuard: NSObject, WKNavigationDelegate {
         self.onLink = onLink
     }
 
-    /// Made the page's navigation delegate, and kept as long as the page is.
+    /// Navigation delegate, retained for the page's lifetime.
     func attach(to page: WKWebView) {
         page.navigationDelegate = self
         objc_setAssociatedObject(page, &Self.key, self, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 
-    /// Whether the page may go there: one of the extension's own pages, or a blank one.
+    /// Allowed: the extension's own pages or about:blank.
     static func staysInExtension(_ url: URL?, base: URL) -> Bool {
         guard let url else { return false }
         if url.absoluteString == "about:blank" || url.absoluteString == "about:srcdoc" { return true }
@@ -1008,8 +1000,9 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
 
 // MARK: - extension fetch
 
-/// WebKit leaves SameSite cookies out of extension fetches even with host access. Reads use a blank page at
-/// the target origin; writes use a temporary native session to preserve the sender's Chrome extension Origin.
+/// WebKit leaves SameSite cookies out of extension fetches even with host access. With credentials: 'include', reads
+/// use a blank page at the target origin; writes, and every request with the default credentials, use a temporary
+/// native session that keeps the sender's Chrome extension Origin.
 /// Both use the owning profile's cookies. Live host permission authorizes requests, with no vendor allowlist.
 @available(macOS 15.4, *)
 @MainActor
@@ -1043,12 +1036,63 @@ final class BridgeExtensionFetch: BridgeNamespace {
         guard let context = host.context(for: extensionID) else { throw BridgeError("The extension is no longer loaded.") }
         // Without host access, ordinary WebKit fetch decides what is available through the site's CORS policy.
         guard Self.allows(url, context: context) else { return ["fallback": true] }
-        return try await requests.response(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID) {
-            host.context(for: extensionID) === context && Self.allows(url, context: context)
+        // Each hop of a redirect is checked against the extension's access as it is then.
+        let authorize: @MainActor @Sendable (URL) -> Bool = { hop in host.context(for: extensionID) === context && Self.allows(hop, context: context) }
+        if options.string("credentials") == "same-origin" {
+            // With default credentials WebKit's own fetch sends every cookie but SameSite ones, so it needs no help without them.
+            guard await sameSiteCookies.has(url, in: host.profile.store) else { return ["fallback": true] }
+            return try await requests.direct(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID, authorize: authorize)
         }
+        return try await requests.response(options, url: url, extensionID: extensionID, store: host.profile.store, requestID: requestID, authorize: authorize)
+    }
+
+    private let sameSiteCookies = SameSiteCookieCheck()
+
+    /// Whether the profile has a SameSite Lax or Strict cookie for the URL's host, the kind WebKit leaves out.
+    static func keepsSameSiteCookies(_ url: URL, in store: WKWebsiteDataStore) async -> Bool {
+        await ExtensionWrite.hasSameSite(await ExtensionWrite.profileCookies(for: url, in: store), for: url)
     }
 
     func release(_ extensionID: String) { requests.release(extensionID) }
+}
+
+/// `keepsSameSiteCookies` per host, kept until the profile's cookies change, so a burst of fetches reads them once.
+@available(macOS 15.4, *)
+@MainActor
+final class SameSiteCookieCheck: NSObject, WKHTTPCookieStoreObserver {
+    private var known: [String: Bool] = [:]
+    private var changes = 0
+    private weak var watched: WKHTTPCookieStore?
+
+    // The store doesn't retain its observers.
+    isolated deinit { watched?.remove(self) }
+
+    func has(_ url: URL, in store: WKWebsiteDataStore) async -> Bool {
+        let cookieStore = store.httpCookieStore
+        if watched !== cookieStore {
+            watched?.remove(self)
+            cookieStore.add(self)
+            watched = cookieStore
+            known = [:]
+        }
+        let host = url.host()?.lowercased() ?? ""
+        if let answer = known[host] { return answer }
+        let before = changes
+        let answer = await BridgeExtensionFetch.keepsSameSiteCookies(url, in: store)
+        // Not kept if the cookies changed while they were read.
+        if changes == before, watched === cookieStore, known.count < 512 { known[host] = answer }
+        return answer
+    }
+
+    nonisolated func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
+        MainActor.assumeIsolated {
+            changes += 1
+            known = [:]
+        }
+    }
+
+    /// Hosts answered and not yet cleared.
+    var count: Int { known.count }
 }
 
 /// One profile's in-flight requests. Kept apart from the host so transport tests use temporary stores without
@@ -1070,7 +1114,7 @@ final class ExtensionFetchRequests {
     private var waiting: Set<RequestKey> = []
 
     func response(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
-                  requestID id: UUID = UUID(), authorize: @escaping @MainActor @Sendable () -> Bool = { true }) async throws -> Any? {
+                  requestID id: UUID = UUID(), authorize: @escaping @MainActor @Sendable (URL) -> Bool = { _ in true }) async throws -> Any? {
         let key = RequestKey(extensionID: extensionID, id: id)
         if let when = cancelled.removeValue(forKey: key), when.timeIntervalSinceNow > -40 { throw BridgeError("Extension request cancelled.") }
         guard pages[key] == nil, writes[key] == nil else { throw BridgeError("Extension request is already running.") }
@@ -1083,18 +1127,7 @@ final class ExtensionFetchRequests {
             if url.scheme == "http", !Self.isLoopback(url) { return ["fallback": true] }
             if ((options["body"] as? String)?.utf8.count ?? 0) > Self.responseLimit { return ["fallback": true] }
             let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
-            // Only WebKit's cookie store stays on the main thread; the jar, the request and its body leave it.
-            let task = Task {
-                // The profile's proxy, set by an extension through chrome.proxy, carries these as it carries its pages.
-                try await ExtensionWrite.send(request, cookies: await store.httpCookieStore.allCookies(), proxies: store.proxyConfigurations,
-                                              authorize: authorize) { set, deleted in
-                    for cookie in deleted { await store.httpCookieStore.deleteCookie(cookie) }
-                    for cookie in set { await store.httpCookieStore.setCookie(cookie) }
-                }
-            }
-            writes[key] = task
-            defer { writes[key] = nil }
-            return try await task.value.value
+            return try await send(request, key: key, store: store, authorize: authorize)
         }
         if openPages < Self.pageLimit {
             openPages += 1
@@ -1121,10 +1154,50 @@ final class ExtensionFetchRequests {
         page.loadHTMLString("<!doctype html><title></title>", baseURL: origin)
         await loaded.wait(seconds: 10)
         // Site access can change while the blank page is being prepared.
-        guard authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+        guard authorize(url) else { throw BridgeError("The extension can no longer access this URL.") }
         guard pages[key] != nil else { throw BridgeError("Extension request cancelled.") }
         return try await page.callAsyncJavaScript(Self.requestScript, arguments: ["options": options, "target": url.absoluteString, "limit": Self.responseLimit],
                                                   in: nil, contentWorld: .page)
+    }
+
+    /// A request with default credentials, sent here rather than by WebKit, which leaves SameSite cookies out. All of
+    /// it is decided before anything is sent, so nothing is sent twice: what this can't carry goes to WebKit's fetch
+    /// from the start. Redirects are followed one hop at a time like WebKit's: a site the extension may reach gets its
+    /// cookies, any other gets none and must allow the extension by CORS.
+    func direct(_ options: [String: Any], url: URL, extensionID: String, store: WKWebsiteDataStore,
+                requestID id: UUID = UUID(), authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
+        let key = RequestKey(extensionID: extensionID, id: id)
+        if let when = cancelled.removeValue(forKey: key), when.timeIntervalSinceNow > -40 { throw BridgeError("Extension request cancelled.") }
+        guard pages[key] == nil, writes[key] == nil else { throw BridgeError("Extension request is already running.") }
+        let method = (options["method"] as? String ?? "GET").uppercased()
+        let body = options["body"] as? String
+        let headers = options["headers"] as? [[String]] ?? []
+        let streams = headers.contains { $0.count == 2 && $0[0].lowercased() == "accept" && $0[1].lowercased().contains("event-stream") }
+        guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method),
+              url.scheme == "https" || Self.isLoopback(url), !streams, (body?.utf8.count ?? 0) <= Self.responseLimit,
+              options["body"] == nil || options["body"] is NSNull || body != nil, body == nil || !["GET", "HEAD"].contains(method)
+        else { return ["fallback": true] }
+        let request = try Self.writeRequest(options, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        return try await send(request, key: key, store: store, followsOtherOrigins: true, authorize: authorize)
+    }
+
+    /// Sends natively with the profile's cookies; only WebKit's cookie store stays on the main thread.
+    private func send(_ request: ExtensionWrite.Request, key: RequestKey, store: WKWebsiteDataStore, followsOtherOrigins: Bool = false,
+                      authorize: @escaping @MainActor @Sendable (URL) -> Bool) async throws -> Any? {
+        // Every cookie, scoped to each hop's host off the main thread: one for another path of the site goes too.
+        let every: @MainActor @Sendable (URL) async -> [HTTPCookie] = { _ in await store.httpCookieStore.allCookies() }
+        let cookies = followsOtherOrigins ? every : nil
+        let task = Task {
+            // The profile's proxy, set by an extension through chrome.proxy, carries these as it carries its pages.
+            try await ExtensionWrite.send(request, cookies: await store.httpCookieStore.allCookies(), proxies: store.proxyConfigurations,
+                                          otherOrigins: cookies, authorize: authorize) { set, deleted in
+                for cookie in deleted { await store.httpCookieStore.deleteCookie(cookie) }
+                for cookie in set { await store.httpCookieStore.setCookie(cookie) }
+            }
+        }
+        writes[key] = task
+        defer { writes[key] = nil }
+        return try await task.value.value
     }
 
     /// The most one request hands over, as it's carried whole, in Base64, through three processes. Bigger reads go
@@ -1132,16 +1205,17 @@ final class ExtensionFetchRequests {
     nonisolated static let responseLimit = 32 << 20
 
     /// This Mac itself, where a developer's own server answers over plain HTTP.
-    static func isLoopback(_ url: URL) -> Bool {
+    nonisolated static func isLoopback(_ url: URL) -> Bool {
         let host = (url.host(percentEncoded: false) ?? "").lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
         return host == "localhost" || host.hasSuffix(".localhost") || host == "::1" || host.hasPrefix("127.")
             && host.split(separator: ".").count == 4 && host.split(separator: ".").allSatisfy { UInt8($0) != nil }
     }
 
     /// What a write sends, read from the extension's message here so the rest can leave the main thread.
-    private static func writeRequest(_ options: [String: Any], url: URL, extensionID: String) throws -> ExtensionWrite.Request {
+    private static func writeRequest(_ options: [String: Any], url: URL, extensionID: String,
+                                     methods: Set<String> = ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"]) throws -> ExtensionWrite.Request {
         let method = (options["method"] as? String ?? "POST").uppercased()
-        guard ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method),
+        guard methods.contains(method),
               options["body"] == nil || options["body"] is NSNull || options["body"] is String else {
             throw BridgeError("Unsupported extension request.")
         }
@@ -1258,11 +1332,35 @@ nonisolated enum ExtensionWrite {
         return true
     }
 
+    /// The cookies whose domain covers the URL's host.
+    static func scoped(_ cookies: [HTTPCookie], to url: URL) -> [HTTPCookie] {
+        let host = url.host()?.lowercased() ?? ""
+        return cookies.filter { cookie in
+            let domain = cookie.domain.lowercased()
+            return domain == host || (domain.hasPrefix(".") && (host == String(domain.dropFirst()) || host.hasSuffix(domain)))
+        }
+    }
+
+    /// The profile's cookies for the URL where WebKit can say, else all of them, to be scoped off the main thread.
+    @available(macOS 15.4, *)
+    @MainActor static func profileCookies(for url: URL, in store: WKWebsiteDataStore) async -> [HTTPCookie] {
+        if #available(macOS 27.0, *) { return await store.httpCookieStore.cookies(for: url) }
+        return await store.httpCookieStore.allCookies()
+    }
+
+    /// Whether any of these cookies for the URL's host is SameSite Lax or Strict, worked out off the main thread.
+    @concurrent static func hasSameSite(_ cookies: [HTTPCookie], for url: URL) async -> Bool {
+        scoped(cookies, to: url).contains { [.sameSiteLax, .sameSiteStrict].contains($0.sameSitePolicy) }
+    }
+
     /// Cookies that go back to the profile: those the server set or changed, and those it deleted.
     typealias Apply = @MainActor @Sendable (_ set: [HTTPCookie], _ deleted: [HTTPCookie]) async -> Void
 
+    /// With `otherOrigins`, a redirect to another origin is followed: with that site's cookies (read through it) when
+    /// `authorize` allows it, else with none and only if its answer allows the extension by CORS. Without it, it fails.
     @concurrent static func send(_ input: Request, cookies: [HTTPCookie], proxies: [ProxyConfiguration] = [],
-                                 authorize: @escaping @MainActor @Sendable () -> Bool,
+                                 otherOrigins: (@MainActor @Sendable (URL) async -> [HTTPCookie])? = nil,
+                                 authorize: @escaping @MainActor @Sendable (URL) -> Bool,
                                  apply: @escaping Apply) async throws -> ExtensionWriteResponse {
         let url = input.url
         let configuration = URLSessionConfiguration.ephemeral
@@ -1274,14 +1372,9 @@ nonisolated enum ExtensionWrite {
         let jar = configuration.httpCookieStorage!
         jar.cookieAcceptPolicy = .onlyFromMainDocumentDomain
         // Never use HTTPCookieStorage.shared. The temporary jar starts with cookies for this target only.
-        let host = url.host()?.lowercased() ?? ""
-        let scoped = cookies.filter { cookie in
-            let domain = cookie.domain.lowercased()
-            return domain == host || (domain.hasPrefix(".") && (host == String(domain.dropFirst()) || host.hasSuffix(domain)))
-        }
-        jar.setCookies(scoped, for: url, mainDocumentURL: url)
+        jar.setCookies(scoped(cookies, to: url), for: url, mainDocumentURL: url)
         try Task.checkCancellation()
-        guard await authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+        guard await authorize(url) else { throw BridgeError("The extension can no longer access this URL.") }
         let transfer = ExtensionWriteTransfer(limit: ExtensionFetchRequests.responseLimit)
         let session = URLSession(configuration: configuration, delegate: transfer, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
@@ -1297,9 +1390,20 @@ nonisolated enum ExtensionWrite {
         for header in input.headers where mayBeSet(header[0], header[1]) { request.setValue(header[1], forHTTPHeaderField: header[0]) }
         request.setValue(input.origin, forHTTPHeaderField: "Origin")
         var redirected = false
+        // Whether this hop goes to a site the extension may reach; one it may not gets no cookies and needs CORS.
+        var reached = true
         for _ in 0..<20 {
             try Task.checkCancellation()
-            guard await authorize() else { throw BridgeError("The extension can no longer access this URL.") }
+            guard let hop = request.url else { throw BridgeError("Invalid extension request.") }
+            if SiteOrigin.of(hop) == SiteOrigin.of(url) || otherOrigins == nil {
+                guard await authorize(hop) else { throw BridgeError("The extension can no longer access this URL.") }
+                reached = true
+            } else if let otherOrigins {
+                reached = await authorize(hop)
+                if reached { jar.setCookies(scoped(await otherOrigins(hop), to: hop), for: hop, mainDocumentURL: hop) }
+            }
+            request.httpShouldHandleCookies = reached
+            request.mainDocumentURL = hop
             let before = jar.cookies ?? []
             let (data, raw) = try await transfer.run(request, in: session)
             try Task.checkCancellation()
@@ -1317,8 +1421,11 @@ nonisolated enum ExtensionWrite {
             let status = response.statusCode
             if [301, 302, 303, 307, 308].contains(status), let location = response.value(forHTTPHeaderField: "Location"),
                let next = URL(string: location, relativeTo: request.url)?.absoluteURL {
-                guard input.redirect != "error", SiteOrigin.of(next) == SiteOrigin.of(url),
-                      next.user == nil, next.password == nil else { throw BridgeError("Extension request redirect is not allowed.") }
+                guard input.redirect != "error", otherOrigins != nil || SiteOrigin.of(next) == SiteOrigin.of(url),
+                      next.scheme == "https" || ExtensionFetchRequests.isLoopback(next), next.user == nil, next.password == nil
+                else { throw BridgeError("Extension request redirect is not allowed.") }
+                // As the Fetch standard has it: once another origin has answered, the request's origin is opaque.
+                if SiteOrigin.of(next) != SiteOrigin.of(hop) { request.setValue("null", forHTTPHeaderField: "Origin") }
                 if status == 303 || ([301, 302].contains(status) && request.httpMethod == "POST") {
                     request.httpMethod = "GET"
                     request.httpBody = nil
@@ -1331,6 +1438,10 @@ nonisolated enum ExtensionWrite {
             let headers = response.allHeaderFields.compactMap { key, value -> [String]? in
                 let name = String(describing: key).lowercased()
                 return ["set-cookie", "set-cookie2"].contains(name) ? nil : [name, String(describing: value)]
+            }
+            if !reached {
+                let allowed = response.value(forHTTPHeaderField: "Access-Control-Allow-Origin")
+                guard allowed == "*" || allowed == request.value(forHTTPHeaderField: "Origin") else { throw BridgeError("Failed to fetch.") }
             }
             return ExtensionWriteResponse(status: status, headers: headers, body: data.base64EncodedString(),
                                           url: response.url?.absoluteString ?? url.absoluteString, redirected: redirected)
@@ -1519,13 +1630,12 @@ final class BridgeIdentity: NSObject, BridgeNamespace, WKNavigationDelegate, NSW
         end(webView, .success(url))
     }
 
-    /// The window says which site its page is on now, as the sign-in moves from site to site, so a page can't pass
-    /// for the provider it was sent to.
+    /// Shows the current site as the sign-in moves between sites, so a page can't pass as the provider.
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         flows[ObjectIdentifier(webView)]?.window?.subtitle = Self.shownAddress(webView.url)
     }
 
-    /// The site of an address, as the sign-in window shows it: the host for a secure page, the scheme too otherwise.
+    /// Site shown for a URL: host for https, scheme and host otherwise.
     static func shownAddress(_ url: URL?) -> String {
         guard let url, let host = url.host(), !host.isEmpty else { return url?.scheme.map { "\($0):" } ?? "" }
         let port = url.port.map { ":\($0)" } ?? ""
@@ -1564,6 +1674,9 @@ final class BridgeSidePanel: BridgeNamespace {
     /// Pages set for one tab, by the extension's id for the tab.
     private var tabPaths: [String: [Int: String]] = [:]
     private var disabled: Set<String> = []
+    /// Per-tab setting that overrides the global one, as in Chrome. ChatGPT disables its panel globally, enables it for
+    /// the clicked tab, then opens it.
+    private var tabEnabled: [String: [Int: Bool]] = [:]
     private var opensOnClick: Set<String> = []
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
@@ -1572,6 +1685,7 @@ final class BridgeSidePanel: BridgeNamespace {
             let options = args.object(0)
             if let tab = options["tabId"] as? Int {
                 if let path = options.string("path") { tabPaths[extensionID, default: [:]][tab] = path }
+                if let enabled = options["enabled"] as? Bool { tabEnabled[extensionID, default: [:]][tab] = enabled }
                 // Off for that tab: its page goes, and its panel with it.
                 if options["enabled"] as? Bool == false {
                     tabPaths[extensionID]?[tab] = nil
@@ -1587,7 +1701,7 @@ final class BridgeSidePanel: BridgeNamespace {
             return nil
         case "getOptions":
             let tab = args.object(0)["tabId"] as? Int
-            var options: [String: Any] = ["enabled": !disabled.contains(extensionID)]
+            var options: [String: Any] = ["enabled": isEnabled(extensionID, tab: tab)]
             if let path = path(for: extensionID, tab: tab) { options["path"] = path }
             if let tab { options["tabId"] = tab }
             return options
@@ -1599,10 +1713,9 @@ final class BridgeSidePanel: BridgeNamespace {
         case "getPanelBehavior":
             return ["openPanelOnActionClick": opensOnClick.contains(extensionID)]
         case "open":
-            // Chrome lets a panel open only in answer to something you did with this extension: its button, its menu
-            // item or shortcut, or a click in its own pages. A click or key in a web page counts only when the
-            // extension's own content script there passed it on, the call following its message a moment after
-            // (bridge.js says when that message came, and from which page). A click on another extension never does.
+            // Chrome only opens a panel on a user gesture with this extension: its button, menu item, shortcut, or a click in its
+            // pages. A page click or key counts only when its content script relayed it and the call follows that message
+            // (bridge.js reports when and from which page). Clicks on another extension never count.
             let carried = args.indices.contains(1) ? (args[1] as? [String: Any])?["contentMessage"] as? [String: Any] : nil
             let message = carried.flatMap { message -> (hosts: [String], age: TimeInterval)? in
                 guard let hosts = message["hosts"] as? [String], let age = (message["age"] as? NSNumber)?.doubleValue else { return nil }
@@ -1621,6 +1734,13 @@ final class BridgeSidePanel: BridgeNamespace {
             throw BridgeError.unsupported(Self.name, fn)
         }
     }
+
+    /// Shown for the tab: the per-tab setting, else the global one.
+    private func isEnabled(_ extensionID: String, tab: Int?) -> Bool {
+        Self.isEnabled(everywhere: !disabled.contains(extensionID), forTab: tab.flatMap { tabEnabled[extensionID]?[$0] })
+    }
+
+    nonisolated static func isEnabled(everywhere: Bool, forTab: Bool?) -> Bool { forTab ?? everywhere }
 
     /// The page to show: what the extension set for the tab, else for every tab, else its manifest's.
     private func path(for extensionID: String, tab: Int? = nil) -> String? {
@@ -1644,8 +1764,9 @@ final class BridgeSidePanel: BridgeNamespace {
 
     @discardableResult
     func open(_ extensionID: String, in controller: BrowserWindowController?, tab: Int? = nil) -> Bool {
-        guard let controller, !disabled.contains(extensionID), let path = path(for: extensionID, tab: tab),
-              let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
+        guard let controller, isEnabled(extensionID, tab: tab), let path = path(for: extensionID, tab: tab),
+              let context = host.context(for: extensionID), PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate, allowed: context.hasAccessToPrivateData),
+              let configuration = context.webViewConfiguration,
               let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
         let root = controller.root
         // A tab's own page is reported as that tab's; the page for every tab, as no tab's.
@@ -1682,6 +1803,7 @@ final class BridgeSidePanel: BridgeNamespace {
         close(extensionID)
         paths[extensionID] = nil
         tabPaths[extensionID] = nil
+        tabEnabled[extensionID] = nil
         opensOnClick.remove(extensionID)
         disabled.remove(extensionID)
     }
@@ -1809,7 +1931,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 guard let named = pending.removeValue(forKey: streamID), let namedTab = named.tab,
                       let owner = WindowManager.shared.window(of: namedTab),
                       Self.namedStreamHolds(givenTo: named.extensionID, askedBy: extensionID, expires: named.expires, namedOrigin: named.origin,
-                                            origin: SiteOrigin.of(namedTab.webView?.url ?? namedTab.url), isPrivate: owner.tabManager.isPrivate || namedTab.isPrivate)
+                                            origin: SiteOrigin.of(namedTab.webView?.url ?? namedTab.url), isPrivate: owner.tabManager.isPrivate || namedTab.isPrivate,
+                                            seesPrivate: host.seesPrivate(extensionID))
                 else { throw BridgeError("Invalid stream ID") }
                 try ensureReachable(namedTab, in: owner, by: extensionID)
                 (tab, controller) = (namedTab, owner)
@@ -1890,8 +2013,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     }
 
     /// The tab you used the extension on (its button, its menu item, its shortcut), while it still shows the site it
-    /// showed then, and only while the popup or window of that use is open or a moment after. Never a private tab,
-    /// nor a site the extension can't reach or where extensions are off.
+    /// showed then, and only while the popup or window of that use is open or a moment after. A private tab only for an
+    /// extension allowed there, and never a site the extension can't reach or where extensions are off.
     private func invokedTab(for extensionID: String) throws -> (Tab, BrowserWindowController) {
         guard let invocation = host.use.invocations[extensionID], let found = tab(invocation.tabID),
               host.use.mayCapture(extensionID, tabID: found.0.id, origin: SiteOrigin.of(found.0.webView?.url ?? found.0.url),
@@ -1905,8 +2028,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     /// A tab the extension may hear: an everyday one, with its page, on a site its site access reaches.
     private func ensureReachable(_ tab: Tab, in controller: BrowserWindowController, by extensionID: String) throws {
-        guard !controller.tabManager.isPrivate, !tab.isPrivate, let webView = tab.webView, let url = webView.url ?? tab.url,
-              let context = host.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
+        guard let context = host.context(for: extensionID),
+              PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate || tab.isPrivate, allowed: context.hasAccessToPrivateData),
+              let webView = tab.webView, let url = webView.url ?? tab.url else { throw BridgeError("Cannot capture a tab here") }
         guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites(in: host.profile),
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: host.profile.installs.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
@@ -1915,10 +2039,10 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     /// Whether a stream ID from getMediaStreamId still names a tab to hear: asked for by the extension it was given to
     /// (from any of its pages, its offscreen one included, as Sound Booster does), within its few seconds, with the
-    /// tab still on the site it was named on, and never a private one.
+    /// tab still on the site it was named on, and a private one only for an extension allowed there.
     static func namedStreamHolds(givenTo: String, askedBy: String, expires: Date, namedOrigin: String?, origin: String?,
-                                 isPrivate: Bool, now: Date = Date()) -> Bool {
-        givenTo == askedBy && expires > now && !isPrivate && namedOrigin != nil && origin == namedOrigin
+                                 isPrivate: Bool, seesPrivate: Bool = false, now: Date = Date()) -> Bool {
+        givenTo == askedBy && expires > now && PrivateAccess.sees(isPrivate: isPrivate, allowed: seesPrivate) && namedOrigin != nil && origin == namedOrigin
     }
 
     /// Whether site settings let an extension capture a page there: never where extensions are off; else where it has
@@ -2127,8 +2251,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
         }
     }
 
-    /// The most one chunk of sound may be, as base64: the taps send a few thousand samples at a time (16384 at
-    /// most, 44 KB). The page's own world can post to the handler too, so anything bigger is dropped unread.
+    /// Max audio chunk as base64: taps send up to 16384 samples (44 KB). Page scripts can post here too, so larger ones
+    /// are dropped unread.
     nonisolated static let maxChunkCharacters = 64 * 1024
 
     nonisolated static func acceptsChunk(pcm: String, rate: Double) -> Bool {

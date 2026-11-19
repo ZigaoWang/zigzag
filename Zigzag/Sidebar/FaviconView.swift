@@ -50,9 +50,8 @@ final class FaviconView: NSView {
     private let badgeCut = CAShapeLayer()
     private var renderedBadge: (side: CGFloat, scale: CGFloat, color: CGColor)?
 
-    /// A favorite whose page moved on from the one it was saved with: the saved page's icon, small on the corner the
-    /// Developer Mode chip uses, the icon cut away round it by the same gap, as an icon wears its app's badge. The
-    /// chip, when there's one too, keeps the corner. Nil: none.
+    /// For an away favorite: the saved page's icon as a small badge in the Developer Mode chip's corner, with a gap cut
+    /// around it. The chip, if present, keeps the corner. Nil: none.
     var originalIcon: NSImage? {
         didSet {
             guard oldValue !== originalIcon else { return }
@@ -62,11 +61,21 @@ final class FaviconView: NSView {
         }
     }
     private var renderedOriginal: (side: CGFloat, scale: CGFloat, image: NSImage)?
+    /// A round badge laid on the icon from outside it (a favorite's speaker), in the icon's own coordinates: the icon
+    /// is cut away round it by `speakerGap`, so the ground shows as a ring. Nil: none.
+    var speakerCut: CGRect? { didSet { if oldValue != speakerCut { needsLayout = true } } }
+    static let speakerGap: CGFloat = 1.5
+
+    /// Where a speaker badge of `chip` points sits on an icon of `side`: the bottom-trailing corner as the Developer
+    /// Mode chip's, reaching as far past it, or the bottom-leading one while that chip (or an away icon) has the corner.
+    static func speakerFrame(side: CGFloat, chip: CGFloat, leading: Bool) -> CGRect {
+        let out = (chip * Tokens.Sidebar.developerBadgeOverhang * 2).rounded() / 2
+        return CGRect(x: leading ? -out : side + out - chip, y: -out, width: chip, height: chip)
+    }
     /// The globe a site without an icon shows, for a badge.
     static var globeIcon: NSImage { globe }
-    /// A question is waiting for this page that cannot be shown yet (it is in a background tab, or the window is
-    /// hidden): a filled dot in this color at the developer chip's place, or the icon's top corner while the chip is
-    /// there too, with nothing cut out of the icon for it. One dot per page, however many questions are waiting.
+    /// A question waits for this page but can't show (background tab or hidden window): a filled dot at the developer chip's
+    /// corner, or the other top corner when the chip is there. No cutout; one dot per page.
     var attentionColor: NSColor? {
         didSet {
             guard oldValue !== attentionColor else { return }
@@ -85,8 +94,7 @@ final class FaviconView: NSView {
         return CGRect(x: side + out - chip, y: -out, width: chip, height: chip)
     }
 
-    /// Where the waiting dot sits: the chip's own corner, or, while the chip is showing too, the icon's other top
-    /// corner, so the two never draw over each other.
+    /// Dot position: the chip's corner, or the other top corner when the chip shows, so they never overlap.
     static func attentionFrame(side: CGFloat, overBadge: Bool) -> CGRect {
         let frame = badgeFrame(side: side)
         guard overBadge else { return frame }
@@ -168,23 +176,27 @@ final class FaviconView: NSView {
     /// The chip on its corner, drawn again only when its size, the screen or its color changes; and the gap cut out
     /// of the icon round it (the rest of the cut reaching well past the sleeping ring).
     private func layoutBadge() {
-        guard developerBadge != nil || originalIcon != nil, bounds.width > 0 else { body.mask = nil; return }
+        let hasBadge = developerBadge != nil || originalIcon != nil
+        guard hasBadge || speakerCut != nil, bounds.width > 0 else { body.mask = nil; return }
         let frame = Self.badgeFrame(side: bounds.width)
-        badge.frame = frame
         let gap = Tokens.Sidebar.developerBadgeGap
         let reach = bounds.insetBy(dx: -bounds.width, dy: -bounds.height)
         let path = CGMutablePath()
         path.addRect(reach)
-        let round = developerBadge == nil ? Self.originalRadius(side: frame.width) + gap : frame.width / 2 + gap
-        path.addRoundedRect(in: frame.insetBy(dx: -gap, dy: -gap), cornerWidth: round, cornerHeight: round)
+        if hasBadge {
+            badge.frame = frame
+            let round = developerBadge == nil ? Self.originalRadius(side: frame.width) + gap : frame.width / 2 + gap
+            path.addRoundedRect(in: frame.insetBy(dx: -gap, dy: -gap), cornerWidth: round, cornerHeight: round)
+        }
+        if let speaker = speakerCut { path.addEllipse(in: speaker.insetBy(dx: -Self.speakerGap, dy: -Self.speakerGap)) }
         let scale = window?.backingScaleFactor ?? 2
         badgeCut.frame = body.bounds
         badgeCut.path = path
-        // A masked layer is drawn off screen at the mask's scale: left at 1, the icon under the badge's cut would be
-        // drawn at half the screen's pixels and come out soft on a Retina display.
+        // Masked layers render offscreen at the mask's scale; at 1 the icon under the badge cut is half resolution on Retina.
         badgeCut.contentsScale = scale
         body.contentsScale = scale
         if body.mask !== badgeCut { body.mask = badgeCut }
+        guard hasBadge else { return }
         guard let color = developerBadge else {
             guard let original = originalIcon else { return }
             if let last = renderedOriginal, last.side == frame.width, last.scale == scale, last.image === original { return }
@@ -203,11 +215,10 @@ final class FaviconView: NSView {
         badge.contentsScale = scale
     }
 
-    /// A site's icon on a badge is rounded off as it is at full size, a little more for its small size.
+    /// Badge site icons are rounded like full-size ones, a bit more for the small size.
     private static func originalRadius(side: CGFloat) -> CGFloat { max(1.5, side * 0.22) }
 
-    /// The saved page's icon for the corner, at exactly the pixels it fills, rounded as a site's icon is; a symbol
-    /// (the globe, an icon you chose) in the quiet ink.
+    /// Saved page icon for the corner, pixel-exact and rounded like site icons; symbols (globe, chosen icon) in secondary ink.
     private static func renderOriginal(_ image: NSImage, side: CGFloat, scale: CGFloat, appearance: NSAppearance) -> CGImage? {
         let pixels = Int((side * scale).rounded())
         guard pixels > 0, let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,
@@ -231,8 +242,7 @@ final class FaviconView: NSView {
         return context.makeImage()
     }
 
-    /// The dot a page wears when a question is waiting for it that can't be shown yet, at the chip's own place, or
-    /// the icon's other top corner while the chip is there too.
+    /// Waiting question dot: at the chip's corner, or the other top corner while the chip shows.
     private func layoutAttention() {
         guard let color = attentionColor, bounds.width > 0 else { return }
         let frame = Self.attentionFrame(side: bounds.width, overBadge: developerBadge != nil || originalIcon != nil)
@@ -246,7 +256,7 @@ final class FaviconView: NSView {
         attentionDot.contentsScale = scale
     }
 
-    /// A plain disc, at exactly the pixels it fills: the badge without the hammer, and without the cut in the icon.
+    /// A plain pixel-exact disc: the badge without hammer or cutout.
     private static func renderDot(side: CGFloat, scale: CGFloat, color: CGColor) -> CGImage? {
         let pixels = Int((side * scale).rounded())
         guard pixels > 0, let context = CGContext(data: nil, width: pixels, height: pixels, bitsPerComponent: 8, bytesPerRow: 0,

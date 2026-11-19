@@ -52,9 +52,7 @@ struct MiniWindowTests {
         #expect(!MiniWindowController.takes(URL(fileURLWithPath: "/tmp/page.html"), settingOn: true, needsOnboarding: false))
     }
 
-    /// Every way another app hands Zigzag a page, as AppDelegate takes it: an Apple Event link (`open location`, what
-    /// Python's webbrowser and most apps send), a URL handed over as a document (`open -a`, Finder), and Handoff,
-    /// which all end in `takes` (#246).
+    /// Every way another app hands over a page ends in `takes` (#246): Apple Event `open location` (Python webbrowser, most apps), document open (`open -a`, Finder), and Handoff.
     @Test func everyLinkFromAnotherAppGoesToZigzagMiniWhenOn() {
         func viaAppleEvent(_ string: String) -> Bool? {
             Scripting.webAddress(string).map { MiniWindowController.takes($0, settingOn: true, needsOnboarding: false) }
@@ -62,51 +60,53 @@ struct MiniWindowTests {
         func viaDocument(_ url: URL) -> Bool? {
             AppDelegate.opensAsDocument(url) ? MiniWindowController.takes(url, settingOn: true, needsOnboarding: false) : nil
         }
-        // A script's local plot server and an OAuth page from another app: Zigzag Mini.
+        // A script's local plot server or another app's OAuth page: Mini.
         #expect(viaAppleEvent("http://127.0.0.1:54123/") == true)
         #expect(viaAppleEvent("https://github.com/login/oauth/authorize?client_id=x") == true)
         #expect(viaDocument(URL(string: "https://accounts.google.com/o/oauth2/auth")!) == true)
-        // A file opened from Finder or `open page.html`: a tab, to keep.
+        // A file from Finder or `open page.html`: a tab.
         #expect(viaDocument(URL(fileURLWithPath: "/tmp/report.html")) == false)
-        // Never Zigzag's own pages, an extension's or a script's: nothing opens.
+        // Zigzag, extension and script URLs: nothing opens.
         #expect(viaAppleEvent("zigzag://settings") == nil)
         #expect(viaAppleEvent("javascript:alert(1)") == nil)
         #expect(viaDocument(URL(string: "zigzag://history")!) == nil)
     }
 
-    // MARK: The one-time offer (#246)
+    // MARK: On by default
 
-    @Test func theOfferIsMadeOnlyOnceAndOnlyWhileOff() {
-        let web = URL(string: "https://accounts.example.com/sign-in")!
-        #expect(MiniWindowController.offersMini(for: web, settingOn: false, asked: false, needsOnboarding: false))
-        // Asked before, whatever the answer, it never comes back.
-        #expect(!MiniWindowController.offersMini(for: web, settingOn: false, asked: true, needsOnboarding: false))
-        // Already on: the link went to Zigzag Mini, nothing to offer.
-        #expect(!MiniWindowController.offersMini(for: web, settingOn: true, asked: false, needsOnboarding: false))
-        // The first window after onboarding is where you start: no offer over it.
-        #expect(!MiniWindowController.offersMini(for: web, settingOn: false, asked: false, needsOnboarding: true))
-        // Files opened from Finder stay tabs even with the setting on, so they don't offer it.
-        #expect(!MiniWindowController.offersMini(for: URL(fileURLWithPath: "/tmp/plot.html"), settingOn: false, asked: false, needsOnboarding: false))
+    @Test func takesLinksFromOtherAppsUnlessTurnedOff() throws {
+        let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        // Unset: on, as in Little Arc.
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
+        // Turned off in Settings: stays off.
+        defaults.set(false, forKey: "OpensExternalLinksInMini")
+        #expect(!MiniWindowController.opensExternalLinks(in: defaults))
+        defaults.set(true, forKey: "OpensExternalLinksInMini")
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
     }
 
-    /// It never takes the place of another toast, nor gets its place taken by the offer to translate that comes as
-    /// the page loads: two quiet checks in a row first.
-    @Test func theOfferWaitsItsTurn() {
-        #expect(MiniWindowController.offerTurn(quiet: true, quietBefore: true, inFront: true) == .now)
-        #expect(MiniWindowController.offerTurn(quiet: true, quietBefore: false, inFront: true) == .wait)
-        #expect(MiniWindowController.offerTurn(quiet: false, quietBefore: true, inFront: true) == .wait)
-        // Gone to another tab: not over a page it isn't about (and not counted as asked, so the next link asks).
-        #expect(MiniWindowController.offerTurn(quiet: true, quietBefore: true, inFront: false) == .never)
+    @Test func gotItKeepsMiniAndEndsTheNote() throws {
+        let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(MiniWindowController.needsLinksNote(in: defaults))
+        MiniWindowController.answerLinksNote(useTabs: false, in: defaults)
+        #expect(!MiniWindowController.needsLinksNote(in: defaults))
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
     }
 
-    @Test func theOfferIsRememberedOnceShown() {
-        let defaults = UserDefaults.standard
-        let before = defaults.object(forKey: "MiniOfferShown")
-        defer { defaults.set(before, forKey: "MiniOfferShown") }
-        defaults.removeObject(forKey: "MiniOfferShown")
-        #expect(!MiniWindowController.miniOffered)
-        MiniWindowController.miniOffered = true
-        #expect(defaults.bool(forKey: "MiniOfferShown"))
+    @Test func useTabsInsteadTurnsMiniOffAndUndoTurnsItBack() throws {
+        let suite = "zigzag-mini-links-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        MiniWindowController.answerLinksNote(useTabs: true, in: defaults)
+        #expect(!MiniWindowController.needsLinksNote(in: defaults))
+        #expect(!MiniWindowController.opensExternalLinks(in: defaults))
+        MiniWindowController.undoUseTabs(in: defaults)
+        #expect(MiniWindowController.opensExternalLinks(in: defaults))
+        #expect(!MiniWindowController.needsLinksNote(in: defaults))
     }
 
     // MARK: Its size
@@ -114,7 +114,7 @@ struct MiniWindowTests {
     @Test func opensAtTheSizeLastLeftAt() {
         #expect(MiniWindowController.size(remembered: nil) == Tokens.Metric.miniWindowSize)
         #expect(MiniWindowController.size(remembered: NSSize(width: 700.4, height: 820)) == NSSize(width: 700, height: 820))
-        // Never smaller than it can be made.
+        // Never below the minimum size.
         #expect(MiniWindowController.size(remembered: NSSize(width: 100, height: 820)) == Tokens.Metric.miniWindowSize)
         #expect(MiniWindowController.size(remembered: .zero) == Tokens.Metric.miniWindowSize)
     }
@@ -122,15 +122,15 @@ struct MiniWindowTests {
     // MARK: A page that opens an app (#246)
 
     @Test func closesOnceItsPageHandedOffToAnApp() {
-        // A sign-in page from another app sending you back to that app on its own: done.
+        // A sign-in page from another app that returns to that app: closes.
         #expect(MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: true, linkClick: false))
-        // A link that went straight to an app leaves nothing to show, wherever the window came from.
+        // A link that went straight to an app leaves nothing to show.
         #expect(MiniWindowController.closesAfterOpeningApp(hasPage: false, fromAnotherApp: false, isMainFrame: true, linkClick: true))
-        // A link you click (mailto:, an Open in App link) leaves the page you were reading.
+        // A clicked mailto: or Open in App link leaves the page open.
         #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: true, linkClick: true))
-        // A frame in the page opening an app isn't the page ending there.
+        // A subframe opening an app doesn't close it.
         #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: true, isMainFrame: false, linkClick: false))
-        // One you opened yourself, for a quick look, stays.
+        // One opened by you stays.
         #expect(!MiniWindowController.closesAfterOpeningApp(hasPage: true, fromAnotherApp: false, isMainFrame: true, linkClick: false))
     }
 
@@ -169,10 +169,43 @@ struct MiniWindowTests {
             strip.layout()
             let row = [strip.backButton, strip.forwardButton, strip.reloadButton, strip.spaceChip, strip.title,
                        strip.siteButton, strip.pinButton, strip.copyButton, strip.openButton].map(\.frame).filter { $0.width > 0 }
-            for (a, b) in zip(row, row.dropFirst()) { #expect(a.maxX <= b.minX + 0.5, "at \(width)") }
+            // Every hover box keeps room from the next, never touching it.
+            for (a, b) in zip(row, row.dropFirst()) { #expect(a.maxX + Tokens.Pane.stripGap <= b.minX + 0.5, "at \(width)") }
             #expect(strip.reloadButton.frame.minX > strip.trafficLightsWidth)
             #expect(strip.openButton.frame.maxX <= width)
+            // As far from the strip's top as from its bottom, and as from the next box.
+            for frame in row {
+                #expect(frame.minY == Tokens.Pane.stripGap && strip.bounds.height - frame.maxY == Tokens.Pane.stripGap, "at \(width)")
+            }
         }
+    }
+
+    /// Editing the address, the field fills the room between the space and the buttons, never under either.
+    @Test func theAddressFieldStaysInItsSlot() {
+        let strip = MiniStripView()
+        strip.trafficLightsWidth = 52
+        strip.openButton.show("Open in A Space With a Long Name", keys: "⌘O")
+        strip.isEditing = true
+        let minimum = Tokens.Metric.miniWindowMinSize.width
+        for width in stride(from: minimum, through: 1400, by: 20) {
+            strip.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.miniStripHeight)
+            strip.layout()
+            let field = strip.anchor.frame
+            // Its narrowest; in a window too narrow for that beside the buttons, they step aside for the strip's end.
+            #expect(field.width >= MiniStripView.narrowestField, "at \(width)")
+            #expect(field.maxX <= width - Tokens.Pane.stripGap, "at \(width)")
+            #expect(field.minY == Tokens.Pane.stripGap && field.height == Tokens.Pane.addressHeight, "at \(width)")
+            #expect(field.minX >= strip.reloadButton.frame.maxX + Tokens.Space.x2, "at \(width)")
+            if !strip.spaceChip.isHidden { #expect(field.minX >= strip.spaceChip.frame.maxX + Tokens.Space.x2, "at \(width)") }
+            for button in [strip.siteButton, strip.pinButton, strip.copyButton, strip.openButton] where !button.isHidden {
+                #expect(field.maxX + Tokens.Space.x2 <= button.frame.minX + 0.5, "at \(width)")
+            }
+        }
+        // Done editing, everything is back.
+        strip.isEditing = false
+        strip.frame = NSRect(x: 0, y: 0, width: minimum, height: Tokens.Metric.miniStripHeight)
+        strip.layout()
+        #expect(!strip.siteButton.isHidden && !strip.pinButton.isHidden && !strip.copyButton.isHidden)
     }
 
     /// Site Controls (#225) ends the strip's room as it ends the address in a browser window: right before Keep on
@@ -186,10 +219,7 @@ struct MiniWindowTests {
             strip.frame = NSRect(x: 0, y: 0, width: width, height: Tokens.Metric.miniStripHeight)
             strip.layout()
             #expect(strip.siteButton.frame.width > 0, "at \(width)")
-            #expect(strip.siteButton.frame.maxX == strip.pinButton.frame.minX, "at \(width)")
-            // Editing the address always opens a field wide enough to use; where the strip has room, clear of the buttons.
-            #expect(strip.anchor.frame.width >= MiniStripView.narrowestField, "at \(width)")
-            if width >= 640 { #expect(strip.anchor.frame.maxX <= strip.siteButton.frame.minX - Tokens.Space.x2, "at \(width)") }
+            #expect(strip.siteButton.frame.maxX + Tokens.Pane.stripGap == strip.pinButton.frame.minX, "at \(width)")
             #expect(strip.title.frame.width == 0 || strip.title.frame.maxX <= strip.siteButton.frame.minX + 0.5, "at \(width)")
             // Concentric with the window's corner: as far in from the right as from the top.
             #expect(strip.openButton.frame.maxX == width - strip.openButton.frame.minY, "at \(width)")

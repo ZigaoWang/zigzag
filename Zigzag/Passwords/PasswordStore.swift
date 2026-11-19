@@ -421,24 +421,24 @@ enum PasswordAuthentication {
     @MainActor private static var unlockedUntil: Date? { didSet { if unlockedUntil != nil { watchForSleep() } } }
     @MainActor private static var sleepObservers: [LockObserver] = []
 
-    /// Once, on the first unlock: sleep, the screen sleeping, the screen being locked or another user switching in locks again.
+    /// Registered on first unlock: sleep, display sleep, screen lock or user switch locks again.
     @MainActor private static func watchForSleep() {
         guard sleepObservers.isEmpty else { return }
         sleepObservers = observeLocking { lock() }
     }
 
-    /// Sent when the screen is locked by hand (Control-Command-Q, the menu, a hot corner), even while the display stays on.
+    /// Posted on manual screen lock (Control-Command-Q, the menu, a hot corner), even with the display on.
     static let screenLockedNotification = Notification.Name("com.apple.screenIsLocked")
 
-    /// One registration, so it can be removed from the center it was added to.
+    /// One registration, removable from its center.
     struct LockObserver {
         let center: NotificationCenter
         let token: Any
         func remove() { center.removeObserver(token) }
     }
 
-    /// Calls `action` whenever the Mac sleeps, its screen sleeps or locks, or another user switches in.
-    /// The centers can be swapped in tests, so a test never broadcasts a screen lock to other apps.
+    /// Calls `action` on sleep, display sleep, screen lock or user switch. Centers are injectable so tests never
+    /// broadcast a screen lock.
     @MainActor static func observeLocking(workspace: NotificationCenter = NSWorkspace.shared.notificationCenter,
                                           distributed: NotificationCenter = DistributedNotificationCenter.default(),
                                           _ action: @escaping @MainActor () -> Void) -> [LockObserver] {

@@ -47,9 +47,8 @@ enum Brand {
         return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
     }
 
-    /// Text on a button filled with `fill`: white, or a deep ink of the fill's own hue, whichever reads better on it
-    /// in the appearance it's drawn in. A space's accent is deep by day and pale at night, so white text on it
-    /// would fail in dark mode; this picks as `Theme.onAccent` does, for any fill.
+    /// White or a deep ink of the fill's hue, whichever contrasts better in the current appearance. Accents are pale in
+    /// dark mode, so white would fail; same logic as `Theme.onAccent`.
     static func ink(on fill: NSColor) -> NSColor {
         NSColor(name: nil) { appearance in
             var ink = NSColor.white
@@ -142,13 +141,20 @@ enum Brand {
 
         /// The frame's colors bare and under the hover and card washes, in the current drawing appearance.
         private static func washed(_ grounds: [NSColor]) -> [NSColor] {
-            let washes = [Tokens.Chrome.hover, Tokens.Chrome.card].map { $0.usingColorSpace(.sRGB)?.alphaComponent ?? 0 } + [0]
-            return grounds.compactMap { $0.usingColorSpace(.sRGB) }.flatMap { c in
-                washes.map { w in
-                    NSColor(srgbRed: c.redComponent + (1 - c.redComponent) * w, green: c.greenComponent + (1 - c.greenComponent) * w,
-                            blue: c.blueComponent + (1 - c.blueComponent) * w, alpha: 1)
-                }
-            }
+            let washes = Self.chromeWashes
+            return grounds.compactMap { $0.usingColorSpace(.sRGB) }.flatMap { c in washes.map { Self.laid($0, over: c) } }
+        }
+
+        /// The washes the frame's inks sit under, as drawn now: hover and the card, and none.
+        private static var chromeWashes: [NSColor] {
+            [Tokens.Chrome.hover, Tokens.Chrome.card].compactMap { $0.usingColorSpace(.sRGB) } + [NSColor(srgbRed: 0, green: 0, blue: 0, alpha: 0)]
+        }
+
+        /// `wash` laid over an opaque sRGB `ground`.
+        private static func laid(_ wash: NSColor, over ground: NSColor) -> NSColor {
+            let a = wash.alphaComponent
+            return NSColor(srgbRed: wash.redComponent * a + ground.redComponent * (1 - a), green: wash.greenComponent * a + ground.greenComponent * (1 - a),
+                           blue: wash.blueComponent * a + ground.blueComponent * (1 - a), alpha: 1)
         }
 
         /// The space's ink at an OKLCH lightness and chroma, checked against this space's own frame in each mode,
@@ -169,16 +175,7 @@ enum Brand {
                 var fallback = plain
                 appearance.performAsCurrentDrawingAppearance {
                     fallback = plain.usingColorSpace(.sRGB) ?? plain
-                    let washes = [Tokens.Chrome.hover, Tokens.Chrome.card].map { $0.usingColorSpace(.sRGB)?.alphaComponent ?? 0 } + [0]
-                    for ground in grounds {
-                        guard let c = ground.usingColorSpace(.sRGB) else { continue }
-                        for w in washes {
-                            let mixed = NSColor(srgbRed: c.redComponent + (1 - c.redComponent) * w,
-                                                green: c.greenComponent + (1 - c.greenComponent) * w,
-                                                blue: c.blueComponent + (1 - c.blueComponent) * w, alpha: 1)
-                            if Brand.contrast(ink, mixed) < 4.5 { passes = false }
-                        }
-                    }
+                    for mixed in Self.washed(grounds) where Brand.contrast(ink, mixed) < 4.5 { passes = false }
                 }
                 return passes ? ink : fallback
             }

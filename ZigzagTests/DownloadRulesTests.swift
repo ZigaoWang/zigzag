@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// Download and link rules: what they match, the values a token becomes, the cookies file a manager reads, and the
-/// bodies a JSON-RPC or XML-RPC service is sent.
+/// Download and link rules: matching, token values, the cookies file, and JSON-RPC / XML-RPC bodies.
 struct DownloadRuleTests {
     private func rule(_ match: DownloadRule.Match, _ pattern: String = "", applies: DownloadRule.Applies = .downloads,
                       enabled: Bool = true, caseSensitive: Bool = false) -> DownloadRule {
@@ -36,7 +35,7 @@ struct DownloadRuleTests {
     }
 
     @Test func aPatternIsAlwaysApartFromTheAddress() {
-        // A bare host in the pattern never matches by magic: the whole address is what's compared.
+        // A bare host doesn't match; the whole URL is compared.
         #expect(!rule(.startsWith, "youtube").matches(video))
         #expect(!rule(.contains, "").matches(video))
         #expect(rule(.any).matches(video))
@@ -58,7 +57,7 @@ struct DownloadRuleTests {
         let specific = rule(.contains, "youtube.com/watch", applies: .linksAndDownloads)
         let catchAll = rule(.any, applies: .linksAndDownloads)
         #expect(DownloadRulesStore.firstMatch(in: [specific, catchAll], url: video, appliesToLinks: true)?.id == specific.id)
-        // Reversed, the catch-all is first and takes it.
+        // Reversed, the catch-all matches first.
         #expect(DownloadRulesStore.firstMatch(in: [catchAll, specific], url: video, appliesToLinks: true)?.id == catchAll.id)
         #expect(DownloadRulesStore.firstMatch(in: [specific], url: file, appliesToLinks: true) == nil)
     }
@@ -91,25 +90,23 @@ struct DownloadRuleTests {
         #expect(DownloadTokens.filename(for: file, suggested: "-rf") == "_-rf")
         #expect(DownloadTokens.filename(for: file, suggested: ".hidden") == "hidden")
         #expect(!DownloadTokens.filename(for: file, suggested: "a\u{0}b").contains("\u{0}"))
-        // A bidi override can make "invoicefdp.exe" read as a PDF name; it is a format character, so it goes.
+        // A bidi override is a format character, so it's stripped.
         #expect(DownloadTokens.filename(for: file, suggested: "invoice\u{202E}fdp.exe") == "invoicefdp.exe")
         #expect(DownloadTokens.filename(for: URL(string: "https://example.com/")!, suggested: "") == "example.com")
     }
 
-    /// A rule names its script, and a name alone means the scripts folder in your Documents: one place for them, which
-    /// is what makes them findable, and a script kept elsewhere is still reachable by its own path.
+    /// A script name alone resolves to the scripts folder in Documents; a path is used as given.
     @Test func aRuleNamesAScriptInItsOneFolder() {
         let folder = Paths.scripts.standardizedFileURL
         #expect(folder == Paths.support.appendingPathComponent("Scripts", isDirectory: true).standardizedFileURL)
 
-        // A bare name is in the folder; a path of its own is taken as it stands, `~` and all.
+        // A bare name is in the folder; a path is used as is, `~` included.
         #expect(Paths.script(named: "yt-dlp.sh").standardizedFileURL == folder.appendingPathComponent("yt-dlp.sh"))
         #expect(Paths.script(named: "/opt/tools/dl.sh").path == "/opt/tools/dl.sh")
         let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
         #expect(Paths.script(named: "~/bin/dl.sh").standardizedFileURL == home.appendingPathComponent("bin/dl.sh"))
 
-        // Picked from the folder, a script is stored by its name, so the rule reads `yt-dlp.sh` and goes on working;
-        // picked anywhere else it keeps its path.
+        // Scripts picked from the folder are stored by name; others keep their path.
         #expect(Paths.scriptName(for: folder.appendingPathComponent("yt-dlp.sh")) == "yt-dlp.sh")
         #expect(Paths.scriptName(for: URL(fileURLWithPath: "/opt/tools/dl.sh")) == "/opt/tools/dl.sh")
     }
@@ -153,10 +150,10 @@ struct DownloadRuleTests {
         #expect(rules[2].applies == .downloads)
         #expect(rules[2].action.kind == .openURL)
         #expect(!rules[2].isEnabled)
-        // A field of the wrong type is not a rule either: `.contains` with no pattern would catch every address.
+        // A wrongly typed field disables the rule: `.contains` with no pattern would match everything.
         #expect(!rules[3].isEnabled)
         #expect(!rules[4].isEnabled)
-        // No action would decode as an Open URL rule with nothing to open; a catch-all prompt is worse than no rule.
+        // A missing action would decode as an empty Open URL rule; a catch-all prompt is worse than no rule.
         #expect(!rules[5].isEnabled)
         #expect(!rules[6].isEnabled)
         #expect(rules[6].name.isEmpty)
@@ -186,8 +183,7 @@ struct DownloadRuleTests {
         #expect(!expanded.contains("{link}"))
     }
 
-    /// A script rule's notice says what it is doing while it runs, and how it went when it stops: green when it exited
-    /// 0, the script's own last words when it didn't.
+    /// A script notice shows progress while running, then green on exit 0, else the script's last output.
     @Test func aScriptNoticeSaysHowItWent() {
         let running = ScriptNotice(script: "yt-dlp.sh", state: .running)
         #expect(running.title == "Running script: yt-dlp.sh")
@@ -210,12 +206,11 @@ struct DownloadRuleTests {
         #expect(failed.tone == .bad)
         #expect(failed.isOver)
 
-        // A script that said nothing has nothing to show under the title.
+        // No output: no detail line.
         #expect(ScriptNotice(script: "yt-dlp.sh", state: .failed("   \n")).detail == nil)
     }
 
-    /// The link's own parts, so a rule can send an address somewhere else: the host, the path and the query on their
-    /// own, exactly as the address has them.
+    /// Host, path and query tokens, exactly as in the URL.
     @Test func theLinksOwnPartsAreTokensOfTheirOwn() {
         let values = HandoffValues(link: URL(string: "https://www.google.com/search/deep?a=1&b=two%20words")!)
         let expanded = DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values)
@@ -233,11 +228,11 @@ struct DownloadRuleTests {
     @Test func aQuestionIsOnlyAskedWhereItCanBeSeen() {
         #expect(DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: true, windowIsKey: true))
         #expect(DownloadHandoff.questionCanShow(tabIsInFront: nil, windowIsVisible: true, windowIsKey: true))
-        // A background tab, a window behind another, or Zigzag in the background holds the question unseen.
+        // A background tab, a hidden window, or Zigzag in the background holds the question.
         #expect(!DownloadHandoff.questionCanShow(tabIsInFront: false, windowIsVisible: true, windowIsKey: true))
         #expect(!DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: false, windowIsKey: true))
         #expect(!DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: true, windowIsKey: false))
-        // A pop-up is key while its opener's window is not: its own links wait for a window that can ask.
+        // A key popup with an unfocused opener waits for a window that can ask.
         #expect(!DownloadHandoff.questionCanShow(tabIsInFront: true, windowIsVisible: true, windowIsKey: false))
         #expect(!DownloadHandoff.questionCanShow(tabIsInFront: nil, windowIsVisible: true, windowIsKey: false))
     }
@@ -275,7 +270,7 @@ struct DownloadRuleTests {
         #expect(!old.applies(to: file, now: now))
         let session = HandoffCookie(name: "e", value: "5", domain: "example.com", expires: nil)
         #expect(session.applies(to: file, now: now))
-        // A host-only cookie stays on its host; one with a leading dot is for the domain.
+        // A host-only cookie stays on its host; a leading dot means the domain.
         let hostOnly = HandoffCookie(name: "h", value: "6", domain: "example.com")
         #expect(hostOnly.applies(to: file, now: now))
         #expect(!hostOnly.applies(to: URL(string: "https://sub.example.com/")!, now: now))
@@ -322,12 +317,11 @@ struct DownloadRuleTests {
         let withToken = DownloadHandoff.jsonParameters(parameters, method: "aria2.addUri", secret: "s3cret")
         #expect(withToken.first as? String == "token:s3cret")
         #expect(DownloadHandoff.jsonParameters(parameters, method: "aria2.addUri", secret: "").first as? [String] != nil)
-        // Nothing token-like is added to a service that doesn't take one.
+        // No secret is added for a service that doesn't take one.
         #expect(DownloadHandoff.jsonParameters(parameters, method: "other.method", secret: "s3cret").first as? String == nil)
     }
 
-    /// An Open URL template fills each token as one query value: a filename or title with `&` or `=` in it can't add
-    /// a parameter of its own. `{path}` and `{query}` are the address's own parts and are not encoded twice.
+    /// Each Open URL token is one query value, so `&` or `=` can't add parameters; `{path}` and `{query}` aren't double-encoded.
     @Test func openURLTokensAreOneQueryValue() throws {
         let values = HandoffValues(link: URL(string: "https://site.example/a?b=c&d=e")!,
                                    referrer: URL(string: "https://ref.example/x y")!,
@@ -340,22 +334,21 @@ struct DownloadRuleTests {
         #expect(byName["name"] == values.filename)
         #expect(byName["ref"] == values.referrer?.absoluteString)
         #expect(byName["mime"] == "video/mp4")
-        // Exactly the five asked for: the filename added no sixth.
+        // Exactly five; the filename added none.
         #expect(items.count == 5)
 
-        // The redirect case keeps the address's own path and query as they are.
+        // `{path}` and `{query}` are kept as is.
         #expect(DownloadTokens.expand("https://www.bing.com{path}?{query}", with: values, query: true)
                 == "https://www.bing.com/a?b=c&d=e")
     }
 
-    /// A MIME type is the server's, not an option: one that starts with `-` is passed with a `_` before it.
+    /// A MIME type starting with `-` gets a `_` prefix so it can't be read as an option.
     @Test func aMimeTypeCannotBeReadAsAnOption() {
         let values = HandoffValues(link: URL(string: "https://site.example/f")!, mime: "-o/tmp/x")
         #expect(DownloadTokens.expand("{mime}", with: values) == "_-o/tmp/x")
     }
 
-    /// Cookies go only to a target on this Mac: a script or app runs here, an RPC service must be local, and an Open
-    /// URL may be a custom scheme or a local http(s) address. A remote address gets none.
+    /// Cookies only go to local targets: scripts, apps, local RPC, custom schemes or local http(s). Remote addresses get none.
     @Test func cookiesOnlyGoToATargetOnThisMac() {
         let values = HandoffValues(link: URL(string: "https://site.example/f")!)
         func action(_ kind: DownloadRuleAction.Kind, _ field: (inout DownloadRuleAction) -> Void) -> DownloadRuleAction {
@@ -371,7 +364,7 @@ struct DownloadRuleTests {
         #expect(DownloadHandoff.targetIsOnThisMac(action(.jsonRPC) { $0.rpcEndpoint = "http://127.0.0.1:6800/jsonrpc" }, values: values))
     }
 
-    /// A boolean is a boolean over XML-RPC, not an integer: JSONSerialization gives both back as NSNumbers.
+    /// XML-RPC booleans stay booleans; JSONSerialization returns both as NSNumber.
     @Test func xmlRPCBodySendsBooleansAsBooleans() {
         let body = DownloadHandoff.xmlRPC(method: "d.load", parameters: [true, 3, "x"])
         #expect(body.contains("<boolean>1</boolean>"))
@@ -392,8 +385,7 @@ struct DownloadRuleTests {
 
     // MARK: Per-extension destinations
 
-    /// A per-extension destination as the panel makes one: a download rule whose match is the file's type, and an
-    /// action that says where a file of it lands.
+    /// A per-extension destination as the panel creates it: a file-type rule plus a save action.
     private func destination(_ extensions: String, _ kind: DownloadRuleAction.Kind = .saveToFolder,
                              folder: String = "/Users/me/Documents", enabled: Bool = true) -> DownloadRule {
         var action = DownloadRuleAction(kind: kind)
@@ -403,15 +395,14 @@ struct DownloadRuleTests {
         return rule
     }
 
-    /// A file's type is its own name, never the address: that is what lets a per-extension destination be written as
-    /// an ordinary rule and still read the right thing.
+    /// File-type rules match the filename, never the URL.
     @Test func aFileTypeMatchesByNameAndNeverByAddress() {
         let type = rule(.fileType, "pdf, epub")
         #expect(type.matches(filename: "report.pdf"))
         #expect(type.matches(filename: "report.PDF"))
         #expect(type.matches(filename: "book.EPUB"))
         #expect(!type.matches(filename: "report.txt"))
-        // An address on its own is never a file's name, so a type rule catches nothing without one.
+        // A URL alone has no filename, so a type rule matches nothing.
         #expect(!type.matches(file))
         #expect(!type.matches(file, filename: ""))
     }
@@ -422,7 +413,7 @@ struct DownloadRuleTests {
         #expect(rule(.fileType, "pdf,epub").matches(filename: "b.epub"))
         #expect(rule(.fileType, "tar.gz").matches(filename: "backup.tar.gz"))
         #expect(!rule(.fileType, "gz").matches(filename: "backup.tar.xz"))
-        // The dot is what makes an extension an extension.
+        // An extension needs a dot.
         #expect(!rule(.fileType, "pdf").matches(filename: "pdf"))
         #expect(!rule(.fileType, "").matches(filename: "a.pdf"))
         #expect(!rule(.fileType, "pdf", enabled: false).matches(filename: "a.pdf"))
@@ -434,8 +425,7 @@ struct DownloadRuleTests {
         #expect(rule(.fileType, "PDF", caseSensitive: false).matches(filename: "a.pdf"))
     }
 
-    /// The download path reads the file's name, so a type rule catches its download — and, since a link has no name,
-    /// never a link.
+    /// Downloads match by filename; links have none, so type rules never match links.
     @Test func aDownloadIsCaughtByItsTypeAndALinkIsNot() {
         let type = rule(.fileType, "pdf")
         #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: false)?.id == type.id)
@@ -443,8 +433,7 @@ struct DownloadRuleTests {
         #expect(DownloadRulesStore.firstMatch(in: [type], url: file, filename: "report.pdf", appliesToLinks: true) == nil)
     }
 
-    /// Where a download lands is the first destination that matches, in the same order a handoff is tried — and a
-    /// handoff rule for the same file is not a destination, so it is left to the handoff path.
+    /// The first matching destination wins, in handoff order; a handoff rule for the same file isn't a destination.
     @Test func aDestinationIsTheFirstThatMatches() {
         let pdf = destination("pdf", folder: "/Users/me/Documents")
         let books = destination("pdf, epub", .openFile)
@@ -458,8 +447,7 @@ struct DownloadRuleTests {
 
     // MARK: Where a destination puts the file
 
-    /// A folder destination saves into the folder the rule names, under the file's own name; there is nothing to
-    /// decide when the folder is empty or has gone, and Zigzag's own showing saves where it always would.
+    /// A folder destination saves there under the file's name; empty or missing folders decide nothing, and Open saves to the default place.
     @Test func aDestinationIsReadAsAPlaceToSave() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("zz-dest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -469,37 +457,36 @@ struct DownloadRuleTests {
         #expect(there?.destination == folder.appendingPathComponent("report.pdf"))
         #expect(there?.openWhenFinished == false, "a folder destination saves, it never opens")
 
-        // The file's name is made safe, as every download's is.
+        // The filename is sanitized.
         #expect(DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "a/b:c.pdf")?.destination
                 == folder.appendingPathComponent("a-b-c.pdf"))
 
-        // A name already taken there is not overwritten.
+        // Existing files aren't overwritten.
         let taken = folder.appendingPathComponent("report.pdf")
         try Data("one".utf8).write(to: taken)
         let second = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf")
         #expect(second?.destination == folder.appendingPathComponent("report 2.pdf"))
 
-        // A folder still being downloaded into is not chosen either.
+        // Nor files still downloading.
         let busy = DownloadManager.place(for: .folder(folder.path), folder: folder.path, filename: "report.pdf",
                                          avoiding: [folder.appendingPathComponent("report 2.pdf").path])
         #expect(busy?.destination == folder.appendingPathComponent("report 3.pdf"))
 
-        // Nothing to decide: no folder named, one that doesn't exist, and one that is really a file.
+        // No folder, a missing one, or a file instead of a folder: nothing decided.
         #expect(DownloadManager.place(for: .folder(""), folder: "", filename: "a.pdf") == nil)
         #expect(DownloadManager.place(for: .folder("/no/such/folder"), folder: "/no/such/folder", filename: "a.pdf") == nil)
         let aFile = folder.appendingPathComponent("notafolder")
         try Data("x".utf8).write(to: aFile)
         #expect(DownloadManager.place(for: .folder(aFile.path), folder: aFile.path, filename: "a.pdf") == nil)
 
-        // Open saves where it would have gone anyway, and says to open it once it's here.
+        // Open saves to the default place and opens when finished.
         let shown = DownloadManager.place(for: .open, folder: "ignored", filename: "report.pdf")
         #expect(shown?.openWhenFinished == true)
         #expect(shown?.destination.lastPathComponent == "report.pdf")
-        // A private window keeps the file but never hands it to another app, unless the rule was let in.
+        // Private windows keep the file but don't open it in another app unless the rule is allowed there.
         #expect(DownloadManager.place(for: .open, folder: "", filename: "report.pdf", canOpen: false)?.openWhenFinished == false)
     }
-    /// A destination is a destination, and needs what it needs: a folder to save into, nothing to be opened by the
-    /// Mac's own app.
+    /// Destinations need a folder to save into; Open needs nothing.
     @Test func aDestinationSaysWhatItIsAndNeedsItsFolder() {
         #expect(DownloadRuleAction.Kind.saveToFolder.isDestination)
         #expect(DownloadRuleAction.Kind.openFile.isDestination)
@@ -519,8 +506,7 @@ struct DownloadRuleTests {
         #expect(destination("pdf", .openFile).destinationSentence == "Files of type pdf open in your Mac’s app")
     }
 
-    /// A file-type Open never offers or performs an app, a script, an installer or an archive. The lookup skips such
-    /// a rule, and a later Save rule for the same type still decides where the file lands.
+    /// File-type Open never runs apps, scripts, installers or archives; the lookup skips it and a later Save rule decides.
     @Test func anOpenNeverTakesAnAppScriptOrArchive() {
         #expect(DownloadOpening.isRefused("dmg"))
         #expect(DownloadOpening.isRefused("APP"))
@@ -536,19 +522,18 @@ struct DownloadRuleTests {
         #expect(DownloadOpening.isRefused(pattern: "pdf, dmg"))
         #expect(!DownloadOpening.isRefused("pdf"))
 
-        // What else runs, loads, or sends the Mac somewhere when opened: location files, web pages, plug-ins,
-        // workflows and macro documents.
+        // Other types that run, load, or navigate when opened: location files, web pages, plug-ins, workflows, macro documents.
         for type in ["fileloc", "inetloc", "webloc", "url", "html", "svg", "webarchive", "js", "wflow", "shortcut",
                      "scptd", "plugin", "dylib", "qtz", "jnlp", "class", "ipa", "docm", "xlsm", "term", "tool"] {
             #expect(DownloadOpening.isRefused(type), "\(type) must not open")
         }
         #expect(DownloadOpening.isRefused(pattern: "epub, fileloc"))
-        // A type the list doesn't name is still refused when the Mac calls it a script or an archive.
+        // Unlisted types are refused when UTType says script or archive.
         for type in ["sparseimage", "cpgz", "xar", "phtml", "pyc"] {
             #expect(!DownloadOpening.refused.contains(type))
             #expect(DownloadOpening.isRefused(type), "\(type) must not open")
         }
-        // The ordinary documents and media Open is for.
+        // Ordinary documents and media are allowed.
         for type in ["pdf", "epub", "txt", "rtf", "md", "csv", "json", "png", "jpg", "heic", "mp3", "mp4", "mov",
                      "docx", "xlsx", "pptx", "pages", "key", "numbers", "ics", "vcf"] {
             #expect(!DownloadOpening.isRefused(type), "\(type) should be able to open")
@@ -565,7 +550,7 @@ struct DownloadRuleTests {
         #expect(found?.rule.name == "Save")
         #expect(found?.destination == .folder("/tmp"))
 
-        // The same for an installer and a compound archive, both of which the card would otherwise offer.
+        // Same for installers and compound archives.
         let installer = URL(string: "https://example.com/tool.mpkg")!
         let installerOpen = destination("mpkg", .openFile)
         #expect(DownloadRulesStore.destination(in: [installerOpen], url: installer, filename: "tool.mpkg") == nil)
@@ -574,8 +559,7 @@ struct DownloadRuleTests {
         #expect(DownloadRulesStore.destination(in: [archiveOpen], url: archive, filename: "bundle.tar.gz") == nil)
     }
 
-    /// The list has one order: a file type before a catch-all handoff decides, and a refused Open is no match, so a
-    /// handoff behind it can still take the file.
+    /// One list order: a file type before a catch-all wins, and a refused Open doesn't match, so a later handoff can take it.
     @Test func aTypeRuleBeforeACatchAllHandoffWins() {
         var type = destination("pdf", .saveToFolder, folder: "/tmp")
         type.name = "Type"
@@ -593,13 +577,13 @@ struct DownloadRuleTests {
                                                      url: URL(string: "https://example.com/x.dmg")!, filename: "x.dmg",
                                                      appliesToLinks: false)?.name == "Catch-all")
 
-        // A Save destination still stands in a private window even with its switch off: only Open and handoffs need it.
+        // A Save destination applies in private windows even with the switch off; only Open and handoffs need it.
         var privateCatchAll = catchAll
         privateCatchAll.runsInPrivateWindows = true
         #expect(DownloadRulesStore.firstHandoffMatch(in: [type, privateCatchAll], url: url, filename: "file.pdf",
                                                      appliesToLinks: false, isPrivate: true) == nil)
 
-        // A hand-edited links-and-downloads destination is not a download destination, so it cannot block a handoff.
+        // A hand-edited link destination isn't a download destination and doesn't block a handoff.
         var linkDestination = destination("pdf", .saveToFolder, folder: "/tmp")
         linkDestination.applies = .linksAndDownloads
         linkDestination.name = "Link destination"
@@ -607,8 +591,7 @@ struct DownloadRuleTests {
                                                      appliesToLinks: false)?.name == "Catch-all")
     }
 
-    /// The last word on Open: an app, a script, an installer, an archive or a file with no type is saved, while a PDF
-    /// may open.
+    /// Open saves apps, scripts, installers, archives and untyped files instead; a PDF may open.
     @Test func aNewFileTypeGoesBeforeTheHandoffRules() {
         var aria2 = rule(.any)
         aria2.name = "aria2"
@@ -621,7 +604,7 @@ struct DownloadRuleTests {
         #expect(DownloadRulesStore.placeForNewFileType(in: [pdf, aria2]) == 1)
         #expect(DownloadRulesStore.placeForNewFileType(in: [pdf, epub]) == 2)
 
-        // Added that way, a type behind a downloader preset's catch-all still decides its own files.
+        // A type added behind a downloader preset's catch-all still handles its files.
         var rules = [aria2]
         rules.insert(pdf, at: DownloadRulesStore.placeForNewFileType(in: rules))
         #expect(DownloadRulesStore.firstHandoffMatch(in: rules, url: URL(string: "https://example.com/a.pdf")!,
@@ -638,8 +621,7 @@ struct DownloadRuleTests {
         #expect(DownloadManager.place(for: .open, folder: "", filename: "zz-\(unique)")?.openWhenFinished == false)
     }
 
-    /// A file type is named by its extensions, so it needs no name of its own — where an address rule has nothing to
-    /// read without one — and only the destination that saves the file needs a folder to save it into.
+    /// File types need extensions but no name; only save destinations need a folder.
     @Test func aFileTypeNeedsItsExtensionsAndOnlyAFolderToSaveInto() {
         var save = destination("", .saveToFolder, folder: "")
         #expect(save.pattern.isEmpty)
@@ -649,7 +631,7 @@ struct DownloadRuleTests {
         save.action.folderPath = "/Users/me/Downloads/PDFs"
         #expect(save.action.isComplete)
 
-        // Opening the file needs nothing more than the type.
+        // Opening needs only the type.
         var show = destination("pdf", .openFile)
         show.name = ""
         #expect(show.action.isComplete)
@@ -668,8 +650,7 @@ struct DownloadRuleTests {
 
     // MARK: Where an Open URL rule opens
 
-    /// Which addresses are Zigzag's own to open, and which belong to the app that handles them. Only the web's own
-    /// are Zigzag's: what you build a rule for to reach mpv or IINA must still reach mpv or IINA.
+    /// Only web URLs open in Zigzag; others go to their app (mpv, IINA).
     @Test func aWebAddressIsZigzagsAndAnythingElseItsAppsOwn() {
         #expect(OpenInZigzag.handles(URL(string: "https://example.com/a?b=c")!))
         #expect(OpenInZigzag.handles(URL(string: "http://example.com/a")!))
@@ -681,8 +662,7 @@ struct DownloadRuleTests {
         #expect(!OpenInZigzag.handles(URL(string: "file:///Users/me/a.pdf")!))
     }
 
-    /// A new rule asks where to open; a rule from before the choice existed keeps opening in the Mac's default
-    /// browser, which is what every Open URL rule did before Zigzag had places of its own.
+    /// New rules ask where to open; rules saved before the choice existed keep using the default browser.
     @Test func aRuleRemembersWhereItsWebAddressOpens() throws {
         var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -701,8 +681,7 @@ struct DownloadRuleTests {
         #expect(again == [rule])
         #expect(again.first?.action.openIn == .mini)
 
-        // An older file has no openIn at all: those rules went to the default browser, and still do.
-        // Taken out of the object itself: JSONEncoder's key order isn't fixed, so the text may not have a comma before it.
+        // Older files have no openIn and keep the default browser. Removed from the object since JSONEncoder key order isn't fixed.
         var objects = try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
         var action = try #require(objects[0]["action"] as? [String: Any])
         #expect(action.removeValue(forKey: "openIn") != nil)
@@ -716,14 +695,13 @@ struct DownloadRuleTests {
         #expect(OpenInZigzag.Place.allCases.map(\.rawValue) == ["thisTab", "newTab", "mini"])
         #expect(OpenInZigzag.Place(rawValue: "thisTab") == .thisTab)
         #expect(OpenInZigzag.Place(rawValue: "mini") == .mini)
-        // The pop-up question's "deny", and the viewer it keeps under that name, are not places to open in, so an
-        // answer of those leaves the rule asking rather than taking a value it doesn't know.
+        // "deny" and its viewer aren't places, so the rule keeps asking.
         #expect(OpenInZigzag.Place(rawValue: "deny") == nil)
         #expect(OpenInZigzag.Place(rawValue: "viewer") == nil)
         #expect(OpenInZigzag.Place(rawValue: "") == nil)
         #expect(OpenInZigzag.Place.allCases.allSatisfy { !$0.title.isEmpty })
 
-        // A rule's own choice adds Ask and the Mac's default browser, but the question only offers destinations.
+        // Rules add Ask and the default browser; the question offers destinations only.
         #expect(OpenInZigzag.Choice.allCases.map(\.rawValue) == ["ask", "defaultBrowser", "thisTab", "newTab", "mini"])
         #expect(OpenInZigzag.Choice.destinations.map(\.rawValue) == ["defaultBrowser", "thisTab", "newTab", "mini"])
         #expect(OpenInZigzag.Choice.ask.place == nil)
@@ -732,8 +710,7 @@ struct DownloadRuleTests {
         #expect(OpenInZigzag.Choice.allCases.allSatisfy { !$0.title.isEmpty })
     }
 
-    /// An Open URL rule that opens the web's own address still needs nothing but that address: where it opens has an
-    /// answer from the moment the rule exists (Zigzag asks), so it can never hold Add back.
+    /// Where an Open URL opens always has an answer (ask), so it never blocks Add.
     @Test func whereAWebAddressOpensNeverHoldsTheRuleBack() {
         var action = DownloadRuleAction(kind: .openURL)
         #expect(!action.isComplete)
@@ -741,7 +718,7 @@ struct DownloadRuleTests {
         #expect(action.isComplete)
         #expect(DownloadRuleSheet.actionHoldUp(action) == nil)
         #expect(action.openIn == .ask)
-        // Nothing to answer about where it opens, so the only thing a rule could be held up by is what it catches.
+        // Only the match can block it.
         var mine = DownloadRule(name: "Mirror", match: .any, action: action)
         #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
         mine.action.openIn = .newTab
@@ -750,28 +727,21 @@ struct DownloadRuleTests {
 
     // MARK: The place the hand-off card asks for
 
-    /// The hand-off card asks where its web address opens only when the rule hasn't been told, and it is answered in a
-    /// hurry: the dropdown's first entry is the answer a press of Hand Off sends without the dropdown being touched.
-    /// That entry is This Tab, which keeps the link inside Zigzag; the Mac's browser is still offered. The separate
-    /// "Where should this open" question and the rule sheet keep their order — the browser first — because they are
-    /// about a rule, not about this one hand-off.
+    /// The hand-off card asks only when the rule hasn't decided; its dropdown starts on This Tab, which a quick press sends. The question and rule sheet keep the browser first.
     @Test func theHandOffCardStartsWithThisTabInZigzag() {
         #expect(DownloadHandoff.cardPlaces.map(\.rawValue) == ["thisTab", "defaultBrowser", "newTab", "mini"])
         #expect(DownloadHandoff.cardPlaces.first == .thisTab)
-        // The first entry is what the card's dropdown starts on: `DropdownButton` selects index 0 until it is touched,
-        // and the card reads the selected entry when Hand Off is pressed.
+        // `DropdownButton` selects index 0 until touched, and the card reads it on Hand Off.
         let dropdown = DropdownButton()
         dropdown.options = DownloadHandoff.cardPlaces.map { DropdownButton.Option(title: $0.title) }
         #expect(dropdown.selectedIndex == 0)
         #expect(dropdown.options.first?.title == OpenInZigzag.Choice.thisTab.title)
-        // The question the rule itself asks, and the sheet, are unchanged: the browser is the first destination
-        // offered, and Ask is still the sheet's first choice.
+        // The rule's question and sheet are unchanged: browser first, Ask first in the sheet.
         #expect(OpenInZigzag.Choice.destinations.map(\.rawValue) == ["defaultBrowser", "thisTab", "newTab", "mini"])
         #expect(OpenInZigzag.Choice.allCases.map(\.rawValue) == ["ask", "defaultBrowser", "thisTab", "newTab", "mini"])
     }
 
-    /// A place picked in the hand-off card opens that hand-off and nothing else: the rule is left exactly as it was,
-    /// so a rule that hadn't been told (`.ask`) is still asking next time.
+    /// A place picked in the card applies to that hand-off only; the rule stays `.ask`.
     @Test func aCardsPlaceOpensOneHandOffAndNeverBecomesTheRules() {
         var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -783,7 +753,7 @@ struct DownloadRuleTests {
         #expect(DownloadHandoff.ruleToKeep(rule, choice: .thisTab, always: false) == nil, "nothing is written on the rule")
         #expect(rule.action.openIn == .ask, "and the rule is still asking")
 
-        // Told in its sheet, the rule opens there without a card, and a card's place still overrides this one only.
+        // A rule told in its sheet opens there without a card; a card choice still overrides once.
         var told = rule
         told.action.openIn = .mini
         #expect(DownloadHandoff.opening(told, at: nil) == .mini)
@@ -791,8 +761,7 @@ struct DownloadRuleTests {
         #expect(told.action.openIn == .mini)
     }
 
-    /// The separate question's two answers: Always keeps the place on the rule, Once opens it there and leaves the rule
-    /// asking. The answer is a rule to save, never a rule changed in place — the caller writes it.
+    /// Always saves the place on the rule; Once opens and leaves the rule asking. Returns a rule for the caller to save.
     @Test func onlyAlwaysKeepsThePlaceOnTheRule() {
         var rule = DownloadRule(name: "Mirror", applies: .linksAndDownloads, match: .contains, pattern: "example.com",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -806,14 +775,13 @@ struct DownloadRuleTests {
         #expect(rule.action.openIn == .ask, "the rule the question asked about is not changed in place")
     }
 
-    /// Everything holding a rule's Add button back, in the order the form is filled in: the button's own words and the
-    /// fields it marks come from this one list, so the two can never disagree.
+    /// One list drives both the Add button's text and the marked fields, in form order.
     @Test func aRuleSaysEverythingHoldingAddBack() {
         var mine = rule(.contains, "")
         mine.name = ""
         #expect(DownloadRuleSheet.heldUp(mine, all: true).map(\.field) == [.name, .pattern, .action(.url)])
 
-        // While you type, only what you have already filled in wrong is said: a pattern you haven't reached isn't.
+        // While typing, only fields already filled in wrong are reported.
         mine.name = "Torrents"
         #expect(DownloadRuleSheet.heldUp(mine, all: false).map(\.field) == [.action(.url)])
         #expect(DownloadRuleSheet.heldUp(mine, all: true).map(\.field) == [.pattern, .action(.url)])
@@ -822,12 +790,12 @@ struct DownloadRuleTests {
         mine.action.urlTemplate = "mpd://{link}"
         #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
 
-        // A broken expression is worth saying whether or not you are hovering.
+        // A broken regex is reported regardless of hover.
         mine.match = .regex
         mine.pattern = "(["
         #expect(DownloadRuleSheet.heldUp(mine, all: false).map(\.field) == [.pattern])
 
-        // An `any` rule needs no pattern at all.
+        // `any` needs no pattern.
         mine.match = .any
         mine.pattern = ""
         #expect(DownloadRuleSheet.heldUp(mine, all: true).isEmpty)
@@ -861,7 +829,7 @@ struct DownloadRuleTests {
         for preset in [DownloadPreset.aria2, .motrix, .rTorrent, .ytdlp] {
             #expect(preset.rule.applies == .downloads)
         }
-        // A player is for the links you click, and for files that turn out to be media.
+        // Players handle clicked links and media files.
         for preset in [DownloadPreset.mpv, .iina] {
             #expect(preset.rule.applies == .linksAndDownloads)
         }
@@ -880,11 +848,11 @@ struct DownloadRuleTests {
         let elsewhere = DownloadHandoff.Request(url: URL(string: "https://other.example/file.zip")!, pageOrigin: page)
         #expect(DownloadHandoff.maySendCookies(own))
         #expect(!DownloadHandoff.maySendCookies(elsewhere))
-        // A link you clicked may carry the page's sign-in to where it points.
+        // A clicked link may carry the page's cookies.
         var clicked = elsewhere
         clicked.wasClicked = true
         #expect(DownloadHandoff.maySendCookies(clicked))
-        // With no page to name, there is nothing to send.
+        // No page, no cookies.
         #expect(!DownloadHandoff.maySendCookies(DownloadHandoff.Request(url: own.url)))
     }
 
@@ -907,8 +875,7 @@ struct DownloadRuleTests {
         #expect(answers.isEmpty)
     }
 
-    /// A page that already answered keeps that answer even where no question could be shown: the answer is the
-    /// page's, and the tab it was given in may be in the background (or here, in no window at all).
+    /// A kept answer holds even where no question can show, e.g. a background tab or no window.
     @Test func aKeptAnswerHoldsWhereNoQuestionCouldShow() async {
         let rule = DownloadRule(name: "aria2", applies: .downloads, match: .contains, pattern: "example.com",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -925,8 +892,7 @@ struct DownloadRuleTests {
         #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .browser)
     }
 
-    /// A page with no site of its own (a file, a data URL) is asked every time: an answer kept against the target's
-    /// site must not be borrowed for it.
+    /// Pages without a site (file, data URL) are asked every time and never borrow a kept answer.
     @Test func aPageWithNoSiteBorrowsNoAnswer() async {
         let rule = DownloadRule(name: "aria2", applies: .downloads, match: .contains, pattern: "example.com",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -937,7 +903,7 @@ struct DownloadRuleTests {
         #expect(await DownloadHandoff.decide(rule, request: request, tab: tab, forDownload: true).gate == .browser)
     }
 
-    /// A pop-up may not ask (its window can sit behind the browser's), but a page's kept answer still holds there.
+    /// Popups don't ask, but kept answers still apply.
     @Test func aPopupAsksNothingButReadsAKeptAnswer() async {
         let rule = DownloadRule(name: "aria2", applies: .downloads, match: .contains, pattern: "example.com",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -953,21 +919,20 @@ struct DownloadRuleTests {
 
     // MARK: The App field's menu
 
-    /// The App field lists what's in the Applications folders, **one level deep**: bundles only, each once, in the
-    /// order a person expects. Anything else stays one Choose an App… away.
+    /// The App field lists Applications one level deep: bundles only, deduplicated, sorted.
     @Test func theAppMenuListsApplicationsOneLevelDeep() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("apps-\(UUID().uuidString)")
         let mac = root.appendingPathComponent("Mac"), mine = root.appendingPathComponent("Mine")
         try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: mine.appendingPathComponent("Alpha.app"), withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        // Not a bundle: never offered.
+        // Not a bundle.
         try Data().write(to: mine.appendingPathComponent("notes.txt"))
-        // A bundle inside a bundle: this reads one level, never into Contents.
+        // Nested bundles aren't scanned.
         try FileManager.default.createDirectory(at: mac.appendingPathComponent("Zeta.app/Contents/PlugIns/Inner.app"),
                                                 withIntermediateDirectories: true)
 
-        // The same folder twice is still one entry, and the order is the names'.
+        // Duplicate folders give one entry; sorted by name.
         let named = Applications.named(in: [mac.path, mine.path, mine.path])
         #expect(named.map(\.name) == ["Alpha", "Zeta"])
         #expect(named.first?.path == mine.appendingPathComponent("Alpha.app").path)
@@ -975,9 +940,7 @@ struct DownloadRuleTests {
 
     // MARK: A rule that can't be saved yet
 
-    /// The field a rule's action still needs something in, which its sheet marks so a greyed Add button says which
-    /// one is holding it up. The plainest case is an address with no scheme: `bing.com` parses, but nothing could
-    /// open it, so the rule isn't complete and the address field is the one to fill.
+    /// An action that can't run names the field to fix, e.g. `bing.com` without a scheme marks the address field.
     @Test func anActionThatCannotRunNamesTheFieldHoldingItUp() {
         var open = DownloadRuleAction(kind: .openURL)
         #expect(DownloadRuleSheet.actionHoldUp(open)?.field == .url)
@@ -1006,11 +969,24 @@ struct DownloadRuleTests {
         #expect(DownloadRuleSheet.actionHoldUp(rpc) == nil)
     }
 
+    /// A service's place leads and its method follows in brackets (#367), without a dot between them.
+    @MainActor @Test func aServiceReadsAsItsPlaceThenItsMethod() {
+        var send = DownloadRuleAction(kind: .jsonRPC)
+        send.rpcEndpoint = "http://127.0.0.1:5000/RPC2"
+        send.rpcMethod = "load.start"
+        #expect(send.summary == "127.0.0.1 (load.start)")
+        let rule = DownloadRule(name: "Send to rTorrent", applies: .downloads, match: .endsWith, pattern: ".torrent", action: send)
+        #expect(rule.summarySentence == "Files ending in .torrent go to 127.0.0.1 (load.start)")
+        send.rpcEndpoint = ""
+        #expect(send.summary == "load.start")
+        let kept = SettingsView.handoffAnswerRow(ruleNamed: "YouTube", answer: "Hand Off", sites: "youtube.com")
+        #expect(kept.detail == "youtube.com: Hand Off")
+        #expect(!send.summary.contains("·") && !rule.summarySentence.contains("·") && !kept.detail.contains("·"))
+    }
+
     // MARK: What an automation says for itself
 
-    /// Only the handoffs that would otherwise be **silent** are announced — an app, a service, the Mac's own browser,
-    /// and an address of some other app's — and a rule says its line once, so the tab it opened isn't covered by a
-    /// line saying it opened it.
+    /// Only otherwise invisible handoffs are announced (app, service, default browser, another app's URL), once per rule.
     @Test func onlyTheHandoffsYouCantSeeAreAnnounced() {
         func action(_ kind: DownloadRuleAction.Kind) -> DownloadRuleAction { DownloadRuleAction(kind: kind) }
 
@@ -1024,42 +1000,39 @@ struct DownloadRuleTests {
         var web = action(.openURL)
         web.urlTemplate = "{link}"
 
-        // An app and a service leave Zigzag with nothing on screen saying so: a line each.
+        // An app or service handoff gets a line.
         #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: app), elsewhere: .app("mpv")) == "Videos: handed this link to mpv")
-        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: service), elsewhere: .service("aria2.addUri · 127.0.0.1")) == "Videos: sent this link to aria2.addUri · 127.0.0.1")
-        // A rule that was never named says what happened without inventing a name for it.
+        #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: service), elsewhere: .service("127.0.0.1 (aria2.addUri)")) == "Videos: sent this link to 127.0.0.1 (aria2.addUri)")
+        // An unnamed rule gets a generic line.
         #expect(HandoffNotice.line(for: DownloadRule(name: "", action: app), elsewhere: .app("mpv")) == "handed this link to mpv")
-        // Nothing that shows itself: a script's card, a tab, Mini, a question, a download's file.
+        // Visible results get none: script card, tab, Mini, question, download.
         #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: script), elsewhere: nil) == nil)
         #expect(HandoffNotice.line(for: DownloadRule(name: "Videos", action: web), elsewhere: nil) == nil)
-        // And nothing without a rule to name.
+        // No rule, no line.
         #expect(HandoffNotice.line(for: nil, elsewhere: .app("mpv")) == nil)
     }
 
-    /// A rule says its line once a session: the first handoff announces, and the ones after it don't, so a rule that
-    /// fires all afternoon doesn't bury the page in notices.
+    /// One announcement per rule per session.
     @Test func aRuleSaysItsLineOnceASession() {
         HandoffNotice.forgetSaid()
         defer { HandoffNotice.forgetSaid() }
         let rule = DownloadRule(name: "Videos", match: .any, action: DownloadRuleAction(kind: .openApp))
         #expect(HandoffNotice.takeLine(for: rule, elsewhere: .app("mpv")) == "Videos: handed this link to mpv")
         #expect(HandoffNotice.takeLine(for: rule, elsewhere: .app("mpv")) == nil)
-        // A different rule has its own line.
+        // Another rule gets its own.
         let other = DownloadRule(name: "Music", match: .any, action: DownloadRuleAction(kind: .openApp))
         #expect(HandoffNotice.takeLine(for: other, elsewhere: .app("mpv")) == "Music: handed this link to mpv")
-        // One that has nothing to say doesn't use up its turn: it says so if it ever hands off for real.
+        // A rule with nothing to say doesn't use up its announcement.
         let quiet = DownloadRule(name: "Quiet", match: .any, action: DownloadRuleAction(kind: .runScript))
         #expect(HandoffNotice.takeLine(for: quiet, elsewhere: nil) == nil)
         #expect(HandoffNotice.takeLine(for: quiet, elsewhere: .app("mpv")) == "Quiet: handed this link to mpv")
     }
 
-    /// Where an Open URL will open is decided in **one** place, so what a notice says and what the action does can
-    /// never drift apart: the card's answer for this handoff, else the rule's own.
+    /// The card's answer, else the rule's, decided in one place so notice and action agree.
     @Test func aWebAddressOpensWhereTheRuleSaysItDoes() {
         var web = DownloadRuleAction(kind: .openURL)
         let rule = DownloadRule(name: "Videos", match: .any, action: web)
 
-        // The rule's own answer, until the card answers for this hand-off alone.
         for choice in OpenInZigzag.Choice.allCases {
             web.openIn = choice
             let told = DownloadRule(name: "Videos", match: .any, action: web)
@@ -1067,7 +1040,7 @@ struct DownloadRuleTests {
             #expect(DownloadHandoff.opening(told, at: .mini) == .mini)
         }
 
-        // Ask is a place only the question can answer: nothing to open until it does.
+        // Ask opens nothing until answered.
         web.openIn = .ask
         #expect(DownloadHandoff.opening(rule, at: nil) == .ask)
         #expect(DownloadHandoff.opening(rule, at: nil).place == nil)
@@ -1075,10 +1048,7 @@ struct DownloadRuleTests {
     }
 
     // MARK: The order the rules are in
-    /// A drag in the rules list names the row it was dropped on, not a position, because that list shows only the
-    /// handoffs: its numbering leaves the file types out, so a place in it isn't a place in the store. The rule lands
-    /// just before the one it was dropped on, and everything else stays where it was — a file type between the two,
-    /// included.
+    /// Drops name the target row, not an index, since the list hides file types; the rule moves just before the target.
     @Test func aRuleMovesToSitBeforeTheOneItWasDroppedOn() {
         let a = rule(.any)
         let b = rule(.any)
@@ -1090,16 +1060,16 @@ struct DownloadRuleTests {
             order(DownloadRulesStore.moved(rules, id: id, before: before))
         }
 
-        // Down the list, up the list, and to the end.
+        // Down, up, and to the end.
         #expect(moved([a, b, c], c.id, before: a.id) == order([c, a, b]))
         #expect(moved([a, b, c], a.id, before: c.id) == order([b, a, c]))
         #expect(moved([a, b, c], a.id, before: nil) == order([b, c, a]))
-        // Dropped where it already is, nothing moves: it is already just before that rule.
+        // Dropped in place: no change.
         #expect(moved([a, b, c], a.id, before: b.id) == order([a, b, c]))
         #expect(moved([a, b, c], b.id, before: c.id) == order([a, b, c]))
-        // A file type sitting between them stays where it is: the handoff is placed before its neighbor, not last.
+        // A file type between them stays put.
         #expect(moved([a, type, b], b.id, before: a.id) == order([b, a, type]))
-        // A rule that isn't in the list it was dropped into leaves the order alone.
+        // An unknown rule leaves the order alone.
         #expect(moved([a, b], c.id, before: a.id) == order([a, b]))
         #expect(moved([], a.id, before: nil) == [])
     }
@@ -1113,8 +1083,7 @@ extension DownloadRuleTests {
         #expect(DownloadHandoff.gate(stored: nil) == .browser)
     }
 
-    /// A handoff answered "Always on this site" is kept for the site and read back without asking again, in any page
-    /// of that site. The rule's own answer travels with the rule, so a private window still reads it.
+    /// "Always on this site" is kept per site and applies to every page there; the rule's own answer travels with it, even into private windows.
     @MainActor @Test func aSitesHandoffAnswerStandsForEveryPageOfIt() async throws {
         let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -1138,16 +1107,14 @@ extension DownloadRuleTests {
                 "a private window is not the site the answer was given to")
     }
 
-    /// The third scope: a rule answered for itself stands for every site. A private window still refuses a rule that
-    /// was not let in there, and once it is, reads the rule's own answer, which belongs to the rule rather than to the
-    /// site the session is on.
+    /// A rule-level answer applies to every site; private windows still need the rule allowed there.
     @MainActor @Test func aRulesOwnAnswerStandsForEverySite() async {
         var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
                                 action: DownloadRuleAction(kind: .openURL))
         let request = DownloadHandoff.Request(url: URL(string: "https://cdn.example/file.zip")!,
                                               referrer: URL(string: "https://site.example/page")!,
                                               pageOrigin: "https://site.example")
-        // Never told: with no window to ask in, the rule simply doesn't run.
+        // Never answered and no window to ask: the rule doesn't run.
         #expect(await DownloadHandoff.decide(rule, request: request).gate == .browser)
 
         rule.handoffAnswer = "handOff"
@@ -1165,8 +1132,7 @@ extension DownloadRuleTests {
         #expect(await DownloadHandoff.decide(rule, request: privateRequest).gate == .handOff)
     }
 
-    /// The site's answer is the more specific one, so it outranks the rule's own; the rule's is still saved with the
-    /// rule, so it travels with it.
+    /// The site answer outranks the rule's; the rule's is still saved with it.
     @MainActor @Test func aSitesAnswerOutranksTheRulesOwn() async throws {
         let suite = "zigzag-download-rules-test-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -1186,7 +1152,7 @@ extension DownloadRuleTests {
         #expect(await DownloadHandoff.decide(rule, request: request).gate == .cancel)
     }
 
-    /// The rule's own answer is saved with the rule, so it travels with it; a rule with none reads as none.
+    /// The rule's answer survives JSON; no answer decodes as none.
     @Test func aRulesOwnAnswerSurvivesItsJSON() throws {
         var rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "zip",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -1196,7 +1162,7 @@ extension DownloadRuleTests {
         #expect(read.handoffAnswer == "handOff")
     }
 
-    /// The third duration choice names the rule, and says "this rule" where the rule has no name rather than "".
+    /// The third duration choice names the rule, or "this rule" when unnamed.
     @Test func theThirdDurationChoiceNamesTheRule() {
         let named = DownloadRule(name: "YouTube", applies: .downloads, match: .contains, pattern: "youtube",
                                  action: DownloadRuleAction(kind: .openURL))
@@ -1224,8 +1190,7 @@ extension DownloadRuleTests {
 }
 
 extension DownloadRuleTests {
-    /// A handoff answered "Open in Browser" this time holds for the page, so the download the same page starts is not
-    /// asked the same question again.
+    /// "Open in Browser" this time holds for the page, so its download isn't asked again.
     @MainActor @Test func aHandoffAnsweredThisTimeIsNotAskedAgain() async {
         let rule = DownloadRule(name: "Files", applies: .downloads, match: .contains, pattern: "file.zip",
                                 action: DownloadRuleAction(kind: .openURL))
@@ -1239,8 +1204,7 @@ extension DownloadRuleTests {
     }
 }
 
-/// What saving a rule does to the answers it kept: a different script or URL is a different rule's behaviour, while
-/// its name or another field leaves the answers where they are.
+/// Changing a rule's script or URL clears its answers; renaming or other fields don't.
 extension DownloadRuleTests {
     private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
         let suite = "DownloadRuleKeptAnswerTests-\(UUID().uuidString)"
@@ -1254,7 +1218,7 @@ extension DownloadRuleTests {
         try body(defaults)
     }
 
-    /// A rules file of its own, so a test never reads or writes the Mac's own list.
+    /// A temp rules file, never the real one.
     private func rulesFile() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-download-rules-\(UUID().uuidString).json")
     }
@@ -1283,7 +1247,7 @@ extension DownloadRuleTests {
 
             #expect(store.rules.first { $0.id == rule.id }?.handoffAnswer == nil)
             #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(rule.id)).isEmpty)
-            // Another rule's answers, and this rule's own row, are not touched.
+            // Other rules' answers and this rule's row are untouched.
             #expect(store.rules.first { $0.id == other.id }?.handoffAnswer == "browser")
             #expect(SitePermissions.decisions(prefix: PermissionSubject.handoff(other.id)).count == 1)
         }
@@ -1324,8 +1288,7 @@ extension DownloadRuleTests {
 
             var edited = rule
             edited.name = "Renamed"
-            // A field of the action that isn't the script or the URL — `openIn`'s place in a later build — is not a
-            // change of what runs.
+            // Other action fields (like a later `openIn`) don't count as changing what runs.
             edited.action.arguments = ["--unrelated"]
             store.update(edited)
 

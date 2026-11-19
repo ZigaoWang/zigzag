@@ -10,8 +10,7 @@ struct PermissionPromptTests {
         #expect(ordered.last?.isProminent == true)
     }
 
-    /// One question at a time in a window: the card that is up says how many wait their turn behind it, and says
-    /// nothing when none do — an empty line would be a label with no work.
+    /// One question at a time per window; the card shows how many wait, and nothing when none do.
     @Test func aCardSaysHowManyWaitBehindIt() {
         #expect(PermissionPrompt.waitingBehind(questionsWaiting: 0) == nil)
         #expect(PermissionPrompt.waitingBehind(questionsWaiting: 1) == nil)
@@ -47,10 +46,9 @@ struct PermissionPromptTests {
         #expect(answer?.remember == false)
     }
 
-    /// Two tabs of one site, a page's two frames, a private window and the window itself each ask for themselves: only
-    /// the same tab, frame and privacy's repeated question shares one card.
+    /// Different tabs, frames, privacy or windows each ask separately; only the same tab, frame and privacy share a card.
     @Test func twoAskersShareOnlyTheSameQuestion() {
-        // Held, not temporaries: a freed object's address can be reused by the next one.
+        // Kept alive: a freed object's address could be reused.
         let firstWindow = NSObject(), secondWindow = NSObject()
         let window = ObjectIdentifier(firstWindow), otherWindow = ObjectIdentifier(secondWindow)
         let tab = UUID(), otherTab = UUID()
@@ -82,8 +80,93 @@ struct PermissionPromptTests {
         #expect(dropdown.toolTip == "Private windows don’t remember answers.")
     }
 
-    /// The card is light or dark as the page under it, not as the window: a light space's window puts a dark card
-    /// on a dark page (#300). With no page color yet, the look the page is drawn in; with neither, the window's.
+    /// Cancel leads, Open last and filled.
+    @Test func theAppQuestionPutsCancelFirstAndOpenLast() {
+        let (question, actions) = ExternalLinks.question(app: "Lantern", site: "example.com")
+        let ordered = PermissionPrompt.actions(for: actions)
+        #expect(ordered.map(\.id) == ["cancel", "allow"])
+        #expect(ordered.last?.isProminent == true)
+        #expect(ordered.first?.isCancel == true)
+        #expect(question.title == "Open Lantern")
+        #expect(question.detail == "example.com wants to open the Lantern app.")
+        #expect(question.rememberTitle == "Always allow example.com to open Lantern")
+    }
+
+    /// Open unchecked is this time, checked is Always; Cancel answers nothing.
+    @Test func openMapsToOnceOrAlwaysAndCancelToNothing() {
+        let (_, actions) = ExternalLinks.question(app: "Lantern", site: "example.com")
+        let open = actions[1]
+        let once = PermissionPrompt.answer(for: open, rememberChecked: false, canRemember: true)
+        #expect(once?.action == "allow")
+        #expect(once?.remember == false)
+        let always = PermissionPrompt.answer(for: open, rememberChecked: true, canRemember: true)
+        #expect(always?.action == "allow")
+        #expect(always?.remember == true)
+        #expect(PermissionPrompt.answer(for: .cancel, rememberChecked: true, canRemember: true) == nil)
+    }
+
+    /// Where nothing can be kept (private, http, a foreign frame) a checked box still means this time.
+    @Test func nothingIsKeptWhereTheSiteCantRemember() {
+        let answer = PermissionPrompt.answer(for: .allow, rememberChecked: true, canRemember: false)
+        #expect(answer?.remember == false)
+    }
+
+    /// Other questions keep Remember for either answer, Don't Allow included.
+    @Test func rememberStillKeepsADenyOnOtherQuestions() {
+        let answer = PermissionPrompt.answer(for: .deny, rememberChecked: true, canRemember: true)
+        #expect(answer?.action == "deny")
+        #expect(answer?.remember == true)
+    }
+
+    /// An Always answer is saved under the app's own scheme.
+    @Test func alwaysIsKeptForTheOneApp() {
+        let always = PermissionAnswer(action: "allow", remember: true)
+        #expect(ExternalLinks.storageSubject(for: always, scheme: "x-lantern") == PermissionSubject.app("x-lantern"))
+    }
+
+    /// Esc always cancels; Return and Tab are the card's only once it has the keyboard.
+    @Test func keysAnswerOnlyWhenTheCardHasTheKeyboard() {
+        #expect(PermissionPrompt.keyAction(keyCode: 53, modified: false, focused: false) == .cancel)
+        #expect(PermissionPrompt.keyAction(keyCode: 53, modified: false, focused: true) == .cancel)
+        #expect(PermissionPrompt.keyAction(keyCode: 36, modified: false, focused: false) == .pass)
+        #expect(PermissionPrompt.keyAction(keyCode: 36, modified: false, focused: true) == .primary)
+        #expect(PermissionPrompt.keyAction(keyCode: 76, modified: false, focused: true) == .primary)
+        #expect(PermissionPrompt.keyAction(keyCode: 36, modified: true, focused: true) == .pass)
+        #expect(PermissionPrompt.keyAction(keyCode: 48, modified: false, focused: true) == .next(back: false))
+        #expect(PermissionPrompt.keyAction(keyCode: 48, modified: false, focused: true, shift: true) == .next(back: true))
+        #expect(PermissionPrompt.keyAction(keyCode: 48, modified: false, focused: false) == .pass)
+        #expect(PermissionPrompt.keyAction(keyCode: 0, modified: false, focused: true) == .pass)
+    }
+
+    /// One width when it fits, their own widths next, else one per row.
+    @Test func answersNeverClip() {
+        #expect(PermissionPrompt.answerLayout(widths: [80, 150], available: 400, gap: 8) == .shared)
+        #expect(PermissionPrompt.answerLayout(widths: [80, 150], available: 308, gap: 8) == .shared)
+        #expect(PermissionPrompt.answerLayout(widths: [80, 150], available: 300, gap: 8) == .own)
+        #expect(PermissionPrompt.answerLayout(widths: [80, 150], available: 238, gap: 8) == .own)
+        #expect(PermissionPrompt.answerLayout(widths: [80, 150], available: 237, gap: 8) == .stacked)
+        #expect(PermissionPrompt.answerLayout(widths: [80], menu: 120, available: 208, gap: 8) == .shared)
+        #expect(PermissionPrompt.answerLayout(widths: [80], menu: 120, available: 207, gap: 8) == .stacked)
+        #expect(PermissionPrompt.answerLayout(widths: [300], available: 200, gap: 8) == .shared)
+    }
+
+    /// A checkbox: off by default, a click turns it on and says so.
+    @Test func theCheckboxToggles() {
+        let box = Checkbox(title: "Always allow example.com to open Lantern")
+        var heard: Bool?
+        box.onChange = { heard = $0 }
+        #expect(box.isOn == false)
+        #expect(box.accessibilityRole() == .checkBox)
+        #expect(box.accessibilityLabel() == "Always allow example.com to open Lantern")
+        #expect(box.accessibilityPerformPress())
+        #expect(box.isOn == true)
+        #expect(heard == true)
+        #expect(box.accessibilityValue() as? Int == 1)
+        // Wraps rather than clips when narrow.
+        #expect(box.height(for: 120) > box.height(for: 1000))
+    }
+
+    /// The card follows the page's appearance, not the window's (#300); without a page color, the page's drawn appearance, else the window's.
     @Test func theCardTakesItsPagesLook() {
         let black = NSColor(srgbRed: 0.1, green: 0.1, blue: 0.1, alpha: 1)
         #expect(PermissionPrompt.look(pageColor: black, pageLook: .aqua) == .darkAqua)

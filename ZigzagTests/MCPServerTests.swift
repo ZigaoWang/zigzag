@@ -342,7 +342,7 @@ struct MCPServerTests {
 // MARK: Connections that don't send the key
 
 extension MCPServerTests {
-    /// A plain TCP connection to the test server, read with a timeout.
+    /// A raw TCP connection to the test server, with a read timeout.
     nonisolated final class RawConnection {
         let socket: Int32
 
@@ -367,7 +367,7 @@ extension MCPServerTests {
             _ = Array(text.utf8).withUnsafeBytes { Darwin.send(socket, $0.baseAddress, $0.count, 0) }
         }
 
-        /// Everything until the server closes, or nil if it's still open when the timeout passes.
+        /// Everything until the server closes, or nil on timeout.
         func readToEnd() -> String? {
             var all = Data()
             var buffer = [UInt8](repeating: 0, count: 4096)
@@ -399,7 +399,7 @@ extension MCPServerTests {
         let wrongPath = try #require(RawConnection(port: port))
         wrongPath.send("POST /other HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Bearer \(Self.token)\r\nContent-Length: 0\r\n\r\n")
         #expect(try #require(wrongPath.readToEnd()).hasPrefix("HTTP/1.1 404"))
-        // With the key, the connection stays for the next request.
+        // With the key, the connection is kept alive.
         let kept = try #require(RawConnection(port: port))
         kept.send(Self.request(key: Self.token))
         #expect(kept.readToEnd() == nil)
@@ -415,7 +415,7 @@ extension MCPServerTests {
             idle.append(try #require(RawConnection(port: port)))
             try await Task.sleep(nanoseconds: 20_000_000)
         }
-        // One more pushes out the oldest that never sent the key, and an app with the key still gets in.
+        // One more evicts the oldest unkeyed connection; a keyed app still gets in.
         let app = try #require(RawConnection(port: port))
         try await Task.sleep(nanoseconds: 200_000_000)
         #expect(idle[0].readToEnd() == "")
@@ -425,15 +425,14 @@ extension MCPServerTests {
         #expect(count > 0 && String(decoding: buffer[0..<max(count, 0)], as: UTF8.self).hasPrefix("HTTP/1.1 200"))
     }
 
-    /// The first answer on a connection, without waiting for it to close.
+    /// The first response, without waiting for close.
     private static func firstAnswer(_ connection: RawConnection) -> String {
         var buffer = [UInt8](repeating: 0, count: 4096)
         let count = recv(connection.socket, &buffer, buffer.count, 0)
         return String(decoding: buffer[0..<max(count, 0)], as: UTF8.self)
     }
 
-    /// A 404 to a request with the key (a session that ended, a method Zigzag doesn't have) is an answer: the app's
-    /// connection stays for its next request.
+    /// A 404 to a keyed request (ended session, unknown method) keeps the connection alive.
     @Test func aNotFoundWithTheKeyKeepsTheConnection() async throws {
         let server = MCPServer(port: 0, endpoint: endpoint())
         server.start()
@@ -456,8 +455,7 @@ extension MCPServerTests {
         }
     }
 
-    /// An app whose tool call takes a while counts as keyed from the moment its key is accepted: connections that
-    /// never send the key can't push it out mid-call.
+    /// A keyed connection counts as keyed from acceptance, so unkeyed ones can't evict it mid-call.
     @Test func aLongToolCallIsNeverPushedOut() async throws {
         let server = MCPServer(port: 0, endpoint: MCPEndpoint(token: Self.token, runner: SlowRunner(), serverVersion: "1.0"))
         server.start()
@@ -502,10 +500,10 @@ extension MCPServerTests {
         let new = try #require(MCPKeyFile.token(at: file, creating: false))
         #expect(new != old)
         #expect(await endpoint.handle(post(Self.initialize)).status == 401)
-        // Still taken at the next launch: the new key was never handed out, so it stays.
+        // Still taken next launch: the new key was never handed out, so it stays.
         #expect(!MCPService.replaceKeyForBusyPort(endpoint, keyFile: file, defaults: defaults))
         #expect(MCPKeyFile.token(at: file, creating: false) == new)
-        // Once it's copied for an app, a taken port replaces it again.
+        // Once copied for an app, a taken port replaces it again.
         MCPService.noteKeyHandedOut(defaults: defaults)
         #expect(MCPService.replaceKeyForBusyPort(endpoint, keyFile: file, defaults: defaults))
         #expect(MCPKeyFile.token(at: file, creating: false) != new)

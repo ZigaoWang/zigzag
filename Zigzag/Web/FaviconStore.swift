@@ -25,8 +25,8 @@ final class FaviconStore {
     static func makeConfiguration() -> URLSessionConfiguration {
         let config = URLSessionConfiguration.default
         config.dropsCookies()
-        // Icons are kept by host in Zigzag's own store; the shared disk cache would also keep a list of the sites
-        // they came from, which Clear History never reaches.
+        // Icons are stored by host in Zigzag's own store; the shared disk cache would also keep a list of their
+        // sites, which Clear History doesn't reach.
         config.urlCache = nil
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.timeoutIntervalForRequest = 10

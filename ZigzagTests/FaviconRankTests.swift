@@ -88,7 +88,7 @@ struct FaviconSessionTests {
         #expect(configuration.httpCookieStorage == nil)
         #expect(!configuration.httpShouldSetCookies)
         #expect(configuration.httpCookieAcceptPolicy == .never)
-        // Nor kept in the shared disk cache, out of reach of Clear History.
+        // Not in the shared disk cache either, which Clear History can't reach.
         #expect(configuration.urlCache == nil)
     }
 
@@ -102,7 +102,7 @@ struct FaviconSessionTests {
         #expect(URLSessionConfiguration.ephemeral.httpCookieStorage != nil)
     }
 
-    /// Extension packages, the update feed, store logos and onboarding icons use the shared cookieless session.
+    /// Extension packages, the update feed, store logos and onboarding icons use the cookieless session.
     @Test func zigzagsOwnFetchesKeepNoCookies() {
         let configuration = URLSession.cookieless.configuration
         #expect(configuration.httpCookieStorage == nil)

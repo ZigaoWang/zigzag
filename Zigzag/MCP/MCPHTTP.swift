@@ -112,13 +112,12 @@ nonisolated struct HTTPRequestReader: Sendable {
         return value
     }
 
-    /// A request whose head has been read and whose body is still coming: kept so neither is read again each
-    /// time more bytes arrive.
+    /// A request with its head parsed and body pending, so neither is reparsed as bytes arrive.
     private struct Pending: Sendable {
         var method: String
         var path: String
         var headers: [String: String]
-        /// Where the body starts, counted from the front of the buffer.
+        /// Body start offset in the buffer.
         var bodyOffset: Int
         var chunks: Dechunker?
     }
@@ -156,7 +155,7 @@ nonisolated struct HTTPRequestReader: Sendable {
             } else {
                 length = 0
             }
-            // Refused before a byte of it is waited for.
+            // Refused before waiting for any of the body.
             guard length <= Self.maxBodyBytes else { return fail(413) }
             guard buffer.endIndex - bodyStart >= length else { return .incomplete }
             body = Data(buffer[bodyStart..<(bodyStart + length)])
@@ -167,13 +166,13 @@ nonisolated struct HTTPRequestReader: Sendable {
         return .request(HTTPRequest(method: request.method, path: request.path, headers: request.headers, body: body))
     }
 
-    /// A refusal ends the connection, so nothing more of this request is read.
+    /// A refusal closes the connection.
     private mutating func fail(_ status: Int) -> Outcome {
         pending = nil
         return .failure(status)
     }
 
-    /// The request line and headers, once they're all here; nil while they aren't.
+    /// Request line and headers once complete; nil until then.
     private func readHead() -> Result<Pending, HeadFailure>? {
         guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else { return nil }
         guard headerEnd.lowerBound - buffer.startIndex <= Self.maxHeaderBytes,
@@ -217,27 +216,27 @@ nonisolated struct HTTPRequestReader: Sendable {
     /// The most trailer lines a chunked body may end with.
     static let maxTrailerCount = maxHeaderCount
 
-    /// Reads a chunked body as it comes, picking up where the last bytes left off: each byte is looked at about
-    /// once, however finely the body is cut into chunks or packets.
+    /// Incremental chunked-body reader: resumes where it stopped, so each byte is scanned about once regardless of
+    /// chunking.
     struct Dechunker: Sendable {
         enum Outcome: Equatable { case incomplete, invalid, tooLarge, done(length: Int) }
-        /// How far into the framing has been read, counted from the body's start.
+        /// Framing read so far, from the body's start.
         private(set) var offset = 0
         private(set) var body = Data()
-        /// Set once the last chunk is in: how many trailer lines have been read since.
+        /// Trailer lines read since the last chunk; nil before it.
         private var trailers: Int?
 
         mutating func read(_ bytes: Data, from bodyStart: Int) -> Outcome {
             let crlf = Data("\r\n".utf8)
             while true {
                 let index = bodyStart + offset
-                // A size line or trailer line is short: one that runs on without ending isn't one.
+                // Size and trailer lines are short; an unterminated long one is invalid.
                 guard let lineEnd = bytes.range(of: crlf, in: index..<bytes.endIndex) else {
                     return bytes.endIndex - index > maxChunkLineBytes ? .invalid : .incomplete
                 }
                 guard lineEnd.lowerBound - index <= maxChunkLineBytes else { return .invalid }
                 if let count = trailers {
-                    // Trailers, if any, end with an empty line.
+                    // Trailers end with an empty line.
                     if lineEnd.lowerBound == index { return .done(length: lineEnd.upperBound - bodyStart) }
                     guard count < maxTrailerCount else { return .invalid }
                     trailers = count + 1
@@ -254,9 +253,9 @@ nonisolated struct HTTPRequestReader: Sendable {
                     offset = data - bodyStart
                     continue
                 }
-                // Compared without adding, so a size near Int.max can't overflow into a small one.
+                // Compared without adding, so a size near Int.max can't overflow.
                 guard size <= maxBodyBytes - body.count else { return .tooLarge }
-                // The size line is read again when the rest comes: it's short.
+                // Short size line: reread when more arrives.
                 guard bytes.endIndex - data >= size + 2 else { return .incomplete }
                 guard bytes[(data + size)..<(data + size + 2)] == crlf else { return .invalid }
                 body.append(bytes[data..<(data + size)])

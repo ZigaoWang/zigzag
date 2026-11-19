@@ -114,7 +114,7 @@ struct OriginTests {
 }
 
 @MainActor struct VaultLockTests {
-    /// A manual screen lock (not only sleep) locks the vault. Private centers, so nothing is broadcast to other apps.
+    /// A manual screen lock (not only sleep) locks the vault. Uses private notification centers so nothing is broadcast.
     @Test func lockingTheScreenLocksTheVault() async throws {
         let workspace = NotificationCenter(), distributed = NotificationCenter()
         var locks = 0

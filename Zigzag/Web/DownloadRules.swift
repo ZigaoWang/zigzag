@@ -5,23 +5,20 @@ import WebKit
 
 // MARK: - A rule
 
-/// Where a file goes, for a rule whose destination is not another app: saved into a folder of its own, or opened in
-/// the Mac's own app for its type. A destination never cancels the download — it decides *where the file lands* — so
-/// it is read in the response decision and honored when the download is made, never run through `DownloadHandoff`.
+/// Where a rule that isn't a handoff puts the file: a folder, or the Mac's default app for its type. Never cancels
+/// the download; applied when the download is made, not through `DownloadHandoff`.
 nonisolated enum DownloadDestination: Equatable, Sendable {
-    /// Save into this folder, as chosen in the panel. Empty asks for the default, which is nothing to decide.
+    /// Empty means the default folder.
     case folder(String)
-    /// Save it where downloads go, then hand it to the Mac's own app for its type.
+    /// Saves to Downloads, then opens it in the Mac's default app for its type.
     case open
 }
 
-/// The file types a file-type **Open** never offers or performs. Each can run code, mount an installer, or hand the
-/// Mac's app an archive or a configuration profile that does: opening one from a download is a double-click you did
-/// not make. A type may still be **saved**; the clamp is on Open only.
+/// File types a file-type Open never opens: each can run code, mount an installer, or hand over an archive or profile
+/// that does. Saving them is still allowed.
 nonisolated enum DownloadOpening {
-    /// Lowercase extensions, without a leading dot. Scripts are included because the Mac's default app for one may
-    /// run it; installers and disk images because opening one mounts or runs what the page sent; archives because
-    /// opening one can hand out an app the archive carries.
+    /// Lowercase, no leading dot. Scripts because the default app may run them; installers and disk images because
+    /// opening mounts or runs them; archives because they can carry an app.
     static let refused: Set<String> = [
         // Apps and bundles.
         "app", "prefpane", "kext",
@@ -36,7 +33,7 @@ nonisolated enum DownloadOpening {
         "plugin", "bundle", "framework", "dylib", "so", "osax", "appex", "xpc", "saver", "qlgenerator", "mdimporter",
         "service", "systemextension", "driver", "inputplugin", "ibplugin", "menu", "help", "x11app", "nib", "xib",
         "qtz", "class", "jnlp", "ipa", "cin", "icp", "gcx", "ipg",
-        // Locations and web pages: opening one sends the Mac to another address or file, or runs a page from disk.
+        // Locations and HTML: opening one sends the Mac to another address or runs a page from disk.
         "fileloc", "inetloc", "webloc", "url", "afploc", "ftploc", "mailloc", "newsloc",
         "html", "htm", "shtml", "xhtml", "xht", "mht", "mhtml", "svg", "svgz", "webarchive",
         // Office documents that carry macros.
@@ -45,19 +42,15 @@ nonisolated enum DownloadOpening {
         "mobileconfig"
     ]
 
-    /// The kinds of file the Mac itself calls risky, for an extension the list above doesn't name: anything that runs,
-    /// a script, an archive or disk image, a web location. macOS's own risk list (CoreTypes' LSRiskCategory) names the
-    /// same families; reading the type keeps an extension the list missed from slipping past.
+    /// The Mac's risky type families (as in LSRiskCategory), for extensions the list above misses.
     private static let refusedTypes: [UTType] = [.executable, .application, .unixExecutable, .script, .shellScript,
                                                 .archive, .diskImage, .internetLocation, .html]
 
     static func isRefused(_ type: String) -> Bool {
         let trimmed = type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        // No extension is no type to vouch for: an extensionless file can be a script or a binary, and Open is for a
-        // type, not for "whatever this is". It is saved like any other download.
+        // No extension means no type to vouch for (could be a script or binary), so refused.
         guard !trimmed.isEmpty else { return true }
-        // A compound or comma-carrying type is refused when any part of it is: `tar.gz` is an archive because `tar`
-        // and `gz` are, and a page-supplied `pdf,dmg` cannot smuggle the second one past this check.
+        // Refused when any part is: `tar.gz` is an archive, and a page-supplied `pdf,dmg` can't sneak `dmg` past.
         return trimmed.split(whereSeparator: { $0 == "." || $0 == "," })
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .contains(where: isRefusedPart)
@@ -69,20 +62,18 @@ nonisolated enum DownloadOpening {
         return refusedTypes.contains { type.conforms(to: $0) }
     }
 
-    /// Whether any extension a file-type pattern names is one an Open must refuse. An Open rule for one of them could
-    /// otherwise arrive from an older build or a hand-edited rules file.
+    /// Whether a file-type pattern names any refused extension, e.g. from an older build or a hand-edited rules file.
     static func isRefused(pattern: String) -> Bool {
         let extensions = DownloadRule.Match.extensions(in: pattern)
-        // No extension at all is no type to vouch for, just as an extensionless file is not.
         guard !extensions.isEmpty else { return true }
         return extensions.contains { isRefused($0) }
     }
 }
 
-/// One thing Zigzag hands to another app: a link you click, or a download a page starts, whose address matches.
-/// Rules are tried top to bottom and the first one that matches wins; a download no rule matches stays WebKit's.
+/// Hands a matching link or download to another app. First match wins, top to bottom; unmatched downloads stay with
+/// WebKit.
 nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
-    /// What a rule may catch. A new rule catches downloads only, so adding one can never change how a link opens.
+    /// New rules catch downloads only, so adding one never changes how links open.
     enum Applies: String, Codable, CaseIterable, Sendable {
         case downloads
         case linksAndDownloads
@@ -95,9 +86,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    /// How a rule compares what it caught. Every kind but `fileType` reads the address; `fileType` reads the file's
-    /// own name, which is how a per-extension destination is written (the file's type *is* its extension). `any` is
-    /// the catch-all that sits at the bottom of the list.
+    /// `fileType` matches the file name's extension; every other kind matches the address. `any` is the catch-all.
     enum Match: String, Codable, CaseIterable, Sendable {
         case startsWith, contains, endsWith, regex, fileType, any
 
@@ -112,8 +101,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
             }
         }
 
-        /// The extensions a `fileType` pattern names: comma-separated, whitespace and a leading dot tolerated. The
-        /// extension is the part after the dot (`tar.gz` is one), so a name matches when it ends in `.<extension>`.
+        /// Comma-separated; whitespace and a leading dot are allowed. Multi-part extensions (`tar.gz`) count as one.
         static func extensions(in pattern: String) -> [String] {
             pattern.split(separator: ",").compactMap { part in
                 let trimmed = part.trimmingCharacters(in: .whitespaces)
@@ -129,20 +117,17 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
     var applies: Applies = .downloads
     var match: Match = .contains
     var pattern = ""
-    /// Regex and text both follow the case switch. A host is case-insensitive, so a rule for YouTube needn't say so.
+    /// Applies to regex and text. Hosts are always case-insensitive.
     var isCaseSensitive = false
-    /// **Off by default**: a private window promises that what happens there leaves no trace, and handing its address,
-    /// or its cookies, to another app or script is exactly what could break that promise. A private window runs no
-    /// rule that hasn't been let in, and the link or download carries on as if no rule had matched.
+    /// Off by default: handing a private window's address or cookies to another app breaks its no-trace promise. When
+    /// off, the rule is ignored there.
     var runsInPrivateWindows = false
-    /// What this rule was told about handing off, for **every site**: "handOff", "browser" or "deny". Nil is a rule
-    /// that has only been answered per site (kept under `handoff:<id>` in `SitePermissions`) or not at all. It is the
-    /// third scope a question about a rule offers, and it belongs here because it is the rule's own answer: it travels
-    /// with the rule and goes when the rule does.
+    /// The rule's own answer for every site: "handOff", "browser" or "deny". Nil when answered only per site
+    /// (`handoff:<id>` in `SitePermissions`) or not at all. Stored on the rule so it goes when the rule does.
     var handoffAnswer: String?
     var action: DownloadRuleAction
 
-    /// A regex that doesn't compile is kept as typed but never matches, so a half-written rule can't catch anything.
+    /// A regex that doesn't compile never matches.
     var isValidPattern: Bool {
         guard match == .regex, !pattern.isEmpty else { return true }
         return (try? NSRegularExpression(pattern: pattern)) != nil
@@ -156,8 +141,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         case .any:
             return true
         case .fileType:
-            // A file *type* is a file's own name, which an address on its own never is; `matches(_:filename:)` is what
-            // the download path uses. A link has no name, so a type rule never catches one.
+            // Type rules match file names, never a bare address; see `matches(_:filename:)`.
             return false
         case .startsWith:
             return address.hasPrefix(pattern, caseSensitive: isCaseSensitive)
@@ -174,20 +158,18 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    /// Whether this rule catches a download whose file is named `filename`. Only a `fileType` rule reads the name:
-    /// its pattern is a comma-separated list of extensions, and the name matches when it ends in any of them.
+    /// Only `fileType` rules read the name; it matches when it ends in any listed extension.
     func matches(filename: String) -> Bool {
         guard match == .fileType, isEnabled, !filename.isEmpty else { return false }
         return Match.extensions(in: pattern).contains { filename.hasSuffix("." + $0, caseSensitive: isCaseSensitive) }
     }
 
-    /// Whether this rule catches what was caught, in one call: the address for every kind but `fileType`, the file's
-    /// own name for that one. A download passes both; a link passes an empty name.
+    /// Address for every kind except `fileType`, which reads the name. Links pass an empty name.
     func matches(_ url: URL, filename: String) -> Bool {
         match == .fileType ? matches(filename: filename) : matches(url)
     }
 
-    /// Whether the chosen action reads the tab's cookies. Only then is the cookie store asked.
+    /// Only then is the cookie store read.
     var needsCookies: Bool {
         action.textFields.contains { $0.contains("{cookies}") || $0.contains("{cookie_header}") }
     }
@@ -197,10 +179,8 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         action.textFields.contains { $0.contains("{cookies}") }
     }
 
-    /// What the row says it does, in a few words.
     var actionSummary: String { action.summary }
 
-    /// What a file-type destination's row says it does: the types it names, and where they go.
     var destinationSentence: String {
         let types = Match.extensions(in: pattern).joined(separator: ", ")
         switch action.kind {
@@ -213,11 +193,9 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    /// The rule in a sentence, as its row in Settings › Downloads says it: "Files ending in .torrent go to
-    /// rTorrent". It ends where the rule's action puts things — an app, a folder or a service — not with the rule's
-    /// own name, which the row already shows above.
+    /// Settings › Downloads row text, e.g. "Files ending in .torrent go to rTorrent". Ends with the target, not the
+    /// rule's name, which the row already shows.
     var summarySentence: String {
-        // A file-type rule is a per-extension destination, whose row says the types and where they go.
         if match == .fileType { return destinationSentence }
         let goes = action.summary
         if match == .any {
@@ -257,7 +235,6 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         }
     }
 
-    /// A new rule with the action it was created with.
     init(name: String, applies: Applies = .downloads, match: Match = .contains, pattern: String = "",
          isCaseSensitive: Bool = false, action: DownloadRuleAction) {
         self.name = name
@@ -272,8 +249,8 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         case id, name, isEnabled, applies, match, pattern, isCaseSensitive, runsInPrivateWindows, handoffAnswer, action
     }
 
-    /// Older files may lack a key a newer Zigzag added, and a kind this build doesn't know (a file-type rule from
-    /// another branch) decodes as the nearest ordinary one. A rule is never thrown away for one unknown value.
+    /// Missing keys use defaults, and an unknown kind (e.g. from another branch) decodes as the nearest known one, so
+    /// a rule is never dropped.
     init(from decoder: Decoder) throws {
         let container = try? decoder.container(keyedBy: CodingKeys.self)
         func value<T: Decodable>(_ type: T.Type, _ key: CodingKeys) -> T? {
@@ -288,7 +265,7 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         if let rawMatch = value(String.self, .match) {
             if let known = Match(rawValue: rawMatch) { match = known } else { match = .contains; isEnabled = false }
         } else {
-            // A value of another type is not a match either: a `.contains` with no pattern would catch everything.
+            // A `.contains` with no pattern would match everything.
             match = .contains
             if wasSet(.match) { isEnabled = false }
         }
@@ -297,9 +274,8 @@ nonisolated struct DownloadRule: Codable, Identifiable, Equatable, Sendable {
         runsInPrivateWindows = value(Bool.self, .runsInPrivateWindows) ?? false
         handoffAnswer = value(String.self, .handoffAnswer)
         action = value(DownloadRuleAction.self, .action) ?? DownloadRuleAction(kind: .openURL)
-        // A rule that isn't an object, has no action, or names a kind this build doesn't know is kept, but not run:
-        // it could not do what it says, and a prompt for it would be a question with no true answer. A `.contains`
-        // rule with no action fields would otherwise catch every address.
+        // Kept but disabled when not an object, missing an action, or naming an unknown kind. Otherwise a `.contains`
+        // rule with no action fields would match every address.
         if container == nil || !wasSet(.action) || (wasSet(.action) && value(DownloadRuleAction.self, .action) == nil) {
             isEnabled = false
         }
@@ -323,24 +299,23 @@ nonisolated private extension String {
 
 // MARK: - What a rule does
 
-/// The action behind a rule. One flat shape with a `kind`, rather than an enum with a payload each, so the file stays
-/// readable, a field a newer Zigzag adds doesn't break an older one, and the editor's fields map one to one.
+/// One flat shape with a `kind` instead of an enum with payloads: readable file, forward compatible, and one field
+/// per editor control.
 nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     enum Kind: String, Codable, CaseIterable, Sendable {
         case openApp
         case openURL
         case runScript
         case jsonRPC
-        /// A per-extension destination, not a handoff: the file is saved as it always was, into a folder of its own.
-        /// It is decided when WebKit makes the download (`DownloadDestination`), never run from the handoff path.
+        /// Destination, not a handoff: saves into the rule's folder. Applied when WebKit makes the download
+        /// (`DownloadDestination`).
         case saveToFolder
-        /// The other per-extension destination: the file is saved where downloads go and then handed to the Mac's own
-        /// app for its type — the one a double-click in Finder would open. Never a chosen app: choosing one is a
-        /// handoff, and a handoff is a different question.
+        /// Destination: saves to Downloads, then opens in the Mac's default app for the type. Choosing a specific app
+        /// is a handoff instead.
         case openFile
 
-        /// Whether this kind is a destination rather than a handoff action: it never cancels the download, so it is
-        /// made from the per-extension panel, not from Add Rule's Custom… menu.
+        /// Destinations never cancel the download and are made from the per-extension panel, not Add Rule's Custom…
+        /// menu.
         var isDestination: Bool { self == .saveToFolder || self == .openFile }
 
         var title: String {
@@ -368,8 +343,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         init(from decoder: Decoder) throws {
             let container = try decoder.singleValueContainer()
             let raw = try container.decode(String.self)
-            // "showInZigzag" was this case while it opened the file in a tab. It opens the Mac's app instead now, and
-            // a rule saved then still reads as the nearest thing: open it, not save it and say nothing.
+            // Old name from when it opened the file in a tab; now reads as `openFile`.
             if raw == "showInZigzag" { self = .openFile; return }
             guard let kind = Kind(rawValue: raw) else {
                 throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown download rule action \(raw).")
@@ -378,7 +352,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
     }
 
-    /// How a JSON-RPC action speaks. rTorrent's own API is XML-RPC; aria2, Motrix and qBittorrent take JSON.
+    /// rTorrent uses XML-RPC; aria2, Motrix and qBittorrent take JSON-RPC.
     enum RPCStyle: String, Codable, CaseIterable, Sendable {
         case json
         case xmlrpc
@@ -392,8 +366,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
     }
 
     var kind: Kind = .openURL
-    /// Where this action sends the file, for the two destination kinds that don't hand it to another app: a folder of
-    /// its own, or the Mac's own app opening it. Nil for the four handoff actions, which `DownloadHandoff` runs.
+    /// Destination for `saveToFolder` and `openFile`; nil for the handoff kinds that `DownloadHandoff` runs.
     var destination: DownloadDestination? {
         switch kind {
         case .saveToFolder: .folder(folderPath)
@@ -402,34 +375,26 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
     }
 
-    /// Open App: the app's path, as chosen in the open panel.
     var appPath = ""
-    /// Open URL: the URL to open, with tokens such as `{encoded_link}`.
     var urlTemplate = ""
-    /// Open URL: where a *web* address opens. Ask is a rule that has not been told yet: the hand-off card picks a place
-    /// for that one hand-off only, and the separate "Where should this open" question's Always is what keeps a place
-    /// here. Default Browser is what these rules did before Zigzag had places of its own, and is what a rule from an
-    /// older file keeps. An address that isn't the web's (mpv://, a magnet) belongs to the app that handles it and
-    /// ignores this.
+    /// Open URL: where a web address opens. Ask lets the hand-off card choose each time, and the "Where should this
+    /// open" question's Always saves a place here. Rules from older files keep Default Browser. Non-web schemes
+    /// (mpv://, magnet) ignore this.
     var openIn: OpenInZigzag.Choice = .ask
-    /// Run Script: the executable, or a `.sh` file run by `/bin/sh`.
     var scriptPath = ""
-    /// Run Script: one argv value each. A token is substituted into its own argument, never joined into a shell line.
+    /// One argv value each. Tokens are substituted per argument, never joined into a shell line.
     var arguments: [String] = []
-    /// Save to Folder: the folder a file of this rule's type lands in, as chosen in the panel. Tokens are allowed, so
-    /// a rule can be pointed at `{space}` if it likes.
+    /// Save to Folder: the destination. Tokens allowed (e.g. `{space}`).
     var folderPath = ""
-    /// JSON-RPC: the endpoint, the method, and a JSON array of parameters (tokens allowed inside strings).
     var rpcEndpoint = ""
     var rpcMethod = ""
-    /// A JSON array of parameters. For XML-RPC each is sent as a string.
+    /// XML-RPC sends each as a string.
     var rpcParameters = "[]"
     var rpcStyle: RPCStyle = .json
-    /// True when a file named an action kind this build doesn't know; the rule is kept but disabled.
+    /// Set when the file named an unknown action kind; the rule is kept but disabled.
     var wasDecodedFromUnknownKind = false
 
-    /// Every string the action substitutes tokens into. A path, an endpoint and a method are literal, so a token in
-    /// one of them is text, not a value.
+    /// Fields that get token substitution. Paths, endpoints and methods are literal.
     var textFields: [String] {
         switch kind {
         case .openApp: []
@@ -454,7 +419,9 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         case .jsonRPC:
             if rpcMethod.isEmpty { return Kind.jsonRPC.title }
             let host = URL(string: rpcEndpoint)?.host() ?? rpcEndpoint
-            return host.isEmpty ? rpcMethod : "\(rpcMethod) · \(host)"
+            // The place first, the method after it in brackets (#367).
+            return host.isEmpty ? rpcMethod
+                : String(localized: "\(host) (\(rpcMethod))", comment: "Where a download rule sends links: the service's address, then its method in parentheses, like “127.0.0.1 (load.start)”.")
         case .saveToFolder:
             let name = URL(fileURLWithPath: (folderPath as NSString).expandingTildeInPath).lastPathComponent
             return name.isEmpty ? Kind.saveToFolder.title : name
@@ -463,15 +430,12 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
         }
     }
 
-    /// Whether the service's endpoint is an address it could be reached at: it needs a scheme. `URL(string:)` is
-    /// forgiving — it parses `bing.com`, and a bare word — so scheme-less text is not an address a request could go
-    /// to, and a rule that couldn't work is never saved quietly.
+    /// Requires a scheme: `URL(string:)` also accepts `bing.com` or a bare word, which can't be requested.
     var endpointIsUsable: Bool {
         guard let url = URL(string: rpcEndpoint), let scheme = url.scheme, !scheme.isEmpty else { return false }
         return true
     }
 
-    /// Whether the action has what it needs to run.
     var isComplete: Bool {
         switch kind {
         case .openApp:
@@ -507,7 +471,6 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
             if let known = Kind(rawValue: rawKind) { kind = known } else { kind = .openURL; wasDecodedFromUnknownKind = true }
         } else {
             kind = .openURL
-            // No kind at all is as unreadable as one this build doesn't know.
             wasDecodedFromUnknownKind = true
         }
         appPath = value(String.self, .appPath) ?? ""
@@ -525,8 +488,7 @@ nonisolated struct DownloadRuleAction: Codable, Equatable, Sendable {
 
 // MARK: - Presets
 
-/// The arrangements most people want, so a rule for aria2 or mpv is a menu choice and a look at the fields rather
-/// than a JSON lesson.
+/// Common setups, so an aria2 or mpv rule is a menu choice instead of hand-written JSON.
 nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
     case aria2, motrix, rTorrent, ytdlp, mpv, iina
 
@@ -541,8 +503,8 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
         }
     }
 
-    /// The name the rule it makes carries: the service or the app itself, so the rule reads as a sentence —
-    /// "Files ending in .torrent go to rTorrent". The menu entry says more ("Send to rTorrent").
+    /// The service or app name, so the row reads "Files ending in .torrent go to rTorrent". The menu entry says "Send
+    /// to rTorrent".
     var ruleName: String {
         switch self {
         case .aria2: "aria2"
@@ -554,7 +516,7 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
         }
     }
 
-    /// The rule a preset starts from: a media site for the players, a magnet or link for the downloaders.
+    /// Media sites for players, magnets or links for downloaders.
     var rule: DownloadRule {
         switch self {
         case .aria2, .motrix:
@@ -576,7 +538,7 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
             return DownloadRule(name: ruleName, applies: .downloads, match: .any, action: action)
         case .ytdlp:
             var action = DownloadRuleAction(kind: .runScript)
-            // Through env, so it's found under either Homebrew prefix, and anywhere else on PATH.
+            // Via env, so it's found under either Homebrew prefix or anywhere on PATH.
             action.scriptPath = "/usr/bin/env"
             action.arguments = ["yt-dlp", "--no-playlist", "--cookies", "{cookies}", "{link}"]
             return DownloadRule(name: ruleName, applies: .downloads, match: .any, action: action)
@@ -594,8 +556,7 @@ nonisolated enum DownloadPreset: String, CaseIterable, Sendable {
 
 // MARK: - Values a token stands for
 
-/// What `{link}`, `{filename}` and the rest become for one handoff. Cookies are filled in only when a rule asks for
-/// them, since reading the cookie store takes a moment.
+/// Token values for one handoff. Cookies are filled only when a rule needs them, since reading the store is slow.
 nonisolated struct HandoffValues: Equatable, Sendable {
     var link: URL
     var referrer: URL?
@@ -620,22 +581,20 @@ nonisolated struct HandoffValues: Equatable, Sendable {
 // MARK: - Tokens
 
 nonisolated enum DownloadTokens {
-    /// The tokens a template may use, and what each becomes, for the editor's note.
+    /// All tokens, for the editor's note.
     static let names = ["{link}", "{encoded_link}", "{referrer}", "{cookies}", "{cookie_header}", "{filename}", "{mime}", "{space}"]
 
-    /// A value as one query value: `&`, `+`, `=` and `#` in it become part of the value, not of the query around it.
+    /// Encodes `&`, `+`, `=` and `#` so they stay inside the value.
     static func queryValue(_ text: String) -> String {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=?#")
         return text.addingPercentEncoding(withAllowedCharacters: allowed) ?? text
     }
 
-    /// The URL as one query value.
     static func encoded(_ url: URL) -> String { queryValue(url.absoluteString) }
 
-    /// The characters a name may keep: no control, format (bidi included), line or paragraph separators, surrogates
-    /// or unassigned scalars, and no folder separators or colons. Shared with the download manager, so a name shown
-    /// in a rule and a name written to disk follow one policy.
+    /// Strips control, format (incl. bidi), line/paragraph separators, surrogates, unassigned scalars, folder
+    /// separators and colons. Shared with the download manager.
     static func safeName(_ name: String) -> String {
         var scalars = String.UnicodeScalarView()
         for scalar in name.unicodeScalars {
@@ -650,8 +609,8 @@ nonisolated enum DownloadTokens {
         return trimmed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// A name safe to write in Downloads, a header, or an argument: no folder separators, no control characters,
-    /// no leading dot, and no leading dash that a script would read as an option.
+    /// Safe for Downloads, a header or an argument: no folder separators, control characters, leading dot, or leading
+    /// dash a script would read as an option.
     static func filename(for url: URL, suggested: String) -> String {
         var name = suggested
         if name.isEmpty {
@@ -665,18 +624,15 @@ nonisolated enum DownloadTokens {
         return name
     }
 
-    /// A value as the inside of a JSON string, without the quotes.
+    /// JSON string contents, without the quotes.
     static func jsonEscaped(_ value: String) -> String {
         guard let data = try? JSONEncoder().encode(value), let text = String(data: data, encoding: .utf8) else { return value }
         return String(text.dropFirst().dropLast())
     }
 
-    /// Fills every token in `template`, in one pass. A value is never scanned again, so a filename or a title that
-    /// happens to read `{secret}` or `{link}` is passed as it is, not turned into another value.
-    /// `query`: every value is one query value, so a filename or a title with `&`, `=` or `#` in it can't add a
-    /// parameter of its own to an Open URL template. `{path}`, `{query}` and `{encoded_link}` are the address's own
-    /// already-encoded parts and are not encoded twice.
-    /// `json`: every value is the inside of a JSON string.
+    /// Fills tokens in one pass, so a value that contains `{link}` or `{secret}` isn't expanded again. `query`
+    /// encodes each value as one query value so a filename can't add parameters. `{path}`, `{query}` and
+    /// `{encoded_link}` are already encoded and aren't encoded twice. `json` escapes each value for a JSON string.
     static func expand(_ template: String, with values: HandoffValues, secret: String = "", json: Bool = false,
                        query: Bool = false) -> String {
         func value(_ text: String) -> String {
@@ -684,9 +640,9 @@ nonisolated enum DownloadTokens {
             if query { return queryValue(text) }
             return text
         }
-        // Already encoded for where it goes: escaped for JSON if asked, but never percent-encoded again.
+        // Already encoded: JSON-escaped if needed, never percent-encoded again.
         func part(_ text: String) -> String { json ? jsonEscaped(text) : text }
-        // A server's MIME type is not an option: one that starts with `-` must not be read as one by aria2 or yt-dlp.
+        // So aria2 or yt-dlp don't read a MIME type starting with `-` as an option.
         let mime = values.mime.hasPrefix("-") ? "_" + values.mime : values.mime
         let replacements: [String: String] = [
             "{encoded_link}": part(encoded(values.link)),
@@ -697,9 +653,8 @@ nonisolated enum DownloadTokens {
             "{mime}": value(mime),
             "{space}": value(values.space),
             "{secret}": value(secret),
-            // The link's own parts, so a rule can send an address somewhere else: `https://bing.com{path}` takes a
-            // match on google.com to the same page on bing.com. Both are the address's own, percent-encoded, so what
-            // is put back together is still one valid URL.
+            // Address parts, e.g. `https://bing.com{path}` sends a google.com match to the same page on bing.com.
+            // Already percent-encoded.
             "{host}": value(values.link.host() ?? ""),
             "{path}": part(values.link.path(percentEncoded: true)),
             "{query}": part(values.link.query(percentEncoded: true) ?? ""),
@@ -725,7 +680,7 @@ nonisolated enum DownloadTokens {
 
 // MARK: - Cookies
 
-/// One cookie, apart from WebKit, so the matching and the file can be tested without a web view.
+/// A cookie outside WebKit, so matching and the file can be tested without a web view.
 nonisolated struct HandoffCookie: Equatable, Sendable {
     var name: String
     var value: String
@@ -751,11 +706,10 @@ nonisolated struct HandoffCookie: Equatable, Sendable {
                   isSecure: cookie.isSecure, isHTTPOnly: cookie.isHTTPOnly, expires: cookie.expiresDate)
     }
 
-    /// A cookie with no leading dot belongs to the exact host and no subdomain; one with a dot is for the domain.
+    /// No leading dot means host-only.
     var isHostOnly: Bool { !domain.hasPrefix(".") }
 
-    /// Whether this cookie would be sent with a request for `url`: its domain and path cover it, it hasn't expired,
-    /// and a secure cookie only goes over https.
+    /// Domain and path match, not expired, and secure cookies only over https.
     func applies(to url: URL, now: Date = Date()) -> Bool {
         if let expires, expires <= now { return false }
         guard let host = url.host()?.lowercased() else { return false }
@@ -771,13 +725,12 @@ nonisolated struct HandoffCookie: Equatable, Sendable {
             || cookiePath == "/"
     }
 
-    /// `name=value`, for a Cookie header. HTTP-only cookies go in too: the header is for a program that makes the
-    /// request itself, where the page's JavaScript couldn't reach them anyway.
+    /// HTTP-only cookies included: the receiving program makes the request itself.
     var headerField: String { "\(name)=\(value)" }
 }
 
 nonisolated enum HandoffCookies {
-    /// The cookies for `url`, in a stable order, and their Cookie header.
+    /// Sorted, with their Cookie header.
     static func matching(_ cookies: [HandoffCookie], for url: URL, now: Date = Date()) -> [HandoffCookie] {
         cookies.filter { $0.applies(to: url, now: now) }
             .sorted { ($0.domain, $0.path, $0.name) < ($1.domain, $1.path, $1.name) }
@@ -787,14 +740,12 @@ nonisolated enum HandoffCookies {
         cookies.map(\.headerField).joined(separator: "; ")
     }
 
-    /// A Netscape cookies.txt, the file yt-dlp and aria2 read. HTTP-only cookies are marked `#HttpOnly_`, as curl and
-    /// yt-dlp write them.
+    /// Netscape cookies.txt for yt-dlp and aria2. HTTP-only cookies get `#HttpOnly_`, as curl and yt-dlp write them.
     static func netscape(_ cookies: [HandoffCookie]) -> String {
         var lines = ["# Netscape HTTP Cookie File", "# Written by Zigzag for one handoff.", ""]
         for cookie in cookies {
-            // The leading dot and the include-subdomains flag say the same thing, and yt-dlp's loader refuses a
-            // file where they disagree: a host-only cookie is `example.com` with FALSE, a domain cookie `.example.com`
-            // with TRUE.
+            // yt-dlp refuses a file where the leading dot and the subdomains flag disagree: host-only is
+            // `example.com` FALSE, domain is `.example.com` TRUE.
             let domain = cookie.domain
             let includeSubdomains = cookie.isHostOnly ? "FALSE" : "TRUE"
             let secure = cookie.isSecure ? "TRUE" : "FALSE"
@@ -805,7 +756,7 @@ nonisolated enum HandoffCookies {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    /// Writes the file in the handoff's own temporary folder, readable by its owner only, and returns its path.
+    /// Writes to a temp folder, owner-readable only, and returns the path.
     static func writeFile(_ cookies: [HandoffCookie]) throws -> URL {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("ZigzagHandoff-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
@@ -816,7 +767,6 @@ nonisolated enum HandoffCookies {
         return file
     }
 
-    /// Removes a file `writeFile` made, and its folder.
     static func removeFile(_ file: URL) {
         try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
     }
@@ -824,15 +774,15 @@ nonisolated enum HandoffCookies {
 
 // MARK: - The list
 
-/// The rules, in order, kept in DownloadRules.json. The same list serves every profile; the cookies and the space a
-/// rule sees come from the tab that triggered it.
+/// Rules in order, stored in DownloadRules.json and shared by all profiles. Cookies and space come from the
+/// triggering tab.
 @MainActor
 final class DownloadRulesStore {
     static let shared = DownloadRulesStore()
 
     private(set) var rules: [DownloadRule]
     let changed = Signal<Void>()
-    /// The file the list is kept in. A test passes one of its own, so it never reads or writes the Mac's list.
+    /// Tests pass their own file.
     private let file: URL
 
     init(file: URL = Paths.downloadRules) {
@@ -840,14 +790,13 @@ final class DownloadRulesStore {
         rules = JSONStore.load([DownloadRule].self, from: file) ?? []
     }
 
-    /// The first rule that catches `url`, or none. `appliesToLinks` is false for a download. `filename` is the
-    /// download's own name, for a rule that matches a file's type; a link passes none.
+    /// First rule that matches. `appliesToLinks` is false for downloads; `filename` is the download's name (links
+    /// pass none).
     func firstMatch(url: URL, filename: String = "", appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
         Self.firstMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
     }
 
-    /// The same order, apart from the file, for a list being tested or previewed. A rule not let into private windows
-    /// is left out there, so a private window never even asks about it.
+    /// Static version for testing or previews. Rules not allowed in private windows are skipped there.
     nonisolated static func firstMatch(in rules: [DownloadRule], url: URL, filename: String = "",
                                        appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
         rules.first { rule in
@@ -857,10 +806,8 @@ final class DownloadRulesStore {
         }
     }
 
-    /// The first handoff rule that catches a download, if no earlier rule decides where the file lands. A destination
-    /// earlier in the list wins: the list has one order, and a later catch-all handoff must not take a file a type
-    /// rule has already claimed. An Open that the type clamp refuses is treated as no match, so a later Save or
-    /// handoff can still decide, just as it would if that rule were absent.
+    /// First handoff rule for a download, unless an earlier destination rule claims it first (a later catch-all
+    /// handoff can't take a file a type rule claimed). An Open refused by `DownloadOpening` counts as no match.
     func firstHandoffMatch(url: URL, filename: String, appliesToLinks: Bool, isPrivate: Bool = false) -> DownloadRule? {
         Self.firstHandoffMatch(in: rules, url: url, filename: filename, appliesToLinks: appliesToLinks, isPrivate: isPrivate)
     }
@@ -871,11 +818,9 @@ final class DownloadRulesStore {
             guard rule.applies == .linksAndDownloads || !appliesToLinks else { continue }
             guard rule.matches(url, filename: filename) else { continue }
             if let destination = rule.action.destination {
-                // A destination only decides downloads; a hand-edited links-and-downloads one is not one, as
-                // `destination(in:)` also says.
+                // Destinations only apply to downloads, as in `destination(in:)`.
                 guard rule.applies == .downloads else { continue }
-                // A Save destination is not a handoff: it still applies in a private window, switch or no switch.
-                // An Open needs the rule's switch, and stands aside while it is off.
+                // Save still applies in private windows; Open needs the rule's private-window switch.
                 if isPrivate, !rule.runsInPrivateWindows, destination == .open { continue }
                 if destination == .open, DownloadOpening.isRefused((filename as NSString).pathExtension) { continue }
                 return nil
@@ -886,21 +831,20 @@ final class DownloadRulesStore {
         return nil
     }
 
-    /// The first rule whose destination is this download's, if any: the entry that decides where the file lands. Only
-    /// a rule that *is* a destination (`saveToFolder`, `openFile`) is looked at, so a handoff rule for the same
-    /// name is left for the handoff path to run. First match wins, exactly as it does for handoffs.
+    /// First destination rule (`saveToFolder`, `openFile`) for this download; handoff rules are left to the handoff
+    /// path. First match wins.
     func destination(for url: URL, filename: String) -> (rule: DownloadRule, destination: DownloadDestination)? {
         Self.destination(in: rules, url: url, filename: filename)
     }
 
-    /// The same, apart from the file, for a list being tested or previewed.
+    /// Static version for testing or previews.
     nonisolated static func destination(in rules: [DownloadRule], url: URL, filename: String)
         -> (rule: DownloadRule, destination: DownloadDestination)? {
         for rule in rules {
             guard rule.applies == .downloads, rule.isEnabled, let destination = rule.action.destination,
                   rule.matches(url, filename: filename) else { continue }
-            // An Open for an app, a script, an installer or an archive is never performed, even if one was saved by an
-            // older build: the file is saved as if this rule had not matched, and a later Save rule may still take it.
+            // A refused Open (app, script, installer, archive) is skipped, even from an older build, so a later Save
+            // rule can still take the file.
             if destination == .open, DownloadOpening.isRefused((filename as NSString).pathExtension) { continue }
             return (rule, destination)
         }
@@ -915,9 +859,8 @@ final class DownloadRulesStore {
     func update(_ rule: DownloadRule) {
         guard let index = rules.firstIndex(where: { $0.id == rule.id }) else { return }
         let old = rules[index]
-        // An answer was given to the behaviour the rule had then. A different script or URL is a different thing to
-        // hand a link or download to, so the answers must not silently rule the new one; its name or another field
-        // doesn't change what runs, and leaves them alone.
+        // Answers were given for the old behavior; a new script or URL clears them. Changing the name or other fields
+        // doesn't.
         var saved = rule
         if old.action.scriptPath != rule.action.scriptPath || old.action.urlTemplate != rule.action.urlTemplate {
             saved.handoffAnswer = nil
@@ -927,9 +870,8 @@ final class DownloadRulesStore {
         save()
     }
 
-    /// Where a new file type goes: after the file types already there and before the first rule that hands something
-    /// off. Settings lists the file types above the handoff rules, so that is the order they are tried in; appended
-    /// at the end, a new type would sit behind a catch-all handoff (a downloader preset) and never decide anything.
+    /// New file types go after existing ones and before the first handoff rule, matching Settings' order. At the end
+    /// they'd sit behind a catch-all handoff and never match.
     nonisolated static func placeForNewFileType(in rules: [DownloadRule]) -> Int {
         rules.firstIndex { !$0.action.kind.isDestination } ?? rules.count
     }
@@ -943,21 +885,19 @@ final class DownloadRulesStore {
     func remove(id: UUID) {
         rules.removeAll { $0.id == id }
         HandoffSecrets.removeSecret(for: id)
-        // The answers sites gave this rule go with it: kept under its id, nothing else could ever read them again.
+        // Only this rule could read its answers.
         Self.forgetHandoffAnswers(for: id)
         save()
     }
 
-    /// Forgets the answers sites gave the rule with `id`: kept under `handoff:<id>`, only that rule could read them,
-    /// and they were given to the behavior it had when they were kept.
+    /// Forgets the `handoff:<id>` answers, which applied to the rule's old behavior.
     private static func forgetHandoffAnswers(for id: UUID) {
         let subject = PermissionSubject.handoff(id)
         for site in SitePermissions.sites(prefix: subject) { SitePermissions.remember(nil, subject: subject, origin: site) }
     }
 
-    /// The rules with the one whose `id` this is moved to just before `before` (`nil` puts it last). Kept apart from
-    /// the store so the order a drag produces can be read without one: a list that shows only some of the rules can't
-    /// number a place in the store, so it names the row it was dropped on instead.
+    /// Moves rule `id` before `beforeID` (`nil` puts it last). Static so a drag's result can be tested; a filtered
+    /// list names the drop row rather than an index.
     nonisolated static func moved(_ rules: [DownloadRule], id: UUID, before beforeID: UUID?) -> [DownloadRule] {
         guard let from = rules.firstIndex(where: { $0.id == id }) else { return rules }
         var without = rules
@@ -968,7 +908,7 @@ final class DownloadRulesStore {
         return without
     }
 
-    /// Moves the rule at one place in the list to another, as the Up and Down buttons do.
+    /// As the Up and Down buttons do.
     func move(from: Int, to: Int) {
         guard rules.indices.contains(from), rules.indices.contains(to), from != to else { return }
         let rule = rules.remove(at: from)
@@ -976,7 +916,6 @@ final class DownloadRulesStore {
         save()
     }
 
-    /// Moves the rule with `id` to just before the rule with `before` (`nil` puts it last).
     func move(_ id: UUID, before beforeID: UUID?) {
         let moved = Self.moved(rules, id: id, before: beforeID)
         guard moved != rules else { return }
@@ -998,7 +937,7 @@ final class DownloadRulesStore {
 
 // MARK: - Secrets
 
-/// The token an aria2 or rTorrent endpoint asks for, kept in the Keychain by the rule's id, never in the rules file.
+/// aria2 or rTorrent tokens, stored in the Keychain by rule id, never in the rules file.
 nonisolated enum HandoffSecrets {
     private static var service: String { "\(Bundle.main.bundleIdentifier ?? "app.zigzag").download-rules" }
 

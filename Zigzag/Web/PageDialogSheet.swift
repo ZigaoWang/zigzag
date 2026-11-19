@@ -17,11 +17,11 @@ final class PageDialogSheet: NSView {
         case cancelled
         /// Don't show this page's dialogs any more (until it loads something new).
         case blocked
-        /// A sheet with choices: the one picked, and whether its "always" choice was on.
+        /// The picked index, and whether "always" was on.
         case chose(index: Int, remember: Bool)
     }
 
-    /// One thing to pick in a sheet that lists choices (a certificate a site asks for).
+    /// An entry in a choice list (e.g. a certificate a site asks for).
     struct Choice {
         let title: String
         let detail: String
@@ -102,7 +102,7 @@ final class PageDialogSheet: NSView {
                 choiceList.addSubview(row)
                 choiceRows.append(row)
             }
-            // Set directly: an observer doesn't run for a property set in its own class's init.
+            // Set directly: observers don't fire for properties set in their own class's init.
             choiceRows.first?.isSelected = true
             if let remember {
                 let pill = ChoicePill(title: remember)
@@ -131,13 +131,13 @@ final class PageDialogSheet: NSView {
     required init?(coder: NSCoder) { fatalError() }
     override var isFlipped: Bool { true }
 
-    /// The main button: the choice picked when it lists choices, else what's in its fields.
+    /// The selected choice if there's a list, else the fields' contents.
     private func finishChoosing() {
         if choiceRows.isEmpty { finish(.confirmed(inputs.map(\.stringValue))) }
         else { finish(.chose(index: chosen, remember: rememberPill?.isOn ?? false)) }
     }
 
-    /// Up and down move the choice, keeping it in sight.
+    /// Arrow keys move the selection and keep it visible.
     private func moveChoice(_ step: Int) {
         guard !choiceRows.isEmpty else { return }
         chosen = min(max(0, chosen + step), choiceRows.count - 1)
@@ -214,8 +214,8 @@ final class PageDialogSheet: NSView {
                 default: return event
                 }
             }
-            // On a tab out of sight, it waits there until the tab is in front again; `viewDidMoveToWindow` shows it.
-            // On the page in front, What's New, which only informs, makes way for it.
+            // A background tab's sheet waits until the tab is in front (`viewDidMoveToWindow` shows it). In front,
+            // What's New makes way for it.
             WhatsNewSheet.makeRoom(in: host.window)
             host.addSubview(sheet)
         }
@@ -230,9 +230,13 @@ final class PageDialogSheet: NSView {
     }
 
     /// Answered another way (an extension gave the sign-in it asks for): the sheet tagged so goes, with these values.
-    static func answer(tag: String, with values: [String]) {
-        for box in open where box.sheet?.answers == tag { box.sheet?.finish(.confirmed(values)) }
+    /// Whether one was up to answer.
+    @discardableResult
+    static func answer(tag: String, with values: [String]) -> Bool {
+        let tagged = open.compactMap(\.sheet).filter { $0.answers == tag && $0.isUp }
+        tagged.forEach { $0.finish(.confirmed(values)) }
         open = open.filter { $0.sheet?.isUp == true }
+        return !tagged.isEmpty
     }
 
     // MARK: Saved passwords
@@ -285,7 +289,7 @@ final class PageDialogSheet: NSView {
         open.compactMap(\.sheet).first { $0.savedMenu == nil && $0.saved.superview != nil }?.toggleSavedMenu()
     }
 
-    /// Picks a choice in the first sheet listing them, sets its "always" choice when given, and continues.
+    /// Debug: picks a choice in the first choice sheet, sets "always" if given, and continues.
     static func debugChoose(_ index: Int, remember: Bool?) {
         guard let sheet = open.compactMap(\.sheet).first(where: { $0.isUp && !$0.choiceRows.isEmpty }) else { return }
         sheet.chosen = min(max(0, index), sheet.choiceRows.count - 1)
@@ -293,13 +297,13 @@ final class PageDialogSheet: NSView {
         sheet.finishChoosing()
     }
 
-    /// Answers every dialog showing with Cancel (OK for an alert), as Escape does.
+    /// Debug: Cancel on every showing dialog (OK for an alert), like Escape.
     static func debugCancel() {
         for sheet in open.compactMap(\.sheet) where sheet.isUp { sheet.finish(sheet.cancel.superview == nil ? .confirmed([]) : .cancelled) }
     }
     #endif
 
-    /// A page's dialog (an alert, a sign-in) is showing in `window`: over the window, or over a page in front there.
+    /// A page dialog (alert, sign-in) shows over `window` or over its front page.
     static func isShowing(in window: NSWindow?) -> Bool {
         guard let window else { return false }
         return open.contains { $0.sheet?.isUp == true && $0.sheet?.window === window }
@@ -322,8 +326,8 @@ final class PageDialogSheet: NSView {
         }
         let completion = self.completion
         self.completion = { _ in }
-        // It goes as the other sheets do, quicker than it came, letting clicks through at once; out of sight (its tab
-        // behind, its window closing), at once.
+        // Fades out faster than it appeared and passes clicks through at once; instantly when hidden (tab behind,
+        // window closing).
         if window != nil {
             isLeaving = true
             panel.dismiss()
@@ -334,11 +338,11 @@ final class PageDialogSheet: NSView {
         completion(result)
     }
 
-    /// Answered and fading away: it's no longer up, and clicks reach the page under it.
+    /// Set while fading out: no longer up, clicks reach the page.
     private var isLeaving = false
     private var isUp: Bool { superview != nil && !isLeaving }
     override func hitTest(_ point: NSPoint) -> NSView? { isLeaving ? nil : super.hitTest(point) }
-    /// Shown once: coming back with its tab, it's simply there again, as the page is.
+    /// Reappears without animation when its tab comes back.
     private var hasShown = false
 
     override func viewDidMoveToWindow() {
@@ -352,7 +356,7 @@ final class PageDialogSheet: NSView {
         }
         needsLayout = true
         layoutSubtreeIfNeeded()
-        // The first time, as any sheet: its dimming fades in as it grows from a little below its middle.
+        // First appearance: dimming fades in as the sheet grows from just below center.
         if hasShown {
             panel.present(arrival: .instant)
         } else {
@@ -382,7 +386,7 @@ final class PageDialogSheet: NSView {
 
     private var bodyHeight: CGFloat { ceil(body.sizeThatFits(NSSize(width: width - pad * 2, height: 600)).height) }
     private let fieldHeight: CGFloat = 36
-    /// Up to four choices show at once; more scroll.
+    /// Up to four visible; more scroll.
     private var choicesHeight: CGFloat {
         choiceRows.isEmpty ? 0 : CGFloat(min(choiceRows.count, 4)) * ChoiceRow.height + Tokens.Space.x2
     }
@@ -407,7 +411,7 @@ final class PageDialogSheet: NSView {
         }
         y += inputs.isEmpty ? 0 : Tokens.Space.x2
         if !choiceRows.isEmpty {
-            // The rows' icons line up with the message's first letter; their fills reach out into the padding.
+            // Row icons align with the message's first letter; fills extend into the padding.
             let listHeight = choicesHeight - Tokens.Space.x2
             choiceScroll.frame = NSRect(x: pad - CardRow.inset, y: y, width: inner + CardRow.inset * 2, height: listHeight)
             choiceList.frame = NSRect(x: 0, y: 0, width: choiceScroll.frame.width, height: CGFloat(choiceRows.count) * ChoiceRow.height)
@@ -417,7 +421,7 @@ final class PageDialogSheet: NSView {
             y += choicesHeight
         }
         if let rememberPill {
-            // The pill's check, not its edge, lines up with the text above.
+            // Aligns the pill's checkmark, not its edge, with the text above.
             rememberPill.frame = NSRect(x: pad - Tokens.Space.x2, y: y, width: min(inner + Tokens.Space.x2 * 2, rememberPill.fittingWidth),
                                         height: Tokens.Metric.controlHeight)
             y += rememberHeight
@@ -426,7 +430,7 @@ final class PageDialogSheet: NSView {
     }
 }
 
-/// A choice in a dialog's list: a symbol, its name, and a quiet line under it. The picked one is the soft card.
+/// Symbol, name and subtitle; the selected one gets the soft card.
 private final class ChoiceRow: InteractiveView {
     static let height: CGFloat = 48
     let choice: PageDialogSheet.Choice

@@ -29,22 +29,48 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         button.isChrome = true
         return button
     }()
+    /// Copy Link and Open in New Tab, beside Keep on Top, as in Zigzag Mini's strip.
+    private let copyButton: IconButton = {
+        let button = IconButton(symbol: "link", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph,
+                                toolTip: Shortcuts.tooltip(PopupWindowController.copyLinkTitle, for: #selector(PopupWindowController.copyPageURL(_:))))
+        button.isChrome = true
+        return button
+    }()
+    private let openButton: IconButton = {
+        let button = IconButton(symbol: "arrow.up.forward.app", size: Tokens.Pane.button, symbolSize: Tokens.Pane.glyph,
+                                toolTip: Shortcuts.tooltip(PopupWindowController.openInTabTitle, for: #selector(PopupWindowController.openDocument(_:))))
+        button.isChrome = true
+        return button
+    }()
+    static var copyLinkTitle: String { String(localized: "Copy Link", comment: "Edit menu item.") }
+    static var openInTabTitle: String {
+        String(localized: "Open in New Tab", comment: "Button in a pop-up window's top strip, its right-click menu and the File menu while it's in front: moves its page into a tab of the browser window.")
+    }
+    /// Over the page, for the find bar and toasts.
+    private let overlay = PassthroughView()
+    /// ⌘F: made the first time it's asked for.
+    private var madeFindBar: FindBarController?
+    private var findBar: FindBarController {
+        if let madeFindBar { return madeFindBar }
+        let made = FindBarController(window: self)
+        madeFindBar = made
+        return made
+    }
     private var keepOnTopToken: NSObjectProtocol?
     private var parentObserver: Any?
     /// The browser window that opened it, where news about it (a pop-up it tried to open) is shown.
     private(set) weak var parentWindow: NSWindow?
-    /// The tab whose page opened it: WebRTC's question for its page is asked in that tab's window, and a private
-    /// window's choices made there hold for it too (`WebRTCProtection`).
+    /// The tab that opened it: WebRTC questions go to its window, and its private-window choices apply here
+    /// (`WebRTCProtection`).
     private(set) weak var opener: Tab?
-    /// The opener's choices for sites (a private window's, made for that tab alone), as they were last seen: they
-    /// still hold once that tab has closed.
+    /// Copy of the opener's choices, kept after it closes.
     private var openerWebRTCChoices: [String: Bool] = [:]
-    /// What WebRTC follows here: the opener's choices while it's open, the ones kept from it after.
+    /// The opener's choices while it's open, the copy after.
     var webRTCChoices: [String: Bool] {
         if let opener { openerWebRTCChoices = opener.webRTCHere }
         return openerWebRTCChoices
     }
-    /// The same for JavaScript (`SiteJavaScript`).
+    /// Same for JavaScript (`SiteJavaScript`).
     private var openerJavaScriptChoices: [String: Bool] = [:]
     var javaScriptChoices: [String: Bool] {
         if let opener { openerJavaScriptChoices = opener.javaScriptHere }
@@ -53,23 +79,20 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// The strip at the top with the traffic lights and whose page it is.
     static let headerHeight = Tokens.Space.x8 + Tokens.Space.x1
     private var lastCrash: Date?
-    /// A pop-up WebKit has handed over before its address is decided: the window exists, so `window.opener` works,
-    /// but nothing is fetched until the person answers. True only until the answer; a denied pop-up makes no request
-    /// at all, which is what blocking is for.
+    /// True until the pop-up question is answered: the window exists (so `window.opener` works) but nothing is
+    /// fetched, so a denied pop-up makes no request.
     private var isHoldingFirstLoad = false
-    /// What the pop-up asked for, held back while `isHoldingFirstLoad`, and loaded once the answer is Mini. Only the
-    /// first request is kept: a page that sends the held window somewhere else while the card is up cannot change
-    /// what the card asked about.
+    /// The first request, loaded if the answer is Mini. Later navigations of the held window can't change what the
+    /// card asked about.
     private var heldRequest: URLRequest?
-    /// The page closed the held pop-up while its question was up: the question has nothing left to ask.
+    /// Called when the page closes the held pop-up while its question is up.
     var onClose: (() -> Void)?
-    /// Whether this window has been closed, by the page or by a person, before or after the answer.
     private(set) var isClosed = false
 
     static func open(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?, opener: Tab?) -> WKWebView {
         let controller = makeController(configuration: configuration, features: features, parent: parent, opener: opener)
         Self.open.insert(controller)
-        // Sign-ins and payments run through these: which site opened one is often the clue.
+        // Sign-ins and payments run through these; the opener's site helps debugging.
         let opener = WindowManager.shared.controller(for: parent)?.tabManager.selectedTab?.url?.host()
         Diagnostics.note("Pop-up opened", site: opener, isPrivate: controller.isPrivate)
         controller.showWindow(nil)
@@ -77,9 +100,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller.webView
     }
 
-    /// The pop-up a page asked for, made before its address is decided, so the answer can be Mini and still give the
-    /// page a real window it can script (`window.opener`). The window stays off screen and the address is held until
-    /// `revealHeldPage()`; `discardHeldPage()` closes it without a request. Nothing here shows or fetches anything.
+    /// Makes the pop-up window before the answer, so a Mini answer still gives the page a scriptable window
+    /// (`window.opener`). Kept off screen with its address held until `revealHeldPage()`; `discardHeldPage()` closes
+    /// it without a request.
     static func asking(configuration: WKWebViewConfiguration, features: WKWindowFeatures, parent: NSWindow?, opener: Tab?) -> PopupWindowController {
         let controller = makeController(configuration: configuration, features: features, parent: parent, opener: opener)
         Self.open.insert(controller)
@@ -87,13 +110,13 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller
     }
 
-    /// The answer was Mini (or the ordinary yes, for a pop-up with a size): show the window and let its address load.
-    /// Returns false when the window is gone, so the caller can open its own viewer instead.
+    /// Shows the window and loads the held address. Returns false when the window is gone, so the caller can open its
+    /// own viewer.
     @discardableResult
     func revealHeldPage() -> Bool {
         guard window != nil, !isClosed else { return false }
-        // The first address goes through the same routing as any page link, at the moment it is revealed too: a
-        // webView.load would otherwise skip WebKit's own block on a top-level data: page.
+        // Route the held address like any page link; a plain webView.load would skip WebKit's block on top-level
+        // data: pages.
         if let heldRequest, let url = heldRequest.url,
            case .refuse = PopupNotice.route(url, from: opener?.url) {
             discardHeldPage()
@@ -109,20 +132,20 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return true
     }
 
-    /// The answer was anything but Mini: the window goes without the address ever being fetched.
+    /// Closes the window without fetching the address.
     func discardHeldPage() {
         isHoldingFirstLoad = false
         heldRequest = nil
         onClose = nil
         close()
-        // A window that was never on screen may not report its closing; the controller is let go here either way.
+        // A never-shown window may not report closing, so release it here.
         Self.open.remove(self)
     }
 
-    /// The first address the pop-up asked for, if it got that far: what a reveal is checked against.
+    /// What a reveal is checked against.
     var heldURL: URL? { heldRequest?.url }
 
-    /// The window closed while a question about it could still be up: end that question, once.
+    /// Ends the pending question once.
     private func noteClosed() {
         guard !isClosed else { return }
         isClosed = true
@@ -161,8 +184,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller
     }
 
-    /// A page's pop-up opened later, from the question about it (or from its remembered destination): a small window
-    /// of its own showing `url`, on the page's own data store where one is given, so it is still signed in.
+    /// Opens `url` in a small viewer window, on the page's data store when given so it stays signed in.
     static func viewer(url: URL, configuration: WKWebViewConfiguration, parent: NSWindow?,
                        by sender: Tab.LoadSender = .page) -> PopupWindowController {
         let controller = PopupWindowController(configuration: configuration,
@@ -175,11 +197,11 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return controller
     }
 
-    /// True while this viewer's page got here because a download rule opened it: that rule must not catch it again.
+    /// Set while showing a page a download rule opened, so the rule doesn't catch it again.
     private var openedByRule = false
 
     private init(configuration: WKWebViewConfiguration, pageSize: NSSize, origin: NSPoint?, parent: NSWindow?, opener: Tab? = nil) {
-        // Preferences of its own, never its opener's: its WebRTC switch is set for each page it goes to.
+        // Own preferences, since WebRTC is set per page.
         WebKitSetup.separatePreferences(of: configuration)
         webView = WKWebView(frame: .zero, configuration: configuration)
         self.opener = opener
@@ -224,11 +246,21 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         content.addSubview(holder)
         header.frame = NSRect(x: 0, y: 0, width: size.width, height: Self.headerHeight)
         header.autoresizingMask = [.width]
-        let pin = Tokens.Pane.button
-        pinButton.frame = NSRect(x: size.width - Tokens.Space.x2 - pin, y: round((Self.headerHeight - pin) / 2), width: pin, height: pin)
-        pinButton.autoresizingMask = [.minXMargin]
-        content.addSubview(pinButton)
-        header.trailingInset = pin + Tokens.Space.x2
+        let pin = Tokens.Pane.button, gap = Tokens.Pane.stripGap
+        // As far in from the right edge as from the top, with room between the buttons' hover boxes.
+        let buttonY = round((Self.headerHeight - pin) / 2)
+        openButton.frame = NSRect(x: size.width - buttonY - pin, y: buttonY, width: pin, height: pin)
+        copyButton.frame = NSRect(x: openButton.frame.minX - gap - pin, y: buttonY, width: pin, height: pin)
+        pinButton.frame = NSRect(x: copyButton.frame.minX - gap - pin, y: buttonY, width: pin, height: pin)
+        for button in [pinButton, copyButton, openButton] {
+            button.autoresizingMask = [.minXMargin]
+            content.addSubview(button)
+        }
+        header.trailingInset = size.width - pinButton.frame.minX
+        copyButton.onClick = { [weak self] _ in self?.copyPageURL(nil) }
+        openButton.onClick = { [weak self] _ in self?.openInTab() }
+        header.onCopy = { [weak self] in self?.copyPageURL(nil) }
+        header.onOpenInTab = { [weak self] in self?.openInTab() }
         pinButton.onClick = { [weak window] _ in
             guard let window else { return }
             KeepOnTop.toggle(window)
@@ -240,12 +272,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                 KeepOnTop.refresh(self.pinButton, for: self.window)
             }
         }
-        // From the content view's own size, not the one asked for: the window may come out a point taller (AppKit
-        // rounding its frame to the screen's pixels), and the page fills it to the bottom edge, with no strip of the
-        // header's color under it.
+        // Uses the content view's size, not the requested one: AppKit may round the frame a point taller, and the
+        // page must fill to the bottom.
         let area = content.bounds
         holder.frame = NSRect(x: 0, y: Self.headerHeight, width: area.width, height: max(0, area.height - Self.headerHeight))
         holder.autoresizingMask = [.width, .height]
+        overlay.frame = holder.frame
+        overlay.autoresizingMask = [.width, .height]
+        content.addSubview(overlay)
         webView.uiDelegate = self
         webView.navigationDelegate = self
         webView.isInspectable = true
@@ -304,18 +338,135 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     /// The address of the page on screen: never one only on its way, which a page could start and never finish.
     private var shownURL: URL?
 
-    /// The address Zigzag's own page for a load that failed is showing at, if it's showing one.
+    /// The address the error page is showing, if any.
     private var errorShownFor: URL?
-    /// What its pages may save, and which responses are shown: a tab's policy.
     private let downloads = DownloadPolicy()
 
-    /// The lock says what Site Controls' connection line says: a certificate let through on the warning page, or
-    /// Zigzag's own warning in place of a page, is never secure.
+    /// Matches Site Controls: a certificate let through, or Zigzag's own warning page, is never secure.
     private func updateHeader() {
         let connection = SitePanel.connection(scheme: shownURL?.scheme, onlySecureContent: webView.hasOnlySecureContent,
                                               certificateException: CertificateExceptions.isShowingException(in: webView),
                                               hasCertificate: !(shownURL != nil && shownURL == errorShownFor))
         header.show(url: shownURL, secure: !connection.warns)
+        copyButton.isEnabled = Self.movableURL(shownURL) != nil
+        openButton.isEnabled = canOpenInTab
+    }
+
+    // MARK: Its page, as a tab's
+
+    /// An address a tab can open: none for a blank page or an extension's own.
+    static func movableURL(_ url: URL?) -> URL? {
+        guard let url, let scheme = url.scheme?.lowercased(), ["http", "https", "file"].contains(scheme) else { return nil }
+        return url
+    }
+
+    /// The profile whose sign-ins the page has; nil for a private page or one in no profile's store.
+    private var profile: Profile? { isPrivate ? nil : Profiles.shared.profile(ofStore: webView.configuration.websiteDataStore) }
+
+    /// Whether the page can move into a tab and keep its sign-in: a web or file address, in a private window's store
+    /// or a profile's. One in a store no tab has would sign in afresh, so it stays a pop-up.
+    var canOpenInTab: Bool { Self.movableURL(shownURL) != nil && (isPrivate || profile != nil) }
+
+    /// Reopens the page as a tab in the opener's window, in a space of the page's own profile, then closes the popup
+    /// (WebKit can't move a live page). Never in another profile's space, where its sign-in isn't.
+    func openInTab() {
+        guard let url = Self.movableURL(shownURL ?? webView.url), !isClosed else { return }
+        let manager = WindowManager.shared
+        let store = webView.configuration.websiteDataStore
+        let target: BrowserWindowController
+        var space: UUID?
+        if isPrivate {
+            // The private window whose store it shares keeps its sign-in.
+            target = manager.controllers.first { $0.tabManager.privateStore === store }
+                ?? manager.newWindow(showCommandBar: false, isPrivate: true)
+        } else {
+            guard let profile else { return }
+            target = manager.controller(for: parentWindow).flatMap { $0.tabManager.isPrivate ? nil : $0 } ?? MiniWindowController.browserWindow()
+            let openerSpace = opener.flatMap { tab in target.tabManager.allTabs.contains { $0 === tab } ? tab.spaceID : nil }
+            space = Self.space(for: profile.id, opener: openerSpace, manager: target.tabManager)
+        }
+        let inTarget = opener.flatMap { tab in target.tabManager.allTabs.contains { $0 === tab } && tab.spaceID == space ? tab : nil }
+        if let space { target.tabManager.switchToSpace(space) }
+        target.tabManager.newTab(url: url, spaceID: space, opener: inTarget, by: .you)
+        window?.close()
+        target.window?.makeKeyAndOrderFront(nil)
+    }
+
+    /// Where a page of `profile` opens as a tab: the opener's space when it's on that profile, else one of that
+    /// profile's, else a new space on it.
+    static func space(for profile: UUID, opener: UUID?, manager: TabManager) -> UUID {
+        let library = Library.shared
+        if let opener, library.space(opener) != nil, library.profileID(ofSpace: opener) == profile { return opener }
+        if library.profileID(ofSpace: manager.currentSpaceID) == profile { return manager.currentSpaceID }
+        let spaces = library.spaces(in: profile).map(\.id)
+        if let space = spaces.first(where: { !manager.tabs(in: $0).isEmpty }) ?? spaces.first { return space }
+        return library.addSpace(profile: profile).id
+    }
+
+    /// ⌘O with the popup in front, as in Zigzag Mini: Open in New Tab.
+    @objc func openDocument(_ sender: Any?) { openInTab() }
+
+    /// The strip's Copy Link, ⇧⌘C, and the address's right-click menu.
+    @objc func copyPageURL(_ sender: Any?) {
+        // A web or file address, as Copy Link in the strip and its right-click menu; never a blank or extension page's.
+        guard let url = Self.movableURL(shownURL) else { return }
+        CleanLink.write(url, title: webView.title)
+        Toast.show(String(localized: "Link copied", comment: "Toast after the page's address is copied."), symbol: "link", over: overlay, area: overlay.bounds)
+    }
+
+    /// ⌘W: the popup holds one page, so the window closes.
+    @objc func closeTab(_ sender: Any?) { window?.performClose(sender) }
+    @objc func goBack(_ sender: Any?) { webView.goBack() }
+    @objc func goForward(_ sender: Any?) { webView.goForward() }
+    @objc func reloadPage(_ sender: Any?) { webView.reload() }
+    @objc func reloadPageFromOrigin(_ sender: Any?) { webView.reloadFromOrigin() }
+    @objc func stopLoading(_ sender: Any?) { webView.stopLoading() }
+
+    @objc func showFindBar(_ sender: Any?) { findBar.toggle() }
+    @objc func findNextMatch(_ sender: Any?) { findBar.next(backwards: false) }
+    @objc func findPreviousMatch(_ sender: Any?) { findBar.next(backwards: true) }
+    @objc func useSelectionForFind(_ sender: Any?) {
+        webView.runOwnScript("window.getSelection().toString()") { [weak self] answer in
+            let result = try? answer.get()
+            MainActor.assumeIsolated {
+                guard let text = result as? String, !text.isEmpty else { return }
+                self?.findBar.show(query: text)
+            }
+        }
+    }
+
+    @objc func zoomIn(_ sender: Any?) { setZoom(ZoomLevels.step(webView.pageZoom, by: 1)) }
+    @objc func zoomOut(_ sender: Any?) { setZoom(ZoomLevels.step(webView.pageZoom, by: -1)) }
+    @objc func actualSize(_ sender: Any?) {
+        setZoom(ZoomLevels.defaultZoom)
+        webView.magnification = 1
+    }
+
+    /// As in a tab: kept for the site, except in private.
+    private func setZoom(_ zoom: CGFloat) {
+        webView.pageZoom = zoom
+        if !isPrivate, let url = shownURL { ZoomLevels.set(zoom, for: url) }
+        Toast.show(ZoomLevels.percent(zoom), symbol: zoom < 1 ? "minus.magnifyingglass" : zoom > 1 ? "plus.magnifyingglass" : "magnifyingglass",
+                   over: overlay, area: overlay.bounds)
+    }
+
+    private var inspector: NSObject? {
+        let selector = NSSelectorFromString("_inspector")
+        guard webView.responds(to: selector) else { return nil }
+        return webView.perform(selector)?.takeUnretainedValue() as? NSObject
+    }
+
+    @objc func showWebInspector(_ sender: Any?) {
+        guard let inspector else { return }
+        inspector.callIfPresent(inspector.inspectorFlag("isVisible") ? "close" : "show")
+    }
+
+    @objc func showJavaScriptConsole(_ sender: Any?) { inspector?.callIfPresent("showConsole") }
+
+    @objc func inspectElement(_ sender: Any?) {
+        guard let inspector else { return }
+        if !inspector.inspectorFlag("isVisible") { inspector.callIfPresent("show") }
+        inspector.callIfPresent("toggleElementSelection")
     }
 
     /// Shows an extension's popup over this window, from the right end of its header, so it isn't hidden behind it.
@@ -327,6 +478,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func windowWillClose(_ notification: Notification) {
+        madeFindBar?.hide()
         noteClosed()
         observations.forEach { $0.invalidate() }
         webView.stopLoading()
@@ -346,23 +498,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         guard Tab.mayOpenInNewWebView(navigationAction.request.url) else { return nil }
-        // A pop-up a page inside this one opened on its own: only a remembered destination opens it, or it asks.
+        // Unclicked pop-ups open only via a kept destination, or ask.
         if !PopupNotice.isUserInitiated(navigationAction) {
-            // The window this pop-up came from, of any kind. A page inside Zigzag Mini or an installed app's window
-            // asks there too; with a browser window's controller alone, that lookup found nothing, so a pop-up a page
-            // inside one of them opened on its own was dropped with nothing said.
+            // Any kind of window: a page in Zigzag Mini or an installed app also asks there. Looking up only browser
+            // windows dropped those pop-ups silently.
             let parent = WindowManager.shared.promptHost(for: parentWindow) ?? (opener?.host as? PromptHost)
-            // A blank window.open() is a page link too: an allowed site keeps the open-blank-then-navigate pattern.
-            // WebKit hands it over as a scheme-less address, not nil.
+            // A blank window.open() counts as a page link so allowed sites can open-then-navigate. WebKit passes it
+            // as a scheme-less address, not nil.
             let (target, isBlank) = PopupNotice.popupTarget(navigationAction.request.url)
-            // The same routing as any other page link, kept answer or not: an app's address asks its own question, and
-            // anything the web may not open top-level opens nowhere.
+            // Same routing as page links: app addresses ask their own question; anything not allowed top-level opens
+            // nowhere.
             switch PopupNotice.route(target, from: webView.url) {
             case .refuse:
                 Diagnostics.note("Refused a page's pop-up", site: webView.url?.host(), "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                 return nil
             case .app:
-                // A frame's pop-up stays blocked quietly here too: only the page itself asks for an app.
+                // Only the main frame asks for an app; a frame's pop-up stays blocked.
                 guard navigationAction.sourceFrame.isMainFrame else {
                     Diagnostics.note("Blocked a frame's pop-up", site: webView.url?.host(),
                                      "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
@@ -373,9 +524,8 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             case .open:
                 break
             }
-            // A destination kept for the site applies to the whole site, a frame's pop-up and a blank one included,
-            // but only Allow and Zigzag Mini may open those: This Tab or New Tab from a frame or a blank window would
-            // move the page without a click.
+            // A kept destination applies to frames and blank pop-ups too, but only Allow and Mini: This Tab or New
+            // Tab from those would move the page without a click.
             var automatic = false
             if !isPrivate, let stored = PopupNotice.storedAction(origin: SiteOrigin.of(webView.url)) {
                 let destination = PopupNotice.destination(for: stored)
@@ -393,20 +543,18 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                     }
                     return nil
                 case .automatic:
-                    // A legacy allow: the routing below, which is what a page's own mouse-click would get.
+                    // Legacy allow: normal routing, as for a click.
                     automatic = true
                 }
             }
             guard automatic else {
-                // Only the page itself asks, never a frame in it: a frame's pop-up is blocked quietly here too. A
-                // blank address with no allowed site is not a question: there is nothing to ask about yet.
+                // Only the main frame asks, and a blank address with no allowed site has nothing to ask about.
                 guard !isBlank, navigationAction.sourceFrame.isMainFrame else {
                     Diagnostics.note("Blocked a frame's or a blank pop-up", site: webView.url?.host(),
                                      "\(target.scheme ?? "no scheme"):", isPrivate: isPrivate)
                     return nil
                 }
-                // The question belongs to the tab whose page opened this pop-up, shown in that tab's window, which
-                // comes forward so the card isn't left behind the pop-up that asked.
+                // Ask in the opener tab's window, brought forward so the card isn't behind the pop-up.
                 parent?.window?.makeKeyAndOrderFront(nil)
                 return PopupNotice.ask(navigationAction, from: webView.url, isPrivate: isPrivate, tab: opener, in: parent,
                                        configuration: configuration, features: windowFeatures)
@@ -441,7 +589,7 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let policy = await decide(navigationAction, in: webView)
-        // The page's own scripts as in a tab (`SiteJavaScript`), a frame's as its page's, with the opener's private choices.
+        // Scripts as in a tab (`SiteJavaScript`), with the opener's private choices.
         if policy == .allow {
             let mainFrame = navigationAction.targetFrame?.isMainFrame ?? true
             SiteJavaScript.apply(to: preferences, for: mainFrame ? navigationAction.request.url : webView.url, here: javaScriptChoices,
@@ -451,31 +599,30 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     private func decide(_ navigationAction: WKNavigationAction, in webView: WKWebView) async -> WKNavigationActionPolicy {
-        // A pop-up waiting on its answer: the address is kept, never fetched. WebKit loads the request into the view
-        // it was handed before anyone has answered, and a denied pop-up must not have asked for its page.
+        // Hold the address while waiting: WebKit loads into the view before the answer, and a denied pop-up must not
+        // have requested its page.
         if isHoldingFirstLoad {
-            // Keep the first address only. A subframe load, or the opener sending the held window somewhere else
-            // after `window.open('/a.html')`, must not change what the card asked about or what is revealed.
+            // First main-frame address only; a later `window.open('/a.html')` redirect can't change what's revealed.
             if heldRequest == nil, navigationAction.targetFrame?.isMainFrame ?? true {
                 heldRequest = navigationAction.request
             }
             return .cancel
         }
-        // Downloads as a tab's are: a stream of them nobody clicked for is refused.
+        // Unclicked download streams are refused, as in a tab.
         let clicked = PopupNotice.isUserInitiated(navigationAction)
         if let policy = downloads.decide(shouldDownload: navigationAction.shouldPerformDownload, clicked: clicked,
                                          isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true) {
-            // A rule for downloads may take it instead: then WebKit makes no download at all.
+            // A download rule may take it; then WebKit makes no download.
             if policy == .download, let url = navigationAction.request.url,
                await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: false,
                                       wasClicked: clicked) { return .cancel }
-            // No rule took it: whether this site may save files at all is asked once, and remembered per site. A
-            // download the page started on its own never asks, though a stored answer still decides it.
+            // Otherwise ask once per site whether it may download. Page-started downloads never ask, but a kept
+            // answer still applies.
             if policy == .download, let url = navigationAction.request.url,
                await !mayDownload(url, request: navigationAction.request, asking: clicked) { return .cancel }
             if policy == .cancel {
-                // The page started this one on its own. Allow Once asks again from the same page — the gesture the
-                // flow policy wanted — and a request that can't be asked for again leaves the notice as it was.
+                // Page-started: Allow Once re-requests from the same page; a request that can't be re-sent leaves the
+                // notice as it is.
                 let origin = SiteOrigin.of(webView.url) ?? SiteOrigin.of(navigationAction.request.url)
                 refusedDownload(action: origin.flatMap {
                     askAgain(origin: $0, request: navigationAction.request, keepAnswer: false)
@@ -483,12 +630,12 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
             }
             return policy
         }
-        // A link a rule wants opens in its app, never a popup page that would be blank.
+        // A rule's link opens in its app, not a blank pop-up page.
         if PopupNotice.isUserInitiated(navigationAction), let url = navigationAction.request.url,
            await handOffIfWanted(url, request: navigationAction.request, appliesToLinks: true, wasClicked: true) { return .cancel }
         // Zigzag's own pages (History) open in its tabs, never in a page's pop-up.
         if navigationAction.request.url?.scheme?.lowercased() == HistoryPage.scheme { return .cancel }
-        // WebRTC on or off for where it's going, before its page is made, as in a tab.
+        // Set WebRTC for the destination before its page is made, as in a tab.
         if navigationAction.targetFrame?.isMainFrame == true, let url = navigationAction.request.url, !ExternalLinks.isExternal(url) {
             WebRTCProtection.apply(to: webView, for: url, here: webRTCChoices)
         }
@@ -503,7 +650,6 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        // The rule-opened page is here: its own links and downloads are its own again.
         openedByRule = false
         PageDialogs.pageLoaded(webView)
         shownURL = webView.url
@@ -513,7 +659,6 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
 
     /// A page that never arrived says why, as a tab does, rather than leave the window blank.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        // A page that never arrived leaves no rule-opened navigation to carry to the next one.
         openedByRule = false
         // It never came: the header stays on the page still showing.
         shownURL = webView.url
@@ -537,10 +682,9 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
         let response = navigationResponse.response
         StrictTransport.note(response, in: webView.configuration.websiteDataStore)
-        // Shown or saved as in a tab: a file sent as an attachment is saved, never shown as the site's page.
+        // As in a tab: an attachment is saved, never shown as the page.
         let policy = downloads.decide(mimeType: response.mimeType, contentDisposition: (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"),
                                       canShowMIMEType: navigationResponse.canShowMIMEType, isMainFrame: navigationResponse.isForMainFrame)
-        // A file a rule wants never reaches the downloads list.
         if policy == .download, let url = response.url {
             let mime = (response.mimeType ?? "").lowercased()
             let disposition = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition") ?? ""
@@ -550,40 +694,37 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                      wasClicked: wasClicked) {
                 return .cancel
             }
-            // A rule didn't take it, so whether this site may save files at all is what decides. A response nobody
-            // clicked for never asks, though a stored answer still decides it.
+            // Then the site's download permission decides. Unclicked responses never ask.
             if await !mayDownload(url, asking: wasClicked) { return .cancel }
         }
         if policy == .cancel, navigationResponse.isForMainFrame { refusedDownload() }
-        // WebRTC follows the page that's to show, where a redirect took it.
+        // WebRTC follows a redirect's destination.
         if navigationResponse.isForMainFrame {
             WebRTCProtection.apply(to: webView, for: policy == .allow ? response.url : webView.url, here: webRTCChoices)
         }
         return policy
     }
 
-    /// A download the page started on its own, refused: said over the page, under the header, never silently.
+    /// Shown under the header, never silently.
     private func refusedDownload(text: String = DownloadPolicy.refusedText, note: String = "A page started another download without a click",
                                  action: (title: String, run: () -> Void)? = nil) {
         Diagnostics.note("Download refused", site: webView.url?.host(), note, isPrivate: isPrivate)
         guard let content = window?.contentView, window?.isVisible == true else { return }
         let area = NSRect(x: 0, y: Self.headerHeight, width: content.bounds.width, height: max(0, content.bounds.height - Self.headerHeight))
-        // A notice with something to offer stays long enough to read and act on, and can be put away, as in a tab.
+        // Longer when there's an action, and dismissable, as in a tab.
         Toast.show(text, symbol: "arrow.down.circle", action: action, duration: action == nil ? 3 : 6,
                    closes: action != nil, over: content, area: area)
     }
 
-    /// What a refused download's notice offers, as in a tab: by then WebKit's "no" can't be taken back, so Allow Once
-    /// asks for it again through this page — the session the site expects — and keeps the answer for the page. What
-    /// comes back is tracked like any other download. Only a plain GET can be asked for again.
+    /// As in a tab: WebKit's refusal can't be undone, so Allow Once re-requests through this page (keeping its
+    /// session) and keeps the answer for the page. Only plain GETs can be re-sent.
     private func askAgain(origin: String, request: URLRequest?,
                           keepAnswer: Bool = true) -> (title: String, run: () -> Void)? {
         guard let request, DownloadPolicy.canBeAskedAgain(request) else { return nil }
         return (String(localized: "Allow Once", comment: "Button in the notice saying a site’s download was blocked: asks the site for the file again and saves it."),
                 { [weak webView, opener] in
                     guard let webView else { return }
-                    // A site's own block keeps its say: this answer is for the page only, and only where the site
-                    // question was the thing that refused the file.
+                    // Page-only, and only when the site question was what refused it; a site Block still wins.
                     if keepAnswer { SitePermissions.allowThisDownload(origin: origin, tab: opener) }
                     webView.startDownload(using: request) { download in
                         DownloadManager.shared.track(download, window: webView.window)
@@ -591,24 +732,20 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                 })
     }
 
-    /// Whether this site may save a file, as in a tab: asked once, "This time" for this page and "Always" for the
-    /// site. False means it may not — said over the page — so the caller cancels the download.
+    /// As in a tab: asked once, "This time" for the page, "Always" for the site. False means cancel the download.
     private func mayDownload(_ url: URL, request: URLRequest? = nil, asking: Bool = true) async -> Bool {
         guard let origin = SiteOrigin.of(webView.url ?? url) else {
-            // A file on this Mac has no site to ask about. A page a site made (about:blank, data:) has an origin it
-            // cannot name, so with asking on it is not allowed to save what it was given; with asking off it saves as
-            // it always did.
+            // Local files have no site. A site-made page (about:blank, data:) has no nameable origin, so with asking
+            // on it can't download.
             if SitePermissions.pageWithoutSiteMayDownload(isFile: (webView.url ?? url).isFileURL) { return true }
             refusedDownload(text: DownloadPolicy.blockedText, note: "A page with no site of its own tried to save a file")
             return false
         }
-        // The pop-up's parent may be another pop-up, which cannot ask. The tab that opened it can, and its window is
-        // where the question belongs; it comes forward so the card is not hidden behind this page.
+        // The parent may be another pop-up, which can't ask; the opener tab's window asks and comes forward.
         let window = WindowManager.shared.promptHost(for: parentWindow)?.window
             ?? opener.flatMap { WindowManager.shared.promptHost(holding: $0)?.window }
-        // Only a site that has not answered needs the question brought forward; a later download is decided without
-        // pulling the window in front of the page the person is using. With no window left to ask in, a site that
-        // needs asking is refused below, while one that doesn't (asking off, or an answer kept) decides as before.
+        // Bring the window forward only when the site still needs asking. With no window, a site that needs asking is
+        // refused below.
         if let window, SitePermissions.asksBeforeDownloads, SitePermissions.downloads(origin: origin, tab: opener) == nil {
             window.makeKeyAndOrderFront(nil)
         }
@@ -621,14 +758,14 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         return allowed
     }
 
-    /// Runs the first rule that catches `url`. True means the popup's page should not load or download it.
+    /// True when a rule took `url`, so the pop-up shouldn't load or download it.
     private func handOffIfWanted(_ url: URL, request: URLRequest, appliesToLinks: Bool, filename: String? = nil,
                                  mime: String = "", wasClicked: Bool = false) async -> Bool {
-        // A page a rule opened in this viewer is the rule's own doing: the rule must not take it again.
+        // Don't re-catch a page a rule opened here.
         guard !openedByRule else { return false }
-        // Zigzag's own pages and an extension's are never a rule's to take.
+        // Zigzag's own pages and extension pages are never handed off.
         guard url.scheme?.lowercased() != HistoryPage.scheme, !Tab.isExtensionPage(url) else { return false }
-        // A download's own name is what an earlier file-type destination matches; a link has none.
+        // File-type rules match a download's name; links have none.
         let handoffName = appliesToLinks ? "" : (filename ?? DownloadTokens.filename(for: url, suggested: ""))
         guard let rule = DownloadHandoff.firstMatch(url, appliesToLinks: appliesToLinks, filename: handoffName,
                                                     isPrivate: isPrivate) else { return false }
@@ -638,20 +775,19 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
                                               mime: mime, space: "",
                                               dataStore: webView.configuration.websiteDataStore, isPrivate: isPrivate,
                                               window: parentWindow, tab: nil, wasClicked: wasClicked, mayAsk: false)
-        // A pop-up has no page store of its own to keep an answer in, and its opener's is another page's. Until the
-        // permission card gives pop-ups a host, their links and downloads are Zigzag's own.
+        // Pop-ups have no page store for an answer (the opener's is another page's). Until the card supports pop-up
+        // hosts, they never ask.
         let decision = await DownloadHandoff.decide(rule, request: handoff, tab: nil, forDownload: !appliesToLinks)
         switch decision.gate {
         case .handOff:
             let outcome = await DownloadHandoff.perform(rule, request: handoff)
             if case .failed = outcome { DownloadHandoff.report(outcome, rule: rule, request: handoff) }
-            // A rule that was matched but didn't take it leaves the pop-up's page as it was.
             if case .noMatch = outcome { return false }
             return true
         case .browser:
             return false
         case .cancel:
-            // Don't Allow: a link asked for goes nowhere, and a download is not saved either.
+            // Don't Allow: a link goes nowhere and a download isn't saved.
             return true
         }
     }
@@ -669,6 +805,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         DownloadManager.shared.track(download, window: window)
     }
 
+    /// The page's own Print button (`window.print()`), as in a tab (`PagePrinting`).
+    @objc(_webView:printFrame:pdfFirstPageSize:completionHandler:)
+    func webView(_ webView: WKWebView, printFrame frame: AnyObject?, pdfFirstPageSize size: CGSize, completionHandler: @escaping () -> Void) {
+        PagePrinting.printForPage(webView, frame: frame, in: window, completion: completionHandler)
+    }
+
+    @objc(_webView:printFrame:)
+    func webView(_ webView: WKWebView, printFrame frame: AnyObject?) {
+        PagePrinting.printForPage(webView, frame: frame, in: window, completion: {})
+    }
+
+    /// File › Print… (⌘P) with the popup in front.
+    @objc func printPage(_ sender: Any?) {
+        PagePrinting.print(webView, in: window, completion: {})
+    }
+
     /// The window the page is told it's in, as a tab's page is (PageWindowFrame).
     @objc(_webView:getWindowFrameWithCompletionHandler:)
     func webView(_ webView: WKWebView, getWindowFrameWithCompletionHandler completion: @escaping (CGRect) -> Void) {
@@ -680,19 +832,59 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
     }
 }
 
-/// The popup's window: it lets extensions' shortcuts have the keys first, as the browser window does, and keeps its
-/// traffic lights on the header's middle, as the browser window and Zigzag Mini keep theirs on their top rows.
+#if DEBUG
+extension PopupWindowController {
+    var debugState: [String: Any] {
+        ["url": shownURL?.absoluteString ?? "-", "copy": copyButton.isEnabled, "open": openButton.isEnabled,
+         "selected": (window?.firstResponder as? NSTextView)?.string ?? ""]
+    }
+    func debugSelectAddress() { header.selectAddress() }
+}
+#endif
+
+extension PopupWindowController: NSMenuItemValidation {
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        // ⌘← and ⌘→ (the hidden Back and Forward) in a text field or the page move the cursor, as in a browser window.
+        if item.isHidden, item.action == #selector(goBack(_:)) || item.action == #selector(goForward(_:)),
+           window?.firstResponder is NSText || window?.firstResponder is WKWebView {
+            return false
+        }
+        switch item.action {
+        case #selector(openDocument(_:)):
+            item.title = Self.openInTabTitle
+            return canOpenInTab
+        case #selector(copyPageURL(_:)): return Self.movableURL(shownURL) != nil
+        case #selector(goBack(_:)): return webView.canGoBack
+        case #selector(goForward(_:)): return webView.canGoForward
+        case #selector(stopLoading(_:)): return webView.isLoading
+        case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)): return madeFindBar?.hasQuery == true
+        default: return true
+        }
+    }
+}
+
+extension PopupWindowController: FindBarHost {
+    var focusedPaneFrame: NSRect { overlay.bounds }
+    var findBarHeaderHeight: CGFloat { 0 }
+    var findBarOverlay: NSView { overlay }
+    var findBarIsCovered: Bool { false }
+    var findableWebView: WKWebView? { webView }
+    var findablePDF: PDFViewerView? { nil }
+}
+
+/// Gives extension shortcuts the keys first, like the browser window, and keeps the traffic lights centered on the
+/// header.
 private final class PopupWindow: NSWindow {
     var commandHandler: ((NSEvent) -> Bool)?
     private var buttonSpacing: CGFloat?
 
     override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
         super.init(contentRect: contentRect, styleMask: style, backing: backingStoreType, defer: flag)
-        // AppKit puts the buttons back whenever it relays the title bar; they go back where they belong.
+        // AppKit resets the buttons on every title bar layout.
         TrafficLightKeeper.install(in: self) { [weak self] in self?.placeTrafficLights() }
     }
 
-    /// Centered on the header, as far in from the left as the browser window's.
+    /// Centered on the header, same left inset as the browser window.
     func placeTrafficLights() {
         guard !styleMask.contains(.fullScreen), let close = standardWindowButton(.closeButton) else { return }
         let origin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((PopupWindowController.headerHeight - close.frame.height) / 2))
@@ -705,14 +897,21 @@ private final class PopupWindow: NSWindow {
     }
 }
 
-/// The popup's top strip: traffic lights on the left, the page's whole address in the middle (`FullAddress`), its
-/// site alone when there isn't room for more.
+/// Traffic lights on the left, the full address in the middle (`FullAddress`), or just the site when narrow.
 final class PopupHeaderView: NSView {
     private let label = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     private var fullAddress: FullAddress.Parts?
     private let lock = NSImageView()
     /// Room kept clear at the right end for buttons laid over the strip (Zigzag Mini's Open in Zigzag).
     var trailingInset: CGFloat = 0 { didSet { needsLayout = true } }
+    /// The address's right-click menu.
+    var onCopy: (() -> Void)?
+    var onOpenInTab: (() -> Void)?
+    /// The whole address, selectable to copy, while the address is clicked.
+    private var shownURL: URL?
+    private var shownSecure = true
+    private let hit = AddressHit()
+    private var selectable: SelectableAddress?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -722,6 +921,8 @@ final class PopupHeaderView: NSView {
         // A long host loses its start, never its end, which says whose site it is.
         label.lineBreakMode = .byTruncatingHead
         addSubview(label)
+        hit.onClick = { [weak self] in self?.selectAddress() }
+        addSubview(hit)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -730,6 +931,9 @@ final class PopupHeaderView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
 
     func show(url: URL?, secure: Bool) {
+        if url != shownURL { endSelecting() }
+        shownURL = url
+        shownSecure = secure
         // An extension's own page: whose it is, not an address no one could read.
         fullAddress = nil
         if #available(macOS 15.4, *), let ext = ExtensionCenter.webExtension(ofPage: url) {
@@ -745,7 +949,7 @@ final class PopupHeaderView: NSView {
         label.stringValue = site ?? AddressView.name(of: url)
         fullAddress = site == nil ? nil : FullAddress.parts(of: url)
         lock.isHidden = site == nil
-        // The open padlock the address bar and Site Controls mark a page that isn't secure with.
+        // Same not-secure padlock as the address bar and Site Controls.
         lock.image = Tokens.Symbol.image(secure ? "lock" : SitePanel.notSecureSymbol, size: Tokens.Symbol.inline)
         lock.setAccessibilityLabel(secure ? String(localized: "Secure connection", comment: "VoiceOver label of the lock before the address in a pop-up window.")
                                            : SitePanel.notSecure)
@@ -771,8 +975,7 @@ final class PopupHeaderView: NSView {
         let leading = Tokens.Space.x16 + Tokens.Space.x4
         var textWidth = label.textWidth
         if let fullAddress {
-            // The whole address when it fits; cut at its end when the site and the start of the rest do; else the
-            // site alone, centered as it is.
+            // Full address if it fits; truncated at the end if the site and some path fit; else the site alone.
             let font = label.font ?? Tokens.Font.body(.medium)
             func measure(_ text: String) -> CGFloat { ceil((text as NSString).size(withAttributes: [.font: font]).width) }
             let most = max(0, bounds.width - leading - lockWidth - gap - Tokens.Space.x4 - trailingInset)
@@ -787,6 +990,101 @@ final class PopupHeaderView: NSView {
         lock.frame = NSRect(x: x, y: 0, width: lockWidth, height: bounds.height)
         label.frame = NSRect(x: lock.frame.maxX + gap, y: (bounds.height - h) / 2, width: max(0, min(ceil(textSize.width), bounds.width - x - Tokens.Space.x4 - trailingInset)), height: h)
         if let fullAddress { FullAddress.show(fullAddress, in: label, room: label.frame.width - Label.inset * 2) }
+        hit.frame = label.frame.insetBy(dx: -Tokens.Space.x1, dy: 0)
+        hit.frame.origin.y = 0
+        hit.frame.size.height = bounds.height
+        hit.isHidden = PopupWindowController.movableURL(shownURL) == nil
+        selectable?.frame = selectableFrame
+    }
+
+    /// The room the whole address takes while selected: the strip between the traffic lights and the buttons.
+    private var selectableFrame: NSRect {
+        let leading = Tokens.Space.x16 + Tokens.Space.x4
+        let h = ceil(label.lineHeight)
+        return NSRect(x: leading, y: round((bounds.height - h) / 2), width: max(0, bounds.width - leading - Tokens.Space.x2 - trailingInset), height: h)
+    }
+
+    /// Shows the whole address selected, read-only, until Esc or focus moves on.
+    func selectAddress() {
+        guard let url = PopupWindowController.movableURL(shownURL), selectable == nil else { return }
+        let field = SelectableAddress(string: url.absoluteString)
+        field.isEditable = false
+        field.isSelectable = true
+        field.isBordered = false
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = label.font
+        field.textColor = Tokens.Color.textPrimary
+        field.lineBreakMode = .byTruncatingTail
+        field.cell?.usesSingleLineMode = true
+        field.cell?.isScrollable = true
+        field.alignment = .center
+        field.onEnd = { [weak self] in self?.endSelecting() }
+        field.setAccessibilityLabel(String(localized: "Address", comment: "VoiceOver label of a pop-up window's address while it's selected to copy."))
+        field.frame = selectableFrame
+        addSubview(field)
+        selectable = field
+        [label, lock, hit].forEach { $0.isHidden = true }
+        window?.makeFirstResponder(field)
+        field.selectText(nil)
+    }
+
+    private func endSelecting() {
+        guard let field = selectable else { return }
+        selectable = nil
+        field.onEnd = nil
+        if field.currentEditor() != nil { window?.makeFirstResponder(nil) }
+        field.removeFromSuperview()
+        label.isHidden = false
+        hit.isHidden = false
+        show(url: shownURL, secure: shownSecure)
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard PopupWindowController.movableURL(shownURL) != nil else { return nil }
+        let menu = NSMenu()
+        let copy = NSMenuItem(title: PopupWindowController.copyLinkTitle, action: #selector(menuCopy), keyEquivalent: "")
+        let open = NSMenuItem(title: PopupWindowController.openInTabTitle, action: #selector(menuOpen), keyEquivalent: "")
+        [copy, open].forEach { $0.target = self; menu.addItem($0) }
+        return menu
+    }
+
+    @objc private func menuCopy() { onCopy?() }
+    @objc private func menuOpen() { onOpenInTab?() }
+}
+
+/// Over the address: a click selects it, a drag moves the window as the rest of the strip does.
+private final class AddressHit: NSView {
+    var onClick: (() -> Void)?
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .iBeam) }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        let start = event.locationInWindow
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if next.type == .leftMouseUp {
+                onClick?()
+                return
+            }
+            let p = next.locationInWindow
+            if hypot(p.x - start.x, p.y - start.y) > 3 {
+                window.performDrag(with: event)
+                return
+            }
+        }
+    }
+}
+
+/// The selected address: says when it's let go, by Esc or by focus moving on.
+private final class SelectableAddress: NSTextField {
+    var onEnd: (() -> Void)?
+    override func cancelOperation(_ sender: Any?) { onEnd?() }
+    override func textDidEndEditing(_ notification: Notification) {
+        super.textDidEndEditing(notification)
+        let end = onEnd
+        DispatchQueue.main.async { end?() }
     }
 }
 
@@ -828,7 +1126,7 @@ extension PopupWindowController: WKWebExtensionWindow {
     func activeTab(for context: WKWebExtensionContext) -> (any WKWebExtensionTab)? { tab }
     func windowType(for context: WKWebExtensionContext) -> WKWebExtension.WindowType { .popup }
     func windowState(for context: WKWebExtensionContext) -> WKWebExtension.WindowState { window?.isMiniaturized == true ? .minimized : .normal }
-    func isPrivate(for context: WKWebExtensionContext) -> Bool { false }
+    func isPrivate(for context: WKWebExtensionContext) -> Bool { isPrivate }
     func frame(for context: WKWebExtensionContext) -> CGRect { window?.frame ?? .null }
     func screenFrame(for context: WKWebExtensionContext) -> CGRect { window?.screen?.frame ?? .null }
 

@@ -298,13 +298,11 @@ nonisolated struct TileShape: Equatable, Sendable {
 
     // MARK: Changing the group
 
-    /// Where the pages already in the group go when a new one takes `target`, in their order; nil if it can't.
-    /// A half beside one page puts that page in the other half. A half beside two halves moves both into the other
-    /// half, a quarter each, first one first (left or top). A quarter takes that corner of the half it's in, which
-    /// keeps the other corner. Never more than four, and never a page left with a shape that isn't a half or a quarter.
-    /// A page dropped on a split's row in the sidebar, joining it (`onRight`: the right half of the row): it takes
-    /// a quarter of the half on that side (the second quarter, below or to the right), the page there keeping the
-    /// first. Two side by side become a half and two quarters, three a grid of four. Nil once there's no half left.
+    /// Where existing pages go when a new one takes `target`, in order; nil if impossible. A half beside one page moves
+    /// that page to the other half; beside two halves, both become quarters of the other half (first left or top). A
+    /// quarter takes that corner of its half. At most four, only halves and quarters.
+    /// A page dropped on a split's sidebar row (`onRight`: right half) takes the second quarter of that side's half.
+    /// Two become a half and two quarters, three a 2x2 grid. Nil when no half is left.
     static func joining(_ regions: [TileRegion], onRight: Bool) -> TileDrop.Kind? {
         guard regions.count < maxPanes else { return nil }
         let halves = regions.filter(\.isHalf)
@@ -661,7 +659,6 @@ nonisolated struct PaneZoom: Equatable, Sendable {
             self = PaneZoom()
             return nil
         }
-        return index
         return index
     }
 }

@@ -150,11 +150,11 @@ extension ExtensionBridgeTests {
             try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), requestID: id)
         }
         await #expect(throws: BridgeError.self) {
-            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), authorize: { false })
+            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), authorize: { _ in false })
         }
         let duringSetup = UUID()
         await #expect(throws: BridgeError.self) {
-            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), requestID: duringSetup) {
+            try await bridge.response([:], url: url, extensionID: "test", store: .nonPersistent(), requestID: duringSetup) { _ in
                 bridge.cancel(duringSetup, extensionID: "test")
                 return true
             }
@@ -201,6 +201,26 @@ extension ExtensionBridgeTests {
         #expect(server.requests.withLock { $0 } == 2)
     }
 
+    @Test func defaultCredentialFetchStepsInOnlyForSameSiteCookies() async throws {
+        let store = WKWebsiteDataStore.nonPersistent()
+        let url = try #require(URL(string: "https://account.example/api/me"))
+        func cookie(_ name: String, domain: String, sameSite: String?) throws -> HTTPCookie {
+            var properties: [HTTPCookiePropertyKey: Any] = [.name: name, .value: "synthetic", .domain: domain, .path: "/", .secure: "TRUE"]
+            if let sameSite { properties[.sameSitePolicy] = sameSite }
+            return try #require(HTTPCookie(properties: properties))
+        }
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(url, in: store) == false)
+        // WebKit's own fetch sends these, so the bridge leaves them to it.
+        await store.httpCookieStore.setCookie(try cookie("plain", domain: "account.example", sameSite: nil))
+        await store.httpCookieStore.setCookie(try cookie("elsewhere", domain: "other.example", sameSite: "lax"))
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(url, in: store) == false)
+        await store.httpCookieStore.setCookie(try cookie("session", domain: ".account.example", sameSite: "lax"))
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(url, in: store))
+        #expect(await BridgeExtensionFetch.keepsSameSiteCookies(try #require(URL(string: "https://other.example/")), in: store))
+        let scoped = ExtensionWrite.scoped(await store.httpCookieStore.allCookies(), to: url).map(\.name).sorted()
+        #expect(scoped == ["plain", "session"])
+    }
+
     @Test(arguments: ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"])
     func credentialedFetchIsSharedAndLeavesUnsupportedRequestsUntouched(extensionID: String) async throws {
         let configuration = WKWebViewConfiguration()
@@ -239,6 +259,11 @@ extension ExtensionBridgeTests {
             const shared = calls.length === 8 && calls.every(c => c.ns === 'extensionFetch')
               && calls[0].args[0].cache === 'no-store' && calls[1].args[0].cache === 'reload'
               && calls[1].args[0].redirect === 'error' && calls[6].args[0].body === 'plain text';
+            // Left at the default, as Chrome sends cookies then too; the native side decides whether it steps in.
+            await fetch(other, {});
+            await fetch(other, { ...json, credentials: 'same-origin' });
+            const defaults = calls.length === 10 && calls[0].args[0].credentials === 'include'
+              && calls[8].args[0].credentials === 'same-origin' && calls[9].args[0].credentials === 'same-origin';
             const request = new Request(other, json);
             const fallback = await fetch(request);
             const untouched = !request.bodyUsed && normal[0][0] === request;
@@ -250,7 +275,7 @@ extension ExtensionBridgeTests {
             await streaming;
             const cases = [
               [other, { ...json, body: new Uint8Array([255, 0]) }], [other, { ...json, body: new Blob(['x']) }],
-              [other, { credentials: 'omit' }], [other, {}], [other, { credentials: 'include', method: 'PROPFIND' }],
+              [other, { credentials: 'omit' }], [other, { credentials: 'include', method: 'PROPFIND' }],
               [other, { credentials: 'include', mode: 'same-origin' }], [other, { credentials: 'include', mode: 'no-cors' }],
               [other, { credentials: 'include', integrity: 'sha256-test' }],
               [other, { credentials: 'include', redirect: 'manual' }], [other, { credentials: 'include', keepalive: true }],
@@ -260,9 +285,9 @@ extension ExtensionBridgeTests {
               ['data:text/plain,hello', { credentials: 'include' }]
             ];
             for (const [url, options] of cases) await fetch(url, options);
-            const unsupportedSkippedBridge = calls.length === 8;
+            const unsupportedSkippedBridge = calls.length === 10;
             await fetch('https://unapproved.example/me', { credentials: 'include' });
-            const declinedOnce = calls.length === 9 && normal.length === cases.length + 3;
+            const declinedOnce = calls.length === 11 && normal.length === cases.length + 3;
             let networkError = false;
             try { await fetch('https://fails.example/write', json); } catch (error) { networkError = error instanceof TypeError; }
             const noRetry = networkError && normal.length === cases.length + 3;
@@ -279,13 +304,13 @@ extension ExtensionBridgeTests {
             ongoingController.abort();
             try { await ongoing; } catch (error) { aborted = aborted && error.name === 'AbortError'; }
             const cancelForwarded = calls.at(-1).fn === 'cancel' && calls.at(-1).args[0] === calls.at(-2).args[0].requestID;
-            return { binary, cloneOK, shared, untouched, streamUntouched, fallback: await fallback.text(),
+            return { binary, cloneOK, shared, defaults, untouched, streamUntouched, fallback: await fallback.text(),
                      unsupportedSkippedBridge, declinedOnce, noRetry, aborted, preAbortedSkippedBridge, cancelForwarded };
             """, arguments: ["bridge": ExtensionBridgeScript.source, "extensionID": extensionID], in: nil, contentWorld: .page) as? [String: Any]
         let value = try #require(result)
         #expect(value["binary"] as? String == "0,255,128,65")
         #expect(value["fallback"] as? String == "original")
-        for key in ["cloneOK", "shared", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
+        for key in ["cloneOK", "shared", "defaults", "untouched", "streamUntouched", "unsupportedSkippedBridge", "declinedOnce", "noRetry", "aborted", "preAbortedSkippedBridge", "cancelForwarded"] {
             #expect(value[key] as? Bool == true, "Failed fetch behavior: \(key)")
         }
     }
@@ -446,10 +471,10 @@ extension ExtensionBridgeTests {
         defer { server.listener.cancel() }
         let requests = ExtensionFetchRequests(), id = UUID()
         await #expect(throws: BridgeError.self) {
-            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), authorize: { false })
+            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), authorize: { _ in false })
         }
         await #expect(throws: (any Error).self) {
-            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), requestID: id) {
+            try await requests.response(["method": "POST"], url: url, extensionID: "test", store: .nonPersistent(), requestID: id) { _ in
                 requests.cancel(id, extensionID: "test")
                 return true
             }
@@ -498,6 +523,145 @@ extension ExtensionBridgeTests {
         #expect(response["url"] as? String == localURL.appendingPathComponent("unexpected").absoluteString)
     }
 
+    /// Default credentials (YouMind's sign-in check): a redirect to another site the extension may reach is followed
+    /// here with that site's cookies, once, never handed to WebKit to send again.
+    @Test(arguments: ["GET", "POST"])
+    func defaultCredentialRedirectsToAnotherReachableSiteAreFollowedOnce(method: String) async throws {
+        let target = try SessionTestServer()
+        let targetURL = try await target.start()
+        defer { target.listener.cancel() }
+        let server = try SessionTestServer(redirectTarget: targetURL.appendingPathComponent("me").absoluteString)
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/", .init("SameSite"): "Lax"])))
+        let options: [String: Any] = method == "POST" ? ["method": method, "body": "{}"] : ["method": method]
+        let response = try #require(try await ExtensionFetchRequests().direct(options,
+            url: url.appendingPathComponent("redirect"), extensionID: "test", store: store) { _ in true } as? [String: Any])
+        #expect(response["redirected"] as? Bool == true)
+        #expect(response["url"] as? String == targetURL.appendingPathComponent("me").absoluteString)
+        let body = String(decoding: Data(base64Encoded: try #require(response["body"] as? String)) ?? Data(), as: UTF8.self)
+        #expect(body.contains("\"signedIn\":true"))
+        #expect(server.requests.withLock { $0 } == 1)
+        #expect(target.requests.withLock { $0 } == 1)
+    }
+
+    /// A site the extension may not reach gets no cookies and must allow it by CORS; each hop is checked as it's made.
+    @Test func defaultCredentialRedirectsAreCheckedHopByHop() async throws {
+        let target = try SessionTestServer()
+        let targetURL = try await target.start()
+        defer { target.listener.cancel() }
+        let store = WKWebsiteDataStore.nonPersistent()
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "session", .value: "synthetic", .domain: "127.0.0.1", .path: "/", .init("SameSite"): "Lax"])))
+        for (path, allowed) in [("open", true), ("me", false)] {
+            let server = try SessionTestServer(redirectTarget: targetURL.appendingPathComponent(path).absoluteString)
+            let url = try await server.start()
+            defer { server.listener.cancel() }
+            let port = url.port
+            let send = { try await ExtensionFetchRequests().direct([:], url: url.appendingPathComponent("redirect"), extensionID: "test", store: store) { $0.port == port } }
+            if allowed {
+                let response = try #require(try await send() as? [String: Any])
+                let body = String(decoding: Data(base64Encoded: try #require(response["body"] as? String)) ?? Data(), as: UTF8.self)
+                #expect(body.contains("\"signedIn\":false"))
+            } else {
+                await #expect(throws: BridgeError.self) { try await send() }
+            }
+            #expect(server.requests.withLock { $0 } == 1)
+        }
+        #expect(target.requests.withLock { $0 } == 2)
+        // Within the site too: a hop to a path the extension can't reach goes no further.
+        let local = try SessionTestServer()
+        let localURL = try await local.start()
+        defer { local.listener.cancel() }
+        await #expect(throws: BridgeError.self) {
+            try await ExtensionFetchRequests().direct([:], url: localURL.appendingPathComponent("redirect"), extensionID: "test", store: store) { $0.path != "/unexpected" }
+        }
+        #expect(local.requests.withLock { $0 } == 1)
+    }
+
+    /// What default credentials can't carry here goes to WebKit's fetch before anything is sent.
+    @Test func defaultCredentialFetchDecidesBeforeSending() async throws {
+        let server = try SessionTestServer()
+        let url = try await server.start()
+        defer { server.listener.cancel() }
+        let requests = ExtensionFetchRequests()
+        for (options, target) in [([String: Any](), URL(string: "http://remote.example/api")!),
+                                  (["headers": [["Accept", "text/event-stream"]]], url),
+                                  (["method": "GET", "body": "x"], url),
+                                  (["method": "POST", "body": String(repeating: "x", count: ExtensionFetchRequests.responseLimit + 1)], url)] {
+            let answer = try await requests.direct(options, url: target, extensionID: "test", store: .nonPersistent()) { _ in true }
+            #expect((answer as? [String: Any])?["fallback"] as? Bool == true)
+        }
+        #expect(server.requests.withLock { $0 } == 0)
+        // A slow read isn't cut short: it ends when its extension lets go of it.
+        let id = UUID()
+        let slow = Task { _ = try await requests.direct([:], url: url.appendingPathComponent("pending"), extensionID: "test", store: .nonPersistent(), requestID: id) { _ in true } }
+        for _ in 0..<300 where server.requests.withLock({ $0 }) == 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(server.requests.withLock { $0 } == 1)
+        requests.cancel(id, extensionID: "test")
+        await #expect(throws: (any Error).self) { try await slow.value }
+    }
+
+    /// The SameSite check is read once per host until the profile's cookies change.
+    @Test func sameSiteCheckIsKeptUntilCookiesChange() async throws {
+        let store = WKWebsiteDataStore.nonPersistent()
+        let url = try #require(URL(string: "https://account.example/api/me"))
+        let check = SameSiteCookieCheck()
+        #expect(await check.has(url, in: store) == false)
+        #expect(check.count == 1)
+        await store.httpCookieStore.setCookie(try #require(HTTPCookie(properties: [.name: "s", .value: "1", .domain: "account.example", .path: "/", .secure: "TRUE", .sameSitePolicy: "lax"])))
+        for _ in 0..<200 where check.count > 0 { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(check.count == 0)
+        #expect(await check.has(url, in: store))
+    }
+
+    /// An extension asking for sites only as optional (Raindrop) reaches a server without CORS headers once "On All
+    /// Sites" is chosen, as Chrome does with host access; by default, or for another site listed, it's blocked (#324).
+    @Test func chosenAllSitesGivesOptionalHostAccessPastCORS() async throws {
+        let server = try SessionTestServer()
+        let target = try await server.start()
+        defer { server.listener.cancel() }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":[],"optional_host_permissions":["*://*/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("<!doctype html><title>page</title>".utf8).write(to: folder.appendingPathComponent("page.html"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+
+        func fetched(_ access: ExtensionInstalls.SiteAccess?, sites: [String] = []) async throws -> String {
+            let controller = WKWebExtensionController(configuration: .nonPersistent())
+            let context = WKWebExtensionContext(for: ext)
+            try controller.load(context)
+            defer { try? controller.unload(context) }
+            for pattern in ExtensionHost.siteAccessPatterns(access, approved: [], optional: ext.optionalPermissionMatchPatterns, sites: sites) {
+                context.setPermissionStatus(.grantedExplicitly, for: pattern)
+            }
+            #expect(BridgeExtensionFetch.allows(target, context: context) == (access == .all))
+            let page = WKWebView(frame: .zero, configuration: try #require(context.webViewConfiguration))
+            page.load(URLRequest(url: context.baseURL.appendingPathComponent("page.html")))
+            for _ in 0..<100 where page.isLoading || page.title != "page" { try await Task.sleep(for: .milliseconds(100)) }
+            #expect(page.title == "page")
+            return try await page.callAsyncJavaScript("""
+                try { const response = await fetch(target, { credentials: 'omit' }); return String(response.status) + ' ' + await response.text(); }
+                catch (error) { return error.name; }
+                """, arguments: ["target": target.absoluteString], in: nil, contentWorld: .page) as? String ?? ""
+        }
+        #expect(try await fetched(nil) == "TypeError")
+        #expect(try await fetched(.sites, sites: ["example.com"]) == "TypeError")
+        #expect(try await fetched(.all) == #"200 {"signedIn":false}"#)
+    }
+
+    @Test func siteAccessChoicesGrantWhatTheySay() throws {
+        let required = try WKWebExtension.MatchPattern(string: "https://api.example/*")
+        let optional: Set = [try WKWebExtension.MatchPattern(string: "*://*/*")]
+        #expect(ExtensionHost.siteAccessPatterns(nil, approved: [required], optional: optional, sites: []) == [required])
+        #expect(Set(ExtensionHost.siteAccessPatterns(.all, approved: [required], optional: optional, sites: [])) == optional.union([required]))
+        #expect(ExtensionHost.siteAccessPatterns(.click, approved: [required], optional: optional, sites: []).isEmpty)
+        #expect(Set(ExtensionHost.siteAccessPatterns(.sites, approved: [], optional: optional, sites: ["raindrop.io"]))
+            == Set(ExtensionHost.patterns(for: "raindrop.io")))
+    }
+
     /// A name an extension gives a download stays a plain file name inside Downloads.
     @Test func downloadNamesCantClimbOut() {
         #expect(BridgeDownloads.safeName("../../evil/report.pdf") == "report.pdf")
@@ -523,6 +687,17 @@ extension ExtensionBridgeTests {
         #expect(!BridgeDownloads.sees(hidden, in: other))
     }
 
+    /// An extension allowed in private windows sees their downloads too, in its own profile only (#353).
+    @Test func privateDownloadsOnlyToAnExtensionAllowedThere() {
+        let other = UUID()
+        let hidden = DownloadItem(filename: "c.pdf", sourceURL: nil, isPrivate: true)
+        let everyday = DownloadItem(filename: "a.pdf", sourceURL: nil, isPrivate: false)
+        #expect(BridgeDownloads.sees(hidden, in: Profile.defaultID, seesPrivate: true))
+        #expect(!BridgeDownloads.sees(hidden, in: Profile.defaultID, seesPrivate: false))
+        #expect(!BridgeDownloads.sees(hidden, in: other, seesPrivate: true))
+        #expect(BridgeDownloads.sees(everyday, in: Profile.defaultID, seesPrivate: false))
+    }
+
     /// A download fetched again (one listed from before Zigzag started has no store of its own) goes in its own
     /// profile's store, never the one of whichever page is in front: that could be another profile's sign-ins.
     @Test func aDownloadIsFetchedAgainInItsOwnProfile() {
@@ -535,18 +710,15 @@ extension ExtensionBridgeTests {
     }
 }
 
-/// `runtime.getContexts`, as Chrome answers it: its background, its offscreen page, its popup and its side panel,
-/// with Chrome's filters over them. Claude's side panel opens only when it finds itself there as its tab's side panel,
-/// by its whole address (#112). Only what Zigzag can name truthfully is reported: no tab, document or incognito
-/// identity it doesn't have.
+/// `runtime.getContexts` like Chrome: background, offscreen, popup, side panel, with filters. Claude's side panel checks its full URL (#112). Only truthful fields are reported.
 struct ExtensionContextsTests {
     private let id = "fcoeoabgfenejglbffodgkkbkcdhcgfn"
     private let base = "webkit-extension://fcoeoabgfenejglbffodgkkbkcdhcgfn/"
     private var baseURL: URL { URL(string: base)! }
-    /// The extension's origin, as Chrome reports it: its actual scheme, query and all.
+    /// The extension origin as Chrome reports it.
     private var origin: String { String(base.dropLast()) }
 
-    /// A popup's page as WebKit holds it. Its address is the page's own, not a path rebuilt by anyone else.
+    /// A popup with its real URL, not a rebuilt path.
     private final class PopupPage: WKWebView {
         private let address: URL?
         override var url: URL? { address }
@@ -557,7 +729,7 @@ struct ExtensionContextsTests {
         required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
     }
 
-    /// The pages an extension has open: its background, its offscreen page, and a side panel opened for one tab.
+    /// Background, offscreen page, and a side panel for one tab.
     private var contexts: [Context] {
         [Context(type: .background, contextID: "background", documentURL: URL(string: base + "zigzag-entry.js")),
          Context(type: .offscreenDocument, contextID: "offscreen", documentURL: URL(string: base + "offscreen.html")),
@@ -612,7 +784,7 @@ struct ExtensionContextsTests {
         #expect(declared.documentURL?.absoluteString == base + "background.html")
         #expect(declared.frameID == 0)
         #expect(declared.tabID == -1)
-        // Scripts alone: the page Chrome generates for them.
+        // Scripts only: Chrome's generated page.
         let generated = try #require(BridgeContexts.background(manifest: ["manifest_version": 2, "background": ["scripts": ["background.js"]]],
                                                                baseURL: baseURL, contextID: "background"))
         #expect(generated.documentURL?.absoluteString == base + "_generated_background_page.html")
@@ -639,7 +811,7 @@ struct ExtensionContextsTests {
         #expect(BridgeContexts.matching(all, filter: ["tabIds": [7]]).map(\.contextID) == ["panel"])
         #expect(BridgeContexts.matching(all, filter: ["windowIds": [3]]).map(\.contextID) == ["panel", "popup"])
         #expect(BridgeContexts.matching(all, filter: ["contextTypes": ["POPUP", "BACKGROUND"]]).map(\.contextID) == ["worker", "popup"])
-        // Every field given narrows the answer, and every value within one widens it.
+        // Each filter field narrows; values within one widen.
         #expect(BridgeContexts.matching(all, filter: ["windowIds": [3], "contextTypes": ["POPUP"]]).map(\.contextID) == ["popup"])
         #expect(BridgeContexts.matching(all, filter: ["windowIds": [4]]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: [:]).count == 3)
@@ -649,11 +821,11 @@ struct ExtensionContextsTests {
         let worker = Context(type: .background, contextID: "worker", frameID: -1)
         let popup = Context(type: .popup, contextID: "popup", documentURL: URL(string: base + "popup.html"))
         let all = [worker, popup]
-        // An explicit empty list matches nothing, where leaving the field out matches everything.
+        // An empty list matches nothing; an absent field matches everything.
         #expect(BridgeContexts.matching(all, filter: ["contextIds": []]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: ["documentUrls": []]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: ["contextTypes": []]).isEmpty)
-        // A document field leaves out a context that has no document.
+        // A document filter skips contexts without a document.
         #expect(BridgeContexts.matching(all, filter: ["documentUrls": [base + "popup.html"]]).map(\.contextID) == ["popup"])
         #expect(BridgeContexts.matching(all, filter: ["documentIds": ["anything"]]).isEmpty)
         #expect(BridgeContexts.matching(all, filter: ["documentOrigins": [origin]]).map(\.contextID) == ["popup"])
@@ -665,12 +837,12 @@ struct ExtensionContextsTests {
         let first = names.name(of: panel, extensionID: "one")
         #expect(names.name(of: panel, extensionID: "one") == first)
         #expect(names.name(of: NSObject(), extensionID: "one") != first)
-        // Two popups showing the same page are two contexts, with two names.
+        // Two popups on the same page are two contexts.
         let url = URL(string: base + "popup.html")!
         let one = PopupPage(url), two = PopupPage(url)
         let oneID = names.name(of: one, extensionID: "one")
         #expect(names.name(of: two, extensionID: "one") != oneID)
-        // A context that closes is forgotten, so one that opens again is a new one.
+        // Closed contexts are forgotten; reopening gives a new ID.
         names.keeping([names.name(of: two, extensionID: "one")], extensionID: "one")
         #expect(names.name(of: one, extensionID: "one") != oneID)
     }
@@ -680,12 +852,12 @@ struct ExtensionContextsTests {
         let first = NSObject(), second = NSObject()
         let firstID = names.name(of: first, extensionID: "one")
         let secondID = names.name(of: second, extensionID: "two")
-        // Two extensions may hold the same page object; their names are their own.
+        // Names are per extension.
         #expect(names.name(of: first, extensionID: "two") != firstID)
-        // One extension's sweep keeps its own live contexts and forgets none of the other's.
+        // One extension's sweep doesn't touch another's.
         names.keeping([firstID], extensionID: "one")
         #expect(names.name(of: second, extensionID: "two") == secondID)
-        // And it does not resurrect the other's closed context either.
+        // Nor revive its closed context.
         names.keeping([], extensionID: "two")
         #expect(names.name(of: second, extensionID: "two") != secondID)
     }
@@ -701,13 +873,12 @@ struct ExtensionContextsTests {
             #expect(context.documentID == nil)
             #expect(context.dictionary["documentId"] == nil)
         }
-        // What can be named is there.
         #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html")
         #expect(panel.dictionary["tabId"] as? Int == 770)
     }
 
     @Test func aPopupKeepsItsQueryString() throws {
-        // The address is the page's own (`WKWebView.url`), not the path `shownPopupPage` gives tab capture.
+        // The URL is `WKWebView.url`, not the path `shownPopupPage` gives tab capture.
         let address = try #require(URL(string: base + "popup.html?tabId=770&view=side"))
         let page = PopupPage(address)
         let names = ContextNames()
@@ -716,7 +887,7 @@ struct ExtensionContextsTests {
         #expect(popup.dictionary["documentUrl"] as? String == base + "popup.html?tabId=770&view=side")
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html?tabId=770&view=side"]]).count == 1)
         #expect(BridgeContexts.matching([popup], filter: ["documentUrls": [base + "popup.html"]]).isEmpty)
-        // Its identity is the page itself, not its address.
+        // Identity is the page object, not its URL.
         #expect(names.name(of: page, extensionID: "one") == popup.contextID)
     }
 }
@@ -811,6 +982,7 @@ nonisolated private final class SessionTestServer: @unchecked Sendable {
                 return
             }
             let redirect = path == "/redirect"
+            let open = path == "/open" ? "Access-Control-Allow-Origin: *\r\n" : ""
             let signedIn = text.components(separatedBy: "\r\n").contains { $0.lowercased().hasPrefix("cookie:") && $0.contains("session=synthetic") }
             let body = path == "/binary" ? Data([0, 255, 128, 65])
                 : path == "/echo" ? Data(bytes[boundary.upperBound..<(boundary.upperBound + length)])
@@ -820,7 +992,7 @@ nonisolated private final class SessionTestServer: @unchecked Sendable {
                 && text.components(separatedBy: "\r\n").contains { $0.lowercased().hasPrefix("cookie:") && $0.contains("logout_token=test-session") && !$0.contains("session=forged") }
             let status = redirect ? "302 Found" : path == "/logout" && !logoutOK ? "403 Forbidden" : "200 OK"
             let deleted = path == "/logout" ? "Set-Cookie: logout_token=; Max-Age=0; Path=/; HttpOnly\r\n" : ""
-            let headers = redirect ? "Location: \(redirectTarget)\r\n" : deleted + "Set-Cookie: refreshed=synthetic; Path=/; SameSite=Lax; HttpOnly\r\n"
+            let headers = redirect ? "Location: \(redirectTarget)\r\n" : open + deleted + "Set-Cookie: refreshed=synthetic; Path=/; SameSite=Lax; HttpOnly\r\n"
             let response = "HTTP/1.1 \(status)\r\nContent-Type: application/octet-stream\r\nCache-Control: public, max-age=3600\r\n\(headers)Content-Length: \(body.count)\r\nConnection: close\r\n\r\n"
             connection.send(content: Data(response.utf8) + body, completion: .contentProcessed { _ in connection.cancel() })
         }
@@ -853,8 +1025,7 @@ struct ExtensionNumberTests {
 }
 
 extension ExtensionBridgeTests {
-    /// A background's WebSocket reaches this Mac, a site its manifest's host_permissions name, or an optional one
-    /// once granted; wss://host counts as https://host.
+    /// Background WebSockets need local, host_permissions, or granted optional hosts; wss://host counts as https://host.
     @Test func backgroundSocketsNeedHostAccess() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -878,7 +1049,7 @@ extension ExtensionBridgeTests {
 }
 
 extension ExtensionBridgeTests {
-    /// downloads.search's filenameRegex runs away from the main thread and gives up on a pattern that takes too long.
+    /// downloads.search filenameRegex runs off the main thread with a timeout.
     @Test func downloadSearchPatternsGiveUp() async {
         let names = ["/Users/me/Downloads/report.pdf", "/Users/me/Downloads/photo.png", String(repeating: "a", count: 40) + "!"]
         #expect(await BridgeDownloads.matching(#"\.pdf$"#, in: names) == [0])
@@ -889,7 +1060,7 @@ extension ExtensionBridgeTests {
         #expect(Date().timeIntervalSince(started) < 5)
     }
 
-    /// An extension's lines in extensions.log stay one line each, and short.
+    /// Extension log lines stay single-line and short.
     @Test func extensionLogLinesStayShort() {
         #expect(ExtensionLog.entry("socket to example.com closed") == "socket to example.com closed")
         #expect(ExtensionLog.entry("name\n2026-01-01 Zigzag: fake line\r\u{2028}x") == "name 2026-01-01 Zigzag: fake line  x")
@@ -897,11 +1068,21 @@ extension ExtensionBridgeTests {
         #expect(long.unicodeScalars.count == ExtensionLog.lineLimit + 1 && long.hasSuffix("…"))
     }
 
-    /// The sound taps take chunks of the size they send, not any a page posts.
+    /// Sound tap chunks are capped at the sent size.
     @Test func tapChunksAreCapped() {
         #expect(BridgeTabCapture.acceptsChunk(pcm: String(repeating: "A", count: 44_000), rate: 48_000))
         #expect(!BridgeTabCapture.acceptsChunk(pcm: String(repeating: "A", count: BridgeTabCapture.maxChunkCharacters + 1), rate: 48_000))
         #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: 0))
         #expect(!BridgeTabCapture.acceptsChunk(pcm: "AAAA", rate: .infinity))
+    }
+
+    /// A per-tab side panel shows there even when off globally (ChatGPT).
+    @Test func sidePanelTabOptionWinsOverEveryTab() {
+        if #available(macOS 15.4, *) {
+            #expect(BridgeSidePanel.isEnabled(everywhere: false, forTab: true))
+            #expect(!BridgeSidePanel.isEnabled(everywhere: true, forTab: false))
+            #expect(!BridgeSidePanel.isEnabled(everywhere: false, forTab: nil))
+            #expect(BridgeSidePanel.isEnabled(everywhere: true, forTab: nil))
+        }
     }
 }

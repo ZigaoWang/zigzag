@@ -134,15 +134,14 @@ enum PageDialogs {
         return now < exception.until && exception.leaf == leaf
     }
 
-    /// Whether the page `webView` shows came with a certificate you chose to trust on the warning page.
+    /// Whether the shown page was loaded through a certificate trusted from the warning page.
     static func isShowingException(in webView: WKWebView?) -> Bool {
         guard let webView, let url = webView.url, url.scheme?.lowercased() == "https", let host = url.host(),
               let trust = webView.serverTrust else { return false }
         return wasTrusted(host, leaf: leaf(of: trust), in: webView.configuration.websiteDataStore)
     }
 
-    /// Whether `leaf` is a certificate you chose to trust for `host`, even if that choice has since run out: a page
-    /// still showing what came with it isn't secure, and goes on saying so.
+    /// Whether you trusted `leaf` for `host`, even if that has since expired: a page still showing it isn't secure.
     static func wasTrusted(_ host: String, leaf: Data?, in store: WKWebsiteDataStore) -> Bool {
         guard let leaf, !leaf.isEmpty, let exception = trusted.object(forKey: store)?[host.lowercased()] as? Exception else { return false }
         return exception.leaf == leaf
@@ -154,8 +153,7 @@ enum PageDialogs {
         return now < exception.until
     }
 
-    /// The choices for `store` go (its site data was cleared): all of them, or one site's (covering its subdomains
-    /// and the domains it's under).
+    /// Clears choices after site data is cleared: all, or one site's (its subdomains and parent domains).
     static func forget(in store: WKWebsiteDataStore, site: String? = nil) {
         guard let site = site?.lowercased() else {
             trusted.removeObject(forKey: store)
@@ -251,16 +249,15 @@ enum AuthenticationPrompt {
                                                    leaf: CertificateExceptions.leaf(of: trust), askedBy: page?.url, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
-        // A site asking for a certificate that identifies you: one from your Keychain, as Safari offers.
+        // Client certificate from the Keychain, as in Safari.
         if method == NSURLAuthenticationMethodClientCertificate {
             return await ClientCertificates.respond(to: challenge, window: window, store: store, page: page)
         }
         guard method == NSURLAuthenticationMethodHTTPBasic || method == NSURLAuthenticationMethodHTTPDigest || method == NSURLAuthenticationMethodNTLM else {
             return (.performDefaultHandling, nil)
         }
-        // Only the site you're on (or going to) signs in over its page. Something from another site inside it (an
-        // image, a frame) neither puts a sign-in sheet over a page that isn't its own nor gets a name and password
-        // saved for its site sent along: it's asked before anything saved is looked at.
+        // Only the page's own site can sign in over it. Cross-site resources (images, frames) get no sheet and no
+        // saved credentials; checked before saved logins are read.
         let pageHost = await MainActor.run { page?.url?.host() }
         guard Self.mayAnswer(pageHost: pageHost, askingHost: challenge.protectionSpace.host) else {
             return (.cancelAuthenticationChallenge, nil)
@@ -272,13 +269,12 @@ enum AuthenticationPrompt {
         // Several loads asking for the same sign-in at once (a page and its images): one question, one answer for all.
         let space = challenge.protectionSpace
         let key = "\(ObjectIdentifier(store).hashValue)|\(space.host):\(space.port)|\(space.realm ?? "")"
-        let asker = store.isPersistent ? tab : nil
-        // Extensions never hear of a private tab's sign-ins, as they never see its pages.
-        let asksExtensions = store.isPersistent
+        // A private tab's sign-ins go only to extensions allowed in private windows (BridgeWebRequest.askForSignIn).
+        let asker = tab
         if challenge.previousFailureCount == 0, let asking = signingIn[key] {
             // Asked again while the sheet is up: the page loaded again, often because an extension was told what to
             // fill (1Password reloads the tab once you pick a login in it). Its answer answers the sheet too.
-            if asking.sheetShown, asksExtensions, case .credentials(let username, let password) = await askExtensions(challenge, page: page, tab: asker) {
+            if asking.sheetShown, case .credentials(let username, let password) = await askExtensions(challenge, page: page, tab: asker) {
                 PageDialogSheet.answer(tag: key, with: [username, password])
                 return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
             }
@@ -286,14 +282,22 @@ enum AuthenticationPrompt {
         }
         let attempt = SigningIn()
         signingIn[key] = attempt
+        // While the sheet asks, an extension's late name and password signs in with it (#387).
+        let late = BridgeWebRequest.LateAnswer { username, password in
+            if !PageDialogSheet.answer(tag: key, with: [username, password]) { attempt.early = [username, password] }
+        }
         let task = Task { @MainActor () -> (URLSession.AuthChallengeDisposition, URLCredential?) in
-            switch asksExtensions ? await askExtensions(challenge, page: page, tab: asker) : .none {
+            defer { late.end() }
+            switch await askExtensions(challenge, page: page, tab: asker, late: late) {
             case .credentials(let username, let password):
                 return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
             case .cancel:
                 return (.cancelAuthenticationChallenge, nil)
             case .none:
-                return await ask(challenge, window: window, page: page, tag: key) { attempt.sheetShown = true }
+                return await ask(challenge, window: window, page: page, tag: key) {
+                    attempt.sheetShown = true
+                    return attempt.early
+                }
             }
         }
         attempt.task = task
@@ -302,8 +306,7 @@ enum AuthenticationPrompt {
         return answer
     }
 
-    /// Whether a sign-in asked for by `askingHost` may be answered on the page at `pageHost`, with a saved name and
-    /// password or a sheet: only on its own site. With no page to go by, it may.
+    /// Only on its own site; with no page, allowed.
     nonisolated static func mayAnswer(pageHost: String?, askingHost: String) -> Bool {
         guard let pageHost = pageHost?.lowercased(), !pageHost.isEmpty else { return true }
         return sameSite(pageHost, askingHost.lowercased())
@@ -317,6 +320,8 @@ enum AuthenticationPrompt {
     @MainActor private final class SigningIn {
         var task: Task<(URLSession.AuthChallengeDisposition, URLCredential?), Never>?
         var sheetShown = false
+        /// An extension's name and password that came before the sheet showed.
+        var early: [String]?
     }
 
     @MainActor private static var signingIn: [String: SigningIn] = [:]
@@ -324,16 +329,17 @@ enum AuthenticationPrompt {
     /// Extensions' onAuthRequired listeners, asked as Chrome asks them before its own dialog. After a wrong password
     /// they're asked once more, as in Chrome; after that only the sheet asks, so a wrong answer can't go round and round.
     @MainActor
-    private static func askExtensions(_ challenge: URLAuthenticationChallenge, page: WKWebView?, tab: (any WKWebExtensionTab)?) async -> BridgeWebRequest.Answer {
+    private static func askExtensions(_ challenge: URLAuthenticationChallenge, page: WKWebView?, tab: (any WKWebExtensionTab)?,
+                                      late: BridgeWebRequest.LateAnswer? = nil) async -> BridgeWebRequest.Answer {
         // The extensions of the profile the page is in: another profile's never hear of its sign-ins.
         guard challenge.previousFailureCount < 2, let page, let site = SiteChallenge(challenge, pageURL: page.url),
               let host = (page as? BrowserWebView)?.owner?.extensionHost ?? Profiles.shared.profile(of: page)?.extensions else { return .none }
-        return await host.bridge.webRequest.askForSignIn(site, tab: tab)
+        return await host.bridge.webRequest.askForSignIn(site, tab: tab, isPrivate: !page.configuration.websiteDataStore.isPersistent, late: late)
     }
 
     @MainActor
     private static func ask(_ challenge: URLAuthenticationChallenge, window: NSWindow,
-                            page: WKWebView?, tag: String, shown: () -> Void) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+                            page: WKWebView?, tag: String, shown: () -> [String]?) async -> (URLSession.AuthChallengeDisposition, URLCredential?) {
         let isPrivate = page?.configuration.websiteDataStore.isPersistent != true
         Diagnostics.note(challenge.previousFailureCount > 0 ? "Site sign-in didn’t work" : "Site asked to sign in", site: challenge.protectionSpace.host,
                          isPrivate: isPrivate)
@@ -354,7 +360,8 @@ enum AuthenticationPrompt {
         // The tab or window may have gone while extensions and saved passwords were asked: nothing to put a sheet on,
         // and a sheet on nothing would never be answered, leaving the site's next sign-in waiting on it.
         guard window.isVisible, page.map({ $0.window === window }) ?? true else { return (.cancelAuthenticationChallenge, nil) }
-        shown()
+        // An extension answered while saved passwords were read: no sheet.
+        if let early = shown(), early.count == 2 { return (.useCredential, URLCredential(user: early[0], password: early[1], persistence: .forSession)) }
         let result = await PageDialogSheet.ask(in: window, title: String(localized: "Sign in to \(challenge.protectionSpace.host)", comment: "Title of the sheet a site's HTTP sign-in asks with. The placeholder is the site's host name."), message: message,
                                                fields: fields, confirmTitle: String(localized: "Sign In", comment: "Button in a site's HTTP sign-in sheet."), showsCancel: true, offersBlock: false, page: page,
                                                savedLogins: offered, tag: tag)

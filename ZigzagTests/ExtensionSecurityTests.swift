@@ -279,17 +279,16 @@ struct ExtensionSecurityTests {
         #expect(use.hasGesture(id, now: start.addingTimeInterval(11)))
     }
 
-    /// A click in a page carries over to sidePanel.open only through the extension's content script in that page:
-    /// its message follows the click, the call comes within a second, and the page is the one clicked.
+    /// A page click counts for sidePanel.open only via the extension's content script there, with the call within a second.
     @Test func aPageClickCarriesOverThroughAContentScript() {
         let start = Date()
         var use = ExtensionUse()
         let soon = start.addingTimeInterval(0.3)
-        // No click in a page at all: a message alone opens nothing.
+        // No page click: a message alone opens nothing.
         #expect(!use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start, now: soon))
         use.pageGesture(on: "Docs.Example.com", at: start)
         #expect(use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start.addingTimeInterval(0.1), now: soon))
-        // Another page's content script, a message from before the click, or a call too long after: no.
+        // Another page's script, a message before the click, or a late call: no.
         #expect(!use.carriesPageGesture(messageHosts: ["other.example.com"], messageAt: start.addingTimeInterval(0.1), now: soon))
         #expect(!use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start.addingTimeInterval(-2), now: soon))
         #expect(!use.carriesPageGesture(messageHosts: ["docs.example.com"], messageAt: start.addingTimeInterval(0.1),
@@ -338,6 +337,9 @@ struct ExtensionSecurityTests {
                                                    isPrivate: false, now: slider.addingTimeInterval(1)))
         #expect(!BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: site,
                                                    isPrivate: true, now: slider.addingTimeInterval(1)))
+        // A private one only for an extension allowed in private windows (#353).
+        #expect(BridgeTabCapture.namedStreamHolds(givenTo: booster, askedBy: booster, expires: expires, namedOrigin: site, origin: site,
+                                                  isPrivate: true, seesPrivate: true, now: slider.addingTimeInterval(1)))
         // Shazam asks for no sites at all: on every site you let it reach, its capture goes ahead (Chrome's needs no
         // host permission). An extension with only activeTab has the site once you click it, as WebKit grants it.
         let url = URL(string: "https://www.music.example/song")!
@@ -359,6 +361,9 @@ struct ExtensionSecurityTests {
         let found = BridgeFavicons.icons(for: ["https://video.example/watch", "https://bank.example/", "https://secret.example/",
                                                "https://blank.example/", "https://visited-once.example/", nil], among: open)
         #expect(found.map { $0 != nil } == [true, false, false, false, false, false])
+        // An extension allowed in private windows gets the private tab's icon too (#353).
+        let allowed = BridgeFavicons.icons(for: ["https://secret.example/", "https://bank.example/"], among: open, seesPrivate: true)
+        #expect(allowed.map { $0 != nil } == [true, false])
         let url = try #require(BridgeFavicons.dataURL(icon, side: BridgeFavicons.side))
         #expect(url.hasPrefix("data:image/png;base64,"))
         let data = try #require(Data(base64Encoded: String(url.dropFirst("data:image/png;base64,".count))))
@@ -464,8 +469,7 @@ struct ExtensionSecurityTests {
 // MARK: Install sheets
 
 extension ExtensionSecurityTests {
-    /// The install sheet's limits come from the compatibility claims. In PR A a permission whose row is partial is
-    /// silent (main's noise level), as is one the claims support, and neither becomes a raw-name line.
+    /// Install sheet limits come from compatibility claims; partial and supported rows are silent and never raw-name lines.
     @Test func limitsComeFromClaimsNotFromWebKit() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let manifest: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
@@ -473,12 +477,11 @@ extension ExtensionSecurityTests {
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
         #expect(report.limits.isEmpty)
-        // sidePanel is supported by the claims, so the old table's "Side panel" is gone even though WebKit supplies it.
+        // sidePanel is supported by the claims, so "Side panel" is gone.
         #expect(!report.limits.map(\.text).contains("Side panel"))
     }
 
-    /// A permission neither WebKit nor the claims know is still something the extension asked for and won't get:
-    /// it is reported by its own name, with no invented English around it, once.
+    /// A permission unknown to both WebKit and the claims is reported once by its raw name.
     @Test func aPermissionNoClaimCoversIsReportedNotDropped() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let manifest: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
@@ -486,7 +489,7 @@ extension ExtensionSecurityTests {
                                        "optional_permissions": ["anotherUnknownPermission"]]
         let context = try await Self.context(manifest)
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
-        // WebKit knows alarms, so an unclaimed but working permission is not a limit.
+        // WebKit supports alarms, so it's not a limit.
         #expect(!report.limits.map(\.source).contains("alarms"))
         let madeUp = try #require(report.limits.first { $0.source == "totallyMadeUpPermission" })
         #expect(madeUp.catalogKey == nil)
@@ -496,7 +499,7 @@ extension ExtensionSecurityTests {
         let optional = try #require(report.limits.first { $0.source == "anotherUnknownPermission" })
         #expect(optional.catalogKey == nil)
         #expect(optional.text == "anotherUnknownPermission")
-        // MV2 puts host patterns beside permissions; a pattern is not a permission missing a claim.
+        // MV2 host patterns sit in permissions; they aren't unclaimed permissions.
         let legacy: [String: Any] = ["manifest_version": 2, "name": "Test", "version": "1.0",
                                      "permissions": ["storage", "https://*.example.com/*", "<all_urls>"]]
         let legacyContext = try await Self.context(legacy)
@@ -505,8 +508,7 @@ extension ExtensionSecurityTests {
         #expect(!legacyReport.limits.map(\.source).contains("<all_urls>"))
     }
 
-    /// Every line a person saw before the claims that the claims still call a gap reads the same. A partial row is
-    /// silent in PR A, so the narrower lines it names are not in the sheet yet.
+    /// Lines the claims still mark as gaps read as before; partial rows are silent for now.
     @Test func theInstallSheetLimitsReadAsTheyDidBefore() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let permissions = ["sidePanel", "identity", "identity.email", "notifications", "downloads", "downloads.open",
@@ -522,8 +524,7 @@ extension ExtensionSecurityTests {
             "Saving pages", "Recording your screen", "Address bar keyword", "Reading aloud", "Your location",
             "Reading what you copy",
         ])
-        // The permission rows the claims call supported, and the partial ones (management, tabCapture, proxy,
-        // identity.email) that name a narrower gap, keep their lines out of the sheet in PR A.
+        // Supported rows, and partial ones (management, tabCapture, proxy, identity.email), have no sheet lines yet.
         for gone in ["Side panel", "Your browsing history", "Your bookmarks", "Your top sites", "Notifications",
                      "Downloads", "Knowing when you’re away", "Background audio and clipboard", "Recording tabs",
                      "Display information", "Keeping your Mac awake", "Signing in with your account",
@@ -532,7 +533,7 @@ extension ExtensionSecurityTests {
         }
     }
 
-    /// An update's sheet names only the limits the new version adds, by their catalog key, not every limit it has.
+    /// Update sheets list only newly added limits, by catalog key.
     @Test func anUpdateShowsOnlyLimitsItAdds() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let old: [String: Any] = ["manifest_version": 3, "name": "Test", "version": "1.0",
@@ -543,15 +544,14 @@ extension ExtensionSecurityTests {
         let context = try await Self.context(new)
         let report = ExtensionReport(newIn: context.webExtension, manifest: new, comparedTo: old, id: id)
         #expect(report.limits.map(\.text) == ["Font settings"])
-        // Taking one away is not an addition.
+        // Removing one isn't an addition.
         var fewer = new
         fewer["permissions"] = ["privacy"]
         let removed = ExtensionReport(newIn: context.webExtension, manifest: fewer, comparedTo: old, id: id)
         #expect(removed.limits.isEmpty)
     }
 
-    /// A shim's prelude stands in for the permissions it covers, so the lines those permissions would add are
-    /// suppressed; the claims still word every other line, and PR A's partial rows add none.
+    /// Permissions a shim covers produce no lines; partial rows add none.
     @Test func aShimCoveredPermissionIsNotReported() async throws {
         let manifest: [String: Any] = ["manifest_version": 3, "name": "1Password", "version": "1.0",
                                        "permissions": ["management", "privacy", "storage"]]
@@ -561,8 +561,7 @@ extension ExtensionSecurityTests {
         #expect(report.limits.isEmpty)
     }
 
-    /// A permission that mostly works keeps its whole namespace out of the sheet: partial rows are silent in PR A, so
-    /// "Won't work in Zigzag" never reads as "tabs do not work" when only some member does not.
+    /// A mostly working permission doesn't put its whole namespace in the sheet, so "tabs" isn't reported broken for one member.
     @Test func aCommonPermissionNamesItsGapNotItsNamespace() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let manifest: [String: Any] = ["manifest_version": 3, "name": "Tab Tool", "version": "1.0",
@@ -575,7 +574,7 @@ extension ExtensionSecurityTests {
         #expect(!report.limits.map(\.text).contains("Blocking rules"))
     }
 
-    /// The later-request sheet uses the same limits as the install sheet, not an empty list.
+    /// The later-request sheet shows the same limits as the install sheet.
     @Test func theQuestionShowsTheSameLimitsAsTheSheet() {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         #expect(ExtensionReport(requesting: ["privacy", "tabGroups"], id: id).limits.map(\.text)
@@ -583,7 +582,7 @@ extension ExtensionSecurityTests {
         #expect(ExtensionReport(requesting: ["sidePanel"], id: id).limits.isEmpty)
     }
 
-    /// The install sheet words what these permissions bring, as the later-request sheet does.
+    /// The install sheet describes each risky permission, like the later-request sheet.
     @Test func theInstallSheetNamesEveryRiskyPermission() async throws {
         let id = "abcdefghijklmnopabcdefghijklmnop"
         let expected: [(String, String)] = [
@@ -596,7 +595,7 @@ extension ExtensionSecurityTests {
             let context = try await Self.context(manifest)
             let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
             #expect(report.abilities.map(\.text).contains(line), "\(permission)")
-            // Asked for later, it reads the same, once.
+            // Requested later: same text, once.
             #expect(ExtensionReport(requesting: [permission], id: id).abilities.map(\.text) == [line], "\(permission)")
         }
     }
@@ -605,7 +604,7 @@ extension ExtensionSecurityTests {
 // MARK: Packages and updates
 
 extension ExtensionSecurityTests {
-    /// One entry can't claim more than a file could be, nor more than its packed bytes could unpack to.
+    /// Entries can't claim more than the file size or the packed bytes could inflate to.
     @Test func entriesCantClaimHugeSizes() {
         let manifest = CraftedZip.Item(name: "manifest.json", data: Data(#"{"version": "1.0"}"#.utf8))
         let huge = CraftedZip(items: [manifest, .init(name: "a.bin", data: Data([0x03, 0x00]), method: 8, claimedSize: UInt32(PackageZip.maxEntrySize + 1))])
@@ -616,7 +615,7 @@ extension ExtensionSecurityTests {
         #expect((try? PackageZip.entries(fair.data))?.count == 2)
     }
 
-    /// A version names a folder: only Chrome's numbers and dots.
+    /// Versions name folders: digits and dots only, as Chrome allows.
     @Test func versionsAreOnlyNumbers() {
         for good in ["1", "1.0", "2.10.3", "1.2.3.4", "65535.0"] { #expect(ExtensionStore.isValidVersion(good), "\(good)") }
         for bad in ["", ".", "..", "1..2", "1.", ".1", "1/2", "..\\x", "1.2.3.4.5", "1.0-beta", "65536", "1:2", " 1", "١"] {
@@ -624,7 +623,7 @@ extension ExtensionSecurityTests {
         }
     }
 
-    /// An update that changes the search engine, Zigzag's own pages or who may talk to it waits for the person.
+    /// Updates that change the search engine, Zigzag pages, or external messaging wait for approval.
     @Test func updatesThatTakeOverMoreWait() {
         let old: [String: Any] = ["permissions": ["storage"], "chrome_settings_overrides": ["search_provider": ["search_url": "https://good.example/?q={searchTerms}"]]]
         #expect(!ExtensionStore.asksForMore(old, than: old))
@@ -637,22 +636,20 @@ extension ExtensionSecurityTests {
         var connectable = old
         connectable["externally_connectable"] = ["matches": ["https://*.example/*"]]
         #expect(ExtensionStore.asksForMore(connectable, than: old))
-        // Taking one away asks for nothing.
+        // Removing one needs no approval.
         #expect(!ExtensionStore.asksForMore(["permissions": ["storage"]], than: old))
         #expect(ExtensionStore.asksForMore(["permissions": ["storage", "tabs"]], than: old))
     }
 
-    /// Manifest V2's webRequestBlocking is recorded, so its sign-in answers keep working; a folder's record from
-    /// before takes nothing more from its files on disk.
+    /// MV2 webRequestBlocking is recorded so sign-in handling keeps working; folder records migrate without taking more from disk.
     @Test func blockingIsRecordedAndFoldersMigrateFromTheRecord() {
         #expect(ExtensionHost.askedPermissions(requested: ["webRequest"], declared: ["webRequest", "webRequestBlocking"]).contains("webRequestBlocking"))
-        // An extension approved before webRequestBlocking was recorded (Tampermonkey) takes it quietly, never asked again.
+        // Extensions approved before blocking was recorded (Tampermonkey) get it without asking.
         #expect(ExtensionHost.carryingBlocking(["storage", "webRequest"], declared: ["webRequest", "webRequestBlocking"]) == ["storage", "webRequest", "webRequestBlocking"])
         #expect(ExtensionHost.carryingBlocking(["storage"], declared: ["webRequest", "webRequestBlocking"]) == nil)
         #expect(ExtensionHost.carryingBlocking(["webRequest", "webRequestBlocking"], declared: ["webRequest", "webRequestBlocking"]) == nil)
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging"], declared: []) == ["storage"])
-        // A folder keeps the native messaging and scripting its record had, while its manifest still asks; nothing
-        // its files ask for beyond the record is added.
+        // A folder keeps native messaging and scripting from its record while the manifest asks; nothing beyond the record is added.
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging", "scripting"], declared: ["storage", "nativeMessaging", "scripting", "history"],
                                              fromFolder: true) == ["storage", "nativeMessaging", "scripting"])
         #expect(ExtensionHost.migratedGrants(["storage", "nativeMessaging", "scripting"], declared: ["storage"], fromFolder: true) == ["storage"])
@@ -661,7 +658,7 @@ extension ExtensionSecurityTests {
 }
 
 extension ExtensionSecurityTests {
-    /// The sign-in window names the site its page is on now.
+    /// The sign-in window shows the current site.
     @Test func signInWindowsShowTheSite() {
         #expect(BridgeIdentity.shownAddress(URL(string: "https://accounts.example.com/o/oauth2?x=1")) == "accounts.example.com")
         #expect(BridgeIdentity.shownAddress(URL(string: "https://login.example:8443/")) == "login.example:8443")
@@ -672,7 +669,7 @@ extension ExtensionSecurityTests {
 }
 
 extension ExtensionSecurityTests {
-    /// Side panels and offscreen pages stay on the extension's own pages.
+    /// Side panels and offscreen pages stay on extension pages.
     @Test func panelsStayOnTheExtensionsPages() {
         let base = URL(string: "webkit-extension://abcdefghijklmnopabcdefghijklmnop/")!
         #expect(ExtensionPageGuard.staysInExtension(URL(string: "webkit-extension://abcdefghijklmnopabcdefghijklmnop/panel.html?tabId=3"), base: base))
@@ -683,7 +680,7 @@ extension ExtensionSecurityTests {
         #expect(!ExtensionPageGuard.staysInExtension(nil, base: base))
     }
 
-    /// A click or a key pressed counts as using an extension; a key repeating while held, or a move, doesn't.
+    /// Clicks and key presses count as gestures; key repeats and mouse moves don't.
     @Test func onlyRealPressesAreGestures() {
         #expect(ExtensionUse.isGesture(.leftMouseDown, isRepeat: false))
         #expect(ExtensionUse.isGesture(.keyDown, isRepeat: false))
@@ -696,7 +693,7 @@ extension ExtensionSecurityTests {
 }
 
 extension ExtensionSecurityTests {
-    /// A folder's extension shows what it asks for before it's added, as a store package does.
+    /// Folder extensions show their permissions before they're added, like store packages.
     @Test func foldersAreReviewedBeforeTheyAreAdded() async throws {
         let folder = try Self.temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }

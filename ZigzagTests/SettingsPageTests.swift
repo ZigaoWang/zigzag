@@ -158,6 +158,28 @@ struct GroupListingTests {
 
 }
 
+/// Settings' picture, taken for a tab's preview when you leave it.
+@MainActor
+struct SettingsSnapshotTests {
+    /// The picture is taken with the shadows off, since drawing them on the CPU froze Zigzag on Developer, and every
+    /// shadow is back as it was afterward.
+    @Test func snapshotLeavesShadowsAsTheyWere() throws {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView?.wantsLayer = true
+        let settings = SettingsView(pane: .general)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        window.contentView?.addSubview(settings)
+        settings.layoutSubtreeIfNeeded()
+
+        let shadowed = SettingsView.shadowedLayers(in: settings)
+        let before = shadowed.map(\.shadowOpacity)
+        try #require(!shadowed.isEmpty, "General has switches, whose knobs have shadows")
+        let image = try #require(settings.snapshot())
+        #expect(image.size == settings.bounds.size)
+        #expect(shadowed.map(\.shadowOpacity) == before)
+    }
+}
+
 /// Find a setting, in Settings' header.
 @MainActor
 struct SettingsSearchTests {
@@ -188,11 +210,68 @@ struct SettingsSearchTests {
         #expect(settings.debugFound.contains("How it works"))
     }
 
-    /// A shortcut with the Globe key, as macOS gives Enter Full Screen, shows the Globe first, never a lone letter.
+    /// Globe key shortcuts (Enter Full Screen) show the Globe first.
     @Test func globeKeyShowsInAShortcut() {
         let fullScreen = Shortcuts.Combo(key: "f", modifiers: NSEvent.ModifierFlags.function.rawValue)
         #expect(Shortcuts.caps(fullScreen) == [Shortcuts.globe, "F"])
         let both = Shortcuts.Combo(key: "f", modifiers: NSEvent.ModifierFlags([.function, .control, .command]).rawValue)
         #expect(Shortcuts.caps(both) == [Shortcuts.globe, "⌃", "⌘", "F"])
+    }
+
+    /// ⌃⌥⇧⌘ together summarize as the Hyper key.
+    @Test func hyperKeyShowsInAShortcut() {
+        let hyper = Shortcuts.Combo(key: "t", modifiers: Shortcuts.hyperFlags.rawValue)
+        #expect(Shortcuts.caps(hyper) == [Shortcuts.hyper, "T"])
+        let withGlobe = Shortcuts.Combo(key: "t", modifiers: Shortcuts.hyperFlags.union(.function).rawValue)
+        #expect(Shortcuts.caps(withGlobe) == [Shortcuts.globe, Shortcuts.hyper, "T"])
+        let row = ShortcutRow(title: "New Tab", keys: Shortcuts.caps(hyper))
+        for query in ["hyper", "hypr", "command", "cmd", "shift", "option", "control", "✦T"] {
+            #expect(row.searchText.localizedCaseInsensitiveContains(query), "“\(query)” should match \(row.searchText)")
+        }
+    }
+}
+
+/// Settings reads a section's slow rows when it's first shown or searched, never all of them on opening (#357).
+@MainActor
+struct SettingsReadingTests {
+    @Test func openingGeneralReadsNoOtherSection() {
+        let settings = SettingsView(pane: .general)
+        #expect(settings.debugReads.isEmpty)
+        settings.debugReadNow()
+        #expect(settings.debugReads["webApps"] == 1)
+        #expect(settings.debugReads["siteData"] == nil)
+        #expect(settings.debugReads["extensions"] == nil)
+        #expect(settings.debugReads["orphans"] == nil)
+        #expect(settings.debugReads["privacy"] == nil)
+    }
+
+    @Test func websiteDataIsReadWhenShown() {
+        let settings = SettingsView(pane: .general)
+        settings.show(SettingsPane.websiteData(manyProfiles: Library.shared.hasManyProfiles))
+        // Read once the page has drawn, not while it's asked for.
+        #expect(settings.debugReads["siteData"] == nil)
+        settings.debugReadNow()
+        #expect(settings.debugReads["siteData"] == 1)
+        #expect(settings.debugReads["privacy"] == 1)
+        #expect(settings.debugReads["extensions"] == nil)
+        #expect(settings.debugReads["orphans"] == nil)
+    }
+
+    @Test func extensionsAreReadWhenShown() {
+        let settings = SettingsView(pane: .extensions)
+        #expect(settings.debugReads["extensions"] == nil)
+        settings.debugReadNow()
+        #expect(settings.debugReads["extensions"] == 1)
+        #expect(settings.debugReads["siteData"] == nil)
+        #expect(settings.debugReads["orphans"] == nil)
+    }
+
+    @Test func searchFindsRowsInSectionsNotShownYet() throws {
+        let settings = SettingsView(pane: .general)
+        let name = try #require(Library.shared.profiles.first?.displayName)
+        #expect(!settings.debugFound.contains(name))
+        settings.debugFind(name)
+        #expect(settings.debugFound.contains(name))
+        #expect(settings.debugReads["orphans"] == 1)
     }
 }

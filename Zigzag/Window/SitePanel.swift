@@ -1,6 +1,18 @@
 import AppKit
 import WebKit
 
+/// A window of one page with no browser window behind it, where Site Controls opens from its strip: Zigzag Mini (#225)
+/// and an installed app's window (#356).
+@MainActor protocol SitePanelPageHost: AnyObject {
+    var tab: Tab { get }
+    var overlay: PassthroughView { get }
+    var window: NSWindow? { get }
+    /// Its extensions listed, their menus working and their popups not: those open from a browser window's address.
+    var listsExtensions: Bool { get }
+    func copyPageURL(_ sender: Any?)
+    func confirmClear(_ kind: WebsiteData.Kind, of tab: Tab)
+}
+
 /// Everything about the page you're on, behind one button by the address (#174). Its first page is short: the site,
 /// with whether its connection is secure in a small line under its name (#221), a row of quick actions, your
 /// extensions to click right there (#215), a line into Permissions (once the site asked), and the few switches that
@@ -17,9 +29,9 @@ final class SitePanel: FloatingPanelView {
     static func closeCurrent() { current?.close() }
 
     private weak var controller: BrowserWindowController?
-    /// Opened in Zigzag Mini (#225): its one page, with what a page's own settings are; what needs a browser window
-    /// (Reader, translating, extensions' popups, the developer tools) stays there.
-    private weak var mini: MiniWindowController?
+    /// Opened in Zigzag Mini (#225) or an installed app's window (#356): its one page, with what a page's own settings
+    /// are; what needs a browser window (Reader, translating, extensions' popups, the developer tools) stays there.
+    private weak var pageHost: SitePanelPageHost?
     private weak var anchor: NSView?
     /// The button it opened from, shown pressed while it's open: the sidebar's, or a split pane's (#160).
     private weak var opener: IconButton?
@@ -36,12 +48,16 @@ final class SitePanel: FloatingPanelView {
     private let isBlank: Bool
     /// The panel is about one page: when it goes to another site (a sign-in redirect), the panel goes too.
     private var pageToken: SignalToken?
+    /// Clear cookies when Zigzag quits, which shows or hides Keep cookies while the panel is open (#383).
+    private var clearingToken: SignalToken?
     /// Whether this panel describes the page in this tab.
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
     /// Opened from a split pane's strip, under its address: it belongs to where that strip is.
     private(set) var isFromPane = false
-    /// Under the sidebar's address, as wide as it and edge to edge with it: a window growing or shrinking leaves it there.
+    /// Opened from the sidebar address: aligned with the field's edge.
     private var isAlongAddress = false
+    /// Sidebar on the right: aligned with the address's trailing edge.
+    private var alignsTrailing = false
 
     private let icon = FaviconView()
     private let siteName = Label("", font: Tokens.Font.voice(20), color: Tokens.Color.textPrimary)
@@ -72,13 +88,13 @@ final class SitePanel: FloatingPanelView {
         return label
     }()
     private var permissionsRow: PanelLinkRow?
-    /// How many elements on the site are zapped, and Restore All.
+    /// Zapped element count, with Restore All.
     private var zappedRow: PanelLinkRow?
-    /// The site's own CSS, while it has some: into Edit Style.
+    /// The site's custom CSS, if any; opens Edit Style.
     private var styleRow: PanelLinkRow?
     private let permissionsGroup = PanelGroup()
     private var resetPermissions: PanelLinkRow?
-    /// The Permissions page of a site that hasn't asked for anything: says so, with no Reset (#232).
+    /// Permissions page for a site that asked for nothing: says so, no Reset (#232).
     private let permissionsEmpty: Label = {
         let label = Label(String(localized: "This site hasn’t asked for anything yet.", comment: "On a site's Permissions page in the site panel when the site hasn't asked for the camera, location, notifications or anything else."),
                           font: Tokens.Font.body(), color: Tokens.Color.textSecondary)
@@ -136,21 +152,25 @@ final class SitePanel: FloatingPanelView {
     static let unpinTitle = String(localized: "Unpin from Address", comment: "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.")
     static var pinLimitTip: String { String(localized: "At most \(ExtensionPins.limit) pins. Unpin one first.", comment: "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.") }
     static let minimumWidth: CGFloat = 256
+    /// Panel width, narrower only in a small window.
+    static func fittingWidth(in overlayWidth: CGFloat) -> CGFloat {
+        max(minimumWidth, min(width, overlayWidth - Tokens.Metric.cardInset * 2))
+    }
     private var width: CGFloat = SitePanel.width
     private var pad: CGFloat { width < Self.width ? Tokens.Space.x3 : Tokens.Space.x4 }
 
     #if DEBUG
-    /// The panel for `tab`, outside any window: for tests.
+    /// A panel for `tab` outside any window, for tests.
     static func forTesting(tab: Tab) -> SitePanel? { SitePanel(controller: nil, tab: tab) }
     #endif
 
-    private init?(controller: BrowserWindowController?, mini: MiniWindowController? = nil, tab asked: Tab?) {
+    private init?(controller: BrowserWindowController?, pageHost: SitePanelPageHost? = nil, tab asked: Tab?) {
         // With no page (a new tab), it still opens: your extensions are always one click away.
         guard let tab = asked ?? controller.map({ $0.tabManager.selectedTab ?? Tab(url: nil, spaceID: $0.tabManager.currentSpaceID) }) else { return nil }
         let url = tab.url.flatMap { ["http", "https", "webkit-extension"].contains($0.scheme ?? "") ? $0 : nil }
         isBlank = url == nil
         self.controller = controller
-        self.mini = mini
+        self.pageHost = pageHost
         self.tab = tab
         isPrivate = tab.isPrivate || controller?.tabManager.isPrivate == true
         self.url = url ?? URL(string: "about:blank")!
@@ -216,6 +236,12 @@ final class SitePanel: FloatingPanelView {
             guard change == .url, let now = tab?.url else { return }
             if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite || SiteOrigin.of(now) != origin { self.close() }
         }
+        let profileID = tab.profile.id
+        clearingToken = KeptCookies.clearingChanged.observe { [weak self] profile in
+            guard let self, profile == profileID, !self.isBlank,
+                  SitePanelRows.rows(self.rowContext).contains(.keepCookies) != self.rows.contains(where: { $0 === self.keepCookiesRow }) else { return }
+            self.rebuildRows()
+        }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
         moreButton.isHidden = !canClear && !canBoost && !canSetIcon
         // No page: only your extensions, one click away, the whole panel.
@@ -251,30 +277,20 @@ final class SitePanel: FloatingPanelView {
         panel.isFromPane = Self.paneStrip(of: anchor) != nil
         let overlay = controller.root.overlay
         let anchorFrame = anchor.convert(anchor.bounds, to: overlay)
-        // From the address bar in the sidebar: its width and left edge, just below it. With the sidebar slid out or
-        // hidden it's the same width (the address keeps its width off screen), so it never grows past the sidebar.
-        // From the address above the page, the sidebar's width, under the address's end where its button is.
-        // From a split pane's strip (on its card or up in the bar), its own width, under that pane's address's end,
-        // where its button is, and kept in the window.
+        // Fixed width, independent of the sidebar (#335).
         let pane = Self.paneStrip(of: anchor) != nil
         let aboveThePage = anchor.isDescendant(of: controller.root.topBar)
-        let sidebarLane = controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
         let inset = Tokens.Metric.cardInset
-        if pane {
-            panel.width = max(Self.minimumWidth, min(Self.width, overlay.bounds.width - inset * 2))
-        } else {
-            panel.width = anchorFrame.width > 0 && !aboveThePage ? anchorFrame.width : sidebarLane
-        }
+        panel.width = Self.fittingWidth(in: overlay.bounds.width)
         if controller.root.sidebarVisible, !controller.root.isSidebarFloatingVisible, !aboveThePage, !pane {
             // The same glass panel as Downloads over the sidebar's lane, with the tabs under it faded back.
             panel.recedes = [controller.sidebar.list]
         }
-        var x = aboveThePage || pane ? anchorFrame.maxX - panel.width : anchorFrame.minX
-        if pane { x = min(x, overlay.bounds.width - inset - panel.width) }
-        // Under the sidebar's address, edge to edge with it, both sides: the window's inset put it a little right of
-        // the field, with the favorite under it peeking out at its corner.
+        // Aligned with the address field's outer edge.
         let alongAddress = !aboveThePage && !pane && anchorFrame.minX >= 0
         panel.isAlongAddress = alongAddress
+        panel.alignsTrailing = alongAddress && controller.root.sidebarOnRight
+        let x = aboveThePage || pane || panel.alignsTrailing ? anchorFrame.maxX - panel.width : anchorFrame.minX
         panel.frame.origin = NSPoint(x: SitePanelSizing.x(x, alongAddress: alongAddress, inset: inset, width: panel.width, overlayWidth: overlay.bounds.width),
                                      y: anchorFrame.maxY + 4)
         // Never past the window's bottom: what doesn't fit scrolls.
@@ -302,19 +318,20 @@ final class SitePanel: FloatingPanelView {
         }
     }
 
-    /// Opens the panel for Zigzag Mini's page under its strip's Site Controls button, or closes the one open (#225).
-    static func toggle(in mini: MiniWindowController, from button: IconButton) {
+    /// Opens the panel for the page of Zigzag Mini or an app's window under its strip's Site Controls button, or
+    /// closes the one open (#225, #356).
+    static func toggle(in host: SitePanelPageHost, from button: IconButton) {
         if let current, current.superview != nil {
-            let here = current.window === mini.window
+            let here = current.window === host.window
             current.close()
             if here { return }
         }
-        guard let panel = SitePanel(controller: nil, mini: mini, tab: mini.tab) else { return }
+        guard let panel = SitePanel(controller: nil, pageHost: host, tab: host.tab) else { return }
         panel.anchor = button
         // Over the page, under the button's end, as from the address above a browser window's page; kept in the window.
-        let overlay = mini.overlay
+        let overlay = host.overlay
         let inset = Tokens.Metric.cardInset
-        panel.width = max(Self.minimumWidth, min(Self.width, overlay.bounds.width - inset * 2))
+        panel.width = Self.fittingWidth(in: overlay.bounds.width)
         let b = button.convert(button.bounds, to: overlay)
         let x = min(b.maxX - panel.width, overlay.bounds.width - inset - panel.width)
         panel.frame.origin = NSPoint(x: max(inset, x), y: max(b.maxY, 0) + 4)
@@ -362,6 +379,7 @@ final class SitePanel: FloatingPanelView {
 
     func close() {
         pageToken = nil
+        clearingToken = nil
         if let scrollToken { NotificationCenter.default.removeObserver(scrollToken) }
         scrollToken = nil
         extensionsToken = nil
@@ -377,8 +395,8 @@ final class SitePanel: FloatingPanelView {
     /// What this page can do right now, as named tiles: sharing, the link, a screenshot and translating always, Reader
     /// and Picture in Picture when the page has them. The steady ones come first, so they never move.
     private func buildTiles() {
-        // Zigzag Mini (`mini`) has the page's own actions: sharing, the link and Picture in Picture.
-        guard controller != nil || mini != nil else { return }
+        // Zigzag Mini and an app's window (`pageHost`) have the page's own actions: sharing, the link and Picture in Picture.
+        guard controller != nil || pageHost != nil else { return }
         let readerOn = controller?.isShowingReader ?? false
         // (symbol, caption, full name for the tooltip and VoiceOver, on, action)
         var specs: [(String, String, String, Bool, () -> Void)] = []
@@ -394,7 +412,7 @@ final class SitePanel: FloatingPanelView {
         let copyLink = String(localized: "Copy Link", comment: "Action in the site panel: copies the page's address.")
         specs.append(("link", copyLink, copyLink, false, { [weak self] in
             guard let self else { return }
-            if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.mini?.copyPageURL(nil) }
+            if let controller = self.controller { controller.copyLink(self.url, title: self.tab.displayTitle) } else { self.pageHost?.copyPageURL(nil) }
             self.close()
         }))
         if controller != nil, PageScreenshot.canTake(tab), !readerOn {
@@ -471,20 +489,19 @@ final class SitePanel: FloatingPanelView {
     /// Only a web site has a cache and cookies of its own to clear: not a file, an extension's page or a new tab.
     private var canClear: Bool { !tab.isPrivate && (url.scheme == "http" || url.scheme == "https") }
 
-    /// Boosts (zapping elements) for a web page in a browser window, a private one's too: never Zigzag's own pages,
-    /// an error page, Reader or a PDF.
+    /// Boosts (zapping) for web pages in browser windows, private too; never Zigzag pages, error pages, Reader or PDFs.
     private var canBoost: Bool {
         controller != nil && !isBlank && ZapPicker.canZap(tab) && controller?.isShowingReader != true
     }
 
-    /// A web page's site in a browser window, a private one's too (kept for that window only), can have an icon of
-    /// its own: never in Zigzag Mini, which has no sidebar to show it.
+    /// Site icons for web pages in browser windows (private ones keep them per window); not in Zigzag Mini, which has
+    /// no sidebar.
     private var canSetIcon: Bool { controller != nil && SiteIcons.site(of: url) != nil }
 
     static let siteIconTitle = String(localized: "Change Site Icon…", comment: "Item in the … menu of the site panel: opens the icon choices for the whole site, used by every tab, pinned tab and favorite on it.")
 
-    /// The icon grid for the site, where the panel was: beside the sidebar when it hung from the sidebar's address,
-    /// so the tabs it changes stay in sight.
+    /// Opens the site icon grid where the panel was: beside the sidebar when opened from its address, so affected tabs
+    /// stay visible.
     private func chooseSiteIcon() {
         guard let controller else { return }
         let tab = tab, top = frame.origin, beside = isAlongAddress
@@ -494,7 +511,7 @@ final class SitePanel: FloatingPanelView {
 
     static let zapTitle = String(localized: "Zap Element", comment: "Item in the … menu of the site panel: pick elements on the page to hide on this site, like Arc's Zap.")
 
-    /// Clearing this site's cache or cookies, and its boosts: there when you need them, out of the way when you don't.
+    /// Menu with Clear Cache, Clear Cookies and boosts.
     private func showMoreMenu() {
         guard canClear || canBoost || canSetIcon else { return }
         var entries: [MenuPanel.Entry] = []
@@ -518,12 +535,12 @@ final class SitePanel: FloatingPanelView {
             }))
             entries.append(.separator)
         }
-        // Boosts: hiding what you don't want on the site.
+        // Boosts: hide elements on the site.
         if canBoost {
             entries.append(.item(.init(title: Self.zapTitle, symbol: "scope") { [weak self] in self?.startZapping() }))
             entries.append(.item(.init(title: SiteStyleSheet.title, symbol: "paintbrush") { [weak self] in self?.editStyle() }))
         }
-        // An icon for the whole site (#310).
+        // A site-wide icon (#310).
         if canSetIcon {
             entries.append(.item(.init(title: Self.siteIconTitle, symbol: "face.smiling") { [weak self] in self?.chooseSiteIcon() }))
         }
@@ -587,18 +604,16 @@ final class SitePanel: FloatingPanelView {
         guard let superview, maxHeight < .greatestFiniteMagnitude else { return }
         // Narrower now: as narrow as it must be, and back inside the window's right edge, as it opened.
         let inset = Tokens.Metric.cardInset
-        if !isAlongAddress {
-            width = max(Self.minimumWidth, min(Self.width, superview.bounds.width - inset * 2))
-            frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
-            frame.size.width = width
-        } else if let anchor, anchor.window === window {
-            // Under the sidebar's address: still edge to edge with it, wherever the window's edge took it (a sidebar
-            // on the right moves with that edge), and kept inside the window.
+        width = Self.fittingWidth(in: superview.bounds.width)
+        if isAlongAddress, let anchor, anchor.window === window {
+            // Keep alignment with the address after a resize.
             let along = anchor.convert(anchor.bounds, to: superview)
-            if along.width > 0 { width = along.width }
-            frame.origin.x = SitePanelSizing.x(along.minX, alongAddress: true, inset: inset, width: width, overlayWidth: superview.bounds.width)
-            frame.size.width = width
+            frame.origin.x = SitePanelSizing.x(alignsTrailing ? along.maxX - width : along.minX, alongAddress: true, inset: inset,
+                                               width: width, overlayWidth: superview.bounds.width)
+        } else {
+            frame.origin.x = max(inset, min(frame.minX, superview.bounds.width - inset - width))
         }
+        frame.size.width = width
         maxHeight = SitePanelSizing.maxHeight(overlayHeight: superview.bounds.height, top: frame.minY)
         resize()
     }
@@ -676,7 +691,7 @@ final class SitePanel: FloatingPanelView {
     #if DEBUG
     /// sitepage <main|connection|permissions>: goes to that page, as its row or back button does.
     func debugPage(_ arg: String) {
-        // sitepage zap | restore: Zap Element in ⋯, or the zapped row's Restore All.
+        // sitepage zap | restore: Zap Element in ⋯, or Restore All.
         if arg == "zap" { startZapping(); return }
         if arg == "restore" { restoreZaps(); return }
         if arg == "style" { editStyle(); return }
@@ -698,8 +713,11 @@ final class SitePanel: FloatingPanelView {
          "extensions": extensionsSection?.debugState ?? [:],
          "zoom": zoomStepper.map { ZoomLevels.percent($0.zoom) } ?? "",
          "scroll": ["panel": frame.height, "viewport": scroll.frame.height, "body": content.frame.height, "offset": scroll.contentView.bounds.minY],
+         // Width the widest row needs on one line.
+         "fit": (rows + permissionsGroup.rows).map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
+         "linksFit": [permissionsRow, zappedRow, styleRow].compactMap { $0 }.filter { !$0.isHidden }.map(\.debugWants).max().map { $0 + pad * 2 } ?? 0,
          "place": ["x": frame.minX, "width": frame.width, "window": superview?.bounds.width ?? 0,
-                   "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? -1]]
+                   "anchor": anchor.flatMap { a in superview.map { a.convert(a.bounds, to: $0).minX } } ?? CGFloat(-1)]]
     }
 
     /// sitedark <automatic|on|off|force>: chooses in the Dark page row's dropdown.
@@ -708,7 +726,7 @@ final class SitePanel: FloatingPanelView {
         darkRow?.debugChoose(index)
     }
 
-    /// sitejs allowed|blocked: chooses in the JavaScript row's dropdown.
+    /// sitejs allowed|blocked: picks from the JavaScript dropdown.
     func debugJavaScript(_ arg: String) {
         guard ["allowed", "blocked"].contains(arg) else { return }
         javaScriptRow?.debugChoose(arg == "allowed" ? 0 : 1)
@@ -732,7 +750,7 @@ final class SitePanel: FloatingPanelView {
         permissionsGroup.rows[row].debugChoose(choice)
     }
 
-    /// <index> <row title>: picks that choice in the This Site row of that name, as its menu would ("1 Open in").
+    /// <index> <row title>: picks that choice in the named This Site row's menu ("1 Open in").
     func debugChooseRow(_ arg: String) {
         let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
         guard f.count == 2, let index = Int(f[0]), let row = rows.first(where: { $0.debugTitle.hasPrefix(f[1] + ":") }) else { return }
@@ -746,12 +764,42 @@ final class SitePanel: FloatingPanelView {
     static var debugExtensionCount = 0
     #endif
 
+    /// Extensions are listed in a browser window and an app's window.
+    private var listsExtensions: Bool { controller != nil || pageHost?.listsExtensions == true }
+
+    /// Where the store, Settings and an extension's settings open: this browser window, or from an app's window, one
+    /// brought forward.
+    private func windowToOpenIn() -> BrowserWindowController? {
+        if let controller { return controller }
+        guard pageHost != nil else { return nil }
+        let target = MiniWindowController.browserWindow()
+        target.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        return target
+    }
+
+    /// An extension's menu, from a browser window or, about this page, from an app's window.
+    @available(macOS 15.4, *)
+    private func extensionMenu(for context: WKWebExtensionContext) -> NSMenu? {
+        if let controller { return controller.extensionMenu(for: context) }
+        guard let pageHost else { return nil }
+        let profile = tab.profile
+        return BrowserWindowController.extensionMenu(for: context, profile: profile, tab: tab, isPrivate: isPrivate, over: pageHost.overlay,
+                                                     openOptions: { [weak self] options in
+            guard let target = self?.windowToOpenIn() else { return }
+            target.tabManager.newTab(url: options, spaceID: target.tabManager.space(for: profile), title: context.webExtension.displayName)
+        }, pins: { menu, id in menu.addItem(BrowserWindowController.pinItem(for: id, installs: profile.installs)) })
+    }
+
     /// Your extensions, as their toolbar buttons are: the icon, the badge, and whether each works on this site.
     private func buildExtensions() {
-        // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
-        // In Zigzag Mini, none: an extension's popup opens from a browser window's address.
-        guard #available(macOS 15.4, *), controller != nil, let host = tab.extensionHost else { return }
-        let actions = host.actions(for: tab)
+        // In a private window, only those allowed there, as in Chrome's incognito (ExtensionHost.actions).
+        // In Zigzag Mini, none: an extension's popup opens from a browser window's address. An app's window lists
+        // them with their menus (#356).
+        guard #available(macOS 15.4, *), listsExtensions, let host = tab.extensionHost else { return }
+        // A blank private window's stand-in tab isn't private itself: the window says it.
+        let actions = host.actions(for: tab).filter { PrivateAccess.sees(isPrivate: isPrivate, allowed: $0.context.hasAccessToPrivateData) }
+        if isPrivate, actions.isEmpty { return }
         let installs = tab.profile.installs
         let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
         let web = ["http", "https"].contains(url.scheme ?? "")
@@ -765,11 +813,13 @@ final class SitePanel: FloatingPanelView {
             return SiteExtensionsSection.Item(id: action.id, name: context.webExtension.displayName ?? action.label, label: action.label,
                                               icon: action.icon, badge: action.badge,
                                               needsAttention: action.attention != nil, access: access,
-                                              run: { [weak self] _ in
-                                                  guard let self, let controller = self.controller else { return }
+                                              run: { [weak self] view in
+                                                  guard let self else { return }
+                                                  // No popup without a browser window: the click opens its menu.
+                                                  guard let controller = self.controller else { (view as? InteractiveView)?.showContextMenu(); return }
                                                   host.performAction(action, tab: self.tab, in: controller)
                                               },
-                                              menu: { [weak self] in self?.controller?.extensionMenu(for: context) })
+                                              menu: { [weak self] in self?.extensionMenu(for: context) })
         }
         // By name, so a tile is always where it was, whatever order they were loaded in.
         items.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -786,11 +836,14 @@ final class SitePanel: FloatingPanelView {
         #endif
         let profile = Library.shared.hasManyProfiles && !tab.isPrivate ? Library.shared.directory.profile(tab.profile.id)?.displayName : nil
         let section = SiteExtensionsSection(items: items, isWhole: isBlank, profile: profile, get: { [weak self] in
-            self?.controller?.tabManager.newTab(url: ExtensionStore.webStoreURL)
+            // In a space of the page's profile, so what's added is that profile's.
+            if let self, let target = self.windowToOpenIn() {
+                target.tabManager.newTab(url: ExtensionStore.webStoreURL, spaceID: self.controller == nil ? target.tabManager.space(for: self.tab.profile) : nil)
+            }
             self?.close()
         }, manage: { [weak self] in
             // Every extension, its sites and its pins: Settings › Extensions.
-            guard let self, let controller = self.controller else { return }
+            guard let self, let controller = self.windowToOpenIn() else { return }
             self.close()
             SettingsPage.open(.extensions, in: controller)
         })
@@ -863,8 +916,8 @@ final class SitePanel: FloatingPanelView {
     static let javaScriptAllowed = String(localized: "javascript.allowed", defaultValue: "Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages run their scripts.")
     static let javaScriptNotAllowed = String(localized: "javascript.not-allowed", defaultValue: "Not Allowed", comment: "A choice in the JavaScript dropdown, in the site panel and in Settings › Privacy: pages don't run their scripts.")
 
-    /// What the JavaScript row says under its name, so a page that looks broken is explained: off here because of the
-    /// setting, or the site's own choice where it differs from the setting. Nothing where it's as everywhere else.
+    /// JavaScript row subtitle explaining a broken-looking page: off by the setting, or a site choice that differs from
+    /// it. Nil when it matches the setting.
     static func javaScriptStatus(url: URL, tab: Tab) -> String? {
         let allowed = SiteJavaScript.allows(url, in: tab)
         if SiteJavaScript.isOwn(url, in: tab) {
@@ -888,10 +941,11 @@ final class SitePanel: FloatingPanelView {
         // Once a consent pop-up was found on the page, or a choice was made for the site (#175).
         context.cookieBanners = CookieBanners.applies(to: url)
             && (CookieBanners.outcome(in: tab.webView, site: site) != nil || CookieBanners.choice(for: url) != nil)
-        // JavaScript has its row on every web page, so Permissions is always a page with something on it.
+        // JavaScript has a row on every web page, so Permissions is never empty.
         let hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.hasPermissions = hasPermissions || context.isWeb
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
+        context.clearsCookiesOnQuit = KeptCookies.clearsOnQuit(in: tab.profile.id)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
@@ -902,14 +956,28 @@ final class SitePanel: FloatingPanelView {
         return context
     }
 
+    /// The full-screen row's name, here and in Settings › Privacy › Sites: on, a video's full screen stays in the window.
+    static var fullScreenTitle: String {
+        String(localized: "Keep full screen in the window", comment: "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.")
+    }
+
+    /// Under the full-screen row, what full screen does on this site now (#385).
+    static func fullScreenStatus(_ on: Bool) -> String {
+        on ? String(localized: "Videos fill the page, not the screen", comment: "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.")
+            : String(localized: "Videos fill your screen", comment: "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.")
+    }
+
     /// The Dark page row, while there is one.
     private weak var darkRow: PanelRow?
+    /// The Keep cookies row, while there is one.
+    private weak var keepCookiesRow: PanelRow?
     /// The JavaScript row, while there is one.
     private weak var javaScriptRow: PanelRow?
 
     private func buildRows() {
         rows = []
         zoomStepper = nil
+        keepCookiesRow = nil
         // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
         // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
         // Privacy › Sites. Its tabs still follow the ones made elsewhere.
@@ -969,10 +1037,19 @@ final class SitePanel: FloatingPanelView {
                     guard let self else { return }
                     KeepAwake.set(on, for: self.url)
                 })
+            case .keepCookies:
+                // Clear Cookies… and quitting leave the site's cookies alone (#334).
+                let row = PanelRow.toggle(String(localized: "Keep cookies", comment: "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in."),
+                                    on: KeptCookies.keeps(url, in: tab.profile.id), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                    guard let self else { return }
+                    KeptCookies.set(on, for: self.url, in: self.tab.profile.id, isPrivate: self.isPrivate || self.tab.isPrivate)
+                }
+                keepCookiesRow = row
+                rows.append(row)
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
-                rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
-                                    on: PageFullScreen.fills(for: url) == .page, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                rows.append(.toggle(Self.fullScreenTitle,
+                                    on: PageFullScreen.fills(for: url) == .page, status: Self.fullScreenStatus) { [weak self] on in
                     guard let self else { return }
                     PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
                 })
@@ -999,10 +1076,9 @@ final class SitePanel: FloatingPanelView {
         buildBoostRows()
     }
 
-    /// The Permissions page: a row for each permission the site asked for this session or has an answer kept for,
-    /// with Ask, Allow and Block; answers are the page's origin's, so another port or scheme on the same host has its
-    /// own. A call (Meet, Zoom, Teams) asks for the camera and the microphone, so it can have a row for each; the
-    /// answers of a call from elsewhere embedded in the page count there too. None asked, no page and no row into it.
+    /// Permissions page: a row per permission asked this session or with a saved answer, with Ask, Allow and Block.
+    /// Answers are per origin, so another port or scheme has its own. A call (Meet, Zoom, Teams) can have camera and
+    /// microphone rows; embedded calls count too. Nothing asked: no page and no row to it.
     private func buildPermissions() {
         var permissionRows: [PanelRow] = []
         permissionKinds = []
@@ -1012,8 +1088,8 @@ final class SitePanel: FloatingPanelView {
             for permission in SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate) {
                 let choices = permission.choices
                 let now = choice(permission, origin: origin)
-                // WebRTC is for the page as it loads: choosing reloads it (`WebRTCProtection.choose`), and in a private
-                // window it's this tab's alone.
+                // WebRTC applies at load: choosing reloads (`WebRTCProtection.choose`); private windows keep it per
+                // tab.
                 permissionRows.append(.choice(permission.title, options: choices.map(\.title), selected: choices.firstIndex(of: now) ?? 0) { [weak self] index in
                     if permission == .webRTC {
                         WebRTCProtection.choose(choices[index] == .allow, origin: origin, in: tab)
@@ -1025,10 +1101,9 @@ final class SitePanel: FloatingPanelView {
                 permissionKinds.append(permission)
             }
         }
-        // Whether extensions run here at all; off, every tile above dims and says so (#215). It is a permission the
-        // site is given or not, not a switch for the page, so it belongs here with the rest.
-        // Only once there are extensions to run here, or they were turned off here before.
-        if #available(macOS 15.4, *), controller != nil, !isPrivate, !isBlank, tab.extensionHost != nil,
+        // Whether extensions run here; when off, tiles above dim and say so (#215). It's a site permission, so it's
+        // listed here. Only once extensions could run here or were turned off here before.
+        if #available(macOS 15.4, *), listsExtensions, !isPrivate, !isBlank, tab.extensionHost != nil,
            ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
            !(extensionsSection?.items.isEmpty ?? true) || ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) {
             let profile = tab.profile
@@ -1043,9 +1118,8 @@ final class SitePanel: FloatingPanelView {
             }
             permissionRows.append(row)
         }
-        // JavaScript is a site choice of its own, not one of WebKit's permissions, but it belongs on this page with
-        // them: Allowed or Not Allowed, over Settings › Privacy › JavaScript. It's for the page as it loads, so
-        // choosing reloads it; in a private window it's this tab's alone.
+        // JavaScript isn't a WebKit permission but belongs here: Allowed or Not Allowed, overriding Settings › Privacy
+        // › JavaScript. Applies at load, so choosing reloads; private windows keep it per tab.
         if ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             let tab = tab, url = url
             let allowed = SiteJavaScript.allows(url, in: tab)
@@ -1059,8 +1133,8 @@ final class SitePanel: FloatingPanelView {
         }
         if permissionsGroup.superview == nil { permissionsBox.addSubview(permissionsGroup) }
         permissionsGroup.rows = permissionRows
-        // WebRTC's row with the protection on is the setting's, not the site's: under the line saying it hasn't
-        // asked for anything, and with no Reset.
+        // WebRTC's row while protection is on reflects the setting, not the site: listed below the empty note, with no
+        // Reset.
         let own = permissionKinds.filter { isOwn($0) }
         if permissionsEmpty.superview == nil { permissionsBox.addSubview(permissionsEmpty) }
         permissionsEmpty.isHidden = !own.isEmpty || javaScriptRow != nil
@@ -1092,11 +1166,10 @@ final class SitePanel: FloatingPanelView {
         let shown = SitePermissions.shown(origin: origin, isPrivate: isPrivate || tab.isPrivate)
         let web = ["http", "https"].contains(url.scheme?.lowercased() ?? "")
         row.isHidden = shown.isEmpty && !web
-        // Only the site's own answers count: WebRTC blocked by the setting alone says nothing about this site.
+        // Only the site's own answers: WebRTC blocked by the setting says nothing about this site.
         let own = shown.filter { isOwn($0) }
         var choices = own.map { choice($0, origin: origin) }
-        // JavaScript and extensions are on this page too, so a site's own choice for them counts: JavaScript off
-        // here never reads as Ask.
+        // The site's own JavaScript and extension choices count too, so JavaScript off never shows as Ask.
         if web, SiteJavaScript.isOwn(url, in: tab) { choices.append(SiteJavaScript.allows(url, in: tab) ? .allow : .block) }
         if web, !isPrivate, ExtensionStore.extensionsOffSites(in: tab.profile).contains(site) { choices.append(.block) }
         row.value = choices.isEmpty ? "" : PermissionChoice.summary(choices)
@@ -1104,8 +1177,8 @@ final class SitePanel: FloatingPanelView {
         needsLayout = true
     }
 
-    /// Open in (#286): the space this site always opens in, or Any space. A page on a subdomain of a listed site shows
-    /// that site's choice, and changes it; otherwise the page's own site is listed.
+    /// Open in (#286): the space this site always opens in, or Any space. A subdomain of a listed site shows and
+    /// changes that site's choice; otherwise the page's site is used.
     private func openInRow() -> PanelRow {
         let spaces = Library.shared.spaces
         let route = Library.shared.siteRoute(for: url)
@@ -1115,7 +1188,7 @@ final class SitePanel: FloatingPanelView {
         return .choice(String(localized: "Open in", comment: "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from."),
                        options: [Self.anySpace] + spaces.map(\.name), selected: selected,
                        status: { index in
-                           // Said only when the choice is a parent site's: what else it covers.
+                           // Only when the choice belongs to a parent site: shows what else it covers.
                            guard index > 0, site != pageSite else { return nil }
                            return String(localized: "All of \(site)", comment: "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).")
                        }) { index in
@@ -1134,7 +1207,7 @@ final class SitePanel: FloatingPanelView {
 
     // MARK: Boosts
 
-    /// The page's site's boosts, a private window's own included.
+    /// The site's boosts, including a private window's.
     private var boost: SiteBoost { SiteBoosts.boost(for: url, privateStore: tab.privateStore) }
 
     private func startZapping() {
@@ -1151,7 +1224,7 @@ final class SitePanel: FloatingPanelView {
         SiteStyleSheet.show(for: tab, in: controller)
     }
 
-    /// "3 zapped", with Restore All, and Custom style: only once the site has them.
+    /// "3 zapped" with Restore All, and Custom style, once the site has them.
     private func buildBoostRows() {
         guard canBoost else { return }
         if zappedRow == nil {
@@ -1186,16 +1259,16 @@ final class SitePanel: FloatingPanelView {
         resize()
     }
 
-    /// The permissions of the rows on the Permissions page, top to bottom.
+    /// Permissions of the Permissions page rows, top to bottom.
     private var permissionKinds: [SitePermission] = []
 
-    /// The site has an answer of its own for it, not just the setting (a private tab's WebRTC choice counts).
+    /// The site has its own answer, not just the setting (a private tab's WebRTC choice counts).
     private func isOwn(_ permission: SitePermission) -> Bool {
         guard let origin else { return false }
         return SitePermissions.isOwn(permission, origin: origin, here: tab.webRTCHere[origin])
     }
 
-    /// What a permission's row shows: WebRTC as this tab has it, a private window's own choice included.
+    /// A permission row's value: WebRTC as this tab has it, including a private window's choice.
     private func choice(_ permission: SitePermission, origin: String) -> PermissionChoice {
         permission == .webRTC ? WebRTCProtection.choice(origin: origin, in: tab) : SitePermissions.choice(permission, origin: origin)
     }
@@ -1204,7 +1277,7 @@ final class SitePanel: FloatingPanelView {
     private func clear(_ kind: WebsiteData.Kind) {
         let tab = tab
         close()
-        if let controller { controller.confirmClear(kind, of: tab) } else { mini?.confirmClear(kind, of: tab) }
+        if let controller { controller.confirmClear(kind, of: tab) } else { pageHost?.confirmClear(kind, of: tab) }
     }
 
     // MARK: Layout
@@ -1265,7 +1338,7 @@ final class SitePanel: FloatingPanelView {
             if !permissionsEmpty.isHidden {
                 let w = inner + Label.inset * 2
                 let h = ceil(permissionsEmpty.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: w, height: 10_000)).height ?? permissionsEmpty.lineHeight)
-                // Alone, it sits a step under the header; with WebRTC's row under it, that row follows a step down.
+                // Alone, a step below the header; WebRTC's row follows a step lower.
                 place(permissionsEmpty, NSRect(x: pad - Label.inset, y: y + Tokens.Space.x2, width: w, height: h))
                 y += Tokens.Space.x2 + h
                 if !permissionsGroup.rows.isEmpty { y += Tokens.Space.x3 }
@@ -1661,7 +1734,7 @@ final class PanelRow: NSView {
     private let value: Label?
     /// The words' height: the title, and the line under it when there is one.
     var contentHeight: CGFloat { title.lineHeight + (value.flatMap { $0.isHidden ? nil : $0.lineHeight } ?? 0) }
-    /// The room under its words inside the row: one line sits by its capitals, two as a block.
+    /// Space below the text inside the row: cap-aligned for one line, block for two.
     var bottomSlack: CGFloat {
         guard value?.isHidden ?? true else { return (Self.height - contentHeight) / 2 }
         return Self.height - title.centeredY(in: Self.height) - title.lineHeight
@@ -1728,31 +1801,42 @@ final class PanelRow: NSView {
         return title.stringValue
     }
 
+    /// Width needed for the title, subtitle and control without wrapping.
+    var debugWants: CGFloat {
+        let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
+        return ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0)) + Tokens.Space.x2 + wanted.width
+    }
+
     /// choose <index>: picks that choice in the row's dropdown, as its menu would.
     func debugChoose(_ index: Int) {
+        // A switch: 1 is on, 0 off.
+        if let toggle = control as? Toggle {
+            toggle.isOn = index != 0
+            toggle.onChange?(toggle.isOn)
+            return
+        }
         guard let dropdown = control as? DropdownButton, dropdown.options.indices.contains(index) else { return }
         dropdown.selectedIndex = index
         dropdown.onSelect?(index)
     }
     #endif
 
-    /// The least room a row's name keeps beside its control: enough for a short one ("Microphone", "JavaScript").
-    /// A control that wants more than the rest of the row (a menu of long space names) takes what's left and says the
-    /// whole of its choice in its tooltip, and its menu opens as wide as that choice needs (#314).
+    /// Minimum width a row title keeps beside its control, enough for "Microphone" or "JavaScript". A control wanting
+    /// more (a menu of long space names) takes the rest, shows its full value in a tooltip, and its menu opens as wide
+    /// as needed (#314).
     private static let minimumTitle: CGFloat = 96
 
     override func layout() {
         super.layout()
         let wanted = control.fittingSize.width > 0 ? control.fittingSize : control.intrinsicContentSize
-        // A name shorter than that keeps only its own width, so a short name never cuts its control short.
+        // Shorter titles keep only their own width, so they never squeeze the control.
         let named = ceil(max(title.textWidth, value.map { $0.isHidden ? 0 : $0.textWidth } ?? 0))
         let size = NSSize(width: min(wanted.width, max(0, bounds.width - min(named, Self.minimumTitle) - Tokens.Space.x2)), height: wanted.height)
         control.frame = NSRect(x: bounds.width - size.width, y: (bounds.height - size.height) / 2, width: size.width, height: size.height)
         let x = -Label.inset
         let right = control.frame.minX - Tokens.Space.x2 - x
         guard let value, !value.isHidden else {
-            // A long name beside its control ("Microphone" by a dropdown) takes a second line rather than
-            // being cut short; the row has room for two.
+            // A long title beside its control wraps to a second line instead of truncating; the row fits two.
             let twoLines = title.textWidth > right
             title.usesSingleLineMode = !twoLines
             title.maximumNumberOfLines = twoLines ? 2 : 1
@@ -1818,6 +1902,11 @@ final class PanelLinkRow: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
 
     var debugTitle: String { value.isEmpty ? title.stringValue : "\(title.stringValue): \(value)" }
+    /// Width needed for the name and value, including the hover outsets.
+    var debugWants: CGFloat {
+        let valueWidth = value.isEmpty ? 0 : ceil((value as NSString).size(withAttributes: [.font: valueLabel.font ?? Tokens.Font.body()]).width) + Tokens.Space.x2
+        return ceil(title.textWidth) + valueWidth + (chevron.isHidden ? 0 : Tokens.Space.x4 + Tokens.Space.x1)
+    }
 
     /// Its name, for a row that says something else after a click (Show All, Show Less).
     var titleText: String {
@@ -2007,8 +2096,8 @@ final class PanelPageHeader: NSView {
 
     override func layout() {
         super.layout()
-        // The back glyph's ink on the panel's text column (the button centers the ink, which is narrower than its
-        // glyph's box), the title after it.
+        // Align the back glyph's ink with the text column (the button centers ink narrower than the glyph box), title
+        // after it.
         let side = Tokens.Metric.compactIconButton
         let inkWidth = Tokens.Symbol.inkSize("chevron.left", size: Tokens.Symbol.compactGlyph).width
         let ink = (side - inkWidth) / 2
@@ -2021,11 +2110,9 @@ final class PanelPageHeader: NSView {
 /// How tall Site Controls is, and how much of a page scrolls (#220): never past the window's bottom, a page's header
 /// kept at the top, and the rest of the page under it scrolling when it doesn't fit.
 enum SitePanelSizing {
-    /// Where the panel's left edge goes. Under the sidebar's address (`alongAddress`), at the field's own edge, so the
-    /// two line up both sides and nothing under the panel shows past its corner; with that address off screen (the
-    /// sidebar hidden), kept in from the window's edge by `inset`, as anything else is.
-    /// With `width` and `overlayWidth` given, one that would run past the window's right edge is brought back in
-    /// from it by `inset`.
+    /// The panel's left edge. Under the sidebar address (`alongAddress`) it aligns with the field's edge so nothing
+    /// shows past its corner; with the address off screen (sidebar hidden), inset from the window edge by `inset`. With
+    /// `width` and `overlayWidth`, a panel past the right edge is pulled in by `inset`.
     static func x(_ x: CGFloat, alongAddress: Bool, inset: CGFloat, width: CGFloat = 0, overlayWidth: CGFloat = .greatestFiniteMagnitude) -> CGFloat {
         let placed = alongAddress && x >= 0 ? x : max(inset, x)
         guard placed + width > overlayWidth else { return placed }
@@ -2053,9 +2140,9 @@ enum SitePanelSizing {
 /// Which of the panel's rows apply to the page: none is shown that does nothing there.
 enum SitePanelRows {
     /// This Site's switches, on the panel's first page.
-    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, fullScreenFills, alwaysTranslate, openIn }
-    /// The rows into the panel's other pages. A page's permissions, JavaScript and extensions are their own page
-    /// (#311, #313), and the connection is a small line under the site's name (#221).
+    enum Row: Equatable { case zoom, adBlocking, cookieBanners, darkPage, keepAwake, keepCookies, fullScreenFills, alwaysTranslate, openIn }
+    /// Rows linking to subpages. Permissions, JavaScript and extensions share one (#311, #313); the connection is a
+    /// line under the site name (#221).
     enum Link: Equatable { case permissions, zapped, style }
 
     struct Context {
@@ -2068,6 +2155,8 @@ enum SitePanelRows {
         var cookieBanners = false
         /// Choices kept for a site (dark page, keeping tabs awake) are offered for it (`KeepAwake.isOffered`).
         var siteChoices = true
+        /// Settings › Privacy › Clear cookies when Zigzag quits is on for the profile: Keep cookies is everyday then (#383).
+        var clearsCookiesOnQuit = false
         /// Full screen in the page is offered here, and the page has a video or a choice was made.
         var fullScreen = false
         /// The page is in a language other than yours.
@@ -2076,11 +2165,11 @@ enum SitePanelRows {
         var coveredPage = false
         /// The site asked for something, or has an answer kept.
         var hasPermissions = false
-        /// There's more than one space for the site to always open in (#286).
+        /// More than one space to route the site to (#286).
         var manySpaces = false
-        /// How many elements on the site are zapped.
+        /// Number of zapped elements.
         var zapped = 0
-        /// The site has CSS of your own.
+        /// The site has custom CSS.
         var styled = false
     }
 
@@ -2092,10 +2181,11 @@ enum SitePanelRows {
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
+            if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
-        // The space the site always opens in: never chosen from a private window, which keeps nothing of its sites.
+        // Open in: never from a private window, which saves nothing per site.
         if c.isWeb, !c.isPrivate, c.manySpaces { rows.append(.openIn) }
         return rows
     }

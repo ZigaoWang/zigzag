@@ -50,8 +50,7 @@ struct OwnScriptsTests {
     }
 }
 
-/// Zigzag's own scripts never hand a page a click: a page that redefines what they might call (a getter on
-/// `navigator.userAgent` that calls window.open) gets no popup out of Zigzag reading it.
+/// Zigzag's scripts never grant a page a user gesture: a `navigator.userAgent` getter that calls window.open gets no popup.
 @MainActor
 struct OwnScriptGestureTests {
     private final class Page: NSObject, WKUIDelegate, WKNavigationDelegate {
@@ -59,14 +58,14 @@ struct OwnScriptGestureTests {
         var done: CheckedContinuation<Void, Never>?
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction,
                      windowFeatures: WKWindowFeatures) -> WKWebView? {
-            // What Zigzag lets through on its own: a window a click opened (PopupNotice.allows).
+            // Zigzag allows only click-opened windows (PopupNotice.allows).
             if PopupNotice.isUserInitiated(navigationAction) { opened += 1 }
             return nil
         }
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { done?.resume(); done = nil }
     }
 
-    /// Everything Zigzag's scripts might reach for, made to open a window.
+    /// Traps on everything Zigzag's scripts might touch, each opening a window.
     private static let trap = """
     <html><head><link rel="icon" href="/favicon.ico"></head><body><video></video><script>
     window.calls = 0;
@@ -98,14 +97,14 @@ struct OwnScriptGestureTests {
     @Test func readingThePageOpensNothing() async throws {
         #expect(WKWebView.runsScriptsWithoutGesture)
         let (webView, page) = await load()
-        // What a tab asks of every page it loads, and what it runs on its own.
+        // What a tab runs on every page load.
         let type = try await webView.runOwnScript(Tab.pdfCheckScript) as? String
         #expect(type == "text/html")
         let icons = try await webView.runOwnScript(PageScripts.iconLinks) as? [[String: String]]
         #expect(icons?.first?["href"] == "https://example.com/favicon.ico")
         _ = try await webView.runOwnScript(Tab.elementMuting(true))
         _ = try await webView.runOwnScript("window.getSelection().toString()")
-        // The user agent is the web view's own, not the page's answer.
+        // The user agent comes from the web view, not the page.
         #expect(webView.sentUserAgent?.contains("AppleWebKit") == true)
         let calls = try await webView.evaluateJavaScript("window.calls", in: nil, contentWorld: .page) as? Int
         #expect(calls == 0)
@@ -115,14 +114,13 @@ struct OwnScriptGestureTests {
 
     @Test func aScriptInThePagesWorldCarriesNoClick() async throws {
         let (webView, page) = await load()
-        // Run where the page's own code is (a consent platform's check, full screen's switch): the getter runs,
-        // but without a click its window.open is refused.
+        // In the page world (consent check, full screen toggle) the getter runs, but window.open is refused without a click.
         _ = try await webView.runOwnScript("navigator.userAgent", world: .page)
         _ = try await webView.runOwnScript("return navigator.userAgent", asFunction: true, world: .page)
         let calls = try await webView.evaluateJavaScript("window.calls", in: nil, contentWorld: .page) as? Int
         #expect(calls == 2)
         #expect(page.opened == 0)
-        // What WebKit's plain call does, for comparison: it runs as a click, and the page's window opens.
+        // For comparison, plain evaluateJavaScript counts as a click and the window opens.
         _ = try await webView.evaluateJavaScript("navigator.userAgent")
         #expect(page.opened == 1)
         withExtendedLifetime(page) {}

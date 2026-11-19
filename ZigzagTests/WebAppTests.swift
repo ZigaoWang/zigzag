@@ -79,13 +79,28 @@ struct WebAppTests {
         #expect(!WebApps.opensInBrowser(URL(string: "mailto:a@b.c")!, from: here, isLinkClick: true))
     }
 
+    /// Open on an installed app's row in Settings (#355) takes the Dock icon's path.
+    @Test func settingsOpenButtonLaunchesTheApp() {
+        let app = WebApp(id: "0123456789abcdef", name: "GitHub", url: URL(string: "https://github.com/")!, profileID: profile,
+                         spaceID: UUID(), bundlePath: "/x.app", created: Date())
+        let saved = SettingsView.openWebApp
+        defer { SettingsView.openWebApp = saved }
+        var opened: [String] = []
+        SettingsView.openWebApp = { opened.append($0.id) }
+        let button = SettingsView.openButton(for: app)
+        #expect(button.title == String(localized: "Open"))
+        #expect(button.accessibilityLabel() == String(localized: "Open “\(app.name)”"))
+        #expect(button.accessibilityPerformPress())
+        #expect(opened == [app.id])
+    }
+
     @Test func stripShowsTheNameOnTheSiteAndTheHostElsewhere() {
         let app = WebApp(id: "0123456789abcdef", name: "GitHub", url: URL(string: "https://github.com/")!, profileID: profile,
                          spaceID: UUID(), bundlePath: "/x.app", created: Date())
         #expect(WebAppWindowController.stripTitle(app: app, page: URL(string: "https://github.com/issues")!) == "GitHub")
         #expect(WebAppWindowController.stripTitle(app: app, page: URL(string: "https://gist.github.com/")!) == "GitHub")
         #expect(WebAppWindowController.stripTitle(app: app, page: URL(string: "https://accounts.google.com/")!) == "accounts.google.com")
-        // Installed from one site under a shared host: another site there is named as itself.
+        // An app installed from a site on a shared host names other sites there as themselves.
         let hosted = WebApp(id: "0123456789abcdee", name: "My App", url: URL(string: "https://myapp.vercel.app/")!, profileID: profile,
                             spaceID: UUID(), bundlePath: "/y.app", created: Date())
         #expect(WebAppWindowController.stripTitle(app: hosted, page: URL(string: "https://myapp.vercel.app/settings")!) == "My App")
@@ -269,8 +284,7 @@ struct WebAppTests {
 }
 
 extension WebAppTests {
-    /// An app found only by its bundle id comes back only if its id is the one Zigzag gives its web address on one
-    /// of your profiles: another address in its marker, or one that isn't a web address, matches none.
+    /// Apps recovered by bundle id only count if the id is Zigzag's for that web URL on one of your profiles.
     @Test func recoveredAppsMustBeZigzagsOwn() {
         let other = UUID()
         let site = URL(string: "https://mail.example/")!

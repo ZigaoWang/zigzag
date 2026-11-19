@@ -60,7 +60,7 @@ struct MiniPlayerPageTests {
         #expect(try await visibility("#movie_player", in: webView, pseudo: "::after") == "hidden")
         // The player it sits in stays, on black.
         #expect(try await script("return getComputedStyle(document.body).backgroundColor", in: webView) as? String == "rgb(0, 0, 0)")
-        // Its own controls are off while it's in the card, so they don't show over the card's (#230).
+        // Native controls are off in the card so they don't overlap its own (#230).
         #expect(try await script("return document.querySelector('video').controls", in: webView) as? Bool == false)
         // Nothing moved: the video is where it was.
         #expect(try await script("return document.querySelector('video').getBoundingClientRect().width", in: webView) as? Double == 640)
@@ -120,6 +120,50 @@ struct MiniPlayerPageTests {
         #expect(try await visibility("article p", in: webView) == "hidden")
         try await script("return window.__zigzagVideos.unisolate()", in: webView)
         #expect(try await script("return document.querySelectorAll('[data-zigzag-mini]').length", in: webView) as? Int == 0)
+    }
+
+    /// A page's Web Audio that only outputs silence (a call app's idle graph) isn't playing sound to WebKit, so it
+    /// never keeps a covered window's page on screen; any sound at all is (#199).
+    @Test func silentWebAudioIsNotPlayingSound() async throws {
+        let window = NSWindow(contentRect: NSRect(x: -4000, y: -4000, width: 400, height: 300), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        let configuration = WKWebViewConfiguration()
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300), configuration: configuration)
+        let key = "_isPlayingAudio"
+        guard webView.responds(to: NSSelectorFromString(key)) else { return }
+        window.contentView = webView
+        let loading = Loading()
+        webView.navigationDelegate = loading
+        // In the page's own world. A source held at zero; then a step far below hearing (-120 dB).
+        let page = "<html><body><script>window.ctx = new AudioContext(); window.s = ctx.createConstantSource(); s.offset.value = 0; s.connect(ctx.destination); s.start(); ctx.resume();</script></body></html>"
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString(page, baseURL: URL(string: "https://audio.test/"))
+        }
+        func playing(after wait: Int) async throws -> Bool {
+            try await Task.sleep(for: .milliseconds(wait))
+            return webView.value(forKey: key) as? Bool ?? false
+        }
+        #expect(try await webView.evaluateJavaScript("ctx.state") as? String == "running")
+        #expect(try await !playing(after: 1500))
+        _ = try await webView.evaluateJavaScript("s.offset.value = 0.000001; 1")
+        #expect(try await playing(after: 1500))
+        _ = try await webView.evaluateJavaScript("ctx.close(); 1")
+    }
+
+    /// WebKit is told whether a covered window hides the page, as `Tab` does while it plays (#199).
+    @Test func aPageCanBeLeftOnScreenInACoveredWindow() {
+        let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        let key = "_windowOcclusionDetectionEnabled"
+        guard webView.responds(to: NSSelectorFromString(key)) else { return }
+        #expect(webView.value(forKey: key) as? Bool == true)
+        Tab.setWatchesCover(false, of: webView)
+        #expect(webView.value(forKey: key) as? Bool == false)
+        Tab.setWatchesCover(true, of: webView)
+        #expect(webView.value(forKey: key) as? Bool == true)
     }
 
     /// A page out of the window counts as hidden, where WebKit won't load or start a playlist's next song; kept in the

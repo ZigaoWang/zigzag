@@ -4,8 +4,7 @@ import Testing
 import WebKit
 @testable import Zigzag
 
-/// Certificates a site asks for (#297): which Keychain identities are offered, which kept choice is used, and that
-/// private windows keep nothing. The Keychain part runs on a keychain file the test makes and deletes, never yours.
+/// Client certificates (#297): offered identities, kept choices, nothing kept in private windows. Uses a temp keychain.
 @MainActor @Suite(.serialized)
 struct ClientCertificatesTests {
     private func info(_ name: String, sha: String, from: Date? = nil, until: Date? = nil) -> ClientCertificates.Info {
@@ -18,11 +17,11 @@ struct ClientCertificatesTests {
         #expect(ClientCertificates.decide(candidates: [], session: nil, kept: "AA", now: now) == .noMatch)
         #expect(ClientCertificates.decide(candidates: [a, b], session: nil, kept: nil, now: now) == .ask)
         #expect(ClientCertificates.decide(candidates: [a, b], session: nil, kept: "BB", now: now) == .use(1))
-        // A kept one that's gone from the Keychain, or expired (so no longer a candidate): asked again.
+        // A kept identity that's gone or expired: ask again.
         #expect(ClientCertificates.decide(candidates: [a], session: nil, kept: "BB", now: now) == .ask)
         #expect(ClientCertificates.decide(candidates: [a, b], session: .identity(sha256: "AA"), kept: "BB", now: now) == .use(0))
         #expect(ClientCertificates.decide(candidates: [b], session: .identity(sha256: "AA"), kept: nil, now: now) == .ask)
-        // Cancel holds a little while, then the site may ask again.
+        // Cancel holds briefly, then the site may ask again.
         #expect(ClientCertificates.decide(candidates: [a], session: .declined(until: now.addingTimeInterval(5)), kept: "AA", now: now) == .declined)
         #expect(ClientCertificates.decide(candidates: [a], session: .declined(until: now.addingTimeInterval(-5)), kept: "AA", now: now) == .use(0))
     }
@@ -56,7 +55,7 @@ struct ClientCertificatesTests {
         #expect(ClientCertificates.query(issuers: nil)[kSecClass] as? String == kSecClassIdentity as String)
     }
 
-    /// Three identities in a keychain of the test's own: one from CA A, one from CA B, and an expired one from CA A.
+    /// Temp keychain: one identity from CA A, one from CA B, one expired from CA A.
     @Test func findsIdentitiesIssuedByWhomTheSiteNames() throws {
         let path = NSTemporaryDirectory() + "zigzag-client-certificates-\(UUID().uuidString).keychain-db"
         var keychain: SecKeychain?
@@ -78,7 +77,7 @@ struct ClientCertificatesTests {
         #expect(names([caA]) == ["Test Client A"])
         #expect(names([caB]) == ["Test Client B"])
         #expect(names([caA, caB]) == ["Test Client A", "Test Client B"])
-        // A site that names no issuers is offered every valid one; the expired one never.
+        // No issuers named: every valid identity is offered.
         #expect(names(nil) == ["Test Client A", "Test Client B"])
         #expect(names([]) == ["Test Client A", "Test Client B"])
         #expect(names([Data([0x30, 0x00])]).isEmpty)
@@ -113,7 +112,7 @@ struct ClientCertificatesTests {
             ClientCertificates.forgetSessions(site: "login.example.com")
             #expect(ClientCertificates.kept(host: "login.example.com") == nil)
             #expect(ClientCertificates.sessionAnswer(host: "login.example.com", store: store) == nil)
-            // Without "always", it holds for the session only.
+            // Without "always" it's session only.
             ClientCertificates.noteChosen(a, host: "intranet.example", store: store, always: false)
             #expect(ClientCertificates.kept(host: "intranet.example") == nil)
             #expect(ClientCertificates.sessionAnswer(host: "intranet.example", store: store) == .identity(sha256: "AA"))
@@ -129,7 +128,7 @@ struct ClientCertificatesTests {
             #expect(ClientCertificates.kept(host: "login.example.com") == nil)
             #expect(ClientCertificates.sites.isEmpty)
             #expect(ClientCertificates.defaults.dictionaryRepresentation()["ClientCertificateChoices"] == nil)
-            // Its session has it; another window's doesn't.
+            // Per session: another window doesn't have it.
             #expect(ClientCertificates.sessionAnswer(host: "login.example.com", store: privateStore) == .identity(sha256: "AA"))
             #expect(ClientCertificates.sessionAnswer(host: "login.example.com", store: other) == nil)
             ClientCertificates.noteDeclined(host: "other.example", store: privateStore, now: Date(timeIntervalSince1970: 0))
@@ -137,8 +136,7 @@ struct ClientCertificatesTests {
         }
     }
 
-    // Made with openssl for this test: CAs "Zigzag Test CA A" and "B" (their subject names, DER), and three
-    // identities as .p12 with the password "test". The expired one ran out in 2021; the others last until 2120.
+    // Made with openssl: CA A and B subject names (DER) and three .p12 identities, password "test"; one expired in 2021, others valid to 2120.
     private static let caA = "MDExFDASBgNVBAoMC1ppZ3phZyBUZXN0MRkwFwYDVQQDDBBaaWd6YWcgVGVzdCBDQSBB"
     private static let caB = "MDExFDASBgNVBAoMC1ppZ3phZyBUZXN0MRkwFwYDVQQDDBBaaWd6YWcgVGVzdCBDQSBC"
     private static let clientA = """

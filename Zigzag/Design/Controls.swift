@@ -290,16 +290,14 @@ class InteractiveView: NSView {
 
     // MARK: Accessibility
 
-    /// What VoiceOver can act on. A control drawn on this view is one element with its role, name and state, and
-    /// its pictures and words are its own, not read on their own: the icon of a button would otherwise come through
-    /// as an image named after its symbol. A plain view used as a panel or a row of controls stays out of the way,
-    /// so the controls in it are reached one by one.
+    /// Roles VoiceOver treats as one element with role, name and state; its icons and labels aren't read separately (an
+    /// icon would read as its symbol name). Plain container views stay out so their controls are reached one by one.
     static let controlRoles: Set<NSAccessibility.Role> = [.button, .checkBox, .radioButton, .popUpButton, .menuButton,
                                                            .disclosureTriangle, .row, .cell, .slider, .incrementor, .link, .menuItem]
-    /// Roles that hold other elements: one becomes an element of its own only with a name to say (a toolbar).
+    /// Container roles: an element only when named (a toolbar).
     private static let containerRoles: Set<NSAccessibility.Role> = [.group, .toolbar, .list, .radioGroup, .sheet, .menu]
 
-    /// Set by `setAccessibilityElement`, which outranks the role.
+    /// Set by `setAccessibilityElement`; overrides the role.
     private var elementChoice: Bool?
 
     override func setAccessibilityElement(_ isElement: Bool) {
@@ -307,7 +305,7 @@ class InteractiveView: NSView {
         super.setAccessibilityElement(isElement)
     }
 
-    /// Something you press: a control's role, or no role of its own but a click to answer.
+    /// A control role, or no role but handles clicks.
     var isAccessibilityControl: Bool {
         guard let role = super.accessibilityRole(), role != .unknown else { return onClick != nil }
         return Self.controlRoles.contains(role)
@@ -320,15 +318,14 @@ class InteractiveView: NSView {
         return !(super.accessibilityLabel() ?? "").isEmpty
     }
 
-    /// A clickable view that never said what it is reads as a button.
+    /// A clickable view with no role reads as a button.
     override func accessibilityRole() -> NSAccessibility.Role? {
         let own = super.accessibilityRole()
         guard own == nil || own == .unknown, onClick != nil else { return own }
         return .button
     }
 
-    /// Its name: the one it was given; otherwise its tooltip, without the shortcut it ends with; otherwise the words
-    /// it shows.
+    /// The given label, else the tooltip without its shortcut, else the shown text.
     override func accessibilityLabel() -> String? {
         if let own = super.accessibilityLabel(), !own.isEmpty { return own }
         guard isAccessibilityControl else { return super.accessibilityLabel() }
@@ -337,7 +334,7 @@ class InteractiveView: NSView {
         return words.isEmpty ? nil : words.joined(separator: ", ")
     }
 
-    /// The words in a control's own labels, leading to trailing, not those of a control inside it.
+    /// Text from the control's own labels, leading to trailing, excluding nested controls.
     private static func shownWords(in view: NSView) -> [String] {
         view.subviews.filter { !$0.isHidden }.flatMap { child -> [String] in
             if child is InteractiveView { return [] }
@@ -349,17 +346,16 @@ class InteractiveView: NSView {
         }
     }
 
-    /// A control's pictures and words: said by the control, never on their own.
+    /// A control's icons and labels: read via the control, never alone.
     static func isDecoration(_ element: Any) -> Bool {
-        // AppKit hands a control's cell to VoiceOver in its place.
+        // AppKit hands VoiceOver the cell instead of the control.
         if let cell = element as? NSCell { return cell.controlView.map(isDecoration) ?? (cell is NSImageCell) }
         if element is NSImageView { return true }
         if let field = element as? NSTextField, !field.isEditable { return true }
         return false
     }
 
-    /// One element that speaks for itself (a control, or a line of text drawn on this): its pictures and words are
-    /// its own. A group keeps its children.
+    /// A control or drawn text line that speaks for its icons and labels. Groups keep their children.
     private var isDrawnControlElement: Bool {
         guard isAccessibilityElement() else { return false }
         return !(super.accessibilityRole().map(Self.containerRoles.contains) ?? false)
@@ -371,7 +367,7 @@ class InteractiveView: NSView {
         return children?.filter { !Self.isDecoration($0) }
     }
 
-    /// VoiceOver under the pointer lands on the control, not on its icon or words.
+    /// VoiceOver under the pointer hits the control, not its icon or text.
     nonisolated override func accessibilityHitTest(_ point: NSPoint) -> Any? {
         nonisolated(unsafe) var found: Any?
         MainActor.assumeIsolated {
@@ -568,7 +564,7 @@ final class IconButton: InteractiveView {
         layer?.cornerCurve = .continuous
         imageView.image = Tokens.Symbol.image(symbol, size: symbolSize)
         imageView.imageScaling = .scaleNone
-        // The button says what it does; its symbol's own name ("split view horizontally left") is never read.
+        // Read the button's label, not the symbol name ("split view horizontally left").
         imageView.setAccessibilityElement(false)
         addSubview(imageView)
         self.toolTip = toolTip
@@ -600,14 +596,13 @@ final class IconButton: InteractiveView {
             let ink = Tokens.Symbol.inkOffset(symbol, size: symbolSize)
             imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
         } else {
-            // Over a video, the glyph's own ink goes in the middle of the circle (a play triangle leans right in
-            // its image).
-            let ink = isOverMedia ? glyphInk : .zero
+            // The glyph's own ink goes in the middle (a play triangle leans right in its image).
+            let ink = glyphInk
             imageView.frame = bounds.offsetBy(dx: -ink.width, dy: isFlipped ? ink.height : -ink.height)
         }
     }
 
-    /// Where the glyph's ink sits from its image's middle, for `isOverMedia`; set with the glyph.
+    /// Where the glyph's ink sits from its image's middle; set with the glyph.
     var glyphInk: CGSize = .zero { didSet { needsLayout = true } }
 
     /// Chosen, it's the soft card (`applyRowStyle`) rather than the hover fill: a choice among many, like an icon
@@ -685,25 +680,24 @@ final class Label: NSTextField {
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    /// Text too long for its room fades out at its end instead of ending in "…": the same cut whether a button
-    /// covers its end (a sidebar row under the pointer) or not, so nothing about the text changes as the pointer
-    /// comes and goes. Its owner calls `fadeTail` once it's placed.
+    /// Long text fades out at its end instead of "…", with the same cut whether or not a hover button covers it, so it
+    /// doesn't shift on hover. The owner calls `fadeTail` after placing it.
     var fadesTail = false {
         didSet { lineBreakMode = fadesTail ? .byClipping : .byTruncatingTail }
     }
 
-    /// How far the fade at the end runs.
+    /// Fade length.
     static let tailFade = Tokens.Space.x4
 
-    /// Fades the text out just before `end` (in its own terms; a button over its end), or, with none, at its own
-    /// end when the text doesn't fit. Text that fits, with nothing over it, has no fade.
+    /// Fades out before `end` (local coordinates; where a button covers it), or at its own end when it doesn't fit. No
+    /// fade when it fits uncovered.
     func fadeTail(endingAt end: CGFloat? = nil) {
         #if DEBUG
         fadesAsked += 1
         #endif
         let room = bounds.width - Label.inset * 2
         let stop = end ?? (inkWidth > room + 0.5 ? bounds.width - Label.inset : nil)
-        // Every layout of every row asks again: the same size and the same cut as last time leave the mask be.
+        // Called on every row layout: skip when size and stop are unchanged.
         let wanted = Fade(size: bounds.size, stop: stop)
         if wanted == lastFade, (stop == nil || bounds.width <= 0) == (layer?.mask == nil) { return }
         lastFade = wanted
@@ -726,15 +720,14 @@ final class Label: NSTextField {
         if layer.mask !== fade { layer.mask = fade }
     }
 
-    /// What `fadeTail` last drew: its size and where the fade ended.
+    /// Last drawn fade: size and stop.
     private struct Fade: Equatable {
         var size: NSSize
         var stop: CGFloat?
     }
     private var lastFade: Fade?
 
-    /// Moved to a screen of another scale: where `centeredY` puts it is on the old screen's pixels, so the view
-    /// that places it does so again.
+    /// New backing scale: `centeredY` was for the old pixels, so the parent relayouts.
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         superview?.needsLayout = true
@@ -743,14 +736,12 @@ final class Label: NSTextField {
     /// Exact width of the text, plus the cell's own padding.
     var textWidth: CGFloat { inkWidth + Tokens.Space.x2 }
 
-    /// The text's own width, without the padding `textWidth` adds: for laying out text inside a pill. Set as
-    /// styled text (a space's name, set tight), it's measured as drawn, tracking included.
-    /// Measured once per text, font and tracking: a sidebar row asks on every layout.
+    /// Text width without `textWidth`'s padding, for pill layout. Styled text is measured as drawn, tracking included.
+    /// Cached per text, font and tracking since sidebar rows ask on every layout.
     var inkWidth: CGFloat {
         let font = self.font ?? Tokens.Font.body()
         let text = stringValue
-        // Set aside whenever the text or font is set through the label; checked here too, for a change made
-        // around it (through its cell).
+        // Invalidated when text or font is set through the label; also checked here for changes made via the cell.
         if let measured = measuredInk, measured.text == text, measured.fontName == font.fontName, measured.pointSize == font.pointSize {
             return measured.width
         }
@@ -761,8 +752,8 @@ final class Label: NSTextField {
         return width
     }
 
-    /// The last `inkWidth` and what it was measured for. Tracking isn't kept: it only ever comes with styled text
-    /// set through the label, which sets the measure aside.
+    /// Cached `inkWidth` and its inputs. Tracking isn't stored: it only comes with styled text set through the label,
+    /// which invalidates the cache.
     private struct MeasuredInk: Equatable {
         var text: String
         var fontName: String
@@ -776,9 +767,9 @@ final class Label: NSTextField {
     override var font: NSFont? { didSet { measuredInk = nil } }
 
     #if DEBUG
-    /// Whether `inkWidth` would measure again: for tests.
+    /// For tests.
     var hasMeasuredInk: Bool { measuredInk != nil }
-    /// How many times `fadeTail` was asked: for tests.
+    /// For tests.
     var fadesAsked = 0
     #endif
 
@@ -795,8 +786,8 @@ final class Label: NSTextField {
     }
     private static var capsOffsets: [CapsKey: CGFloat] = [:]
 
-    /// How far below the middle of a label's line its capital letters' middle is drawn, measured once per font by
-    /// drawing a few capitals (the cell's own insets and the font's metrics both play in, so it's measured, not worked out).
+    /// How far below the line's middle the caps' middle sits, measured once per font by drawing capitals (cell insets
+    /// and font metrics both affect it).
     static func capsBelowMiddle(of font: NSFont, lineHeight: CGFloat) -> CGFloat {
         let key = CapsKey(fontName: font.fontName, pointSize: font.pointSize, lineHeight: lineHeight)
         if let known = capsOffsets[key] { return known }
@@ -824,14 +815,13 @@ final class Label: NSTextField {
 }
 
 extension NSTextField {
-    /// Where to put this text, one line tall, so its capital letters sit in the middle of `height`, on the screen's
-    /// pixels: centering the line box instead leaves the letters up to a point low (the system font draws its caps
-    /// below the middle of its line, more so as it grows), which reads as more room above the text than below. A
-    /// field is placed the same way as a label, so its text never moves when one stands in for the other.
+    /// Y that centers the caps in `height` on pixel boundaries. Centering the line box leaves caps low (the system font
+    /// draws caps below the line's middle, more at larger sizes). Fields use the same placement as labels so text
+    /// doesn't jump when one replaces the other.
     func centeredY(in height: CGFloat) -> CGFloat {
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
         let lineHeight = ceil(intrinsicContentSize.height)
-        // In a flipped view y runs down, so the text goes up by the offset; in a plain one, y runs up.
+        // Flipped views run y down, so the text moves up by the offset.
         let below = Label.capsBelowMiddle(of: font ?? Tokens.Font.body(), lineHeight: lineHeight)
         let y = (height - lineHeight) / 2 + ((superview?.isFlipped ?? true) ? -below : below)
         return (y * scale).rounded() / scale
@@ -1035,8 +1025,8 @@ final class TextButton: InteractiveView {
     /// `textWidth` already carries the label's own inset; the label is centered, so the padding is even.
     var fittingWidth: CGFloat { label.textWidth + (showsFillAtRest ? Tokens.Space.x6 : Tokens.Space.x3) }
 
-    /// From the button's edge to its words at its fitting width: how far text alone reaches out past a column's edge,
-    /// so its words line up with the text and controls above and below it.
+    /// Distance from the button edge to its text at fitting width, so text-only buttons align with content above and
+    /// below.
     var textInset: CGFloat { (fittingWidth - label.inkWidth) / 2 }
 
     /// So stacks and form rows can size it like any control.
@@ -1057,19 +1047,18 @@ final class TextButton: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let ink = applyButtonLook(showsFillAtRest ? .secondary : .quiet)
-        // Text alone takes the disabled ink when it can't be used, rather than fading past reading.
+        // Text-only buttons use the disabled ink rather than fading.
         if !showsFillAtRest { alphaValue = 1 }
-        // In its own color (Back and Skip, pale on the welcome's blue), it fades that color: the neutral disabled
-        // gray would go muddy on a ground it wasn't made for.
+        // Custom-colored text (Back and Skip on the welcome's blue) fades its own color; the neutral gray goes muddy
+        // there.
         label.textColor = isEnabled || showsFillAtRest ? textColor ?? ink : textColor.map(Self.disabledInk) ?? Tokens.Color.textDisabled
         label.alphaValue = 1
     }
 
-    /// How much of its own color's strength text in a custom color keeps while it can't be used: plainly fainter,
-    /// still 3:1 on the ground it was picked for (pale ribbon on the welcome's navy).
+    /// Share of a custom color kept when disabled: fainter, still 3:1 on its intended background.
     nonisolated static let disabledFade: CGFloat = 0.8
 
-    /// `color`, faded for a disabled button, in whichever appearance it's drawn.
+    /// `color` faded for a disabled button, in the current appearance.
     nonisolated static func disabledInk(_ color: NSColor) -> NSColor {
         NSColor(name: nil) { appearance in
             var faded = color
@@ -1143,8 +1132,8 @@ final class FilledField: NSView {
 
     @objc private func editingChanged() { updateColors() }
 
-    /// The ring shows as soon as the field takes the keyboard (a sheet putting you straight into it), not only once
-    /// you type: the window's first responder is watched, since taking focus says nothing to the field's delegate.
+    /// Shows the focus ring as soon as the field takes focus, not on first keystroke; watches the first responder since
+    /// the delegate isn't told.
     private var responderWatch: NSKeyValueObservation?
 
     override func viewDidMoveToWindow() {
@@ -1159,8 +1148,7 @@ final class FilledField: NSView {
     /// panel's field is a soft fill. A page's header sets it for its search.
     var isOutlined = false { didSet { updateColors(); needsLayout = true } }
 
-    /// What's in it is wrong for what it's for: its edge takes the warning color until it's right again, so a form
-    /// that can't be confirmed says which field is holding it up instead of leaving its button dead unexplained.
+    /// Invalid content: the border turns the warning color, so a blocked form shows which field holds it up.
     var isInvalid = false { didSet { guard isInvalid != oldValue else { return }; updateColors() } }
 
     private func updateColors() {
@@ -1255,6 +1243,105 @@ final class ChoicePill: InteractiveView {
         label.textColor = isOn ? Tokens.Color.textPrimary : Tokens.Color.textSecondary
         check.image = Tokens.Symbol.image(isOn ? "checkmark" : "plus", size: Tokens.Symbol.inline)
         check.contentTintColor = isOn ? tint : Tokens.Color.textTertiary
+    }
+}
+
+/// A checkbox and its words, the whole row taking the click. Off, a white box with a hairline like a secondary
+/// button; on, the box fills with the accent and shows a bold check. The words wrap to two lines when narrow.
+final class Checkbox: InteractiveView {
+    private let label: Label
+    private let box = NSView()
+    private let check = NSImageView()
+    var onChange: ((Bool) -> Void)?
+    var isOn = false { didSet { if oldValue != isOn { stateDidChange(animated: false) } } }
+    /// Nil takes its window's accent.
+    var tint: NSColor? { didSet { stateDidChange(animated: false) } }
+    var title: String {
+        get { label.stringValue }
+        set {
+            label.stringValue = newValue
+            setAccessibilityLabel(newValue)
+            needsLayout = true
+        }
+    }
+
+    static let side: CGFloat = 14
+    static let boxRadius: CGFloat = Tokens.Radius.small
+    /// Box to words.
+    static let gap: CGFloat = Tokens.Space.x2
+
+    init(title: String = "") {
+        label = Label(title, font: Tokens.Font.body(), color: Tokens.Color.textPrimary)
+        super.init(frame: .zero)
+        label.lineBreakMode = .byWordWrapping
+        label.usesSingleLineMode = false
+        label.maximumNumberOfLines = 2
+        box.wantsLayer = true
+        box.layer?.cornerRadius = Self.boxRadius
+        box.layer?.cornerCurve = .continuous
+        check.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .bold))
+        check.imageScaling = .scaleNone
+        box.addSubview(check)
+        [box, label].forEach { addSubview($0) }
+        layer?.cornerRadius = Self.boxRadius
+        onClick = { [weak self] _ in
+            guard let self, self.isEnabled else { return }
+            self.isOn.toggle()
+            self.onChange?(self.isOn)
+        }
+        setAccessibilityRole(.checkBox)
+        setAccessibilityLabel(title)
+        stateDidChange(animated: false)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func accessibilityValue() -> Any? { isOn ? 1 : 0 }
+
+    private var textX: CGFloat { Self.side + Self.gap }
+
+    /// One line's width: the box, the gap and the words.
+    var fittingWidth: CGFloat { ceil(textX + label.inkWidth) }
+
+    /// One line, or two when the words don't fit in `width`.
+    func height(for width: CGFloat) -> CGFloat {
+        let room = width - textX
+        guard label.inkWidth > room else { return max(Self.side, label.lineHeight) }
+        let wrapped = label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: room + Label.inset * 2, height: 200)).height ?? label.lineHeight
+        return max(Self.side, ceil(wrapped))
+    }
+
+    override func layout() {
+        super.layout()
+        let line = label.lineHeight
+        // The box sits on the first line's caps.
+        let scale = window?.backingScaleFactor ?? 2
+        let below = Label.capsBelowMiddle(of: label.font ?? Tokens.Font.body(), lineHeight: line)
+        let y = ((line / 2 + below - Self.side / 2) * scale).rounded() / scale
+        box.frame = NSRect(x: 0, y: max(0, y), width: Self.side, height: Self.side)
+        let size = check.image?.size ?? .zero
+        check.frame = NSRect(x: round((Self.side - size.width) / 2), y: round((Self.side - size.height) / 2), width: size.width, height: size.height)
+        label.frame = NSRect(x: textX - Label.inset, y: 0, width: bounds.width - textX + Label.inset * 2, height: bounds.height)
+    }
+
+    override func stateDidChange(animated: Bool) {
+        let accent = tint ?? Brand.Theme.for(self).accent
+        let fill: NSColor
+        if isOn {
+            fill = isPressed ? (accent.shadow(withLevel: 0.15) ?? accent) : isHovered ? (accent.highlight(withLevel: 0.08) ?? accent) : accent
+        } else {
+            fill = isPressed ? Tokens.Color.controlPressed : isHovered ? Tokens.Color.controlHover : Tokens.Color.controlFill
+        }
+        box.layer?.set(backgroundColor: cgColor(fill), animated: false)
+        Tokens.Motion.withoutAnimation {
+            box.layer?.borderWidth = isOn ? 0 : Tokens.Metric.hairline
+            box.layer?.borderColor = cgColor(Tokens.Color.controlEdge)
+        }
+        check.isHidden = !isOn
+        check.contentTintColor = tint.map(Brand.ink(on:)) ?? Brand.Theme.for(self).onAccent
+        label.textColor = isEnabled ? Tokens.Color.textPrimary : Tokens.Color.textDisabled
+        alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
     }
 }
 
@@ -1360,10 +1447,7 @@ final class Toggle: InteractiveView {
     }
 }
 
-/// A choice from a list, drawn as Zigzag's: the current choice (with its icon) on the secondary look, a chevron at
-/// the end, and Zigzag's own menu (`MenuPanel`) when clicked, its chosen item right over the button as macOS places it.
-/// Press and drag to an item to choose in one go; with the keyboard, Space, Return or an arrow opens it.
-/// Menus that line up as one column, as the ones in a group of settings: each as wide as the widest of them.
+/// Dropdown menus in a column (a settings group) share the widest one's width.
 final class DropdownWidthGroup {
     private let members = NSHashTable<DropdownButton>.weakObjects()
     private var updating = false
@@ -1375,7 +1459,7 @@ final class DropdownWidthGroup {
 
     var width: CGFloat { members.allObjects.filter { !$0.showsPictureOnly }.map(\.naturalWidth).max() ?? 0 }
 
-    /// One of them changed its choices: each takes the new width.
+    /// A member's choices changed: recompute the width.
     func changed() {
         guard !updating else { return }
         updating = true
@@ -1407,10 +1491,9 @@ final class DropdownButton: InteractiveView {
     var onSelect: ((Int) -> Void)?
     /// Under the choices, after a line: making a new thing to choose ("New Profile…").
     var actions: [Action] = []
-    /// How it's painted: the plain control, or, where it stands in for a filled answer (a question's own affirmative,
-    /// offered as choices), the primary look. `tint` replaces the primary's fill with the window's accent.
+    /// Secondary look, or primary where it stands in for a filled answer. `tint` uses the window's accent as the fill.
     var look: ButtonLook = .secondary { didSet { stateDidChange(animated: false) } }
-    /// Its menu opens light or dark as the button is drawn, not as the window is (a card in its page's look).
+    /// The menu follows the button's appearance, not the window's (a card in the page's look).
     var menuTakesOwnLook = false
     var tint: NSColor? { didSet { stateDidChange(animated: false) } }
     private var openedAt: TimeInterval = 0
@@ -1460,10 +1543,10 @@ final class DropdownButton: InteractiveView {
         widthGroup?.changed()
     }
 
-    /// Menus set one under another (a group of settings) share the widest one's width, so their edges line up.
+    /// Shared width so stacked menus line up.
     weak var widthGroup: DropdownWidthGroup? { didSet { oldValue?.changed(); widthGroup?.changed() } }
 
-    /// Wide enough for its longest choice, as a pop-up button is.
+    /// Fits the longest choice, like a pop-up button.
     var naturalWidth: CGFloat {
         let widest = options.map { ($0.title as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width }.max() ?? 0
         let iconWidth: CGFloat = options.contains { $0.image != nil } ? Self.iconSide + Tokens.Space.x2 : 0
@@ -1537,7 +1620,7 @@ final class DropdownButton: InteractiveView {
 
     override func stateDidChange(animated: Bool) {
         let ink = applyButtonLook(look, tint: look == .primary ? tint : nil)
-        // An open menu shows on the control itself, unless it's already the filled answer, whose fill says enough.
+        // Open menus highlight the control, unless the filled look already does.
         if menuOpen, look == .secondary { layer?.set(backgroundColor: cgColor(Tokens.Color.controlHover), animated: false) }
         label.textColor = ink
         chevron.contentTintColor = look == .primary ? ink : Tokens.Color.textSecondary
@@ -1703,7 +1786,7 @@ final class MenuPanel: FloatingPanelView {
 
     /// Opens a menu from `anchor`. `closed` runs once it's gone, chosen or not.
     @discardableResult
-    /// `appearance`: light or dark for the menu, when it isn't the window's (a menu from a card in the page's look).
+    /// `appearance`: the menu's light or dark, when it differs from the window's.
     static func show(_ entries: [Entry], from anchor: NSView, placement: Placement = .below, minWidth: CGFloat = 0,
                      appearance: NSAppearance? = nil, closed: (() -> Void)? = nil) -> MenuPanel? {
         current?.close(animated: false)
@@ -2132,7 +2215,7 @@ final class SlidingSwitch: NSView {
                 addSubview(icon)
             }
         }
-        // One group VoiceOver steps into, its segments the radio buttons in it.
+        // One VoiceOver group with radio-button segments.
         setAccessibilityElement(true)
         setAccessibilityRole(.radioGroup)
         // One radio button per choice for VoiceOver, each chosen with a press.

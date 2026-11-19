@@ -94,6 +94,9 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | Duplicate Tab | 复制标签页 | | Safari. |
 | Move Tab to New Window | 将标签页移到新窗口 | | Safari's menu item exactly. |
 | Mute Tab | 将标签页静音 | 静音 | Safari. |
+| Open All in Tabs (a folder's) | 全部在标签页中打开 | 在新标签页中打开 | That one is Open in New Tab. |
+| Expand All / Collapse All (a folder and the ones inside) | 全部展开 / 全部折叠 | 全部收起 | Safari's and Finder's. One folder or group is still 打开文件夹, 收起分组. |
+| Expand All Folders / Collapse All Folders (a space's pinned folders) | 展开所有文件夹 / 折叠所有文件夹 | 全部展开文件夹 | Every folder in the space, not one folder's tree. |
 | Change Icon… (a folder, tab, pinned tab, favorite) | 更改图标… | 更换图标… | Plain, as 更改 is everywhere in macOS. |
 | Use Site Icon | 使用网站图标 | 恢复默认图标, 还原图标 | Says which icon comes back: the site's own, 网站 as in 网站设置. |
 | Use Default Colors (a space) | 使用默认颜色 | 恢复默认配色, 重置颜色 | As Use Site Icon: 使用, then what comes back. 颜色 as the space editor's other color words. |

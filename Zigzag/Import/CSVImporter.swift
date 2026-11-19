@@ -50,7 +50,7 @@ nonisolated enum CSVImporter {
             return .failure(.unknownFormat)
         }
         let notesIndex = index(columns.notes), otpIndex = index(columns.otp)
-        // Zigzag's own export puts a ' before text a spreadsheet would run as a formula; it comes off again here.
+        // Zigzag's export prefixes formula-like text with ' for spreadsheets; strip it here.
         let isOwnExport = header == zigzagExportHeader
         func restore(_ text: String) -> String { isOwnExport ? unneutralized(text) : text }
         var batch = ImportBatch()
@@ -72,10 +72,10 @@ nonisolated enum CSVImporter {
         return batch.logins.isEmpty && skipped == 0 ? .failure(.empty) : .success((format, batch))
     }
 
-    /// The header row of Passwords' own export (`PasswordExport`), which no other app writes.
+    /// Header of Zigzag's own password export (`PasswordExport`).
     static let zigzagExportHeader = ["name", "url", "username", "password", "note", "otpauth"]
 
-    /// Takes off the ' that `PasswordExport.field` put before =, +, -, @, a tab or a return; any other ' is the text's own.
+    /// Strips the ' `PasswordExport.field` puts before =, +, -, @, tab or return; other quotes are kept.
     static func unneutralized(_ text: String) -> String {
         guard text.hasPrefix("'"), let next = text.unicodeScalars.dropFirst().first, "=+-@\t\r".unicodeScalars.contains(next) else { return text }
         return String(text.dropFirst())

@@ -134,6 +134,322 @@ import Testing
         directory.assign(favorite: marks[4].id, to: work.id)
         #expect(Library.tidied(marks, splits: [pinned], directory: directory).1.isEmpty)
     }
+
+    // MARK: Groups of tabs pinned (#325)
+
+    /// A window with tabs `titles` in the first space; the library is restored after.
+    private func withTabs(_ titles: [String], _ body: (TabManager, [Tab], UUID) throws -> Void) rethrows {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tabs = titles.enumerated().map { i, title in Tab(url: URL(string: "https://example.com/group/\(i)")!, title: title, spaceID: space) }
+        manager.adopt(tabs, in: space)
+        try body(manager, tabs, space)
+    }
+
+    /// Pinning a tab in a group pins the whole group as one folder; unpinning restores the group.
+    @Test func pinningAGroupOfTabsKeepsItWholeAsOneFolder() throws {
+        try withTabs(["0", "1", "2", "3"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
+            manager.bookmarkTab(tabs[0], in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            let folder = try #require(Library.shared.pinnedGroup(containing: page))
+            #expect(folder.name == "Reading")
+            #expect(folder.groupID == groupID)
+            #expect(folder.bookmarkIDs == tabs.compactMap(\.bookmarkID))
+            // One entry: every page in the folder, none as its own pinned split.
+            #expect(Library.shared.pinnedSplit(containing: page) == nil)
+            #expect(Library.shared.bookmarks(in: space).filter { folder.bookmarkIDs.contains($0.id) }.map(\.id) == folder.bookmarkIDs)
+            #expect(manager.tabs(in: space).isEmpty)
+            // Unpinning a page restores the whole group.
+            manager.unbookmark(folder.bookmarkIDs[2], toIndex: 0)
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(manager.groups(in: space).map(\.id) == [groupID])
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == tabs.map(\.id))
+            #expect(manager.tabs(in: space).map(\.id) == tabs.map(\.id))
+        }
+    }
+
+    /// A one-tab group pins as a one-page folder and comes back as a group.
+    @Test func aGroupOfOneTabPinsAsAGroupToo() throws {
+        try withTabs(["0"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: [tabs[0]], name: "Solo"))
+            manager.bookmarkTab(tabs[0], in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            let folder = try #require(Library.shared.pinnedGroup(containing: page))
+            #expect(folder.bookmarkIDs == [page])
+            manager.unbookmark(page, toIndex: 0)
+            #expect(manager.group(groupID)?.name == "Solo")
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == [tabs[0].id])
+        }
+    }
+
+    /// A split in a group pins as a pinned split in the folder and comes back side by side.
+    @Test func aSplitInAGroupStaysASplit() throws {
+        try withTabs(["0", "1", "2"]) { manager, tabs, space in
+            manager.makeSplit(tabs[1], with: tabs[2])
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Mixed"))
+            #expect(manager.tabs(inGroup: groupID).count == 3)
+            manager.bookmarkTab(tabs[0], in: space)
+            let folder = try #require(tabs[0].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+            #expect(folder.bookmarkIDs.count == 3)
+            let pinned = try #require(tabs[1].bookmarkID.flatMap(Library.shared.pinnedSplit(containing:)))
+            #expect(Set(pinned.ids) == Set([tabs[1], tabs[2]].compactMap(\.bookmarkID)))
+            // Unpinning one split page restores the group with the split.
+            manager.unbookmark(pinned.ids[0], toIndex: 0)
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(Set(manager.tabs(inGroup: groupID).map(\.id)) == Set(tabs.map(\.id)))
+            #expect(manager.split(for: tabs[1])?.contains(tabs[2].id) == true)
+        }
+    }
+
+    /// A collapsed group pins as a closed folder and comes back collapsed.
+    @Test func aFoldedGroupPinsShut() throws {
+        try withTabs(["0", "1"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Folded"))
+            manager.setGroupOpen(groupID, false)
+            manager.bookmarkTab(tabs[0], in: space)
+            let folder = try #require(tabs[0].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+            #expect(!folder.isOpen)
+            #expect(Set(folder.tucked ?? []) == Set(folder.bookmarkIDs))
+            manager.unbookmark(folder.bookmarkIDs[0], toIndex: 0)
+            #expect(manager.group(groupID)?.isOpen == false)
+        }
+    }
+
+    /// Dragging one tab of a group to pinned pins only that tab.
+    @Test func aTabPinnedOutOfItsGroupLeavesTheRest() throws {
+        try withTabs(["0", "1"]) { manager, tabs, space in
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Two"))
+            manager.bookmarkTab(tabs[0], in: space, keepingGroup: false)
+            let page = try #require(tabs[0].bookmarkID)
+            #expect(Library.shared.pinnedGroup(containing: page) == nil)
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == [tabs[1].id])
+        }
+    }
+
+    /// An ungrouped tab pins on its own, outside any folder.
+    @Test func aTabOutsideAGroupStillPinsOnItsOwn() throws {
+        try withTabs(["0"]) { manager, tabs, space in
+            manager.bookmarkTab(tabs[0], in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            #expect(Library.shared.pinnedGroup(containing: page) == nil)
+            #expect(Library.shared.bookmarks(in: space).map(\.id).contains(page))
+        }
+    }
+
+    // MARK: Through the window (#325)
+
+    /// A window over a fresh manager, with tabs `titles` in the first space, closed and the library restored after.
+    private func inWindow(_ titles: [String], _ body: (BrowserWindowController, [Tab], UUID) throws -> Void) rethrows {
+        try withTabs(titles) { manager, tabs, space in
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            try body(controller, tabs, space)
+        }
+    }
+
+    /// ⌘D (File › Pin Group) on a tab of a group pins the group as one folder, and ⌘Z brings the group back.
+    @Test func commandDPinsTheWholeGroupAndUndoes() throws {
+        try inWindow(["0", "1", "2"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
+            manager.select(tabs[1])
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleBookmark(_:)), keyEquivalent: "d")
+            #expect(controller.validateMenuItem(item))
+            #expect(item.title == String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder."))
+            controller.toggleBookmark(item)
+            let folder = try #require(tabs[1].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+            #expect(folder.name == "Reading")
+            #expect(folder.bookmarkIDs == tabs.compactMap(\.bookmarkID))
+            #expect(manager.tabs(in: space).isEmpty)
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(Library.shared.bookmarks(in: space).isEmpty)
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == tabs.map(\.id))
+        }
+    }
+
+    /// A group's row dropped among the pinned pages pins the whole group there as one folder, undoably.
+    @Test func droppingAGroupRowAmongThePinsPinsItWhole() throws {
+        try inWindow(["0", "1", "2"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let before = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/pinned")!, title: "Pinned", to: space))
+            let groupID = try #require(manager.makeGroup(with: [tabs[0], tabs[1]], name: "Two"))
+            controller.listPinGroup(groupID, at: 0, in: space, folder: nil)
+            let folder = try #require(tabs[0].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+            #expect(folder.name == "Two")
+            #expect(folder.bookmarkIDs == [tabs[0], tabs[1]].compactMap(\.bookmarkID))
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == folder.bookmarkIDs + [before.id])
+            // The tab outside the group stays a tab.
+            #expect(manager.tabs(in: space).map(\.id) == [tabs[2].id])
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == [tabs[0].id, tabs[1].id])
+        }
+    }
+
+    /// Dropped in a folder's gap, the group's folder goes inside that folder.
+    @Test func aGroupDroppedInAFolderNestsThere() throws {
+        try inWindow(["0", "1"]) { controller, tabs, space in
+            let page = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/pinned")!, title: "Pinned", to: space))
+            let outer = try #require(Library.shared.addFolder(named: "Outer", with: [page.id], in: space))
+            let groupID = try #require(controller.tabManager.makeGroup(with: tabs, name: "Inner"))
+            controller.listPinGroup(groupID, at: 1, in: space, folder: outer.id)
+            let folder = try #require(tabs[0].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+            #expect(folder.parentID == outer.id)
+            #expect(folder.bookmarkIDs == tabs.compactMap(\.bookmarkID))
+        }
+    }
+
+    /// Dragging one tab of a group still pins only that tab, through the window too.
+    @Test func droppingOneTabOfAGroupStillPinsOnlyIt() throws {
+        try inWindow(["0", "1"]) { controller, tabs, space in
+            let groupID = try #require(controller.tabManager.makeGroup(with: tabs, name: "Two"))
+            controller.listBookmark(tabs[0], at: 0, in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            #expect(Library.shared.pinnedGroup(containing: page) == nil)
+            #expect(controller.tabManager.tabs(inGroup: groupID).map(\.id) == [tabs[1].id])
+        }
+    }
+
+    // MARK: With the pinned section folded (#325)
+
+    /// `inWindow` with the space's pinned section folded, kept off the saved defaults.
+    private func inFoldedWindow(_ titles: [String], _ body: (BrowserWindowController, [Tab], UUID) throws -> Void) rethrows {
+        try inWindow(titles) { controller, tabs, space in
+            let before = SidebarListView.debugCollapsed
+            SidebarListView.debugCollapsed = [space.uuidString]
+            defer { SidebarListView.debugCollapsed = before }
+            controller.sidebar.list.reload(animated: false)
+            try body(controller, tabs, space)
+        }
+    }
+
+    /// The pinned rows the folded list shows, top to bottom.
+    private func pinnedItems(_ controller: BrowserWindowController) -> [SidebarItem] {
+        controller.sidebar.list.reload(animated: false)
+        return controller.sidebar.list.debugItems.filter { if case .bookmark = $0 { true } else if case .folder = $0 { true } else { false } }
+    }
+
+    /// The group pinned whole, shown in the still folded section as one folder row with its open pages under it.
+    private func expectShownAsOneFolder(_ controller: BrowserWindowController, _ tabs: [Tab], _ space: UUID, named name: String) throws -> BookmarkFolder {
+        let folder = try #require(tabs[0].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
+        #expect(folder.name == name)
+        #expect(folder.bookmarkIDs == tabs.compactMap(\.bookmarkID))
+        #expect(SidebarListView.isCollapsed(space))
+        let rows = pinnedItems(controller)
+        let head = try #require(rows.firstIndex(of: .folder(folder.id)))
+        #expect(Array(rows[(head + 1)...]) == folder.bookmarkIDs.map { .bookmark($0) })
+        return folder
+    }
+
+    /// Folded, an open page shows under the folders on its way, nested ones too; closed pages and folders with no
+    /// open page don't show.
+    @Test func foldedPinsShowOpenPagesUnderTheirFolders() throws {
+        try inFoldedWindow(["0", "1"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            manager.bookmarkTab(tabs[0], in: space)
+            manager.bookmarkTab(tabs[1], in: space)
+            let open = try #require(tabs[0].bookmarkID), loose = try #require(tabs[1].bookmarkID)
+            @MainActor func closed(_ title: String) throws -> UUID {
+                try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/\(title)")!, title: title, to: space)).id
+            }
+            let shut = try closed("shut"), other = try closed("other"), top = try closed("top")
+            let outer = try #require(Library.shared.addFolder(named: "Outer", with: [shut], in: space))
+            let inner = try #require(Library.shared.addFolder(named: "Inner", with: [open], in: space, parent: .some(outer.id)))
+            let empty = try #require(Library.shared.addFolder(named: "Closed only", with: [other], in: space))
+            let rows = pinnedItems(controller)
+            #expect(rows.contains(.folder(outer.id)) && rows.contains(.folder(inner.id)) && rows.contains(.bookmark(open)))
+            #expect(rows.firstIndex(of: .folder(outer.id))! < rows.firstIndex(of: .folder(inner.id))!)
+            #expect(rows.firstIndex(of: .folder(inner.id))! + 1 == rows.firstIndex(of: .bookmark(open))!)
+            #expect(rows.contains(.bookmark(loose)))
+            #expect(!rows.contains(.folder(empty.id)))
+            #expect(!rows.contains(.bookmark(shut)) && !rows.contains(.bookmark(other)) && !rows.contains(.bookmark(top)))
+            // Unfolded, everything shows again.
+            SidebarListView.setCollapsed(space, false)
+            let all = pinnedItems(controller)
+            #expect(all.contains(.folder(empty.id)) && all.contains(.bookmark(top)))
+        }
+    }
+
+    /// The folded rows set each page in by the folders on its way, as unfolded.
+    @Test func foldedRowsAreSetInByTheirFolders() {
+        let outer = BookmarkFolder(name: "Outer", bookmarkIDs: [])
+        var inner = BookmarkFolder(name: "Inner", bookmarkIDs: [UUID()])
+        inner.parentID = outer.id
+        inner.isOpen = false
+        let page = inner.bookmarkIDs[0], closed = UUID()
+        let shown = SidebarListView.pinnedRows(bookmarks: [page, closed], folders: [outer, inner], current: nil, folded: true) { $0 == page }
+        #expect(shown.rows == [.folder(outer.id), .folder(inner.id), .bookmark(page)])
+        #expect(shown.depth[.folder(outer.id)] == 0 && shown.depth[.folder(inner.id)] == 1 && shown.depth[.bookmark(page)] == 2)
+    }
+
+    /// ⌘D on a tab of a group, with the section folded: one folder row with its pages, still folded; ⌘Z undoes it.
+    @Test func commandDWithPinsFoldedPinsOneFolder() throws {
+        try inFoldedWindow(["0", "1", "2", "3"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Reading"))
+            manager.select(tabs[2])
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.toggleBookmark(_:)), keyEquivalent: "d")
+            #expect(controller.validateMenuItem(item))
+            controller.toggleBookmark(item)
+            let folder = try expectShownAsOneFolder(controller, tabs, space, named: "Reading")
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == tabs.map(\.id))
+        }
+    }
+
+    /// A group's row dropped on the folded section pins it as one folder there, undoably.
+    @Test func droppingAGroupOnFoldedPinsPinsOneFolder() throws {
+        try inFoldedWindow(["0", "1", "2", "3"]) { controller, tabs, space in
+            let manager = controller.tabManager
+            let page = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/pinned")!, title: "Pinned", to: space))
+            let groupID = try #require(manager.makeGroup(with: tabs, name: "Four"))
+            controller.listPinGroup(groupID, at: 0, in: space, folder: nil)
+            let folder = try expectShownAsOneFolder(controller, tabs, space, named: "Four")
+            #expect(Library.shared.bookmarks(in: space).map(\.id) == folder.bookmarkIDs + [page.id])
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(manager.tabs(inGroup: groupID).map(\.id) == tabs.map(\.id))
+        }
+    }
+
+    /// The group's tabs picked and pinned together, with the section folded: one folder.
+    @Test func pinningPickedGroupTabsWithPinsFoldedPinsOneFolder() throws {
+        try inFoldedWindow(["0", "1", "2", "3"]) { controller, tabs, space in
+            let groupID = try #require(controller.tabManager.makeGroup(with: tabs, name: "Picked"))
+            controller.pinMarked(tabs)
+            let folder = try expectShownAsOneFolder(controller, tabs, space, named: "Picked")
+            controller.sidebarUndo.undo()
+            #expect(Library.shared.folder(folder.id) == nil)
+            #expect(controller.tabManager.tabs(inGroup: groupID).map(\.id) == tabs.map(\.id))
+        }
+    }
+
+    /// One tab of a group dropped on the folded section pins only it, and the section stays folded.
+    @Test func droppingOneGroupTabOnFoldedPinsPinsOnlyIt() throws {
+        try inFoldedWindow(["0", "1"]) { controller, tabs, space in
+            let groupID = try #require(controller.tabManager.makeGroup(with: tabs, name: "Two"))
+            controller.listBookmark(tabs[0], at: 0, in: space)
+            let page = try #require(tabs[0].bookmarkID)
+            #expect(Library.shared.pinnedGroup(containing: page) == nil)
+            #expect(controller.tabManager.tabs(inGroup: groupID).map(\.id) == [tabs[1].id])
+            #expect(SidebarListView.isCollapsed(space))
+        }
+    }
+
+    /// Folders saved before group pinning decode with no group and keep their pages.
+    @Test func anOlderFolderReadsWithNoGroupAndItsPages() throws {
+        let page = UUID()
+        let json = #"{"id":"\#(UUID())","name":"Old","bookmarkIDs":["\#(page)"],"isOpen":true}"#
+        let folder = try JSONDecoder().decode(BookmarkFolder.self, from: Data(json.utf8))
+        #expect(folder.groupID == nil)
+        #expect(folder.name == "Old")
+        #expect(folder.bookmarkIDs == [page])
+    }
 }
 
 /// How a favorite group's tile shows its pages (#203): a small icon for each, placed as the pages share the window, and

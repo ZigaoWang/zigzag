@@ -1,12 +1,12 @@
 import AppKit
 import WebKit
 
-/// What you changed about one site's pages, as Arc's Boosts: elements you zapped, hidden on every visit, and CSS of
-/// your own. No scripts: user scripts are Tampermonkey's.
+/// Per-site changes, like Arc's Boosts: zapped elements hidden on every visit, plus custom CSS. No scripts (that's
+/// Tampermonkey's job).
 nonisolated struct SiteBoost: Codable, Equatable, Sendable {
-    /// CSS selectors, one for each element zapped, in the order they were.
+    /// One CSS selector per zapped element, in zap order.
     var zaps: [String] = []
-    /// The site's own CSS (Edit Style…); empty is off.
+    /// Custom CSS from Edit Style…; empty is off.
     var style = ""
 
     var hasStyle: Bool { !style.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -16,7 +16,7 @@ nonisolated struct SiteBoost: Codable, Equatable, Sendable {
 nonisolated extension SiteBoost {
     private enum Keys: String, CodingKey { case zaps, style }
 
-    /// Either part may be missing (boosts kept before styles were).
+    /// Either may be missing (boosts saved before styles existed).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
         zaps = try c.decodeIfPresent([String].self, forKey: .zaps) ?? []
@@ -24,7 +24,7 @@ nonisolated extension SiteBoost {
     }
 }
 
-/// Why a site's CSS can't be used: plain CSS only, nothing that loads from elsewhere or reads as HTML.
+/// Why CSS was rejected: plain CSS only, nothing remote or HTML-like.
 nonisolated enum StyleProblem: Equatable, Sendable {
     case tooLong, tag, loads
 
@@ -37,17 +37,14 @@ nonisolated enum StyleProblem: Equatable, Sendable {
     }
 }
 
-/// Boosts for each site, kept under its host without "www.". Only web pages (http, https) have them: never Zigzag's
-/// own pages, an extension's or an error page. A private window starts from what's kept and changes only its own
-/// copy, gone when the window closes.
+/// Boosts keyed by host without "www.". Only http(s) pages; never Zigzag's own, extension or error pages. A private
+/// window works on its own copy, dropped when it closes.
 enum SiteBoosts {
-    /// Where boosts are kept; tests use their own.
+    /// Tests use their own.
     static var defaults: UserDefaults = .standard
     private static let key = "SiteBoosts"
-    /// The most zaps kept for one site.
     static let maxZaps = 200
 
-    /// Every site's boosts, as kept.
     static var all: [String: SiteBoost] {
         get {
             guard let data = defaults.data(forKey: key), let all = try? JSONDecoder().decode([String: SiteBoost].self, from: data) else { return [:] }
@@ -61,24 +58,24 @@ enum SiteBoosts {
 
     static var sites: Set<String> { Set(all.keys) }
 
-    /// "3 zapped": in Site Controls, and in Settings › Privacy › Sites.
+    /// "3 zapped", for Site Controls and Settings › Privacy › Sites.
     static func zapped(_ count: Int) -> String {
         String(localized: "\(count) zapped", comment: "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.")
     }
 
-    /// A private window's own boosts, by its store: they go when the window's store does.
+    /// A private window's boosts, keyed by its store.
     private final class Window {
         var boosts: [String: SiteBoost] = [:]
     }
     private static let windows = NSMapTable<WKWebsiteDataStore, Window>.weakToStrongObjects()
 
-    /// The site a boost is kept under: a web page's host without "www.".
+    /// Host without "www.", web pages only.
     static func site(of url: URL?) -> String? {
         guard ["http", "https"].contains(url?.scheme?.lowercased() ?? "") else { return nil }
         return ContentBlocker.site(of: url)
     }
 
-    /// The site's boosts in a window: a private one's own copy once it changed them, otherwise the kept ones.
+    /// A private window's copy once it changed, else the kept boosts.
     static func boost(forSite site: String, privateStore: WKWebsiteDataStore? = nil) -> SiteBoost {
         if let privateStore, let own = windows.object(forKey: privateStore)?.boosts[site] { return own }
         return all[site] ?? SiteBoost()
@@ -88,7 +85,7 @@ enum SiteBoosts {
         site(of: url).map { boost(forSite: $0, privateStore: privateStore) } ?? SiteBoost()
     }
 
-    /// Keeps a site's boosts, or in a private window keeps them for that window only.
+    /// In a private window, for that window only.
     static func set(_ boost: SiteBoost, forSite site: String, privateStore: WKWebsiteDataStore? = nil) {
         if let privateStore {
             let window = windows.object(forKey: privateStore) ?? {
@@ -104,7 +101,7 @@ enum SiteBoosts {
         self.all = all
     }
 
-    /// Adds a zapped element's selector for the site. Returns false for one that isn't a plain selector.
+    /// Returns false if the selector isn't plain.
     @discardableResult
     static func zap(_ selector: String, forSite site: String, privateStore: WKWebsiteDataStore? = nil) -> Bool {
         let selector = selector.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,39 +114,38 @@ enum SiteBoosts {
         return true
     }
 
-    /// Restore All: every zapped element on the site shows again.
+    /// Restore All: unhides every zapped element on the site.
     static func restoreZaps(forSite site: String, privateStore: WKWebsiteDataStore? = nil) {
         var boost = boost(forSite: site, privateStore: privateStore)
         boost.zaps = []
         set(boost, forSite: site, privateStore: privateStore)
     }
 
-    /// One site's boosts forgotten (Forget in Settings › Privacy › Sites).
+    /// Forget in Settings › Privacy › Sites.
     static func forget(site: String) {
         var all = all
         all[site] = nil
         self.all = all
     }
 
-    /// Every site's (Settings › Privacy › Sites › Reset All).
+    /// Settings › Privacy › Sites › Reset All.
     static func forgetAll() { all = [:] }
 
-    /// A selector the picker made, as a style sheet may take it: nothing that could end its rule, start another or
-    /// comment out the ones after it. Backslashes stay: `CSS.escape` writes them.
+    /// Rejects anything that could close the rule, start another or comment out later ones. Backslashes are allowed
+    /// since `CSS.escape` writes them.
     nonisolated static func isPlainSelector(_ selector: String) -> Bool {
         guard !selector.isEmpty, selector.count <= 512 else { return false }
         return !selector.contains { "{};@<\"'\n\r".contains($0) } && !selector.contains("/*") && !selector.contains("*/")
     }
 
-    /// The style sheet for a site's boosts: a rule for each zap, so one a browser can't read leaves the rest working,
-    /// then the site's own CSS, when it's plain CSS.
+    /// One rule per zap, so an invalid selector doesn't break the rest, then the site's CSS if it's plain.
     nonisolated static func css(for boost: SiteBoost) -> String {
         var parts = boost.zaps.filter(isPlainSelector).map { "\($0) { display: none !important; }" }
         if boost.hasStyle, styleProblem(boost.style) == nil { parts.append(boost.style) }
         return parts.joined(separator: "\n")
     }
 
-    /// Keeps a site's CSS (empty turns it off). Returns false for CSS that can't be used.
+    /// Empty turns it off. Returns false if the CSS can't be used.
     @discardableResult
     static func setStyle(_ css: String, forSite site: String, privateStore: WKWebsiteDataStore? = nil) -> Bool {
         guard styleProblem(css) == nil else { return false }
@@ -159,18 +155,17 @@ enum SiteBoosts {
         return true
     }
 
-    /// The longest CSS a site keeps, in bytes.
+    /// In bytes.
     nonisolated static let maxStyle = 100_000
 
-    /// Why CSS can't be a site's style, or nil for plain CSS. It's read as a browser reads it, with its comments
-    /// gone and its escapes (`\75 rl(`) undone, so nothing written in a roundabout way gets past: no tags, no
-    /// @import, and no url(), src() or image-set() that reaches anything but data: or the page's own #fragment.
+    /// Nil for plain CSS. Read as a browser would, with comments removed and escapes (`\75 rl(`) undone: no tags, no
+    /// @import, and url(), src() or image-set() only for data: or a #fragment.
     nonisolated static func styleProblem(_ css: String) -> StyleProblem? {
         guard css.utf8.count <= maxStyle else { return .tooLong }
         let plain = unescaped(withoutComments(css)).lowercased()
         if plain.range(of: #"<\s*/?\s*[a-z!]"#, options: .regularExpression) != nil { return .tag }
         if plain.contains("@import") { return .loads }
-        // Every function that takes an address: what it's handed must be inline.
+        // Every address-taking function must get inline content.
         var rest = plain[...]
         while let call = rest.range(of: #"(url|src|image-set|-webkit-image-set|image|cross-fade|-webkit-cross-fade)\s*\("#, options: .regularExpression) {
             let name = plain[call].prefix { $0.isLetter || $0 == "-" }
@@ -178,7 +173,7 @@ enum SiteBoosts {
             if name == "url" || name == "src" {
                 if !(argument.hasPrefix("data:") || argument.hasPrefix("#")) { return .loads }
             } else {
-                // A list of addresses: strings in it are addresses too.
+                // Strings in an address list are addresses too.
                 let inside = rest[call.upperBound...].prefix { $0 != ")" }
                 if inside.contains("\"") || inside.contains("'") { return .loads }
             }
@@ -187,7 +182,7 @@ enum SiteBoosts {
         return nil
     }
 
-    /// CSS with each comment a space, as the browser sees it (`u/**/rl` is two words).
+    /// Replaces each comment with a space, as the browser does (`u/**/rl` is two words).
     nonisolated static func withoutComments(_ css: String) -> String {
         var out = "", rest = css[...]
         while let start = rest.range(of: "/*") {
@@ -198,8 +193,8 @@ enum SiteBoosts {
         return out + rest
     }
 
-    /// CSS with its escapes undone: a backslash and up to six hex digits (and one space after) is that character,
-    /// a backslash and anything else is that.
+    /// A backslash plus up to six hex digits (and one trailing space) is that code point; a backslash plus anything
+    /// else is that character.
     nonisolated static func unescaped(_ css: String) -> String {
         var out = "", chars = Array(css.unicodeScalars), i = 0
         while i < chars.count {
@@ -219,19 +214,17 @@ enum SiteBoosts {
     }
 }
 
-/// Puts a site's boosts in its pages: a style sheet added as the document starts, in the main frame only, the way the
-/// ad blocker hides what its lists name (`PageFilters.styleSource`). Changed while you're on the page, it changes in
-/// place.
+/// Injects boosts as a style sheet at document start, main frame only, like the ad blocker's cosmetic rules
+/// (`PageFilters.styleSource`). Edits apply in place.
 enum PageBoosts {
-    /// Where the style sheet and the picker run, apart from the page's own scripts.
+    /// Isolated from the page's scripts.
     static let world = WKContentWorld.world(name: "ZigzagBoosts")
     private static let mark = "/* zigzag boosts */"
-    /// The world's name for the style element, so a change finds it.
     private static let styleName = "__zigzagBoost"
 
     static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(mark) }
 
-    /// Readies a web view for a page at `url` before it loads: the site's boosts, or none. Error pages get none.
+    /// Sets up a web view's boosts before it loads `url`; none for error pages.
     static func prepare(_ webView: WKWebView, for url: URL?, privateStore: WKWebsiteDataStore?, errorPage: Bool) {
         let controller = webView.configuration.userContentController
         OwnScripts.remove(from: controller, where: isOurs)
@@ -241,13 +234,13 @@ enum PageBoosts {
         controller.addUserScript(WKUserScript(source: source(css: css, site: site), injectionTime: .atDocumentStart, forMainFrameOnly: true, in: world))
     }
 
-    /// Shows `boost` on the page in `tab` now without keeping it (Edit Style's preview as you type).
+    /// Previews `boost` without saving (Edit Style while typing).
     static func show(_ boost: SiteBoost, site: String, in tab: Tab) {
         guard let webView = tab.webView, !ErrorPage.pending.contains(webView), SiteBoosts.site(of: webView.url) == site else { return }
         webView.runOwnScript(source(css: SiteBoosts.css(for: boost), site: site), world: world)
     }
 
-    /// The boosts of the page in `tab` changed: the page shows it now, and its next load too.
+    /// Applies now and on the next load.
     static func refresh(_ tab: Tab) {
         guard let webView = tab.webView else { return }
         let url = webView.url ?? tab.url
@@ -257,21 +250,20 @@ enum PageBoosts {
         webView.runOwnScript(source(css: css, site: site), world: world)
     }
 
-    /// The script that puts `css` in a page of `site`, kept under one name so the next change replaces it.
+    /// Injects `css` under one name so the next change replaces it.
     static func source(css: String, site: String) -> String {
         "\(mark)\nif (\(siteCheck(site))) {\n\(PageFilters.styleSource(css, keptAs: styleName))\n}"
     }
 
-    /// Whether the document is on `site`, as `ContentBlocker.site` names it.
+    /// Matches `site` as `ContentBlocker.site` names it.
     private static func siteCheck(_ site: String) -> String {
         "location.hostname.toLowerCase().replace(/\\.$/, '').replace(/^www\\./, '') === \(PageFilters.jsString(site))"
     }
 
     // MARK: Picking
 
-    /// Makes a unique, lasting selector for an element: its id when that's stable, otherwise its tag with up to two
-    /// classes that don't look generated, then its place among siblings of its tag, going up to `maxDepth` parents.
-    /// An element inside an SVG drawing is the drawing. The page itself (html, body) never is.
+    /// Builds a stable selector: a stable id, else the tag with up to two non-generated classes and its nth-of-type,
+    /// up to `maxDepth` parents. Elements in an SVG resolve to the SVG. Never html or body.
     static let selectorSource = #"""
     window.ZigzagBoostSelector = (() => {
       const maxDepth = 10;
@@ -317,7 +309,7 @@ enum PageBoosts {
           const kept = classes(node);
           const named = tag + kept.map((name) => '.' + CSS.escape(name)).join('');
           const step = named + place(node);
-          // A path starts from something with a name of its own (a class, a landmark), not a bare tag and place.
+          // Start from a named element (a class or a landmark), not a bare tag and position.
           if (kept.length || landmarks.includes(node.localName)) {
             const plain = [named].concat(path).join(' > ');
             if (unique(plain, element)) return plain;
@@ -331,8 +323,8 @@ enum PageBoosts {
     })();
     """#
 
-    /// The picker over the page: the element under the pointer outlined in `accent`, its tag and size by it; a click
-    /// zaps it and nothing else in the page hears the click. `stop()` takes every trace of it away.
+    /// Outlines the hovered element in `accent` with its tag and size; a click zaps it and the page never sees the
+    /// click. `stop()` removes every trace.
     static func pickerSource(accent: String, hint: String) -> String {
         selectorSource + "\n" + #"""
         (() => {
@@ -402,8 +394,8 @@ enum PageBoosts {
     static let stopSource = "window.__zigzagZap && window.__zigzagZap.stop();"
 }
 
-/// Zap Element, from Site Controls: picking elements on the page you're on to hide, until Esc, a click outside the
-/// page, a shortcut or the page going elsewhere. One page at a time.
+/// Zap Element from Site Controls: picks elements to hide until Esc, a click outside the page, a shortcut or
+/// navigation. One page at a time.
 final class ZapPicker: NSObject, WKScriptMessageHandler {
     private(set) static var current: ZapPicker?
     static let messageName = "zigzagZap"
@@ -427,7 +419,6 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
         self.controller = controller
     }
 
-    /// Starts picking on the page in `tab`.
     static func start(in tab: Tab, controller: BrowserWindowController) {
         current?.stop()
         guard canZap(tab), let webView = tab.webView, let site = SiteBoosts.site(of: webView.url ?? tab.url) else { return }
@@ -439,7 +430,7 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
         let accent = DarkPages.hex(Brand.Theme.for(webView).accent)
         webView.runOwnScript(PageBoosts.pickerSource(accent: accent, hint: Self.hint), world: PageBoosts.world)
         controller.window?.makeFirstResponder(webView)
-        // Esc and shortcuts end it from Zigzag's side too, as does a click anywhere but the page.
+        // Esc, shortcuts and clicks outside the page end it from Zigzag's side too.
         picker.monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown]) { [weak picker] event in
             guard let picker else { return event }
             return picker.handle(event)
@@ -464,7 +455,7 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
         return event
     }
 
-    /// Takes the picker off the page, which then hears its clicks again.
+    /// Removes the picker so the page gets clicks again.
     func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
@@ -489,14 +480,14 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
         }
     }
 
-    /// Hides an element by its selector on the site, here and on later visits (or for a private window, in it).
+    /// Hides `selector` on the site now and on later visits (in a private window, only there).
     static func zap(_ selector: String, site: String, in tab: Tab) {
         guard SiteBoosts.zap(selector, forSite: site, privateStore: tab.privateStore) else { return }
         PageBoosts.refresh(tab)
     }
 
     #if DEBUG
-    /// zap <css selector>: what the picker does on a click on the first element that matches, in the page in front.
+    /// zap <css selector>: zaps the first match in the front page, as a click would.
     static func debugZap(_ query: String, in tab: Tab) {
         guard let webView = tab.webView, let site = SiteBoosts.site(of: webView.url) else { debugLog("zap: no site"); return }
         let script = PageBoosts.selectorSource + "\nwindow.ZigzagBoostSelector(document.querySelector(\(PageFilters.jsString(query))))"
@@ -507,7 +498,7 @@ final class ZapPicker: NSObject, WKScriptMessageHandler {
         }
     }
 
-    /// zaphover <css selector>: the picker's outline on the first element that matches, as the pointer would put it.
+    /// zaphover <css selector>: outlines the first match, as hovering would.
     static func debugHover(_ query: String) {
         current?.webView?.runOwnScript("window.__zigzagZap && window.__zigzagZap.show(document.querySelector(\(PageFilters.jsString(query))))", world: PageBoosts.world)
     }

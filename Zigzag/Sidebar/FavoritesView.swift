@@ -374,13 +374,12 @@ final class FavoriteTile: InteractiveView {
             dropHalf.isHidden = splitSide == nil
         }
     }
-    /// Its page is loaded in the background: a fine edge, so you can tell at a glance which are. Not for a page put to
-    /// sleep or not loaded yet since Zigzag reopened: that looks like a favorite never opened, with no edge (#205).
+    /// Page loaded in the background: shown with a fine edge. Not for sleeping pages or ones not loaded since relaunch,
+    /// which look unopened (#205).
     private(set) var isOpen = false { didSet { if oldValue != isOpen { stateDidChange(animated: false) } } }
 
-    /// How a favorite's tile looks, in the tab rows' terms: the one you're on has the selected tab's card; one whose
-    /// page is loaded has the open edge; one that isn't running has neither. Its icon is always at full strength: a
-    /// favorite is a site you chose to keep in view, and a faded one read as washed out rather than as closed.
+    /// Tile style in tab row terms: the current one gets the selected card, a loaded one the open edge, others neither.
+    /// Icons stay full strength; faded ones looked washed out rather than closed.
     enum Look: Equatable { case closed, open, selected }
 
     static func look(selected: Bool, loaded: [Bool]) -> Look {
@@ -392,25 +391,24 @@ final class FavoriteTile: InteractiveView {
         1
     }
 
-    /// Whether a favorite's open page has moved on from the address it was saved with, as a pinned tab's row tells
-    /// (`TabManager.isAway`): not where it was saved, nor where that address lands on its own (a redirect).
+    /// Whether the open page has left its saved URL (`TabManager.isAway`, as pinned rows): neither the saved URL nor where
+    /// it redirects.
     static func isAway(current: URL?, saved: URL, landing: URL?) -> Bool {
         guard let current else { return false }
         let here = TabManager.normalize(current)
         return here != TabManager.normalize(saved) && here != landing.map(TabManager.normalize)
     }
 
-    /// What pointing at one of its pages says: its name, and while it's away the page it shows now, as the pinned
-    /// row reads "Original / Current page".
+    /// Tooltip: the name, plus the current page while away, like a pinned row's "Original / Current page".
     static func pageName(saved: String, away current: String?) -> String {
         guard let current, !current.isEmpty else { return saved }
         return String(localized: "\(saved) — \(current)", comment: "Tooltip of a favorite whose page moved on from the one it was saved with: the favorite's name, then the page it shows now.")
     }
 
-    /// Which of its pages, in order, have moved on from their saved address.
+    /// Which pages, in order, have left their saved URL.
     private(set) var awayParts: [Bool] = []
 
-    /// Every page's open tab, in order (nil for one that isn't open).
+    /// Each page's open tab, in order (nil when not open).
     private var livePages: [Tab?] { [tab] + partners.indices.map { partnerTabs.indices.contains($0) ? partnerTabs[$0].tab : nil } }
     override var pressSinks: Bool { get { true } set {} }
     var iconImage: NSImage? { icon.image }
@@ -449,17 +447,16 @@ final class FavoriteTile: InteractiveView {
         addSubview(button)
         return button
     }()
-    /// While its page plays sound, or is muted: a speaker in the top-left corner, the chip the × is, as a tab's row
-    /// has one beside its title. Clicking it mutes the page, or unmutes it.
+    /// While its page plays sound, or is muted: a small speaker badge on the icon's bottom corner, the icon cut away
+    /// round it so the tile shows as a ring (`FaviconView.speakerCut`), as a status sits on an avatar. Its target is
+    /// the ×'s size round it. Clicking it mutes the page, or unmutes it.
     private lazy var audioButton: IconButton = {
         let button = IconButton(symbol: "speaker.wave.2", size: Self.closeSide, symbolSize: Tokens.Sidebar.favoriteCloseGlyph,
                                 toolTip: String(localized: "Mute Tab", comment: "Tooltip of the speaker on a favorite whose page plays sound."))
         button.tint = Tokens.Color.textSecondary
         button.wantsLayer = true
         button.radius = Self.closeSide / 2
-        button.showsFillAtRest = true
-        button.layer?.borderWidth = Tokens.Metric.hairline
-        button.layer?.borderColor = cgColor(Tokens.Color.controlEdge)
+        button.layer?.insertSublayer(audioDisc, at: 0)
         button.onClick = { [weak self] _ in
             guard let tab = self?.tab else { return }
             tab.setMuted(!tab.isMuted)
@@ -468,6 +465,25 @@ final class FavoriteTile: InteractiveView {
         addSubview(button)
         return button
     }()
+    /// The badge itself: a disc of the selected card's light, under the speaker's glyph.
+    private let audioDisc = CALayer()
+
+    /// The speaker's glyph for the badge: playing and muted in the disc's middle together, the speaker's body on the
+    /// same pixels in both.
+    private static func speakerGlyph(muted: Bool) -> (image: NSImage, ink: CGSize) {
+        if speakerGlyphs.isEmpty {
+            let config = NSImage.SymbolConfiguration(pointSize: Tokens.Sidebar.favoriteSpeakerGlyph, weight: .semibold, scale: .small)
+            let names = ["speaker.wave.2", "speaker.slash"], keys = names.map { "favorite speaker \($0)" }
+            let images = names.map { name in
+                let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
+                image.isTemplate = true
+                return image
+            }
+            speakerGlyphs = Array(zip(images, Tokens.Symbol.sharedInkOffsets(of: images, keys: keys)))
+        }
+        return speakerGlyphs[muted ? 1 : 0]
+    }
+    private static var speakerGlyphs: [(image: NSImage, ink: CGSize)] = []
 
     /// Developer Mode (#141): the icon of a favorite whose open page is in it has the chip a tab's row has
     /// (`FaviconView.developerBadge`), and its tooltip says so, with the host.
@@ -483,8 +499,13 @@ final class FavoriteTile: InteractiveView {
         let shows = tab.map { $0.isPlayingAudio || $0.isMuted } ?? false
         guard shows || !audioButton.isHidden else { return }
         audioButton.isHidden = !shows
+        if !shows { icon.speakerCut = nil }
         let muted = tab?.isMuted == true
-        audioButton.symbol = muted ? "speaker.slash" : "speaker.wave.2"
+        let glyph = Self.speakerGlyph(muted: muted)
+        if audioButton.glyph !== glyph.image {
+            audioButton.glyph = glyph.image
+            audioButton.glyphInk = glyph.ink
+        }
         audioButton.toolTip = muted ? String(localized: "Unmute Tab", comment: "Tooltip of the speaker on a favorite whose page is muted.")
             : String(localized: "Mute Tab", comment: "Tooltip of the speaker on a favorite whose page plays sound.")
         needsLayout = true
@@ -566,7 +587,7 @@ final class FavoriteTile: InteractiveView {
         for (i, view) in extraIcons.enumerated() { view.isHidden = i >= partners.count - 1 }
     }
 
-    /// Its pages' names, in order; a page that moved on, with the page it shows now.
+    /// Page names in order; an away page with its current page.
     private var name: String {
         guard let bookmark else { return "" }
         let live = livePages
@@ -630,8 +651,8 @@ final class FavoriteTile: InteractiveView {
         isOpen = TabRowView.showsOpenEdge(pinned: true, loaded: live.compactMap { $0?.isLoaded })
         refreshAway()
         let name = self.name
-        // A favorite has no hover card, so one whose page isn't running says why in its tooltip: asleep, and what
-        // that freed, or not loaded since Zigzag reopened. It looks like a favorite never opened: no edge.
+        // Favorites have no hover card, so the tooltip explains an unloaded page (asleep and memory freed, or not loaded since
+        // relaunch). Shown without an edge, like an unopened favorite.
         let notes = [inDeveloperMode ? TabRowView.developerTip(for: tab?.url) : nil, tab?.notLoadedNote].compactMap { $0 }
         toolTip = ([name].filter { !$0.isEmpty } + notes).joined(separator: "\n")
         if awayParts.first != true, let image = tab?.displayIcon, !(tab?.isLoading ?? false) { icon.image = image; needsLayout = true }
@@ -650,7 +671,7 @@ final class FavoriteTile: InteractiveView {
             }
         }
         if isAway(part: 0) {
-            // The page it's on now: `refreshAwayIcons`.
+            // Current page's icon: `refreshAwayIcons`.
         } else if let image = bookmark.displayIcon {
             icon.image = image
             needsLayout = true
@@ -663,10 +684,9 @@ final class FavoriteTile: InteractiveView {
 
     private func isAway(part: Int) -> Bool { awayParts.indices.contains(part) && awayParts[part] }
 
-    /// A page that moved on shows the icon of the page it's on now, as its pinned row does, with the icon it was
-    /// saved with small on the corner, the way an icon wears its app's badge, so the tile still says which favorite
-    /// it is. Pointing at it names both; its menu goes back. Only once that page's own icon is known
-    /// (`awayIcon`): until then the favorite's own, with no badge, never a stand-in for the page's.
+    /// An away page shows its current page's icon with the saved icon as a small corner badge, so the tile is still
+    /// recognizable. Tooltip names both; the menu goes back. Only once that icon is known (`awayIcon`); until then the
+    /// saved icon, no badge.
     private func refreshAwayIcons() {
         guard let bookmark else { return }
         let live = livePages
@@ -682,8 +702,7 @@ final class FavoriteTile: InteractiveView {
         }
     }
 
-    /// The icon a favorite's page that moved on is drawn with: the page's own, once it's known; nil draws the
-    /// favorite as it was saved, its own icon and no badge.
+    /// Icon for an away page: the current page's once known; nil draws the saved icon with no badge.
     static func awayIcon(away: Bool, current: NSImage?) -> NSImage? { away ? current : nil }
 
     override func layout() {
@@ -727,8 +746,25 @@ final class FavoriteTile: InteractiveView {
         }
         let side = Self.closeSide, edge = Self.closeInset
         closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
-        if !audioButton.isHidden { audioButton.frame = NSRect(x: edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side) }
+        if !audioButton.isHidden { layoutSpeaker() }
         layoutNumber()
+    }
+
+    /// The speaker badge on the icon's bottom corner, its button centered on it.
+    private func layoutSpeaker() {
+        let side = icon.frame.width
+        let chip = (side * Tokens.Sidebar.favoriteSpeakerShare * 2).rounded() / 2
+        let leading = icon.developerBadge != nil || icon.originalIcon != nil
+        let cut = FaviconView.speakerFrame(side: side, chip: chip, leading: leading)
+        icon.speakerCut = cut
+        let disc = convert(cut, from: icon)
+        let target = Self.closeSide
+        audioButton.frame = NSRect(x: disc.midX - target / 2, y: disc.midY - target / 2, width: target, height: target)
+        Tokens.Motion.withoutAnimation {
+            audioDisc.frame = CGRect(x: (target - chip) / 2, y: (target - chip) / 2, width: chip, height: chip)
+            audioDisc.cornerRadius = chip / 2
+            audioDisc.backgroundColor = cgColor(Tokens.Chrome.card)
+        }
     }
 
     /// The number tucked into the top-right corner, as far in as the ×: the digit alone, as the × is one mark, so it
@@ -759,8 +795,7 @@ final class FavoriteTile: InteractiveView {
         closeButton.isHidden = !(isOpen && isHovered) || number != nil
         let alpha = Self.iconAlpha(Self.look(selected: isSelected, loaded: [isOpen]), hovered: isHovered)
         for view in pageIcons where view.alphaValue != alpha { view.alphaValue = alpha }
-        // A soft tile of the space's own color, a step lighter under the pointer; brighter, with a fine edge, while its
-        // page is open, so you can tell which are loaded. The one you're on is the selected tab's card.
+        // Space-tinted tile, lighter on hover; brighter with a fine edge while loaded. The current one uses the selected card.
         let fill = isSelected ? (isHovered ? Tokens.Chrome.cardHover : Tokens.Chrome.card)
             : isPressed ? Tokens.Chrome.fieldPressed
             : isOpen ? (isHovered ? Tokens.Chrome.openTileHover : Tokens.Chrome.openTile)
@@ -770,6 +805,7 @@ final class FavoriteTile: InteractiveView {
             layer?.borderWidth = isSelected || isOpen ? Tokens.Metric.hairline : 0
             layer?.borderColor = cgColor(isSelected ? Tokens.Chrome.cardEdge : Tokens.Chrome.openEdge)
             setCardShadow(isSelected)
+            audioDisc.backgroundColor = cgColor(Tokens.Chrome.card)
         }
         setCardRim(isSelected)
     }

@@ -65,16 +65,29 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     private var changes = 0
     private var settling = false
     private var clickMonitor: Any?
+    /// The window was on screen when the fields went in, so it being gone by the ask means it closed or was hidden.
+    private var shownInVisibleWindow = false
     /// The system's list took the front (Zigzag stopped being the active app), so coming back means it closed.
     private(set) var opened = false
     private let timeout: TimeInterval
     private let openCheck: TimeInterval?
+    private let settle: TimeInterval
+    private let dismissSystem: @MainActor () -> Void
+
+    /// How long AppKit's AutoFill takes to catch up with a newly focused field. Asked sooner, its own update for
+    /// the field closes the list a moment after it opens (#378).
+    static let settle: TimeInterval = 0.35
 
     /// `openCheck`: how soon the list must have taken the front, or the fields go away (nil, the default, never
     /// checks: the Mac can show its list inside Zigzag's own window, where Zigzag never stops being the active app).
-    init(timeout: TimeInterval = SystemPasswordPicker.timeout, openCheck: TimeInterval? = nil) {
+    /// `settle`: how long the password field is focused before the list is asked for (0 asks at once).
+    /// `dismissSystem`: closes whatever AutoFill still shows for the fields as they go.
+    init(timeout: TimeInterval = SystemPasswordPicker.timeout, openCheck: TimeInterval? = nil, settle: TimeInterval = SystemPasswordPicker.settle,
+         dismissSystem: @escaping @MainActor () -> Void = SystemPasswordPicker.dismissSystemAutoFill) {
         self.timeout = timeout
         self.openCheck = openCheck
+        self.settle = settle
+        self.dismissSystem = dismissSystem
         super.init()
         usernameField.contentType = .username
         passwordField.contentType = .password
@@ -94,7 +107,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     /// called once, on the main thread, with what came back; by then the fields are empty and gone, and the focus is
     /// back on `responder`.
     func present(over rect: NSRect, in overlay: NSView, restoringFocusTo responder: NSResponder?,
-                 ask: @MainActor (NSTextField) -> Bool = SystemPasswordPicker.askSystem, completion: @escaping (Outcome) -> Void) {
+                 ask: @escaping @MainActor (NSTextField) -> Bool = SystemPasswordPicker.askSystem, completion: @escaping (Outcome) -> Void) {
         if isPresented { finish(.cancelled(.replaced)) }
         self.completion = completion
         restoreTo = responder
@@ -108,8 +121,13 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
         overlay.addSubview(anchor)
         debugLog("syspasswords present")
         guard let window = overlay.window, window.makeFirstResponder(passwordField) else { finish(.cancelled(.unavailable)); return }
+        shownInVisibleWindow = window.isVisible
         let center = NotificationCenter.default
         observers = [
+            // The window closing takes the fields with it: nothing is asked of a closed window.
+            center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.finish(.cancelled(.dismissed)) }
+            },
             center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.opened = true }
             },
@@ -129,8 +147,25 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
             return event
         }
         after(timeout) { $0.finish(.cancelled(.timedOut)) }
+        guard settle > 0 else { askNow(ask); return }
+        after(settle) { $0.askNow(ask) }
+    }
+
+    private func askNow(_ ask: @MainActor (NSTextField) -> Bool) {
+        // The focus moved on while AutoFill caught up, or the window closed or went away: you've moved on.
+        guard anchor.superview != nil, let window = anchor.window, !shownInVisibleWindow || window.isVisible,
+              Self.owns(window.firstResponder, [passwordField]) else { finish(.cancelled(.dismissed)); return }
         guard ask(passwordField) else { finish(.cancelled(.unavailable)); return }
         if let openCheck { after(openCheck) { if !$0.opened { $0.giveUpIfEmpty(.unavailable) } } }
+    }
+
+    /// AppKit's AutoFill panel and suggestion outlive the fields they were opened for, and come back each time the
+    /// window becomes key, so they're closed with the fields. Private, so only where AppKit has it.
+    static func dismissSystemAutoFill() {
+        let shared = NSSelectorFromString("sharedInstance"), dismiss = NSSelectorFromString("_dismissAutoFill")
+        guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
+              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.responds(to: dismiss) else { return }
+        controller.perform(dismiss)
     }
 
     /// Takes the fields away with nothing filled.
@@ -212,8 +247,10 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
             field.abortEditing()
             field.stringValue = ""
         }
-        anchor.removeFromSuperview()
+        // Focus handed back while the fields are still in the window, so AppKit sees them let go of it.
         if focused, let window { window.makeFirstResponder(restoreTo.flatMap { ($0 as? NSView)?.window === window ? $0 : nil }) }
+        dismissSystem()
+        anchor.removeFromSuperview()
         switch outcome {
         case .filled: debugLog("syspasswords filled")
         case .cancelled(let reason): debugLog("syspasswords cancelled \(reason)")
@@ -302,10 +339,9 @@ enum AutofillKeyIcon {
         controller.addScriptMessageHandler(Asker.shared, contentWorld: world, name: messageName)
     }
 
-    /// Whether sign-in fields show the key: only where Zigzag itself fills passwords and the Mac's panel can open. Not
-    /// with a password-manager extension on, which draws its own icon at the same end of the field (Bitwarden,
-    /// 1Password), nor with Fill passwords off: as in Chrome, the browser puts nothing in a field it isn't offering
-    /// to fill (#236).
+    /// Show the key only where Zigzag fills passwords and the system panel can open. Not with a password-manager
+    /// extension on (Bitwarden and 1Password draw their own icon there), nor with Fill passwords off, as in Chrome
+    /// (#236).
     static func shows(fills: Bool, managerOn: Bool, panelAvailable: Bool) -> Bool {
         panelAvailable && fills && !managerOn
     }
@@ -318,7 +354,7 @@ enum AutofillKeyIcon {
                      panelAvailable: SystemAutoFillPanel.isAvailable)
     }
 
-    /// Answers the page script's one question: should sign-in fields show the key? (`shows`)
+    /// Answers the page script's question: show the key? (`shows`)
     final class Asker: NSObject, WKScriptMessageHandlerWithReply {
         static let shared = Asker { webView in AutofillKeyIcon.shows(in: webView) }
         private let isOn: (WKWebView?) -> Bool

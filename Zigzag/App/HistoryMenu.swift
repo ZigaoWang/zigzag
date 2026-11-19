@@ -1,26 +1,21 @@
 import AppKit
 
-/// What the History menu lists of the pages you visited (#271), as Safari's does: today's latest pages in the menu,
-/// the rest of today and each earlier day of the last week in a submenu of its own. A page is listed once a day, at
-/// its latest visit.
+/// Groups history for the History menu (#271), as Safari does: today's latest in the menu, the rest of today and the
+/// last week's days in submenus. One entry per page per day.
 nonisolated enum HistoryMenuDays {
     struct Day {
-        /// The day's first moment.
         let start: Date
         let entries: [HistoryEntry]
     }
 
     struct Grouped {
-        /// Today's latest pages, shown in the menu itself.
         var today: [HistoryEntry] = []
-        /// Today's pages before those, for Earlier Today.
         var earlierToday: [HistoryEntry] = []
-        /// The days before today that have pages, newest first.
+        /// Newest first.
         var earlier: [Day] = []
     }
 
-    /// `entries` in any order. Pages from a day after today (the clock was turned back) or older than `earlierDays`
-    /// days before today are left out.
+    /// Drops future entries (clock set back) and ones older than `earlierDays`.
     static func group(_ entries: [HistoryEntry], now: Date, calendar: Calendar = .current, todayLimit: Int = 15,
                       dayLimit: Int = 40, earlierDays: Int = 7) -> Grouped {
         let today = calendar.startOfDay(for: now)
@@ -43,7 +38,7 @@ nonisolated enum HistoryMenuDays {
         return grouped
     }
 
-    /// A page's name as a menu item: its title on one line, cut short with an ellipsis past `limit` characters.
+    /// Title on one line, truncated past `limit` characters.
     static func menuTitle(_ entry: HistoryEntry, limit: Int = 60) -> String {
         let shown = HistoryStore.shownTitle(entry.title.trimmingCharacters(in: .whitespacesAndNewlines), url: entry.url)
         return shortened(shown, limit: limit)
@@ -55,7 +50,7 @@ nonisolated enum HistoryMenuDays {
         return line.prefix(limit - 1).trimmingCharacters(in: .whitespaces) + "…"
     }
 
-    /// A day's submenu's name: Yesterday, then the weekday and date (“Saturday, November 14”), in your language.
+    /// Yesterday, else weekday and date, localized.
     static func title(of day: Date, now: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
         let formatter = DateFormatter()
         formatter.locale = locale
@@ -72,13 +67,12 @@ nonisolated enum HistoryMenuDays {
     }
 }
 
-/// Fills the History menu each time it opens (#271): Recently Closed, with the front window's closed tabs and the
-/// closed windows, then the pages visited today and a submenu for each day before. A private window's tabs are never
-/// listed, and its pages are never in History to begin with.
+/// Builds the History menu on open (#271): Recently Closed, today's pages, and a submenu per earlier day. Private
+/// windows' tabs are never listed.
 final class HistoryMenu: NSObject, NSMenuDelegate {
     static let shared = HistoryMenu()
 
-    /// Marks the items filled in each time, so the next time takes them out.
+    /// Tags filled items so the next open removes them.
     private static let pageID = NSUserInterfaceItemIdentifier("ZigzagHistoryMenuPage")
 
     private static let recentlyClosedID = NSUserInterfaceItemIdentifier("ZigzagHistoryMenuRecentlyClosed")
@@ -86,7 +80,7 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
         String(localized: "Recently Closed", comment: "History menu item: a submenu of the tabs and windows you closed lately.")
     }
 
-    /// History › Recently Closed, for the menu bar: filled as History opens, dimmed with nothing to bring back.
+    /// Dimmed when empty.
     static func makeRecentlyClosedItem() -> NSMenuItem {
         let item = NSMenuItem(title: recentlyClosedTitle, action: nil, keyEquivalent: "")
         item.identifier = recentlyClosedID
@@ -94,11 +88,11 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
     }
 
     private let noShortcuts = Pages()
-    /// The day submenus' delegates, which their menus only hold weakly: replaced each time the menu opens.
+    /// Day submenus' delegates, held here since menus hold them weakly.
     private var days: [Pages] = []
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        // Asked for while a shortcut is looked for (every ⌘ key): the shortcuts are all in the items always there.
+        // Skip during shortcut lookups (⌘ key down); every shortcut is on a fixed item.
         if let event = NSApp.currentEvent, event.type == .keyDown, event.modifierFlags.contains(.command) { return }
         let controller = WindowManager.shared.keyController
         for item in menu.items where item.identifier == Self.pageID { menu.removeItem(item) }
@@ -131,7 +125,7 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
     private func fillRecentlyClosed(_ recentlyClosedItem: NSMenuItem, from controller: BrowserWindowController?) {
         let recentlyClosed = NSMenu(title: Self.recentlyClosedTitle)
         recentlyClosed.delegate = noShortcuts
-        // A private window's closed tabs are its own: never listed where the menu bar shows them.
+        // Private windows' closed tabs are never listed.
         if let controller, !controller.tabManager.isPrivate {
             for closed in controller.tabManager.recentlyClosedTabs.prefix(10) {
                 let item = SidebarMenus.Item(HistoryMenuDays.shortened(HistoryStore.shownTitle(closed.title, url: closed.url))) { [weak controller] in
@@ -150,11 +144,10 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
                 WindowManager.shared.reopenClosedWindow(window.id)
             }
             item.image = Tokens.Symbol.image("macwindow", size: 13)
-            // The page it was showing, to tell the windows apart.
+            // Tooltip with the page it showed, to tell windows apart.
             if let shown = window.shown, let url = shown.url { item.toolTip = HistoryStore.shownTitle(shown.customTitle ?? shown.title, url: url) }
             recentlyClosed.addItem(item)
         }
-        // Nothing to bring back: dimmed, with no empty submenu to open.
         recentlyClosedItem.submenu = recentlyClosed.items.isEmpty ? nil : recentlyClosed
     }
 
@@ -166,7 +159,7 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
         return item
     }
 
-    /// A day's pages, put in its submenu only when that opens.
+    /// Filled when the submenu opens.
     private static func dayItem(_ title: String, _ entries: [HistoryEntry]) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         let menu = NSMenu(title: title)
@@ -177,7 +170,7 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
         return item
     }
 
-    /// In the tab you're on, as Chrome does; ⌘-clicked, in a new tab.
+    /// Opens in the current tab, as Chrome does; ⌘-click opens a new tab.
     private static func open(_ url: URL) {
         let newTab = NSApp.currentEvent?.modifierFlags.contains(.command) == true
         guard let controller = WindowManager.shared.keyController else { WindowManager.shared.openFromZigzag(url); return }
@@ -191,8 +184,7 @@ final class HistoryMenu: NSObject, NSMenuDelegate {
         return icon
     }
 
-    /// A submenu's delegate: it has no shortcuts in it, and is filled (if it fills itself) the first time it opens,
-    /// so looking for a shortcut never builds it.
+    /// Fills itself on first open, so shortcut lookups never build it.
     final class Pages: NSObject, NSMenuDelegate {
         var fill: ((NSMenu) -> Void)?
 

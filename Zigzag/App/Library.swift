@@ -7,8 +7,7 @@ struct Bookmark: Codable, Identifiable, Equatable {
     /// Drawn instead of its site's icon: an SF Symbol's name, or an emoji. Nil: its site's (and older libraries).
     var icon: String? = nil
 
-    /// What stands for it wherever it's drawn: the icon you chose, else the one set for its site (`SiteIcons`), else
-    /// its site's own, once that's been fetched.
+    /// Chosen icon, else the site's set icon (`SiteIcons`), else its favicon.
     var displayIcon: NSImage? { (icon ?? SiteIcons.icon(for: url)).map(IconChoice.pageIcon) ?? FaviconStore.shared.cachedIcon(for: url) }
 }
 
@@ -26,6 +25,8 @@ struct BookmarkFolder: Codable, Identifiable, Equatable {
     /// The pages that were open when it was shut: shut on purpose, it hides them too (#154), though pages opened
     /// after still show under it (#94). Nil while it's open.
     var tucked: [UUID]? = nil
+    /// The tab group (#209) this folder was pinned from; nil if made by hand.
+    var groupID: UUID? = nil
 }
 
 extension Array where Element == BookmarkFolder {
@@ -49,6 +50,35 @@ extension Array where Element == BookmarkFolder {
         var ids: Set<UUID> = []
         for folder in self where all.contains(folder.id) { ids.formUnion(folder.bookmarkIDs) }
         return ids
+    }
+
+    /// Pinned pages in a folder and its subfolders, in list order.
+    nonisolated func pages(in id: UUID, ordered order: [UUID]) -> [UUID] {
+        let inside = pages(in: id)
+        return order.filter { inside.contains($0) }
+    }
+
+    /// Whether the folder or any subfolder is open (or shut, for `open` false).
+    nonisolated func anyInTree(of id: UUID, isOpen open: Bool) -> Bool {
+        let tree = Set(descendants(of: id) + [id])
+        return contains { tree.contains($0.id) && $0.isOpen == open }
+    }
+
+    /// Opens or shuts a folder and all its subfolders; shutting hides their pages in `shown`.
+    nonisolated func folding(_ id: UUID, open: Bool, shown: Set<UUID> = []) -> [BookmarkFolder] {
+        folding(Set(descendants(of: id) + [id]), open: open, shown: shown)
+    }
+
+    /// Opens or shuts these folders; shutting hides their pages in `shown`.
+    nonisolated func folding(_ tree: Set<UUID>, open: Bool, shown: Set<UUID> = []) -> [BookmarkFolder] {
+        map { folder in
+            guard tree.contains(folder.id) else { return folder }
+            var folder = folder
+            let tucking = open || shown.isEmpty ? [] : pages(in: folder.id).intersection(shown)
+            folder.isOpen = open
+            folder.tucked = tucking.isEmpty ? nil : tucking.sorted { $0.uuidString < $1.uuidString }
+            return folder
+        }
     }
 
     /// The folders with a pinned page in them or in a folder inside them.
@@ -228,11 +258,9 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
     /// The color Zigzag gave the space when it was made, which Use Default Colors puts back. Nil: not kept yet (made
     /// before it was, and not changed since), so `Library.defaultColors` works it out.
     var defaultColor: SpaceColor? = nil
-    /// Sites that always open in this space, whatever space the link came from (#286, `SiteRoutes`): hosts without
-    /// "www.", each covering its subdomains. Nil: none (older libraries too).
+    /// Hosts without "www." that always open in this space, subdomains included (#286, `SiteRoutes`).
     var routedSites: [String]? = nil
-    /// The picture the space's empty page shows (Background in its editor): a file's name in Zigzag's own
-    /// `Backgrounds` folder (`SpaceBackground`). Nil: the soft wash of the space's color.
+    /// Background file name in `Backgrounds` (`SpaceBackground`); nil uses the space's color.
     var backgroundImage: String? = nil
 
     /// No hue of its own: white, a gray, or black.
@@ -304,6 +332,25 @@ struct SpaceInfo: Codable, Identifiable, Equatable {
             // At night the color is already deep and rich: only a touch, so the frame stays dark under light text.
             let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             return a.blended(withFraction: CGFloat(dark ? amount * 0.3 : amount), of: b) ?? a
+        }
+    }
+
+    /// `a` moved `share` of the way to `b`, alpha included, light and dark alike: a look partway through a swipe.
+    static func mix(_ a: NSColor, _ b: NSColor, by share: CGFloat) -> NSColor {
+        let t = min(max(share, 0), 1)
+        if t == 0 { return a }
+        if t == 1 { return b }
+        return NSColor(name: nil) { appearance in
+            var x: NSColor?, y: NSColor?
+            appearance.performAsCurrentDrawingAppearance {
+                x = a.usingColorSpace(.sRGB)
+                y = b.usingColorSpace(.sRGB)
+            }
+            guard let x, let y else { return t < 0.5 ? a : b }
+            return NSColor(srgbRed: x.redComponent + (y.redComponent - x.redComponent) * t,
+                           green: x.greenComponent + (y.greenComponent - x.greenComponent) * t,
+                           blue: x.blueComponent + (y.blueComponent - x.blueComponent) * t,
+                           alpha: x.alphaComponent + (y.alphaComponent - x.alphaComponent) * t)
         }
     }
 
@@ -630,15 +677,14 @@ final class Library {
 
     func index(of id: UUID) -> Int? { spaces.firstIndex { $0.id == id } }
 
-    /// Settings › Spaces: a space you make with + or New Space gets a profile of its own, named after it (#291). Off
-    /// unless you turn it on. Spaces made before, and ones an import makes, stay as they are.
+    /// Settings › Spaces: new spaces get their own profile (#291). Off by default; existing and imported spaces are
+    /// unchanged.
     static var newSpacesGetOwnProfile: Bool {
         get { UserDefaults.standard.bool(forKey: "NewSpacesGetOwnProfile") }
         set { UserDefaults.standard.set(newValue, forKey: "NewSpacesGetOwnProfile") }
     }
 
-    /// A new space, on `profile`: where you made it from, so a space made among separate ones stays with them. With
-    /// `ownProfile`, on a new profile of its own instead, named after it (`newSpacesGetOwnProfile`).
+    /// A new space on `profile`, or with `ownProfile` on a new profile named after it.
     @discardableResult
     func addSpace(name: String? = nil, color: SpaceColor? = nil, profile: UUID = Profile.defaultID, ownProfile: Bool = false) -> SpaceInfo {
         let pick = color ?? SpaceColor.next(unused: spaces.map(\.color))
@@ -672,7 +718,7 @@ final class Library {
         commit()
     }
 
-    /// The picture for the space's empty page, or nil for none. The one it had is deleted: Remove takes the copy away.
+    /// Sets the space's background, deleting the previous file.
     func setBackgroundImage(_ name: String?, forSpace id: UUID) {
         guard let i = index(of: id), spaces[i].backgroundImage != name else { return }
         let old = spaces[i].backgroundImage
@@ -800,13 +846,13 @@ final class Library {
 
     // MARK: Sites that open in a space (#286)
 
-    /// Every site sent to a space, in the spaces' order.
+    /// Every site route, in space order.
     var siteRoutes: [SiteRoutes.Route] { SiteRoutes.routes(in: spaces) }
 
     /// The route that covers a page, if any.
     func siteRoute(for url: URL?) -> SiteRoutes.Route? { SiteRoutes.route(for: url, in: siteRoutes) }
 
-    /// Sends `site` to a space from now on, or (nil) lets it open in any space again.
+    /// Routes `site` to a space, or nil to remove the route.
     func setSiteRoute(_ site: String, to space: UUID?) {
         guard space.map({ self.space($0) != nil }) ?? true else { return }
         let next = SiteRoutes.setting(site, to: space, in: spaces)
@@ -1090,6 +1136,8 @@ final class Library {
             let at = known[Place(parent: parent, name: name)] ?? {
                 var made = BookmarkFolder(name: name)
                 made.parentID = parent
+                // Shut: a big import of open folders is a long list to scroll (#343).
+                made.isOpen = false
                 folders.append(made)
                 known[Place(parent: parent, name: name)] = folders.count - 1
                 return folders.count - 1
@@ -1197,8 +1245,7 @@ final class Library {
     /// Every pinned page in a folder and its subfolders, in the list's order.
     func allBookmarkIDs(inFolder id: UUID) -> [UUID] {
         guard let s = spaceIndex(ofFolder: id) else { return [] }
-        let inside = (spaces[s].folders ?? []).pages(in: id)
-        return spaces[s].bookmarks.map(\.id).filter { inside.contains($0) }
+        return (spaces[s].folders ?? []).pages(in: id, ordered: spaces[s].bookmarks.map(\.id))
     }
 
     /// Every folder inside this one, at any depth.
@@ -1255,6 +1302,21 @@ final class Library {
         guard let s = spaceIndex(ofFolder: id), let f = spaces[s].folders?.firstIndex(where: { $0.id == id }) else { return }
         spaces[s].folders?[f].isOpen = open
         spaces[s].folders?[f].tucked = open || tucking.isEmpty ? nil : tucking.sorted { $0.uuidString < $1.uuidString }
+        commit()
+    }
+
+    /// Opens or shuts a folder and all its subfolders; shutting hides their pages in `shown`.
+    func setFolderTreeOpen(_ id: UUID, _ open: Bool, shown: Set<UUID> = []) {
+        guard let s = spaceIndex(ofFolder: id), let folders = spaces[s].folders else { return }
+        spaces[s].folders = folders.folding(id, open: open, shown: shown)
+        commit()
+    }
+
+    /// Opens or shuts every folder in a space; shutting hides their pages in `shown`.
+    func setAllFoldersOpen(in spaceID: UUID, _ open: Bool, shown: Set<UUID> = []) {
+        guard let s = self.index(of: spaceID), let folders = spaces[s].folders,
+              folders.contains(where: { $0.isOpen != open }) else { return }
+        spaces[s].folders = folders.folding(Set(folders.map(\.id)), open: open, shown: shown)
         commit()
     }
 
@@ -1451,6 +1513,14 @@ final class Library {
         return nil
     }
 
+    /// The folder a pinned tab group (#209) became, if the page is in one.
+    func pinnedGroup(containing bookmarkID: UUID) -> BookmarkFolder? {
+        for space in spaces {
+            if let folder = space.folders?.first(where: { $0.groupID != nil && $0.bookmarkIDs.contains(bookmarkID) }) { return folder }
+        }
+        return nil
+    }
+
     /// Pins the pages of a split view or tile group together at a place in a space's list, laid out as `layout`
     /// (whose pages are `marks`, in order), in one change.
     func addPinnedSplit(_ marks: [Bookmark], as layout: PinnedSplit, to spaceID: UUID, at index: Int? = nil) {
@@ -1458,6 +1528,22 @@ final class Library {
         let at = Self.place(index, among: spaces[s].bookmarks.count)
         spaces[s].bookmarks.insert(contentsOf: marks, at: at)
         spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + [layout]
+        tidyFolders(s)
+        commit()
+    }
+
+    /// Pins a tab group (#209) as one folder, keeping its name and fold state.
+    func addPinnedGroup(_ marks: [Bookmark], splits: [PinnedSplit] = [], named name: String, group: UUID, isOpen: Bool, to spaceID: UUID, at index: Int? = nil) {
+        guard let s = self.index(of: spaceID), !marks.isEmpty else { return }
+        let at = Self.place(index, among: spaces[s].bookmarks.count)
+        spaces[s].bookmarks.insert(contentsOf: marks, at: at)
+        var folder = BookmarkFolder(name: name, bookmarkIDs: marks.map(\.id))
+        folder.groupID = group
+        folder.isOpen = isOpen
+        // A folded group hides its pages while open.
+        if !isOpen { folder.tucked = marks.map(\.id).sorted { $0.uuidString < $1.uuidString } }
+        spaces[s].folders = (spaces[s].folders ?? []) + [folder]
+        if !splits.isEmpty { spaces[s].pinnedSplits = (spaces[s].pinnedSplits ?? []) + splits }
         tidyFolders(s)
         commit()
     }

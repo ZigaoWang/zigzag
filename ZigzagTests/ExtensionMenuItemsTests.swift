@@ -82,9 +82,20 @@ struct ExtensionMenuItemsTests {
         #expect(plan.removed.first === existing.last)
         #expect(plan.added.isEmpty && plan.adopted.isEmpty)
     }
+
+    /// In a private tab only extensions allowed there are listed: theirs stay, anyone else's WebKit put in go (#353).
+    @Test func aPrivateTabShowsOnlyAllowedExtensions() {
+        let existing = webKitMenu() + [item("Translate this page")]
+        let plan = ExtensionMenuItems.plan(existing: existing, extensions: [("bitwarden", [item("Bitwarden", under: ["Autofill login", "Copy username", "Generate password"])])],
+                                           isPrivate: true)
+        #expect(plan.adopted.map(\.id) == ["bitwarden"])
+        #expect(plan.removed.count == 1)
+        #expect(plan.removed.first === existing.last)
+        #expect(plan.added.isEmpty)
+    }
     // MARK: Kept across relaunches (#239)
 
-    /// Downie adds its items on install only; Zigzag keeps them as Chrome does, with every change the extension makes.
+    /// Downie adds items on install only; Zigzag persists them like Chrome, with every change.
     @available(macOS 15.4, *)
     @Test func menuItemsAreKeptWithTheirChanges() {
         var items = BridgeContextMenus.apply("create", args: [["id": "open-in-downie", "title": "Open link in Downie", "contexts": ["link"]]], to: [])
@@ -92,21 +103,21 @@ struct ExtensionMenuItemsTests {
         items = BridgeContextMenus.apply("create", args: [["id": "mp4-hd", "parentId": "mp4", "title": "HD"]], to: items)
         items = BridgeContextMenus.apply("create", args: [["title": "No ID"]], to: items)
         #expect(items.compactMap { $0["id"] as? String } == ["open-in-downie", "mp4", "mp4-hd"])
-        // Made again with the same ID: the newer one, in the same place.
+        // Recreated with the same ID: replaced in place.
         items = BridgeContextMenus.apply("create", args: [["id": "open-in-downie", "title": "Send to Downie", "contexts": ["link"]]], to: items)
         #expect(items.first?["title"] as? String == "Send to Downie")
         items = BridgeContextMenus.apply("update", args: ["mp4", ["title": "MP4 video", "id": "renamed", "enabled": false]], to: items)
-        // Its title as it was made: one changed as you go can carry what you selected.
+        // The title as created; a selection-dependent title is never stored.
         #expect(items[1]["title"] as? String == "MP4")
         #expect(items[1]["enabled"] as? Bool == false)
         #expect(items[1]["id"] as? String == "mp4")
-        // Removing one takes its own items with it.
+        // Removing one removes its children.
         items = BridgeContextMenus.apply("remove", args: ["mp4"], to: items)
         #expect(items.compactMap { $0["id"] as? String } == ["open-in-downie"])
         #expect(BridgeContextMenus.apply("removeAll", args: [], to: items).isEmpty)
     }
 
-    /// A search item retitled with each selection keeps its %s title on disk, never the text you selected.
+    /// A search item keeps its %s title on disk, never the selected text.
     @available(macOS 15.4, *)
     @Test func selectedTextIsNeverKept() {
         var items = BridgeContextMenus.apply("create", args: [["id": "search", "title": "Search “%s”", "contexts": ["selection"]]], to: [])
@@ -117,7 +128,7 @@ struct ExtensionMenuItemsTests {
         #expect(!String(decoding: data, as: UTF8.self).contains("bank"))
     }
 
-    /// One item past 4 KB isn't kept, and the file stays under 256 KB however many items there are.
+    /// Items over 4 KB are dropped and the file stays under 256 KB.
     @available(macOS 15.4, *)
     @Test func keptItemsHaveALimit() {
         let big = String(repeating: "x", count: BridgeContextMenus.maxItemBytes)
@@ -138,18 +149,18 @@ struct ExtensionMenuItemsTests {
     @Test func keptItemsComeBackOnlyToTheSameVersionAsItStarts() {
         let kept = BridgeContextMenus.Kept(version: "1.3.3", items: [["id": "mp4", "title": "MP4", "contexts": ["page"]]])
         #expect(BridgeContextMenus.toRestore(kept, version: "1.3.3", isNewInstall: false, persistentBackground: false).count == 1)
-        // A new install or an update adds its own, on install; a background that never sleeps adds them as it starts.
+        // Installs and updates add their own; a persistent background adds them at start.
         #expect(BridgeContextMenus.toRestore(kept, version: "1.3.3", isNewInstall: true, persistentBackground: false).isEmpty)
         #expect(BridgeContextMenus.toRestore(kept, version: "1.4", isNewInstall: false, persistentBackground: false).isEmpty)
         #expect(BridgeContextMenus.toRestore(kept, version: "1.3.3", isNewInstall: false, persistentBackground: true).isEmpty)
-        // Items made before Zigzag kept them: the extension is told once that Zigzag was updated, and adds them again.
+        // Items made before persistence existed: the extension gets one update event to add them again.
         #expect(BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: false, persistentBackground: false))
         #expect(!BridgeContextMenus.addsItemsAgain(neverKept: false, isNewInstall: false, persistentBackground: false))
         #expect(!BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: true, persistentBackground: false))
         #expect(!BridgeContextMenus.addsItemsAgain(neverKept: true, isNewInstall: false, persistentBackground: true))
     }
 
-    /// Downie's button sends the tab to its app's link: no popup, no new tab, but not nothing, so its options stay shut.
+    /// Downie's button opens its app link: no popup or tab, but it counts as handled, so options stay closed.
     @available(macOS 15.4, *)
     @Test func aClickThatSendsTheTabSomewhereDidSomething() {
         let clicked = Date()

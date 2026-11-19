@@ -11,7 +11,7 @@ import WebKit
 /// Every call is checked against what the person approved for the extension: one that wasn't allowed "history" can't
 /// read history through the bridge, whatever its scripts send, and one whose files now ask for more (an extension read
 /// from a folder can change them) gets it only once the person allows it (ExtensionHost.restoreGrants). Private
-/// windows never show through.
+/// windows show through only to an extension allowed in them.
 @available(macOS 15.4, *)
 @MainActor
 final class ExtensionBridge {
@@ -37,16 +37,13 @@ final class ExtensionBridge {
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
-    /// What the bridge answers, by the namespace's name in an extension's call (`history`, `system.display`). The
-    /// compatibility overlay names one of these as a `swift:` implementation, so a claim cannot promise a handler
-    /// nobody wrote.
+    /// Namespaces the bridge handles (`history`, `system.display`). Overlay `swift:` claims must name one of these.
     static let handlerNames: Set<String> = Set(handlerTypes.map { $0.name })
 
-    /// The handler classes' own names (`BridgeContexts`), which a claim may name instead of the namespace an
-    /// extension calls (`contexts`). Both name the same code; neither is a second list of what the bridge answers.
+    /// Handler class names (`BridgeContexts`), which a claim may use instead of the namespace (`contexts`).
     static let handlerTypeNames: Set<String> = Set(handlerTypes.map { String(describing: $0) })
 
-    /// One handler per namespace. `init` makes the ones a profile owns; the rest are made for each profile too.
+    /// One handler per namespace. `init` creates the profile-owned ones; the rest are per profile too.
     private static let handlerTypes: [any BridgeNamespace.Type] = [
         BridgeHistory.self, BridgeTopSites.self, BridgeBookmarks.self, BridgeDownloads.self,
         BridgeNotifications.self, BridgeIdle.self, BridgeDisplay.self, BridgeContexts.self,
@@ -153,10 +150,12 @@ final class ExtensionBridge {
         ports.values.contains { $0.events.contains(event) && (extensionID == nil || $0.id == extensionID) }
     }
 
-    /// Tells every extension listening to `event` (all of them, or only `extensionID`).
-    func emit(_ event: String, _ args: [Any], to extensionID: String? = nil) {
+    /// Tells every extension listening to `event` (all of them, or only `extensionID`). About a private window
+    /// (`isPrivate`), only those allowed in private windows.
+    func emit(_ event: String, _ args: [Any], to extensionID: String? = nil, isPrivate: Bool = false) {
         let payload: [String: Any] = ["event": event, "args": Self.plain(args) ?? []]
-        for entry in ports.values where entry.events.contains(event) && (extensionID == nil || entry.id == extensionID) {
+        for entry in ports.values where entry.events.contains(event) && (extensionID == nil || entry.id == extensionID)
+            && PrivateAccess.sees(isPrivate: isPrivate, allowed: host.seesPrivate(entry.id)) {
             entry.port.sendMessage(payload, completionHandler: nil)
         }
     }
@@ -197,8 +196,8 @@ nonisolated struct BridgeError: Error {
 enum ExtensionBridgeScript {
     /// The permissions whose APIs the bridge answers, so the install sheet doesn't list them as missing.
     static let permissions: Set<String> = ["history", "topSites", "bookmarks", "downloads", "downloads.open", "notifications", "idle", "tts", "power", "offscreen", "identity", "sidePanel", "tabCapture", "system.display", "userScripts", "proxy", "webRequestAuthProvider"]
-    /// What the bridge grants and records from the manifest, as WebKit leaves them out: its own permissions, and
-    /// Manifest V2's webRequestBlocking, which answers sign-ins (BridgeWebRequest) though blocking itself won't work.
+    /// Permissions the bridge grants and records because WebKit drops them: its own, and MV2 webRequestBlocking, which
+    /// sign-ins need (BridgeWebRequest) even though blocking doesn't work.
     static let granted: Set<String> = permissions.union(["webRequestBlocking"])
 
     static let source: String = {
@@ -208,16 +207,71 @@ enum ExtensionBridgeScript {
     }()
 
     /// Where WebKit answers differently from Chrome, made to answer as Chrome does (webkit-differences.js).
-    static let differences: String = keepsBrowser + "\n" + webLocks + "\n" + differencesSource
+    static let differences: String = keepsBrowser + "\n" + storageInOrder + "\n" + idleCallbacks + "\n" + webLocks + "\n" + differencesSource
 
-    /// Keeps the global `browser` WebKit's extension API, in the extension's background, its pages and its content
-    /// scripts. WebKit finds an extension's listeners through that global each time it delivers something (a message,
-    /// a port, an event); Chrome's delivery looks up no global at all. So an extension that puts something else in
-    /// its place cuts itself off from everything sent to it. Proton Pass hides its API from other scripts once it has
-    /// started, swapping `chrome` and `browser` for stand-ins that answer nothing: its background then heard nothing
-    /// its popup asked, and the popup said the browser was having difficulties (#287). Chrome has no `browser` of
-    /// its own, so what an extension sets there was never what Chrome delivers through: here `browser` stays
-    /// WebKit's and setting it does nothing. `chrome` is left to the extension, as WebKit doesn't deliver through it.
+    /// Storage calls answer in the order made, as in Chrome; WebKit can answer a get before an earlier set (#350).
+    nonisolated static let storageInOrder = """
+    (() => {
+      const lines = {};
+      const kept = new Set();
+      const reads = ['get', 'getKeys', 'getBytesInUse'];
+      const order = (area, name) => {
+        if (!area || typeof area !== 'object' || kept.has(area)) return;
+        kept.add(area);
+        const line = lines[name] || (lines[name] = { writes: null, all: null, open: 0 });
+        for (const method of [...reads, 'set', 'remove', 'clear', 'setAccessLevel']) {
+          const native = area[method];
+          if (typeof native !== 'function') continue;
+          const write = !reads.includes(method);
+          const inOrder = function (...args) {
+            const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+            const ahead = write ? line.all : line.writes;
+            let finish;
+            const done = new Promise((resolve) => { finish = resolve; });
+            line.open++;
+            const mine = done.then(() => { if (--line.open === 0) { line.writes = null; line.all = null; } });
+            line.all = line.all ? Promise.all([line.all, mine]) : mine;
+            if (write) line.writes = line.all;
+            const start = () => {
+              try {
+                if (callback) {
+                  native.call(area, ...args, function (...values) { finish(); return callback.apply(this, values); });
+                  return undefined;
+                }
+                const answer = native.apply(area, args);
+                Promise.resolve(answer).then(finish, finish);
+                return answer;
+              } catch (error) { finish(); throw error; }
+            };
+            if (!ahead) return start();
+            const started = ahead.then(start);
+            if (!callback) return started;
+            started.catch((error) => { setTimeout(() => { throw error; }); });
+            return undefined;
+          };
+          try { Object.defineProperty(area, method, { value: inOrder, configurable: true, writable: true }); } catch (e) {}
+        }
+      };
+      const wrap = () => {
+        const roots = [...new Set([globalThis.chrome, globalThis.browser])].filter((root) => root && root.storage);
+        for (const root of roots) {
+          kept.add(root.storage);
+          for (const name of ['local', 'sync', 'session']) order(root.storage[name], name);
+        }
+        return roots.length > 0;
+      };
+      if (wrap() || typeof document === 'undefined') return;
+      let tries = 0;
+      const again = () => { if (!wrap() && ++tries < 100) setTimeout(again, 20); };
+      setTimeout(again, 0);
+    })();
+    """
+
+    /// Keeps the global `browser` as WebKit's API in backgrounds, pages and content scripts. WebKit looks up listeners
+    /// through that global on every delivery (message, port, event); Chrome doesn't. Proton Pass replaces `chrome` and
+    /// `browser` with inert stand-ins after starting, so its background never heard its popup (#287). Chrome has no
+    /// `browser` of its own, so here assigning it does nothing. `chrome` is left to the extension; WebKit doesn't deliver
+    /// through it.
     nonisolated static let keepsBrowser = """
     (() => {
       const keep = () => {
@@ -231,10 +285,34 @@ enum ExtensionBridgeScript {
         return true;
       };
       if (keep() || typeof document === 'undefined') return;
-      // An extension page may get its API a moment after this runs; this still comes before the page's own timers.
+      // An extension page may get its API after this runs; this still runs before the page's timers.
       let tries = 0;
       const again = () => { if (!keep() && ++tries < 100) setTimeout(again, 20); };
       setTimeout(again, 0);
+    })();
+    """
+
+    /// requestIdleCallback where WebKit has none, in the extension's pages and content scripts: Chrome has it, and
+    /// Proton Pass's content script stopped on it before putting its icon in sign-in fields (#287).
+    nonisolated static let idleCallbacks = """
+    (() => {
+      if (typeof document === 'undefined' || typeof globalThis.requestIdleCallback === 'function') return;
+      const timers = new Map();
+      let last = 0;
+      globalThis.requestIdleCallback = function requestIdleCallback(callback) {
+        if (typeof callback !== 'function') throw new TypeError("Failed to execute 'requestIdleCallback' on 'Window': parameter 1 is not of type 'Function'.");
+        const id = ++last;
+        timers.set(id, setTimeout(() => {
+          timers.delete(id);
+          const began = Date.now();
+          callback({ didTimeout: false, timeRemaining: () => Math.max(0, 50 - (Date.now() - began)) });
+        }, 1));
+        return id;
+      };
+      globalThis.cancelIdleCallback = function cancelIdleCallback(id) {
+        clearTimeout(timers.get(id));
+        timers.delete(id);
+      };
     })();
     """
 

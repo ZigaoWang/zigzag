@@ -95,7 +95,7 @@ struct ReaderTests {
     }
 }
 
-/// Reader pressed while it waits for a loading page calls the wait off only on that tab; on another, it's for that one.
+/// Reader pressed while waiting for a load cancels the wait only on that tab.
 @MainActor
 struct ReaderWaitTests {
     @Test func onlyTheSameTabCallsTheWaitOff() {

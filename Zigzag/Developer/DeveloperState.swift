@@ -53,17 +53,16 @@ nonisolated struct DeveloperState: Equatable {
     var javaScriptOff = false
     /// Every element of the page is drawn with a line around it.
     var outlines = false
-    /// The page loads none of its images (`PageImages`).
+    /// Blocks all images (`PageImages`).
     var imagesOff = false
-    /// The page is drawn without any of its styles, as bare HTML (`PageStyles`).
+    /// Renders as bare HTML with no styles (`PageStyles`).
     var stylesOff = false
 
     /// Nothing is chosen: the page is as any page.
     var isUnchanged: Bool { self == DeveloperState() }
 
-    /// Whether a change from `old` only shows once the page loads again: what a page is told, allowed and given as it
-    /// loads (its user agent, its scripts, its images), not how one already here is drawn. Either way round: what
-    /// differs, from or to `old`.
+    /// Whether a change needs a reload: anything applied at load time (user agent, scripts, images), not how the
+    /// current page draws. Checked in both directions.
     func needsReload(from old: DeveloperState) -> Bool {
         userAgent != old.userAgent || javaScriptOff != old.javaScriptOff || imagesOff != old.imagesOff
     }
@@ -90,10 +89,8 @@ extension Tab {
         return developerInEffect(at: url).appearance.name
     }
 
-    /// Puts the choices in effect on the page that loads: when one changes, when the web view's address does, when
-    /// the tab becomes or stops being a development tab, and for a new web view. What it's told and given as it loads
-    /// (its user agent, its images), and the look it's asked for. One path for all of them, so the page is never left
-    /// with a choice nothing shows.
+    /// Applies load-time choices (user agent, images) and the requested look: on change, on address change, on toggling
+    /// development mode, and for new web views. One path so nothing is missed.
     func applyDeveloperState() {
         guard let webView else { return }
         let state = developerInEffect(at: webView.url ?? url)
@@ -102,10 +99,8 @@ extension Tab {
         DarkPages.lookChanged(for: webView)
     }
 
-    /// Puts on the page that's here how the developer tools have it drawn (its styles, for print or none, and its
-    /// outlines): once it has arrived (`didCommit`), and when a choice changes or the tab becomes or stops being a
-    /// development tab. Never by the address a web view is going to: the page still showing would be drawn as the
-    /// next one, without its styles while it waits.
+    /// Applies draw-time choices (styles, outlines) to the current page: on `didCommit`, on change, and on toggling
+    /// development mode. Never on the pending address, or the old page would draw unstyled while waiting.
     func applyDeveloperStateToPage() {
         guard let webView else { return }
         let state = developerInEffect
@@ -128,11 +123,9 @@ extension Tab {
     func pageIsUntouched(at url: URL?) -> Bool { developerInEffect(at: url).isUnchanged }
 }
 
-/// Disable Styles (#141): the page drawn with none of its styles, as bare HTML, through WebKit's own preference for it
-/// (`authorAndUserStylesEnabled`, unpublished, so offered only where this WebKit has it). It takes every author style
-/// with it, the ones Zigzag puts in a page included, and goes and comes back at once. WebKit lists it as the app's own
-/// to set (an "embedder" feature), so Settings' Feature Flags never shows or sets it. It's the tab's web view's
-/// (`Tab.applyDeveloperStateToPage`, as each page arrives); no other page shares them, not even one this page opened
+/// Disable Styles (#141) via WebKit's private `authorAndUserStylesEnabled`, offered only where it exists. Drops all
+/// author styles, Zigzag's included, and applies instantly. It's an embedder feature, so Feature Flags never shows it.
+/// Per web view (`Tab.applyDeveloperStateToPage`); preferences aren't shared, even with opened pages
 /// (`WebKitSetup.separatePreferences`).
 enum PageStyles {
     static let key = "authorAndUserStylesEnabled"
@@ -141,21 +134,14 @@ enum PageStyles {
     static func set(_ on: Bool, in preferences: WKPreferences) { WebKitSetup.setIfAvailable(on, key: key, in: preferences) }
 }
 
-/// Disable Images (#141): a content rule that blocks every image a page asks for, on a tab's web view while it's
-/// chosen there. A rule rather than WebKit's preference to load images automatically: that one still shows any
-/// image WebKit has in memory, so a page you come back to has them all, and a rule is checked before the cache.
-/// It shows from the page's next load, either way.
-///
-/// The rule blocks only on a page whose site is on the development list (`if-top-url`), so it never touches any
-/// other site's page, whatever shares it: a page and the tabs and pop-ups it opened share one set of scripts and
-/// rules (as dark pages' scripts), so the choice is theirs together. A tab it opens starts with it, and turned on
-/// or off in any of them it is in all (`Tab.shareImagesChoice`), so each one's menu says what its pages get. It's
-/// compiled for the list as it is, the first time it's wanted and again when the list changes, then looked up.
+/// Disable Images (#141): a content rule blocking every image. Not WebKit's auto-load preference, which still shows
+/// cached images; rules run before the cache. Applies from the next load. Scoped by `if-top-url` to development sites.
+/// Opener and opened pages share rule sets, so the choice is shared (`Tab.shareImagesChoice`). Compiled per list
+/// version on first use and on list change, then looked up.
 enum PageImages {
     static let prefix = "zigzag-developer-images-off-"
 
-    /// The rule for pages on `sites`, the development list's entries; nil with none, as WebKit compiles no
-    /// condition that's empty.
+    /// Nil for no sites; WebKit won't compile an empty condition.
     static func rules(for sites: [String]) -> String? {
         let pages = sites.compactMap(topURL(for:))
         guard !pages.isEmpty else { return nil }
@@ -167,36 +153,34 @@ enum PageImages {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// The pages of a listed site, as `if-top-url` matches a page's address: the site or any of its subdomains,
-    /// whatever its port, as the list covers them (`DevelopmentSites.covers`). By address rather than `if-domain`,
-    /// which never matches an address in brackets (`[::1]`). The list keeps hosts as a page's address has them, so
-    /// lowercase and ASCII; anything else couldn't be a page's host.
+    /// `if-top-url` pattern for a site and its subdomains, any port (`DevelopmentSites.covers`). Not `if-domain`, which
+    /// never matches bracketed hosts (`[::1]`). Hosts are stored lowercase ASCII.
     static func topURL(for site: String) -> String? {
         guard !site.isEmpty, site.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || ".-:".contains($0)) && !$0.isUppercase }) else { return nil }
         let escaped = site.replacingOccurrences(of: ".", with: "\\.")
-        // An address with colons is in brackets in a page's address, and has no subdomains.
+        // IPv6: bracketed, no subdomains.
         return site.contains(":") ? "^https?://\\[\(escaped)\\][:/]" : "^https?://([^/]*\\.)?\(escaped)[:/]"
     }
 
-    /// The rules' version is in the name: compiled once for a list, and looked up after.
+    /// Versioned by the rules' hash.
     static func identifier(for rules: String) -> String { prefix + String(Data(rules.utf8).hashValueStable, radix: 36) }
 
-    /// The rule compiled last, put on every set of scripts and rules a page wants it in.
+    /// Last compiled rule list, added to each content controller that needs it.
     private static var list: WKContentRuleList?
-    /// The name of the rule for the list as it is now; nil with nothing listed. `list` is that rule once compiled.
+    /// Name of the rule for the current list; nil when empty. `list` holds it once compiled.
     private static var wanted: String?
     /// The rule being compiled.
     private static var preparing: String?
-    /// Per set of scripts and rules, the web views that want their images off: the rule is there while any does.
+    /// Per content controller, the web views wanting images off; the rule stays while any does.
     private static let wanting = NSMapTable<WKUserContentController, NSHashTable<WKWebView>>.weakToStrongObjects()
-    /// Per set of scripts and rules, the rule that's on it, as `PageFilters` keeps its own.
+    /// Per content controller, the installed rule, as `PageFilters` tracks its own.
     private static let installed = NSMapTable<WKUserContentController, WKContentRuleList>.weakToStrongObjects()
-    /// Pages waiting for the rule before they load again (`defersReload`).
+    /// Pages waiting for the rule before reloading (`defersReload`).
     private static let waiting = NSHashTable<WKWebView>.weakObjects()
-    /// Per set of scripts and rules, every tab's web view made with it: a page and the ones it opened.
+    /// Per content controller, every tab web view using it: an opener and the pages it opened.
     private static let members = NSMapTable<WKUserContentController, NSHashTable<WKWebView>>.weakToStrongObjects()
 
-    /// A tab's new web view, among the others with its set of scripts and rules (`sharing`).
+    /// Registers a tab's new web view with its content controller (`sharing`).
     static func join(_ webView: WKWebView) {
         let controller = webView.configuration.userContentController
         let webViews = members.object(forKey: controller) ?? NSHashTable<WKWebView>.weakObjects()
@@ -204,15 +188,14 @@ enum PageImages {
         members.setObject(webViews, forKey: controller)
     }
 
-    /// The other tabs' web views that share a web view's set of scripts and rules, and so its images rule: the page
-    /// that opened it, and the ones it or they opened. WebKit makes a page's new window with its opener's set, and
-    /// it can't be given its own: the opener's scripts, handlers and rules can't be read back to fill one.
+    /// Other tab web views sharing this one's content controller, and so its images rule. WebKit gives a new window its
+    /// opener's controller, and a fresh one can't be filled since scripts, handlers and rules can't be read back.
     static func sharing(with webView: WKWebView) -> [WKWebView] {
         (members.object(forKey: webView.configuration.userContentController)?.allObjects ?? []).filter { $0 !== webView }
     }
 
-    /// Images off or back on for a web view's pages: from its next load. A web view that goes (`Tab.tearDown`) is
-    /// set back on, so the rule never stays for the pages it shared it with.
+    /// Turns images off or on from the next load. A torn-down web view (`Tab.tearDown`) is turned back on so the rule
+    /// doesn't linger on shared pages.
     static func set(_ off: Bool, in webView: WKWebView) {
         let controller = webView.configuration.userContentController
         let webViews = wanting.object(forKey: controller) ?? NSHashTable<WKWebView>.weakObjects()
@@ -226,26 +209,25 @@ enum PageImages {
     /// Whether a web view's pages are meant to be without their images.
     static func isOff(in webView: WKWebView) -> Bool { wanting.object(forKey: webView.configuration.userContentController)?.contains(webView) == true }
 
-    /// Whether a web view's page waits for the rule before it loads again (`defersReload`).
+    /// Whether the page waits for the rule before reloading (`defersReload`).
     static func isWaiting(_ webView: WKWebView) -> Bool { waiting.contains(webView) }
 
-    /// Whether the rule is on a web view's set of scripts and rules, the one for the list as it is.
+    /// Whether the current list's rule is installed on the web view's controller.
     static func isOn(in webView: WKWebView) -> Bool {
         guard let wanted else { return false }
         return installed.object(forKey: webView.configuration.userContentController)?.identifier == wanted
     }
 
-    /// Whether loading a page again for a change to its choices waits for the rule: its images are off and the rule
-    /// for the list as it is isn't on yet. It's then loaded again once it is, with every change made meanwhile; the
-    /// page loads once, never first with its images and again without.
+    /// Whether a reload waits for the rule: images are off and the current rule isn't installed yet. Then it reloads
+    /// once with all pending changes, never first with images and again without.
     static func defersReload(of webView: WKWebView) -> Bool {
         guard isOff(in: webView), wanted != nil, !isOn(in: webView) else { return false }
         waiting.add(webView)
         return true
     }
 
-    /// The development list changed: the rule follows it, while what's on stays until the new one is ready. Before
-    /// the tabs take the change, so a page that just came onto the list waits for it (`defersReload`).
+    /// The development list changed: recompile, keeping the old rule until the new one is ready. Runs before tabs
+    /// update so a newly listed page waits (`defersReload`).
     static func sitesChanged() {
         let now = rules(for: DevelopmentSites.sites).map(identifier(for:))
         guard now != wanted else { return }
@@ -260,8 +242,8 @@ enum PageImages {
 
     private static var hasWanting: Bool { wanting.objectEnumerator()?.allObjects.contains { ($0 as? NSHashTable<WKWebView>)?.allObjects.isEmpty == false } == true }
 
-    /// Puts the rule on a set of scripts and rules while a page there wants it, and takes it off when none does, as
-    /// `ContentBlocker.apply` swaps its lists: what's on is known, never counted.
+    /// Adds the rule to a controller while any page there wants it and removes it when none does, as
+    /// `ContentBlocker.apply` swaps lists; tracked, not counted.
     @discardableResult
     private static func sync(_ controller: WKUserContentController) -> Bool {
         let want = wanting.object(forKey: controller)?.allObjects.isEmpty == false ? list : nil
@@ -274,11 +256,11 @@ enum PageImages {
 
     private static func syncAll() { controllers.forEach { sync($0) } }
 
-    /// Looks the rule for the list as it is up, or compiles it; then puts it where it's wanted, in place of the one
-    /// before, and loads the pages that waited for it again. A list that changed meanwhile is worked toward next.
+    /// Looks up or compiles the current rule, swaps it in where wanted, and reloads waiting pages. Recompiles if the
+    /// list changed meanwhile.
     private static func prepare() {
-        // Nothing listed: no rule will come, so no page waits for one. Each tab, no longer a development tab, loads
-        // again without its choices (`Tab.refreshDevelopment`).
+        // Empty list: no rule coming, so nothing waits. Each tab reloads without its developer choices
+        // (`Tab.refreshDevelopment`).
         guard let rules = rules(for: DevelopmentSites.sites) else { wanted = nil; waiting.removeAllObjects(); return }
         let name = identifier(for: rules)
         wanted = name
@@ -286,14 +268,14 @@ enum PageImages {
         preparing = name
         let ready: @MainActor (WKContentRuleList?) -> Void = { found in
             if preparing == name { preparing = nil }
-            // The list changed while this was compiled: the one for it comes next, and the pages wait for that.
+            // The list changed during compiling: compile again; pages keep waiting.
             guard name == wanted else { prepare(); return }
             if let found {
                 list = found
                 syncAll()
                 ContentBlocker.removeOld(withPrefix: prefix, keeping: name)
             }
-            // Loaded again, without the rule if it failed: the other changes made meanwhile are never lost.
+            // Reload even if compiling failed, so other pending changes aren't lost.
             let pages = waiting.allObjects
             waiting.removeAllObjects()
             for page in pages { if let tab = (page as? BrowserWebView)?.owner { tab.reload() } else { page.reload() } }

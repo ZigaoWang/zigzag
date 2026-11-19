@@ -11,7 +11,7 @@
   // What WebKit sends, for the requests Zigzag sends for the extension itself (extensionFetch below).
   const sentUserAgent = nav ? String(nav.userAgent) : '';
   if (nav && !/Chrome\//.test(nav.userAgent)) {
-    const asChrome = nav.userAgent.replace(/Version\/[\d.]+ Safari\/[\d.]+/, 'Chrome/140.0.0.0 Safari/537.36');
+    const asChrome = nav.userAgent.replace(/Version\/[\d.]+ Safari\/[\d.]+/, 'Chrome/157.0.0.0 Safari/537.36');
     const proto = Object.getPrototypeOf(nav);
     for (const [key, value] of [['userAgent', asChrome], ['appVersion', asChrome.replace(/^Mozilla\//, '')]]) {
       try { Object.defineProperty(proto, key, { get: () => value, configurable: true, enumerable: true }); } catch (e) {}
@@ -70,7 +70,7 @@
   // The icons of open tabs, by address, for the favIconUrl WebKit's tabs leave out (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagFavicons', { value: (urls) => send('favicons', 'forPages', [urls]), configurable: true });
 
-  // The extension's right-click menu items, kept across relaunches as Chrome keeps them (webkit-differences.js).
+  // Context menu items persisted across relaunches, like Chrome (webkit-differences.js).
   Object.defineProperty(globalThis, '__zigzagContextMenus', {
     value: { change: (op, args) => send('contextMenusKept', 'change', [op, ...args]), restore: () => send('contextMenusKept', 'restore', []) },
     configurable: true,
@@ -99,7 +99,9 @@
       const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
       const method = String(option('method', 'GET')).toUpperCase();
       const body = init && init.body != null ? init.body : isRequest ? input.body : null;
-      if (!['http:', 'https:'].includes(url.protocol) || option('credentials', 'same-origin') !== 'include'
+      // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
+      const credentials = option('credentials', 'same-origin');
+      if (!['http:', 'https:'].includes(url.protocol) || !['include', 'same-origin'].includes(credentials)
           || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
@@ -119,7 +121,7 @@
       }; });
       signal.addEventListener('abort', abort, { once: true });
       try {
-        const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method,
+        const answer = await Promise.race([send('extensionFetch', 'fetch', [{ requestID, url: request.url, method, credentials,
           headers: [...request.headers.entries()], body, cache: request.cache, redirect: request.redirect, userAgent: sentUserAgent }]), aborted]);
         signal.throwIfAborted();
         if (answer.fallback) return nativeFetch(input, init);
@@ -361,10 +363,9 @@
     onSignInChanged: event('identity.onSignInChanged'),
   });
 
-  // Chrome lets a click in a page open the panel when the extension's content script there passes it on to the
-  // background. The last message from one of its content scripts, and the page it came from, go with open(); Zigzag
-  // checks that you clicked or typed in that page a moment before (BridgeSidePanel). Listened to before the
-  // extension's own listeners, so it's known by the time they call open().
+  // Chrome lets a page click open the panel when the content script relays it. open() carries the last content script
+  // message and its page; Zigzag checks for a recent click or key there (BridgeSidePanel). Registered before the
+  // extension's listeners so it's set before they call open().
   let contentMessage = null;
   if (asked.has('sidePanel')) {
     const ownOrigin = globalThis.location ? String(globalThis.location.origin) : '';
@@ -437,8 +438,8 @@
       return !Array.isArray(filter.urls) || filter.urls.some((pattern) => matchesPattern(pattern, details.url));
     };
     // Every listener whose filter wants it, at once; the first that answers decides, and one that's said nothing in
-    // ten seconds counts as nothing. Resolves { authCredentials }, { cancel: true } or {}.
-    const ask = (details) => new Promise((resolve) => {
+    // `wait` ms counts as nothing. Resolves { authCredentials }, { cancel: true } or {}.
+    const ask = (details, wait = 10000) => new Promise((resolve) => {
       const listening = [...signIn].filter(([, entry]) => wants(entry.filter, details));
       let left = listening.length;
       let done = false;
@@ -463,7 +464,7 @@
           const returned = listener(given, entry.callsBack ? say : undefined);
           if (!entry.callsBack) Promise.resolve(returned).then(say, () => say(undefined));
         } catch (e) { say(undefined); }
-        setTimeout(() => say(undefined), 10000);
+        setTimeout(() => say(undefined), wait);
       }
     });
     // A site's sign-in names the tab asking by WebKit's ID, which only this extension's tabs.query knows: Zigzag
@@ -481,7 +482,8 @@
       const hint = details.__zigzagTab;
       delete details.__zigzagTab;
       details.tabId = await tabFor(hint);
-      const answer = await ask(details);
+      // A site's can be answered while Zigzag's sheet asks, as 1Password does once you pick a login in its popup (#387).
+      const answer = await ask(details, 10 * 60 * 1000);
       send('webRequest', 'authAnswer', [details.requestId, answer]).catch(() => {});
     };
     const askForProxy = async (details) => {
@@ -705,8 +707,8 @@
     onStatusChanged: event('tabCapture.onStatusChanged'),
   });
 
-  // runtime.getContexts: MV3 only, as in Chrome. Zigzag knows which of the extension's pages are open (its offscreen
-  // page, popup, side panel).
+  // runtime.getContexts: MV3 only, as in Chrome. Zigzag knows which extension pages are open (offscreen, popup, side
+  // panel).
   if (manifest.manifest_version === 3 && typeof api.runtime.getContexts !== 'function') {
     try { api.runtime.getContexts = method('contexts', 'getContexts'); } catch (e) {}
   }
@@ -822,7 +824,7 @@
       const remove = event.removeListener && event.removeListener.bind(event);
       const has = event.hasListener && event.hasListener.bind(event);
       const wrapped = new WeakMap();
-      // Set plainly, or defined when it can't be: either way it has to have taken, or nothing is hidden.
+      // Assigned, or defined when assignment fails; either way it must stick or nothing is hidden.
       const put = (name, value) => {
         try { event[name] = value; } catch (e) {}
         if (event[name] !== value) { try { Object.defineProperty(event, name, { value, configurable: true, writable: true }); } catch (e) {} }
@@ -839,7 +841,7 @@
       if (has) put('hasListener', (listener) => has(wrapped.get(listener) || listener));
       return add;
     };
-    // On chrome and on browser both, should WebKit give each its own events.
+    // On both chrome and browser, in case WebKit gives each its own events.
     const runtimes = [...new Set([globalThis.chrome, globalThis.browser].map((target) => target && target.runtime).filter(Boolean))];
     held.push(...runtimes);
     const hideAll = (name, test) => [...new Set(runtimes.map((runtime) => runtime[name]))].map((event) => hide(event, test)).find(Boolean);

@@ -462,9 +462,9 @@ final class TabSwitcher {
 
     enum Ending: Equatable { case cancel, commit, letGo }
 
-    /// A key that ends the switch while it's up. Esc and Return are the switcher's, Control held or not, so nothing
-    /// under it (Reader, find, a full-screen page) takes them too. Any other key with Control let go somewhere we
-    /// didn't see (another app) ends it too, and goes on to the page.
+    /// A key that ends the switcher. Esc and Return always belong to it, so nothing underneath (Reader, find,
+    /// full-screen pages) also gets them. Any other key with Control released unseen (in another app) ends it and
+    /// passes through.
     static func ending(keyCode: UInt16, controlHeld: Bool) -> Ending? {
         switch keyCode {
         case 53 /* esc */: .cancel

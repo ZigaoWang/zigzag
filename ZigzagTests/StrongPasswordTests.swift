@@ -17,7 +17,7 @@ struct StrongPasswordTests {
         if case .settled = settlement { true } else { false }
     }
 
-    /// The site seeming to take it is a guess: the account's saved password is replaced only once you say so.
+    /// The account's password is replaced only after you confirm; the site accepting it is a guess.
     @Test func aStrongPasswordAsksBeforeReplacingTheOldOne() async throws {
         let store = memoryVault()
         let site = try #require(Origin(URL(string: "https://example.com")))
@@ -30,19 +30,18 @@ struct StrongPasswordTests {
         #expect(try await store.credentials(for: site).count == 2)
         // A password that wasn't one Zigzag made goes the usual way.
         #expect(await !PasswordCapture.settleGenerated(origin: site, username: "sam@example.com", password: SecretString("typed"), in: store).wasGenerated)
-        // The site seems to have taken it: you're asked, and until you say so the account keeps its password and the
-        // pending one keeps the new one, marked used so it's never tidied away.
+        // Looks accepted: you're asked; until then the account keeps its password and the pending entry holds the new one, marked used so it isn't cleaned up.
         #expect(isAsk(await PasswordCapture.settleGenerated(origin: site, username: "Sam@example.com", password: strong, in: store), for: account))
         #expect(try await store.password(for: account.id).matches(old))
         let kept = try #require(try await store.credentials(for: site).first { $0.id == pending.id })
         #expect(kept.isPendingGenerated && kept.lastUsed != nil)
-        // Update in the prompt: the account takes it and the pending one goes.
+        // Update: the account takes it and the pending entry goes.
         try await store.update(account, password: strong)
         await PasswordCapture.dropGenerated(origin: site, password: strong, account: "sam@example.com", in: store)
         #expect(try await store.credentials(for: site).map(\.id) == [account.id])
     }
 
-    /// An account that has the new password already (updated by hand meanwhile) needs no question.
+    /// An account that already has the new password needs no question.
     @Test func anAccountThatHasItAlreadySettlesWithoutAsking() async throws {
         let store = memoryVault()
         let site = try #require(Origin(URL(string: "https://same.example.com")))
@@ -94,7 +93,7 @@ struct StrongPasswordTests {
         let pending = try await PasswordCapture.keepGenerated(strong, origin: site, username: "sam", replacing: nil, in: store)
         #expect(pending.generatedFor == "sam" && pending.username.isEmpty)
         #expect(pending.shownUsername.contains("sam"))
-        // It names sam's account as the one to ask about; alex's is never touched.
+        // Asks about sam's account; alex's is untouched.
         #expect(isAsk(await PasswordCapture.settleGenerated(origin: site, username: "", password: strong, in: store), for: sam))
         #expect(try await store.password(for: sam.id).matches(old))
     }
@@ -121,17 +120,14 @@ struct StrongPasswordTests {
         #expect(try await store.password(for: settled.id).matches(SecretString("x")))
     }
 
-    /// Another strong password replaces the last one only for the same form, and only while that one can't have
-    /// been sent: one for another form (sent, perhaps, by a clickable box) is kept beside it.
+    /// A new strong password replaces the last only for the same form while unsent; one for another form is kept alongside.
     @Test func anotherFormsStrongPasswordIsKeptBesideIt() {
         #expect(PasswordCapture.replacesPending(attempted: nil, sameForm: true))
         #expect(!PasswordCapture.replacesPending(attempted: nil, sameForm: false))
         #expect(!PasswordCapture.replacesPending(attempted: Date(), sameForm: true))
     }
 
-    /// A strong password the site was never seen taking is never deleted by age: it may be the only copy of the
-    /// account's password. It goes once a later one for the same account settles in its place; ones for no
-    /// account, or for another, stay.
+    /// Unconfirmed strong passwords never expire, since one may be the only copy; they go when a later one settles for that account.
     @Test func standInsStayUntilALaterOneSettles() async throws {
         let store = memoryVault()
         let site = try #require(Origin(URL(string: "https://tidy.example.com")))
@@ -141,7 +137,7 @@ struct StrongPasswordTests {
         try await store.update(old)
         let nobody = try await PasswordCapture.keepGenerated(SecretString("Strong-Nobody"), origin: site, username: "", replacing: nil, in: store)
         let other = try await PasswordCapture.keepGenerated(SecretString("Strong-Other"), origin: site, username: "alex", replacing: nil, in: store)
-        // Months later, nothing has gone.
+        // Months later, nothing removed.
         #expect(try await store.credentials(for: site).count == 3)
         _ = try await PasswordCapture.keepGenerated(SecretString("Strong-New"), origin: site, username: "Sam", replacing: nil, in: store)
         #expect(isSettled(await PasswordCapture.settleGenerated(origin: site, username: "", password: SecretString("Strong-New"), in: store)))
@@ -150,7 +146,7 @@ struct StrongPasswordTests {
         #expect(left.contains { !$0.isPendingGenerated && $0.username == "Sam" })
     }
 
-    /// The update prompt giving an account its strong password clears that account's earlier stand-ins too.
+    /// Updating via the prompt clears that account's earlier stand-ins.
     @Test func theUpdatePromptClearsEarlierStandIns() async throws {
         let store = memoryVault()
         let site = try #require(Origin(URL(string: "https://prompt.example.com")))
@@ -159,7 +155,7 @@ struct StrongPasswordTests {
         _ = try await PasswordCapture.keepGenerated(SecretString("Strong-2"), origin: site, username: "sam", replacing: nil, in: store)
         let other = try await PasswordCapture.keepGenerated(SecretString("Strong-3"), origin: site, username: "alex", replacing: nil, in: store)
         #expect(isAsk(await PasswordCapture.settleGenerated(origin: site, username: "", password: SecretString("Strong-2"), in: store), for: account))
-        // Asked, not yet answered: everything stays.
+        // Asked but unanswered: everything stays.
         #expect(try await store.credentials(for: site).contains { $0.id == earlier.id })
         try await store.update(account, password: SecretString("Strong-2"))
         await PasswordCapture.dropGenerated(origin: site, password: SecretString("Strong-2"), account: "sam", in: store)

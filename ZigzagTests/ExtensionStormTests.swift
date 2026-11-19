@@ -3,12 +3,9 @@ import JavaScriptCore
 import Testing
 @testable import Zigzag
 
-/// The guard that holds back a content script reconnecting to its background in a loop (ConnectGuard), run on a
-/// clock and timers of the test's own, against a stand-in for `chrome.runtime`.
+/// ConnectGuard, which throttles content scripts reconnecting in a loop, on a fake clock against a stand-in `chrome.runtime`.
 struct ExtensionStormTests {
-    /// A world with the guard installed on a stand-in runtime. `connects` counts the runtime's own connects; `ports`
-    /// holds what it made, each with `close()` to end it. While `turnAway` is set, its background closes each port a
-    /// moment after it opens.
+    /// The guard on a stand-in runtime. `connects` counts connects; `ports` holds them with `close()`; with `turnAway` set the background closes each port right after opening.
     private func world() throws -> JSContext {
         let context = try #require(JSContext())
         context.exceptionHandler = { _, value in Issue.record("JavaScript: \(value?.toString() ?? "?")") }
@@ -56,8 +53,7 @@ struct ExtensionStormTests {
         Int(context.evaluateScript(script)?.toInt32() ?? -1)
     }
 
-    /// The loop as Sound Booster's store sync makes it: a port opened again the moment its background closes it, which
-    /// it does at once.
+    /// Sound Booster's store sync loop: reopens the port as soon as the background closes it.
     private let loop = """
     var reconnects = 0;
     turnAway = true;
@@ -71,7 +67,7 @@ struct ExtensionStormTests {
     @Test func aReconnectLoopIsHeldBackAndSaidOnce() throws {
         let context = try world()
         context.evaluateScript(loop)
-        // A thousand a second: still let through for the first seconds, as a short burst would be.
+        // 1000/s still passes for the first seconds, like a short burst.
         context.evaluateScript("advance(3000)")
         #expect(context.evaluateScript("guard.isHeld()")?.toBool() == false)
         #expect(number(context, "connects") > 2500)
@@ -80,13 +76,13 @@ struct ExtensionStormTests {
         #expect(number(context, "reports.length") == 1)
         #expect(context.evaluateScript("reports[0].kind")?.toString() == "connect")
         #expect(number(context, "reports[0].perSecond") > ConnectGuard.perSecond)
-        // Held back, a minute lets through a handful, each further apart, up to the longest wait.
+        // Throttled: a handful per minute, backing off up to the max wait.
         let before = number(context, "connects")
         context.evaluateScript("advance(60000)")
         let during = number(context, "connects") - before
         #expect(during >= 3 && during <= 10)
         #expect(number(context, "guard.gap()") == ConnectGuard.maxGap)
-        // The extension's loop is still running, only slowly; it's said once.
+        // The loop still runs, slowly; logged once.
         #expect(number(context, "guard.waiting()") == 1)
         context.evaluateScript("advance(120000)")
         #expect(number(context, "reports.length") == 1)
@@ -94,8 +90,7 @@ struct ExtensionStormTests {
 
     @Test func normalRatesAreLeftAlone() throws {
         let context = try world()
-        // Forty connects a second for half a minute (a page opening many frames, Tampermonkey's requests): under the
-        // limit, every one goes straight through and is the runtime's own port.
+        // 40/s for 30 s (many frames, Tampermonkey): under the limit, all pass through as real ports.
         context.evaluateScript("""
         var same = 0;
         for (let i = 0; i < 1200; i++) { const p = runtime.connect({ name: 'n' + i }); if (p === ports[ports.length - 1]) same++; advance(25); }
@@ -108,8 +103,7 @@ struct ExtensionStormTests {
 
     @Test func aShortBurstIsLeftAlone() throws {
         let context = try world()
-        // Five hundred at once as a heavy page loads, then a few seconds of quiet, then another: never five seconds in
-        // a row past the limit.
+        // 500 at once, a few quiet seconds, then another: never 5 s straight over the limit.
         context.evaluateScript("""
         for (let round = 0; round < 4; round++) {
           for (let i = 0; i < 500; i++) runtime.connect({ name: 'b' });
@@ -126,7 +120,7 @@ struct ExtensionStormTests {
         context.evaluateScript(loop)
         context.evaluateScript("advance(6000)")
         #expect(context.evaluateScript("guard.isHeld()")?.toBool() == true)
-        // The background now keeps ports: the loop has stopped closing them.
+        // The background keeps ports now.
         context.evaluateScript("""
         turnAway = false;
         var heard = [], closed = 0;
@@ -136,7 +130,7 @@ struct ExtensionStormTests {
         port.postMessage('early');
         """)
         #expect(context.evaluateScript("port.name")?.toString() == "settled")
-        // Not through yet: what it sent waits with it.
+        // Not through yet; queued messages wait.
         context.evaluateScript("advance(70000)")
         let real = "ports.find((p) => p.name === 'settled')"
         #expect(context.evaluateScript("\(real).sent[0]")?.toString() == "early")
@@ -154,10 +148,10 @@ struct ExtensionStormTests {
         context.evaluateScript(loop)
         context.evaluateScript("advance(6000)")
         #expect(context.evaluateScript("guard.isHeld()")?.toBool() == true)
-        // The background starts keeping ports (its listener finally there): the next one let through stays open.
+        // The background starts keeping ports: the next one passed stays open.
         context.evaluateScript("turnAway = false; advance(40000)")
         context.evaluateScript("advance(\(ConnectGuard.calm))")
-        // Ten seconds on, a new connect goes straight through again.
+        // After 10 s, new connects pass immediately.
         context.evaluateScript("var fresh = runtime.connect({ name: 'fresh' });")
         #expect(context.evaluateScript("fresh === ports[ports.length - 1]")?.toBool() == true)
         #expect(context.evaluateScript("guard.isHeld()")?.toBool() == false)
@@ -165,7 +159,7 @@ struct ExtensionStormTests {
 
     @Test func eachRuntimeIsGuardedOnce() throws {
         let context = try world()
-        // The file runs once per manifest entry in a frame: a second install on the same runtime does nothing.
+        // The file runs once per manifest entry; a second install is a no-op.
         #expect(context.evaluateScript("__zigzagConnectGuard(runtime, () => t, later, () => {})")?.isNull == true)
         #expect(context.evaluateScript("runtime.connect.__zigzagGuard")?.toBool() == true)
     }
@@ -189,5 +183,11 @@ struct ExtensionStormTests {
         var state = ExtensionInstalls.State()
         state.offSites = ["youtube.com"]
         #expect(state.carried(enabled: true).offSites == nil)
+    }
+
+    @MainActor @Test func privatePagesAreNotNamedInTheLog() {
+        let url = URL(string: "https://secret.example.com/page")
+        #expect(ExtensionStorms.loggedSite(url, isPrivate: true) == "a private page")
+        #expect(ExtensionStorms.loggedSite(url, isPrivate: false) == "secret.example.com")
     }
 }

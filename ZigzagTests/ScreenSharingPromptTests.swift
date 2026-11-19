@@ -19,7 +19,7 @@ struct ScreenSharingPromptTests {
         // Don't Allow, and putting it off (Esc, ×, a click elsewhere, the tab moving on), are no.
         #expect(DisplayCaptureChoice(PermissionAnswer(action: "deny", remember: false)) == .deny)
         #expect(DisplayCaptureChoice(nil) == .deny)
-        // An action that is not one of the two shares (an older build's "always", a malformed value) is no.
+        // Unknown actions (an older "always", malformed values) are deny.
         #expect(DisplayCaptureChoice(PermissionAnswer(action: "always", remember: true)) == .deny)
     }
 

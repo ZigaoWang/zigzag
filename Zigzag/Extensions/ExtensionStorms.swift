@@ -1,41 +1,37 @@
 import AppKit
 import WebKit
 
-/// Holds back an extension's content script that reconnects to its background in a tight loop.
+/// Throttles a content script that reconnects to its background in a tight loop.
 ///
-/// Some extensions open a port from every frame and open another the moment it closes (vuex-webextensions' store
-/// sync does). When their background turns each one away, that loops as fast as WebKit can carry it: thousands of
-/// connections a second, each one passing through Zigzag's main thread (WebKit asks which tab, window and place the
-/// sender is in), which kept the app busy with a page in the background (a Sound Booster, 2026-11).
+/// Some extensions reconnect a port from every frame as soon as it closes (vuex-webextensions' store sync). When the
+/// background rejects each one, it loops as fast as WebKit allows: thousands of connects per second, each hitting
+/// Zigzag's main thread (WebKit asks for the sender's tab and window). A background Sound Booster page kept the app
+/// busy (2026-11).
 ///
-/// WebKit gives the app no say in a content script's `runtime.connect`: the call goes from the page's process to the
-/// extension's background without asking. So the extension's own content-script world gets this first, ahead of its
-/// scripts (the loaded copy's manifest lists it first in each entry): it counts the frame's connects and, only once
-/// they stay far past anything a working extension does, lets one through every so often instead of every one, the
-/// rest waiting their turn. Ports keep working once through, so a loop that settles goes on as before. Nothing else
-/// about the extension changes, and other extensions and frames are never touched: each world counts its own.
+/// WebKit gives the app no hook into a content script's `runtime.connect`, so this runs first in the extension's
+/// content-script world (listed first in each manifest entry of the loaded copy). Once a frame's connect rate stays far
+/// above normal, it lets one through at intervals and queues the rest. Ports that get through work normally. Each
+/// world counts its own; other extensions and frames are untouched.
 nonisolated enum ConnectGuard {
-    /// The guard's file in the loaded copy.
+    /// Guard file in the loaded copy.
     static let file = "zigzag-connect-guard.js"
-    /// What it tells Zigzag through, from the extension's content-script world only.
+    /// Message handler name, from the extension's content-script world only.
     static let handlerName = "zigzagExtensionStorm"
 
-    /// Past this many connects in one second, every second for `seconds` in a row, a frame is held back. A working
-    /// extension opens a port or two as a frame loads (1Password one per frame, Tampermonkey one per script's
-    /// request): far under. A loop runs at hundreds to thousands.
+    /// Throttle a frame above this many connects per second for `seconds` in a row. Normal extensions open one or two per
+    /// frame load (1Password one per frame, Tampermonkey one per script request); loops do hundreds to thousands.
     static let perSecond = 50
     static let seconds = 5
-    /// Held back, one connect goes through after this long, then after twice that while each still closes at once,
-    /// up to `maxGap`.
+    /// While throttled, one connect goes through after this delay, doubling while each closes at once, up to `maxGap`.
     static let firstGap = 1_000
     static let maxGap = 30_000
-    /// A port let through that stays open this long means the loop is over: the frame connects freely again.
+    /// A port that stays open this long ends the throttle.
     static let calm = 10_000
-    /// Connects waiting their turn, at most; past it, the newest wait for nothing.
+    /// Max queued connects; past it the newest are dropped.
     static let queue = 100
 
-    /// The content scripts as the loaded copy runs them: the guard first in each entry that runs in the extension's
-    /// own world. One for the page's world (`"world": "MAIN"`) is left alone: the page's scripts aren't the extension's.
+    /// Content scripts with the guard first in each entry for the extension's world. `"world": "MAIN"` entries are left
+    /// alone; page scripts aren't the extension's.
     static func guarding(_ entries: [[String: Any]]) -> [[String: Any]] {
         entries.map { entry in
             guard (entry["world"] as? String)?.uppercased() != "MAIN", let js = entry["js"] as? [String], !js.isEmpty,
@@ -46,9 +42,8 @@ nonisolated enum ConnectGuard {
         }
     }
 
-    /// The guard. `install(runtime, now, later, report, limits)` wraps one `runtime` object's `connect`; the file runs it
-    /// on the world's own `chrome.runtime` (and `browser.runtime` if that's another object), once per frame however
-    /// many entries list it.
+    /// The guard. `install(runtime, now, later, report, limits)` wraps one `runtime.connect`; runs on the world's
+    /// `chrome.runtime` (and `browser.runtime` if different), once per frame.
     static let source = """
     (() => {
       'use strict';
@@ -58,12 +53,12 @@ nonisolated enum ConnectGuard {
         const L = Object.assign({ perSecond: \(perSecond), seconds: \(seconds), firstGap: \(firstGap), maxGap: \(maxGap), calm: \(calm), queue: \(queue) }, limits || {});
         let second = -1, count = 0, streak = 0, peak = 0;
         let held = false, told = false, gap = L.firstGap, nextAt = 0, pumping = false;
-        // The last port let through while held back: when, whether it's still open, whether it closed at once.
+        // The last port let through while throttled: when, whether open, whether it closed at once.
         let openedAt = 0, open = false, quick = false;
         const waiting = [];
         const rethrow = (e) => later(() => { throw e; }, 0);
         const each = (list, ...args) => { for (const f of list.slice()) { try { f(...args); } catch (e) { rethrow(e); } } };
-        // Counted by the clock's second: a second past the limit right after another one adds to the run.
+        // Counted per clock second; consecutive seconds over the limit extend the run.
         const tick = () => {
           const s = Math.floor(now() / 1000);
           if (s !== second) {
@@ -81,7 +76,7 @@ nonisolated enum ConnectGuard {
             if (!told) { told = true; try { report({ kind: 'connect', perSecond: Math.max(peak, count) }); } catch (e) {} }
           }
         };
-        // A port handed back at once that connects when its turn comes; until then what's sent on it waits.
+        // Returns a port now that connects on its turn; messages queue until then.
         const deferred = (args) => {
           const messages = [], gone = [], outbox = [];
           let real = null, closed = false;
@@ -117,7 +112,7 @@ nonisolated enum ConnectGuard {
             mine.onDisconnect.addListener(() => {
               closed = true;
               if (real === mine) { open = false; quick = now() - openedAt < 1000; }
-              // Read inside the listener, where the extension expects runtime.lastError to be set.
+              // Read inside the listener, where runtime.lastError is expected.
               each(gone, port);
             });
             for (const message of outbox.splice(0)) mine.postMessage(message);
@@ -129,7 +124,7 @@ nonisolated enum ConnectGuard {
           if (!waiting.length) return;
           const t = now();
           if (t < nextAt) { pumping = true; later(pump, nextAt - t); return; }
-          // Still closing as soon as it opens: the next waits twice as long.
+          // Still closing right away: double the wait.
           if (quick) gap = Math.min(gap * 2, L.maxGap);
           nextAt = t + gap;
           waiting.shift()();
@@ -137,7 +132,7 @@ nonisolated enum ConnectGuard {
         };
         const wrapped = function connect(...args) {
           tick();
-          // The port let through has stayed open: the loop is over.
+          // The port stayed open: loop over.
           if (held && open && now() - openedAt >= L.calm) { held = false; streak = 0; count = 0; }
           if (!held) return native.apply(runtime, args);
           const made = deferred(args);
@@ -147,8 +142,8 @@ nonisolated enum ConnectGuard {
           return made.port;
         };
         wrapped.__zigzagGuard = true;
-        // WebKit makes its API objects afresh once nothing holds them, without what was set on them: held, so the
-        // extension's `chrome.runtime` stays this one (as the compatibility layer holds what it fills).
+        // WebKit recreates API objects without their properties once unreferenced; hold this one so `chrome.runtime` keeps
+        // the wrapper (as the compatibility layer does).
         (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []).push(runtime);
         try { runtime.connect = wrapped; } catch (e) {}
         if (runtime.connect !== wrapped) {
@@ -174,26 +169,26 @@ nonisolated enum ConnectGuard {
     """
 }
 
-/// What Zigzag does when an extension's content script was held back (ConnectGuard): says so once in the extensions
-/// log, and once in the window, naming the extension, with a way to turn it off.
+/// Handles a throttled content script (ConnectGuard): logs once and shows one window notice naming the extension, with
+/// a way to turn it off.
 @available(macOS 15.4, *)
 @MainActor
 final class ExtensionStorms {
     unowned let host: ExtensionHost
-    /// Extensions held back in each tab, by tab: what EnergyWatch names for a busy tab.
+    /// Throttled extensions per tab, for EnergyWatch's busy tab note.
     private var byTab: [UUID: Set<String>] = [:]
-    /// Extension and site pairs already written to the log: one line each, however many frames say so.
+    /// Extension and site pairs already logged; one line each.
     private var logged: Set<String> = []
-    /// Lines written since Zigzag started: a cap, so even an extension held back on every site can't fill the log.
+    /// Lines logged this launch, capped so one extension can't fill the log.
     private var lines = 0
     static let maxLines = 50
 
     init(host: ExtensionHost) { self.host = host }
 
-    /// The extensions held back in a tab, by ID.
+    /// Throttled extensions in a tab, by ID.
     func extensions(in tab: Tab) -> Set<String> { byTab[tab.id] ?? [] }
 
-    /// A frame's guard held its extension back.
+    /// A frame's guard throttled its extension.
     func receive(_ message: WKScriptMessage) {
         guard let world = message.world.name, world.hasPrefix("WebExtension-") else { return }
         let id = String(world.dropFirst("WebExtension-".count))
@@ -206,16 +201,21 @@ final class ExtensionStorms {
     func noted(_ id: String, name: String, rate: Int, in tab: Tab) {
         guard byTab[tab.id]?.contains(id) != true else { return }
         byTab[tab.id, default: []].insert(id)
-        // Tabs gone since are let go.
+        // Drop closed tabs.
         if byTab.count > 200 {
             let open = Set(WindowManager.shared.controllers.flatMap { $0.tabManager.allTabs.map(\.id) })
             byTab = byTab.filter { open.contains($0.key) }
         }
-        let site = ContentBlocker.site(of: tab.url) ?? "a page"
+        let site = Self.loggedSite(tab.url, isPrivate: tab.isPrivate)
         if logged.insert(id + "|" + site).inserted, lines < Self.maxLines {
             lines += 1
             ExtensionLog.write("\(name) reconnected to its background \(rate) times a second on \(site); held back there to one try a second or less")
         }
         EnergyWatch.shared.extensionIsBusy(id, name: name, in: tab, host: host)
+    }
+
+    /// The site named in the log; a private tab's is left out.
+    static func loggedSite(_ url: URL?, isPrivate: Bool) -> String {
+        isPrivate ? "a private page" : ContentBlocker.site(of: url) ?? "a page"
     }
 }

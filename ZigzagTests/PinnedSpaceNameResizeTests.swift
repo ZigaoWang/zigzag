@@ -2,8 +2,7 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// The space's name stays pinned at the top of a scrolled list through a resize and a rebuild of its rows (the
-/// sidebar's size changed in Settings), never left out with the rows under it masked away.
+/// The space name stays pinned at the top of a scrolled list through resizes and row rebuilds (sidebar size change), never hidden.
 @MainActor
 struct PinnedSpaceNameResizeTests {
     private final class Host: SidebarListDelegate {
@@ -21,6 +20,7 @@ struct PinnedSpaceNameResizeTests {
         func listSetGroupOpen(_ id: UUID, _ open: Bool) {}
         func listRenameGroup(_ id: UUID, to name: String) {}
         func listMoveGroup(_ id: UUID, to index: Int, in spaceID: UUID) {}
+        func listPinGroup(_ id: UUID, at index: Int, in spaceID: UUID, folder: UUID?) {}
         func listAddToGroup(_ tabs: [Tab], group: UUID) {}
         func listRenameFolder(_ id: UUID, to name: String) {}
         func listSetFolder(of bookmarkID: UUID, to folderID: UUID?) {}
@@ -55,8 +55,7 @@ struct PinnedSpaceNameResizeTests {
         func listDropOnPage(_ item: SidebarItem) -> Bool { false }
     }
 
-    /// The name is pinned: in the scroll view, at the top of what shows, as wide as the list, with the rows under it
-    /// cut off.
+    /// The name is pinned: in the scroll view, at the visible top, list width, rows under it clipped.
     private func expectPinned(_ list: SidebarListView, in scroll: NSScrollView, _ comment: Comment) {
         let header = list.headerView
         #expect(header?.superview === scroll, comment)
@@ -81,7 +80,7 @@ struct PinnedSpaceNameResizeTests {
         scroll.contentView = clip
         let list = SidebarListView(frame: NSRect(x: 0, y: 0, width: 240, height: 300))
         scroll.documentView = list
-        // In a window, as in the sidebar, so it hears of Settings' changes.
+        // In a window so it gets the size-change notification.
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 240, height: 300), styleMask: [.borderless], backing: .buffered, defer: true)
         window.contentView?.addSubview(scroll)
         window.isReleasedWhenClosed = false
@@ -90,25 +89,25 @@ struct PinnedSpaceNameResizeTests {
         list.reload(animated: false)
         #expect(list.contentHeight > 600)
 
-        // Scrolled well down: the name stands pinned in the scroll view.
+        // Scrolled down: the name is pinned.
         clip.scroll(to: NSPoint(x: 0, y: 400))
         scroll.reflectScrolledClipView(clip)
         list.pinHeader()
         expectPinned(list, in: scroll, "scrolled")
 
-        // The sidebar made wider and narrower while scrolled.
+        // Sidebar resized while scrolled.
         list.setFrameSize(NSSize(width: 300, height: list.frame.height))
         expectPinned(list, in: scroll, "wider")
         list.setFrameSize(NSSize(width: 200, height: list.frame.height))
         expectPinned(list, in: scroll, "narrower")
 
-        // Settings › Appearance › Sidebar size: every row is made again.
+        // Sidebar size changed: every row is rebuilt.
         NotificationCenter.default.post(name: Tokens.Sidebar.sizeChanged, object: nil)
         expectPinned(list, in: scroll, "rows made again")
         list.reload(animated: false)
         expectPinned(list, in: scroll, "reloaded")
 
-        // Back at the top: the first row of the list again, with nothing masked.
+        // Back at the top: the first row, nothing masked.
         clip.scroll(to: .zero)
         scroll.reflectScrolledClipView(clip)
         list.pinHeader()

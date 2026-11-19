@@ -223,13 +223,25 @@ struct SidebarSideTests {
         sidebar.isOnRight = false
         #expect(sidebar.sidebarButton.symbol == "sidebar.left")
     }
+
+    /// Settings › Appearance › Sidebar position (#360): Left and Right in Zigzag's own menu, on the same preference.
+    @Test func sidebarPositionIsALeftRightMenuOnTheSamePreference() throws {
+        #expect(SettingsView.sidebarSides == [false, true])
+        let settings = SettingsView(pane: .appearance)
+        func all(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(all) }
+        let row = try #require(all(settings).compactMap { $0 as? FormRow }.first { $0.titleText == String(localized: "Sidebar position") })
+        let menu = try #require(all(row).compactMap { $0 as? DropdownButton }.first)
+        #expect(menu.options.map(\.title) == [String(localized: "Left"), String(localized: "Right")])
+        #expect(SettingsView.sidebarSides[menu.selectedIndex] == BrowserRootView.sidebarOnRight)
+        #expect(!all(row).contains { $0 is Toggle })
+    }
 }
 
-/// The space's name stays at the top of the list while it scrolls, as Arc keeps it.
+/// The space name stays at the top while scrolling, as in Arc.
 struct PinnedSpaceNameTests {
     @Test func atTheTopTheNameIsTheFirstRow() {
         #expect(SidebarListView.pinnedHeaderOffset(scrolled: 0) == 0)
-        // Pulled down past the top, it comes along with the rows.
+        // Overscrolled past the top, it moves with the rows.
         #expect(SidebarListView.pinnedHeaderOffset(scrolled: -40) == 0)
     }
 
@@ -239,8 +251,7 @@ struct PinnedSpaceNameTests {
     }
 }
 
-/// A row's title never moves or cuts shorter as the pointer comes and its button shows: the button comes over the
-/// title's faded end.
+/// Row titles never shift or truncate when the hover button appears; the button covers the faded end.
 @MainActor struct RowHoverTests {
     private func row(pinned: Bool, away: Bool) -> (TabRowView, Tab) {
         let tab = Tab(url: URL(string: "https://video.example.com/watch")!, title: "A very long page title that runs past the row's end", spaceID: UUID())
@@ -266,7 +277,7 @@ struct PinnedSpaceNameTests {
         row.bookmarkIcon = IconChoice.pageIcon("star")
         row.isAway = true
         row.configure(tab: tab)
-        // The page it's on has no icon yet: the pinned page's own, never the globe.
+        // The page has no icon yet: the pinned page's, never the globe.
         #expect(row.icon.image === row.bookmarkIcon)
         _ = tab
     }
@@ -292,7 +303,7 @@ struct PinnedSpaceNameTests {
         let (row, tab) = row(pinned: false, away: false)
         row.isSelected = true
         #expect(!row.closeButton.isHidden)
-        // Its title ends before the close button, which is always there.
+        // The title ends before the always-visible close button.
         let title = frames(row).first { $0.minX > 0 }
         #expect((title?.maxX ?? .infinity) <= row.closeButton.frame.minX)
         _ = tab

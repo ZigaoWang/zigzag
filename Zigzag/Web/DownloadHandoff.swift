@@ -2,17 +2,16 @@ import AppKit
 import Foundation
 import WebKit
 
-/// Runs the first rule that catches a link or a download: opens an app or a URL, runs a script, or calls a JSON-RPC or
-/// XML-RPC service. The tab's own store supplies the cookies, so a logged-in download keeps its sign-in; nothing here
-/// ever builds a shell line, so a URL with `&`, `;` or `$()` arrives as one argument.
+/// Runs the first matching rule: opens an app or URL, runs a script, or calls a JSON-RPC or XML-RPC service. Cookies
+/// come from the tab's own store, so sign-ins carry over. Never builds a shell line, so `&`, `;` or `$()` in a URL
+/// stays one argument.
 @MainActor
 enum DownloadHandoff {
-    /// One handoff's occasion: the address, what the page said about it, and where its cookies live.
     struct Request {
         var url: URL
         var referrer: URL?
-        /// The site the page that asked is on, when there is one: what a handoff question is keyed to, and the only
-        /// site whose cookies may go to a target of its own.
+        /// The asking page's site: keys the handoff question, and the only site whose cookies may go to its own
+        /// target.
         var pageOrigin: String?
         var filename = ""
         var mime = ""
@@ -20,74 +19,63 @@ enum DownloadHandoff {
         var dataStore: WKWebsiteDataStore?
         var isPrivate = false
         var window: NSWindow?
-        /// The tab that asked, where one did: its page keeps the answer for as long as it is on the page, and an Open
-        /// URL rule opening a web address in Zigzag opens it in relation to this tab ("This Tab" is this one).
+        /// The asking tab: keeps the page answer, and is "This Tab" for an Open URL rule opening in Zigzag.
         var tab: Tab?
-        /// Where the handoff question was told to open a web address, when it offered that choice in the same card:
-        /// this hand-off's place, never the rule's. Only the separate question's Always writes one on the rule.
+        /// Place picked in the handoff card, for this handoff only. Only the separate question's Always saves one on
+        /// the rule.
         var place: OpenInZigzag.Choice?
-        /// Whether you clicked the link that led here. A click may send this page's cookies to the target; a page
-        /// that starts a download or a navigation on its own may not.
+        /// A click may send this page's cookies to the target; a page-started download or navigation may not.
         var wasClicked = false
-        /// Whether a new question may be put at all. A pop-up has no page store of its own and its window can sit
-        /// behind the browser's, so its links and downloads are always Zigzag's own rather than a question in another
-        /// window. A page's kept answer is still read, where there is a page.
+        /// False for pop-ups: no page store of their own and their window can sit behind the browser's, so they never
+        /// ask. A kept page answer is still read.
         var mayAsk = true
     }
 
     enum Outcome: Equatable {
-        /// A rule ran. The navigation is cancelled, and any download WebKit made for it is.
+        /// The navigation, and any download WebKit made for it, is cancelled.
         case handedOff
-        /// No rule wanted it: carry on as if there were none. Also what an Open URL rule answers when its question was
-        /// put off, so the link loads or the file saves as if the rule had never matched.
+        /// No rule matched, or an Open URL question was put off: carry on as normal.
         case noMatch
-        /// Refused at the handoff question: cancel it without running the rule. A link goes nowhere, and a download
-        /// is not saved either.
+        /// Refused at the question: cancel without running the rule, and don't save the download.
         case cancelled
         case failed(String)
     }
 
-    /// The rule that catches `url`, if any, and whether it wants a link (true) or a download (false).
+    /// The matching rule, if any. `appliesToLinks` is true for links, false for downloads.
     static func firstMatch(_ url: URL, appliesToLinks: Bool, filename: String = "", isPrivate: Bool = false) -> DownloadRule? {
         guard isHandoffable(url) else { return nil }
         return DownloadRulesStore.shared.firstHandoffMatch(url: url, filename: filename, appliesToLinks: appliesToLinks,
                                                            isPrivate: isPrivate)
     }
 
-    /// Whether a rule may take this address at all. Zigzag's own pages and the certificate warning's proceed link are
-    /// not links a page may hand to an app: a catch-all rule could otherwise turn "Visit this site anyway" into an
-    /// app launch, or send a history page to a script.
+    /// Zigzag's own pages and the certificate warning's proceed link are never handed off; a catch-all rule could
+    /// otherwise turn "Visit this site anyway" into an app launch.
     static func isHandoffable(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
-        // Zigzag's own schemes, the certificate warning's proceed link and a web app's link are never a rule's.
         if scheme == HistoryPage.scheme || scheme == CertificateExceptions.scheme || scheme == "zigzag-webapp" { return false }
         if ["about", "data", "blob", "javascript", "file"].contains(scheme) { return false }
         if scheme.hasSuffix("-extension") { return false }
         return true
     }
 
-    /// Whether a new question can be seen before it is put: the page in front (or no page named, for a window of its
-    /// own), and the window visible and key. A kept page answer doesn't need this.
+    /// Whether a new question would be seen: tab in front (or none named), window visible and key. Not needed for a
+    /// kept page answer.
     static func questionCanShow(tabIsInFront: Bool?, windowIsVisible: Bool, windowIsKey: Bool) -> Bool {
         (tabIsInFront ?? true) && windowIsVisible && windowIsKey
     }
 
-    /// Where a handoff stands: run the rule, leave it in the browser, or cancel the link.
     enum HandoffGate: Equatable { case handOff, browser, cancel }
 
-    /// What a handoff question answered: the gate, and, where the same card offered a place to open a web address,
-    /// the place it picked. The place travels with this handoff only: a card's answer is never written on the rule. A
-    /// rule's own place comes from its sheet, or from the separate question's Always.
+    /// The answer, plus the place picked in the card (when offered). The place applies to this handoff only and is
+    /// never saved on the rule.
     struct Decision {
         let gate: HandoffGate
         var place: OpenInZigzag.Choice? = nil
-        /// True when the question was put off rather than answered like "Open in Browser": the link or download
-        /// carries on, but the same download must not be offered to the rule a second time.
+        /// Put off rather than answered: carries on, but the same download isn't offered to the rule again.
         var declined = false
     }
 
-    /// A stored answer as a gate. Nil and anything that isn't one of the three answers read as the browser, which is
-    /// what a caller that only has an answer to pass has always meant.
+    /// Unknown or nil reads as the browser.
     static func gate(stored: String?) -> HandoffGate {
         switch stored {
         case "handOff": .handOff
@@ -97,8 +85,7 @@ enum DownloadHandoff {
         }
     }
 
-    /// A kept answer as a gate, or nil when there is no answer yet. Unlike `gate`, an unknown or missing answer is not
-    /// the browser: it is the caller's sign that the question still has to be asked.
+    /// Like `gate`, but nil when there's no valid answer yet, meaning ask.
     private static func keptGate(_ stored: String?) -> HandoffGate? {
         switch stored {
         case "handOff": .handOff
@@ -108,22 +95,19 @@ enum DownloadHandoff {
         }
     }
 
-    /// The key a page answer is kept under: per rule, so two rules on one page keep their own answers.
+    /// Per rule, so two rules on one page keep their own answers.
     static func handoffKind(_ rule: DownloadRule) -> String { "handoff:\(rule.id.uuidString)" }
 
-    /// The places the hand-off card's dropdown offers, This Tab first. The card's buttons answer the question and the
-    /// dropdown only says where, so its first entry is the place Hand Off sends without the dropdown being looked at:
-    /// This Tab keeps the link inside Zigzag. The rule's own question, and the sheet, keep `Choice.destinations`'
-    /// order, where the Mac's browser is first — they are about the rule, not about one hurried hand-off.
+    /// This Tab first, since Hand Off uses the first entry without the dropdown being touched. The rule's own
+    /// question and sheet use `Choice.destinations`' order, browser first.
     static let cardPlaces: [OpenInZigzag.Choice] = [.thisTab] + OpenInZigzag.Choice.destinations.filter { $0 != .thisTab }
 
-    /// The site that produced the handoff, never the destination when a page or referrer can name it instead.
+    /// The source site, preferring the page or referrer over the destination.
     static func questionOrigin(for request: Request) -> String? {
         request.pageOrigin ?? SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
     }
 
-    /// The third duration a handoff question offers: the rule by name, or "this rule" where it has none. Kept on the
-    /// rule itself, the answer travels with it, is exported with it, and goes when it does.
+    /// The third duration: the rule by name, or "this rule". Saved on the rule, so it's exported and removed with it.
     static func alwaysFor(_ rule: DownloadRule) -> String {
         let name = rule.name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name.isEmpty
@@ -131,51 +115,45 @@ enum DownloadHandoff {
             : String(localized: "Always for “\(name)”", comment: "Duration choice on a question a download rule asks: the answer is kept on the rule, for every site. The placeholder is the rule's name.")
     }
 
-    /// Asks where a handoff should go, unless this page, this site or the rule itself already answered. The question
-    /// asks in the page's own window; with no window to ask in, nothing is handed off and the link or download stays as
-    /// it is. A link that starts a download is one question, not two.
+    /// Asks where a handoff goes unless the page, site or rule already answered. Asked in the page's window; with no
+    /// window, nothing is handed off. A link that starts a download asks once.
     static func decide(_ rule: DownloadRule, request: Request, tab: Tab? = nil, forDownload: Bool = false) async -> Decision {
-        // A private window runs no rule that hasn't been let in, even if a caller hands one over directly.
+        // Guards callers that pass a rule directly.
         guard !request.isPrivate || rule.runsInPrivateWindows else { return Decision(gate: .browser) }
         guard isHandoffable(request.url) else { return Decision(gate: .browser) }
-        // The page's own site keys its answer: a page with no site (a file, a data URL) is asked every time, so the
-        // target's site is not used in its place. The target is still what a prompt names when there is no page.
+        // Keyed by the page's site. A page with no site (file, data URL) asks every time rather than falling back to
+        // the target's site; the target is only used to name the prompt.
         let pageOrigin = request.pageOrigin ?? SiteOrigin.of(request.referrer)
         let origin = pageOrigin ?? SiteOrigin.of(request.url)
         let kind = handoffKind(rule)
         let subject = PermissionSubject.handoff(rule.id)
-        // What this page already answered holds wherever the page is: it was given for this question, and asking again
-        // from a background tab would only lose the answer.
+        // The page's answer holds even in a background tab.
         if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind),
            let answered = keptGate(kept) {
             return Decision(gate: answered)
         }
-        // Then the site's standing answer. A private window is not the site the answer was given to, so the answer
-        // kept for it doesn't reach into one.
+        // The site's kept answer doesn't apply in a private window.
         if !request.isPrivate, let pageOrigin, let kept = SitePermissions.action(subject, origin: pageOrigin),
            let answered = keptGate(kept) {
             return Decision(gate: answered)
         }
-        // The rule's own answer belongs to the rule, as its configured fields do, so a private window that has let the
-        // rule in still reads it.
+        // The rule's own answer applies in private windows that allow the rule.
         if let kept = rule.handoffAnswer, let answered = keptGate(kept) { return Decision(gate: answered) }
-        // Nothing new is asked for a pop-up: its links and downloads stay in Zigzag.
+        // Pop-ups never ask; their links and downloads stay in Zigzag.
         guard request.mayAsk else { return Decision(gate: .browser) }
         guard let controller = tab.flatMap({ WindowManager.shared.promptHost(holding: $0) })
                 ?? (request.window?.windowController as? PromptHost)
                 ?? WindowManager.shared.promptHost(for: request.window)
                 ?? WindowManager.shared.promptHost(for: NSApp?.keyWindow) else { return Decision(gate: .browser) }
-        // A new question has to be able to show: a background tab, a window behind another, a pop-up's own window (not
-        // a prompt host yet) or Zigzag in the background would hold it with nothing to see. The download or link
-        // carries on as if no rule had matched.
+        // Only ask where it can be seen: not a background tab, a covered window, a pop-up's window (not a prompt host
+        // yet) or Zigzag in the background. Otherwise carry on as if no rule matched.
         let inFront = tab.map { controller.promptShows($0) }
         guard questionCanShow(tabIsInFront: inFront, windowIsVisible: controller.window?.isVisible == true,
                               windowIsKey: controller.window?.isKeyWindow == true) else { return Decision(gate: .browser) }
-        // An Open URL rule that hasn't been told where to open asks in this same card: the place is the one thing its
-        // question has to add, and a second card for it would be a second interruption.
+        // An Open URL rule with no place yet asks for it in the same card, not a second one.
         let asksPlace = asksWhereToOpen(rule, request: request)
-        // This time, then the site where there is one, then the rule's own answer for every site. A private window
-        // keeps nothing for the site, so that choice is not offered there; the rule's own is.
+        // This time, the site (when there is one), then the rule. A private window can't keep a site answer, so only
+        // the rule's is offered there.
         let siteMayKeep = !request.isPrivate && !controller.promptIsPrivate && pageOrigin != nil
         var durations = [String(localized: "This time", comment: "Duration choice on a site's permission question: the answer holds for this page only.")]
         if siteMayKeep {
@@ -198,8 +176,7 @@ enum DownloadHandoff {
             durations: durations,
             canRemember: false,
             answered: {
-                // Asked while another question was up: the page, the site or the rule may have answered this one in the
-                // meantime.
+                // May have been answered while another question was up.
                 if let pageOrigin, let tab, let kept = tab.permissionAnswers.action(key: pageOrigin, kind: kind),
                    keptGate(kept) != nil {
                     return PermissionAnswer(action: kept, remember: false)
@@ -233,8 +210,7 @@ enum DownloadHandoff {
         return Decision(gate: gate(stored: action), place: place)
     }
 
-    /// Whether this rule's question has to add where a web address opens: an Open URL rule that hasn't been told, and
-    /// a target that is the web's own. Anything else (mpv://, a magnet) belongs to its app and has no place to pick.
+    /// Only for an Open URL rule with no place and a web target; other schemes (mpv://, magnet) go to their app.
     private static func asksWhereToOpen(_ rule: DownloadRule, request: Request) -> Bool {
         guard rule.action.kind == .openURL, rule.action.openIn == .ask else { return false }
         let values = HandoffValues(link: request.url, referrer: request.referrer, filename: request.filename,
@@ -244,23 +220,19 @@ enum DownloadHandoff {
         return OpenInZigzag.handles(url)
     }
 
-    /// Whether a rule may read this page's cookies for its target: only when the target is the page's own site, or
-    /// when you clicked the link that led to it. A page that names another site on its own gets none of its cookies.
+    /// Cookies may go only to the page's own site or to a link you clicked.
     static func maySendCookies(_ request: Request) -> Bool {
         request.wasClicked || (request.pageOrigin != nil && SiteOrigin.of(request.url) == request.pageOrigin)
     }
 
-    /// Whether a service's endpoint is on this Mac. The cookies a site signs in with are not sent to a host off it,
-    /// however the rule was written: a remote seedbox can be reached without handing it the site's sign-in.
+    /// Whether an endpoint is local. Cookies never go to a remote host, so a remote seedbox gets no site sign-in.
     static func serviceIsOnThisMac(_ endpoint: String) -> Bool {
         guard let host = URL(string: endpoint)?.host()?.lowercased() else { return false }
         return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
     }
 
-    /// Whether a rule's target is on this Mac. A script or an app runs here; an RPC service must be local; an Open URL
-    /// may carry cookies only to a custom scheme (which this Mac's own handler takes) or an http(s) address on this
-    /// Mac. A remote address never gets the site's sign-in, whatever the template says: a page that talks a rule into
-    /// firing can't also choose somewhere off the Mac for the cookies to go.
+    /// Scripts and apps run locally; RPC services must be local; Open URL may carry cookies only to a custom scheme
+    /// or a local http(s) address. A page that triggers a rule can't send cookies off the Mac.
     static func targetIsOnThisMac(_ action: DownloadRuleAction, values: HandoffValues) -> Bool {
         switch action.kind {
         case .openApp, .runScript:
@@ -272,24 +244,21 @@ enum DownloadHandoff {
             guard let url = URL(string: text), let scheme = url.scheme?.lowercased() else { return false }
             return (scheme != "http" && scheme != "https") || serviceIsOnThisMac(text)
         case .saveToFolder, .openFile:
-            // A destination is not a handoff: it is where the file lands, and it never carries cookies anywhere.
+            // Destinations never carry cookies.
             return false
         }
     }
 
-    /// Runs one rule. Cookies are read only when its action names one, and the files it makes are gone by the end.
+    /// Cookies are read only when the action uses them; temporary files are removed afterwards.
     @discardableResult
     static func perform(_ rule: DownloadRule, request: Request) async -> Outcome {
         var values = HandoffValues(link: request.url, referrer: request.referrer, filename: request.filename,
                                    mime: request.mime, space: request.space)
         let secret = rule.action.kind == .jsonRPC ? (HandoffSecrets.secret(for: rule.id) ?? "") : ""
         var cookieFile: URL?
-        // The site's sign-in may go to a target of its own, or to one you clicked through to, and only to a target on
-        // this Mac: a remote address or service never gets it, whichever rule it names.
         let cookiesMayLeave = maySendCookies(request) && targetIsOnThisMac(rule.action, values: values)
         if rule.needsCookies {
-            // A rule that names the cookie file always gets one, empty where the cookies may not leave: a service or
-            // a script that insists on a jar still runs, and no site's sign-in goes where it shouldn't.
+            // A rule using the cookie file always gets one, empty when cookies can't be sent, so it still runs.
             let cookies = cookiesMayLeave ? await cookies(from: request.dataStore, for: request.url) : []
             values.cookieHeader = HandoffCookies.header(cookies)
             if rule.usesCookieFile, let file = try? HandoffCookies.writeFile(cookies) {
@@ -301,7 +270,7 @@ enum DownloadHandoff {
         switch rule.action.kind {
         case .runScript:
             outcome = runScript(rule.action, values: values, secret: secret, request: request, rule: rule)
-            // A script keeps the file until it exits; one that never started has no use for it.
+            // A running script keeps the file until it exits.
             if outcome != .handedOff, let cookieFile { HandoffCookies.removeFile(cookieFile) }
         case .openApp:
             outcome = await openApp(rule.action, values: values, secret: secret)
@@ -313,18 +282,16 @@ enum DownloadHandoff {
             outcome = await callService(rule.action, values: values, secret: secret)
             if let cookieFile { HandoffCookies.removeFile(cookieFile) }
         case .saveToFolder, .openFile:
-            // A destination, not a handoff: where the file lands is decided when the download is made, and the
-            // download is never cancelled for it — so there is nothing to do here but let it be saved.
+            // Destinations are applied when the download is made and never cancel it.
             outcome = .noMatch
         }
-        // Only once it worked: a failed handoff shows its failure instead.
+        // Failures show their own message.
         if outcome == .handedOff { announce(rule, request: request, values: values, secret: secret) }
         return outcome
     }
 
-    /// Says what a rule did, where its tab is — in the window holding it, so a rule that fires in a background tab
-    /// says so there rather than in the one you are looking at. Only for a handoff that leaves Zigzag and only once a
-    /// session: everything else shows itself (see `HandoffNotice.takeLine`).
+    /// Announces in the window holding the tab, so a background tab's rule says so there. Only for handoffs that
+    /// leave Zigzag, once per session (see `HandoffNotice.takeLine`).
     private static func announce(_ rule: DownloadRule, request: Request, values: HandoffValues, secret: String) {
         let choice = opening(rule, at: request.place)
         guard let host = handoffHost(for: request),
@@ -333,12 +300,12 @@ enum DownloadHandoff {
         host.promptToast(line, symbol: rule.action.kind.symbol, duration: 4)
     }
 
-    /// A rule that ran, but not: said over the page, and noted without the link, the cookies or the secret.
+    /// A rule failed: shown over the page and logged without the link, cookies or secret.
     static func report(_ outcome: Outcome, rule: DownloadRule?, request: Request) {
         report(outcome, rule: rule, url: request.url, isPrivate: request.isPrivate, window: request.window)
     }
 
-    /// The same, for a failure that arrives after the tab has moved on (a script that exits non-zero).
+    /// For a failure that arrives after the tab moved on (a script exiting non-zero).
     static func report(_ outcome: Outcome, rule: DownloadRule?, url: URL, isPrivate: Bool, window: NSWindow? = nil) {
         guard case .failed(let reason) = outcome else { return }
         Diagnostics.note("Handoff failed", site: url.host(), "\(rule?.name ?? "Rule"): \(reason)", isPrivate: isPrivate)
@@ -347,8 +314,8 @@ enum DownloadHandoff {
                    symbol: "exclamationmark.triangle", duration: 4, in: controller)
     }
 
-    /// Where a handoff went, when there's nowhere in Zigzag that shows it: an app on this Mac, or a service. Nil for
-    /// everything else — a link opened in a tab or in Mini, a script's card, a download's file — which shows itself.
+    /// Where a handoff went when Zigzag shows nothing for it: an app or a service. Nil for tabs, Mini, script cards
+    /// and downloads.
     private static func elsewhere(of action: DownloadRuleAction, at choice: OpenInZigzag.Choice,
                                   values: HandoffValues, secret: String) -> HandoffNotice.Elsewhere? {
         switch action.kind {
@@ -357,11 +324,11 @@ enum DownloadHandoff {
         case .jsonRPC:
             return .service(action.summary)
         case .openURL:
-            // A non-web address opens in its own app. A web address is only announced when it goes to another browser.
+            // Non-web addresses open in their app; web addresses are announced only when sent to another browser.
             guard let url = URL(string: DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)),
                   let scheme = url.scheme else { return nil }
             if !OpenInZigzag.handles(url) { return .app(ExternalLinks.appName(forScheme: scheme)) }
-            // When Zigzag is the default browser, the link comes back here and opens in a tab.
+            // If Zigzag is the default browser, the link opens in a tab here.
             guard choice == .defaultBrowser, !DefaultBrowser.isDefault else { return nil }
             return .app(ExternalLinks.appName(forScheme: "https"))
         case .runScript, .saveToFolder, .openFile:
@@ -369,8 +336,8 @@ enum DownloadHandoff {
         }
     }
 
-    /// An app handed a `{cookies}` path may read it a moment later than the open call returns. The file waits a few
-    /// minutes in the temporary folder, readable by its owner only, then goes.
+    /// An app given a `{cookies}` path may read it after open returns, so the owner-only temp file stays a few
+    /// minutes.
     private static func removeWhenTheOtherAppHasRead(_ file: URL) {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(300))
@@ -380,7 +347,7 @@ enum DownloadHandoff {
 
     // MARK: Cookies
 
-    /// The tab's cookies that a request for `url` would carry, from its own store, never another profile's.
+    /// From the tab's own store, never another profile's.
     static func cookies(from store: WKWebsiteDataStore?, for url: URL) async -> [HandoffCookie] {
         guard let store else { return [] }
         let all: [HandoffCookie] = await withCheckedContinuation { continuation in
@@ -394,7 +361,7 @@ enum DownloadHandoff {
     // MARK: Actions
 
     private static func openApp(_ action: DownloadRuleAction, values: HandoffValues, secret: String) async -> Outcome {
-        // A path is literal: what a page says in a link may become an argument, never the program that runs.
+        // Literal: a link can fill an argument but never pick the program.
         let path = (action.appPath as NSString).expandingTildeInPath
         let app = URL(fileURLWithPath: path, isDirectory: true)
         guard FileManager.default.fileExists(atPath: app.path) else {
@@ -410,11 +377,9 @@ enum DownloadHandoff {
         return .handedOff
     }
 
-    /// An Open URL action. A web address is Zigzag's own: it opens where the rule says, and a rule that hasn't been
-    /// told yet asks — in the hand-off card, or in the separate question when there was no card. The card's place is
-    /// that one hand-off's alone and is never written on the rule; only the separate question's Always keeps one
-    /// there. Any other address (mpv://, a magnet, a mail link) belongs to the app that handles it and is handed on
-    /// exactly as it always was.
+    /// Web addresses open where the rule says; a rule with no place asks in the card, or in the separate question
+    /// when there was no card. Only the separate question's Always saves a place. Other schemes (mpv://, magnet,
+    /// mailto) go to their handler.
     private static func openURL(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
                                 request: Request, rule: DownloadRule) async -> Outcome {
         let text = DownloadTokens.expand(action.urlTemplate, with: values, secret: secret, query: true)
@@ -422,15 +387,14 @@ enum DownloadHandoff {
             return .failed(String(localized: "The URL isn’t valid.", comment: "Why a download rule failed: the URL it was told to open can't be made."))
         }
         guard OpenInZigzag.handles(url) else { return openWithTheSystem(url) }
-        // The card's place is this hand-off's own (see `opening`), so nothing here writes the rule: a rule that asked
-        // is still asking afterwards, and asks again the next time it fires.
+        // The card's place is never saved, so the rule asks again next time.
         var choice = opening(rule, at: request.place)
         if choice == .ask { choice = await askWhereToOpen(rule: rule, request: request) ?? .ask }
         switch choice {
         case .defaultBrowser:
             return openWithTheSystem(url)
         case .thisTab, .newTab, .mini:
-            // Put off, or nowhere to show it: the link or the file is left as if no rule had it.
+            // Put off or nowhere to show: carry on as if no rule matched.
             guard let place = choice.place, let host = WindowManager.shared.promptHost(for: request.window) else { return .noMatch }
             OpenInZigzag.open(url, at: place, from: request.tab, in: host)
             return .handedOff
@@ -439,16 +403,13 @@ enum DownloadHandoff {
         }
     }
 
-    /// Where one hand-off opens: the place its card picked for this time, or the rule's own answer. The card's place is
-    /// never written on the rule, whichever it is: the card is answered in a hurry, and its dropdown says what happens
-    /// to this link or file, not what the rule should do. A rule's own place comes from its sheet, or from the separate
-    /// question's Always.
+    /// The card's place for this time, else the rule's. Never saved from the card; the rule's place comes from its
+    /// sheet or the separate question's Always.
     static func opening(_ rule: DownloadRule, at cardPlace: OpenInZigzag.Choice?) -> OpenInZigzag.Choice {
         cardPlace ?? rule.action.openIn
     }
 
-    /// The rule the separate question's answer leaves behind: Always writes the picked place down, Once leaves the rule
-    /// asking. Nil is "the rule stays exactly as it is", so a caller saves only what it is given.
+    /// Always saves the picked place; Once leaves the rule asking. Nil means save nothing.
     static func ruleToKeep(_ rule: DownloadRule, choice: OpenInZigzag.Choice, always: Bool) -> DownloadRule? {
         guard always else { return nil }
         var kept = rule
@@ -456,18 +417,17 @@ enum DownloadHandoff {
         return kept
     }
 
-    /// An address Zigzag doesn't own, handed to whatever on this Mac does.
+    /// Hands a non-Zigzag address to its system handler.
     private static func openWithTheSystem(_ url: URL) -> Outcome {
         NSWorkspace.shared.open(url) ? .handedOff
             : .failed(String(localized: "No app opens that URL.", comment: "Why a download rule failed: nothing on this Mac handles the URL's scheme."))
     }
 
-    /// Asks, once, where this rule's web addresses should open, and writes the answer down on the rule. The dropdown
-    /// picks one of the places; the two buttons say whether it lasts — Once, or Always, which keeps it on the rule.
+    /// Asks where this rule's web addresses open. The dropdown picks a place; Once or Always says whether it's saved
+    /// on the rule.
     private static func askWhereToOpen(rule: DownloadRule, request: Request) async -> OpenInZigzag.Choice? {
         guard let host = WindowManager.shared.promptHost(for: request.window) else { return nil }
-        // The site it's for, not the rule's name: the card names a site the way every other question does, and the
-        // question goes when that site is left behind (never because the *rule's* name isn't the page's host).
+        // Named by site, like other questions, and dismissed when you leave that site.
         let origin = SiteOrigin.of(request.referrer) ?? SiteOrigin.of(request.url)
         let answer = await PermissionPrompt.ask(
             host: SitePermissions.askerName(origin), origin: origin,
@@ -479,8 +439,7 @@ enum DownloadHandoff {
             chooser: OpenInZigzag.Choice.destinations.map { .alternate($0.rawValue, $0.title) },
             canRemember: false)
         guard let answer, let choice = OpenInZigzag.Choice(rawValue: answer.choice ?? "") else { return nil }
-        // "Once" opens it where it was asked for and asks again next time; "Always" writes it on the rule.
-        // The rule as it is now: its own question may have just written down its kept answer.
+        // Re-read the rule: its question may have just saved an answer.
         let current = DownloadRulesStore.shared.rules.first { $0.id == rule.id } ?? rule
         if let kept = ruleToKeep(current, choice: choice, always: answer.action != "once") {
             DownloadRulesStore.shared.update(kept)
@@ -488,12 +447,11 @@ enum DownloadHandoff {
         return choice
     }
 
-    /// Runs the script with every token as its own argument or environment value. A `.sh` file is run by `/bin/sh`;
-    /// anything else must be executable. Never `/bin/sh -c`, and never a joined command line.
+    /// Every token is its own argument or environment value. `.sh` files run via `/bin/sh`, anything else must be
+    /// executable. Never `/bin/sh -c` or a joined command line.
     private static func runScript(_ action: DownloadRuleAction, values: HandoffValues, secret: String,
                                   request: Request, rule: DownloadRule?) -> Outcome {
-        // A bare file name is in the scripts folder; a path of its own is taken as it stands. Literal, as an app's
-        // path is: a link may fill an argument, never choose the script.
+        // A bare name is in the scripts folder; a path is used as is. Literal, so a link can't pick the script.
         let path = Paths.script(named: action.scriptPath).path
         guard FileManager.default.fileExists(atPath: path) else {
             return .failed(String(localized: "The script is no longer there.", comment: "Why a download rule failed: the script it was told to run is gone."))
@@ -507,8 +465,8 @@ enum DownloadHandoff {
             process.arguments = action.arguments.map { DownloadTokens.expand($0, with: values, secret: secret) }
         }
         var environment = ProcessInfo.processInfo.environment
-        // An app opened from the Finder inherits a bare `PATH`, so `yt-dlp` and friends installed by Homebrew or a
-        // hand-installed tool in /usr/local/bin wouldn't be found. Those two come first; the user's own `PATH` stays.
+        // Apps launched from Finder get a bare `PATH`, so prepend Homebrew and /usr/local/bin for tools like
+        // `yt-dlp`.
         let inherited = environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + inherited
         environment["ZIGZAG_LINK"] = values.link.absoluteString
@@ -531,8 +489,7 @@ enum DownloadHandoff {
         let cookieFile = values.cookieFile
         let link = values.link
         let isPrivate = request.isPrivate
-        // While it runs, and how it went: a card over the page it was handed, in the window its tab is in. A run that
-        // comes and goes in a moment never flashes "running" — the card appears with how it ended instead.
+        // Card over the page in the tab's window. Quick runs skip "running" and show only the result.
         let script = ScriptNotice(script: (path as NSString).lastPathComponent, state: .running)
         let card = handoffHost(for: request).map { NoticeCard.show(script, tab: request.tab, in: $0) }
         process.terminationHandler = { finished in
@@ -542,15 +499,14 @@ enum DownloadHandoff {
             let said = errors.text
             let status = finished.terminationStatus
             Task { @MainActor in
-                // The card says how it went, where there is one and it hasn't been put away. Anything else falls back
-                // to the notice below, so a script that fails is never silent.
+                // Falls back to the notice below if the card is gone, so failures are never silent.
                 let ended: ScriptNotice.State = status == 0 ? .ran : .failed(said)
                 let onCard = card?.say(ScriptNotice(script: script.script, state: ended)) == true
                 guard status != 0 else { return }
                 let reason = said.isEmpty
                     ? String(localized: "The script exited with status \(status).", comment: "Why a download rule failed: the script finished with an error code. The placeholder is a number, like 1.")
                     : String(localized: "The script failed: \(said)", comment: "Why a download rule failed: the script exited with an error code and printed this. The placeholder is the script's own last line of error text.")
-                // The card said it over the page; the diagnostics still note it, as they note every failed handoff.
+                // Still logged, as every failed handoff is.
                 if onCard {
                     Diagnostics.note("Handoff failed", site: link.host(), "\(rule?.name ?? "Rule"): \(reason)", isPrivate: isPrivate)
                 } else {
@@ -566,8 +522,7 @@ enum DownloadHandoff {
         return .handedOff
     }
 
-    /// The window a rule's notice belongs in: the one holding the tab it was handed (a rule in a background window
-    /// says so there), else the window the request came from.
+    /// The window holding the handed tab, else the request's window.
     private static func handoffHost(for request: Request) -> PromptHost? {
         if let tab = request.tab, let host = WindowManager.shared.promptHost(holding: tab) { return host }
         return WindowManager.shared.promptHost(for: request.window)
@@ -576,7 +531,7 @@ enum DownloadHandoff {
     // MARK: JSON-RPC and XML-RPC
 
     private static func callService(_ action: DownloadRuleAction, values: HandoffValues, secret: String) async -> Outcome {
-        // The service and its method are literal too: a page can fill the parameters, not pick where they are sent.
+        // Endpoint and method are literal; a page fills parameters only.
         guard let endpoint = URL(string: action.rpcEndpoint) else {
             return .failed(String(localized: "The service’s address isn’t valid.", comment: "Why a download rule failed: the JSON-RPC endpoint can't be made into a URL."))
         }
@@ -611,8 +566,8 @@ enum DownloadHandoff {
         }
     }
 
-    /// The parameter array, parsed from the rule's JSON. aria2 and rTorrent want their token as the first parameter;
-    /// it's put there only when a secret is kept and the template hasn't placed it itself.
+    /// Parsed from the rule's JSON. aria2 and rTorrent want the token first; added only when a secret is kept and the
+    /// template hasn't placed it.
     static func parameters(_ template: String, values: HandoffValues, secret: String) -> [Any]? {
         let text = DownloadTokens.expand(template, with: values, secret: secret, json: true)
         let data = Data(text.utf8)
@@ -622,7 +577,6 @@ enum DownloadHandoff {
 
     static func jsonParameters(_ parameters: [Any], method: String, secret: String) -> [Any] {
         guard !secret.isEmpty, method.hasPrefix("aria2.") || method.hasPrefix("system.") || method.hasPrefix("torrent.") else { return parameters }
-        // A template that already put a token first is left as it is.
         if let first = parameters.first as? String, first.hasPrefix("token:") { return parameters }
         return ["token:\(secret)"] + parameters
     }
@@ -637,7 +591,7 @@ enum DownloadHandoff {
         }
         let params = parameters.map { parameter -> String in
             let value: String
-            // JSONSerialization hands back true and false as NSNumbers too: a boolean is a <boolean>, never <int>1.
+            // JSONSerialization returns booleans as NSNumber too; send them as <boolean>, not <int>1.
             if let number = parameter as? NSNumber {
                 value = CFGetTypeID(number) == CFBooleanGetTypeID()
                     ? "<boolean>\(number.boolValue ? 1 : 0)</boolean>"
@@ -648,7 +602,7 @@ enum DownloadHandoff {
         return "<?xml version=\"1.0\"?><methodCall><methodName>\(escape(method))</methodName><params>\(params)</params></methodCall>"
     }
 
-    /// What a service said went wrong, in its own words when it gave any.
+    /// The service's own error message, if any.
     static func serviceError(in data: Data, style: DownloadRuleAction.RPCStyle) -> String? {
         if style == .xmlrpc {
             let text = String(decoding: data, as: UTF8.self)
@@ -663,8 +617,7 @@ enum DownloadHandoff {
     }
 }
 
-/// The tail of what a script wrote to standard error, so a failure can say what the script itself said. A pipe read on
-/// a background queue and a toast on the main one share it, hence the lock.
+/// Tail of a script's stderr for its failure message. Locked: written on a background queue, read on main.
 private nonisolated final class ScriptErrors: @unchecked Sendable {
     private let lock = NSLock()
     private var data = Data()

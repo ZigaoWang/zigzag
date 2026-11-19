@@ -2,11 +2,9 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// The claim overlay over chrome-api.json: the validator that keeps it honest, and the registry that says what it
-/// means. The fixtures here are inline JSON; the real compatibility.json lands with the claims themselves.
+/// Claim overlay over chrome-api.json: the validator and the registry. Fixtures are inline JSON.
 struct ExtensionCompatibilityTests {
-    /// The bridge's handler names and the corrections script's own words, without the app bundle: the validator
-    /// never trusts the overlay to describe itself.
+    /// Handler names and the corrections script, without the app bundle, so the overlay can't vouch for itself.
     private var implementations: CompatibilityImplementations {
         CompatibilityImplementations(handlers: ["history", "runtime", "storage"], script: """
         const cookies = api.cookies;
@@ -23,8 +21,7 @@ struct ExtensionCompatibilityTests {
         try JSONDecoder().decode(CompatibilityOverlay.self, from: Data(json.utf8))
     }
 
-    /// An overlay from the parts a test cares about; the rest empty, as the real overlay leaves paths it does not
-    /// claim.
+    /// An overlay with only the given parts; the rest empty.
     private func overlay(claims: String, groups: String = "{}", permissions: String = "{}",
                          manifest: String = "{}") throws -> CompatibilityOverlay {
         try overlay("""
@@ -52,7 +49,6 @@ struct ExtensionCompatibilityTests {
         #expect(CompatibilityValidator.diagnostics(overlay: known, universe: try universe(),
                                                    implementations: implementations).isEmpty)
 
-        // Chrome has storage.local.get; it has no storage.local.erase.
         let invented = try overlay(claims: """
         {"storage": {"status": "native", "members": {
             "local": {"status": "native", "members": {"erase": {"status": "native"}}}
@@ -65,7 +61,7 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func noClaimIsMadeTwice() throws {
-        // The same canonical path reached two ways: through storage's members and as a claim of its own.
+        // One canonical path reached through members and as its own claim.
         let problems = try diagnostics(claims: """
         {"storage": {"status": "native", "members": {"local": {"status": "native"}}},
          "storage.local": {"status": "native"}}
@@ -105,7 +101,7 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func anUnknownPermissionStatusIsRejected() {
-        // The API statuses are not permission statuses: `bridged` has no meaning in the install sheet.
+        // API statuses aren't permission statuses; `bridged` is invalid there.
         #expect(throws: (any Error).self) {
             try JSONDecoder().decode(CompatibilityPermission.self, from: Data(#"{"status": "bridged"}"#.utf8))
         }
@@ -129,8 +125,7 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func aPartialClaimMayInheritFromItsNamespace() throws {
-        // history.search has no claim of its own; the history claim covers it, and the overlay still validates. In
-        // PR A the partial row produces no line (main's noise level), though the claim it names stays on record.
+        // history.search is covered by the history claim; partial rows produce no line for now.
         let overlay = try overlay(claims: """
         {"history": {"status": "bridged", "implementation": "swift:history", "group": "privacy"}}
         """, groups: """
@@ -155,8 +150,7 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func aPartialRowMayNameAnUnsupportedMemberAsItsGap() throws {
-        // A partial permission may name the member that cannot work, and the overlay still validates. PR A gives
-        // that row no line of its own: the gap it states is for a later PR, once the error it describes is real.
+        // A partial permission may name the broken member; it gets no line for now.
         let overlay = try overlay(claims: """
         {"history": {"status": "unsupported", "reason": "webkitMissing", "group": "privacy"}}
         """, groups: """
@@ -172,7 +166,7 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func aPartialRowThatStatesNothingIsRejected() throws {
-        // Without a claim or its own catalog, a partial row says nothing about what is missing.
+        // Without a claim or catalog, a partial row says nothing.
         let problems = try diagnostics(claims: "{}", permissions: """
         {"history": {"status": "partial"}}
         """)
@@ -199,7 +193,7 @@ struct ExtensionCompatibilityTests {
     }
 
     @Test func aJsImplementationMustBeInTheCode() {
-        // A name a comment or a string mentions is not a correction; a renamed one must not keep passing there.
+        // Names in comments or strings don't count as corrections.
         let implementations = CompatibilityImplementations(handlers: [], script: """
         // contextMenusKept is only named here.
         /* setMemberToo is only named here. */
@@ -225,11 +219,11 @@ struct ExtensionCompatibilityTests {
                                                           implementations: implementations)
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
         let registry = CompatibilityRegistry(overlay: overlay)
-        // The namespace is the default for its members; a worse member overrides only itself.
+        // Members default to the namespace; a worse member overrides only itself.
         #expect(registry.claim(for: "storage")?.status == .native)
         #expect(registry.claim(for: "storage.local")?.status == .unsupported)
         #expect(registry.claim(for: "storage.local.get")?.status == .unsupported)
-        // The rollup is a separate summary; nothing inherits it.
+        // The rollup is a summary; nothing inherits it.
         #expect(registry.status(of: "storage") == .unsupported)
     }
 
@@ -250,7 +244,7 @@ struct ExtensionCompatibilityTests {
         #expect(registry.claim(for: "tabs.query")?.implementation == "swift:tabs")
         #expect(registry.claim(for: "tabs.group")?.status == .unsupported)
         #expect(registry.claim(for: "tabs.group")?.reason == .webkitMissing)
-        // The namespace keeps its declared answer; the rollup is a separate presentation summary.
+        // The namespace keeps its declared status; the rollup is separate.
         #expect(registry.status(of: "tabs") == .unsupported)
     }
 
@@ -295,8 +289,7 @@ struct ExtensionCompatibilityTests {
         """)
         let limits = ExtensionCompatibility(overlay: overlay)
             .limits(forPermissions: ["proxy", "tabs", "history", "downloads", "alarms"], manifestKeys: ["omnibox"])
-        // The two partial rows and the supported one are silent; a shared catalog is one line, with a
-        // deterministic source.
+        // Partial and supported rows are silent; a shared catalog gives one line with a fixed source.
         #expect(limits.count == 2)
         #expect(Set(limits.compactMap(\.catalogKey)) == ["extension.limit.proxyScripts", "extension.limit.gone"])
         let byCatalog = Dictionary(uniqueKeysWithValues: limits.compactMap { limit in
@@ -319,7 +312,7 @@ struct ExtensionCompatibilityTests {
         return (overlay, universe)
     }
 
-    /// Every claim, nested members flattened to their canonical path.
+    /// All claims, nested members flattened to canonical paths.
     private func flatten(_ claims: [String: CompatibilityClaim], prefix: String = "")
         -> [(path: String, claim: CompatibilityClaim)] {
         claims.flatMap { name, claim in
@@ -329,8 +322,7 @@ struct ExtensionCompatibilityTests {
         .sorted { $0.path < $1.path }
     }
 
-    /// The app's string catalog. The local gate copies the test file out of the repository, so `ZZ_REPO` names it;
-    /// an Xcode build compiles it in place, where `#filePath` does.
+    /// The string catalog: `ZZ_REPO` when the local gate copies tests out of the repo, else `#filePath`.
     private static var repo: URL {
         if let path = ProcessInfo.processInfo.environment["ZZ_REPO"], !path.isEmpty {
             return URL(fileURLWithPath: path)
@@ -358,9 +350,7 @@ struct ExtensionCompatibilityTests {
             #expect(universe.contains(namespace), "\(namespace) is not in chrome-api.json")
             #expect(overlay.claims[namespace] != nil, "\(namespace) is reachable but unclaimed")
         }
-        // Every bridge handler that answers an extension's namespace has a claim. `contexts` answers
-        // runtime.getContexts and `contextMenusKept` answers contextMenus; the favicon and fetch handlers are
-        // Zigzag's own plumbing, not a Chrome namespace.
+        // Every bridge handler for an extension namespace has a claim. `contexts` is runtime.getContexts, `contextMenusKept` is contextMenus; favicon and fetch are internal.
         for handler in ExtensionBridge.handlerNames {
             switch handler {
             case "contexts":
@@ -377,8 +367,7 @@ struct ExtensionCompatibilityTests {
 
     @Test func everyKnownPermissionHasAClaim() throws {
         let (overlay, _) = try shipped()
-        // The keys the old limitNames table named, verbatim, kept so the union the plan covers is still checked after
-        // that table's removal. A permission added to the report without a claim fails this test.
+        // Keys from the removed limitNames table, so its coverage is still checked.
         let oldLimitKeys: Set<String> = [
             "sidePanel", "identity", "identity.email", "notifications", "downloads", "downloads.open",
             "idle", "offscreen", "webRequestBlocking", "history", "bookmarks", "topSites", "tabGroups",
@@ -453,14 +442,13 @@ struct ExtensionCompatibilityTests {
         #expect(problems.isEmpty, "\(problems.joined(separator: "\n"))")
     }
 
-    /// A permission whose row is partial is silent in PR A, however many members its claims name: main's noise
-    /// level, with the claims kept on record for the sheet PR B will show.
+    /// Partial permission rows are silent for now; claims are kept for the install sheet later.
     @Test func aPartialPermissionRowIsSilent() throws {
         let (overlay, _) = try shipped()
         let tabCapture = ExtensionCompatibility(overlay: overlay)
             .limits(forPermissions: ["tabCapture"], manifestKeys: [])
         #expect(tabCapture.isEmpty)
-        // What the row would have said is still the narrow one, ready for PR B.
+        // The narrow wording is still stored.
         #expect(overlay.permissions["tabCapture"]?.status == .partial)
         let capture = try #require(overlay.claims["tabCapture"]?.members?["capture"])
         #expect(capture.group == "tabVideoCapture")
@@ -516,7 +504,7 @@ struct ExtensionCompatibilityTests {
         var noChinese: [String] = []
         var noEnglish: [String] = []
         var wrongEnglish: [String] = []
-        // The wording a person saw before the overlay, kept as each catalog key's English value.
+        // Pre-overlay wording, kept as each key's English value.
         let expectedEnglish: [String: String] = [
             "extension.limit.tabGroups": "Tab groups",
             "extension.limit.tabActions": "Some tab actions",
@@ -596,7 +584,7 @@ struct ExtensionCompatibilityTests {
             let limits = compatibility.limits(forPermissions: [name], manifestKeys: [])
             switch row.status {
             case .supported, .partial:
-                // PR A's noise rule: only unsupported and deprecated permissions get a line.
+                // Only unsupported and deprecated permissions get a line.
                 #expect(limits.isEmpty, "\(name) is \(row.status.rawValue) but has a limit line")
             case .unsupported, .deprecated:
                 #expect(limits.count == 1, "\(name) should have one line, not \(limits.count)")
@@ -614,7 +602,7 @@ struct ExtensionCompatibilityTests {
             #expect(compatibility.limits(forPermissions: [name], manifestKeys: []).isEmpty,
                     "\(name) should have no line")
         }
-        // Tab video capture's row is partial and silent; its narrow wording stays for PR B.
+        // tabCapture is partial and silent; its wording is kept.
         #expect(overlay.permissions["tabCapture"]?.status == .partial)
         #expect(compatibility.limits(forPermissions: ["tabCapture"], manifestKeys: []).isEmpty)
         let omnibox = compatibility.limits(forPermissions: [], manifestKeys: ["omnibox"])
@@ -632,8 +620,7 @@ struct ExtensionCompatibilityTests {
         let compatibility = ExtensionCompatibility(overlay: overlay)
         _ = compatibility.limits(forPermissions: Set(overlay.permissions.keys),
                                   manifestKeys: Set(overlay.manifest.keys))
-        // The registry's only surface is claimedPaths, claim(for:) and status(of:): there is no setter for a
-        // permission's state, so reading the overlay cannot grant, widen or drop one.
+        // The registry has no setter, so reading the overlay can't change a permission.
         #expect(registry.claim(for: "history")?.status == .bridged)
         #expect(CompatibilityRegistry(overlay: overlay).claimedPaths == registry.claimedPaths)
         #expect(ExtensionBridge.handlerNames == handlers)

@@ -137,8 +137,7 @@ enum Tokens {
         /// A toast, a floating capsule at the page's top; its action is a pill this tall, inset evenly.
         static let toastHeight: CGFloat = Space.x8 + Space.x1
         static let toastButtonHeight: CGFloat = Space.x7Height
-        /// The find bar, a floating capsule over the page's top right: as tall as a toast, so one beside it (an offer
-        /// to translate) runs on the same line. Its round buttons are as tall as a toast's action, inset the same.
+        /// Find bar height matches a toast, so a toast beside it lines up; its buttons match a toast's action.
         static let findBarHeight: CGFloat = toastHeight
         static let findBarButton: CGFloat = toastButtonHeight
         /// Where a hovered link goes: the small floating capsule in the page's bottom-left corner.
@@ -214,11 +213,13 @@ enum Tokens {
         /// A row's favicon, or the symbol in its place.
         static var favicon: CGFloat { scaledEven(16) }
         static func favicon(for size: Size) -> CGFloat { scaledEven(16, for: size) }
-        /// The least title a part of a split's row shows beside its icon: a few letters. Narrower, its icon alone.
+        /// Minimum title width in a split row; narrower shows only the icon.
         static func splitTitleMin(for size: Size? = nil) -> CGFloat { scaled(20, for: size) }
         /// From a row's edge to its icon, and from the icon to its title's first letter.
         static let rowInset: CGFloat = 6
         static let iconGap: CGFloat = Space.x2
+        /// From a title's last letter to a symbol in its line (a tab's speaker): a word space at the title's size.
+        static let inlineGlyphGap: CGFloat = 4.5
         /// The corners of small things in the sidebar: a row's fill, a favorite, a button.
         static let rowRadius: CGFloat = Radius.control
         /// A row's own small buttons (a tab's close and mute): a 20pt target, an 11pt glyph.
@@ -260,6 +261,9 @@ enum Tokens {
         static let favoriteClose: CGFloat = 14
         static let favoriteCloseGlyph: CGFloat = 7
         static let favoriteCloseInset: CGFloat = 3
+        /// A favorite's speaker badge: its side as a share of the icon's, and its glyph's point size.
+        static let favoriteSpeakerShare: CGFloat = 0.55
+        static let favoriteSpeakerGlyph: CGFloat = 8
 
         /// The top row: the traffic lights' center line, from the sidebar's top, and every toolbar glyph's.
         static let lightsCenter: CGFloat = 22
@@ -292,29 +296,26 @@ enum Tokens {
 
         /// The bottom bar: 26pt buttons, 4pt from its edges, a space key (`spaceKey`) for each space.
         static let bottomBarHeight: CGFloat = 34
-        /// A space's icon in the bottom bar, in place of its dot (#210, #238): a favorite's icon, so it scales with
-        /// the sidebar's size as the rows do (16, 18, 20).
+        /// A space's icon in the bottom bar (#210, #238), scaled like favorite icons (16, 18, 20).
         static var spaceIcon: CGFloat { spaceIcon(for: current) }
         static func spaceIcon(for size: Size) -> CGFloat { (18 * size.scale / 2).rounded() * 2 }
         /// Each space's target in the bottom bar: a toolbar button, and at Large a little more round its larger icon,
         /// as tall as the bar leaves room for.
         static var spaceTarget: CGFloat { spaceTarget(for: current) }
         static func spaceTarget(for size: Size) -> CGFloat { size == .large ? 28 : button }
-        /// Room round a space's icon in its target: its targets are never narrower than the icon and this, so with
-        /// many spaces the row scrolls before their icons get smaller (#238).
+        /// Padding around a space icon; the row scrolls before icons shrink (#238).
         static let spaceIconRoom: CGFloat = 4
-        /// How wide each space's target is with `count` spaces in `available` points: as wide as `spaceTarget` when
-        /// they all fit, narrower to fit more, never so narrow it squeezes an icon (or below `smallest` for dots);
-        /// past that, the row scrolls.
+        /// Each space target's width for `count` spaces: `spaceTarget` when they fit, narrower down to the icon (or
+        /// `smallest` for dots), then the row scrolls.
         static func spaceKeyWidth(available: CGFloat, count: Int, hasIcons: Bool, smallest: CGFloat, size: Size) -> CGFloat {
             let least = hasIcons ? max(smallest, spaceIcon(for: size) + spaceIconRoom) : smallest
             return max(least, min(spaceTarget(for: size), floor(available / CGFloat(max(count, 1)))))
         }
         /// The now-playing card above the bottom bar: a row's height, at every size.
         static var nowPlayingHeight: CGFloat { rowHeight }
-        /// The update card: two lines, "Update ready" over the version, with a row's room above and below them.
+        /// Two lines with row padding.
         static var updateCardHeight: CGFloat { scaledEven(44) }
-        /// The same while an update comes in, with its progress bar under the two lines.
+        /// Plus the progress bar.
         static var updateCardBusyHeight: CGFloat { scaledEven(56) }
     }
 
@@ -328,6 +329,10 @@ enum Tokens {
         static let favicon: CGFloat = 16
         static let addressText: CGFloat = TypeSize.label
         static let addressHeight: CGFloat = 22
+        /// A slim window strip's buttons (Zigzag Mini, pop-ups, installed apps): the address's height, so every
+        /// hover box sits as far from the strip's edges as from the next one (`stripGap`).
+        static let stripButton: CGFloat = addressHeight
+        static let stripGap: CGFloat = Space.x1
         /// The least room a pane's address keeps before its strip folds its own buttons away (as the sidebar's
         /// address keeps for its host).
         static let addressMinWidth: CGFloat = 72
@@ -568,6 +573,9 @@ enum Tokens {
             return CGSize(width: box.midX, height: box.midY)
         }
 
+        /// The size of an image's ink; `key` names it for the cache.
+        @MainActor static func inkSize(of image: NSImage, key: String) -> CGSize { inkBox(of: image, key: key).size }
+
         @MainActor private static func inkBox(of image: NSImage, key: String) -> CGRect {
             if let known = inkBoxes[key] { return known }
             let scale: CGFloat = 4
@@ -598,6 +606,16 @@ enum Tokens {
             return box
         }
         @MainActor private static var inkBoxes: [String: CGRect] = [:]
+
+        /// Offsets (as `inkOffset`) for symbols that take turns in one place (a speaker playing and muted): each is
+        /// drawn with its alignment rect's origin, its baseline's start, where the others' is, so what they share (the
+        /// speaker's body) stays on the same pixels. The ink centered is `reference`'s, or with none, all of theirs.
+        @MainActor static func sharedInkOffsets(of images: [NSImage], keys: [String], reference: Int? = nil) -> [CGSize] {
+            let origins = images.map { CGPoint(x: $0.alignmentRect.minX - $0.size.width / 2, y: $0.alignmentRect.minY - $0.size.height / 2) }
+            let boxes = zip(images, keys).enumerated().map { i, pair in inkBox(of: pair.0, key: pair.1).offsetBy(dx: -origins[i].x, dy: -origins[i].y) }
+            let middle = reference.map { boxes[$0] } ?? boxes.dropFirst().reduce(boxes[0]) { $0.union($1) }
+            return origins.map { CGSize(width: middle.midX + $0.x, height: middle.midY + $0.y) }
+        }
     }
 
     // MARK: - Motion (five roles, one curve family)
@@ -857,9 +875,8 @@ enum Tokens {
             CATransaction.commit()
         }
 
-        /// A backdrop (a sheet's scrim, the dimming under a peek) fading in with what it's behind, in `enter`, and out
-        /// with it, in `exit`, eased out, from whatever it shows now; with Reduce Motion in `crossfade`, as what's on it
-        /// does. `evenFromKeyboard` false: from a key it's simply there, or gone, with what came at once (the command bar).
+        /// Fades a backdrop (sheet scrim, peek dimming) in or out from its current opacity, eased; crossfade with
+        /// Reduce Motion. `evenFromKeyboard` false: appears instantly from a key, like the command bar.
         static func fadeBackdrop(_ view: NSView, entering: Bool, evenFromKeyboard: Bool = true, completion: (@MainActor () -> Void)? = nil) {
             if let layer = view.layer, layer.animation(forKey: "opacity") != nil, let shown = layer.presentation()?.opacity {
                 withoutAnimation { view.alphaValue = CGFloat(shown) }
@@ -1121,8 +1138,8 @@ enum Tokens {
     // MARK: - Opacity
 
     enum Opacity {
-        /// A control that can't be used now, faded whole: its words still at least 3:1 on a panel or page, in light
-        /// and dark. Words alone (a quiet button) take `Color.textDisabled` instead.
+        /// Whole-control fade for disabled: text still 3:1 in light and dark. Text-only buttons use
+        /// `Color.textDisabled`.
         static let disabled: CGFloat = 0.5
         /// Floor for tabs that have not been looked at in a long time.
         static let fadedFloor: CGFloat = 0.42
@@ -1236,8 +1253,7 @@ enum Tokens {
             highLight: hex(0x000000, alpha: 0.72), highDark: hex(0xFFFFFF, alpha: 0.80))
         static let textTertiary = dynamic(light: hex(0x000000, alpha: 0.45), dark: hex(0xFFFFFF, alpha: 0.42),
             highLight: hex(0x000000, alpha: 0.64), highDark: hex(0xFFFFFF, alpha: 0.72))
-        /// The words of a quiet control that can't be used now ("Use Default Colors" with nothing to put back): the
-        /// faintest text, at full strength rather than faded, so it still reads at 3:1 on a panel or page.
+        /// Disabled quiet button text: the faintest text at full opacity, still 3:1.
         static let textDisabled = textTertiary
 
         static let icon = dynamic(light: hex(0x000000, alpha: 0.62), dark: hex(0xFFFFFF, alpha: 0.66),
@@ -1346,9 +1362,8 @@ enum Tokens {
         static let surfaceGroup = dynamic(light: hex(0xFFFFFF), dark: hex(0x2A2A2D))
         static let surfaceGroupEdge = dynamic(light: hex(0x000000, alpha: 0.08), dark: hex(0xFFFFFF, alpha: 0.06),
             highLight: hex(0x000000, alpha: 0.32), highDark: hex(0xFFFFFF, alpha: 0.30))
-        /// The wordmark on a space's picture (its empty page's Background): white letters, light or dark, with one
-        /// soft shadow (`Shadow.liftRadius`, `liftDrop`) under them, so they read on a busy picture, as a Mac's own
-        /// lock screen does. Stronger with Increase Contrast.
+        /// Wordmark on a space background image: white with a soft shadow (`Shadow.liftRadius`, `liftDrop`), like the
+        /// lock screen. Stronger with Increase Contrast.
         static let markOnPicture = dynamic(light: hex(0xFFFFFF, alpha: 0.9), dark: hex(0xFFFFFF, alpha: 0.86),
             highLight: hex(0xFFFFFF, alpha: 1), highDark: hex(0xFFFFFF, alpha: 1))
         static let markOnPictureShadow = dynamic(light: hex(0x000000, alpha: 0.32), dark: hex(0x000000, alpha: 0.45),
@@ -1414,8 +1429,8 @@ enum Tokens {
     enum Switch {
         private static func ink(_ alpha: CGFloat) -> NSColor { Color.hex(0x000000, alpha: alpha) }
         private static func light(_ alpha: CGFloat) -> NSColor { Color.hex(0xFFFFFF, alpha: alpha) }
-        /// Off: a step darker than the page by day; at night a lighter gray than the page, as macOS's own off switch
-        /// is, since a track darker than a dark page all but disappears.
+        /// Off track: darker than the page in light; lighter in dark, like macOS's switch, since a darker track
+        /// vanishes.
         static let track = Color.dynamic(light: ink(0.075), dark: light(0.16),
             highLight: ink(0.16), highDark: light(0.26))
         static let trackHover = Color.dynamic(light: ink(0.095), dark: light(0.19),
@@ -1470,6 +1485,7 @@ enum Tokens {
     /// space's color, gradient or see-through, each is a lighter step of that same color, never a gray laid over it.
     enum Chrome {
         private static func white(_ alpha: CGFloat) -> NSColor { Color.hex(0xFFFFFF, alpha: alpha) }
+        private static func black(_ alpha: CGFloat) -> NSColor { Color.hex(0x000000, alpha: alpha) }
 
         /// The tab you're on: by day a near-white card lifted by one soft shadow (`cardShadow`, `Shadow.lift`), its edge
         /// only just there, so it reads as a card rather than an outline; at night a lighter step of the space's color.
@@ -1485,15 +1501,16 @@ enum Tokens {
         static let cardEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.035),
             highLight: Color.hex(0x000000, alpha: 0.3), highDark: white(0.3))
         static let cardShadow = Color.dynamic(light: Color.hex(0x1E2A44, alpha: 0.10), dark: Color.hex(0x000000, alpha: 0.3))
-        /// A row or a toolbar button under the pointer: a gentler wash than the card; pressed, a step more.
-        static let hover = Color.dynamic(light: white(0.38), dark: white(0.05),
-            highLight: white(0.62), highDark: white(0.10))
+        /// A row or a toolbar button under the pointer. By day a shade, not a white wash: white can't show on a white or
+        /// near-white space. About the same step on every space, light or dark; pressed, a step more.
+        static let hover = Color.dynamic(light: black(0.06), dark: white(0.065),
+            highLight: black(0.12), highDark: white(0.12))
         /// New Tab under the pointer: a lighter wash than a tab's, so the one quiet row stays quiet.
-        static let quietHover = Color.dynamic(light: white(0.22), dark: white(0.03),
-            highLight: white(0.45), highDark: white(0.07))
-        /// Pressed: a step darker than hover, as a thing pushed in is (`showSink`).
-        static let pressed = Color.dynamic(light: white(0.28), dark: white(0.035),
-            highLight: white(0.5), highDark: white(0.08))
+        static let quietHover = Color.dynamic(light: black(0.035), dark: white(0.04),
+            highLight: black(0.08), highDark: white(0.08))
+        /// Pressed: a step further from the space than hover (`showSink`).
+        static let pressed = Color.dynamic(light: black(0.10), dark: white(0.10),
+            highLight: black(0.16), highDark: white(0.16))
         /// The address and the favorites: a soft field of the space's color, no line around it.
         static let field = Color.dynamic(light: white(0.45), dark: white(0.065),
             highLight: white(0.72), highDark: white(0.12))
@@ -1507,14 +1524,13 @@ enum Tokens {
             highLight: white(0.75), highDark: white(0.12))
         static let keyEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.07), dark: white(0.09),
             highLight: Color.hex(0x000000, alpha: 0.4), highDark: white(0.35))
-        /// A favorite whose page is open: a brighter tile than a closed one, half way to the card you're on, so which
-        /// are open reads at a glance on any color or grain; a step brighter still under the pointer.
+        /// Open favorite tile: brighter than closed, halfway to the selected card; brighter on hover.
         static let openTile = Color.dynamic(light: white(0.74), dark: white(0.125),
             highLight: white(0.9), highDark: white(0.19))
         static let openTileHover = Color.dynamic(light: white(0.84), dark: white(0.15),
             highLight: white(0.95), highDark: white(0.22))
-        /// A favorite whose page is open: a fine edge, the only line on a tile.
-        static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.1), dark: white(0.16),
+        /// A pinned page or favorite whose page is open: a hint of an edge, quieter than the selected card's (#351).
+        static let openEdge = Color.dynamic(light: Color.hex(0x000000, alpha: 0.035), dark: white(0.03),
             highLight: Color.hex(0x000000, alpha: 0.45), highDark: white(0.45))
     }
 

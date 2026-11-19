@@ -3,8 +3,7 @@ import Foundation
 import Testing
 @testable import Zigzag
 
-/// The bar an empty window opens with goes when a page arrives some other way (Open in from Zigzag Mini), and a bar
-/// you opened over a page stays.
+/// The empty-window bar closes when a page arrives another way (Open in from Mini); a bar opened over a page stays.
 @MainActor struct CommandBarArrivalTests {
     private final class Host: CommandBarHost {
         let window: NSWindow? = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 600), styleMask: [.titled], backing: .buffered, defer: true)
@@ -40,7 +39,7 @@ import Testing
         defer { tab.close() }
         host.tab = tab
         let bar = CommandBarController(host: host)
-        // ⌘T over a page, and ⌘L: neither was the empty window's.
+        // ⌘T and ⌘L over a page aren't the empty-window bar.
         bar.show(mode: .newTab)
         #expect(!bar.isForEmptyWindow)
         bar.pageArrived()
