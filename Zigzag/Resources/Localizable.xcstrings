@@ -11145,17 +11145,6 @@
         }
       }
     },
-    "Make This Page the Favorite" : {
-      "comment" : "Item in a favorite's context menu.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将此页面设为收藏"
-          }
-        }
-      }
-    },
     "Make Upper Case" : {
       "comment" : "Edit › Transformations menu item.",
       "localizations" : {
@@ -11570,12 +11559,23 @@
       }
     },
     "Move Tab to New Window" : {
-      "comment" : "File menu item.\nItem in a tab's context menu in the sidebar.",
+      "comment" : "File menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "将标签页移到新窗口"
+          }
+        }
+      }
+    },
+    "Move To" : {
+      "comment" : "Item in a tab's context menu in the sidebar. Opens a list: New Window, Zigzag Mini, then the spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到"
           }
         }
       }
@@ -11691,7 +11691,7 @@
       }
     },
     "Move to Space" : {
-      "comment" : "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces.\nItem in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nItem in a tab's context menu in the sidebar. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space.",
+      "comment" : "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces.\nItem in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13569,7 +13569,7 @@
       }
     },
     "Open in Zigzag Mini" : {
-      "comment" : "Item in a tab's context menu in the sidebar: moves the tab's page into a Zigzag Mini window (the small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.\nUndo action name, shown in the Edit menu as Undo Open in Zigzag Mini.",
+      "comment" : "Undo action name, shown in the Edit menu as Undo Open in Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14535,17 +14535,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "固定此页面"
-          }
-        }
-      }
-    },
-    "Pin This Page Instead" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "改为固定此页面"
           }
         }
       }
@@ -15679,6 +15668,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从历史记录中移除"
+          }
+        }
+      }
+    },
+    "Remove from Split View" : {
+      "comment" : "Item at the top of a tab's context menu in the sidebar, for one page of a split view of three or four: takes just this page out; the others stay side by side.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从分屏浏览中移除"
           }
         }
       }
@@ -17130,8 +17130,19 @@
         }
       }
     },
+    "Separate Split View" : {
+      "comment" : "Item at the top of the context menu of a tab, pinned tab or favorite in a split view, in the sidebar: ends the split view, each page a tab of its own again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束分屏浏览"
+          }
+        }
+      }
+    },
     "Separate Tabs" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a favorite's context menu. Parts a split favorite into two favorites.\nItem in a pinned tab's context menu in the sidebar. Parts a pinned split view into two pinned tabs.\nItem in a tab's context menu in the sidebar. Ends the split view the tab is in.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item.",
+      "comment" : "A command in the command bar, named as in the menu bar.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17203,6 +17214,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务"
+          }
+        }
+      }
+    },
+    "Set Current Page as Favorite" : {
+      "comment" : "Item in a favorite's context menu. The page wandered off the favorite's address; this makes the page it shows now the favorite.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将当前页面设为收藏"
+          }
+        }
+      }
+    },
+    "Set Current Page as Pinned" : {
+      "comment" : "Item in a pinned tab's context menu in the sidebar. The page wandered off its pinned address; this makes the page it shows now the pinned one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将当前页面设为固定页面"
           }
         }
       }

@@ -2912,10 +2912,6 @@ extension BrowserWindowController: SidebarDelegate {
         sidebarUndo.setActionName(Self.openInMiniName)
     }
 
-    static var openInMiniTitle: String {
-        String(localized: "Open in Zigzag Mini", comment: "Item in a tab's context menu in the sidebar: moves the tab's page into a Zigzag Mini window (the small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.")
-    }
-
     private static var openInMiniName: String {
         String(localized: "Open in Zigzag Mini", comment: "Undo action name, shown in the Edit menu as Undo Open in Zigzag Mini.")
     }
@@ -3303,6 +3299,12 @@ extension BrowserWindowController: SidebarDelegate {
             default: return nil
             }
         }
+    }
+
+    /// A tab's part of a split row gets its own tab's menu; a pinned page's part, the row's.
+    func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu? {
+        if let page, page.bookmarkID == nil, tabManager.split(for: page) != nil { return SidebarMenus.tabMenu(for: page, controller: self) }
+        return listMenu(for: item)
     }
 
     func listMenu(for item: SidebarItem) -> NSMenu? {

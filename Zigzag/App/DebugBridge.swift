@@ -1651,6 +1651,36 @@ enum DebugBridge {
             let pages: [(String, [String])] = [("a", ["Work"]), ("b", ["Work", "Docs"]), ("c", ["Work", "Docs"]), ("d", ["Work", "Docs", "Old"]), ("e", ["Work"]), ("f", [])]
                 + (1...12).map { ("r\($0)", ["Reading"]) }
             _ = Library.shared.appendBookmarks(pages.map { (base.appendingPathComponent("\($0.0).html"), $0.0.uppercased()) }, to: controller.tabManager.currentSpaceID, folders: pages.map(\.1))
+        case "rowmenu":
+            // rowmenu <title> | fav <title> | group <name> | marked: the right-click menu of the tab, pinned page, favorite or group with
+            // that title (a split's page gets its own), or of the picked rows, at its row; it closes after 4 s.
+            let list = controller.sidebar.list
+            let m = controller.tabManager
+            var menu: NSMenu?, anchor: NSView?
+            if arg == "marked", let first = list.marked.first {
+                menu = SidebarMenus.markedMenu(for: list.marked, controller: controller)
+                if case .tab(let id) = first { anchor = list.tabRow(id) } else if case .bookmark(let id) = first { anchor = list.bookmarkRow(id) }
+            } else if arg.hasPrefix("group "), let group = m.groups(in: m.currentSpaceID).first(where: { $0.name == String(arg.dropFirst(6)) }) {
+                menu = SidebarMenus.groupMenu(for: group, controller: controller)
+                anchor = list.groupRow(group.id)
+            } else if arg.hasPrefix("fav "),let fav = Library.shared.favorites(in: m.profile.id).first(where: { $0.title == String(arg.dropFirst(4)) }) {
+                menu = SidebarMenus.favoriteMenu(for: fav, controller: controller)
+                anchor = controller.sidebar.favorites.tile(for: fav.id)
+            } else if let tab = m.currentTabs.first(where: { $0.displayTitle == arg }) {
+                menu = controller.listMenu(for: .tab(tab.id), page: tab) ?? SidebarMenus.tabMenu(for: tab, controller: controller)
+                anchor = list.tabRow(tab.id)
+            } else if let bookmark = Library.shared.bookmarks(in: m.currentSpaceID).first(where: { $0.title == arg }) {
+                menu = SidebarMenus.bookmarkMenu(for: Library.shared.pinnedSplit(containing: bookmark.id).flatMap { Library.shared.bookmark($0.ids[0]) } ?? bookmark, controller: controller)
+                anchor = list.bookmarkRow(Library.shared.pinnedSplit(containing: bookmark.id)?.ids[0] ?? bookmark.id)
+            }
+            func titles(_ menu: NSMenu) -> [String] {
+                menu.items.map { $0.isSeparatorItem ? "-" : $0.title + ($0.keyEquivalent.isEmpty ? "" : " [\($0.keyEquivalent)]") + ($0.submenu.map { " ▸ " + titles($0).joined(separator: "|") } ?? "") }
+            }
+            debugLog("rowmenu \(arg) => \(menu.map(titles) ?? [])")
+            if let menu, let anchor {
+                closeNextMenu(after: 4)
+                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: anchor.bounds.midY), in: anchor) }
+            }
         case "foldermenu":
             // foldermenu <folder>[>item]: that item of the folder's menu, as choosing it does; no item, the menu at its
             // row, which closes by itself after 4 s.

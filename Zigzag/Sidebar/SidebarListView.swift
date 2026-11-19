@@ -30,6 +30,8 @@ protocol SidebarListDelegate: AnyObject {
     func listMoveFolder(_ id: UUID, to index: Int, in spaceID: UUID, parent: UUID?)
     func listHover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?)
     func listMenu(for item: SidebarItem) -> NSMenu?
+    /// The menu for a row of several pages, `page` being the one under the pointer.
+    func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu?
     /// The menu for several picked rows at once.
     func listMenu(forMarked items: [SidebarItem]) -> NSMenu?
     /// Returns the space under a window point while dragging (the space dots), highlighting it.
@@ -84,6 +86,7 @@ protocol SidebarListDelegate: AnyObject {
 extension SidebarListDelegate {
     func listMove(_ tab: Tab, to index: Int, in spaceID: UUID) { listMove(tab, to: index, in: spaceID, nesting: .fit, grouping: .fit) }
     func listUnbookmark(_ bookmarkID: UUID, to index: Int) { listUnbookmark(bookmarkID, to: index, under: nil, group: nil) }
+    func listMenu(for item: SidebarItem, page: Tab?) -> NSMenu? { listMenu(for: item) }
 }
 
 enum SidebarItem: Hashable {
@@ -1000,7 +1003,7 @@ final class SidebarListView: NSView {
                 guard let tab = row?.tab else { return }
                 self?.delegate?.listSetNestedTabsCollapsed(tab, !tab.isCollapsed)
             }
-            row.onRightClick = { [weak self] _ in self?.menu(for: item) }
+            row.onRightClick = { [weak self, weak row] event in self?.menu(for: item, row: row, event: event) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
@@ -1053,7 +1056,7 @@ final class SidebarListView: NSView {
                 if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id) } else { unload() }
             }
             row.onMiddleClick = unload
-            row.onRightClick = { [weak self] _ in self?.menu(for: item) }
+            row.onRightClick = { [weak self, weak row] event in self?.menu(for: item, row: row, event: event) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
                 return self.beginDrag(item, view: row, event: event)
@@ -1308,9 +1311,13 @@ final class SidebarListView: NSView {
         refreshRows()
     }
 
-    private func menu(for item: SidebarItem) -> NSMenu? {
+    private func menu(for item: SidebarItem, row: TabRowView? = nil, event: NSEvent? = nil) -> NSMenu? {
         if marked.count > 1, marked.contains(item) { return delegate?.listMenu(forMarked: marked) }
         clearMarks()
+        // In a row of several pages, the part right-clicked.
+        if let row, let event, row.pages.count > 1 {
+            return delegate?.listMenu(for: item, page: row.page(at: row.convert(event.locationInWindow, from: nil)))
+        }
         return delegate?.listMenu(for: item)
     }
 
@@ -1449,8 +1456,14 @@ final class SidebarListView: NSView {
     }
     #endif
     func folderRow(_ id: UUID) -> NSView? { madeRow(.folder(id)) }
+    func groupRow(_ id: UUID) -> NSView? { madeRow(.tabGroup(id)) }
     /// A tab's or pinned page's row, scrolled into sight, for something to open beside it.
-    func tabRow(_ id: UUID) -> NSView? { shownRow(.tab(id)) }
+    func tabRow(_ id: UUID) -> NSView? {
+        if let row = shownRow(.tab(id)) { return row }
+        // A page of a split or tile group: the group's row.
+        guard let item = rows.first(where: { ($0.value as? TabRowView)?.pages.contains { $0.id == id } == true })?.key else { return nil }
+        return shownRow(item)
+    }
     func bookmarkRow(_ id: UUID) -> NSView? { shownRow(.bookmark(id)) }
 
     /// A row scrolled into sight, to type in.

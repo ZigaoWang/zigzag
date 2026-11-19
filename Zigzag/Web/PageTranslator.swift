@@ -84,9 +84,6 @@ enum PageTranslator {
         return ["http", "https", "file"].contains(scheme)
     }
 
-    /// One that can be now: a tab that isn't loaded has no text to translate until it is.
-    static func canTranslate(_ tab: Tab) -> Bool { offersTranslation(tab) && tab.webView != nil }
-
     /// Apple can translate between these on this Mac (now, or once the language is downloaded).
     static func canTranslate(from source: Locale.Language, to target: Locale.Language) async -> Bool {
         await status(from: source, to: target) != .unsupported
