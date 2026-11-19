@@ -645,6 +645,22 @@ final class PopupWindowController: NSWindowController, NSWindowDelegate, WKUIDel
         DownloadManager.shared.track(download, window: window)
     }
 
+    /// The page's own Print button (`window.print()`), as in a tab (`PagePrinting`).
+    @objc(_webView:printFrame:pdfFirstPageSize:completionHandler:)
+    func webView(_ webView: WKWebView, printFrame frame: AnyObject?, pdfFirstPageSize size: CGSize, completionHandler: @escaping () -> Void) {
+        PagePrinting.printForPage(webView, frame: frame, in: window, completion: completionHandler)
+    }
+
+    @objc(_webView:printFrame:)
+    func webView(_ webView: WKWebView, printFrame frame: AnyObject?) {
+        PagePrinting.printForPage(webView, frame: frame, in: window, completion: {})
+    }
+
+    /// File › Print… (⌘P) with the popup in front.
+    @objc func printPage(_ sender: Any?) {
+        PagePrinting.print(webView, in: window, completion: {})
+    }
+
     /// The window the page is told it's in, as a tab's page is (PageWindowFrame).
     @objc(_webView:getWindowFrameWithCompletionHandler:)
     func webView(_ webView: WKWebView, getWindowFrameWithCompletionHandler completion: @escaping (CGRect) -> Void) {
