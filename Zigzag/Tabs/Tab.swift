@@ -162,6 +162,8 @@ final class Tab: NSObject {
     var isPeek = false {
         didSet { if oldValue, !isPeek, let webView { checkForPDF(webView) } }
     }
+    /// The last ⇧ or ⌥ link click the page kept, for its own navigation right after (#322).
+    var followedClick: (url: URL, activation: LinkActivation, at: Date)?
     /// Set for tabs in a private window: their own throwaway storage, and nothing remembered.
     var privateStore: WKWebsiteDataStore? { didSet { if privateStore !== oldValue { refreshChosenIcon() } } }
     var isPrivate: Bool { privateStore != nil }
@@ -1615,24 +1617,32 @@ extension Tab: WKNavigationDelegate {
         let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
         // Only a link to the web opens elsewhere (a tab, a card): one to a file or a script stays the page's to try,
         // where WebKit holds it to what the page may reach.
-        if isLinkClick && isMainFrame && Self.route(forPageLink: url, from: self.url) == .load {
+        let toTheWeb = Self.route(forPageLink: url, from: self.url) == .load
+        // A page navigation to the link a ⇧ or ⌥ click was just on is that click's; a real link click clears the mark.
+        if isLinkClick { followedClick = nil }
+        let followed = isMainFrame && toTheWeb && navigationAction.navigationType == .other ? followedActivation(for: url) : nil
+        if (isLinkClick || followed != nil) && isMainFrame && toTheWeb {
             let flags = navigationAction.modifierFlags
+            let activation = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: isMainFrame,
+                                                 modifiers: flags, buttonNumber: navigationAction.buttonNumber,
+                                                 followed: followed)
             // Site routes (#286) apply to clicks and new-tab links; not peek (⇧), download (⌥) or page-initiated.
-            let opensTab = navigationAction.buttonNumber == 4 || flags.contains(.command)
-            if userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
+            let opensTab = activation.isNewTab
+            if followed == nil, userInitiated, opensTab || flags.isDisjoint(with: [.shift, .option]),
                host?.tab(self, routesLink: url, arrival: opensTab ? .linkNewTab : .linkClick, inBackground: opensTab && !flags.contains(.shift)) == true {
                 return (.cancel, preferences)
             }
-            if navigationAction.buttonNumber == 4 /* middle click */ || flags.contains(.command) {
-                host?.tab(self, openURL: url, disposition: flags.contains(.shift) ? .foregroundTab : .backgroundTab)
+            switch activation {
+            case .newTab(let inFront):
+                host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
                 return (.cancel, preferences)
-            }
-            if flags.contains(.shift) {
+            case .peek:
                 host?.tab(self, openURL: url, disposition: .peek)
                 return (.cancel, preferences)
-            }
-            if flags.contains(.option) {
+            case .download:
                 return (.download, preferences)
+            case .page:
+                break
             }
             // A pinned tab or favorite keeps its site: a link that leaves it opens beside it, in a new tab, so the
             // pinned Gmail is still Gmail when you come back. A site installed as an app sends it to the browser.
@@ -1661,6 +1671,45 @@ extension Tab: WKNavigationDelegate {
         // page it's in, as the blocklist does).
         if !showsExtensionPage { await ContentBlocker.prepareFilters(in: webView, for: url, mainFrame: isMainFrame) }
         return (.allow, preferences)
+    }
+
+    /// Where a main-frame link click opens: ⌘ or middle click a new tab (⇧ in front), ⇧ Peek, ⌥ download, else the
+    /// page. `followed` is a ⇧ or ⌥ click the page kept and then navigated to itself.
+    enum LinkActivation: Equatable {
+        case page, peek, download
+        case newTab(inFront: Bool)
+
+        var isNewTab: Bool { if case .newTab = self { true } else { false } }
+    }
+
+    nonisolated static func linkActivation(type: WKNavigationType, isMainFrame: Bool, modifiers: NSEvent.ModifierFlags,
+                                           buttonNumber: Int, followed: LinkActivation? = nil) -> LinkActivation {
+        guard isMainFrame else { return .page }
+        if type == .linkActivated {
+            // ⌘ wins over ⌥, as in Chrome.
+            if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }
+            if modifiers.contains(.shift) { return .peek }
+            if modifiers.contains(.option) { return .download }
+            return .page
+        }
+        return followed ?? .page
+    }
+
+    /// How long after a ⇧ or ⌥ click the page's navigation still counts as that click's.
+    static let followedClickWindow: TimeInterval = 2
+
+    /// From the page script: a ⇧ or ⌥ click landed on `url` and the page kept it.
+    func modifiedClickFollowed(_ url: URL, peek: Bool, download: Bool) {
+        let activation: LinkActivation = peek ? .peek : download ? .download : .page
+        followedClick = activation == .page ? nil : (url, activation, Date())
+    }
+
+    /// The kept click `url` follows, taken once: same link, within the window.
+    func followedActivation(for url: URL?) -> LinkActivation? {
+        guard let clicked = followedClick, let url, Date().timeIntervalSince(clicked.at) < Self.followedClickWindow,
+              Self.sameAddress(clicked.url, url) else { return nil }
+        followedClick = nil
+        return clicked.activation
     }
 
     /// Whether a "Visit anyway" link came from the certificate warning itself: a click in the main frame of the web
