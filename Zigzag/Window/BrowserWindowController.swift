@@ -24,6 +24,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     let sidebar = SidebarView()
     /// The live second sidebar the hot screen edge shows (#363), made the first time it comes out.
     private var edgeSidebar: SidebarView?
+    /// The floating Mini the edge sidebar borrowed a tab into, if one is out.
+    private var edgeMini: MiniWindowController?
     private var edgeContainer: SidebarContainer?
     /// The command bar is open over the screen in the edge panel, not in this window.
     private(set) var edgeCommandBarInPlace = false
@@ -3524,8 +3526,11 @@ extension BrowserWindowController {
         mirror.hoversWhileInactive = true
         // Hovering a row shows its still page beside it, in the panel's own window: the browser window's overlay is
         // behind another app while the panel is out.
-        mirror.list.onHoverTab = { tab, rect in
-            guard let tab, let rect, !EdgePeek.shared.isVisible else { EdgePeekPreview.shared.hide(); return }
+        mirror.list.onHoverTab = { [weak self] tab, rect in
+            guard let self, let tab, let rect, self.edgeMini == nil, !EdgePeek.shared.isVisible else {
+                EdgePeekPreview.shared.hide()
+                return
+            }
             EdgePeekPreview.shared.hover(tab: tab, at: rect)
         }
         wireEdgeSidebar(mirror)
@@ -3668,13 +3673,37 @@ extension BrowserWindowController {
 
     /// A tab, favorite or page picked in the edge sidebar: its window comes forward on it, and the panel goes at once.
     private func pickFromEdgeSidebar(_ tab: Tab) {
-        // The tab that is already out goes back in: the same click opens and closes the page.
-        if EdgePeek.shared.isVisible, EdgePeek.shared.tab === tab {
-            EdgePeek.shared.close()
+        // The tab that is already out goes back: the same click opens and closes the Mini.
+        if let mini = edgeMini {
+            edgeMini = nil
+            let same = mini.tab === tab
+            mini.closeBorrowed()
+            setEdgePeek(nil)
+            EdgeSidebar.shared.holdForPeek(false)
+            if same { return }
+        }
+        // A page can't be borrowed into Mini (pinned, private, Zigzag's own): the browser window is the answer.
+        guard MiniWindowController.canTake(tab.url, isPinned: tab.bookmarkID != nil, isPrivate: tabManager.isPrivate),
+              let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else {
+            bringForwardForEdge()
             return
         }
-        // The page comes with it, beside the panel; the browser window does not come forward.
-        EdgePeek.shared.show(tab: tab, from: self)
+        if EdgePeek.shared.isVisible { EdgePeek.shared.close() }
+        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(sidebarFrame) } ?? NSScreen.main
+        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let frame = EdgePeekLayout.pageFrame(beside: sidebarFrame, in: visible,
+                                             onRight: EdgeSidebar.shared.panelOnRight)
+        let mini = MiniWindowController.open(borrowing: tab, from: self, origin: sidebarFrame, frame: frame,
+                                             overFullScreen: true, floating: true)
+        edgeMini = mini
+        mini.onBorrowedClose = { [weak self, weak mini] in
+            guard let self, let mini, self.edgeMini === mini else { return }
+            self.edgeMini = nil
+            self.setEdgePeek(nil)
+            EdgeSidebar.shared.holdForPeek(false)
+        }
+        setEdgePeek(tab.id)
+        EdgeSidebar.shared.holdForPeek(true)
     }
 
     /// Zigzag comes forward for something in the edge sidebar. The panel goes with it, unless what was picked hangs
