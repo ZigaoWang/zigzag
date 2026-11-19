@@ -1112,7 +1112,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
     private let addressAboveToggle = Toggle()
-    private let sidebarRightToggle = Toggle()
+    private let sidebarSide = DropdownButton()
+    /// Sidebar position's choices, Left then Right, as whether the sidebar is on the right (#360).
+    static let sidebarSides = [false, true]
     private let doubleClickTabToggle = Toggle()
     private var sideToken: NSObjectProtocol?
     private let largeNamesToggle = Toggle()
@@ -1470,12 +1472,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                  control: addressAboveToggle)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
-        sidebarRightToggle.onChange = { on in BrowserRootView.sidebarOnRight = on }
-        let sideRow = FormRow(title: String(localized: "Sidebar on the right", comment: "A setting in Settings › Appearance: puts the sidebar along the window's right edge."),
-                              detail: String(localized: "The sidebar sits along the window’s right edge, with the page on its left.", comment: "Explanation under “Sidebar on the right” in Settings › Appearance."),
-                              control: sidebarRightToggle)
+        sidebarSide.options = [
+            DropdownButton.Option(title: String(localized: "Left", comment: "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's left edge.")),
+            DropdownButton.Option(title: String(localized: "Right", comment: "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's right edge.")),
+        ]
+        sidebarSide.onSelect = { index in BrowserRootView.sidebarOnRight = Self.sidebarSides[index] }
+        let sideRow = FormRow(title: String(localized: "Sidebar position", comment: "A setting in Settings › Appearance: which edge of the window the sidebar runs along, Left or Right."),
+                              detail: String(localized: "The edge of the window the sidebar runs along. The page sits beside it.", comment: "Explanation under “Sidebar position” in Settings › Appearance."),
+                              control: sidebarSide)
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
-        sideRow.keywords = String(localized: "sidebar right left side position move", comment: "Words that find the Sidebar on the right setting with Find a setting in Settings. Not shown.") + " 侧边栏"
+        sideRow.keywords = String(localized: "sidebar right left side position move", comment: "Words that find the Sidebar position setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sideRow)
         doubleClickTabToggle.onChange = { on in SidebarView.doubleClickOpensNewTab = on }
         let doubleClickRow = FormRow(title: String(localized: "Double-click the sidebar for a new tab", comment: "A setting in Settings › Appearance."),
@@ -1485,7 +1491,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(doubleClickRow)
         // The View menu moves it too, with Settings open.
         sideToken = NotificationCenter.default.addObserver(forName: BrowserRootView.sidebarSideChanged, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight }
+            MainActor.assumeIsolated { self?.sidebarSide.selectedIndex = BrowserRootView.sidebarOnRight ? 1 : 0 }
         }
         // As macOS's System Settings › Appearance › Sidebar icon size: three sizes, Medium as Zigzag has always been.
         sidebarSize.options = Tokens.Sidebar.Size.allCases.map { size in
@@ -3680,7 +3686,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
         addressAboveToggle.isOn = BrowserRootView.addressAbovePage
-        sidebarRightToggle.isOn = BrowserRootView.sidebarOnRight
+        sidebarSide.selectedIndex = Self.sidebarSides.firstIndex(of: BrowserRootView.sidebarOnRight) ?? 0
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
         quitToggle.isOn = AppDelegate.asksBeforeQuitting

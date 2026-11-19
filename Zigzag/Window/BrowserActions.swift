@@ -230,7 +230,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         onStateChange?()
     }
 
-    /// View › Move Sidebar to Right (or Left): the same as Settings › Appearance › Sidebar on the right, for every window.
+    /// View › Move Sidebar to Right (or Left): the same as Settings › Appearance › Sidebar position, for every window.
     @objc func toggleSidebarSide(_ sender: Any?) {
         BrowserRootView.sidebarOnRight.toggle()
     }

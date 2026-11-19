@@ -805,7 +805,7 @@ enum DebugBridge {
         case "newtabclick": controller.newTabNote.debugClick(Int(arg) ?? 0)
         // topbar on|off: Settings › Appearance › Address bar above the page.
         case "topbar": BrowserRootView.addressAbovePage = arg == "on"
-        // sidebarside right|left: Settings › Appearance › Sidebar on the right.
+        // sidebarside right|left: Settings › Appearance › Sidebar position.
         case "sidebarside": BrowserRootView.sidebarOnRight = arg == "right"
         // sideframes: where the sidebar, the page and the traffic lights are, in the debug log.
         case "sideframes":

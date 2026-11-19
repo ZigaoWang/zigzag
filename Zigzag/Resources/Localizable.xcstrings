@@ -3958,6 +3958,17 @@
         }
       }
     },
+    "Left" : {
+      "comment" : "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's left edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左侧"
+          }
+        }
+      }
+    },
     "Remember for this site" : {
       "comment" : "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.",
       "localizations" : {
@@ -3965,6 +3976,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "记住对此网站的选择"
+          }
+        }
+      }
+    },
+    "Right" : {
+      "comment" : "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's right edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右侧"
+          }
+        }
+      }
+    },
+    "Sidebar position" : {
+      "comment" : "A setting in Settings › Appearance: which edge of the window the sidebar runs along, Left or Right.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏位置"
+          }
+        }
+      }
+    },
+    "The edge of the window the sidebar runs along. The page sits beside it." : {
+      "comment" : "Explanation under “Sidebar position” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏靠窗口哪一边放，网页在它旁边。"
           }
         }
       }
@@ -17834,17 +17878,6 @@
         }
       }
     },
-    "Sidebar on the right" : {
-      "comment" : "A setting in Settings › Appearance: puts the sidebar along the window's right edge.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏放在右侧"
-          }
-        }
-      }
-    },
     "Sidebar size" : {
       "comment" : "A setting in Settings › Appearance: how large the sidebar's tabs, folders, space names, favorites and address are, as macOS's Sidebar icon size.",
       "localizations" : {
@@ -19399,17 +19432,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这个服务的地址无效。"
-          }
-        }
-      }
-    },
-    "The sidebar sits along the window’s right edge, with the page on its left." : {
-      "comment" : "Explanation under “Sidebar on the right” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏沿窗口右侧边缘放置，页面在它的左边。"
           }
         }
       }
@@ -24012,7 +24034,7 @@
       }
     },
     "sidebar right left side position move" : {
-      "comment" : "Words that find the Sidebar on the right setting with Find a setting in Settings. Not shown.",
+      "comment" : "Words that find the Sidebar position setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
