@@ -83,6 +83,7 @@ enum WebKitSetup {
             for script in PageScripts.all + Reader.scripts { configuration.userContentController.addUserScript(script) }
             // Runs in its own world, invisible to the page.
             configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagHover")
+            configuration.userContentController.add(PageMessages.shared, contentWorld: .defaultClient, name: "zigzagLinkClick")
             configuration.userContentController.addUserScript(PasswordCapture.script)
             configuration.userContentController.add(PasswordCapture.shared, contentWorld: .defaultClient, name: PasswordCapture.messageName)
             configuration.userContentController.addUserScript(Autofill.script)
@@ -170,26 +171,34 @@ enum PageScripts {
         // Picture in Picture lives in the site panel and View › Picture in Picture (⌥⌘P), not as a pill drawn over
         // videos: pages lay out their own players, and a pill placed from outside drifts off them.
         [WKUserScript(source: linkHover, injectionTime: .atDocumentEnd, forMainFrameOnly: false, in: .defaultClient), applePayMark,
-         commandClickedLinks]
+         modifiedLinkClicks]
     }
 
-    /// ⌘-click on a web link always opens a new tab, whatever the page's script does (#317). YouTube's script
-    /// followed its links in-page, so a ⌘-click moved the tab. Runs before the page's listeners and stops the event;
-    /// WebKit then follows the link and `Tab` opens it in a new tab. Links in editable text, same-page anchors and
-    /// download links are left to the page.
-    static let commandClickedLinks = WKUserScript(source: """
+    /// ⌘ is the browser's and the page never hears it (#317); ⇧ and ⌥ are the page's, and only the navigation it makes right after one is taken (#322).
+    static let modifiedLinkClicks = WKUserScript(source: """
     (() => {
       if (!/^https?:$/.test(location.protocol)) return;
-      addEventListener('click', (e) => {
-        if (!e.isTrusted || e.button !== 0 || !e.metaKey || e.ctrlKey) return;
+      // The link the click is on, to the web: never one in text being edited, one to download or one to this page's
+      // own heading.
+      const target = (e) => {
         const link = e.composedPath().find((n) => n instanceof Element && (n.localName === 'a' || n.localName === 'area') &&
                                               (n.hasAttribute('href') || n.hasAttribute('xlink:href')));
-        if (!link || link.hasAttribute('download') || link.isContentEditable) return;
+        if (!link || link.hasAttribute('download') || link.isContentEditable) return null;
         let url;
-        try { url = new URL(link.getAttribute('href') ?? link.getAttribute('xlink:href'), document.baseURI); } catch (error) { return; }
-        if (!/^https?:$/.test(url.protocol)) return;
-        if (url.hash && url.href.split('#')[0] === location.href.split('#')[0]) return;
-        e.stopImmediatePropagation();
+        try { url = new URL(link.getAttribute('href') ?? link.getAttribute('xlink:href'), document.baseURI); } catch (error) { return null; }
+        if (!/^https?:$/.test(url.protocol)) return null;
+        if (url.hash && url.href.split('#')[0] === location.href.split('#')[0]) return null;
+        return url;
+      };
+      const tell = (url, e) => {
+        try { window.webkit.messageHandlers.zigzagLinkClick.postMessage({ url: url.href, shift: e.shiftKey, alt: e.altKey }); } catch (error) {}
+      };
+      addEventListener('click', (e) => {
+        if (!e.isTrusted || e.button !== 0 || e.ctrlKey) return;
+        const url = target(e);
+        if (!url) return;
+        if (e.metaKey) { e.stopImmediatePropagation(); return; }
+        if (e.shiftKey || e.altKey) tell(url, e);
       }, true);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: false, in: .defaultClient)
@@ -255,9 +264,18 @@ final class PageMessages: NSObject, WKScriptMessageHandler {
     static let shared = PageMessages()
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "zigzagHover", let webView = message.webView as? BrowserWebView, let tab = webView.owner else { return }
-        let text = message.body as? String ?? ""
-        tab.hoveredLinkChanged(text.isEmpty ? nil : URL(string: text))
+        guard let webView = message.webView as? BrowserWebView, let tab = webView.owner else { return }
+        switch message.name {
+        case "zigzagHover":
+            let text = message.body as? String ?? ""
+            tab.hoveredLinkChanged(text.isEmpty ? nil : URL(string: text))
+        case "zigzagLinkClick":
+            guard let body = message.body as? [String: Any], let text = body["url"] as? String,
+                  let url = URL(string: text) else { return }
+            tab.modifiedClickFollowed(url, peek: body["shift"] as? Bool == true, download: body["alt"] as? Bool == true)
+        default:
+            break
+        }
     }
 }
 
