@@ -142,7 +142,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ 及其子路径，例如 %2$@/repo。"
+            "value" : "%1$@ 及其下的网页，例如 %2$@/repo。"
           }
         }
       }
@@ -4091,7 +4091,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输入主机名和路径，例如 github.com/org1。"
+            "value" : "输入域名和路径，例如 github.com/org1。"
           }
         }
       }
@@ -4113,7 +4113,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "匹配所填主机名下的网页（例如 github.com）。"
+            "value" : "只匹配你填写的这个域名下的网页（例如 github.com）。"
           }
         }
       }
@@ -4124,7 +4124,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "匹配同一主机名下的指定路径及其子路径（例如 github.com/org1 和 github.com/org1/repo）。"
+            "value" : "匹配同一域名下的某个路径及其下的网页（例如 github.com/org1 和 github.com/org1/repo）。"
           }
         }
       }
@@ -4135,7 +4135,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "匹配域名及其子域名下的网页（例如 github.com 和 gist.github.com）。"
+            "value" : "匹配某个域名及其所有子域名下的网页（例如 github.com 和 gist.github.com）。"
           }
         }
       }
@@ -4157,7 +4157,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "仅匹配 %@ 上的网页。"
+            "value" : "只匹配 %@ 上的网页。"
           }
         }
       }
@@ -4179,7 +4179,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此规则匹配的所有网址都已被第 %lld 条规则覆盖。"
+            "value" : "第 %lld 条规则已经覆盖了此规则匹配的所有网址。"
           }
         }
       }
@@ -4190,7 +4190,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第 %lld 条规则会被此规则完全覆盖。"
+            "value" : "此规则完全覆盖了第 %lld 条规则。"
           }
         }
       }
@@ -4201,7 +4201,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "以下规则会被此规则完全覆盖：%@。"
+            "value" : "此规则完全覆盖了第 %@ 条规则。"
           }
         }
       }
@@ -4212,7 +4212,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "调整第 %lld 条规则的顺序或移除该规则"
+            "value" : "调整第 %lld 条规则的顺序，或移除它"
           }
         }
       }
@@ -4223,7 +4223,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "主机名和路径"
+            "value" : "域名和路径"
           }
         }
       }
@@ -4234,7 +4234,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "主机名"
+            "value" : "域名"
           }
         }
       }
@@ -4256,7 +4256,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "规则 %lld"
+            "value" : "第 %lld 条规则"
           }
         }
       }
@@ -4267,7 +4267,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请输入一个主机名（如 github.com），无需填写路径。"
+            "value" : "输入一个域名，例如 github.com，不带路径。"
           }
         }
       }
@@ -4278,7 +4278,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请输入上级主机名（如 github.com），无需填写通配符或路径。"
+            "value" : "输入上级域名，例如 github.com，不带通配符或路径。"
           }
         }
       }
@@ -4289,7 +4289,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可以省略 http:// 或 https:// 前缀。"
+            "value" : "可以不写 http:// 或 https://。"
           }
         }
       }
@@ -4300,7 +4300,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第一条已启用且匹配的规则决定打开链接的空间。拖动即可调整顺序。"
+            "value" : "链接在第一条匹配且已启用的规则所选的空间中打开。拖动可以调整顺序。"
           }
         }
       }
