@@ -2514,7 +2514,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 self?.layoutDocument()
             }
             row.onSave = library.saveRoute
-            row.onRightClick = { _ in Self.routeMenu(for: rule.id) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row, !row.isEditing else { return false }
                 return self.beginRouteDrag(row, event: event)
@@ -2529,31 +2528,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         let rows = routeRows.map(\.row)
         let coverage = SiteRoutes.coverage(in: rows.map(\.ruleForValidation))
         for (row, result) in zip(rows, coverage) { row.setWarning(result.warning) }
-    }
-
-    static func routeMenu(for id: UUID) -> NSMenu {
-        let library = Library.shared, routes = library.siteRoutes
-        let menu = NSMenu()
-        guard let rule = routes.first(where: { $0.id == id }) else { return menu }
-        let title = rule.isEnabled ? String(localized: "Turn Off", comment: "Turn off a space rule from its context menu.")
-            : String(localized: "Turn On", comment: "Turn on a space rule from its context menu.")
-        menu.addItem(SidebarMenus.Item(title) {
-            guard var updated = library.siteRoutes.first(where: { $0.id == id }) else { return }
-            updated.isEnabled = !rule.isEnabled
-            library.saveRoute(updated)
-        })
-        if routes.count > 1 { menu.addItem(.separator()) }
-        SiteRouteReorderMenu.addMoves(to: menu, for: id, in: routes.map(\.id)) { library.moveRoute(id, before: $0) }
-        if let i = SiteRoutes.blocker(for: rule, in: routes) {
-            menu.addItem(SidebarMenus.Item(String(localized: "Move Above Rule \(i + 1)", comment: "Move a space rule above the rule hiding it.")) {
-                library.moveRoute(id, before: routes[i].id)
-            })
-        }
-        menu.addItem(.separator())
-        menu.addItem(SidebarMenus.Item(String(localized: "Remove", comment: "Remove a space rule.")) {
-            library.removeRoute(id)
-        })
-        return menu
     }
 
     private func reloadSpaces() {

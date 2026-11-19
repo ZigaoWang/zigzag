@@ -8546,7 +8546,7 @@
       }
     },
     "Edit" : {
-      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.",
+      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nEdit a space rule in its Settings row.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

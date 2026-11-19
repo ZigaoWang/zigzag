@@ -99,7 +99,9 @@ struct SiteRoutesTests {
         let save = try #require(buttons.first { $0.title == String(localized: "Save") })
         let cancel = try #require(buttons.first { $0.title == String(localized: "Cancel") })
         #expect(toggle.isHidden && field.isHidden && buttons.allSatisfy(\.isHidden))
-        #expect(row.alphaValue < 1 && row.accessibilityLabel()?.contains(String(localized: "Off")) == true)
+        let off = String(localized: "Off")
+        #expect(row.alphaValue < 1 && row.accessibilityLabel()?.contains(off) == true)
+        #expect(row.subviews.compactMap { $0 as? Label }.contains { !$0.isHidden && $0.stringValue.contains(off) })
         #expect(row.accessibilityPerformPress())
         #expect(!toggle.isHidden && !field.isHidden && !save.isHidden && !cancel.isHidden)
         #expect(field.stringValue == saved.site)
@@ -131,14 +133,29 @@ struct SiteRoutesTests {
         #expect(row.searchText.contains(saved.site))
     }
 
-    @Test func theRuleContextMenuTurnsTheSameRuleOffAndOn() throws {
+    @Test func theRuleContextMenuEditsMovesAndTogglesTheSelectedRule() throws {
         let library = Library.shared
-        let rule = SiteRoutes.Route(match: .path, site: "context-menu.test/example", spaceID: try #require(library.spaces.first?.id))
-        library.saveRoute(rule)
-        defer { library.removeRoute(rule.id) }
+        let spaceID = try #require(library.spaces.first?.id)
+        let rules = ["first", "middle", "last"].map { SiteRoutes.Route(match: .path, site: "context-menu.test/" + $0, spaceID: spaceID) }
+        for rule in rules { library.saveRoute(rule) }
+        defer { for rule in rules { library.removeRoute(rule.id) } }
+        let rule = rules[1]
+        let row = SiteRouteRow(rule)
+        row.refresh(rule, spaces: library.spaces, number: 2)
+        let click = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                                   windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 0))
+        let menu = try #require(row.menu(for: click))
+        #expect(menu.items.first?.title == String(localized: "Edit"))
+        let up = menu.indexOfItem(withTitle: String(localized: "Move Up"))
+        #expect(up >= 0 && menu.indexOfItem(withTitle: String(localized: "Move Down")) == up + 1)
+        menu.performActionForItem(at: 0)
+        #expect(row.isEditing)
+        let field = try #require(row.subviews.compactMap { $0 as? FilledField }.first)
+        #expect(field.stringValue == rule.site)
+        #expect(row.control(field.field, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))))
         let order = library.siteRoutes.map(\.id)
         for (title, enabled) in [(String(localized: "Turn Off"), false), (String(localized: "Turn On"), true)] {
-            let menu = SettingsView.routeMenu(for: rule.id)
+            let menu = try #require(row.menu(for: click))
             let index = menu.indexOfItem(withTitle: title)
             try #require(index >= 0)
             menu.performActionForItem(at: index)

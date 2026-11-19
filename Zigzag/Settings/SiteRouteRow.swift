@@ -46,6 +46,7 @@ final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable,
         enabled.setAccessibilityLabel(enabledLabel.stringValue)
         [icon, address, detail, field, match, opensIn, destination, enabledLabel, enabled, cancel, save, message].forEach { addSubview($0) }
         onClick = { [weak self] _ in self?.beginEditing() }
+        onRightClick = { [weak self] _ in self?.actionsMenu() }
         save.onClick = { [weak self] _ in self?.commitDraft() }
         cancel.onClick = { [weak self] _ in self?.finishEditing() }
         match.onSelect = { [weak self] _ in self?.draftChanged() }
@@ -99,6 +100,35 @@ final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable,
         [icon, address, detail].forEach { $0.isHidden = isEditing }
         [field, match, enabledLabel, enabled, cancel, save].forEach { $0.isHidden = !isEditing }
         needsLayout = true
+    }
+
+    private func actionsMenu() -> NSMenu {
+        let library = Library.shared, routes = library.siteRoutes
+        let menu = NSMenu()
+        let id = rule.id
+        guard let saved = routes.first(where: { $0.id == id }) else { return menu }
+        menu.addItem(SidebarMenus.Item(String(localized: "Edit", comment: "Edit a space rule in its Settings row.")) { [weak self] in
+            self?.beginEditing()
+        })
+        let title = saved.isEnabled ? String(localized: "Turn Off", comment: "Turn off a space rule from its context menu.")
+            : String(localized: "Turn On", comment: "Turn on a space rule from its context menu.")
+        menu.addItem(SidebarMenus.Item(title) {
+            guard var updated = library.siteRoutes.first(where: { $0.id == id }) else { return }
+            updated.isEnabled = !saved.isEnabled
+            library.saveRoute(updated)
+        })
+        if routes.count > 1 { menu.addItem(.separator()) }
+        SiteRouteReorderMenu.addMoves(to: menu, for: id, in: routes.map(\.id)) { library.moveRoute(id, before: $0) }
+        if let i = SiteRoutes.blocker(for: saved, in: routes) {
+            menu.addItem(SidebarMenus.Item(String(localized: "Move Above Rule \(i + 1)", comment: "Move a space rule above the rule hiding it.")) {
+                library.moveRoute(id, before: routes[i].id)
+            })
+        }
+        menu.addItem(.separator())
+        menu.addItem(SidebarMenus.Item(String(localized: "Remove", comment: "Remove a space rule.")) {
+            library.removeRoute(id)
+        })
+        return menu
     }
 
     private func beginEditing() {
