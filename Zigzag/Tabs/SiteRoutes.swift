@@ -28,7 +28,20 @@ enum SiteRoutes {
             switch match {
             case .domain: SiteRoutes.covers(host, urlHost)
             case .host: host == urlHost
-            case .path: host == urlHost && (urlPath == path || urlPath.hasPrefix(String(path) + "/"))
+            case .path:
+                host == urlHost && Self.matchesPath(path, in: urlPath)
+            }
+        }
+
+        private static func matchesPath(_ prefix: Substring, in path: String) -> Bool {
+            // Split before decoding so an escaped slash stays inside its original segment.
+            let expected = prefix.split(separator: "/", omittingEmptySubsequences: false)
+            let actual = path.split(separator: "/", omittingEmptySubsequences: false)
+            guard actual.count >= expected.count else { return false }
+            return zip(expected, actual).allSatisfy { lhs, rhs in
+                let a = lhs.removingPercentEncoding ?? String(lhs)
+                let b = rhs.removingPercentEncoding ?? String(rhs)
+                return a.caseInsensitiveCompare(b) == .orderedSame
             }
         }
 
@@ -159,11 +172,19 @@ enum SiteRoutes {
         let authority = input[schemeEnd...]
             .prefix { !"/?#".contains($0) }
         guard !authority.contains("%"), !authority.contains("@") else { return nil }
+        // Rules match the hostname across ports, just as the old site lists did.
+        let portSuffix = authority.drop(while: { $0 != "]" }).dropFirst()
+        let port = host.hasPrefix("[") ? portSuffix : authority.drop(while: { $0 != ":" })
+        if !port.isEmpty {
+            let digits = port.dropFirst()
+            guard port.first == ":", !digits.isEmpty, digits.utf8.allSatisfy({ (48...57).contains($0) }),
+                  UInt16(digits) != nil else { return nil }
+        }
         if host.hasPrefix("[") && host.hasSuffix("]") {
             var bytes = in6_addr()
-            guard authority.last == "]", inet_pton(AF_INET6, String(host.dropFirst().dropLast()), &bytes) == 1 else { return nil }
+            guard authority.dropLast(port.count).last == "]", inet_pton(AF_INET6, String(host.dropFirst().dropLast()), &bytes) == 1 else { return nil }
         } else {
-            guard !authority.contains(":"), host.utf8.count <= 253 else { return nil }
+            guard host.utf8.count <= 253 else { return nil }
             let labels = host.split(separator: ".", omittingEmptySubsequences: false)
             guard labels.allSatisfy({ label in
                 (1...63).contains(label.utf8.count) && label.first != "-" && label.last != "-" &&

@@ -51,7 +51,7 @@ struct SiteRoutesTests {
                 #expect(SiteRoutes.entry(from: text, match: mode) == "github.com")
             }
             for text in ["", "two words", "*.github.com", "github.com/org1", "https://github.com/org1",
-                         "github.com/?q=a", "github.com/#readme", "github.com:443", "github.com:",
+                         "github.com/?q=a", "github.com/#readme", "github.com:65536", "github.com:no", "github.com:-1", "github.com:",
                          "https://me@github.com", "ftp://github.com", "-bad.example", "bad-.example",
                          "exa_mple.com", "two..dots", "%67ithub.com", "999.1.2.3", String(repeating: "x", count: 64) + ".com"] {
                 #expect(SiteRoutes.entry(from: text, match: mode) == nil)
@@ -180,6 +180,20 @@ struct SiteRoutesTests {
         #expect(roundTrip == [future as NSDictionary])
     }
 
+    @Test func portsAreAcceptedButDoNotRestrictTheRule() {
+        for (input, site) in [("localhost:3000", "localhost"), ("https://github.com:443", "github.com"),
+                              ("[::1]:8000", "[::1]")] {
+            #expect(SiteRoutes.entry(from: input) == site)
+        }
+        #expect(SiteRoutes.entry(from: "localhost:3000/App", match: .path) == "localhost/App")
+        let rule = SiteRoutes.Route(match: .path, site: "localhost/App", spaceID: work)
+        #expect(SiteRoutes.route(for: url("http://localhost:8000/app/a"), in: [rule]) == rule)
+        #expect(SiteRoutes.route(for: url("http://localhost:3000/apple"), in: [rule]) == nil)
+        for input in ["[::1]:", "[::1]:abc", "[::1]:65536", "localhost:+3"] {
+            #expect(SiteRoutes.entry(from: input) == nil)
+        }
+    }
+
     @Test func choosingASpaceReenablesOnlyTheEquivalentDomainRule() {
         let page = url("https://github.com/org1")
         let exact = SiteRoutes.Route(match: .host, site: "github.com", spaceID: work, isEnabled: false)
@@ -273,10 +287,10 @@ struct SiteRoutesTests {
 
     @Test func matchesPathsOnSegmentBoundariesAndPreservesHostScope() {
         let rule = SiteRoutes.Route(match: .path, site: "github.com/org1", spaceID: work)
-        for suffix in ["/org1", "/org1/", "/org1/repo?q=open#readme"] {
+        for suffix in ["/org1", "/org1/", "/Org1", "/ORG1/repo", "/org1/repo?q=open#readme"] {
             #expect(SiteRoutes.route(for: url("https://github.com" + suffix), in: [rule]) == rule)
         }
-        for address in ["https://github.com/org10", "https://github.com/Org1", "https://github.com/org1%2Frepo",
+        for address in ["https://github.com/org10", "https://github.com/ORG10", "https://github.com/org1%2Frepo",
                         "https://gist.github.com/org1", "https://www.github.com/org1"] {
             #expect(SiteRoutes.route(for: url(address), in: [rule]) == nil)
         }
@@ -329,7 +343,7 @@ struct SiteRoutesTests {
             (.path, "example.com/a", .host, "example.com", false),
             (.path, "example.com/a", .domain, "example.com", false),
             (.path, "example.com/a", .path, "example.com/a", true),
-            (.path, "example.com/a", .path, "example.com/a/b", true),
+            (.path, "example.com/A", .path, "example.com/a/b", true),
             (.path, "example.com/a", .path, "example.com/ab", false)
         ]
         let unrelated = SiteRoutes.Route(site: "unrelated.org", spaceID: media)
