@@ -269,4 +269,31 @@ struct PageHolderTests {
         // Zigzag places the page under its own bars: WebKit insetting it for a title bar left a band along its top.
         #expect(page.value(forKey: key) as? Bool == false)
     }
+
+    /// The views from the page up to its window. A scroll view among them would add a scroll bar of its own.
+    private func ancestors(of view: NSView) -> [NSView] {
+        Array(sequence(first: view, next: \.superview).dropFirst())
+    }
+
+    @Test func aPageInACardHasOnlyItsOwnScrollBars() throws {
+        let card = card(), tab = tab()
+        let page = tab.ensureWebView()
+        card.show(page)
+        card.layoutSubtreeIfNeeded()
+        let holder = try #require(tab.pageHolder)
+        #expect(!ancestors(of: page).contains { $0 is NSScrollView })
+        #expect(page.frame == holder.bounds)
+    }
+
+    @Test func aPageInPeekHasOnlyItsOwnScrollBars() throws {
+        let manager = TabManager(spaceID: Library.shared.spaces[0].id)
+        defer { manager.invalidate() }
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        let page = try #require(controller.peek.show(url: nil, configuration: nil, opener: nil))
+        defer { controller.peek.close() }
+        let holder = try #require(controller.peek.tab?.pageHolder)
+        #expect(!ancestors(of: page).contains { $0 is NSScrollView })
+        #expect(page.frame == holder.bounds)
+    }
 }
