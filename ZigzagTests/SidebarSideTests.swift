@@ -382,14 +382,12 @@ struct EdgeSidebarLayoutTests {
         #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 2000, y: 1100), in: screens) == nil)
     }
 
-    @Test func thePanelComesOutOnlyForAnotherAppsWindowWhoseSidebarIsAway() {
-        // Another app in front and the window's sidebar hidden: the case the panel is for.
-        #expect(EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: false, sidebarFloating: false))
+    @Test func thePanelComesOutForAnotherAppInFrontWhateverTheWindowSidebarShows() {
+        // Another app in front: the panel comes out whether the browser's own sidebar is docked, floating or away,
+        // because none of that is on screen while the browser is behind another app.
+        #expect(EdgeSidebarLayout.canShow(appIsActive: false))
         // Zigzag itself: its own sidebar already comes out at its edge.
-        #expect(!EdgeSidebarLayout.canShow(appIsActive: true, sidebarVisible: false, sidebarFloating: false))
-        // The sidebar already on screen, docked or slid out over the page.
-        #expect(!EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: true, sidebarFloating: false))
-        #expect(!EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: false, sidebarFloating: true))
+        #expect(!EdgeSidebarLayout.canShow(appIsActive: true))
     }
 
     @Test func thePanelAndItsBarTakeKeysWithoutTakingTheWindow() {

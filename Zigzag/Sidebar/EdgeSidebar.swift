@@ -33,10 +33,10 @@ enum EdgeSidebarLayout {
         screens.firstIndex { $0.contains(point) }
     }
 
-    /// Whether the panel may come out: for a window of another app in front, whose sidebar is away. Zigzag's own
-    /// window already brings its sidebar out at its edge, and a sidebar on screen is the one the panel would copy.
-    static func canShow(appIsActive: Bool, sidebarVisible: Bool, sidebarFloating: Bool) -> Bool {
-        !appIsActive && !sidebarVisible && !sidebarFloating
+    /// Whether the panel may come out: whenever Zigzag is not the app in front. A window behind another app is not
+    /// on screen, so whether its own sidebar is docked or floating there changes nothing the person can see.
+    static func canShow(appIsActive: Bool) -> Bool {
+        !appIsActive
     }
 }
 
@@ -171,9 +171,7 @@ final class EdgeSidebar {
         // The window whose sidebar comes out: the last one in front, or, after that one closed, the one Zigzag would
         // have brought forward.
         if target == nil { target = WindowManager.shared.keyController }
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront,
-                                                    sidebarVisible: target.root.sidebarVisible,
-                                                    sidebarFloating: target.root.isSidebarFloatingVisible) else { return }
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront) else { return }
         let point = NSEvent.mouseLocation
         guard let (zone, local, _) = zone(at: point), zone.opens(at: local) else { return }
         met(at: event.timestamp)
@@ -242,9 +240,7 @@ final class EdgeSidebar {
     private func follow() {
         guard isShowing, let visible = shownScreen, let zone = zone(in: visible) else { return }
         // Zigzag came forward, or the window's sidebar came out: the panel has nothing left to show.
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront,
-                                                    sidebarVisible: target.root.sidebarVisible,
-                                                    sidebarFloating: target.root.isSidebarFloatingVisible) else {
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront) else {
             hide()
             return
         }
@@ -314,9 +310,7 @@ final class EdgeSidebar {
     }
 
     private func show(on visible: NSRect) {
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront,
-                                                    sidebarVisible: target.root.sidebarVisible,
-                                                    sidebarFloating: target.root.isSidebarFloatingVisible) else { return }
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront) else { return }
         let (sidebar, container) = target.edgeSidebarForDisplay()
         target.prepareEdgeSidebar()
         let onRight = target.edgeSidebarOnRight
