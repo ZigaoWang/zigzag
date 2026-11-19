@@ -3464,7 +3464,12 @@ extension BrowserWindowController {
         // A click picks a tab; a drag would leave the panel, so its rows stay put.
         mirror.list.allowsDragging = false
         mirror.list.onPickTab = { [weak self] tab in self?.pickFromEdgeSidebar(tab) }
-        wireEdgeSidebar(mirror)
+        // A mirror, not a window's sidebar: no bar to lend its address buttons to, and no close button, since
+        // moving the pointer away is what puts the panel back.
+        mirror.hasTopBar = false
+        mirror.sidebarButton.isHidden = true
+        // Over another app, the app is inactive and the panel never key: its hover states still answer the pointer.
+        mirror.hoversWhileInactive = true
         let container = SidebarContainer(sidebar: mirror)
         edgeSidebar = mirror
         edgeContainer = container
@@ -3515,9 +3520,6 @@ extension BrowserWindowController {
             guard let tab = self?.tabManager.selectedTab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()
         }
-        // The panel is the sidebar: this is its hide button, not the window's.
-        mirror.sidebarButton.onClick = { _ in EdgeSidebar.shared.hide() }
-
         mirror.address.onMiddleClick = { [weak self] in self?.bringForwardForEdge(); self?.closeTab(nil) }
         mirror.address.readerButton.onClick = { [weak self] _ in self?.bringForwardForEdge(); self?.toggleReader() }
         mirror.address.drop.onDrop = { [weak self] destination in

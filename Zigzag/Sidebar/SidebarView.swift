@@ -874,8 +874,21 @@ final class SidebarView: NSView {
             guard holdsAddress != oldValue else { return }
             // Leaving the top bar: back to the field with the site.
             if holdsAddress { address.buttonsOnly = false; addressViews.forEach(addSubview) }
+            refreshAddressButtons()
             needsLayout = true
         }
+    }
+    /// The window's sidebar lends its back, forward, reload and address to the bar above the page. A mirror at the
+    /// screen's edge has no bar to lend them to, so with the address above the page it hides its own instead of
+    /// leaving them at the frames they last had.
+    var hasTopBar = true { didSet { refreshAddressButtons() } }
+    /// Whether everything in it keeps its hover states while Zigzag is inactive and its panel isn't key: the sidebar
+    /// at the screen's edge, which shows over another app.
+    var hoversWhileInactive = false
+
+    private func refreshAddressButtons() {
+        let shows = holdsAddress || hasTopBar
+        addressButtons.forEach { $0.isHidden = !shows }
     }
     /// Where the favorites start while the address is above the page: the page's top, so the two line up under the
     /// top row (set by the window as it lays out the page).
@@ -2480,3 +2493,5 @@ enum SpaceReorder {
         return to == from ? nil : to
     }
 }
+
+extension SidebarView: HoverTrackingWhileInactive {}

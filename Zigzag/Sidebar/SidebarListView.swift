@@ -882,7 +882,9 @@ final class SidebarListView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited,
+                                                         tracksHoverWhileInactive ? .activeAlways : .activeInKeyWindow,
+                                                         .inVisibleRect], owner: self)
         addTrackingArea(area)
         hoverArea = area
     }

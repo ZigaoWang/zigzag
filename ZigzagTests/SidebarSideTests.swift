@@ -19,6 +19,28 @@ struct SidebarSideTests {
         #expect(mirror(mirror(rect)) == rect)
     }
 
+    @Test func aMirrorHidesItsAddressButtonsWhileTheBarHoldsTheAddress() {
+        let mirror = SidebarView(frame: .zero)
+        mirror.hasTopBar = false
+        mirror.holdsAddress = false
+        #expect(mirror.addressButtons.allSatisfy { $0.isHidden })
+        mirror.holdsAddress = true
+        #expect(mirror.addressButtons.allSatisfy { !$0.isHidden })
+        // The window's sidebar keeps them: they leave for the bar above the page, they don't hide.
+        let windowSidebar = SidebarView(frame: .zero)
+        windowSidebar.holdsAddress = false
+        #expect(windowSidebar.addressButtons.allSatisfy { !$0.isHidden })
+    }
+
+    @Test func aMirrorTracksHoverWhileAnotherAppIsInFront() {
+        let mirror = SidebarView(frame: .zero)
+        #expect(!mirror.backButton.tracksHoverWhileInactive)
+        mirror.hoversWhileInactive = true
+        #expect(mirror.backButton.tracksHoverWhileInactive)
+        // A window's sidebar keeps the window's own hover rules.
+        #expect(!SidebarView(frame: .zero).backButton.tracksHoverWhileInactive)
+    }
+
     @Test func theDockedSidebarRunsDownTheRightEdge() {
         let left = BrowserRootView.sidebarFrame(in: window, width: width, visible: true, revealed: false, onRight: false)
         let right = BrowserRootView.sidebarFrame(in: window, width: width, visible: true, revealed: false, onRight: true)
@@ -358,6 +380,16 @@ struct EdgeSidebarLayoutTests {
         #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 2000, y: 100), in: screens) == 1)
         // Over the menu bar, where no visible frame reaches: on none, so no edge.
         #expect(EdgeSidebarLayout.screen(containing: NSPoint(x: 2000, y: 1100), in: screens) == nil)
+    }
+
+    @Test func thePanelComesOutOnlyForAnotherAppsWindowWhoseSidebarIsAway() {
+        // Another app in front and the window's sidebar hidden: the case the panel is for.
+        #expect(EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: false, sidebarFloating: false))
+        // Zigzag itself: its own sidebar already comes out at its edge.
+        #expect(!EdgeSidebarLayout.canShow(appIsActive: true, sidebarVisible: false, sidebarFloating: false))
+        // The sidebar already on screen, docked or slid out over the page.
+        #expect(!EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: true, sidebarFloating: false))
+        #expect(!EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: false, sidebarFloating: true))
     }
 }
 

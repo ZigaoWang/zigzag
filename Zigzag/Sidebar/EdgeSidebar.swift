@@ -32,6 +32,12 @@ enum EdgeSidebarLayout {
     static func screen(containing point: NSPoint, in screens: [NSRect]) -> Int? {
         screens.firstIndex { $0.contains(point) }
     }
+
+    /// Whether the panel may come out: for a window of another app in front, whose sidebar is away. Zigzag's own
+    /// window already brings its sidebar out at its edge, and a sidebar on screen is the one the panel would copy.
+    static func canShow(appIsActive: Bool, sidebarVisible: Bool, sidebarFloating: Bool) -> Bool {
+        !appIsActive && !sidebarVisible && !sidebarFloating
+    }
 }
 
 /// The sidebar's hot screen edge (#363): one switch, and the one panel that comes out of it.
@@ -93,6 +99,11 @@ final class EdgeSidebar {
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hide(animated: false) }
         })
+        // Zigzag coming forward puts it back: the panel is for reaching a tab from another app, and the window's own
+        // sidebar takes over from here.
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.hide(animated: false) }
+        })
         if Self.isOn { start() }
     }
 
@@ -145,6 +156,9 @@ final class EdgeSidebar {
         // The window whose sidebar comes out: the last one in front, or, after that one closed, the one Zigzag would
         // have brought forward.
         if target == nil { target = WindowManager.shared.keyController }
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: NSApp.isActive,
+                                                    sidebarVisible: target.root.sidebarVisible,
+                                                    sidebarFloating: target.root.isSidebarFloatingVisible) else { return }
         let point = NSEvent.mouseLocation
         guard let (zone, local, _) = zone(at: point), zone.opens(at: local) else { return }
         met(at: event.timestamp)
@@ -212,6 +226,13 @@ final class EdgeSidebar {
 
     private func follow() {
         guard isShowing, let visible = shownScreen, let zone = zone(in: visible) else { return }
+        // Zigzag came forward, or the window's sidebar came out: the panel has nothing left to show.
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: NSApp.isActive,
+                                                    sidebarVisible: target.root.sidebarVisible,
+                                                    sidebarFloating: target.root.isSidebarFloatingVisible) else {
+            hide()
+            return
+        }
         let point = EdgeSidebarLayout.point(NSEvent.mouseLocation, in: visible)
         // A pressed button holds it out, as a drag from the panel does. So does a menu opened from it, whose tracking
         // (system menus) or open panel (MenuPanel) runs while the pointer is over it.
@@ -226,7 +247,9 @@ final class EdgeSidebar {
     // MARK: The panel
 
     private func show(on visible: NSRect) {
-        guard let target else { return }
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: NSApp.isActive,
+                                                    sidebarVisible: target.root.sidebarVisible,
+                                                    sidebarFloating: target.root.isSidebarFloatingVisible) else { return }
         let (sidebar, container) = target.edgeSidebarForDisplay()
         target.prepareEdgeSidebar()
         let onRight = target.edgeSidebarOnRight
