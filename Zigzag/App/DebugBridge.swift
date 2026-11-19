@@ -718,10 +718,13 @@ enum DebugBridge {
             controller.sidebar.list.reload(animated: false)
         case "load": if let url = URL(string: arg) { controller.open(url, disposition: .currentTab) }
         case "sidebar": controller.toggleBrowserSidebar(nil)
-        // newtabnote <path>: the new tab note's frame (window points, top left) and the selected tab.
+        // newtabnote <path>: each new tab row out from the hidden sidebar (frame in window points, top left, and title),
+        // then the selected tab.
         case "newtabnote":
-            let frame = controller.newTabNote.debugFrame.map(NSStringFromRect) ?? "none"
-            try? "\(frame)\n\(controller.tabManager.selectedTab?.displayTitle ?? "-")".write(toFile: arg, atomically: true, encoding: .utf8)
+            let rows = controller.newTabNote.debugPeeks.map { "\(NSStringFromRect($0.0)) \($0.1)" }
+            try? (rows + [controller.tabManager.selectedTab?.displayTitle ?? "-"]).joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
+        // newtabclick <i>: clicks the i-th of those rows.
+        case "newtabclick": controller.newTabNote.debugClick(Int(arg) ?? 0)
         // topbar on|off: Settings › Appearance › Address bar above the page.
         case "topbar": BrowserRootView.addressAbovePage = arg == "on"
         // sidebarside right|left: Settings › Appearance › Sidebar on the right.

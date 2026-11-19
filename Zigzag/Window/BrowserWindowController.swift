@@ -362,6 +362,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // Many at once (`TabManager.together`): once, when they're all done.
             if tabManager.isBatching { break }
             sidebar.list.reload(animated: window?.isVisible == true)
+            newTabNote.listChanged()
             // A favorite opened or closed: its tile shows it.
             reloadFavorites()
             numberHints?.placesChanged()
@@ -687,6 +688,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             sidebar.list.refreshRows()
         }
         reloadFavorites()
+        newTabNote.listChanged()
         sidebar.address.setCapture(camera: tab?.isUsingCamera ?? false, microphone: tab?.isUsingMicrophone ?? false)
         updateWindowTitle()
         refreshExtensionActions()

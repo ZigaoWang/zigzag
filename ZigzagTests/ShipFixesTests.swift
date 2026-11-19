@@ -31,17 +31,36 @@ struct ShipFixesTests {
         #expect(!NewTabNote.shows(sidebarVisible: false, sidebarFloating: false, deskVisible: true))
     }
 
-    /// #272: the note shows the site until the title loads.
-    @Test func newTabNoteNamesTheSiteUntilTheTitleComes() {
-        let site = URL(string: "https://www.example.com/a")!
-        // WebKit's empty tab for Open Link in New Tab: the site it's about to load.
+    /// #272: WebKit's empty tab shows the site it's about to load; once the tab has a page, its own title, live.
+    @Test func newTabRowFollowsTheTabsTitle() {
+        let site = URL(string: "https://www.youtube.com/watch?v=1")!
         let empty = Tab(url: nil, spaceID: UUID())
-        #expect(NewTabNote.title(of: empty, site: site) == "example.com")
-        let loading = Tab(url: site, spaceID: UUID())
-        #expect(NewTabNote.title(of: loading, site: nil) == "example.com")
-        let titled = Tab(url: site, title: "Example Domain", spaceID: UUID())
-        #expect(NewTabNote.title(of: titled, site: site) == "Example Domain")
-        #expect(NewTabNote.announcement(for: "Example Domain").contains("Example Domain"))
+        #expect(NewTabNote.placeholder(for: empty, site: site) == "www.youtube.com")
+        #expect(NewTabNote.placeholder(for: Tab(url: site, spaceID: UUID()), site: site) == nil)
+
+        let peek = NewTabPeekView(tab: empty, site: site)
+        #expect(peek.row.title.stringValue == "www.youtube.com")
+        empty.customTitle = "A Video"
+        #expect(peek.row.title.stringValue == "A Video")
+        let titled = Tab(url: site, title: "YouTube", spaceID: UUID())
+        let live = NewTabPeekView(tab: titled, site: site)
+        #expect(live.row.title.stringValue == "YouTube")
+        titled.customTitle = "Another Video"
+        #expect(live.row.title.stringValue == "Another Video")
+        #expect(NewTabNote.announcement(for: "A Video").contains("A Video"))
+    }
+
+    /// #272: each new tab's row comes out at its own place in the list; one scrolled past comes out at that end of the
+    /// list in sight, stacked inward in list order and clear of the others.
+    @Test func newTabRowsEachTakeTheirOwnPlace() {
+        let h: CGFloat = 30, gap: CGFloat = 2, sight: ClosedRange<CGFloat> = 100...400
+        #expect(NewTabNote.slots(rows: [120, 152, 184], visible: sight, height: h, gap: gap) == [120, 152, 184])
+        // Below the fold: up from the bottom, the last lowest.
+        #expect(NewTabNote.slots(rows: [500, 532], visible: sight, height: h, gap: gap) == [338, 370])
+        // Above: down from the top. Nowhere (in a closed folder): the bottom.
+        #expect(NewTabNote.slots(rows: [10, nil], visible: sight, height: h, gap: gap) == [100, 370])
+        // A stacked one steps past a row already there.
+        #expect(NewTabNote.slots(rows: [370, 600], visible: sight, height: h, gap: gap) == [370, 338])
     }
 
     @Test func oldHTTPLoginsFillOnTheSecureSiteOnly() throws {
