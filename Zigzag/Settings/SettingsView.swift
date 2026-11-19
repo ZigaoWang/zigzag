@@ -4162,7 +4162,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                     self?.reloadPrivacy()
                     self?.layoutDocument()
                 }
-                rows.append(makeRow(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
+                rows.append(makeRow(SitePanel.fullScreenTitle,
                                     control: toggle) { PageFullScreen.setChoice(nil, for: url) })
             }
 

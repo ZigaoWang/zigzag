@@ -1408,7 +1408,7 @@ enum DebugBridge {
         // keepawake on|off: the site panel's Keep tabs awake row for the page in front.
         case "keepawake": KeepAwake.set(arg == "on", for: controller.tabManager.selectedTab?.url)
         // fsfill screen|page: Settings › Tabs › Full screen videos fill. fssite page|screen|follow: the site panel's
-        // Full screen fills the page row for the page in front. fsesc: Esc in the window, as the key would be.
+        // Keep full screen in the window row for the page in front. fsesc: Esc in the window, as the key would be.
         // fsstate <path>: whether each tab of the window fills its page (JSON).
         case "fsfill": if let fill = PageFullScreen.Fill(rawValue: arg) { PageFullScreen.fill = fill }
         case "fssite": PageFullScreen.setChoice(arg == "follow" ? nil : PageFullScreen.Fill(rawValue: arg), for: controller.tabManager.selectedTab?.url)

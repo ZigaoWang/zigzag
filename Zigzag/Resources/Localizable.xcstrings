@@ -3958,6 +3958,17 @@
         }
       }
     },
+    "Keep full screen in the window" : {
+      "comment" : "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏时留在窗口内"
+          }
+        }
+      }
+    },
     "Left" : {
       "comment" : "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's left edge.",
       "localizations" : {
@@ -4020,6 +4031,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "边栏靠窗口哪一边放，网页在它旁边。"
+          }
+        }
+      }
+    },
+    "Videos fill the page, not the screen" : {
+      "comment" : "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频只铺满网页，不占满屏幕"
+          }
+        }
+      }
+    },
+    "Videos fill your screen" : {
+      "comment" : "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频铺满整个屏幕"
           }
         }
       }
@@ -9535,17 +9568,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "磨砂"
-          }
-        }
-      }
-    },
-    "Full screen fills the page" : {
-      "comment" : "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全屏幕只填满网页"
           }
         }
       }

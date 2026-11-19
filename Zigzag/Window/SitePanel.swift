@@ -910,6 +910,17 @@ final class SitePanel: FloatingPanelView {
         return context
     }
 
+    /// The full-screen row's name, here and in Settings › Privacy › Sites: on, a video's full screen stays in the window.
+    static var fullScreenTitle: String {
+        String(localized: "Keep full screen in the window", comment: "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.")
+    }
+
+    /// Under the full-screen row, what full screen does on this site now (#385).
+    static func fullScreenStatus(_ on: Bool) -> String {
+        on ? String(localized: "Videos fill the page, not the screen", comment: "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.")
+            : String(localized: "Videos fill your screen", comment: "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.")
+    }
+
     /// The Dark page row, while there is one.
     private weak var darkRow: PanelRow?
     /// The Keep cookies row, while there is one.
@@ -991,8 +1002,8 @@ final class SitePanel: FloatingPanelView {
                 rows.append(row)
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
-                rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
-                                    on: PageFullScreen.fills(for: url) == .page, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                rows.append(.toggle(Self.fullScreenTitle,
+                                    on: PageFullScreen.fills(for: url) == .page, status: Self.fullScreenStatus) { [weak self] on in
                     guard let self else { return }
                     PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
                 })
