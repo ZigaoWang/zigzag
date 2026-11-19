@@ -65,22 +65,16 @@ enum SiteRoutes {
 
         init(_ rules: [Route] = []) { self.rules = rules }
 
-        private enum Key: String, CodingKey { case match }
-
         init(from decoder: Decoder) throws {
             rules = []
             var entries = try decoder.unkeyedContainer()
             while !entries.isAtEnd {
                 let index = entries.currentIndex
                 let entry = try entries.superDecoder()
-                let fields = try entry.container(keyedBy: Key.self)
-                let type = try fields.decode(String.self, forKey: .match)
-                if Match(rawValue: type) == nil {
-                    // Even a future payload we cannot represent must not prevent the library from opening.
-                    if let value = try? StoredValue(from: entry) { future.append((index, value)) }
-                } else {
-                    rules.append(try Route(from: entry))
-                }
+                // A rule this version can't read, from a newer Zigzag or edited by hand, is kept as it is and never
+                // stops the library from opening.
+                if let rule = try? Route(from: entry) { rules.append(rule) }
+                else if let value = try? StoredValue(from: entry) { future.append((index, value)) }
             }
         }
 

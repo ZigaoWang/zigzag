@@ -246,6 +246,17 @@ struct SiteRoutesTests {
         #expect(roundTrip == [future as NSDictionary])
     }
 
+    @Test func aRuleThatCantBeReadIsKeptAndTheRestLoad() throws {
+        let known = SiteRoutes.Route(site: "example.test", spaceID: work)
+        let first = try JSONSerialization.jsonObject(with: JSONEncoder().encode(known))
+        let broken: [String: Any] = ["site": "no-match.test"]
+        let fixture = try JSONSerialization.data(withJSONObject: [broken, first])
+        let list = try JSONDecoder().decode(SiteRoutes.StoredRules.self, from: fixture)
+        #expect(list.rules == [known])
+        let items = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(list)) as? [NSDictionary])
+        #expect(items.first == broken as NSDictionary)
+    }
+
     @Test func portsAreAcceptedButDoNotRestrictTheRule() {
         for (input, site) in [("localhost:3000", "localhost"), ("https://github.com:443", "github.com"),
                               ("[::1]:8000", "[::1]")] {
