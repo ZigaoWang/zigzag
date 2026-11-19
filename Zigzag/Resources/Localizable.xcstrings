@@ -3969,6 +3969,17 @@
         }
       }
     },
+    "Open “%@”" : {
+      "comment" : "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开“%@”"
+          }
+        }
+      }
+    },
     "Remember for this site" : {
       "comment" : "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.",
       "localizations" : {
@@ -13182,7 +13193,7 @@
       }
     },
     "Open" : {
-      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab.",
+      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.\nButton on an installed app's row in Settings › General: opens the app, or brings its window forward.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

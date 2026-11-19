@@ -4490,7 +4490,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             let finder = PillButton(title: String(localized: "Show in Finder", comment: "Button on an installed app's row in Settings › General: shows the app itself, selected in its folder in Finder."))
             finder.setAccessibilityLabel(String(localized: "Show “\(app.name)” in Finder", comment: "VoiceOver label of the Show in Finder button on an installed app's row in Settings › General; the app's name."))
             finder.onClick = { _ in WebAppStore.shared.revealInFinder(app) }
-            let controls = NSStackView(views: [toolbarLabel, toolbar, finder, remove])
+            let controls = NSStackView(views: [toolbarLabel, toolbar, Self.openButton(for: app), finder, remove])
             controls.spacing = Tokens.Space.x2
             controls.setCustomSpacing(Tokens.Space.x4, after: toolbar)
             let icon = store.bundle(of: app).map { NSWorkspace.shared.icon(forFile: $0.path) } ?? SettingsIcon.symbol("app")
@@ -4498,6 +4498,17 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             row.keywords = String(localized: "web app dock install application", comment: "Words that find Installed Apps with Find a setting in Settings. Not shown.")
             webAppsGroup.add(row)
         }
+    }
+
+    /// What an installed app's Open does: the same as its Dock icon, so an open window comes forward.
+    static var openWebApp: @MainActor (WebApp) -> Void = { WebAppInstaller.launch($0) }
+
+    /// Open on an installed app's row (#355), before Show in Finder.
+    static func openButton(for app: WebApp) -> PillButton {
+        let open = PillButton(title: String(localized: "Open", comment: "Button on an installed app's row in Settings › General: opens the app, or brings its window forward."))
+        open.setAccessibilityLabel(String(localized: "Open “\(app.name)”", comment: "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name."))
+        open.onClick = { _ in openWebApp(app) }
+        return open
     }
 
     private func confirm(title: String, message: String, action: String, destructive: Bool = true, then run: @escaping () -> Void) {
