@@ -187,15 +187,15 @@ enum Tokens {
         /// The sidebar's scale now: its size's, and for Custom, the percentage set.
         static var scale: CGFloat { current.scale }
 
-        /// The custom size's percents, 75 to 150 by 5: what the − and + beside Sidebar size step through.
-        static let customSteps: [CGFloat] = stride(from: 75, through: 150, by: 5).map { CGFloat($0) / 100 }
+        /// The custom size's percents, 80 to 150 by 5: what the − and + beside Sidebar size step through.
+        static let customSteps: [CGFloat] = stride(from: 80, through: 150, by: 5).map { CGFloat($0) / 100 }
 
-        /// The custom size's scale, 0.75 to 1.5: written back in whole percents within that range, so every size it
+        /// The custom size's scale, 0.8 to 1.5: written back in whole percents within that range, so every size it
         /// makes is one the sidebar can lay out. Every part of the sidebar lays itself out again when it changes.
         static var customScale: CGFloat {
             get { CGFloat(customPercent) / 100 }
             set {
-                let percent = min(max(Int((newValue * 100).rounded()), 75), 150)
+                let percent = min(max(Int((newValue * 100).rounded()), 80), 150)
                 guard percent != customPercent else { return }
                 customPercent = percent
                 UserDefaults.standard.set(percent, forKey: "SidebarSizePercent")
@@ -217,8 +217,8 @@ enum Tokens {
         static let sizeChanged = Notification.Name("SidebarSizeChanged")
         /// Read once: the sidebar asks for its sizes on every layout.
         private static var current: Size = UserDefaults.standard.string(forKey: "SidebarSize").flatMap(Size.init(rawValue:)) ?? .medium
-        /// A custom percentage as kept: 100 if none was kept, and within 75 to 150.
-        static func keptCustomPercent(_ stored: Int?) -> Int { min(max(stored ?? 100, 75), 150) }
+        /// A custom percentage as kept: 100 if none was kept, and within 80 to 150.
+        static func keptCustomPercent(_ stored: Int?) -> Int { min(max(stored ?? 100, 80), 150) }
         /// Custom's percentage, read once and written as it changes.
         /// `integer(forKey:)` also reads it when it was set as text, like `-SidebarSizePercent 120` at launch.
         private static var customPercent = keptCustomPercent(UserDefaults.standard.object(forKey: "SidebarSizePercent") == nil ? nil

@@ -144,7 +144,7 @@ extension SplitRowAlignmentTests {
         #expect(row(parts: 1, width: 260).accessibilityLabel() == "Page")
     }
 
-    /// The Custom size (#361) is a whole percentage from 75 to 150, 100 if none is kept, and gives the whole and
+    /// The Custom size (#361) is a whole percentage from 80 to 150, 100 if none is kept, and gives the whole and
     /// even points every other size does.
     @Test func theCustomSizeIsAWholePercentageWithinItsRange() {
         let wasSize = Tokens.Sidebar.size
@@ -158,7 +158,7 @@ extension SplitRowAlignmentTests {
         }
 
         #expect(Tokens.Sidebar.keptCustomPercent(nil) == 100)
-        #expect(Tokens.Sidebar.keptCustomPercent(74) == 75)
+        #expect(Tokens.Sidebar.keptCustomPercent(79) == 80)
         #expect(Tokens.Sidebar.keptCustomPercent(151) == 150)
 
         Tokens.Sidebar.size = .custom
@@ -173,9 +173,9 @@ extension SplitRowAlignmentTests {
         Tokens.Sidebar.customScale = 1.296
         #expect(abs(Tokens.Sidebar.customScale - 1.3) < 0.0001)
 
-        // Outside 75 to 150: stays at the end.
+        // Outside 80 to 150: stays at the end.
         Tokens.Sidebar.customScale = 0.1
-        #expect(abs(Tokens.Sidebar.customScale - 0.75) < 0.0001)
+        #expect(abs(Tokens.Sidebar.customScale - 0.8) < 0.0001)
         Tokens.Sidebar.customScale = 2
         #expect(abs(Tokens.Sidebar.customScale - 1.5) < 0.0001)
 
@@ -186,10 +186,10 @@ extension SplitRowAlignmentTests {
         #expect(Tokens.Sidebar.scaled(15, for: .custom) == 20)
         #expect(Tokens.Sidebar.scaledEven(15, for: .custom) == 20)
 
-        // 5% steps from 75% to 150%.
+        // 5% steps from 80% to 150%.
         let steps = Tokens.Sidebar.customSteps
-        #expect(steps.count == 16)
-        #expect(abs((steps.first ?? 0) - 0.75) < 0.0001 && abs((steps.last ?? 0) - 1.5) < 0.0001)
+        #expect(steps.count == 15)
+        #expect(abs((steps.first ?? 0) - 0.8) < 0.0001 && abs((steps.last ?? 0) - 1.5) < 0.0001)
         for (step, next) in zip(steps, steps.dropFirst()) { #expect(abs(next - step - 0.05) < 0.0001) }
     }
 
