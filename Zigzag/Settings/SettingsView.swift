@@ -1975,9 +1975,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Its picture, for the tab's preview and switcher. Taken with the shadows off: `cacheDisplay` blurs each one on
-    /// the CPU, rows out of sight too, and Developer's feature flags have a switch each, so leaving Settings › Developer
-    /// froze Zigzag for about two seconds. They're back before the transaction ends, so the page never shows without.
+    /// Its picture, for the tab's preview and switcher. Shadows are off while it's taken: `cacheDisplay` blurs each on the CPU (#379).
     func snapshot() -> NSImage? {
         guard bounds.width > 0, bounds.height > 0, let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return nil }
         let shadowed = Self.shadowedLayers(in: self)
@@ -1992,8 +1990,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         return image
     }
 
-    /// Every layer with a shadow, from each view as well as each layer: a view's layer isn't always among its
-    /// superview's layer's sublayers.
+    /// Every layer with a shadow, walking views as well as sublayers.
     static func shadowedLayers(in view: NSView) -> [CALayer] {
         func all(_ layer: CALayer) -> [CALayer] { [layer] + (layer.sublayers ?? []).flatMap(all) }
         return (view.layer.map(all) ?? []).filter { $0.shadowOpacity > 0 } + view.subviews.flatMap(shadowedLayers)
