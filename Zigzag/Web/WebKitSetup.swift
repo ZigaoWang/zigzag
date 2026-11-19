@@ -272,7 +272,22 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
     (() => {
       if (window.__zigzagScroll) return;
       window.__zigzagScroll = true;
-      let edge = 0, reported = 0;
+      // When the person last scrolled with their own hand: a wheel or trackpad (momentum keeps sending these) or a
+      // scrolling key; and whether the scroll bar is held. A scroll event is trusted even when the page's own script
+      // scrolled, so only a scroll this close to the person's input counts.
+      let input = 0, pressed = false;
+      const mark = () => { input = Date.now(); };
+      const keys = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' ']);
+      const options = { capture: true, passive: true };
+      window.addEventListener('wheel', (event) => { if (event.isTrusted) mark(); }, options);
+      window.addEventListener('touchmove', (event) => { if (event.isTrusted) mark(); }, options);
+      window.addEventListener('keydown', (event) => { if (event.isTrusted && keys.has(event.key)) mark(); }, options);
+      // On the scroll bar, not a click on the page: a link that jumps somewhere is the page scrolling.
+      window.addEventListener('mousedown', (event) => {
+        const html = document.documentElement;
+        if (event.isTrusted && (event.target === html || event.clientX >= html.clientWidth)) pressed = true;
+      }, options);
+      window.addEventListener('mouseup', () => { pressed = false; }, options);
       const root = document.scrollingElement || document.documentElement;
       const y = () => Math.max(0, window.scrollY || root.scrollTop || 0);
       // A field has the focus: the bar stays where it is while the person types (a page's own field counts too).
@@ -284,19 +299,15 @@ final class ScrollMessages: NSObject, WKScriptMessageHandler {
         return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.closest?.('[contenteditable=""], [contenteditable="true"]');
       };
       window.addEventListener('scroll', (event) => {
-        if (!event.isTrusted) return;
         const target = event.target;
         // A page's own elements scroll inside it all the time; only the page itself moves the bar.
         if (target !== document && target !== document.documentElement && target !== root) return;
-        // A scroll can arrive as a burst (one wheel turn, one momentum frame after another). The first is the
-        // person's. Anything within a moment of it may be the page laying out in steps, so it doesn't count.
-        const now = Date.now();
-        if (now - edge > 100) { reported = 0; edge = now; }
+        // A key's smooth scroll runs on a little after the key, and a dragged scroll bar for as long as it's held.
+        const trusted = pressed || Date.now() - input < 400;
         try {
-          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted: reported === 0, editing: editing() });
+          window.webkit.messageHandlers.\(messageName).postMessage({ y: y(), trusted, editing: editing() });
         } catch (e) {}
-        reported += 1;
-      }, { capture: true, passive: true });
+      }, options);
     })();
     """, injectionTime: .atDocumentStart, forMainFrameOnly: true, in: .defaultClient)
 
