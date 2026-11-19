@@ -188,8 +188,10 @@ nonisolated struct TileShape: Equatable, Sendable {
     }
 
     /// The strips between pages you drag to resize them: one between each pair beside each other, as tall or as wide as
-    /// the two pages, `slop` wider on both sides so it's easy to catch.
-    func segments(in area: CGRect, gap: CGFloat, slop: CGFloat) -> [Segment] {
+    /// the two pages, `slop` wider on both sides so it's easy to catch; the column line `leading` (when given) on its
+    /// left instead, so a page's scroll bar side keeps more of its edge (#362).
+    func segments(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> [Segment] {
+        let leftReach = leading ?? slop
         let frames = frames(in: area, gap: gap)
         var segments: [Segment] = []
         for a in frames.indices {
@@ -201,8 +203,8 @@ nonisolated struct TileShape: Equatable, Sendable {
                     // The page that keeps to one row names it; a half names the row of the page across from it.
                     let row = regions[a].rows.count == 1 ? regions[a].rows.lowerBound : regions[b].rows.lowerBound
                     segments.append(Segment(axis: .column, row: row, column: 0, first: a, second: b,
-                                            frame: CGRect(x: first.maxX - slop, y: top, width: gap + slop * 2,
-                                                          height: bottom - top)))
+                                            frame: CGRect(x: first.maxX - leftReach, y: top,
+                                                          width: gap + leftReach + slop, height: bottom - top)))
                 }
                 if first.minY < second.minY, abs(first.maxY + gap - second.minY) <= 0.5 {
                     let left = max(first.minX, second.minX), right = min(first.maxX, second.maxX)
@@ -218,8 +220,8 @@ nonisolated struct TileShape: Equatable, Sendable {
     }
 
     /// Where the segments meet, the square you drag to move both at once (#309).
-    func corners(in area: CGRect, gap: CGFloat, slop: CGFloat) -> [Corner] {
-        let strips = segments(in: area, gap: gap, slop: slop)
+    func corners(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> [Corner] {
+        let strips = segments(in: area, gap: gap, slop: slop, leading: leading)
         let vertical = strips.filter { $0.axis == .column }, horizontal = strips.filter { $0.axis == .row }
         let side: CGFloat = 12, reach = gap + slop + 0.5
         var corners: [Corner] = []
@@ -242,8 +244,8 @@ nonisolated struct TileShape: Equatable, Sendable {
 
     /// The strips between pages, one per line where it divides them, as the whole line each way: what a thumbnail
     /// draws, and what a split of two always had.
-    func dividers(in area: CGRect, gap: CGFloat, slop: CGFloat) -> (column: CGRect?, row: CGRect?) {
-        let strips = segments(in: area, gap: gap, slop: slop)
+    func dividers(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> (column: CGRect?, row: CGRect?) {
+        let strips = segments(in: area, gap: gap, slop: slop, leading: leading)
         func union(_ axis: Segment.Axis) -> CGRect? {
             let frames = strips.filter { $0.axis == axis }.map(\.frame)
             guard let first = frames.first else { return nil }

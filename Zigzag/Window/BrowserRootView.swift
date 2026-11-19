@@ -258,7 +258,11 @@ final class ResizeHandle: NSView {
     var isVertical = false { didSet { window?.invalidateCursorRects(for: self) } }
     /// Drags both ways, as a corner does.
     var dragsBothWays = false { didSet { window?.invalidateCursorRects(for: self) } }
-    private var startX: CGFloat = 0
+    /// Where the line it moves is, across the strip (x, or y up from its bottom when vertical). A press anywhere in the
+    /// strip moves the line from where it is, never jumping it to the pointer (#362).
+    var line: CGFloat = 0
+    /// From the line to where the press landed.
+    private var grab: CGFloat = 0
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: dragsBothWays ? .crosshair : isVertical ? .rowResize : .columnResize)
@@ -267,14 +271,22 @@ final class ResizeHandle: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
 
     override func mouseDown(with event: NSEvent) {
-        startX = event.locationInWindow.x
+        let point = convert(event.locationInWindow, from: nil)
+        grab = (isVertical ? point.y : point.x) - line
         onBegin?()
         if event.clickCount == 2 { onDoubleClick?() }
     }
 
     override func mouseDragged(with event: NSEvent) {
-        if let onDragPoint { onDragPoint(event.locationInWindow) } else { onDrag?(isVertical ? event.locationInWindow.y : event.locationInWindow.x) }
+        if let onDragPoint {
+            onDragPoint(event.locationInWindow)
+        } else {
+            onDrag?(Self.dragged(isVertical ? event.locationInWindow.y : event.locationInWindow.x, grab: grab))
+        }
     }
+
+    /// Where the line goes for the pointer at `pointer`, pressed `grab` from the line.
+    nonisolated static func dragged(_ pointer: CGFloat, grab: CGFloat) -> CGFloat { pointer - grab }
 
     override func mouseUp(with event: NSEvent) { onEnd?() }
 }
@@ -617,6 +629,8 @@ final class BrowserRootView: SpaceFrameView {
         }
         addSubview(attentionEdge)
         addSubview(sidebarContainer)
+        // Over the sidebar, so the part of its edge's band inside the sidebar takes the pointer too (#362).
+        addSubview(resizeHandle)
         addSubview(splitDropHint)
         addSubview(overlay)
         borderlessToken = NotificationCenter.default.addObserver(forName: Self.borderlessChanged, object: nil, queue: .main) { [weak self] _ in
@@ -946,9 +960,13 @@ final class BrowserRootView: SpaceFrameView {
     /// While a pane is enlarged the lines rest under the dimming.
     private func placeDividers() {
         let area = cardFrame
+        let reach = Tokens.Metric.dragReach
+        let leading = reach / 2
         tileHandles.frame = bounds
-        let segments = zoomedPane == nil ? tiles?.segments(in: area, gap: paneGap, slop: 2) ?? [] : []
-        let corners = zoomedPane == nil ? tiles?.corners(in: area, gap: paneGap, slop: 2) ?? [] : []
+        let segments = zoomedPane == nil
+            ? tiles?.segments(in: area, gap: paneGap, slop: reach, leading: leading) ?? [] : []
+        let corners = zoomedPane == nil
+            ? tiles?.corners(in: area, gap: paneGap, slop: reach, leading: leading) ?? [] : []
         var live: Set<DividerKey> = []
         var madeDivider = false
         for segment in segments {
@@ -963,8 +981,9 @@ final class BrowserRootView: SpaceFrameView {
                 madeDivider = true
             }
             handle.segment = segment
-            let vertical = segment.axis == .column
-            if handle.isVertical != vertical { handle.isVertical = vertical }
+            let isColumn = segment.axis == .column
+            handle.isVertical = !isColumn
+            handle.line = isColumn ? leading : segment.frame.height - reach
             handle.isHidden = false
             handle.frame = segment.frame
         }
@@ -1087,10 +1106,17 @@ final class BrowserRootView: SpaceFrameView {
         AttentionEdge.frame(forPage: bounds, sidebarOnRight: onRight)
     }
 
+    /// The band along the sidebar's edge that takes a drag, full height: well into the sidebar's empty strip beside its
+    /// rows, a little into the page, and less on the right, where the page's scroll bar is (#362).
     static func resizeHandleFrame(in bounds: NSRect, sidebarWidth: CGFloat, onRight: Bool) -> NSRect {
-        let width = Tokens.Metric.resizeHandleWidth
-        return mirrored(NSRect(x: bounds.minX + sidebarWidth - width / 2, y: bounds.minY, width: width, height: bounds.height), in: bounds, if: onRight)
+        let inside = Tokens.Metric.sidebarDragReach, out = resizeHandlePageReach(onRight: onRight)
+        return mirrored(NSRect(x: bounds.minX + sidebarWidth - inside, y: bounds.minY, width: inside + out, height: bounds.height), in: bounds, if: onRight)
     }
+
+    static func resizeHandlePageReach(onRight: Bool) -> CGFloat { onRight ? Tokens.Metric.dragReach / 2 : Tokens.Metric.dragReach }
+
+    /// The sidebar's edge across its handle: from the left, past the part over the sidebar, or the part over the page.
+    static func resizeHandleLine(onRight: Bool) -> CGFloat { onRight ? resizeHandlePageReach(onRight: true) : Tokens.Metric.sidebarDragReach }
 
     /// The sidebar's width for a drag of its edge to `x`: how far that is from the window's edge it's on.
     static func reach(of x: CGFloat, in bounds: NSRect, onRight: Bool) -> CGFloat { onRight ? bounds.maxX - x : x - bounds.minX }
@@ -1133,6 +1159,7 @@ final class BrowserRootView: SpaceFrameView {
         // Docked beside the bar above the page, the sidebar's top row stays on the bar's middle line.
         sidebarContainer.sidebar.topRowDrop = sidebarTopRowDrop
         resizeHandle.frame = Self.resizeHandleFrame(in: bounds, sidebarWidth: sidebarWidth, onRight: sidebarOnRight)
+        resizeHandle.line = Self.resizeHandleLine(onRight: sidebarOnRight)
         resizeHandle.isHidden = !sidebarVisible && !isDraggingSidebarEdge
         // With the sidebar hidden, the glow goes on the window edge, not at the resize handle, which would sit inside
         // the page.

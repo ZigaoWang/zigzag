@@ -1270,11 +1270,17 @@ final class SidebarListView: NSView {
         window.makeFirstResponder(back)
     }
 
+    /// ⌫ or ⌦.
+    nonisolated static func isDeleteKey(_ keyCode: UInt16) -> Bool { keyCode == 51 || keyCode == 117 }
+
     override func keyDown(with event: NSEvent) {
         let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
         if event.keyCode == 53, mods.isEmpty {
             clearMarks()
-        } else if event.keyCode == 51 || event.keyCode == 117, mods.isEmpty || mods == .command {
+        } else if Self.isDeleteKey(event.keyCode), mods.isEmpty || mods == .command {
+            // Held down, the rest of the press would reach the page once the rows are gone (#375).
+            guard !event.isARepeat else { return }
+            (window as? BrowserWindow)?.holdsBackDeleteRepeats = true
             delegate?.listRemove(marked)
         } else {
             super.keyDown(with: event)
