@@ -401,3 +401,15 @@ struct ShutFolderRowsTests {
         #expect(decoded.name == "F" && !decoded.isOpen && decoded.tucked == nil)
     }
 }
+
+/// Big imports (#343): imported folders start shut.
+@MainActor
+struct FolderBulkTests {
+    @Test func importedFoldersStartShutAndYoursStayOpen() {
+        let mine = BookmarkFolder(name: "Mine")
+        let folders = Library.filed([UUID(), UUID()], paths: [["Mine", "Inner"], ["New"]], into: [mine])
+        #expect(folders.first { $0.id == mine.id }?.isOpen == true)
+        #expect(folders.filter { $0.id != mine.id }.map(\.name).sorted() == ["Inner", "New"])
+        #expect(folders.filter { $0.id != mine.id }.allSatisfy { !$0.isOpen })
+    }
+}

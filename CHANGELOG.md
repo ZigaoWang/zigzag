@@ -21,6 +21,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ### Fixed
 - The outline on a pinned tab or favorite whose page is loaded is much fainter, a hint instead of a box, most of all in dark mode. Thanks to [drewbeck](https://github.com/drewbeck). ([#351](https://github.com/ZigaoWang/zigzag/issues/351))
 - A tab's sound button sits right after its title, the size of the text and lined up with it, instead of at the end of the row where × goes. It shows only while the page plays sound or is muted, and clicking it mutes or unmutes the page. A favorite shows it as a small badge on its icon's corner.
+- Folders from an import start collapsed, so a bookmarks file with a hundred folders is a short list instead of a long scroll. Folders you already had stay as they were. Thanks to [mrfragger](https://github.com/mrfragger). ([#343](https://github.com/ZigaoWang/zigzag/issues/343))
 
 ## [0.9.3] - 2026-11-18
 

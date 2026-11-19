@@ -28,6 +28,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ### 修复
 - 已固定的标签页或收藏的网页载入后，外框淡了很多，只是轻轻提示，不再像一个框，深色模式下尤其明显。感谢 [drewbeck](https://github.com/drewbeck)。([#351](https://github.com/ZigaoWang/zigzag/issues/351))
 - 标签页的声音按钮现在紧跟在标题后面，大小和文字一样并与文字对齐，不再放在行尾 × 的位置。只在网页播放声音或已静音时显示，点按可以静音或取消静音。收藏则在图标角上显示一个小标记。
+- 导入的文件夹一开始都是折叠的，有上百个文件夹的书签文件不会再要滚很久。你原来就有的文件夹保持不变。感谢 [mrfragger](https://github.com/mrfragger)。([#343](https://github.com/ZigaoWang/zigzag/issues/343))
 
 ## [0.9.3] - 2026-11-18
 

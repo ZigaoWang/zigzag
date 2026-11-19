@@ -1124,6 +1124,8 @@ final class Library {
             let at = known[Place(parent: parent, name: name)] ?? {
                 var made = BookmarkFolder(name: name)
                 made.parentID = parent
+                // Shut: a big import of open folders is a long list to scroll (#343).
+                made.isOpen = false
                 folders.append(made)
                 known[Place(parent: parent, name: name)] = folders.count - 1
                 return folders.count - 1
