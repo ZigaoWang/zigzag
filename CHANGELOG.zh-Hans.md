@@ -47,6 +47,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 发送到服务的下载规则，现在先写地址，方法放在后面的括号里，比如“以 .torrent 结尾的文件交给 127.0.0.1（load.start）”，不再是“load.start · 127.0.0.1”。网页上方的提示也这样写，规则下面网站保留的选择显示为“youtube.com：转交”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#367](https://github.com/ZigaoWang/zigzag/issues/367))
 - “网站设置”和“设置 › 隐私 › 网站”里的全屏开关改名为“全屏时留在窗口内”，不再叫“全屏幕只填满网页”；“网站设置”里开关下面会写明现在在这个网站上会怎样：“视频只铺满网页，不占满屏幕”或“视频铺满整个屏幕”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#385](https://github.com/ZigaoWang/zigzag/issues/385))
 - 密码扩展可以从自己的弹出窗口填写网站自身的登录框（HTTP 基本认证）了。以前 Zigzag 的登录框出现后，再在扩展里选登录信息不会有任何反应；现在登录框还开着时，第一个由扩展给出的用户名和密码会直接登录并关掉登录框。感谢 [Tuszy42](https://github.com/Tuszy42)。([#387](https://github.com/ZigaoWang/zigzag/issues/387))
+- 扩展在 Peek 里的网页上和在标签页里一样好用了。以前 Peek 里的网页对扩展来说不算标签页，像 SponsorBlock 这样的扩展能在网页上运行，却收不到后台的回复，也不知道自己在哪个标签页里。现在它是所在窗口的一个标签页，Peek 打开时就是当前标签页，打开、变化和关闭时扩展都会知道；“作为标签页打开”后仍是同一个标签页。在无痕浏览窗口中，只有你允许的扩展能看到它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#374](https://github.com/ZigaoWang/zigzag/issues/374))
 
 ## [0.9.3] - 2026-11-18
 
