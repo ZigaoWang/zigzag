@@ -323,14 +323,14 @@ struct BookmarkFolderTests {
 
     /// Runs the swipe script's own decision in JavaScriptCore over made-up elements: `chain` from the one under the
     /// pointer outward, each a JavaScript object literal with its style.
-    private func keeps(_ chain: [String], root: String = "null", ends: String = "[]", deltaX: Double,
-                       prevented: Bool = false) throws -> Bool {
+    private func keeps(_ chain: [String], root: String = "null", ends: String = "[]", view: String = "null",
+                       deltaX: Double, prevented: Bool = false) throws -> Bool {
         let context = try #require(JSContext())
         let result = context.evaluateScript("""
         const chain = [\(chain.joined(separator: ", "))];
         chain.forEach((el, i) => { el.parentElement = chain[i + 1] || null; });
         const style = (el) => Object.assign({ overflowX: 'visible', overflowY: 'visible', overscrollBehaviorX: 'auto', direction: 'ltr' }, el.style);
-        const room = (\(SwipeAnswers.sideways))(chain[0], style, \(root), \(ends));
+        const room = (\(SwipeAnswers.sideways))(chain[0], style, \(root), \(ends), \(view));
         (\(SwipeAnswers.keeps))(room, \(deltaX), \(prevented))
         """)
         #expect(context.exception == nil)
@@ -354,8 +354,10 @@ struct BookmarkFolderTests {
         let rtl = "{ scrollWidth: 3000, clientWidth: 800, scrollLeft: 0, style: { overflowX: 'auto', direction: 'rtl' } }"
         #expect(try keeps([cell, rtl], deltaX: -12))
         #expect(try !keeps([cell, rtl], deltaX: 12))
-        // A page a little too wide by accident doesn't count; a really wide one does.
-        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
+        // A page a little too wide by accident has no room ahead; scrolled along, it has room behind (#377).
+        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 0, style: {} }", deltaX: 12))
+        #expect(try !keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 0, style: {} }", deltaX: -12))
+        #expect(try keeps([cell], root: "{ scrollWidth: 1040, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
         #expect(try keeps([cell], root: "{ scrollWidth: 3000, clientWidth: 1000, scrollLeft: 20, style: {} }", deltaX: -12))
         // Nothing scrolls: a plain page leaves it to the swipe.
         #expect(try !keeps([cell, "{ scrollWidth: 1000, clientWidth: 1000, style: {} }"], deltaX: -12))
@@ -373,6 +375,33 @@ struct BookmarkFolderTests {
         #expect(try !keeps([cell], ends: "[{ style: {} }, { style: {} }]", deltaX: -12))
         // A page that cancels the scrolls itself (Canva) keeps them, whatever scrolls.
         #expect(try keeps([cell], deltaX: -12, prevented: true))
+    }
+
+    @Test func swipeScriptKeepsWhatPansWhenPinchedIn() throws {
+        // Pinched in to twice the size, the visible half pans across a page no wider than the window (#377).
+        let root = "{ scrollWidth: 832, clientWidth: 832, scrollLeft: 0, style: {} }"
+        let panned = "{ scale: 2, pageLeft: 200, width: 416 }"
+        #expect(try keeps([cell], root: root, view: panned, deltaX: -12))
+        #expect(try keeps([cell], root: root, view: panned, deltaX: 12))
+        // At its left edge it goes back; at its right edge it goes forward.
+        #expect(try !keeps([cell], root: root, view: "{ scale: 2, pageLeft: 0, width: 416 }", deltaX: -12))
+        #expect(try !keeps([cell], root: root, view: "{ scale: 2, pageLeft: 416, width: 416 }", deltaX: 12))
+        // Not pinched in: the page's own width decides.
+        #expect(try !keeps([cell], root: root, view: "{ scale: 1, pageLeft: 0, width: 832 }", deltaX: 12))
+    }
+
+    @Test func swipeNeedsAThirdOfThePage() {
+        // A third of the page, within reason, as in Safari (#377).
+        #expect(SwipeDecision.distance(forWidth: 900) == 300)
+        #expect(SwipeDecision.distance(forWidth: 300) == 160)
+        #expect(SwipeDecision.distance(forWidth: 2000) == 320)
+        // All the way, or a quick flick well started.
+        #expect(SwipeDecision.commits(progress: 1, speed: 0))
+        #expect(SwipeDecision.commits(progress: 0.5, speed: 1000))
+        // Short, slow, or pulled back before letting go: no.
+        #expect(!SwipeDecision.commits(progress: 0.3, speed: 2000))
+        #expect(!SwipeDecision.commits(progress: 0.9, speed: 0))
+        #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }
 
     @Test func swipeScriptLooksPastShadowRoots() throws {

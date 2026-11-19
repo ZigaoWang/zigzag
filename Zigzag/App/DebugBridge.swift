@@ -348,8 +348,10 @@ enum DebugBridge {
         var phases: [Int64] = [1]
         phases += Array(repeating: 2, count: parts.contains("slow") ? 48 : 12)
         if !parts.contains("noend") { phases.append(4) }
+        // "reverse": the fingers come back over the last half.
+        let turn = parts.contains("reverse") ? phases.count / 2 : phases.count
         for (i, phase) in phases.enumerated() {
-            let d: Int32 = phase == 2 ? dx : 0
+            let d: Int32 = phase == 2 ? (i > turn ? -dx : dx) : 0
             guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { continue }
             cg.location = flipped
             cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phaseless ? 0 : phase)
@@ -2162,6 +2164,11 @@ enum DebugBridge {
         case "endsheet": if let sheet = controller.window?.attachedSheet { controller.window?.endSheet(sheet, returnCode: .cancel) }
         case "zoomin": controller.zoomIn(nil)
         case "zoomreset": controller.actualSize(nil)
+        case "magnify":
+            // magnify <scale>: the front page pinch-zoomed to scale, around its middle.
+            if let webView = controller.selectedWebView, let scale = Double(arg) {
+                webView.setMagnification(scale, centeredAt: NSPoint(x: webView.bounds.midX, y: webView.bounds.midY))
+            }
         case "themes":
             for tab in controller.tabManager.currentTabs {
                 let t = tab.themeColor?.usingColorSpace(.sRGB)
