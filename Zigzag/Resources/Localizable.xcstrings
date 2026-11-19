@@ -2694,7 +2694,7 @@
       }
     },
     "Address" : {
-      "comment" : "Label of the address pattern in a download rule's sheet.\nSpace rule address field.\nVoiceOver name of the address in a split view page's strip, while it has none.",
+      "comment" : "Label of the address pattern in a download rule's sheet.\nSpace rule address field.\nVoiceOver label of a pop-up window's address while it's selected to copy.\nVoiceOver name of the address in a split view page's strip, while it has none.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
