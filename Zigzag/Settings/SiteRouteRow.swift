@@ -74,8 +74,8 @@ final class SiteRouteRow: InteractiveView, SettingsSizedRow, SettingsSearchable,
         destination.selectedIndex = spaces.firstIndex(of: selected) ?? spaces.firstIndex(of: saved.spaceID) ?? 0
         icon.image = URL(string: "https://" + saved.site).flatMap { SiteIcons.shownIcon(for: $0) }
         address.stringValue = saved.site
-        let off = String(localized: "Off", comment: "Status of a disabled space rule.")
-        detail.stringValue = saved.isEnabled ? saved.match.rowDetail : String(localized: "\(saved.match.rowDetail), \(off)", comment: "Match scope and status of a disabled space rule.")
+        detail.stringValue = saved.isEnabled ? saved.match.rowDetail
+            : String(localized: "\(saved.match.rowDetail), Off", comment: "Beside a space rule that's turned off: its scope, like “and subdomains”, then that it's off.")
         opensIn.stringValue = saved.match == .host
             ? String(localized: "opens in", comment: "Inline before the space menu for a single host: example.com (this host only) opens in Work.")
             : String(localized: "open in", comment: "Inline after a domain and its subdomains, or a path and the pages below it: example.com and subdomains open in Work.")

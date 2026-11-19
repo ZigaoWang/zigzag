@@ -833,7 +833,7 @@
       }
     },
     "%@, %@" : {
-      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nMatch scope and status of a disabled space rule.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.\nWhat VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.",
+      "comment" : "A size in the Page Size menu of the developer tools above the page: its name, then its width and height, like “iPhone, 393 × 852”.\nAccessibility label of the address in the sidebar on a plain http page: the site, then that it's not secure.\nOn the Permissions row of the site panel: how many allowed, then how many blocked, like “2 allowed, 1 blocked”.\nUnder a download's name in the downloads panel: how much has come, then the time left, like 3.7 of 9 MB, a minute left.\nVoiceOver name of a command bar result: its title, then what's under it.\nVoiceOver name of a download in the downloads panel: the file's name, then what's under it.\nVoiceOver name of the page's whole address in the developer tools' bar on a plain http page: the address, then that it's not secure.\nWhat VoiceOver says for a row in the Passwords window: the site, then the username.\nWhat VoiceOver says for a space in the space switcher with more than one profile: the space's name, then its profile's.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -845,6 +845,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@，%2$@"
+          }
+        }
+      }
+    },
+    "%@, Off" : {
+      "comment" : "Beside a space rule that's turned off: its scope, like “and subdomains”, then that it's off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，已关闭"
           }
         }
       }
@@ -13188,7 +13199,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nStatus of a disabled space rule.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
