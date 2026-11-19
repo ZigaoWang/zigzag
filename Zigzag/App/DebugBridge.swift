@@ -2683,6 +2683,8 @@ enum DebugBridge {
         // keptcookies clear | add | quit on|off | top: Settings › Privacy's kept cookies (#334). keptcookiesstate <path>:
         // each profile's kept sites and quit choice, as JSON.
         case "keptcookies": controller.tabManager.selectedTab?.settingsView?.debugKeptCookies(arg)
+        // clearsonquit on|off: Clear cookies when Zigzag quits for the front window's profile, without Settings open.
+        case "clearsonquit": KeptCookies.setClearsOnQuit(arg == "on", in: controller.tabManager.profile.id)
         case "keptcookiesstate":
             let state = Profiles.shared.all.map { ["profile": $0.id.uuidString, "sites": KeptCookies.sites(in: $0.id).sorted(), "clearsOnQuit": KeptCookies.clearsOnQuit(in: $0.id)] as [String: Any] }
             if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) { try? data.write(to: URL(fileURLWithPath: arg)) }
