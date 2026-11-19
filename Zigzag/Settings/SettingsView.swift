@@ -2285,7 +2285,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         if ExtensionStore.needsApproval(id) {
             detail.append(String(localized: "Update wants more access", comment: "Under an extension's name in Settings › Extensions."))
         }
-        // A Firefox package says so, and names the gecko ID it has in Firefox; a Chrome one adds neither.
+        // A Firefox package adds one word, "Firefox"; a Chrome one adds nothing. Neither its gecko ID nor its
+        // signature file is shown.
         detail += Self.packageKindDetail(id)
         // The features it asks for that Zigzag lacks, named right in the row rather than counted: "2 features"
         // says something is missing without saying what.
