@@ -181,6 +181,9 @@ final class SidebarListView: NSView {
     /// A tab or page picked with a click: the edge sidebar sets this to bring its window forward. The window's own
     /// list leaves it nil, and its delegate selects as before.
     var onPickTab: ((Tab) -> Void)?
+    /// New Tab picked with a click: the edge sidebar sets this to open the browser's bar over the screen, in place.
+    /// The window's own list leaves it nil, and its delegate opens it in the window.
+    var onNewTab: (() -> Void)?
     /// Whether rows can be dragged out. The edge sidebar's list can't: a drag would leave the panel.
     var allowsDragging = true
     /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
@@ -977,7 +980,10 @@ final class SidebarListView: NSView {
             return NSView()
         case .newTab:
             let row = NewTabRowView()
-            row.onClick = { [weak self] _ in self?.delegate?.listNewTab() }
+            row.onClick = { [weak self] _ in
+                guard let self else { return }
+                if let onNewTab { onNewTab() } else { delegate?.listNewTab() }
+            }
             return row
         case .tab(let id):
             let row = TabRowView()

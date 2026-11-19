@@ -25,6 +25,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// The live second sidebar the hot screen edge shows (#363), made the first time it comes out.
     private var edgeSidebar: SidebarView?
     private var edgeContainer: SidebarContainer?
+    /// The command bar is open over the screen in the edge panel, not in this window.
+    private(set) var edgeCommandBarInPlace = false
     let root: BrowserRootView
 
     /// The window's sidebar and, once the hot edge has made it, the mirror it shows: one change reaches both. The
@@ -3410,11 +3412,17 @@ extension BrowserWindowController {
 // MARK: - The command bar in a browser window
 
 extension BrowserWindowController: CommandBarHost {
-    var commandBarOverlay: NSView { root.overlay }
-    var commandBarPageFrame: NSRect { root.cardFrame }
+    var commandBarOverlay: NSView {
+        edgeCommandBarInPlace ? (EdgeSidebar.shared.commandBarOverlay ?? root.overlay) : root.overlay
+    }
+    var commandBarPageFrame: NSRect {
+        edgeCommandBarInPlace ? (EdgeSidebar.shared.commandBarPageFrame ?? root.cardFrame) : root.cardFrame
+    }
     /// A split pane's address when asked for; else the address above the page, or the sidebar's while the sidebar
     /// shows docked.
     func commandBarAnchor(asked: NSView?) -> NSView? {
+        // The panel's bar opens over the screen's middle, not over a field in the window behind it.
+        if edgeCommandBarInPlace { return nil }
         if let asked { return asked }
         // In split view under the bar, the bar's address steps aside: the address of the pane you're in, as ⌘L edits
         // that pane's page.
@@ -3425,7 +3433,7 @@ extension BrowserWindowController: CommandBarHost {
         return root.sidebarVisible && !root.isSidebarFloatingVisible ? sidebar.address : nil
     }
     var commandBarTabs: TabManager? { tabManager }
-    var commandBarIsMovable: Bool { true }
+    var commandBarIsMovable: Bool { !edgeCommandBarInPlace }
     var commandBarProfile: Profile { tabManager.profile }
     var commandBarTab: Tab? { tabManager.selectedTab }
     var commandBarSpace: SpaceInfo? { tabManager.currentSpace }
@@ -3448,7 +3456,26 @@ extension BrowserWindowController: CommandBarHost {
     }
 
     func commandBarRestoreFocus() {
+        // In the panel the popup hands the keyboard back when it goes (`commandBarDidHide`).
+        guard !edgeCommandBarInPlace else { return }
         if let selectedWebView { window?.makeFirstResponder(selectedWebView) }
+    }
+
+    /// The same bar, keyboard and all, moved to the screen-edge panel's popup.
+    func commandBarFocus(_ field: NSTextField) {
+        if edgeCommandBarInPlace { EdgeSidebar.shared.focusCommandBar(field) }
+        else { window?.makeFirstResponder(field) }
+    }
+
+    /// A result chosen in the panel is the moment the browser comes forward on it.
+    func commandBarChoseResult() {
+        if edgeCommandBarInPlace { bringForwardForEdge() }
+    }
+
+    func commandBarDidHide() {
+        guard edgeCommandBarInPlace else { return }
+        edgeCommandBarInPlace = false
+        EdgeSidebar.shared.commandBarDidHide()
     }
 }
 
@@ -3464,6 +3491,8 @@ extension BrowserWindowController {
         // A click picks a tab; a drag would leave the panel, so its rows stay put.
         mirror.list.allowsDragging = false
         mirror.list.onPickTab = { [weak self] tab in self?.pickFromEdgeSidebar(tab) }
+        // Its New Tab row opens the browser's bar over the screen, not in the window behind the panel.
+        mirror.list.onNewTab = { EdgeSidebar.shared.newTabInPlace() }
         // A mirror, not a window's sidebar: no bar to lend its address buttons to, and no close button, since
         // moving the pointer away is what puts the panel back.
         mirror.hasTopBar = false
@@ -3485,6 +3514,14 @@ extension BrowserWindowController {
     var edgeSidebarLook: (tint: NSColor, gradient: (end: NSColor, angle: Double)?, grain: Double, glass: WindowGlass?) {
         let container = root.sidebarContainer
         return (container.tint, container.gradient, container.grain, container.windowGlass)
+    }
+
+    /// Opens the browser's own new-tab bar in the panel, over the screen: the same bar and results, its overlay and
+    /// keyboard in the edge popup while it is open (`CommandBarHost` in this file).
+    func showEdgeCommandBar() {
+        guard !commandBar.isVisible else { return }
+        edgeCommandBarInPlace = true
+        commandBar.show(mode: .newTab)
     }
 
     /// Brings the mirror up to the window's sidebar as it is now, before the panel shows it.

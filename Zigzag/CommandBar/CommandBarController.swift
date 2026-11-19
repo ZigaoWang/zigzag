@@ -136,6 +136,10 @@ protocol CommandBarHost: AnyObject {
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool
     /// The bar is gone from the screen, its exit finished.
     func commandBarDidHide()
+    /// Puts the keyboard in the bar's field: in the window it belongs to, or in the panel it opens over.
+    func commandBarFocus(_ field: NSTextField)
+    /// A result was chosen and is being opened in the browser's tabs, not merely dismissed.
+    func commandBarChoseResult()
 }
 
 extension CommandBarHost {
@@ -144,6 +148,8 @@ extension CommandBarHost {
     var commandBarIsMovable: Bool { false }
     func commandBarOpen(_ kind: CommandResult.Kind, modifiers: NSEvent.ModifierFlags, editing: Bool) -> Bool { false }
     func commandBarDidHide() {}
+    func commandBarFocus(_ field: NSTextField) { window?.makeFirstResponder(field) }
+    func commandBarChoseResult() {}
 }
 
 /// The floating command bar: one field for addresses, searches, tabs, bookmarks and history.
@@ -336,7 +342,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // most) it's simply there; clicked open, it grows out of the page's top, or fades in place over the address
         // it stands in for.
         if opening { panel.present(arrival: Tokens.Motion.isFromKey ? .instant : isAnchored ? .fade : .pop) }
-        host.window?.makeFirstResponder(field)
+        host.commandBarFocus(field)
         applySpaceTheme()
         field.currentEditor()?.selectAll(nil)
     }
@@ -1051,6 +1057,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         let editing = mode == .editCurrent && host.commandBarTab != nil
         dismiss(restoringFocus: false)
         unsent = nil
+        host.commandBarChoseResult()
         if host.commandBarOpen(result.kind, modifiers: modifiers, editing: editing) { return }
         guard let controller else { return }
         let manager = controller.tabManager

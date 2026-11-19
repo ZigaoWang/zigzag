@@ -391,6 +391,15 @@ struct EdgeSidebarLayoutTests {
         #expect(!EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: true, sidebarFloating: false))
         #expect(!EdgeSidebarLayout.canShow(appIsActive: false, sidebarVisible: false, sidebarFloating: true))
     }
+
+    @Test func thePanelAndItsBarTakeKeysWithoutTakingTheWindow() {
+        let panel = EdgeSidebarPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        #expect(panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
+        let bar = EdgeCommandBarPopup(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        #expect(bar.canBecomeKey)
+        #expect(!bar.canBecomeMain)
+    }
 }
 
 /// The hot screen edge's switch (#363): off until turned on, one change heard per actual change, and the key left as
