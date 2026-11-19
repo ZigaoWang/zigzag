@@ -61,6 +61,12 @@ final class EdgeSidebar {
         }
     }
 
+    /// Zigzag is active with a window of its own in front, so the pointer is in the browser, not at the screen's
+    /// edge. The panel and its command bar are not that window: showing them can make Zigzag active, and they must
+    /// not read their own act of taking the keyboard as the browser being in front.
+    private var isBrowserInFront: Bool {
+        NSApp.isActive && NSApp.keyWindow !== panel && NSApp.keyWindow !== commandBarPopup
+    }
     /// The last browser window that was in front: its sidebar is the one that comes out.
     private weak var target: BrowserWindowController?
     private var panel: EdgeSidebarPanel?
@@ -103,10 +109,15 @@ final class EdgeSidebar {
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.hide(animated: false) }
         })
-        // Zigzag coming forward puts it back: the panel is for reaching a tab from another app, and the window's own
-        // sidebar takes over from here.
+        // Zigzag coming forward with one of its windows puts it back: the panel is for reaching a tab from another
+        // app. The panel making itself key is not that: it can make Zigzag active while it is the window in front.
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.hide(animated: false) }
+            MainActor.assumeIsolated {
+                DispatchQueue.main.async {
+                    guard let self, self.isBrowserInFront else { return }
+                    self.hide(animated: false)
+                }
+            }
         })
         if Self.isOn { start() }
     }
@@ -160,7 +171,7 @@ final class EdgeSidebar {
         // The window whose sidebar comes out: the last one in front, or, after that one closed, the one Zigzag would
         // have brought forward.
         if target == nil { target = WindowManager.shared.keyController }
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: NSApp.isActive,
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront,
                                                     sidebarVisible: target.root.sidebarVisible,
                                                     sidebarFloating: target.root.isSidebarFloatingVisible) else { return }
         let point = NSEvent.mouseLocation
@@ -231,7 +242,7 @@ final class EdgeSidebar {
     private func follow() {
         guard isShowing, let visible = shownScreen, let zone = zone(in: visible) else { return }
         // Zigzag came forward, or the window's sidebar came out: the panel has nothing left to show.
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: NSApp.isActive,
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront,
                                                     sidebarVisible: target.root.sidebarVisible,
                                                     sidebarFloating: target.root.isSidebarFloatingVisible) else {
             hide()
@@ -303,7 +314,7 @@ final class EdgeSidebar {
     }
 
     private func show(on visible: NSRect) {
-        guard let target, EdgeSidebarLayout.canShow(appIsActive: NSApp.isActive,
+        guard let target, EdgeSidebarLayout.canShow(appIsActive: isBrowserInFront,
                                                     sidebarVisible: target.root.sidebarVisible,
                                                     sidebarFloating: target.root.isSidebarFloatingVisible) else { return }
         let (sidebar, container) = target.edgeSidebarForDisplay()
