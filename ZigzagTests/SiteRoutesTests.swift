@@ -427,9 +427,13 @@ struct SiteRoutesTests {
         for (earlier, a, later, b, covered) in pairs {
             let first = SiteRoutes.Route(match: earlier, site: a, spaceID: work)
             let last = SiteRoutes.Route(match: later, site: b, spaceID: work)
-            let result = SiteRoutes.coverage(in: [first, unrelated, last])
+            let rules = [first, unrelated, last]
+            let result = SiteRoutes.coverage(in: rules)
             #expect(result[0].blocks == (covered ? [2] : []))
-            #expect(result[1].warning == nil)
+            #expect(result[1].warning(in: rules) == nil)
+            // Each warning names the other rule by its address: the list shows no numbers.
+            #expect(result[0].warning(in: rules)?.contains(b) ?? !covered)
+            #expect(result[2].warning(in: rules)?.contains(a) ?? !covered)
             #expect(result[2].blockedBy == (covered ? 0 : nil))
         }
     }
