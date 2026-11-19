@@ -230,9 +230,13 @@ final class PageDialogSheet: NSView {
     }
 
     /// Answered another way (an extension gave the sign-in it asks for): the sheet tagged so goes, with these values.
-    static func answer(tag: String, with values: [String]) {
-        for box in open where box.sheet?.answers == tag { box.sheet?.finish(.confirmed(values)) }
+    /// Whether one was up to answer.
+    @discardableResult
+    static func answer(tag: String, with values: [String]) -> Bool {
+        let tagged = open.compactMap(\.sheet).filter { $0.answers == tag && $0.isUp }
+        tagged.forEach { $0.finish(.confirmed(values)) }
         open = open.filter { $0.sheet?.isUp == true }
+        return !tagged.isEmpty
     }
 
     // MARK: Saved passwords

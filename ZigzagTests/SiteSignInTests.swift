@@ -148,6 +148,46 @@ struct SiteSignInTests {
         #expect(await bridge.ask([:], of: ["slow"], timeout: .milliseconds(50)) == .none)
     }
 
+    // MARK: Answers while the sheet asks (#387)
+
+    private final class Fills { var got: [String] = [] }
+
+    @Test func aLateNameAndPasswordFillsTheSheet() async {
+        let (bridge, _) = bridge(listening: ["popup"]) { bridge, id, request in
+            self.answer(bridge, id, request, ["authCredentials": ["username": "picked", "password": "fake-pass"]], after: .milliseconds(200))
+        }
+        let fills = Fills()
+        let late = BridgeWebRequest.LateAnswer { fills.got.append("\($0):\($1)") }
+        #expect(await bridge.ask([:], of: ["popup"], timeout: .milliseconds(50), late: late) == .none)
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(fills.got == ["picked:fake-pass"])
+    }
+
+    @Test func theFirstLateAnswerWinsAndACancelLeavesTheSheet() async {
+        let (bridge, _) = bridge(listening: ["a", "b", "c"]) { bridge, id, request in
+            if id == "a" { self.answer(bridge, id, request, ["cancel": true], after: .milliseconds(100)) }
+            if id == "b" { self.answer(bridge, id, request, ["authCredentials": ["username": "b", "password": "1"]], after: .milliseconds(200)) }
+            if id == "c" { self.answer(bridge, id, request, ["authCredentials": ["username": "c", "password": "2"]], after: .milliseconds(300)) }
+        }
+        let fills = Fills()
+        let late = BridgeWebRequest.LateAnswer { fills.got.append("\($0):\($1)") }
+        #expect(await bridge.ask([:], of: ["a", "b", "c"], timeout: .milliseconds(50), late: late) == .none)
+        try? await Task.sleep(for: .milliseconds(500))
+        #expect(fills.got == ["b:1"])
+    }
+
+    @Test func noLateAnswerOnceTheSheetIsAnswered() async {
+        let (bridge, _) = bridge(listening: ["slow"]) { bridge, id, request in
+            self.answer(bridge, id, request, ["authCredentials": ["username": "late", "password": "late"]], after: .milliseconds(300))
+        }
+        let fills = Fills()
+        let late = BridgeWebRequest.LateAnswer { fills.got.append("\($0):\($1)") }
+        #expect(await bridge.ask([:], of: ["slow"], timeout: .milliseconds(50), late: late) == .none)
+        late.end()
+        try? await Task.sleep(for: .milliseconds(500))
+        #expect(fills.got.isEmpty)
+    }
+
     @Test func onlyThoseAskedCanAnswer() async {
         let (bridge, _) = bridge(listening: ["asked"]) { bridge, _, request in
             // Another extension answering a question it wasn't asked changes nothing.
