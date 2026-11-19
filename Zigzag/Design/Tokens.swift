@@ -327,10 +327,10 @@ enum Tokens {
         /// A space's icon in the bottom bar (#210, #238), scaled like favorite icons (16, 18, 20).
         static var spaceIcon: CGFloat { spaceIcon(for: current) }
         static func spaceIcon(for size: Size) -> CGFloat { (18 * size.scale / 2).rounded() * 2 }
-        /// Each space's target in the bottom bar: a toolbar button, and at Large a little more round its larger icon,
-        /// as tall as the bar leaves room for. A custom size larger than Large gets the room its icon needs.
+        /// Each space's target in the bottom bar: a toolbar button, and from Large up a little more round its larger icon,
+        /// as tall as the bar leaves room for. Past Large, the room its icon needs.
         static var spaceTarget: CGFloat { spaceTarget(for: current) }
-        static func spaceTarget(for size: Size) -> CGFloat { max(size == .large ? 28 : button, spaceIcon(for: size) + spaceIconRoom) }
+        static func spaceTarget(for size: Size) -> CGFloat { max(size.scale >= Size.large.scale ? 28 : button, spaceIcon(for: size) + spaceIconRoom) }
         /// Padding around a space icon; the row scrolls before icons shrink (#238).
         static let spaceIconRoom: CGFloat = 4
         /// Each space target's width for `count` spaces: `spaceTarget` when they fit, narrower down to the icon (or
