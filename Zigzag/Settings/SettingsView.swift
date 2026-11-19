@@ -2499,7 +2499,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private func addRoute() {
         let library = Library.shared
         guard let spaceID = BrowserWindowController.undoTarget?.tabManager.currentSpaceID ?? library.spaces.first?.id else { return }
-        if pendingRoute == nil { pendingRoute = .init(match: .host, site: "", spaceID: spaceID) }
+        if pendingRoute == nil { pendingRoute = .init(match: .domain, site: "", spaceID: spaceID) }
         reloadRoutes()
         layoutDocument()
         layoutSubtreeIfNeeded()
