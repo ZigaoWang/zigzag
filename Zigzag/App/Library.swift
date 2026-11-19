@@ -615,6 +615,7 @@ final class Library {
         if let stored = JSONStore.load(Stored.self, from: Paths.library), !stored.spaces.isEmpty {
             spaces = Self.keepingDefaultColors(stored.spaces.map(\.upgraded))
             siteRoutes = stored.siteRoutes ?? SiteRoutes.migrated(from: spaces)
+            // The rules are what counts now. The old lists are only written for an older Zigzag.
             for i in spaces.indices { spaces[i].routedSites = nil }
             favorites = stored.favorites ?? []
             favoriteSplits = stored.favoriteSplits ?? []
@@ -642,7 +643,7 @@ final class Library {
 
     func saveNow() {
         saveDebouncer.cancel()
-        JSONStore.save(Stored(spaces: spaces, favorites: favorites, siteRoutes: siteRoutes, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
+        JSONStore.save(Stored(spaces: SiteRoutes.withLegacySites(spaces, from: siteRoutes), favorites: favorites, siteRoutes: siteRoutes, favoriteSplits: favoriteSplits.isEmpty ? nil : favoriteSplits,
                               searchEngine: searchEngine, importedFromArc: importedFromArc), to: Paths.library)
         // Only what reached the disk counts as saved: a write that failed is tried again with the next save.
         if directory != savedDirectory, JSONStore.save(directory, to: Paths.profiles) { savedDirectory = directory }

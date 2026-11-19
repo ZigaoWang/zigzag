@@ -150,6 +150,16 @@ enum SiteRoutes {
         return rules
     }
 
+    /// Spaces with their old site lists filled from the enabled domain rules, so going back to an older Zigzag keeps them.
+    static func withLegacySites(_ spaces: [SpaceInfo], from rules: [Route]) -> [SpaceInfo] {
+        spaces.map { space in
+            var space = space
+            let sites = Set(rules.filter { $0.spaceID == space.id && $0.match == .domain && $0.isEnabled }.map(\.site))
+            space.routedSites = sites.isEmpty ? nil : sites.sorted()
+            return space
+        }
+    }
+
     static func route(for url: URL?, in routes: [Route]) -> Route? {
         guard let url, let host = host(of: url) else { return nil }
         let path = path(of: url)

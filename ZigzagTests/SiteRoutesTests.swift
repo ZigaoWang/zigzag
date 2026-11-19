@@ -219,6 +219,17 @@ struct SiteRoutesTests {
         #expect(try JSONDecoder().decode([SiteRoutes.Route].self, from: JSONEncoder().encode(rules)) == rules)
     }
 
+    @Test func savedSpacesKeepOldListsForAnOlderZigzag() {
+        let spaces = [SpaceInfo(id: media, name: "Media", color: .sky), SpaceInfo(id: work, name: "Work", color: .sky)]
+        let rules = [SiteRoutes.Route(match: .domain, site: "youtube.com", spaceID: media),
+                     SiteRoutes.Route(match: .path, site: "github.com/org1", spaceID: work),
+                     SiteRoutes.Route(match: .domain, site: "apple.com", spaceID: media),
+                     SiteRoutes.Route(match: .domain, site: "off.test", spaceID: work, isEnabled: false)]
+        let saved = SiteRoutes.withLegacySites(spaces, from: rules)
+        #expect(saved.map(\.routedSites) == [["apple.com", "youtube.com"], nil])
+        #expect(SiteRoutes.migrated(from: saved).map(\.site) == ["apple.com", "youtube.com"])
+    }
+
     @Test func domainRulesDropWWW() {
         #expect(SiteRoutes.entry(from: "https://www.youtube.com/", match: .domain) == "youtube.com")
         #expect(SiteRoutes.entry(from: "www.youtube.com", match: .host) == "www.youtube.com")
