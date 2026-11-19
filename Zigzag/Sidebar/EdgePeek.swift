@@ -16,6 +16,20 @@ enum EdgePeekFocusPolicy {
     }
 }
 
+/// Whether a page can go back where it came from: never into a closed tab, and not at all when it had no home.
+enum EdgePeekRestorePolicy {
+    static func canRestore(isClosed: Bool, hasOrigin: Bool) -> Bool { !isClosed && hasOrigin }
+}
+
+/// What the peek does when the browser's context changes under it: a space switch ends it, and a page opened from
+/// it stays in it.
+enum EdgePeekRouting {
+    enum NewPage { case peek, browser }
+
+    static func closesOnSpaceChange(peekVisible: Bool) -> Bool { peekVisible }
+    static func newPage(peekVisible: Bool) -> NewPage { peekVisible ? .peek : .browser }
+}
+
 enum EdgePeekLayout {
     /// The page area beside the sidebar, inside the screen's own margins.
     static func pageFrame(beside sidebar: NSRect, in screen: NSRect, onRight: Bool) -> NSRect {
@@ -55,6 +69,7 @@ final class EdgePeek {
     private weak var origin: NSView?
     private var originFrame: NSRect = .zero
     private var token: Any?
+    private var managerObserver: Any?
     private var escMonitor: Any?
     private var keyObserver: NSObjectProtocol?
     private var closeObserver: NSObjectProtocol?
@@ -88,13 +103,18 @@ final class EdgePeek {
             }
             close()
         }
+        EdgePeekPreview.shared.hide()
         makePanel()
         guard let panel, let card else { return }
         self.controller = controller
         self.tab = tab
-        controller.setEdgePeek(tab.id)
         _ = tab.ensureWebView()
-        guard let holder = tab.pageHolder, let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else { return }
+        guard let holder = tab.pageHolder, let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else {
+            self.controller = nil
+            self.tab = nil
+            return
+        }
+        controller.setEdgePeek(tab.id)
         // The page moves, not a copy: the same holder the pane has, so form state, scroll and media carry.
         origin = holder.superview
         originFrame = holder.frame
@@ -120,6 +140,10 @@ final class EdgePeek {
         layout()
         isVisible = true
         isClosing = false
+        managerObserver = controller.tabManager.changed.observe { [weak self] change in
+            MainActor.assumeIsolated { self?.managerChanged(change) }
+        }
+        controller.prepareEdgeSidebar()
         panel.orderFrontRegardless()
         panel.makeKey()
         if let sourceFrame {
@@ -147,7 +171,7 @@ final class EdgePeek {
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.focusChanged() } }
         }
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
+            guard let self, self.panel?.isKeyWindow == true else { return event }
             if event.keyCode == 53 {
                 self.close()
                 return nil
@@ -167,7 +191,7 @@ final class EdgePeek {
                 case "w":
                     if let tab = self.tab, let controller = self.controller {
                         controller.tabManager.close(tab)
-                        self.dismiss()
+                        self.close()
                     }
                     return nil
                 default:
@@ -187,13 +211,24 @@ final class EdgePeek {
         outsideLocal = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             guard let self, self.isVisible else { return event }
             if MenuPanel.current != nil || RunLoop.current.currentMode == .eventTracking { return event }
+            if event.window is EdgeCommandBarPopup || event.window is NSSavePanel || event.window?.sheetParent != nil { return event }
             if event.window !== self.panel && event.window !== EdgeSidebar.shared.panelWindow { self.close(duration: 0.15) }
             return event
         }
         // Moving to another app or desktop is moving away: the page goes back rather than following the focus.
+        // Becoming active is only leaving when the key is not ours: the panel, the sidebar, the command bar or a
+        // sheet of ours keeps the page out. A browser window taking key is handled by the key observer above.
         activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification,
                                                                   object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.close(duration: 0.15) }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, self.isVisible, !self.isClosing else { return }
+                    let key = NSApp.keyWindow
+                    if key === self.panel || key === EdgeSidebar.shared.panelWindow || key is EdgeCommandBarPopup
+                        || key is NSSavePanel || key?.sheetParent != nil { return }
+                    self.close(duration: 0.15)
+                }
+            }
         }
         spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification,
                                                                           object: nil, queue: .main) { [weak self] _ in
@@ -218,6 +253,7 @@ final class EdgePeek {
         token = nil
         tab = newTab
         controller?.setEdgePeek(newTab.id)
+        panel?.makeKey()
         _ = newTab.ensureWebView()
         guard let holder = newTab.pageHolder else { close(); return }
         origin = holder.superview
@@ -226,20 +262,27 @@ final class EdgePeek {
         holder.frame = content.bounds
         holder.autoresizingMask = [.width, .height]
         content.addSubview(holder)
+        panel?.makeFirstResponder(nil)
         refreshToolbar()
         refreshGround()
         token = newTab.changed.observe { [weak self] _ in self?.refreshToolbar() }
         sourceFrame = controller?.edgeSidebarForDisplay().sidebar.list.lastPickedRowFrame
         layout()
+        controller?.prepareEdgeSidebar()
+        panel?.makeKey()
         if let webView = newTab.webView { panel?.makeFirstResponder(webView) }
     }
 
     private func restore(_ tab: Tab) {
-        guard let holder = tab.pageHolder, let origin else { return }
+        guard let holder = tab.pageHolder else { return }
+        let canRestore = EdgePeekRestorePolicy.canRestore(isClosed: tab.isClosed, hasOrigin: origin != nil)
         holder.removeFromSuperview()
-        holder.frame = originFrame
-        origin.addSubview(holder)
-        origin.needsLayout = true
+        if canRestore, let origin {
+            holder.frame = originFrame
+            origin.addSubview(holder)
+            origin.needsLayout = true
+        }
+        origin = nil
     }
 
     private func makePanel() {
@@ -298,6 +341,11 @@ final class EdgePeek {
 
     private func refreshToolbar() {
         guard let tab else { return }
+        if tab.isClosed {
+            close()
+            return
+        }
+        controller?.updateEdgeSidebarForPeek(tab)
         toolbar.update(state: EdgePeekToolbarState(
             address: tab.url?.absoluteString ?? "",
             canGoBack: tab.webView?.canGoBack ?? false,
@@ -363,6 +411,39 @@ final class EdgePeek {
         }
     }
 
+    /// The sidebar's address, clicked while the popout is out, types in the popout instead of bringing the browser.
+    func focusAddress() {
+        guard isVisible else { return }
+        panel?.makeKey()
+        toolbar.focusAddress()
+    }
+
+    /// The command bar or another of our popups has finished: the page takes the keyboard back.
+    func makeKey() {
+        guard isVisible else { return }
+        panel?.makeKey()
+        if let webView = tab?.webView { panel?.makeFirstResponder(webView) }
+    }
+
+    /// A space change or the peeked tab closing under the page: both end the popout rather than leave a page with
+    /// no row to come from or go back to.
+    private func managerChanged(_ change: TabManager.Change) {
+        guard isVisible else { return }
+        switch change {
+        case .space:
+            if EdgePeekRouting.closesOnSpaceChange(peekVisible: isVisible) { close(duration: 0.15) }
+        case .structure:
+            if tab?.isClosed == true { close() }
+        case .selection:
+            // The browser moved to another page under the popout: the page has no card of its own to go back to,
+            // and restoring it would paint it over the page now in that card. The next show puts the new page out.
+            if tab?.isClosed == true { close() }
+            else if let tab, controller?.tabManager.selectedTab !== tab { dismiss() }
+        case .content:
+            break
+        }
+    }
+
     /// The popout is no longer the key window: keep it only for the sidebar or our own menus and sheets.
     private func focusChanged() {
         guard isVisible, !isClosing else { return }
@@ -396,6 +477,8 @@ final class EdgePeek {
         isClosing = false
         sourceFrame = nil
         token = nil
+        managerObserver = nil
+        content.subviews.forEach { $0.removeFromSuperview() }
         self.tab = nil
         controller = nil
         origin = nil
@@ -428,7 +511,6 @@ final class EdgePeek {
         let screen = NSScreen.screens.first { $0.visibleFrame.contains(NSEvent.mouseLocation) } ?? window.screen ?? NSScreen.main
         let visible = screen?.visibleFrame ?? window.frame
         let frame = EdgePeekLayout.expandedFrame(in: visible, onRight: EdgeSidebar.shared.panelOnRight)
-        close(duration: 0)
         controller.tabManager.select(tab)
         if window.isMiniaturized { window.deminiaturize(nil) }
         if !window.styleMask.contains(.fullScreen) { window.setFrame(frame, display: true) }
@@ -436,6 +518,8 @@ final class EdgePeek {
         window.makeKeyAndOrderFront(nil)
         window.collectionBehavior.remove(.moveToActiveSpace)
         NSApp.activate()
+        close(duration: 0)
+        window.makeFirstResponder(tab.webView)
         EdgeSidebar.shared.hide(animated: false)
     }
 }

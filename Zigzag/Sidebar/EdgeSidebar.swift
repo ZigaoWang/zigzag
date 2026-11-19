@@ -316,7 +316,7 @@ final class EdgeSidebar {
         guard isCommandBarOpen else { return }
         isCommandBarOpen = false
         commandBarPopup?.orderOut(nil)
-        if isShowing { panel?.makeKey() }
+        if EdgePeek.shared.isVisible { EdgePeek.shared.makeKey() } else if isShowing { panel?.makeKey() }
     }
 
     private func makeCommandBarPopup() -> EdgeCommandBarPopup {

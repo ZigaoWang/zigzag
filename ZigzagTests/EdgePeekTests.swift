@@ -52,6 +52,22 @@ struct EdgePeekTests {
         #expect(EdgePeekFocusPolicy.keepsOpen(newKey: .none, menuOpen: true))
     }
 
+    @Test func aClosedTabIsNeverRestored() {
+        #expect(!EdgePeekRestorePolicy.canRestore(isClosed: true, hasOrigin: true))
+        #expect(!EdgePeekRestorePolicy.canRestore(isClosed: false, hasOrigin: false))
+        #expect(EdgePeekRestorePolicy.canRestore(isClosed: false, hasOrigin: true))
+    }
+
+    @Test func aSpaceChangeEndsThePeek() {
+        #expect(EdgePeekRouting.closesOnSpaceChange(peekVisible: true))
+        #expect(!EdgePeekRouting.closesOnSpaceChange(peekVisible: false))
+    }
+
+    @Test func aNewPageFromThePeekStaysInThePeek() {
+        #expect(EdgePeekRouting.newPage(peekVisible: true) == .peek)
+        #expect(EdgePeekRouting.newPage(peekVisible: false) == .browser)
+    }
+
     @Test func theToolbarShowsTheStateItIsGiven() {
         let toolbar = EdgePeekToolbar(frame: .zero)
         toolbar.update(state: EdgePeekToolbarState(address: "youtube.com/watch?v=1", canGoBack: true,

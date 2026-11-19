@@ -194,6 +194,8 @@ final class SidebarListView: NSView {
     /// New Tab picked with a click: the edge sidebar sets this to open the browser's bar over the screen, in place.
     /// The window's own list leaves it nil, and its delegate opens it in the window.
     var onNewTab: (() -> Void)?
+    /// The pointer entered or left a row, with its frame on screen: the edge sidebar shows a still preview there.
+    var onHoverTab: ((Tab?, NSRect?) -> Void)?
     /// Whether rows can be dragged out. The edge sidebar's list can't: a drag would leave the panel.
     var allowsDragging = true
     /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
@@ -1621,8 +1623,11 @@ final class SidebarListView: NSView {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
                 self.delegate?.listHover(row.tab, row: row, bookmark: bookmark)
+                let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
+                self.onHoverTab?(row.tab, screenFrame)
             } else {
                 self.delegate?.listHover(nil, row: nil, bookmark: nil)
+                self.onHoverTab?(nil, nil)
             }
         }
     }

@@ -2518,10 +2518,18 @@ extension BrowserWindowController: TabHost {
         let flags = action.modifierFlags
         let background = flags.contains(.command) && !flags.contains(.shift)
         let newTab = tabManager.newTab(url: nil, select: !background, configuration: configuration, opener: tab, site: action.request.url)
+        if EdgePeekRouting.newPage(peekVisible: EdgePeek.shared.isVisible) == .peek {
+            EdgePeek.shared.show(tab: newTab, from: self)
+        }
         return newTab.ensureWebView()
     }
 
     func tabDidRequestClose(_ tab: Tab) {
+        // The edge popout's page is a real tab: the page asking to close closes it, and the popout follows.
+        if EdgePeek.shared.isVisible, EdgePeek.shared.tab === tab {
+            tabManager.close(tab)
+            return
+        }
         // A peeked link that only fetched a file (or a page that closed itself): the card goes, not a tab.
         if tab.isPeek, peek.tab === tab { peek.close(); return }
         tabManager.close(tab)
@@ -3342,6 +3350,11 @@ extension BrowserWindowController: SidebarDelegate {
     }
 
     func sidebarOpenCommandBar() {
+        // The popout is the browser while it is out: its own address takes the typing, and the sidebar stays.
+        if EdgePeek.shared.isVisible {
+            EdgePeek.shared.focusAddress()
+            return
+        }
         // From the edge sidebar: Zigzag comes forward to be typed in, and the panel makes way for the bar.
         if EdgeSidebar.shared.isShowing { bringForwardForEdge() }
         commandBar.show(mode: .editCurrent)
@@ -3468,7 +3481,13 @@ extension BrowserWindowController: CommandBarHost {
 
     /// A result chosen in the panel is the moment the browser comes forward on it.
     func commandBarChoseResult() {
-        if edgeCommandBarInPlace { bringForwardForEdge() }
+        guard edgeCommandBarInPlace else { return }
+        if EdgePeekRouting.newPage(peekVisible: EdgePeek.shared.isVisible) == .peek,
+           let tab = tabManager.selectedTab {
+            EdgePeek.shared.show(tab: tab, from: self)
+        } else {
+            bringForwardForEdge()
+        }
     }
 
     func commandBarDidHide() {
@@ -3503,6 +3522,13 @@ extension BrowserWindowController {
         mirror.sidebarButton.isHidden = true
         // Over another app, the app is inactive and the panel never key: its hover states still answer the pointer.
         mirror.hoversWhileInactive = true
+        // Hovering a row shows its still page beside it, in the panel's own window: the browser window's overlay is
+        // behind another app while the panel is out.
+        mirror.list.onHoverTab = { tab, rect in
+            guard let tab, let rect, !EdgePeek.shared.isVisible else { EdgePeekPreview.shared.hide(); return }
+            EdgePeekPreview.shared.hover(tab: tab, at: rect)
+        }
+        wireEdgeSidebar(mirror)
         let container = SidebarContainer(sidebar: mirror)
         edgeSidebar = mirror
         edgeContainer = container
@@ -3539,11 +3565,20 @@ extension BrowserWindowController {
         reloadFavorites()
         downloadsChanged()
         updateNowPlaying()
-        edgeSidebar.update(tab: tabManager.selectedTab)
+        // The popout's page is the sidebar's page while it is out, so the mirror's address and controls agree with it.
+        let shownTab = EdgePeek.shared.tab ?? tabManager.selectedTab
+        edgeSidebar.update(tab: shownTab)
         edgeSidebar.list.reload(animated: false)
         edgeSidebar.setUpdateCard(Updater.shared.cardState)
-        edgeSidebar.address.setCapture(camera: tabManager.selectedTab?.isUsingCamera ?? false,
-                                      microphone: tabManager.selectedTab?.isUsingMicrophone ?? false)
+        edgeSidebar.address.setCapture(camera: shownTab?.isUsingCamera ?? false,
+                                      microphone: shownTab?.isUsingMicrophone ?? false)
+    }
+
+    /// The mirror's address follows the peek's page while the popout is out, so the sidebar and the popout agree.
+    func updateEdgeSidebarForPeek(_ tab: Tab) {
+        guard let edgeSidebar, EdgePeek.shared.tab === tab else { return }
+        edgeSidebar.update(tab: tab)
+        edgeSidebar.address.setCapture(camera: tab.isUsingCamera, microphone: tab.isUsingMicrophone)
     }
 
     /// The mirror's clicks: the window's own, except that anything which changes the window's page brings Zigzag
@@ -3552,16 +3587,33 @@ extension BrowserWindowController {
         mirror.updateCard.onRestart = { Updater.shared.restartToUpdate() }
         mirror.updateCard.onHide = { Updater.shared.dismissCard() }
 
-        mirror.backButton.onClick = { [weak self] _ in self?.bringForwardForEdge(); self?.goBack(nil) }
-        mirror.forwardButton.onClick = { [weak self] _ in self?.bringForwardForEdge(); self?.goForward(nil) }
+        mirror.backButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            if EdgePeek.shared.isVisible, let tab = EdgePeek.shared.tab { tab.webView?.goBack() }
+            else { self.bringForwardForEdge(); self.goBack(nil) }
+        }
+        mirror.forwardButton.onClick = { [weak self] _ in
+            guard let self else { return }
+            if EdgePeek.shared.isVisible, let tab = EdgePeek.shared.tab { tab.webView?.goForward() }
+            else { self.bringForwardForEdge(); self.goForward(nil) }
+        }
         mirror.backButton.onRightClick = { [weak self] _ in self?.bringForwardForEdge(); return self?.historyMenu(back: true) }
         mirror.forwardButton.onRightClick = { [weak self] _ in self?.bringForwardForEdge(); return self?.historyMenu(back: false) }
         mirror.reloadButton.onClick = { [weak self] _ in
-            self?.bringForwardForEdge()
-            guard let tab = self?.tabManager.selectedTab else { return }
+            guard let self else { return }
+            if EdgePeek.shared.isVisible, let tab = EdgePeek.shared.tab {
+                if tab.isLoading { tab.webView?.stopLoading() } else { tab.webView?.reload() }
+                return
+            }
+            self.bringForwardForEdge()
+            guard let tab = self.tabManager.selectedTab else { return }
             tab.isLoading ? tab.stopLoading() : tab.reload()
         }
-        mirror.address.onMiddleClick = { [weak self] in self?.bringForwardForEdge(); self?.closeTab(nil) }
+        mirror.address.onMiddleClick = { [weak self] in
+            guard let self else { return }
+            if EdgePeek.shared.isVisible, let tab = EdgePeek.shared.tab { self.tabManager.close(tab) }
+            else { self.bringForwardForEdge(); self.closeTab(nil) }
+        }
         mirror.address.readerButton.onClick = { [weak self] _ in self?.bringForwardForEdge(); self?.toggleReader() }
         mirror.address.drop.onDrop = { [weak self] destination in
             guard let self else { return false }
@@ -3580,8 +3632,10 @@ extension BrowserWindowController {
         mirror.address.siteControlsButton.onRightClick = { _ in sitePanel(); return nil }
 
         mirror.favorites.onOpen = { [weak self] favorite in
-            self?.bringForwardForEdge()
-            self?.tabManager.openBookmark(favorite)
+            guard let self else { return }
+            self.tabManager.openBookmark(favorite)
+            // A page opened from the edge sidebar comes out in the popout, not in the window behind it.
+            if let tab = self.tabManager.selectedTab { EdgePeek.shared.show(tab: tab, from: self) }
         }
         mirror.favorites.onMenu = { [weak self] favorite in
             guard let self else { return nil }
