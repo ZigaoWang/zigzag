@@ -292,33 +292,34 @@ final class FormRow: NSView, SettingsSearchable {
     var textInset: CGFloat { icon.isHidden && !isIndented ? pad : pad + Self.iconSide + Tokens.Space.x3 }
 
     /// Narrow (half of a split, a small window), the control goes under the text instead of squeezing it.
-    private func isStacked(_ width: CGFloat) -> Bool {
-        controlSize.width > 0 && width - pad - controlSize.width - Tokens.Space.x4 - textInset < Self.minimumTextWidth
+    private func isStacked(_ width: CGFloat, _ control: NSSize) -> Bool {
+        control.width > 0 && width - pad - control.width - Tokens.Space.x4 - textInset < Self.minimumTextWidth
     }
     private static let minimumTextWidth: CGFloat = 180
 
-    private func textWidth(for width: CGFloat) -> CGFloat {
-        let control = controlSize.width > 0 && !isStacked(width) ? controlSize.width + Tokens.Space.x4 : 0
-        return max(0, width - pad - control - textInset)
+    private func textWidth(for width: CGFloat, _ control: NSSize) -> CGFloat {
+        let room = control.width > 0 && !isStacked(width, control) ? control.width + Tokens.Space.x4 : 0
+        return max(0, width - pad - room - textInset)
     }
 
     /// Measured at the layout width including inset; narrower, a line that just fits counts as two and leaves a blank
     /// line.
-    private func detailHeight(for width: CGFloat) -> CGFloat {
-        detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width) + Label.inset * 2, height: 400)).height)
+    private func detailHeight(for width: CGFloat, _ control: NSSize) -> CGFloat {
+        detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width, control) + Label.inset * 2, height: 400)).height)
     }
 
     /// The height this row needs at `width`.
     func height(for width: CGFloat) -> CGFloat {
-        let stack = isStacked(width) ? Tokens.Space.x3 + controlSize.height : 0
+        let size = controlSize
+        let stack = isStacked(width, size) ? Tokens.Space.x3 + size.height : 0
         guard !detail.isHidden else { return stack > 0 ? Tokens.Page.groupRowPad * 2 + title.lineHeight + stack : Tokens.Page.groupRowHeight }
-        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width) + stack)
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width, size) + stack)
     }
 
     override func layout() {
         super.layout()
         let size = controlSize
-        let stacked = isStacked(bounds.width)
+        let stacked = isStacked(bounds.width, size)
         control.frame = stacked
             ? NSRect(x: textInset, y: bounds.height - Tokens.Page.groupRowPad - size.height, width: min(size.width, bounds.width - textInset - pad), height: size.height)
             : NSRect(x: bounds.width - pad - size.width, y: round((bounds.height - size.height) / 2), width: size.width, height: size.height)
@@ -327,8 +328,8 @@ final class FormRow: NSView, SettingsSearchable {
             icon.frame = NSRect(x: pad, y: round((bounds.height - side) / 2), width: side, height: side)
         }
         let x = textInset - Label.inset
-        let width = textWidth(for: bounds.width) + Label.inset * 2
-        let detailHeight = detailHeight(for: bounds.width)
+        let width = textWidth(for: bounds.width, size) + Label.inset * 2
+        let detailHeight = detailHeight(for: bounds.width, size)
         let block = title.lineHeight + (detail.isHidden ? 0 : Self.lineGap + detailHeight)
         // A lone title centers its caps, level with the control's text.
         let top = stacked ? Tokens.Page.groupRowPad : detail.isHidden ? title.centeredY(in: bounds.height) : round((bounds.height - block) / 2)
@@ -1974,13 +1975,25 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Its picture, for the tab's preview and switcher.
+    /// Its picture, for the tab's preview and switcher. Shadows are off while it's taken: `cacheDisplay` blurs each on the CPU (#379).
     func snapshot() -> NSImage? {
         guard bounds.width > 0, bounds.height > 0, let rep = bitmapImageRepForCachingDisplay(in: bounds) else { return nil }
-        cacheDisplay(in: bounds, to: rep)
+        let shadowed = Self.shadowedLayers(in: self)
+        let opacities = shadowed.map(\.shadowOpacity)
+        Tokens.Motion.withoutAnimation {
+            shadowed.forEach { $0.shadowOpacity = 0 }
+            cacheDisplay(in: bounds, to: rep)
+            zip(shadowed, opacities).forEach { $0.shadowOpacity = $1 }
+        }
         let image = NSImage(size: bounds.size)
         image.addRepresentation(rep)
         return image
+    }
+
+    /// Every layer with a shadow, walking views as well as sublayers.
+    static func shadowedLayers(in view: NSView) -> [CALayer] {
+        func all(_ layer: CALayer) -> [CALayer] { [layer] + (layer.sublayers ?? []).flatMap(all) }
+        return (view.layer.map(all) ?? []).filter { $0.shadowOpacity > 0 } + view.subviews.flatMap(shadowedLayers)
     }
 
     // MARK: The profile shown
