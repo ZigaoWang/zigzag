@@ -21,7 +21,9 @@ enum SiteRouteSheet {
         destination.options = spaces.map { DropdownButton.Option(title: $0.name) }
         destination.selectedIndex = spaces.firstIndex { $0.id == existing.spaceID } ?? 0
 
-        let matchControls = NSStackView(views: [match, matchHelpButton()])
+        // At the row's end, as the sheet's other menus are.
+        let matchControls = NSStackView()
+        matchControls.setViews([match, matchHelpButton()], in: .trailing)
         matchControls.spacing = Tokens.Space.x2
         let preview = NSTextField.dialogText("", font: Tokens.Font.detail())
         func draft() -> SiteRoutes.Route? {
