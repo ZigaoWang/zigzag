@@ -1006,7 +1006,9 @@ struct PageTextCheckingTests {
         var posted = 0
         let watch = center.addObserver(forName: NSSpellChecker.didChangeAutomaticSpellingCorrectionNotification, object: nil, queue: nil) { _ in posted += 1 }
         defer { center.removeObserver(watch) }
-        let checking = PageTextChecking(defaults: defaults, center: center, systemCorrects: { NSSpellChecker.isAutomaticSpellingCorrectionEnabled })
+        // A choice of this suite's own, above the Mac's setting, so the last change below always counts as one.
+        defaults.set(true, forKey: PageTextChecking.spellingCorrectionKey)
+        let checking = PageTextChecking(defaults: defaults, center: center, systemCorrects: { true })
         checking.start()
         func settle() async throws { try await Task.sleep(for: .milliseconds(100)) }
         defaults.set(true, forKey: "WebAutomaticDashSubstitutionEnabled")
