@@ -7,6 +7,10 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - ⇧-clicking a file on GitHub opens it in Peek instead of moving the tab, and ⌥-clicking a link a page follows itself downloads it. A page that uses ⇧- or ⌥-click itself, like selecting a range of rows, still gets the click. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#322](https://github.com/ZigaoWang/zigzag/issues/322))
+### New
+- The prompt to open an app says who's asking ("claude.ai wants to open the Claude app."), with Cancel and Open Claude at the right and an Always allow checkbox instead of the This time menu. Other site questions use a Remember for this site checkbox the same way, and their buttons stack in a narrow window instead of getting cut off.
+- The sidebar's right-click menus are shorter and in the same order everywhere. What only that row has comes first: Back to Pinned Page and Set Current Page as Pinned when a pinned tab has moved on from its page, and Separate Split View on a split, with Remove from Split View for one page of three or four. Then the page, where it's kept, where it's shown, its name and icon, and closing last. Move To holds New Window, Zigzag Mini and your spaces in one list, Add to Group and Add to Folder start with New, items that would do nothing are left out instead of dimmed, and the tab you're on shows its shortcuts. Right-clicking one half of a split row gives that page's menu. Translate is in View › Translate Page, Site Controls and the page's menu instead of the tab's. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#327](https://github.com/ZigaoWang/zigzag/issues/327))
+- Extensions can run in private windows when you let them. Turn on Allow in private windows under an extension in Settings › Extensions; it's off for every extension until you do. An extension you allow there works in private windows as in others, and sees their tabs and downloads; the rest still see nothing of private browsing, and private windows still keep no history. ([#353](https://github.com/ZigaoWang/zigzag/issues/353))
 
 ## [0.9.3] - 2026-11-18
 

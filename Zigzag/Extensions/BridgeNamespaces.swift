@@ -293,9 +293,10 @@ final class BridgeContexts: BridgeNamespace {
         if let popup = host.shownPopup(for: extensionID) {
             contexts.append(Self.popup(popup, contextID: names.name(of: popup, extensionID: extensionID)))
         }
-        // Private windows have no extension controller; their side panels aren't reported.
+        // A private window's side panel only to an extension allowed there.
         for controller in WindowManager.shared.controllers
-        where !controller.tabManager.isPrivate && controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
+        where PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate, allowed: context.hasAccessToPrivateData)
+            && controller.root.showsSidePanel && host.showsSidePanel(of: extensionID, in: controller) {
             let panel = controller.root.sidePanel
             contexts.append(Context(type: .sidePanel, contextID: names.name(of: panel, extensionID: extensionID), documentURL: panel.webView?.url,
                                     tabID: panel.tabID ?? -1))
@@ -550,7 +551,7 @@ final class BridgeContextMenus: BridgeNamespace {
 
 /// `favIconUrl` on the tabs `tabs.query` and `tabs.get` answer, which WebKit leaves out: Sound Booster's popup shows
 /// each tab it boosts by its site's icon, and drew an empty square. Chrome gives it with the tab's address, so here
-/// too: only for a tab open now, not private, whose address the extension may read. The icon is the one Zigzag
+/// too: only for a tab open now, private only for an extension allowed there, whose address the extension may read. The icon is the one Zigzag
 /// shows, as a small PNG data: URL, which any extension page can draw without fetching anything.
 @available(macOS 15.4, *)
 @MainActor
@@ -570,12 +571,14 @@ final class BridgeFavicons: BridgeNamespace {
         guard let context = host.context(for: extensionID) else { return [] }
         let readsAll = context.hasPermission(.tabs)
         // Its own profile's tabs: the only ones it's told about.
-        let open = WindowManager.shared.controllers.filter { !$0.tabManager.isPrivate }.flatMap { window in window.tabManager.allTabs.filter(window.holds) }.compactMap { tab -> OpenTab? in
+        let seesPrivate = context.hasAccessToPrivateData
+        let open = WindowManager.shared.controllers.filter { PrivateAccess.sees(isPrivate: $0.tabManager.isPrivate, allowed: seesPrivate) }
+            .flatMap { window in window.tabManager.allTabs.filter(window.holds) }.compactMap { tab -> OpenTab? in
             guard tab.profile === host.profile, let url = tab.webView?.url ?? tab.url else { return nil }
             return OpenTab(url: url.absoluteString, icon: tab.favicon, isPrivate: tab.isPrivate,
                            mayRead: readsAll || context.hasAccess(to: url, in: tab))
         }
-        return Self.icons(for: asked.map { $0 as? String }, among: open).map { $0.flatMap(dataURL).map { $0 as Any } ?? NSNull() }
+        return Self.icons(for: asked.map { $0 as? String }, among: open, seesPrivate: seesPrivate).map { $0.flatMap(dataURL).map { $0 as Any } ?? NSNull() }
     }
 
     struct OpenTab {
@@ -587,10 +590,10 @@ final class BridgeFavicons: BridgeNamespace {
 
     /// The icon for each address asked about: an open tab's, when one shows it and the extension may read it. Never
     /// one from history or the icon cache, so asking can't tell where you've been.
-    static func icons(for asked: [String?], among open: [OpenTab]) -> [NSImage?] {
+    static func icons(for asked: [String?], among open: [OpenTab], seesPrivate: Bool = false) -> [NSImage?] {
         asked.map { url in
             guard let url else { return nil }
-            return open.first { $0.url == url && !$0.isPrivate && $0.mayRead && $0.icon != nil }?.icon
+            return open.first { $0.url == url && PrivateAccess.sees(isPrivate: $0.isPrivate, allowed: seesPrivate) && $0.mayRead && $0.icon != nil }?.icon
         }
     }
 
@@ -1643,7 +1646,8 @@ final class BridgeSidePanel: BridgeNamespace {
     @discardableResult
     func open(_ extensionID: String, in controller: BrowserWindowController?, tab: Int? = nil) -> Bool {
         guard let controller, isEnabled(extensionID, tab: tab), let path = path(for: extensionID, tab: tab),
-              let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
+              let context = host.context(for: extensionID), PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate, allowed: context.hasAccessToPrivateData),
+              let configuration = context.webViewConfiguration,
               let url = URL(string: path, relativeTo: context.baseURL)?.absoluteURL, url.host() == context.baseURL.host() else { return false }
         let root = controller.root
         // A tab's own page is reported as that tab's; the page for every tab, as no tab's.
@@ -1808,7 +1812,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
                 guard let named = pending.removeValue(forKey: streamID), let namedTab = named.tab,
                       let owner = WindowManager.shared.window(of: namedTab),
                       Self.namedStreamHolds(givenTo: named.extensionID, askedBy: extensionID, expires: named.expires, namedOrigin: named.origin,
-                                            origin: SiteOrigin.of(namedTab.webView?.url ?? namedTab.url), isPrivate: owner.tabManager.isPrivate || namedTab.isPrivate)
+                                            origin: SiteOrigin.of(namedTab.webView?.url ?? namedTab.url), isPrivate: owner.tabManager.isPrivate || namedTab.isPrivate,
+                                            seesPrivate: host.seesPrivate(extensionID))
                 else { throw BridgeError("Invalid stream ID") }
                 try ensureReachable(namedTab, in: owner, by: extensionID)
                 (tab, controller) = (namedTab, owner)
@@ -1889,8 +1894,8 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
     }
 
     /// The tab you used the extension on (its button, its menu item, its shortcut), while it still shows the site it
-    /// showed then, and only while the popup or window of that use is open or a moment after. Never a private tab,
-    /// nor a site the extension can't reach or where extensions are off.
+    /// showed then, and only while the popup or window of that use is open or a moment after. A private tab only for an
+    /// extension allowed there, and never a site the extension can't reach or where extensions are off.
     private func invokedTab(for extensionID: String) throws -> (Tab, BrowserWindowController) {
         guard let invocation = host.use.invocations[extensionID], let found = tab(invocation.tabID),
               host.use.mayCapture(extensionID, tabID: found.0.id, origin: SiteOrigin.of(found.0.webView?.url ?? found.0.url),
@@ -1904,8 +1909,9 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     /// A tab the extension may hear: an everyday one, with its page, on a site its site access reaches.
     private func ensureReachable(_ tab: Tab, in controller: BrowserWindowController, by extensionID: String) throws {
-        guard !controller.tabManager.isPrivate, !tab.isPrivate, let webView = tab.webView, let url = webView.url ?? tab.url,
-              let context = host.context(for: extensionID) else { throw BridgeError("Cannot capture a tab here") }
+        guard let context = host.context(for: extensionID),
+              PrivateAccess.sees(isPrivate: controller.tabManager.isPrivate || tab.isPrivate, allowed: context.hasAccessToPrivateData),
+              let webView = tab.webView, let url = webView.url ?? tab.url else { throw BridgeError("Cannot capture a tab here") }
         guard Self.siteAllows(url, offSites: ExtensionStore.extensionsOffSites(in: host.profile),
                               hasAccess: context.hasAccess(to: url, in: tab), allSites: host.profile.installs.siteAccess(extensionID) == .all) else {
             throw BridgeError("Extension manifest must request permission to access this host.")
@@ -1914,10 +1920,10 @@ final class BridgeTabCapture: NSObject, BridgeNamespace, WKScriptMessageHandler 
 
     /// Whether a stream ID from getMediaStreamId still names a tab to hear: asked for by the extension it was given to
     /// (from any of its pages, its offscreen one included, as Sound Booster does), within its few seconds, with the
-    /// tab still on the site it was named on, and never a private one.
+    /// tab still on the site it was named on, and a private one only for an extension allowed there.
     static func namedStreamHolds(givenTo: String, askedBy: String, expires: Date, namedOrigin: String?, origin: String?,
-                                 isPrivate: Bool, now: Date = Date()) -> Bool {
-        givenTo == askedBy && expires > now && !isPrivate && namedOrigin != nil && origin == namedOrigin
+                                 isPrivate: Bool, seesPrivate: Bool = false, now: Date = Date()) -> Bool {
+        givenTo == askedBy && expires > now && PrivateAccess.sees(isPrivate: isPrivate, allowed: seesPrivate) && namedOrigin != nil && origin == namedOrigin
     }
 
     /// Whether site settings let an extension capture a page there: never where extensions are off; else where it has

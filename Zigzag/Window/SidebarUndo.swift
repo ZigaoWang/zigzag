@@ -178,7 +178,7 @@ extension BrowserWindowController {
 
     /// The pane out of its group, the rest of which stays on screen; ⌘Z here puts it back in its place once it's
     /// back in this window.
-    private func leaveGroupWithUndo(_ tab: Tab) {
+    func leaveGroupWithUndo(_ tab: Tab) {
         pageChange(String(localized: "Separate Tabs", comment: "Undo action name, shown in the Edit menu as Undo Separate Tabs.")) { [tabManager] in
             if let rest = tabManager.leaveGroup(tab) { tabManager.select(rest) }
         }

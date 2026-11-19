@@ -731,6 +731,23 @@
         }
       }
     },
+    "%@ wants to open the %@ app." : {
+      "comment" : "Under a page's question to open an app: the site, then the app's name, like “claude.ai wants to open the Claude app.”.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ wants to open the %2$@ app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 想要打开 %2$@ 应用。"
+          }
+        }
+      }
+    },
     "%@ whose address contains %@" : {
       "comment" : "Part of a download rule's sentence: what it catches. The first placeholder is “Files” or “Files and links”, the second the text looked for in the address.",
       "localizations" : {
@@ -2835,6 +2852,17 @@
         }
       }
     },
+    "Allow %@ in private windows" : {
+      "comment" : "VoiceOver name of the switch that lets an extension run in private windows, in Settings › Extensions. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许“%@”在无痕浏览窗口中使用"
+          }
+        }
+      }
+    },
     "Allow Access" : {
       "comment" : "Button under a problem in the welcome window: let Zigzag read a browser’s data.",
       "localizations" : {
@@ -2923,6 +2951,17 @@
         }
       }
     },
+    "Allow in private windows" : {
+      "comment" : "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许在无痕浏览窗口中使用"
+          }
+        }
+      }
+    },
     "Allow it only if it needs this for what you just asked it to do." : {
       "comment" : "Under the title of the sheet shown when an extension asks for more access.",
       "localizations" : {
@@ -2974,6 +3013,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "始终翻译"
+          }
+        }
+      }
+    },
+    "Always allow %@ to open %@" : {
+      "comment" : "Checkbox on a page's question to open an app: the site may open this app without asking from now on. The placeholders are the site and the app's name.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Always allow %1$@ to open %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "始终允许 %1$@ 打开 %2$@"
           }
         }
       }
@@ -3854,6 +3910,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已清除 Cookie，保留的网站除外"
+          }
+        }
+      }
+    },
+    "Remember for this site" : {
+      "comment" : "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "记住对此网站的选择"
           }
         }
       }
@@ -10361,6 +10428,17 @@
         }
       }
     },
+    "It can see and change your pages in private windows." : {
+      "comment" : "Under “Allow in private windows” in Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它可以读取和更改你在无痕浏览窗口里打开的网页。"
+          }
+        }
+      }
+    },
     "It gets its own window and Dock icon, and stays signed in as you are here." : {
       "comment" : "Under the title of the Install as App sheet.",
       "localizations" : {
@@ -11100,17 +11178,6 @@
         }
       }
     },
-    "Make This Page the Favorite" : {
-      "comment" : "Item in a favorite's context menu.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将此页面设为收藏"
-          }
-        }
-      }
-    },
     "Make Upper Case" : {
       "comment" : "Edit › Transformations menu item.",
       "localizations" : {
@@ -11525,12 +11592,23 @@
       }
     },
     "Move Tab to New Window" : {
-      "comment" : "File menu item.\nItem in a tab's context menu in the sidebar.",
+      "comment" : "File menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "将标签页移到新窗口"
+          }
+        }
+      }
+    },
+    "Move To" : {
+      "comment" : "Item in a tab's context menu in the sidebar. Opens a list: New Window, Zigzag Mini, then the spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到"
           }
         }
       }
@@ -11646,7 +11724,7 @@
       }
     },
     "Move to Space" : {
-      "comment" : "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces.\nItem in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nItem in a tab's context menu in the sidebar. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space.",
+      "comment" : "Item in a group of tabs' context menu in the sidebar. Opens a list of spaces.\nItem in a pinned tab's context menu in the sidebar. Opens a list of spaces.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Move to Space.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13524,7 +13602,7 @@
       }
     },
     "Open in Zigzag Mini" : {
-      "comment" : "Item in a tab's context menu in the sidebar: moves the tab's page into a Zigzag Mini window (the small window for one page, without the sidebar). Zigzag Mini is a name, kept in Latin letters.\nUndo action name, shown in the Edit menu as Undo Open in Zigzag Mini.",
+      "comment" : "Undo action name, shown in the Edit menu as Undo Open in Zigzag Mini.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14494,17 +14572,6 @@
         }
       }
     },
-    "Pin This Page Instead" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "改为固定此页面"
-          }
-        }
-      }
-    },
     "Pin the sites you use" : {
       "comment" : "Title of the welcome window’s step that picks favorite sites.",
       "localizations" : {
@@ -14842,17 +14909,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无痕浏览"
-          }
-        }
-      }
-    },
-    "Private windows don’t remember answers." : {
-      "comment" : "Tooltip of the disabled duration dropdown on a permission question in a private window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无痕浏览窗口不会记住回答。"
           }
         }
       }
@@ -15645,6 +15701,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从历史记录中移除"
+          }
+        }
+      }
+    },
+    "Remove from Split View" : {
+      "comment" : "Item at the top of a tab's context menu in the sidebar, for one page of a split view of three or four: takes just this page out; the others stay side by side.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从分屏浏览中移除"
           }
         }
       }
@@ -17096,8 +17163,19 @@
         }
       }
     },
+    "Separate Split View" : {
+      "comment" : "Item at the top of the context menu of a tab, pinned tab or favorite in a split view, in the sidebar: ends the split view, each page a tab of its own again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束分屏浏览"
+          }
+        }
+      }
+    },
     "Separate Tabs" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a favorite's context menu. Parts a split favorite into two favorites.\nItem in a pinned tab's context menu in the sidebar. Parts a pinned split view into two pinned tabs.\nItem in a tab's context menu in the sidebar. Ends the split view the tab is in.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item.",
+      "comment" : "A command in the command bar, named as in the menu bar.\nTooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Separate Tabs.\nView menu item.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17169,6 +17247,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "服务"
+          }
+        }
+      }
+    },
+    "Set Current Page as Favorite" : {
+      "comment" : "Item in a favorite's context menu. The page wandered off the favorite's address; this makes the page it shows now the favorite.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将当前页面设为收藏"
+          }
+        }
+      }
+    },
+    "Set Current Page as Pinned" : {
+      "comment" : "Item in a pinned tab's context menu in the sidebar. The page wandered off its pinned address; this makes the page it shows now the pinned one.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将当前页面设为固定页面"
           }
         }
       }
@@ -19732,17 +19832,6 @@
         }
       }
     },
-    "This page has no site to remember the answer for." : {
-      "comment" : "Tooltip of the disabled duration dropdown on a question for a page with no site to keep the answer under.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此页面没有可记住答案的网站。"
-          }
-        }
-      }
-    },
     "This page is in %@" : {
       "comment" : "Toast offering to translate a page. The language is its name, like French.",
       "localizations" : {
@@ -19853,17 +19942,6 @@
         }
       }
     },
-    "This site can’t remember this answer." : {
-      "comment" : "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此网站无法记住此回答。"
-          }
-        }
-      }
-    },
     "This site hasn’t asked for anything yet." : {
       "comment" : "On a site's Permissions page in the site panel when the site hasn't asked for the camera, location, notifications or anything else.",
       "localizations" : {
@@ -19953,7 +20031,7 @@
       }
     },
     "This time" : {
-      "comment" : "Duration choice on a site's permission question: the answer applies only to this page.",
+      "comment" : "Duration choice on a site's permission question: the answer holds for this page only.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -23445,6 +23523,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@、%2$@"
+          }
+        }
+      }
+    },
+    "incognito private browsing" : {
+      "comment" : "Words that find an extension's Allow in private windows setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无痕 无痕浏览 隐私 incognito private browsing"
           }
         }
       }

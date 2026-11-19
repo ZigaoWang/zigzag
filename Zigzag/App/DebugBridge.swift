@@ -755,13 +755,32 @@ enum DebugBridge {
         case "barreset": controller.commandBar.debugResetPosition()
         case "barframe": debugLog("barframe \(NSStringFromRect(controller.commandBar.debugPanelFrame)) overlay=\(NSStringFromRect(controller.root.overlay.bounds)) page=\(NSStringFromRect(controller.root.cardFrame))")
         case "permprompt":
-            if arg == "app" {
-                Task { _ = await PermissionPrompt.ask(host: "meeting.tencent.com", what: "Calendar", symbol: "arrow.up.forward.app",
-                                                      icon: NSWorkspace.shared.icon(forFile: "/System/Applications/Calendar.app"),
-                                                      in: controller, title: "Open Calendar", actions: [.deny, .allow]) }
+            // permprompt app [mini] [name]: the open-an-app question for a made-up app; never opens anything.
+            if arg == "app" || arg.hasPrefix("app ") {
+                var words = arg.split(separator: " ").dropFirst().map(String.init)
+                let inMini = words.first == "mini"
+                if inMini { words.removeFirst(); MiniWindowController.debugPromptsShow = true }
+                let host: PromptHost = inMini ? (MiniWindowController.all.last ?? controller) : controller
+                let tab = host.promptFrontTab
+                let origin = SiteOrigin.of(tab?.url) ?? "https://example.com"
+                let name = words.isEmpty ? "Lantern" : words.joined(separator: " ")
+                Task {
+                    let answer = await ExternalLinks.ask(app: name, icon: NSWorkspace.shared.icon(for: .applicationBundle), origin: origin,
+                                                         answerKey: "\(origin)|x-lantern", in: host, tab: tab, canRemember: tab?.isPrivate != true)
+                    debugLog("permprompt app: \(answer.map { "\($0.action) remember=\($0.remember)" } ?? "put off")")
+                }
             } else {
                 Task { _ = await PermissionPrompt.ask(host: "meet.google.com", what: "your camera", symbol: "video.fill", in: controller) }
             }
+        // permremember on|off [mini], permkey <keyCode> [focused] [mini], permframes [mini]: the showing question.
+        case "permremember", "permkey", "permframes":
+            let words = arg.split(separator: " ").map(String.init)
+            let host: PromptHost = words.contains("mini") ? (MiniWindowController.all.last ?? controller) : controller
+            if name == "permremember" { PermissionPrompt.debugRemember(words.first == "on", in: host) }
+            if name == "permkey", let code = words.first.flatMap(UInt16.init) {
+                PermissionPrompt.debugKey(code, focused: words.contains("focused"), in: host)
+            }
+            if name == "permframes" { debugLog("permframes \(PermissionPrompt.debugFrames(in: host).sorted { $0.key < $1.key })") }
         case "renamepanel": RenamePanel.show(title: "Google", in: controller) { _ in }
         case "importanim": IntoZigzag.shown?.set(arg == "done" ? .done : .importing)
         case "bartab": controller.commandBar.debugTab()
@@ -1632,6 +1651,36 @@ enum DebugBridge {
             let pages: [(String, [String])] = [("a", ["Work"]), ("b", ["Work", "Docs"]), ("c", ["Work", "Docs"]), ("d", ["Work", "Docs", "Old"]), ("e", ["Work"]), ("f", [])]
                 + (1...12).map { ("r\($0)", ["Reading"]) }
             _ = Library.shared.appendBookmarks(pages.map { (base.appendingPathComponent("\($0.0).html"), $0.0.uppercased()) }, to: controller.tabManager.currentSpaceID, folders: pages.map(\.1))
+        case "rowmenu":
+            // rowmenu <title> | fav <title> | group <name> | marked: the right-click menu of the tab, pinned page, favorite or group with
+            // that title (a split's page gets its own), or of the picked rows, at its row; it closes after 4 s.
+            let list = controller.sidebar.list
+            let m = controller.tabManager
+            var menu: NSMenu?, anchor: NSView?
+            if arg == "marked", let first = list.marked.first {
+                menu = SidebarMenus.markedMenu(for: list.marked, controller: controller)
+                if case .tab(let id) = first { anchor = list.tabRow(id) } else if case .bookmark(let id) = first { anchor = list.bookmarkRow(id) }
+            } else if arg.hasPrefix("group "), let group = m.groups(in: m.currentSpaceID).first(where: { $0.name == String(arg.dropFirst(6)) }) {
+                menu = SidebarMenus.groupMenu(for: group, controller: controller)
+                anchor = list.groupRow(group.id)
+            } else if arg.hasPrefix("fav "),let fav = Library.shared.favorites(in: m.profile.id).first(where: { $0.title == String(arg.dropFirst(4)) }) {
+                menu = SidebarMenus.favoriteMenu(for: fav, controller: controller)
+                anchor = controller.sidebar.favorites.tile(for: fav.id)
+            } else if let tab = m.currentTabs.first(where: { $0.displayTitle == arg }) {
+                menu = controller.listMenu(for: .tab(tab.id), page: tab) ?? SidebarMenus.tabMenu(for: tab, controller: controller)
+                anchor = list.tabRow(tab.id)
+            } else if let bookmark = Library.shared.bookmarks(in: m.currentSpaceID).first(where: { $0.title == arg }) {
+                menu = SidebarMenus.bookmarkMenu(for: Library.shared.pinnedSplit(containing: bookmark.id).flatMap { Library.shared.bookmark($0.ids[0]) } ?? bookmark, controller: controller)
+                anchor = list.bookmarkRow(Library.shared.pinnedSplit(containing: bookmark.id)?.ids[0] ?? bookmark.id)
+            }
+            func titles(_ menu: NSMenu) -> [String] {
+                menu.items.map { $0.isSeparatorItem ? "-" : $0.title + ($0.keyEquivalent.isEmpty ? "" : " [\($0.keyEquivalent)]") + ($0.submenu.map { " ▸ " + titles($0).joined(separator: "|") } ?? "") }
+            }
+            debugLog("rowmenu \(arg) => \(menu.map(titles) ?? [])")
+            if let menu, let anchor {
+                closeNextMenu(after: 4)
+                DispatchQueue.main.async { menu.popUp(positioning: nil, at: NSPoint(x: 60, y: anchor.bounds.midY), in: anchor) }
+            }
         case "foldermenu":
             // foldermenu <folder>[>item]: that item of the folder's menu, as choosing it does; no item, the menu at its
             // row, which closes by itself after 4 s.
@@ -2560,6 +2609,10 @@ enum DebugBridge {
         case "extapprove": Task { await ExtensionStore.approvePendingUpdate(arg) }
         case "extoff": controller.tabManager.profile.installs.setEnabled(arg, false)
         case "exton": controller.tabManager.profile.installs.setEnabled(arg, true)
+        case "extprivate":
+            // extprivate <id> on|off: Settings › Extensions › Allow in private windows.
+            let f = arg.split(separator: " ").map(String.init)
+            if f.count == 2 { controller.tabManager.profile.installs.setAllowsPrivate(f[0], f[1] == "on") }
         case "settingsid":
             // Settings is a tab now: its window is the browser window it's in.
             if let w = controller.window { try? "\(w.windowNumber)".write(toFile: arg, atomically: true, encoding: .utf8) }

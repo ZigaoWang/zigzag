@@ -269,13 +269,12 @@ enum AuthenticationPrompt {
         // Several loads asking for the same sign-in at once (a page and its images): one question, one answer for all.
         let space = challenge.protectionSpace
         let key = "\(ObjectIdentifier(store).hashValue)|\(space.host):\(space.port)|\(space.realm ?? "")"
-        let asker = store.isPersistent ? tab : nil
-        // Extensions never hear of a private tab's sign-ins, as they never see its pages.
-        let asksExtensions = store.isPersistent
+        // A private tab's sign-ins go only to extensions allowed in private windows (BridgeWebRequest.askForSignIn).
+        let asker = tab
         if challenge.previousFailureCount == 0, let asking = signingIn[key] {
             // Asked again while the sheet is up: the page loaded again, often because an extension was told what to
             // fill (1Password reloads the tab once you pick a login in it). Its answer answers the sheet too.
-            if asking.sheetShown, asksExtensions, case .credentials(let username, let password) = await askExtensions(challenge, page: page, tab: asker) {
+            if asking.sheetShown, case .credentials(let username, let password) = await askExtensions(challenge, page: page, tab: asker) {
                 PageDialogSheet.answer(tag: key, with: [username, password])
                 return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
             }
@@ -284,7 +283,7 @@ enum AuthenticationPrompt {
         let attempt = SigningIn()
         signingIn[key] = attempt
         let task = Task { @MainActor () -> (URLSession.AuthChallengeDisposition, URLCredential?) in
-            switch asksExtensions ? await askExtensions(challenge, page: page, tab: asker) : .none {
+            switch await askExtensions(challenge, page: page, tab: asker) {
             case .credentials(let username, let password):
                 return (.useCredential, URLCredential(user: username, password: password, persistence: .forSession))
             case .cancel:
@@ -324,7 +323,7 @@ enum AuthenticationPrompt {
         // The extensions of the profile the page is in: another profile's never hear of its sign-ins.
         guard challenge.previousFailureCount < 2, let page, let site = SiteChallenge(challenge, pageURL: page.url),
               let host = (page as? BrowserWebView)?.owner?.extensionHost ?? Profiles.shared.profile(of: page)?.extensions else { return .none }
-        return await host.bridge.webRequest.askForSignIn(site, tab: tab)
+        return await host.bridge.webRequest.askForSignIn(site, tab: tab, isPrivate: !page.configuration.websiteDataStore.isPersistent)
     }
 
     @MainActor

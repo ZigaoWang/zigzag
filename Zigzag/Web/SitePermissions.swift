@@ -519,10 +519,6 @@ enum SitePermissions {
         origin.map(SiteOrigin.label) ?? String(localized: "This page", comment: "Stands for the site in a question when the page has no host.")
     }
 
-    private static var noSiteNote: String {
-        String(localized: "This page has no site to remember the answer for.", comment: "Tooltip of the disabled duration dropdown on a permission question asked by a page with no site, like a local file.")
-    }
-
     /// The site's notification answer on `tab`'s page: Allow or Block kept for the site, else the answer given on
     /// this page.
     static func notifications(origin: String, tab: Tab?) -> Bool? {
@@ -565,7 +561,7 @@ enum SitePermissions {
         let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: "your location",
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
-                                                actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
+                                                actions: [.deny, .allow], canRemember: key != nil,
                                                 answered: {
                                                     key.flatMap { key in
                                                         knownAnswer(site: location(origin: key),
@@ -614,7 +610,7 @@ enum SitePermissions {
             // Asked in turn like any other question (`PageQuestions`).
             let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: what,
                                                     symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
-                                                    actions: [.deny, .allow], canRemember: key != nil, rememberNote: key == nil ? noSiteNote : nil,
+                                                    actions: [.deny, .allow], canRemember: key != nil,
                                                     answered: {
                                                         key.flatMap { key in
                                                             knownAnswer(site: decision(origin: key, type: type),
@@ -835,17 +831,23 @@ final class QuestionCancellation {
 }
 
 /// "Use your location?", at the top of the page that asked, sliding down from its top edge: the question, the site
-/// under it, and two answers, Allow last and filled. The answer holds for the page that asked; Allow or Block for good
-/// is chosen in the site panel or Settings › Privacy. Not answering is easy: the close button, Esc, or a click anywhere else puts
-/// it off ("not now"), and so does the tab going to another site. One question at a time per window. It belongs
-/// to the tab that asked: it steps aside while another tab is in front and comes back with that tab.
+/// under it, a Remember checkbox under that, and the answers at the trailing edge, the filled one last. The answer
+/// holds for the page that asked unless Remember is checked; Allow or Block for good is also chosen in the site panel
+/// or Settings › Privacy. Not answering is easy: the close button (or Cancel, where the question has one), Esc, or a
+/// click anywhere else puts it off ("not now"), and so does the tab going to another site. One question at a time per
+/// window. It belongs to the tab that asked: it steps aside while another tab is in front and comes back with that
+/// tab.
 final class PermissionPrompt: FloatingPanelView {
     /// The app's own icon when it's an app that would open, else the request's symbol on a soft circle.
     private let picture = NSImageView()
     private let badge = ColorView(color: .clear)
     private let request = Label("", font: Tokens.Font.body(.medium), color: Tokens.Color.textPrimary)
     private let asker = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
+    /// Keeps the answer for the site; hidden where nothing can be kept.
+    private let remember = Checkbox()
+    private var remembers = false
     private let closeButton = IconButton(symbol: "xmark", toolTip: String(localized: "Not Now", comment: "Tooltip of the × on a site's permission question."))
+    /// Only for a caller's own durations (a download rule's): one dropdown under the question.
     private let duration = DropdownButton()
     /// One dropdown for answers of one kind (where a pop-up opens); choosing one answers.
     private let answerMenu = DropdownButton()
@@ -933,14 +935,15 @@ final class PermissionPrompt: FloatingPanelView {
     /// `host` names the site in the question; `origin` is the site it's for (`SiteOrigin`); `answerKey` is the
     /// frame-and-page key from `SitePermissions.answerKey`. `answered` is checked when it's this question's turn.
     /// `tab` defaults to the front tab. `menu`: answers of one kind as a dropdown that answers (and acts as the
-    /// filled answer). `chooser`: a dropdown that only picks, returned as `choice`, with no duration. Always is
-    /// offered only when `canRemember`; otherwise `rememberNote` explains why. Nil means Not Now.
+    /// filled answer). `chooser`: a dropdown that only picks, returned as `choice`, with no duration. The Remember
+    /// checkbox (`rememberTitle`, else "Remember for this site") shows only when `canRemember`. `detail` replaces the
+    /// site line with a sentence. A `.cancel` action takes the close button's place. Nil means Not Now.
     static func ask(host: String, origin: String? = nil, answerKey: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
                     chooser: [PermissionAction] = [],
                     durations: [String]? = nil,
-                    canRemember: Bool = true, rememberNote: String? = nil,
+                    canRemember: Bool = true, rememberTitle: String? = nil, detail: String? = nil,
                     cancellation: QuestionCancellation? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let remembers = canRemember && !controller.promptIsPrivate
@@ -969,7 +972,7 @@ final class PermissionPrompt: FloatingPanelView {
             setWaiting(questionsWaiting(in: controller) + 1, in: controller)
             let answer = await show(host: host, request: request,
                                   symbol: symbol, icon: icon, actions: actions, menu: menu, chooser: chooser,
-                                  canRemember: remembers, rememberNote: rememberNote,
+                                  canRemember: remembers, rememberTitle: rememberTitle, detail: detail,
                                   durations: durations,
                                   origin: origin, in: controller, tab: tab, cancellation: cancellation, answered: answered)
             PendingQuestions.answer(questionID)
@@ -994,7 +997,7 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool, rememberNote: String?,
+                             menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool, rememberTitle: String?, detail: String?,
                              durations: [String]? = nil,
                              origin: String?, in controller: PromptHost, tab: Tab?,
                              cancellation: QuestionCancellation? = nil,
@@ -1018,7 +1021,13 @@ final class PermissionPrompt: FloatingPanelView {
             let prompt = PermissionPrompt(frame: .zero)
             prompt.cancelToken = cancellation?.changed.observe { [weak prompt] in prompt?.finish(nil) }
             prompt.request.stringValue = String(localized: "\(request)?", comment: "A site's permission question: the request, then a question mark, like “Use your camera?”.")
-            prompt.asker.stringValue = host.withoutWWW
+            prompt.asker.stringValue = detail ?? host.withoutWWW
+            if detail != nil {
+                // A sentence wraps; a bare host keeps its end.
+                prompt.asker.lineBreakMode = .byWordWrapping
+                prompt.asker.usesSingleLineMode = false
+                prompt.asker.maximumNumberOfLines = 2
+            }
             prompt.askingHost = host
             prompt.askingOrigin = origin
             if let icon {
@@ -1033,32 +1042,28 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.picture.contentTintColor = Tokens.Color.textPrimary
                 prompt.badge.color = .clear
             }
-            prompt.duration.isEnabled = canRemember || durations != nil
+            prompt.remembers = canRemember && durations == nil
+            prompt.remember.isHidden = !prompt.remembers
+            prompt.remember.title = rememberTitle ?? String(localized: "Remember for this site", comment: "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.")
+            prompt.remember.tint = accent
             if let durations {
                 prompt.duration.options = durations.map { DropdownButton.Option(title: $0) }
                 prompt.duration.selectedIndex = 0
-            } else if !canRemember {
-                prompt.duration.toolTip = rememberNote ?? (controller.promptIsPrivate
-                    ? String(localized: "Private windows don’t remember answers.", comment: "Tooltip of the disabled duration dropdown on a permission question in a private window.")
-                    : String(localized: "This site can’t remember this answer.", comment: "Tooltip of the disabled duration dropdown on a permission question whose answer cannot be kept."))
+                prompt.duration.isHidden = false
             }
-            let row = Self.actions(for: actions).map { action -> PillButton in
+            let ordered = Self.actions(for: actions)
+            // Cancel says what the close button would.
+            prompt.closeButton.isHidden = ordered.contains(where: \.isCancel)
+            let row = ordered.map { action -> PillButton in
                 let button = PillButton(title: action.title, style: action.isProminent ? .prominent : .plain)
                 if action.isProminent { button.tint = accent }
-                button.onClick = { [weak prompt] _ in
-                    guard let prompt, action.isDeny || prompt.acceptsAllow else { return }
-                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
-                    prompt.finish(PermissionAnswer(action: action.id,
-                                                   remember: canRemember && prompt.duration.selectedIndex == 1,
-                                                   scopeIndex: scope, choice: prompt.chosenChoice))
-                }
+                button.onClick = { [weak prompt] _ in prompt?.press(action) }
                 return button
             }
+            prompt.orderedActions = ordered
             for button in row { prompt.addSubview(button) }
             prompt.addSubview(prompt.moreWaiting)
-            // Side by side at one width, as a Mac dialog sets its answers.
-            let width = max(row.map(\.fittingWidth).max() ?? 0, Tokens.Dialog.minButtonWidth)
-            prompt.buttons = row.map { ($0 as InteractiveView, width) }
+            prompt.buttons = row.map { ($0 as InteractiveView, max($0.fittingWidth, Tokens.Dialog.minButtonWidth)) }
             // Dropdown that answers (where a pop-up opens); acts as the filled answer.
             if !menu.isEmpty {
                 prompt.menuChoices = menu
@@ -1067,21 +1072,18 @@ final class PermissionPrompt: FloatingPanelView {
                 prompt.answerMenu.tint = accent
                 prompt.answerMenu.onSelect = { [weak prompt] index in
                     guard let prompt, prompt.acceptsAllow, menu.indices.contains(index) else { return }
-                    let scope = durations == nil ? 0 : prompt.duration.selectedIndex
-                    prompt.finish(PermissionAnswer(action: menu[index].id,
-                                                   remember: canRemember && prompt.duration.selectedIndex == 1,
-                                                   scopeIndex: scope))
+                    prompt.finish(PermissionAnswer(action: menu[index].id, remember: prompt.remembers && prompt.remember.isOn,
+                                                   scopeIndex: prompt.duration.isHidden ? 0 : prompt.duration.selectedIndex))
                 }
                 prompt.addSubview(prompt.answerMenu)
             }
-            // Dropdown that only picks (where a web address opens). No duration. `chosenChoice` is read when a button
+            // Dropdown that only picks (where a web address opens), under the text. `chosenChoice` is read when a button
             // is pressed.
             if !chooser.isEmpty {
                 prompt.hasChooser = true
                 prompt.menuChoices = chooser
                 prompt.answerMenu.options = chooser.map { DropdownButton.Option(title: $0.title) }
                 prompt.addSubview(prompt.answerMenu)
-                if durations == nil { prompt.duration.isHidden = true }
             }
             prompt.setAccessibilityLabel(String(localized: "\(host): \(request)?", comment: "VoiceOver label of a site's permission question: the site, then its request, like “zoom.us: Use your camera?”."))
             prompt.answer = { response in
@@ -1119,15 +1121,26 @@ final class PermissionPrompt: FloatingPanelView {
                 let address = controller?.promptAnchor
                 let onAddress = address.map { $0.bounds.contains($0.convert(event.locationInWindow, from: nil)) } ?? false
                 if !inside && !onAddress { prompt.finish(nil) }
+                // A click in the card gives it the keyboard, so Return answers.
+                if inside, !prompt.hasFocus {
+                    DispatchQueue.main.async { [weak prompt] in
+                        guard let prompt, prompt.answer != nil, !prompt.hasFocus else { return }
+                        prompt.window?.makeFirstResponder(prompt)
+                    }
+                }
                 return event
             }
             prompt.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak prompt, weak controller] event in
                 guard let prompt, !prompt.isHidden, event.window === prompt.window else { return event }
                 // Under notes or the command bar opened after it, Esc is theirs.
                 if WhatsNewSheet.isShowing(in: prompt.window) || controller?.promptIsCovered == true { return event }
-                // Esc puts it off. Return does nothing here: it belongs to whatever you're typing in.
-                if event.keyCode == 53 { prompt.finish(nil); return nil }
-                return event
+                let modified = !event.modifierFlags.intersection([.command, .option, .control]).isEmpty
+                switch Self.keyAction(keyCode: event.keyCode, modified: modified, focused: prompt.hasFocus, shift: event.modifierFlags.contains(.shift)) {
+                case .cancel: prompt.finish(nil); return nil
+                case .primary: prompt.pressPrimary(); return nil
+                case .next(let back): prompt.moveFocus(back: back); return nil
+                case .pass: return event
+                }
             }
             if cancellation?.isCancelled == true { prompt.finish(nil); return }
             // Last, once it listens: a tab already gone puts it off here, and that takes down what was just set up.
@@ -1215,18 +1228,79 @@ final class PermissionPrompt: FloatingPanelView {
         request.usesSingleLineMode = false
         request.maximumNumberOfLines = 2
         closeButton.onClick = { [weak self] _ in self?.finish(nil) }
-        duration.options = [
-            DropdownButton.Option(title: String(localized: "This time", comment: "Duration choice on a site's permission question: the answer applies only to this page.")),
-            DropdownButton.Option(title: String(localized: "Always on this site", comment: "Duration choice on a site's permission question: the answer is remembered for this site."))
-        ]
-        duration.selectedIndex = 0
+        duration.isHidden = true
         duration.menuTakesOwnLook = true
         answerMenu.menuTakesOwnLook = true
-        [badge, picture, request, asker, closeButton, duration].forEach { addSubview($0) }
+        [badge, picture, request, asker, closeButton, remember, duration].forEach { addSubview($0) }
         onLayout = { [weak self] in self?.layoutContent() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Takes the keyboard from a click inside it, so Return and Tab are its own.
+    override var acceptsFirstResponder: Bool { answer != nil }
+
+    /// The card or one of its controls has the keyboard.
+    private var hasFocus: Bool {
+        guard let responder = window?.firstResponder as? NSView else { return false }
+        return responder === self || responder.isDescendant(of: self)
+    }
+
+    /// The answers in order, `buttons` beside them.
+    private var orderedActions: [PermissionAction] = []
+
+    /// What a button's press answers: nil for Cancel (put off), else the action, kept for the site only when Remember
+    /// is shown and checked.
+    static func answer(for action: PermissionAction, rememberChecked: Bool, canRemember: Bool,
+                       scopeIndex: Int = 0, choice: String? = nil) -> PermissionAnswer? {
+        guard !action.isCancel else { return nil }
+        return PermissionAnswer(action: action.id, remember: canRemember && rememberChecked, scopeIndex: scopeIndex, choice: choice)
+    }
+
+    enum KeyAction: Equatable {
+        case cancel, primary, pass
+        /// Tab or Shift-Tab between its controls.
+        case next(back: Bool)
+    }
+
+    /// Esc always cancels. Return or Enter press the filled answer, and Tab moves, only while the card has the
+    /// keyboard: a question that comes up while you type never takes your Return.
+    static func keyAction(keyCode: UInt16, modified: Bool, focused: Bool, shift: Bool = false) -> KeyAction {
+        if keyCode == 53 { return .cancel }
+        guard focused, !modified else { return .pass }
+        switch keyCode {
+        case 36, 76: return .primary
+        case 48: return .next(back: shift)
+        default: return .pass
+        }
+    }
+
+    private func press(_ action: PermissionAction) {
+        guard action.isDeny || acceptsAllow else { return }
+        finish(Self.answer(for: action, rememberChecked: remember.isOn, canRemember: remembers,
+                           scopeIndex: duration.isHidden ? 0 : duration.selectedIndex, choice: chosenChoice))
+    }
+
+    /// Return: the filled answer, after its first half second like a click.
+    private func pressPrimary() {
+        if let index = orderedActions.lastIndex(where: \.isProminent) {
+            press(orderedActions[index])
+        }
+    }
+
+    /// Tab order: Remember, the duration, the answers, the menu.
+    private var focusable: [InteractiveView] {
+        ([remember, duration] + buttons.map(\.button) + (menuChoices.isEmpty ? [] : [answerMenu]))
+            .filter { !$0.isHidden && $0.superview === self }
+    }
+
+    private func moveFocus(back: Bool) {
+        let views = focusable
+        guard !views.isEmpty, let window else { return }
+        let current = views.firstIndex { window.firstResponder === $0 }
+        let next = current.map { (back ? $0 - 1 + views.count : $0 + 1) % views.count } ?? (back ? views.count - 1 : 0)
+        window.makeFirstResponder(views[next])
+    }
 
     /// The pick-only dropdown's entry; nil when there isn't one.
     private var chosenChoice: String? {
@@ -1236,8 +1310,10 @@ final class PermissionPrompt: FloatingPanelView {
 
     private func finish(_ choice: PermissionAnswer?) {
         // A private or one-time question never returns Always, debug answers included.
-        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && duration.isEnabled,
+        let choice = choice.map { PermissionAnswer(action: $0.action, remember: $0.remember && (remembers || !duration.isHidden),
                                                    scopeIndex: $0.scopeIndex, choice: $0.choice) }
+        // The keyboard goes back to the page.
+        if hasFocus, let window { window.makeFirstResponder(askingTab?.webView ?? controller?.promptFrontTab?.webView) }
         stopListening()
         let answer = self.answer
         self.answer = nil
@@ -1293,53 +1369,134 @@ final class PermissionPrompt: FloatingPanelView {
         guard let prompt = shown[ObjectIdentifier(host)], prompt.superview != nil, !prompt.isHidden else { return [] }
         return prompt.buttons.compactMap { ($0.button as? PillButton)?.title }
     }
+
+    /// Debug bridge: checks or clears Remember, as a click would.
+    static func debugRemember(_ on: Bool, in host: PromptHost) {
+        guard let prompt = shown[ObjectIdentifier(host)], !prompt.isHidden, !prompt.remember.isHidden else { return }
+        prompt.remember.isOn = on
+    }
+
+    /// Debug bridge: a key as the card's key monitor takes it (`focused`: as after a click in it).
+    static func debugKey(_ keyCode: UInt16, focused: Bool, in host: PromptHost) {
+        guard let prompt = shown[ObjectIdentifier(host)], !prompt.isHidden else { return }
+        if focused { prompt.window?.makeFirstResponder(prompt) }
+        switch keyAction(keyCode: keyCode, modified: false, focused: prompt.hasFocus) {
+        case .cancel: prompt.finish(nil)
+        case .primary: prompt.pressPrimary()
+        case .next(let back): prompt.moveFocus(back: back)
+        case .pass: break
+        }
+    }
+
+    /// The card's frame and its parts', in the card's own flipped coordinates.
+    static func debugFrames(in host: PromptHost) -> [String: String] {
+        guard let prompt = shown[ObjectIdentifier(host)], !prompt.isHidden else { return [:] }
+        var out = ["card": NSStringFromRect(prompt.frame), "remember": NSStringFromRect(prompt.remember.frame),
+                   "close": prompt.closeButton.isHidden ? "hidden" : NSStringFromRect(prompt.closeButton.frame),
+                   "title": NSStringFromRect(prompt.request.frame), "detail": NSStringFromRect(prompt.asker.frame)]
+        for (i, b) in prompt.buttons.enumerated() { out["button\(i)"] = NSStringFromRect(b.button.frame) }
+        return out
+    }
     #endif
 
-    private static let width = CardOverThePage.width
-    private static let maxWidth = CardOverThePage.maxWidth
     private static let pad = CardOverThePage.pad
     private static let iconSide = CardOverThePage.iconSide
     private static let buttonHeight = DialogButtons.height
     private static let buttonGap = Tokens.Dialog.buttonGap
+    /// Text to the Remember row.
+    private static let optionGap = Tokens.Space.x3
+    /// What's above to the answers.
+    private static let answersGap = Tokens.Space.x4
 
     private var textX: CGFloat { Self.pad + Self.iconSide + Tokens.Space.x3 }
-    /// Room kept at the right of the text for the close button.
-    private var closeRoom: CGFloat { Tokens.Metric.iconButton }
+    /// Room kept at the right of the text for the close button; none when Cancel stands in for it.
+    private var closeRoom: CGFloat { closeButton.isHidden ? 0 : Tokens.Metric.iconButton }
+    private func textWidth(for width: CGFloat) -> CGFloat { width - textX - Self.pad - closeRoom }
 
-    private func requestHeight(for width: CGFloat) -> CGFloat {
-        let textWidth = width - textX - Self.pad - closeRoom
-        return ceil(request.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: textWidth, height: 200)).height ?? request.lineHeight)
+    private func wrappedHeight(_ label: Label, width: CGFloat) -> CGFloat {
+        guard label.maximumNumberOfLines != 1 else { return label.lineHeight }
+        return ceil(label.cell?.cellSize(forBounds: NSRect(x: 0, y: 0, width: width + Label.inset * 2, height: 200)).height ?? label.lineHeight)
     }
 
-    private func textHeight(for width: CGFloat) -> CGFloat { requestHeight(for: width) + 2 + asker.lineHeight }
+    private func textHeight(for width: CGFloat) -> CGFloat {
+        wrappedHeight(request, width: textWidth(for: width)) + 2 + wrappedHeight(asker, width: textWidth(for: width))
+    }
+
+    /// Under the text, at its edge: Remember, or the pick-only dropdown and the caller's durations.
+    private var pickers: [InteractiveView] {
+        [hasChooser ? answerMenu : nil, duration.isHidden ? nil : duration].compactMap { $0 }
+    }
+
+    private func optionWidth(for width: CGFloat) -> CGFloat { width - textX - Self.pad }
+
+    private var pickersWidth: CGFloat {
+        pickers.reduce(0) { $0 + $1.intrinsicContentSize.width } + Self.buttonGap * CGFloat(max(0, pickers.count - 1))
+    }
+
+    private func optionHeight(for width: CGFloat) -> CGFloat {
+        if !remember.isHidden { return Self.optionGap + remember.height(for: optionWidth(for: width)) }
+        guard !pickers.isEmpty else { return 0 }
+        let rows = pickersWidth <= optionWidth(for: width) ? 1 : CGFloat(pickers.count)
+        return Self.optionGap + rows * Tokens.Page.controlHeight + (rows - 1) * Self.buttonGap
+    }
+
+    private var answersMenu: Bool { !menuChoices.isEmpty && !hasChooser }
+
+    /// The answers left to right at the widths `layout` gives them: the buttons, then the dropdown that answers.
+    private func answerViews(_ layout: AnswerLayout) -> [(view: InteractiveView, width: CGFloat)] {
+        let shared = buttons.map(\.width).max() ?? 0
+        return buttons.map { ($0.button, layout == .shared ? shared : $0.width) }
+            + (answersMenu ? [(answerMenu as InteractiveView, answerMenu.intrinsicContentSize.width)] : [])
+    }
+
+    enum AnswerLayout: Equatable {
+        /// Side by side at one width, as a Mac dialog sets its answers, at the trailing edge.
+        case shared
+        /// Side by side at their own widths, when one width doesn't fit.
+        case own
+        /// One per row, full width, the filled one on top, as a narrow Mac alert stacks them.
+        case stacked
+    }
+
+    /// One width when that fits, their own widths when those fit, else stacked: never a clipped title. `widths` are
+    /// the buttons' own; `menu` is the answering dropdown's, which keeps its width.
+    static func answerLayout(widths: [CGFloat], menu: CGFloat? = nil, available: CGFloat, gap: CGFloat) -> AnswerLayout {
+        let count = CGFloat(widths.count + (menu == nil ? 0 : 1))
+        guard count > 1 else { return .shared }
+        let rest = gap * (count - 1) + (menu ?? 0)
+        if CGFloat(widths.count) * (widths.max() ?? 0) + rest <= available { return .shared }
+        return widths.reduce(0, +) + rest <= available ? .own : .stacked
+    }
+
+    private func answersLayout(for width: CGFloat) -> AnswerLayout {
+        Self.answerLayout(widths: buttons.map(\.width), menu: answersMenu ? answerMenu.intrinsicContentSize.width : nil,
+                          available: width - Self.pad * 2, gap: Self.buttonGap)
+    }
+
+    private func answersHeight(for width: CGFloat) -> CGFloat {
+        guard answersLayout(for: width) == .stacked else { return Self.buttonHeight }
+        let count = CGFloat(buttons.count + (answersMenu ? 1 : 0))
+        return count * Self.buttonHeight + (count - 1) * Self.buttonGap
+    }
+
+    /// The width it asks for: the answers side by side, or the Remember row on one line.
+    private var answersWidth: CGFloat {
+        let views = answerViews(.shared)
+        let answers = views.reduce(0) { $0 + $1.width } + Self.buttonGap * CGFloat(max(0, views.count - 1))
+        let option = remember.isHidden ? pickersWidth : remember.fittingWidth
+        return max(answers, textX - Self.pad + option)
+    }
 
     private func height(for width: CGFloat) -> CGFloat {
         let header = Self.pad + max(Self.iconSide, textHeight(for: width))
-        // Answers on one line, or the duration on its own row above when they don't fit. No duration means one line
-        // always.
-        let answers = duration.isHidden || answersFit(in: width) ? Self.buttonHeight
-                                                               : Tokens.Page.controlHeight + Tokens.Space.x2 + Self.buttonHeight
         let waiting = Self.waitingLine(questionsWaiting: questionsWaiting) == nil ? 0
                                                                                  : moreWaiting.lineHeight + Tokens.Space.x2
-        return header + Tokens.Space.x4 + answers + waiting + Self.pad
+        return header + optionHeight(for: width) + Self.answersGap + answersHeight(for: width) + waiting + Self.pad
     }
-
-    private var buttonsWidth: CGFloat {
-        buttons.reduce(0) { $0 + $1.width } + Self.buttonGap * CGFloat(max(0, buttons.count - 1))
-    }
-
-    private var menuWidth: CGFloat { menuChoices.isEmpty ? 0 : answerMenu.intrinsicContentSize.width + Self.buttonGap }
-
-    private var durationWidth: CGFloat { duration.isHidden ? 0 : duration.intrinsicContentSize.width + Self.buttonGap }
-
-    private var answersWidth: CGFloat { buttonsWidth + menuWidth + durationWidth }
-
-    /// Too narrow (Zigzag Mini, a narrow pane, long translations) puts the duration on its own row.
-    private func answersFit(in width: CGFloat) -> Bool { answersWidth <= width - Self.pad * 2 }
 
     private func layoutContent() {
         let pad = Self.pad, w = bounds.width
-        let textWidth = w - textX - pad - closeRoom
+        let textWidth = textWidth(for: w)
         let th = textHeight(for: w)
         let cs = closeButton.frame.size
         closeButton.frame.origin = NSPoint(x: w - Tokens.Space.x2 - cs.width, y: Tokens.Space.x2)
@@ -1347,47 +1504,54 @@ final class PermissionPrompt: FloatingPanelView {
         badge.frame = NSRect(x: pad, y: pad + (header - Self.iconSide) / 2, width: Self.iconSide, height: Self.iconSide)
         picture.frame = badge.frame
         let top = pad + (header - th) / 2
-        request.frame = NSRect(x: textX - Label.inset, y: top, width: textWidth + Label.inset * 2, height: requestHeight(for: w))
-        asker.frame = NSRect(x: textX - Label.inset, y: request.frame.maxY + 2, width: textWidth + Label.inset * 2, height: asker.lineHeight)
-        var y = pad + header + Tokens.Space.x4
-        // Trailing-aligned like a Mac dialog: buttons, menu, duration. If they don't fit, the duration goes on the
-        // row above.
-        let oneLine = answersFit(in: w)
-        if !oneLine, !duration.isHidden {
-            let size = duration.intrinsicContentSize
-            duration.frame = NSRect(x: w - pad - size.width, y: y, width: size.width, height: Tokens.Page.controlHeight)
-            y = duration.frame.maxY + Tokens.Space.x2
+        request.frame = NSRect(x: textX - Label.inset, y: top, width: textWidth + Label.inset * 2, height: wrappedHeight(request, width: textWidth))
+        asker.frame = NSRect(x: textX - Label.inset, y: request.frame.maxY + 2, width: textWidth + Label.inset * 2, height: wrappedHeight(asker, width: textWidth))
+        var y = pad + header
+        let optionWidth = optionWidth(for: w)
+        if !remember.isHidden {
+            y += Self.optionGap
+            let h = remember.height(for: optionWidth)
+            remember.frame = NSRect(x: textX, y: y, width: min(optionWidth, remember.fittingWidth), height: h)
+            y += h
+        } else if !pickers.isEmpty {
+            y += Self.optionGap
+            let oneRow = pickersWidth <= optionWidth
+            var x = textX
+            for (i, picker) in pickers.enumerated() {
+                let size = picker.intrinsicContentSize
+                if !oneRow, i > 0 { x = textX; y += Tokens.Page.controlHeight + Self.buttonGap }
+                picker.frame = NSRect(x: x, y: y, width: min(size.width, optionWidth), height: Tokens.Page.controlHeight)
+                x += size.width + Self.buttonGap
+            }
+            y += Tokens.Page.controlHeight
         }
+        y += Self.answersGap
         let available = w - pad * 2
-        // Equal-width buttons in the space left after the menu.
-        let each = max(Tokens.Dialog.minButtonWidth,
-                       (available - menuWidth - Self.buttonGap * CGFloat(max(0, buttons.count - 1))) / CGFloat(max(1, buttons.count)))
-        var x = w - pad
-        if oneLine, !duration.isHidden {
-            let size = duration.intrinsicContentSize
-            x -= size.width
-            duration.frame = NSRect(x: x, y: y, width: size.width, height: Tokens.Page.controlHeight)
-            x -= Self.buttonGap
+        let layout = answersLayout(for: w)
+        let views = answerViews(layout)
+        switch layout {
+        case .shared, .own:
+            var x = w - pad
+            for (view, width) in views.reversed() {
+                // A lone answer wider than the card takes the row.
+                let bw = min(width, available)
+                x -= bw
+                view.frame = NSRect(x: x, y: y, width: bw, height: Self.buttonHeight)
+                x -= Self.buttonGap
+            }
+        case .stacked:
+            var row = y
+            for (view, _) in views.reversed() {
+                view.frame = NSRect(x: pad, y: row, width: available, height: Self.buttonHeight)
+                row += Self.buttonHeight + Self.buttonGap
+            }
         }
-        if !menuChoices.isEmpty {
-            let size = answerMenu.intrinsicContentSize
-            x -= size.width
-            answerMenu.frame = NSRect(x: x, y: y, width: size.width, height: Tokens.Page.controlHeight)
-            x -= Self.buttonGap
-        }
-        let even = !oneLine || buttonsWidth > available
-        for (button, width) in buttons.reversed() {
-            let bw = even ? each : width
-            x -= bw
-            button.frame = NSRect(x: x, y: y, width: bw, height: Self.buttonHeight)
-            x -= Self.buttonGap
-        }
+        y += answersHeight(for: w)
         let waiting = Self.waitingLine(questionsWaiting: questionsWaiting)
         moreWaiting.isHidden = waiting == nil
         if let waiting {
             moreWaiting.stringValue = waiting
-            moreWaiting.frame = NSRect(x: pad, y: y + Self.buttonHeight + Tokens.Space.x2,
-                                       width: available, height: moreWaiting.lineHeight)
+            moreWaiting.frame = NSRect(x: pad, y: y + Tokens.Space.x2, width: available, height: moreWaiting.lineHeight)
         }
     }
 }

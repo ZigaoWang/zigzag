@@ -570,6 +570,17 @@ extension ExtensionBridgeTests {
         #expect(!BridgeDownloads.sees(hidden, in: other))
     }
 
+    /// An extension allowed in private windows sees their downloads too, in its own profile only (#353).
+    @Test func privateDownloadsOnlyToAnExtensionAllowedThere() {
+        let other = UUID()
+        let hidden = DownloadItem(filename: "c.pdf", sourceURL: nil, isPrivate: true)
+        let everyday = DownloadItem(filename: "a.pdf", sourceURL: nil, isPrivate: false)
+        #expect(BridgeDownloads.sees(hidden, in: Profile.defaultID, seesPrivate: true))
+        #expect(!BridgeDownloads.sees(hidden, in: Profile.defaultID, seesPrivate: false))
+        #expect(!BridgeDownloads.sees(hidden, in: other, seesPrivate: true))
+        #expect(BridgeDownloads.sees(everyday, in: Profile.defaultID, seesPrivate: false))
+    }
+
     /// A download fetched again (one listed from before Zigzag started has no store of its own) goes in its own
     /// profile's store, never the one of whichever page is in front: that could be another profile's sign-ins.
     @Test func aDownloadIsFetchedAgainInItsOwnProfile() {

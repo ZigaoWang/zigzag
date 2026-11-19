@@ -184,3 +184,72 @@ struct SettingsSiteAccessTests {
         }
     }
 }
+
+/// Allow in private windows (#353): off until you turn it on, kept with the profile's other answers about the
+/// extension, asked again in another profile, and gone when the extension is.
+@MainActor
+struct PrivateWindowAccessTests {
+    private let id = "private-access-settings-test"
+
+    private func withInstalls(_ body: (ExtensionInstalls) throws -> Void) rethrows {
+        let library = Library.shared
+        let info = library.addProfile(name: "Private access test")
+        let installs = Profiles.shared.profile(info.id).installs
+        defer {
+            installs.remove(id)
+            library.removeProfile(info.id)
+            library.finishedRemovingProfile(info.id)
+        }
+        installs.save(ExtensionInstalls.State(grantedPermissions: [], grantedMatchPatterns: ["<all_urls>"]), for: id)
+        try body(installs)
+    }
+
+    @Test func onlyAnAllowedExtensionSeesPrivateWindows() {
+        #expect(PrivateAccess.sees(isPrivate: false, allowed: false))
+        #expect(PrivateAccess.sees(isPrivate: false, allowed: true))
+        #expect(PrivateAccess.sees(isPrivate: true, allowed: true))
+        #expect(!PrivateAccess.sees(isPrivate: true, allowed: false))
+    }
+
+    @Test func aRecordFromBeforeIsOff() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("zigzag-private-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data(#"{"enabled":true,"grantedPermissions":["tabs"]}"#.utf8).write(to: file)
+        #expect(try #require(ExtensionStore.read(ExtensionInstalls.State.self, from: file)).allowsPrivate == nil)
+        ExtensionStore.write(ExtensionInstalls.State(allowsPrivate: true), keys: ExtensionInstalls.State.keys, to: file)
+        #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file)?.allowsPrivate == true)
+        ExtensionStore.remove(keys: ExtensionInstalls.State.keys, from: file)
+        #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file) == nil)
+    }
+
+    @Test func anotherProfileAsksAgain() {
+        let there = ExtensionInstalls.State(grantedPermissions: ["tabs"], grantedMatchPatterns: ["<all_urls>"], allowsPrivate: true)
+        #expect(there.carried(enabled: true).allowsPrivate == nil)
+    }
+
+    @Test func theSwitchIsOffAtFirstAndKeepsItsChoice() throws {
+        try withInstalls { installs in
+            let row = ExtensionPrivateRow.make(id: id, name: "Test", installs: installs)
+            let toggle = try #require(row.control as? Toggle)
+            #expect(!toggle.isOn)
+            #expect(!installs.allowsPrivate(id))
+            toggle.onChange?(true)
+            #expect(installs.allowsPrivate(id))
+            #expect(installs.state(id)?.allowsPrivate == true)
+            #expect(try #require(ExtensionPrivateRow.make(id: id, name: "Test", installs: installs).control as? Toggle).isOn)
+            toggle.onChange?(false)
+            #expect(!installs.allowsPrivate(id))
+            #expect(installs.state(id)?.allowsPrivate == nil)
+        }
+    }
+
+    @Test func removingTheExtensionForgetsIt() throws {
+        try withInstalls { installs in
+            installs.setAllowsPrivate(id, true)
+            installs.remove(id)
+            #expect(!installs.allowsPrivate(id))
+            installs.save(ExtensionInstalls.State(), for: id)
+            #expect(!installs.allowsPrivate(id))
+        }
+    }
+}

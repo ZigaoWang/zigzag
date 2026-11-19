@@ -498,6 +498,22 @@ enum ExtensionSiteAccessRows {
     }
 }
 
+/// Settings › Extensions: whether an extension runs in private windows too, off until you turn it on (#353).
+enum ExtensionPrivateRow {
+    static func make(id: String, name: String, installs: ExtensionInstalls) -> FormRow {
+        let toggle = Toggle(isOn: installs.allowsPrivate(id))
+        toggle.setAccessibilityLabel(String(localized: "Allow \(name) in private windows", comment: "VoiceOver name of the switch that lets an extension run in private windows, in Settings › Extensions. The placeholder is the extension's name."))
+        toggle.onChange = { on in installs.setAllowsPrivate(id, on) }
+        let row = FormRow(title: String(localized: "Allow in private windows", comment: "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first."),
+                          detail: String(localized: "It can see and change your pages in private windows.", comment: "Under “Allow in private windows” in Settings › Extensions."),
+                          control: toggle)
+        row.isIndented = true
+        let words = String(localized: "incognito private browsing", comment: "Words that find an extension's Allow in private windows setting with Find a setting in Settings. Not shown.")
+        row.keywords = "\(name) \(words)"
+        return row
+    }
+}
+
 // MARK: - A row that can be dragged
 
 /// A draggable group row. `FormRow`s are plain views, so the row sits inside this one, which is the drag surface; its
@@ -2099,12 +2115,14 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         for (id, ext) in installed {
             extensionsGroup.add(extensionRow(id: id, ext: ext))
-            // Only for one that asks to read and change sites.
-            guard !ext.allRequestedMatchPatterns.isEmpty else { continue }
             let name = ext.displayName ?? id
-            ExtensionSiteAccessRows.make(id: id, name: name, installs: profile.installs,
-                                         add: { [weak self] in if let self { ExtensionSiteAccessRows.addSite(id: id, name: name, installs: self.profile.installs, in: self) { self.siteAccessChanged($0) } } },
-                                         changed: { [weak self] in self?.siteAccessChanged($0) }).forEach(extensionsGroup.add)
+            // Only for one that asks to read and change sites.
+            if !ext.allRequestedMatchPatterns.isEmpty {
+                ExtensionSiteAccessRows.make(id: id, name: name, installs: profile.installs,
+                                             add: { [weak self] in if let self { ExtensionSiteAccessRows.addSite(id: id, name: name, installs: self.profile.installs, in: self) { self.siteAccessChanged($0) } } },
+                                             changed: { [weak self] in self?.siteAccessChanged($0) }).forEach(extensionsGroup.add)
+            }
+            extensionsGroup.add(ExtensionPrivateRow.make(id: id, name: name, installs: profile.installs))
         }
         // What your other profiles have that this one doesn't, to add without another trip to the store. Read from
         // each package, not from the other profile's running extensions: looking here starts none of them.
