@@ -144,3 +144,36 @@ extension SplitRowAlignmentTests {
         #expect(row(parts: 1, width: 260).accessibilityLabel() == "Page")
     }
 }
+
+/// A tab's speaker sits in its title's line as a symbol in text does: a word space after the title, its middle a
+/// little under the caps' middle, and its body on the same pixels playing and muted.
+@MainActor struct TabSpeakerTests {
+    @Test func theSpeakerSitsBetweenTheXHeightAndTheCaps() {
+        let font = Tokens.Font.sidebarRow()
+        let drop = TabRowView.speakerDrop(capHeight: font.capHeight, xHeight: font.xHeight)
+        // Halfway between the caps' middle and the x-height's.
+        #expect(abs(drop - (font.capHeight / 2 - font.xHeight / 2) / 2) < 0.001)
+        #expect(drop > 0 && drop < 1)
+        #expect(Tokens.Sidebar.inlineGlyphGap < Tokens.Sidebar.iconGap)
+    }
+
+    /// Placed by the shared offsets, both symbols have their alignment rect's origin, where the speaker's body
+    /// starts on the baseline, at one point.
+    @Test func playingAndMutedShareTheSpeakersPlace() {
+        let config = NSImage.SymbolConfiguration(pointSize: Tokens.Sidebar.rowText, weight: .regular, scale: .small)
+        let images = ["speaker.wave.2", "speaker.slash"].compactMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil)?.withSymbolConfiguration(config) }
+        guard images.count == 2 else { return }
+        for reference in [0, nil] as [Int?] {
+            let inks = Tokens.Symbol.sharedInkOffsets(of: images, keys: ["test wave", "test slash"], reference: reference)
+            // Each image's middle sits at -ink from the button's; its alignment origin is that much further on.
+            let origins = zip(images, inks).map { image, ink in
+                CGPoint(x: -ink.width + image.alignmentRect.minX - image.size.width / 2, y: -ink.height + image.alignmentRect.minY - image.size.height / 2)
+            }
+            #expect(abs(origins[0].x - origins[1].x) < 0.001 && abs(origins[0].y - origins[1].y) < 0.001, "\(origins)")
+        }
+        // Centered by the playing glyph alone, it's where it was before muting was shared.
+        let alone = Tokens.Symbol.inkOffset(of: images[0], key: "test wave")
+        let shared = Tokens.Symbol.sharedInkOffsets(of: images, keys: ["test wave", "test slash"], reference: 0)[0]
+        #expect(abs(alone.width - shared.width) < 0.001 && abs(alone.height - shared.height) < 0.001)
+    }
+}

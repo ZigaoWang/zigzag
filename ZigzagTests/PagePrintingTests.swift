@@ -11,6 +11,42 @@ import WebKit
         #expect(Tab.instancesRespond(to: NSSelectorFromString("_webView:printFrame:")))
     }
 
+    /// Popups answer a page's print() as tabs do (Zigzag Mini, installed apps and Peek pages are tabs).
+    @Test func aPopupAnswersAPagesPrintRequest() {
+        #expect(PopupWindowController.instancesRespond(to: NSSelectorFromString("_webView:printFrame:pdfFirstPageSize:completionHandler:")))
+        #expect(PopupWindowController.instancesRespond(to: NSSelectorFromString("_webView:printFrame:")))
+    }
+
+    /// File › Print… (⌘P) reaches every kind of window with a page in front.
+    @Test func everyPageWindowTakesPrint() {
+        let print = #selector(BrowserWindowController.printPage(_:))
+        #expect(BrowserWindowController.instancesRespond(to: print))
+        #expect(PopupWindowController.instancesRespond(to: print))
+        #expect(MiniWindowController.instancesRespond(to: print))
+        #expect(WebAppWindowController.instancesRespond(to: print))
+    }
+
+    /// With a popup window in front, Print… is on: the popup takes it and doesn't turn it off.
+    @Test func printIsOnWithAPopupInFront() {
+        let popup = PopupWindowController.asking(configuration: WKWebViewConfiguration(), features: WKWindowFeatures(), parent: nil, opener: nil)
+        defer { popup.discardHeldPage() }
+        let item = NSMenuItem(title: "Print…", action: #selector(BrowserWindowController.printPage(_:)), keyEquivalent: "p")
+        #expect(popup.window?.delegate === popup)
+        #expect(popup.responds(to: item.action!))
+        #expect((popup as NSObject as? NSMenuItemValidation)?.validateMenuItem(item) ?? true)
+    }
+
+    /// One print sheet per window: asking again while it's up gets nothing until it closes.
+    @Test func oneSheetAtATime() {
+        let window = NSWindow()
+        let id = ObjectIdentifier(window)
+        #expect(PagePrinting.claim(id))
+        #expect(!PagePrinting.claim(id))
+        PagePrinting.release(id)
+        #expect(PagePrinting.claim(id))
+        PagePrinting.release(id)
+    }
+
     @Test func printingLaysAPageOutAsPrintDoes() {
         let info = PagePrinting.info()
         #expect(info.horizontalPagination == .fit)

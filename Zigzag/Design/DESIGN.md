@@ -139,7 +139,7 @@ The browser window's compact scale (`Tokens.Sidebar`, `Tokens.Pane`):
 | Space name | As typed, its ink on the icon column: 13 semibold in a 30pt slot; large, 26 light (`Font.spaceName`), kern -0.6, 36pt slot |
 | Rows | 13pt text (`Font.sidebarRow`), 30pt tall, 2pt apart, 16pt favicons; icons at 12pt from the sidebar's edge, titles at 36; a pinned page that's open has a fine `Chrome.openEdge`, as a favorite does, only while its page is loaded. A tab whose page isn't running looks the same however it got there (put to sleep, or not loaded yet since Zigzag reopened, #205): in the Tabs list, a split's parts, the ⌃Tab switcher and Show All Tabs, the sleeping ring (a hairline of even dashes in `textTertiary`, 1.5pt out, the icon at 85% inside it); a pinned page or favorite that isn't running has no edge and no ring, as one never opened. Its hover card, or a favorite's tooltip, says why: asleep, and what that freed, or not loaded since Zigzag reopened |
 | Selected row | `Chrome.card` with a 1px `Chrome.cardEdge` and a shadow-sm, radius 6; hover is `Chrome.hover`, pressed `Chrome.pressed` |
-| Row buttons | 20pt targets, 11pt glyphs: close, and a speaker beside the half that plays |
+| Row buttons | 20pt targets, 11pt glyphs: close at the row's end. While a page plays or is muted, its speaker right after its title, `Sidebar.iconGap` after the text: the row's text size and weight at the small symbol scale so its ink is the caps' height, centered on the caps, in `textSecondary`, a 20pt target round it; a long title fades before it, and it never takes the close button's place. A favorite shows it as a badge on the icon's bottom-trailing corner (bottom-leading while the Developer Mode chip has that one), `Sidebar.favoriteSpeakerShare` of the icon, in `Chrome.card`, the icon cut away 1.5pt round it so the tile shows as a ring, a 14pt target |
 | Developer Mode | A tab on a site in Developer Mode (#141) is marked on its icon, as a sleeping one is: a round chip on the favicon's bottom-trailing corner, half the icon's side (`Sidebar.developerBadgeShare`), reaching 30% of its own side past the corner, the mode's hammer knocked out of it (`developerGlyphShare`) so the ground shows through, and the icon, its sleeping ring and its globe cut away round it by `developerBadgeGap` (1pt), as a status on an avatar. In the space's accent (`Theme.badge`), the row's ink where the accent would fall under 3:1 on the frame or on a see-through one, whose ground can't be known; never a fixed color, so it reads on every space. The row keeps its height, its one line, its card and its edges; at rest, under the pointer and selected alike, beside the ring, the loader and the speaker. Each part of a split in it has its own chip, and a favorite's icon has it too. Pointing at the icon says "Developer Mode" and the host with its port, and the hover card says "Developer Mode" under the address; VoiceOver says it after the name |
 | Section labels | 11pt medium, the space's quiet ink, on the icon column, low in a 24pt slot; Clear at its end in the same ink |
 | Bottom bar | 14pt glyphs in 26pt buttons; a space dot for each space (`SpaceDotView`) in a 26pt target: a 6pt dot in the space's ink at rest, the one you're in stretched into a 16pt pill in full ink, eased over `standard`; a space with an icon shows it at 14pt in place of its dot, brightest when it's yours. No numbers: the tooltip names the space and its ⌃ key, and holding ⌃ shows the numbers just above |
@@ -191,9 +191,9 @@ One look for each state, everywhere:
   primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
-  rest. Things that read as objects (space dots, pill buttons, favorites) sink (`pressSinks`, `showSink`): down
+  rest. Things that read as objects (pill buttons, favorites) sink (`pressSinks`, `showSink`): down
   `Motion.pressSink` (1pt) in `pressIn` (100ms), eased out, and back over `pressSettle` (120ms), eased out, with
-  no bounce. Rows and small icon buttons give instead (`pressScales`, `showPress`): to
+  no bounce. Rows and small icon buttons, the space keys among them, give instead (`pressScales`, `showPress`): to
   `Motion.pressScale` (0.97) and back the same way. Both start from wherever they are, and the action
   never waits on them. Not from the keyboard, not with Reduce Motion. The switch's knob travels its short way in
   `Motion.state`, eased out, with its track's color.
@@ -325,7 +325,7 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   of one width for each page in reading order (`TabRowView.splitParts`), a `Color.separator` hairline between them 8pt
   short of the row's top and bottom, and in each part a tab's row in small: the icon 6pt in from the part's start, the
   title after it faded where it's cut, ending 6pt before the next hairline, and while that page plays or is muted, its
-  speaker at the part's end. Where a part is narrower than its icon, the gaps and a few letters
+  speaker right after that title. Where a part is narrower than its icon, the gaps and a few letters
   (`TabRowView.segmentMinWidth`, 56 at Medium), every part shows its icon alone in its middle, hairlines still between.
   In the split you're on, the page you're in has its title in the row's ink and the others in `quietInk`; with icons
   alone, the page you're in has the hover wash under its part. The close button comes as a tab's does, over the last

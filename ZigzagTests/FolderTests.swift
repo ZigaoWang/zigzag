@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Testing
 @testable import Zigzag
 
@@ -399,5 +399,80 @@ struct ShutFolderRowsTests {
         json.removeValue(forKey: "tucked")
         let decoded = try JSONDecoder().decode(BookmarkFolder.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(decoded.name == "F" && !decoded.isOpen && decoded.tucked == nil)
+    }
+}
+
+/// Big imports and folder-wide actions (#343): imported folders start shut, a space's folders fold at once, and
+/// Open All in Tabs opens the pages as new tabs.
+@MainActor
+struct FolderBulkTests {
+    /// The first space with pages filed by these paths, as an import does; the library is restored after.
+    private func inSpace(_ paths: [[String]], _ body: @MainActor (UUID, [Bookmark]) throws -> Void) rethrows {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let pages = Library.shared.appendBookmarks(paths.indices.map { (URL(string: "http://127.0.0.1:9/bulk/\($0)")!, "P\($0)") }, to: space, folders: paths)
+        try body(space, pages)
+    }
+
+    @Test func importedFoldersStartShutAndYoursStayOpen() {
+        let mine = BookmarkFolder(name: "Mine")
+        let folders = Library.filed([UUID(), UUID()], paths: [["Mine", "Inner"], ["New"]], into: [mine])
+        #expect(folders.first { $0.id == mine.id }?.isOpen == true)
+        #expect(folders.filter { $0.id != mine.id }.map(\.name).sorted() == ["Inner", "New"])
+        #expect(folders.filter { $0.id != mine.id }.allSatisfy { !$0.isOpen })
+    }
+
+    @Test func aSpacesFoldersFoldAtOnceWithTheMenuOfferingOnlyWhatChanges() throws {
+        try inSpace([["A"], ["A", "B"], ["C"]]) { space, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            @MainActor func titles() -> [String] { SidebarMenus.spaceMenu(for: space, controller: controller).items.map(\.title) }
+            #expect(Library.shared.folders(in: space).allSatisfy { !$0.isOpen })
+            #expect(titles().contains(SidebarMenus.expandAllFoldersTitle) && !titles().contains(SidebarMenus.collapseAllFoldersTitle))
+
+            controller.setAllFoldersOpen(in: space, true)
+            #expect(Library.shared.folders(in: space).allSatisfy { $0.isOpen && $0.tucked == nil })
+            #expect(titles().contains(SidebarMenus.collapseAllFoldersTitle) && !titles().contains(SidebarMenus.expandAllFoldersTitle))
+            let view = NSMenuItem(title: "", action: #selector(BrowserWindowController.collapseAllFolders(_:)), keyEquivalent: "")
+            #expect(controller.validateMenuItem(view))
+
+            controller.collapseAllFolders(view)
+            #expect(Library.shared.folders(in: space).allSatisfy { !$0.isOpen })
+            #expect(!controller.validateMenuItem(view))
+        }
+    }
+
+    @Test func openAllOpensThePagesAsNewTabsInOrderAndUndoes() throws {
+        try inSpace([["Work"], ["Work", "Docs"], ["Other"], ["Work"]]) { space, pages in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let existing = Tab(url: URL(string: "http://127.0.0.1:9/bulk/here")!, title: "Here", spaceID: space)
+            manager.adopt([existing], in: space)
+            manager.select(existing)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            let work = try #require(Library.shared.folders(in: space).first { $0.name == "Work" })
+
+            controller.openAllInTabs(work.id)
+            let opened = manager.currentTabs.filter { $0 !== existing }
+            // Regular tabs side by side, in the folder's list order, the folder inside it too.
+            let inWork = Library.shared.allBookmarkIDs(inFolder: work.id).compactMap { Library.shared.bookmark($0)?.url }
+            #expect(Set(inWork) == Set([pages[0], pages[1], pages[3]].map(\.url)))
+            #expect(opened.map(\.url) == inWork)
+            #expect(opened.allSatisfy { $0.bookmarkID == nil })
+            let at = try #require(manager.currentTabs.firstIndex { $0 === opened.first })
+            #expect(Array(manager.currentTabs[at...].prefix(3)).map(\.id) == opened.map(\.id))
+            // The first shows; the rest are loading already.
+            #expect(manager.selectedTab === opened.first)
+            #expect(opened.allSatisfy { $0.webView != nil })
+            // The pinned pages stay as they were.
+            #expect(pages.allSatisfy { manager.bookmarkTab(for: $0.id) == nil })
+
+            controller.sidebarUndo.undo()
+            #expect(manager.currentTabs.map(\.id) == [existing.id])
+        }
     }
 }

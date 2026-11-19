@@ -47,7 +47,7 @@
       }
     },
     "%@ (%@)" : {
-      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.",
+      "comment" : "A button's tooltip: its name, then its keyboard shortcut in parentheses, like “Reload (⌘R)”.\nWhere a download rule sends links: the service's address, then its method in parentheses, like “127.0.0.1 (load.start)”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -929,7 +929,7 @@
       }
     },
     "%@: %@" : {
-      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.",
+      "comment" : "Accessibility label of a shortcut in Settings › Shortcuts: the command, then its keys.\nUnder a download rule in Settings › Downloads: the sites, then the answer kept for them, like “youtube.com: Hand Off”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2852,6 +2852,17 @@
         }
       }
     },
+    "Allow %@ in private windows" : {
+      "comment" : "VoiceOver name of the switch that lets an extension run in private windows, in Settings › Extensions. The placeholder is the extension's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许“%@”在无痕浏览窗口中使用"
+          }
+        }
+      }
+    },
     "Allow Access" : {
       "comment" : "Button under a problem in the welcome window: let Zigzag read a browser’s data.",
       "localizations" : {
@@ -2936,6 +2947,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "为此网站允许"
+          }
+        }
+      }
+    },
+    "Allow in private windows" : {
+      "comment" : "A setting under an extension in Settings › Extensions: whether it runs in private windows too. Off at first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许在无痕浏览窗口中使用"
           }
         }
       }
@@ -3881,6 +3903,17 @@
         }
       }
     },
+    "Collapse All Folders" : {
+      "comment" : "Item in the View menu and in a space's context menu in the sidebar: shuts every pinned folder in the space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折叠所有文件夹"
+          }
+        }
+      }
+    },
     "Cookies cleared, except for the sites you keep" : {
       "comment" : "Toast after every site's cookies are cleared but those of the sites that keep theirs (Settings › Privacy).",
       "localizations" : {
@@ -3892,6 +3925,72 @@
         }
       }
     },
+    "Each page in “%@” and the folders inside it opens in a new tab." : {
+      "comment" : "Message of the sheet that asks before Open All in Tabs opens many tabs at once. The folder's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”和其中文件夹里的每个页面都会在新标签页中打开。"
+          }
+        }
+      }
+    },
+    "Each page in “%@” opens in a new tab." : {
+      "comment" : "Message of the sheet that asks before Open All in Tabs opens many tabs at once, from a folder with no folders inside. The folder's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”里的每个页面都会在新标签页中打开。"
+          }
+        }
+      }
+    },
+    "Expand All Folders" : {
+      "comment" : "Item in the View menu and in a space's context menu in the sidebar: opens every pinned folder in the space.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开所有文件夹"
+          }
+        }
+      }
+    },
+    "Keep full screen in the window" : {
+      "comment" : "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏时留在窗口内"
+          }
+        }
+      }
+    },
+    "Left" : {
+      "comment" : "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's left edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左侧"
+          }
+        }
+      }
+    },
+    "Open “%@”" : {
+      "comment" : "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开“%@”"
+          }
+        }
+      }
+    },
     "Remember for this site" : {
       "comment" : "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.",
       "localizations" : {
@@ -3899,6 +3998,61 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "记住对此网站的选择"
+          }
+        }
+      }
+    },
+    "Right" : {
+      "comment" : "A choice for “Sidebar position” in Settings › Appearance: the sidebar along the window's right edge.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右侧"
+          }
+        }
+      }
+    },
+    "Sidebar position" : {
+      "comment" : "A setting in Settings › Appearance: which edge of the window the sidebar runs along, Left or Right.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏位置"
+          }
+        }
+      }
+    },
+    "The edge of the window the sidebar runs along. The page sits beside it." : {
+      "comment" : "Explanation under “Sidebar position” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏靠窗口哪一边放，网页在它旁边。"
+          }
+        }
+      }
+    },
+    "Videos fill the page, not the screen" : {
+      "comment" : "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频只铺满网页，不占满屏幕"
+          }
+        }
+      }
+    },
+    "Videos fill your screen" : {
+      "comment" : "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视频铺满整个屏幕"
           }
         }
       }
@@ -8578,28 +8732,6 @@
         }
       }
     },
-    "Every pinned tab in “%@” and the folders inside it opens." : {
-      "comment" : "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once. The folder's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@”和其中文件夹里的已固定标签页都会打开。"
-          }
-        }
-      }
-    },
-    "Every pinned tab in “%@” opens." : {
-      "comment" : "Message of the sheet that asks before Open All in Tabs opens many pinned tabs at once, from a folder with no folders inside. The folder's name.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "“%@”里的已固定标签页都会打开。"
-          }
-        }
-      }
-    },
     "Every shortcut you changed goes back to its default." : {
       "comment" : "Message of the sheet that puts every shortcut back.",
       "localizations" : {
@@ -9436,17 +9568,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "磨砂"
-          }
-        }
-      }
-    },
-    "Full screen fills the page" : {
-      "comment" : "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "全屏幕只填满网页"
           }
         }
       }
@@ -10402,6 +10523,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它可以读取和更改此网站及其子域名上的页面。"
+          }
+        }
+      }
+    },
+    "It can see and change your pages in private windows." : {
+      "comment" : "Under “Allow in private windows” in Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它可以读取和更改你在无痕浏览窗口里打开的网页。"
           }
         }
       }
@@ -13083,7 +13215,7 @@
       }
     },
     "Open" : {
-      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab.",
+      "comment" : "Action label at the right of the selected command bar result, saying what Return does: opens the page.\nButton on a page's question to open an app: opens it this time.\nButton on an installed app's row in Settings › General: opens the app, or brings its window forward.\nItem in a page's right-click menu over selected text that's a web address, not a link: opens it in this tab.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13127,7 +13259,7 @@
       }
     },
     "Open %lld tabs?" : {
-      "comment" : "Title of the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once (more than 10).",
+      "comment" : "Title of the sheet that asks before Open All in Tabs opens many tabs from a folder at once (more than 10).",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -13162,7 +13294,7 @@
       }
     },
     "Open All" : {
-      "comment" : "Button in the sheet that asks before Open All in Tabs opens many pinned tabs from a folder at once.",
+      "comment" : "Button in the sheet that asks before Open All in Tabs opens many tabs from a folder at once.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13173,7 +13305,7 @@
       }
     },
     "Open All in Tabs" : {
-      "comment" : "Item in a folder's context menu in the sidebar: opens every pinned tab in the folder and the folders inside it.",
+      "comment" : "Item in a folder's context menu in the sidebar: opens every page in the folder and the folders inside it as new tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13667,13 +13799,13 @@
         }
       }
     },
-    "Opened in new tab: %@" : {
+    "Opened %@ in background" : {
       "comment" : "Said by VoiceOver when a link opens in a new tab behind the page while the sidebar is hidden. The placeholder is the tab's title, or its site.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已在新标签页中打开：%@"
+            "value" : "已在后台打开“%@”"
           }
         }
       }
@@ -17779,17 +17911,6 @@
         }
       }
     },
-    "Sidebar on the right" : {
-      "comment" : "A setting in Settings › Appearance: puts the sidebar along the window's right edge.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏放在右侧"
-          }
-        }
-      }
-    },
     "Sidebar size" : {
       "comment" : "A setting in Settings › Appearance: how large the sidebar's tabs, folders, space names, favorites and address are, as macOS's Sidebar icon size.",
       "localizations" : {
@@ -19355,17 +19476,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "这个服务的地址无效。"
-          }
-        }
-      }
-    },
-    "The sidebar sits along the window’s right edge, with the page on its left." : {
-      "comment" : "Explanation under “Sidebar on the right” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏沿窗口右侧边缘放置，页面在它的左边。"
           }
         }
       }
@@ -23505,6 +23615,17 @@
         }
       }
     },
+    "incognito private browsing" : {
+      "comment" : "Words that find an extension's Allow in private windows setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无痕 无痕浏览 隐私 incognito private browsing"
+          }
+        }
+      }
+    },
     "key.space-bar" : {
       "comment" : "The space bar's name in a keyboard shortcut, like ⌥Space. Not a Zigzag space.",
       "extractionState" : "extracted_with_value",
@@ -23913,7 +24034,7 @@
       }
     },
     "sent this link to %@" : {
-      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like aria2.addUri · 127.0.0.1.",
+      "comment" : "An automation's notice over the page: what a rule did with the link. The placeholder names the service and the method, like 127.0.0.1 (aria2.addUri).",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -23957,7 +24078,7 @@
       }
     },
     "sidebar right left side position move" : {
-      "comment" : "Words that find the Sidebar on the right setting with Find a setting in Settings. Not shown.",
+      "comment" : "Words that find the Sidebar position setting with Find a setting in Settings. Not shown.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

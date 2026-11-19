@@ -232,11 +232,6 @@ final class BrowserWindow: NSWindow {
         guard [.leftMouseDown, .rightMouseDown, .otherMouseDown].contains(event.type), let content = contentView,
               let frame = content.superview else { return false }
         guard let panel = FloatingPanelView.bareSurfacePanel(frame.hitTest(frame.convert(event.locationInWindow, from: nil))) else { return false }
-        if event.type == .leftMouseDown, panel.takesPress {
-            pressTarget = panel
-            panel.mouseDown(with: event)
-            return true
-        }
         if event.type == .leftMouseDown { panel.onBarePress?(event) }
         return true
     }
@@ -302,8 +297,7 @@ final class BrowserWindow: NSWindow {
     }
 
     /// Our controls sit in the title bar area, where AppKit sends presses to the title bar first, so presses on them
-    /// are delivered directly. Panels that act as buttons (`FloatingPanelView.takesPress`) get press and release the
-    /// same way.
+    /// are delivered directly.
     private weak var pressTarget: NSView?
 
     private func routeTitlebarEvent(_ event: NSEvent) -> Bool {

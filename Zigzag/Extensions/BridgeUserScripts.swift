@@ -229,24 +229,26 @@ final class BridgeUserScripts: BridgeNamespace {
 
     /// Every web view of the profile whose pages run user scripts (Tab adds its own as it makes them).
     private let controllers = NSHashTable<WKUserContentController>.weakObjects()
+    /// Those of private pages, which run only the scripts of extensions allowed in private windows.
+    private let privateControllers = NSHashTable<WKUserContentController>.weakObjects()
     private final class Installed { var generation = -1; var handlers: Set<String> = [] }
     private let installed = NSMapTable<WKUserContentController, Installed>.weakToStrongObjects()
     /// Counts up whenever the scripts change: a script registered or removed, a world configured, an extension on or
     /// off, its site access changed.
     private var generation = 0
-    private var built: (generation: Int, scripts: [WKUserScript], handlers: [(world: WKContentWorld, name: String)])?
+    private var built: [Bool: (generation: Int, scripts: [WKUserScript], handlers: [(world: WKContentWorld, name: String)])] = [:]
     private lazy var messages = UserScriptMessages(owner: self)
 
     /// A web view's pages run the profile's user scripts from now on.
-    func attach(_ controller: WKUserContentController) {
-        controllers.add(controller)
+    func attach(_ controller: WKUserContentController, isPrivate: Bool = false) {
+        (isPrivate ? privateControllers : controllers).add(controller)
         sync(controller)
     }
 
     /// The scripts changed: every web view has the new set for its next page, as Chrome's registrations apply.
     func refresh() {
         generation += 1
-        for controller in controllers.allObjects { sync(controller) }
+        for controller in controllers.allObjects + privateControllers.allObjects { sync(controller) }
     }
 
     private func sync(_ controller: WKUserContentController) {
@@ -256,7 +258,7 @@ final class BridgeUserScripts: BridgeNamespace {
             return record
         }()
         guard record.generation != generation else { return }
-        let current = currentScripts()
+        let current = currentScripts(isPrivate: privateControllers.contains(controller))
         OwnScripts.remove(from: controller, where: Self.isOurs)
         for handler in current.handlers {
             let key = handler.name + "\u{0}" + (handler.world.name ?? "")
@@ -269,13 +271,14 @@ final class BridgeUserScripts: BridgeNamespace {
 
     static func isOurs(_ script: WKUserScript) -> Bool { (script.source as NSString).hasPrefix(mark) }
 
-    /// The page scripts and message handlers for every extension that's on and allowed user scripts.
-    private func currentScripts() -> (scripts: [WKUserScript], handlers: [(world: WKContentWorld, name: String)]) {
-        if let built, built.generation == generation { return (built.scripts, built.handlers) }
+    /// The page scripts and message handlers for every extension that's on and allowed user scripts; for a private
+    /// page, only those also allowed in private windows.
+    private func currentScripts(isPrivate: Bool) -> (scripts: [WKUserScript], handlers: [(world: WKContentWorld, name: String)]) {
+        if let built = built[isPrivate], built.generation == generation { return (built.scripts, built.handlers) }
         var scripts: [WKUserScript] = [], handlers: [(world: WKContentWorld, name: String)] = []
         var usesPage = false
         for id in host.profile.installs.installedIDs {
-            guard let context = host.context(for: id) else { continue }
+            guard let context = host.context(for: id), PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData) else { continue }
             // Any extension's content-script world may report throttled connects (ConnectGuard).
             handlers.append((Self.contentScriptWorld(id), ConnectGuard.handlerName))
             guard ExtensionBridge.allows(Self.permission, for: context) else { continue }
@@ -318,7 +321,7 @@ final class BridgeUserScripts: BridgeNamespace {
         }
         // The page's world gets the gate before anything, once, for the scripts that run there.
         if usesPage, let gate = Self.pageGate { scripts.insert(gate, at: 0) }
-        built = (generation, scripts, handlers)
+        built[isPrivate] = (generation, scripts, handlers)
         return (scripts, handlers)
     }
 
@@ -586,11 +589,12 @@ final class BridgeUserScripts: BridgeNamespace {
         }
         guard let webView = message.webView, let body = message.body as? [String: Any], let kind = body.string("kind") else { return (nil, "Unknown message") }
         let frame = message.frameInfo
+        let isPrivate = !webView.configuration.websiteDataStore.isPersistent
         if message.name == Self.relayHandler {
             // From the extension's content-script world: something for a user-script world in the same frame.
             guard let worldName = message.world.name, worldName.hasPrefix("WebExtension-") else { return (nil, nil) }
             let extensionID = String(worldName.dropFirst("WebExtension-".count))
-            guard host.context(for: extensionID) != nil else { return (nil, nil) }
+            guard host.context(for: extensionID) != nil, PrivateAccess.sees(isPrivate: isPrivate, allowed: host.seesPrivate(extensionID)) else { return (nil, nil) }
             switch kind {
             case "execute":
                 return (await execute(token: body.string("token") ?? "", nonce: body.string("nonce") ?? "", extensionID: extensionID, in: webView, frame: frame), nil)
@@ -604,6 +608,7 @@ final class BridgeUserScripts: BridgeNamespace {
         }
         // From a user-script world: only what Chrome lets it say, only once the extension turned messaging on.
         guard let world = Self.parseWorld(message.world.name), let context = host.context(for: world.extensionID),
+              PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData),
               ExtensionBridge.allows(Self.permission, for: context),
               Self.settings(for: world.worldID, in: registry(for: world.extensionID).worlds).messaging else {
             return (nil, "Could not establish connection. Receiving end does not exist.")

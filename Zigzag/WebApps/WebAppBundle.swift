@@ -156,6 +156,10 @@ enum WebAppInstaller {
             return
         }
         guard let bundle = WebAppStore.shared.bundle(of: app) else { return }
+        #if DEBUG
+        // A test copy kept behind opens the window itself: the small app would come to the front.
+        if ZigzagApplication.staysBehind { WebAppWindowController.show(app); return }
+        #endif
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.addsToRecentItems = false
         configuration.promptsUserIfNeeded = false

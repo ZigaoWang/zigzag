@@ -201,6 +201,14 @@ struct DarkReaderTests {
         #expect(Tab.pageColor(dark: lightTop, under: Self.dark, theme: Self.white) == Self.dark)
     }
 
+    /// A page Zigzag darkened never paints the bar light, whatever color its script sent (#250).
+    @Test func aDarkenedPageNeverGivesALightBar() {
+        let light = DarkPages.State(darkened: true, native: false, color: Self.white, site: "example.com")
+        #expect(Tab.pageColor(dark: light, under: Self.white, theme: Self.white).map(DarkPages.isDark) == true)
+        let none = DarkPages.State(darkened: true, native: false, color: nil, site: "example.com")
+        #expect(Tab.pageColor(dark: none, under: Self.white, theme: Self.white).map(DarkPages.isDark) == true)
+    }
+
     /// With dark pages off, a page dark on its own still says so, and its dark, for the bar above it (#134), from the
     /// plain script with no Dark Reader in it; turned on, Dark Reader's script takes over from it.
     @Test func aDarkPageSaysItsDarkWithDarkPagesOff() async throws {
@@ -495,6 +503,30 @@ struct DarkReaderTests {
             // Taken off once the pass is done.
             let cleared = await until { (try? await js(webView, "return !document.querySelector('.zigzag-dark-fallback')") as? Bool) == true }
             #expect(cleared)
+        }
+    }
+
+    /// A page drawn dark over a body Dark Reader didn't reach (a style sheet it couldn't read, as on Shopify's
+    /// checkout) gives the dark at its top for the bar, not the body's white (#250).
+    @Test func aBodyDarkReaderMissedGivesTheDarkAtTheTop() async throws {
+        try await withDefaults { () async throws in
+            DarkPages.mode = .always
+            let html = """
+            <html><head><meta name="theme-color" content="#ffffff"><style>body { margin: 0 }
+            #app { background: #fff; color: #111; min-height: 600px }</style></head>
+            <body><div id="app"><header>Store</header><p>Checkout</p></div></body></html>
+            """
+            let webView = await page(html)
+            let drawn = await until { (try? await js(webView, "return document.documentElement.getAttribute('data-darkreader-mode')") as? String) == "dynamic" }
+            #expect(drawn)
+            try? await Task.sleep(for: .milliseconds(500))
+            // A white body Dark Reader leaves alone, as one from a sheet it couldn't read.
+            _ = try await js(webView, "const s = document.createElement('style'); s.className = 'darkreader'; s.textContent = 'body { background-color: #fff !important }'; document.head.appendChild(s); return true")
+            #expect(try await lightness(webView, "getComputedStyle(document.body).backgroundColor") > 0.9)
+            #expect(try await lightness(webView, "getComputedStyle(document.getElementById('app')).backgroundColor") < 0.2)
+            _ = try await webView.callAsyncJavaScript("window.__zigzagDark.check(); return true", arguments: [:], in: nil, contentWorld: DarkPages.world)
+            let color = try await state(webView)["color"] as? String
+            #expect(color.flatMap(DarkPages.color(hex:)).map(DarkPages.isDark) == true, "\(color ?? "none")")
         }
     }
 

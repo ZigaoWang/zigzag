@@ -114,32 +114,59 @@ struct PanelFieldPressTests {
     }
 }
 
-/// Clicks on the new tab note pass through the window; the bare-panel-surface rule used to swallow them.
+/// #272: a new tab's row out from the hidden sidebar takes a click through the window, and slides from the sidebar's
+/// edge, or only fades with Reduce Motion.
 @MainActor
-struct NewTabNoteClickTests {
-    @Test func aClickThroughTheWindowReachesTheNote() {
-        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600))
-        defer { window.close() }
+struct NewTabPeekTests {
+    private func peek(in window: BrowserWindow) -> NewTabPeekView {
         let content = FlippedView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         window.contentView = content
         let overlay = PassthroughView(frame: content.bounds)
         content.addSubview(overlay)
-        let note = NewTabNoteView()
-        note.label.stringValue = "Example Domain"
-        let size = note.size(maxWidth: 320)
-        note.frame = NSRect(x: 12, y: 56, width: size.width, height: size.height)
-        overlay.addSubview(note)
-        var clicks = 0
-        note.onClick = { clicks += 1 }
+        let peek = NewTabPeekView(tab: Tab(url: URL(string: "https://example.com")!, title: "Example Domain", spaceID: UUID()), site: nil)
+        peek.frame = NSRect(x: 8, y: 120, width: 240, height: Tokens.Sidebar.rowHeight)
+        overlay.addSubview(peek)
+        peek.layoutSubtreeIfNeeded()
+        return peek
+    }
 
-        let center = note.convert(NSPoint(x: note.bounds.midX, y: note.bounds.midY), to: nil)
+    @Test func aClickThroughTheWindowReachesTheRow() throws {
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { window.close() }
+        let peek = peek(in: window)
+        var clicks = 0
+        peek.onClick = { clicks += 1 }
+        // On the title, away from the close button: the press lands on the row, not on the panel's bare surface, which
+        // the window would keep for itself.
+        let point = peek.convert(NSPoint(x: 60, y: peek.bounds.midY), to: nil)
+        let frame = try #require(window.contentView?.superview)
+        let hit = try #require(frame.hitTest(frame.convert(point, from: nil)))
+        #expect(hit === peek.row)
+        #expect(!FloatingPanelView.isBareSurface(hit))
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-            let event = NSEvent.mouseEvent(with: type, location: center, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                                           windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
-            window.sendEvent(event!)
+            let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            if type == .leftMouseDown { hit.mouseDown(with: event) } else { hit.mouseUp(with: event) }
         }
         #expect(clicks == 1)
-        // Still a panel surface: the press never moves the window or reaches what's behind.
-        #expect(FloatingPanelView.isBareSurface(note))
+    }
+
+    @Test func slidesFromTheSidebarsEdgeOrFadesWithReduceMotion() throws {
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { window.close() }
+        let peek = peek(in: window)
+        peek.slidesFromSide = .minX
+        peek.present()
+        let slide = try #require(peek.layer?.animation(forKey: "presence.transform") as? CABasicAnimation)
+        let from = try #require((slide.fromValue as? NSValue)?.caTransform3DValue)
+        // From past the window's left edge.
+        #expect(from.m41 <= -peek.frame.maxX)
+
+        Tokens.Motion.debugReduceMotion = true
+        defer { Tokens.Motion.debugReduceMotion = false }
+        peek.dismiss()
+        let fade = try #require(peek.layer?.animation(forKey: "presence.transform") as? CABasicAnimation)
+        #expect(CATransform3DIsIdentity(try #require((fade.toValue as? NSValue)?.caTransform3DValue)))
+        #expect(peek.layer?.animation(forKey: "presence.opacity") != nil)
     }
 }

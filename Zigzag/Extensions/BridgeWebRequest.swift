@@ -6,8 +6,8 @@ import WebKit
 /// answer: Zigzag asks the listeners itself (bridge.js), with Chrome's details, and signs in with what they give.
 ///
 /// Only extensions that could answer in Chrome are asked: those with webRequest and webRequestAuthProvider (Manifest
-/// V3) or webRequestBlocking (V2), and access to the address asking. Private tabs are never offered, as extensions
-/// never see them. The first extension to give a name and password signs in, one that cancels cancels the sign-in,
+/// V3) or webRequestBlocking (V2), and access to the address asking. A private tab's go only to extensions allowed in
+/// private windows. The first extension to give a name and password signs in, one that cancels cancels the sign-in,
 /// and with no answer within a few seconds the sheet asks. What they give is never written down or logged.
 @available(macOS 15.4, *)
 @MainActor
@@ -65,8 +65,9 @@ final class BridgeWebRequest: BridgeNamespace {
     // MARK: Asking
 
     /// Asks the extensions that may answer this sign-in, and says what the first of them answered.
-    func askForSignIn(_ challenge: SiteChallenge, tab: (any WKWebExtensionTab)?) async -> Answer {
+    func askForSignIn(_ challenge: SiteChallenge, tab: (any WKWebExtensionTab)?, isPrivate: Bool = false) async -> Answer {
         let contexts = host.contexts.filter { context in
+            PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData) &&
             Self.mayAnswer(allows: { ExtensionBridge.allows($0, for: context) }, manifestVersion: context.webExtension.manifestVersion,
                            hasAccess: context.hasAccess(to: challenge.url))
         }
@@ -79,12 +80,18 @@ final class BridgeWebRequest: BridgeNamespace {
         let hint = contexts.first.flatMap { context in tab.map { Self.tabHint($0, for: context) } }
         let answer = await ask(Self.details(challenge, tabHint: hint), of: ids)
         let names = ids.map { host.displayName(for: $0) }.joined(separator: ", ")
-        switch answer {
-        case .credentials: ExtensionLog.write("site sign-in for \(challenge.host): an extension answered (asked \(names))")
-        case .cancel: ExtensionLog.write("site sign-in for \(challenge.host): an extension cancelled it (asked \(names))")
-        case .none: ExtensionLog.write("site sign-in for \(challenge.host): no extension answered (asked \(names))")
-        }
+        ExtensionLog.write(Self.logLine(answer, host: challenge.host, isPrivate: isPrivate, asked: names))
         return answer
+    }
+
+    /// The extensions log's line for a sign-in; a private tab's site is left out.
+    static func logLine(_ answer: Answer, host: String, isPrivate: Bool, asked names: String) -> String {
+        let site = isPrivate ? "a private page" : host
+        switch answer {
+        case .credentials: return "site sign-in for \(site): an extension answered (asked \(names))"
+        case .cancel: return "site sign-in for \(site): an extension cancelled it (asked \(names))"
+        case .none: return "site sign-in for \(site): no extension answered (asked \(names))"
+        }
     }
 
     /// Puts `details` to each extension, and waits for the first that answers, all of them saying nothing, or `timeout`.

@@ -36,6 +36,8 @@ final class SitePanel: FloatingPanelView {
     private let isBlank: Bool
     /// The panel is about one page: when it goes to another site (a sign-in redirect), the panel goes too.
     private var pageToken: SignalToken?
+    /// Clear cookies when Zigzag quits, which shows or hides Keep cookies while the panel is open (#383).
+    private var clearingToken: SignalToken?
     /// Whether this panel describes the page in this tab.
     func describes(_ other: Tab?) -> Bool { other === tab || other == nil && isBlank }
     /// Opened from a split pane's strip, under its address: it belongs to where that strip is.
@@ -222,6 +224,12 @@ final class SitePanel: FloatingPanelView {
             guard change == .url, let now = tab?.url else { return }
             if (ContentBlocker.site(of: now) ?? now.host() ?? now.absoluteString) != shownSite || SiteOrigin.of(now) != origin { self.close() }
         }
+        let profileID = tab.profile.id
+        clearingToken = KeptCookies.clearingChanged.observe { [weak self] profile in
+            guard let self, profile == profileID, !self.isBlank,
+                  SitePanelRows.rows(self.rowContext).contains(.keepCookies) != self.rows.contains(where: { $0 === self.keepCookiesRow }) else { return }
+            self.rebuildRows()
+        }
         moreButton.onClick = { [weak self] _ in self?.showMoreMenu() }
         moreButton.isHidden = !canClear && !canBoost && !canSetIcon
         // No page: only your extensions, one click away, the whole panel.
@@ -358,6 +366,7 @@ final class SitePanel: FloatingPanelView {
 
     func close() {
         pageToken = nil
+        clearingToken = nil
         if let scrollToken { NotificationCenter.default.removeObserver(scrollToken) }
         scrollToken = nil
         extensionsToken = nil
@@ -744,10 +753,12 @@ final class SitePanel: FloatingPanelView {
 
     /// Your extensions, as their toolbar buttons are: the icon, the badge, and whether each works on this site.
     private func buildExtensions() {
-        // Extensions don't run in a private window, as in Chrome's incognito: none to show, nor to get here.
+        // In a private window, only those allowed there, as in Chrome's incognito (ExtensionHost.actions).
         // In Zigzag Mini, none: an extension's popup opens from a browser window's address.
         guard #available(macOS 15.4, *), controller != nil, let host = tab.extensionHost else { return }
-        let actions = host.actions(for: tab)
+        // A blank private window's stand-in tab isn't private itself: the window says it.
+        let actions = host.actions(for: tab).filter { PrivateAccess.sees(isPrivate: isPrivate, allowed: $0.context.hasAccessToPrivateData) }
+        if isPrivate, actions.isEmpty { return }
         let installs = tab.profile.installs
         let offHere = !isBlank && ExtensionStore.extensionsOffSites(in: tab.profile).contains(site)
         let web = ["http", "https"].contains(url.scheme ?? "")
@@ -888,6 +899,7 @@ final class SitePanel: FloatingPanelView {
         let hasPermissions = origin.map { !SitePermissions.shown(origin: $0, isPrivate: isPrivate || tab.isPrivate).isEmpty } ?? false
         context.hasPermissions = hasPermissions || context.isWeb
         context.siteChoices = KeepAwake.isOffered(for: url, isPrivate: isPrivate)
+        context.clearsCookiesOnQuit = KeptCookies.clearsOnQuit(in: tab.profile.id)
         // Offered on a page with a video, or once chosen; the setting is in Settings › Tabs.
         context.fullScreen = PageFullScreen.isOffered(for: url, isPrivate: isPrivate)
             && (PageFullScreen.choice(for: url) != nil || tab.webView.map({ PageVideos.shared.frames(in: $0).contains { !$0.videos.isEmpty } }) == true)
@@ -898,14 +910,28 @@ final class SitePanel: FloatingPanelView {
         return context
     }
 
+    /// The full-screen row's name, here and in Settings › Privacy › Sites: on, a video's full screen stays in the window.
+    static var fullScreenTitle: String {
+        String(localized: "Keep full screen in the window", comment: "Row in the site panel's This Site group and in Settings › Privacy › Sites: a video's full screen on this site fills the page's area in the window instead of the whole screen.")
+    }
+
+    /// Under the full-screen row, what full screen does on this site now (#385).
+    static func fullScreenStatus(_ on: Bool) -> String {
+        on ? String(localized: "Videos fill the page, not the screen", comment: "Under Keep full screen in the window in the site panel, while it's on: a video's full screen on this site fills the page's area in the window.")
+            : String(localized: "Videos fill your screen", comment: "Under Keep full screen in the window in the site panel, while it's off: a video's full screen on this site covers the whole screen.")
+    }
+
     /// The Dark page row, while there is one.
     private weak var darkRow: PanelRow?
+    /// The Keep cookies row, while there is one.
+    private weak var keepCookiesRow: PanelRow?
     /// The JavaScript row, while there is one.
     private weak var javaScriptRow: PanelRow?
 
     private func buildRows() {
         rows = []
         zoomStepper = nil
+        keepCookiesRow = nil
         // Each is offered only where it does something (`SitePanelRows`). The choices kept for a site (ad blocking,
         // dark pages, keeping tabs awake) aren't offered in a private window: its site would be kept in Settings ›
         // Privacy › Sites. Its tabs still follow the ones made elsewhere.
@@ -967,15 +993,17 @@ final class SitePanel: FloatingPanelView {
                 })
             case .keepCookies:
                 // Clear Cookies… and quitting leave the site's cookies alone (#334).
-                rows.append(.toggle(String(localized: "Keep cookies", comment: "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in."),
+                let row = PanelRow.toggle(String(localized: "Keep cookies", comment: "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in."),
                                     on: KeptCookies.keeps(url, in: tab.profile.id), status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
                     guard let self else { return }
                     KeptCookies.set(on, for: self.url, in: self.tab.profile.id, isPrivate: self.isPrivate || self.tab.isPrivate)
-                })
+                }
+                keepCookiesRow = row
+                rows.append(row)
             case .fullScreenFills:
                 // Full screen in the page's own area instead of the whole screen (#168), for this site alone.
-                rows.append(.toggle(String(localized: "Full screen fills the page", comment: "Row in the site panel's This Site group: a video's full screen on this site fills the page's area in the window instead of the whole screen."),
-                                    on: PageFullScreen.fills(for: url) == .page, status: { $0 ? Self.onHere : Self.offHere }) { [weak self] on in
+                rows.append(.toggle(Self.fullScreenTitle,
+                                    on: PageFullScreen.fills(for: url) == .page, status: Self.fullScreenStatus) { [weak self] on in
                     guard let self else { return }
                     PageFullScreen.setChoice(on ? .page : .screen, for: self.url)
                 })
@@ -2081,6 +2109,8 @@ enum SitePanelRows {
         var cookieBanners = false
         /// Choices kept for a site (dark page, keeping tabs awake) are offered for it (`KeepAwake.isOffered`).
         var siteChoices = true
+        /// Settings › Privacy › Clear cookies when Zigzag quits is on for the profile: Keep cookies is everyday then (#383).
+        var clearsCookiesOnQuit = false
         /// Full screen in the page is offered here, and the page has a video or a choice was made.
         var fullScreen = false
         /// The page is in a language other than yours.
@@ -2105,7 +2135,7 @@ enum SitePanelRows {
         if c.siteChoices {
             rows.append(.darkPage)
             rows.append(.keepAwake)
-            rows.append(.keepCookies)
+            if c.clearsCookiesOnQuit { rows.append(.keepCookies) }
         }
         if c.fullScreen { rows.append(.fullScreenFills) }
         if c.foreignLanguage { rows.append(.alwaysTranslate) }
