@@ -760,7 +760,7 @@
       }
     },
     "%@ wants to open the %@ app." : {
-      "comment" : "Under a page's question to open an app: the site, then the app's name, like “claude.ai wants to open the Claude app.”.",
+      "comment" : "Under a page's question to open an app: the site, then the app's name, like “app.slack.com wants to open the Slack app.”.",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -771,7 +771,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ 想要打开 %2$@ 应用。"
+            "value" : "%1$@ 想要打开 %2$@ App。"
           }
         }
       }
@@ -16760,6 +16760,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要重置为单个网站所做的选择吗？"
+          }
+        }
+      }
+    },
+    "Reset Tile Layout" : {
+      "comment" : "Tooltip of a button in the strip on top of a tiled page: puts every line between the tiles back in the middle, making the standard even grid.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置平铺布局"
           }
         }
       }
