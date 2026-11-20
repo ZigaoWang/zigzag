@@ -295,7 +295,7 @@ struct SidebarRowMenuTests {
             // Nothing below the last tab to close.
             #expect(!titles(SidebarMenus.tabMenu(for: tabs[1], controller: controller)).contains("Close Tabs Below"))
             let keyed: [(String, Selector)] = [("Reload Page", #selector(BrowserWindowController.reloadPage(_:))), ("Copy Link", #selector(BrowserWindowController.copyPageURL(_:))),
-                                               ("Pin Tab", #selector(BrowserWindowController.savePage(_:))), ("Close Tab", #selector(BrowserWindowController.closeTab(_:)))]
+                                               ("Pin Tab", #selector(BrowserWindowController.toggleBookmark(_:))), ("Close Tab", #selector(BrowserWindowController.closeTab(_:)))]
             for (title, action) in keyed {
                 let bar = Shortcuts.allItems.first { $0.action == action }
                 let item = try #require(menu.items.first { $0.title == title })

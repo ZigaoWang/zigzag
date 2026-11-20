@@ -130,7 +130,7 @@ enum MainMenu {
             item(String(localized: "Duplicate Tab", comment: "File menu item."), #selector(C.duplicateTab(_:)), ""),
             // One verb for saving (#326): ⌘D saves into the space you're in with no question, and its ⇧ twin asks where
             // in that space. Two items, so neither depends on a key held down.
-            item(String(localized: "Pin Tab", comment: "File menu item, with ⌘D: pins the page you're on, into the space you're in, without asking."), #selector(C.savePage(_:)), "d"),
+            item(String(localized: "Pin Tab", comment: "File menu item, with ⌘D: pins the page you're on, into the space you're in, without asking."), #selector(C.toggleBookmark(_:)), "d"),
             item(String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called."), #selector(C.savePageToFolder(_:)), "d", [.command, .shift]),
             item(String(localized: "Add to Favorites", comment: "File menu item."), #selector(C.addToFavorites(_:)), ""),
             item(String(localized: "Move Tab to New Window", comment: "File menu item."), #selector(C.moveTabToNewWindow(_:)), ""),

@@ -477,7 +477,7 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     /// File › Pin Tab (⌘D): the quick pin, into the space you're in at the end of its Pinned pages. ⇧⌘D is its own
     /// item, `savePageToFolder`.
-    @objc func savePage(_ sender: Any?) {
+    @objc func toggleBookmark(_ sender: Any?) {
         guard let tab = selectedTab else { return }
         // A menu item's click keeps ⇧ held while it runs: the tab menu's Pin Tab asks where, like ⇧⌘D.
         save(tab, request: SavePath.request(for: .savePageCommand, shiftHeld: Self.shiftHeld))
@@ -946,7 +946,7 @@ extension BrowserWindowController: NSMenuItemValidation {
                 ? String(localized: "Move Sidebar to Left", comment: "View menu item: puts the sidebar back along the window's left edge.")
                 : String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge.")
             return true
-        case #selector(savePage(_:)):
+        case #selector(toggleBookmark(_:)):
             // ⌘D: the quick save, into this space's Pinned pages, with no question (#326). A whole group or split
             // view saves as one, so the item says which.
             let unsaved = tab?.bookmarkID == nil

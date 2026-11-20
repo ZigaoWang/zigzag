@@ -19,7 +19,7 @@ enum Tutorial {
     /// so the keys are the ones set in Settings › Shortcuts now.
     static var tasks: [Task] {
         let newTabKeys = Shortcuts.caps(for: #selector(BrowserWindowController.newTab(_:)))
-        let pinKeys = Shortcuts.caps(for: #selector(BrowserWindowController.savePage(_:)))
+        let pinKeys = Shortcuts.caps(for: #selector(BrowserWindowController.toggleBookmark(_:)))
         let overviewKeys = Shortcuts.caps(for: #selector(BrowserWindowController.toggleDeskView(_:)))
         let separateKeys = Shortcuts.keys(for: #selector(BrowserWindowController.closeSplitView(_:)))
         let newSpaceKeys = Shortcuts.caps(for: #selector(BrowserWindowController.newSpace(_:)))
