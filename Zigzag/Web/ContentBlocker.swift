@@ -254,14 +254,15 @@ enum AdBlockers {
     static func active(among ids: [String]) -> String? { ids.compactMap { known[$0] }.sorted().first }
 
     /// Whether an extension may run on YouTube as its site access stands: everywhere it was approved for (nil until
-    /// its first load records that, when it gets all it asks for), or only the sites listed or clicked on. A site
-    /// where extensions are off is off for it too.
+    /// its first load records that, when it gets all it asks for), or only the sites listed; a click reaches one tab
+    /// only. A site where extensions are off is off for it too.
     static func reachesYouTube(access: ExtensionInstalls.SiteAccess, approved: [String]?, sites: [String], offSites: Set<String>) -> Bool {
         let youTube: Set<String> = ["youtube.com", "www.youtube.com", "m.youtube.com"]
         if !offSites.isDisjoint(with: youTube) { return false }
         switch access {
         case .all: return approved.map { $0.contains(where: coversYouTube) } ?? true
-        case .click, .sites: return !youTube.isDisjoint(with: sites)
+        case .click: return false
+        case .sites: return !youTube.isDisjoint(with: sites)
         }
     }
 

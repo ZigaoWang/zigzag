@@ -143,6 +143,89 @@ extension SplitRowAlignmentTests {
         #expect(["Page", "Second", "Page 2"].allSatisfy { label.contains($0) })
         #expect(row(parts: 1, width: 260).accessibilityLabel() == "Page")
     }
+
+    /// The Custom size (#361) is a whole percentage from 80 to 150, 100 if none is kept, and gives the whole and
+    /// even points every other size does.
+    @Test func theCustomSizeIsAWholePercentageWithinItsRange() {
+        let wasSize = Tokens.Sidebar.size
+        let wasScale = Tokens.Sidebar.customScale
+        // The tests run in the app, on its own preferences: the percentage goes back to unset if it was.
+        let wasKept = UserDefaults.standard.object(forKey: "SidebarSizePercent")
+        defer {
+            Tokens.Sidebar.size = wasSize
+            Tokens.Sidebar.customScale = wasScale
+            UserDefaults.standard.set(wasKept, forKey: "SidebarSizePercent")
+        }
+
+        #expect(Tokens.Sidebar.keptCustomPercent(nil) == 100)
+        #expect(Tokens.Sidebar.keptCustomPercent(79) == 80)
+        #expect(Tokens.Sidebar.keptCustomPercent(151) == 150)
+
+        Tokens.Sidebar.size = .custom
+        Tokens.Sidebar.customScale = 1.3
+        #expect(abs(Tokens.Sidebar.scale - 1.3) < 0.0001)
+        #expect(abs(Tokens.Sidebar.customScale - 1.3) < 0.0001)
+        #expect(UserDefaults.standard.integer(forKey: "SidebarSizePercent") == 130)
+
+        // Not a whole percentage: rounded to one.
+        Tokens.Sidebar.customScale = 1.294
+        #expect(abs(Tokens.Sidebar.customScale - 1.29) < 0.0001)
+        Tokens.Sidebar.customScale = 1.296
+        #expect(abs(Tokens.Sidebar.customScale - 1.3) < 0.0001)
+
+        // Outside 80 to 150: stays at the end.
+        Tokens.Sidebar.customScale = 0.1
+        #expect(abs(Tokens.Sidebar.customScale - 0.8) < 0.0001)
+        Tokens.Sidebar.customScale = 2
+        #expect(abs(Tokens.Sidebar.customScale - 1.5) < 0.0001)
+
+        // Whole and even points, as at any other size.
+        Tokens.Sidebar.customScale = 1.3
+        #expect(Tokens.Sidebar.scaled(21) == 27)
+        #expect(Tokens.Sidebar.scaledEven(21) == 28)
+        #expect(Tokens.Sidebar.scaled(15, for: .custom) == 20)
+        #expect(Tokens.Sidebar.scaledEven(15, for: .custom) == 20)
+
+        // 5% steps from 80% to 150%.
+        let steps = Tokens.Sidebar.customSteps
+        #expect(steps.count == 15)
+        #expect(abs((steps.first ?? 0) - 0.8) < 0.0001 && abs((steps.last ?? 0) - 1.5) < 0.0001)
+        for (step, next) in zip(steps, steps.dropFirst()) { #expect(abs(next - step - 0.05) < 0.0001) }
+    }
+
+    /// The sidebar lays itself out again when Custom's percentage really changes, and not for the same percentage
+    /// or while another size is chosen.
+    @Test func theCustomSizeTellsTheSidebarOnlyWhenItChanges() {
+        let wasSize = Tokens.Sidebar.size
+        let wasScale = Tokens.Sidebar.customScale
+        // The tests run in the app, on its own preferences: the percentage goes back to unset if it was.
+        let wasKept = UserDefaults.standard.object(forKey: "SidebarSizePercent")
+        defer {
+            Tokens.Sidebar.size = wasSize
+            Tokens.Sidebar.customScale = wasScale
+            UserDefaults.standard.set(wasKept, forKey: "SidebarSizePercent")
+        }
+
+        nonisolated final class Count: @unchecked Sendable { var heard = 0 }
+        let count = Count()
+        let token = NotificationCenter.default.addObserver(forName: Tokens.Sidebar.sizeChanged, object: nil, queue: nil) { _ in count.heard += 1 }
+        defer { NotificationCenter.default.removeObserver(token) }
+
+        Tokens.Sidebar.size = .custom
+        Tokens.Sidebar.customScale = 1.25
+        count.heard = 0
+        Tokens.Sidebar.customScale = 1.3
+        #expect(count.heard == 1)
+        Tokens.Sidebar.customScale = 1.3
+        #expect(count.heard == 1)
+        Tokens.Sidebar.customScale = 1.304
+        #expect(count.heard == 1)
+
+        Tokens.Sidebar.size = .medium
+        count.heard = 0
+        Tokens.Sidebar.customScale = 1.4
+        #expect(count.heard == 0)
+    }
 }
 
 /// A tab's speaker sits in its title's line as a symbol in text does: a word space after the title, its middle a
