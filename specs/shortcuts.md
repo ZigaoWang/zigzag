@@ -61,3 +61,7 @@
   Test: PageShortcutsTests.everythingElseIsThePagesFirst
 - Press a tab, window or address key on a page (⌘T, ⌘W, ⇧⌘T) → it always goes to the browser.
   Test: PageShortcutsTests.theBrowsersOwnKeysStayItsOwn
+- Press ⌥⌘← or ⌥⌘→ on a page that uses those keys → the space still switches.
+  Test: PageShortcutsTests.theSpaceKeysStayTheBrowsers
+- Close Tabs Below in Settings › Shortcuts → listed, though it has no menu bar line or keys, and takes keys of yours.
+  Test: SettingsSearchTests.closeTabsBelowCanHaveAShortcut

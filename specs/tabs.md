@@ -53,6 +53,8 @@
 ## Sound
 - A tab playing sound or muted → a speaker after its title; clicking it mutes or unmutes that page.
   No test yet.
+- Pause the video or audio a tab's sound came from → its speaker goes away after a moment, even if WebKit still says it plays.
+  Test: MiniPlayerPageTests.aSoundFromAVideoEndsOnceItStops
 
 ## Picked rows
 - ⌫, ⌦ or ⌘⌫ with two or more rows picked → picked tabs close and picked pinned pages are removed, once per press.

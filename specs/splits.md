@@ -35,15 +35,19 @@
   No test yet.
 
 ## Resizing
-- Plain drag on a line → the whole line moves; in a grid of four, ⇧-drag moves only the segment between two pages.
+- Plain drag on a line → the whole line moves; in a grid of four, ⇧-drag on either line moves only the segment between two pages.
   Test: DragZoneTests.aPlainDragMovesTheWholeLineAndShiftMovesOneSegment
-- Release a segment near the middle of a grid whose columns don't line up → it snaps to the middle, unless ⇧ is held.
+- In a grid of four, one line is parted at a time → a parted line's segments drag on their own; the other line moves whole, even with ⇧.
+  Test: TileLayoutTests.onlyShiftOrAPartedLineMovesASegmentAlone
+- Release a segment near the middle of a parted grid → it snaps to the middle, unless ⇧ is held.
   Test: DragZoneTests.aNearEvenLineSnapsOnReleaseUnlessShiftHoldsIt
+- Release a segment near the other segment of its line → it snaps there instead, whichever is nearer.
+  Test: TileLayoutTests.aSegmentSnapsToTheOtherColumnsLineAndTheMiddle
 - Double-click a line → that line goes to the middle; lines the other way stay put.
   Test: DragZoneTests.aPlainDragOutsideAPartedGridIsTheDragItAlwaysWas
 - Drag a corner where lines meet → both lines move together, keeping the grab offset.
   Test: DragZoneTests.aCornerIsEasyToCatchAndNeverJumps
-- Reset Tile Layout on the pane strip (only when the columns don't line up) → every line back to the middle.
+- Reset Tile Layout on the pane strip (only when a line is parted) → every line back to the middle.
   Test: TileLayoutTests.evenAgainPutsEveryLineInTheMiddle
 - Quit and reopen → each split comes back at the sizes it had; new splits always start even.
   Test: TileLayoutTests.aGroupsOwnLinesComeBackAsTheyWereSaved
