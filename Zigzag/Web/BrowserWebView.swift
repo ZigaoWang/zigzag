@@ -240,7 +240,7 @@ final class BrowserWebView: WKWebView {
     private func addSaveToPins(to menu: NSMenu) {
         guard owner != nil, WindowManager.shared.controller(for: window) != nil,
               let last = menu.items.lastIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) else { return }
-        let item = NSMenuItem(title: String(localized: "Save to Pins", comment: "Item in a page's right-click menu over a link: saves the link, without opening it."),
+        let item = NSMenuItem(title: String(localized: "Pin Link", comment: "Item in a page's right-click menu over a link: pins the link, without opening it."),
                               action: #selector(saveHoveredLinkToPins(_:)), keyEquivalent: "")
         item.target = self
         item.identifier = NSUserInterfaceItemIdentifier(Self.saveToPinsIdentifier)
@@ -275,7 +275,7 @@ final class BrowserWebView: WKWebView {
     private func addSavePage(to menu: NSMenu) {
         guard owner != nil, WindowManager.shared.controller(for: window) != nil,
               !menu.items.contains(where: { $0.identifier?.rawValue == Self.saveToPinsIdentifier }) else { return }
-        let item = NSMenuItem(title: String(localized: "Save Page", comment: "Item in a page's right-click menu, away from its links: saves the page you're on, and with ⇧ held, asks which folder."),
+        let item = NSMenuItem(title: String(localized: "Pin Page", comment: "Item in a page's right-click menu, away from its links: pins the page you're on, and with ⇧ held, asks which folder."),
                               action: #selector(savePageFromMenu(_:)), keyEquivalent: "")
         item.target = self
         item.identifier = NSUserInterfaceItemIdentifier(Self.savePageIdentifier)

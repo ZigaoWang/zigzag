@@ -246,14 +246,14 @@ enum CommandRanker {
         if c.hasPage, !c.isPrivate, !c.isFavorite {
             // One verb: Save. A group of tabs saves as one pinned folder, so the command says so.
             if c.isPinned {
-                list.append(Action(id: "unpin", title: c.isGroup ? String(localized: "Unsave Group", comment: "A command in the command bar, named as in the menu bar: takes the saved group out of Pinned.")
-                                   : String(localized: "Unsave Page", comment: "A command in the command bar, named as in the menu bar: takes a saved page out of Pinned."),
+                list.append(Action(id: "unpin", title: c.isGroup ? String(localized: "Unpin Group", comment: "A command in the command bar, named as in the menu bar: takes the pinned group out of Pinned.")
+                                   : String(localized: "Unpin Tab", comment: "A command in the command bar, named as in the menu bar: takes a pinned page out of Pinned."),
                                    keywords: ["save", "unsave", "unpin", "pin", "tab", "group", "remove"], symbol: "star.slash"))
             } else {
-                list.append(Action(id: "pin", title: c.isGroup ? String(localized: "Save Group", comment: "A command in the command bar, named as in the menu bar: saves the group of tabs as one pinned folder.")
-                                   : String(localized: "Save Page", comment: "A command in the command bar, named as in the menu bar: saves the page into Pinned."),
+                list.append(Action(id: "pin", title: c.isGroup ? String(localized: "Pin Group", comment: "A command in the command bar, named as in the menu bar: pins the group of tabs as one folder.")
+                                   : String(localized: "Pin Tab", comment: "A command in the command bar, named as in the menu bar: pins the page into Pinned."),
                                    keywords: ["save", "pin", "tab", "group", "keep", "bookmark"], symbol: "star"))
-                list.append(Action(id: "pin-to-folder", title: String(localized: "Save Page to Folder…", comment: "A command in the command bar, named as in the menu bar: saves the page, asking which folder of the space it goes in."),
+                list.append(Action(id: "pin-to-folder", title: String(localized: "Pin Tab to Folder…", comment: "A command in the command bar, named as in the menu bar: pins the page, asking which folder of the space it goes in."),
                                    keywords: ["save", "folder", "pin", "tab", "file"], symbol: "folder.badge.plus"))
             }
         }

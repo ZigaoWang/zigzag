@@ -32,16 +32,16 @@ struct CommandActionTests {
     }
 
     @Test func savingFollowsWhatThePageIs() {
-        #expect(titles("save", onATab).contains("Save Page"))
-        #expect(titles("save", onATab).contains("Save Page to Folder…"))
+        #expect(titles("save", onATab).contains("Pin Tab"))
+        #expect(titles("save", onATab).contains("Pin Tab to Folder…"))
         var pinned = onATab
         pinned.isPinned = true
-        #expect(titles("save", pinned).contains("Unsave Page"))
-        #expect(!titles("save", pinned).contains("Save Page"))
+        #expect(titles("save", pinned).contains("Unpin Tab"))
+        #expect(!titles("save", pinned).contains("Pin Tab"))
         var favorite = onATab
         favorite.isFavorite = true
-        #expect(!titles("save", favorite).contains { $0.hasSuffix("Page") })
-        #expect(!titles("every", favorite).contains("In Every Space"))
+        #expect(!titles("save", favorite).contains("Pin Tab"))
+        #expect(!titles("every", favorite).contains("Add to Favorites"))
         var blank = onATab
         blank.hasPage = false
         #expect(titles("save", blank).isEmpty)
@@ -87,11 +87,11 @@ struct CommandActionTests {
 
     @Test func aFirstLetterNeverRunsOne() {
         // "s" then Return searches for s, it doesn't save; the app's own commands still match as before.
-        #expect(!titles("s", onATab).contains("Save Page"))
+        #expect(!titles("s", onATab).contains("Pin Tab"))
         #expect(titles("s", onATab).contains("Settings"))
-        #expect(!titles("sa", onATab).contains("Save Page"))
+        #expect(!titles("sa", onATab).contains("Pin Tab"))
         #expect(!titles("cl", onATab).contains("Close Other Tabs"))
-        #expect(titles("save", onATab).contains("Save Page"))
+        #expect(titles("save", onATab).contains("Pin Tab"))
     }
 
     @Test func chineseCountsByCharacters() {

@@ -46,7 +46,7 @@ final class AddressView: InteractiveView {
 
     /// The star at the field's right end (#326): outline while the page isn't saved, filled while it is. A click saves
     /// it into the space you're in; ⇧-click asks where.
-    let saveButton = AddressView.button("star", toolTip: String(localized: "Save Page", comment: "Tooltip of the address bar's star button: saves the page you're on, and with ⇧ held, asks where."))
+    let saveButton = AddressView.button("star", toolTip: String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where."))
     /// Beside the star, as in every browser: shares the page from the address bar.
     let shareButton = AddressView.button("square.and.arrow.up", toolTip: String(localized: "Share…", comment: "Tooltip of the address bar's share button: shares the page you're on."))
     /// What the star shows: filled and accent for a page that's saved, outline for one that isn't.
@@ -63,8 +63,8 @@ final class AddressView: InteractiveView {
         saveButton.tint = saved ? Brand.Theme.for(saveButton).accent : Tokens.Color.icon
         saveButton.isEnabled = canSave
         saveButton.toolTip = saved
-            ? String(localized: "Saved", comment: "Tooltip of the address bar's star button for a page that's saved: it says the page is saved.")
-            : String(localized: "Save Page", comment: "Tooltip of the address bar's star button: saves the page you're on, and with ⇧ held, asks where.")
+            ? String(localized: "Pinned", comment: "Tooltip of the address bar's star button for a page that's pinned: it says the page is pinned.")
+            : String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where.")
         reflow(animated: true)
     }
 

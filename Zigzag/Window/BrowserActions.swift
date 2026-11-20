@@ -513,7 +513,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             Toast.show(String(localized: "Moved to Tabs", comment: "Toast after a favorite moves back to the tabs."), symbol: "star.slash", in: self)
         } else {
             unbookmarkWithUndo(bookmarkID, to: 0)
-            Toast.show(String(localized: "Unsaved", comment: "Toast after a saved page is taken out of Pinned, back among the tabs."), symbol: "star.slash", in: self)
+            Toast.show(String(localized: "Unpinned", comment: "Toast after a pinned page is taken out of Pinned, back among the tabs."), symbol: "star.slash", in: self)
         }
         refreshSavedState(of: tab)
         return true
@@ -537,7 +537,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             // A tab in a group saves as the group, as it has since #325: one folder, one undo.
             if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
                 bookmarkWithUndo(tab, at: index, in: tab.spaceID)
-                Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star",
+                Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star",
                            actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
                 refreshSavedState(of: tab)
                 done?()
@@ -545,7 +545,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             }
             // No sheet, no question: the end of this space's Pinned pages.
             guard save(page, to: SavePath.quickPlace(in: tab.spaceID)) else { return false }
-            Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star",
+            Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star",
                        actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
             refreshSavedState(of: tab)
             done?()
@@ -553,7 +553,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
         SavePlaceSheet.show(page: page, spaceID: tab.spaceID, in: root.overlay) { [weak self] answer in
             guard let self, self.save(page, to: answer.place, named: answer.name) else { return }
-            Toast.show(String(localized: "Saved", comment: "Toast after a page is saved into Pinned."), symbol: "star",
+            Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star",
                        actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
             self.refreshSavedState(of: tab)
             done?()
@@ -573,7 +573,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             let item: NSMenuItem
             switch entry.kind {
             case .everySpace:
-                item = SidebarMenus.Item(String(localized: "In Every Space", comment: "Menu item on a saved page: it shows in every space of the profile.")) { [weak self] in
+                item = SidebarMenus.Item(String(localized: "Add to Favorites", comment: "Menu item on a pinned page: it shows in every space of the profile.")) { [weak self] in
                     self?.moveSaved(id, to: .everySpace)
                 }
             case .top:
@@ -640,12 +640,12 @@ extension BrowserWindowController: NSMenuItemValidation {
         let space = tabManager.currentSpaceID
         guard SavePath.request(for: .linkMenu, shiftHeld: shiftHeld) == .picker else {
             guard save(page, to: SavePath.quickPlace(in: space)) else { return false }
-            Toast.show(String(localized: "Saved to Pins", comment: "Toast after a link is saved to Pins from its right-click menu, without opening it."), symbol: "star", in: self)
+            Toast.show(String(localized: "Pinned", comment: "Toast after a link is pinned from its right-click menu, without opening it."), symbol: "star", in: self)
             return true
         }
         SavePlaceSheet.show(page: page, spaceID: space, in: root.overlay) { [weak self] answer in
             guard let self, self.save(page, to: answer.place, named: answer.name) else { return }
-            Toast.show(String(localized: "Saved to Pins", comment: "Toast after a link is saved to Pins from its right-click menu, without opening it."), symbol: "star", in: self)
+            Toast.show(String(localized: "Pinned", comment: "Toast after a link is pinned from its right-click menu, without opening it."), symbol: "star", in: self)
         }
         return true
     }
@@ -657,7 +657,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         if tab.isFavorite { removeFromEverySpace(sender); return }
         libraryChange(SavePath.saveName) { _ = SavePath.keepInEverySpace(id, profile: tabManager.profile.id) }
         tab.isFavorite = Library.shared.isFavorite(id)
-        Toast.show(String(localized: "Saved in Every Space", comment: "Toast after a saved page is ticked In Every Space: it now shows in every space of its profile."), symbol: "star.fill", in: self)
+        Toast.show(String(localized: "Added to Favorites", comment: "Toast after Add to Favorites: the page now shows in every space of its profile."), symbol: "star.fill", in: self)
     }
 
     /// The tick taken off a favorite: the page stays saved, among this space's Pinned pages.
@@ -666,7 +666,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         let space = tabManager.currentSpaceID
         pageChange(SavePath.saveName) { [tabManager] in _ = SavePath.keepInThisSpace(id, spaceID: space) }
         tab.isFavorite = Library.shared.isFavorite(id)
-        Toast.show(String(localized: "Saved in This Space", comment: "Toast after In Every Space is ticked off a favorite: the page stays saved, in this space only."), symbol: "star", in: self)
+        Toast.show(String(localized: "Moved to Tabs", comment: "Toast after a favorite is unticked: the page stays pinned, in this space only."), symbol: "star", in: self)
     }
 
     /// File › Install as App…: the site as an app of its own, with its own Dock icon (#165).
@@ -930,13 +930,13 @@ extension BrowserWindowController: NSMenuItemValidation {
             // view saves as one, so the item says which.
             let unsaved = tab?.bookmarkID == nil
             let pair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
-            item.title = unsaved && tab.map(tabManager.pinsGroup) == true ? String(localized: "Save Group", comment: "Menu bar item: saves the whole group of tabs the tab is in, as a folder.")
-                : unsaved && pair ? String(localized: "Save Split View", comment: "Menu bar item: saves both pages of the split view.")
-                : String(localized: "Save Page", comment: "File menu item, with ⌘D: saves the page you're on, into the space you're in, without asking.")
+            item.title = unsaved && tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
+                : unsaved && pair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
+                : String(localized: "Pin Tab", comment: "File menu item, with ⌘D: pins the page you're on, into the space you're in, without asking.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(savePageToFolder(_:)):
             // ⇧⌘D: the same save, asking where in the space it goes. One word for the verb, everywhere.
-            item.title = String(localized: "Save Page to Folder…", comment: "File menu item, with ⇧⌘D: saves the page you're on, asking which folder of the space it goes in and what it's called.")
+            item.title = String(localized: "Pin Tab to Folder…", comment: "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(addToFavorites(_:)):
             // A saved page's tick, in every space (#326): never a destination of its own.

@@ -1412,7 +1412,7 @@ nonisolated enum ExtensionWrite {
     /// The profile's cookies for the URL where WebKit can say, else all of them, to be scoped off the main thread.
     @available(macOS 15.4, *)
     @MainActor static func profileCookies(for url: URL, in store: WKWebsiteDataStore) async -> [HTTPCookie] {
-        if #available(macOS 27.0, *) { return await store.httpCookieStore.cookies(for: url) }
+        
         return await store.httpCookieStore.allCookies()
     }
 

@@ -102,21 +102,21 @@ enum SidebarMenus {
         }
         var organize: [NSMenuItem] = []
         if !rows.isEmpty, !isPrivate {
-            organize.append(Item(rows.count == 1 ? String(localized: "Save Page", comment: "Menu item for one picked tab: saves the page into Pinned, at the end of it.")
-                                 : String(localized: "Save \(rows.count) Pages", comment: "Menu item for several picked tabs: saves them into Pinned, at the end of it.")) {
+            organize.append(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item for one picked tab: pins the page into Pinned, at the end of it.")
+                                 : String(localized: "Pin \(rows.count) Tabs", comment: "Menu item for several picked tabs: pins them into Pinned, at the end of it.")) {
                 controller.pinMarked(rows)
             })
         }
         // Pinned pages are shared by every window: a private one doesn't take them away.
         if !pins.isEmpty, !isPrivate {
-            organize.append(Item(pins.count == 1 ? String(localized: "Unsave Page", comment: "Menu item for one picked pinned page: takes it out of Pinned, back among the tabs.")
-                                 : String(localized: "Unsave \(pins.count) Pages", comment: "Menu item for several picked pinned pages: takes them out of Pinned, back among the tabs.")) {
+            organize.append(Item(pins.count == 1 ? String(localized: "Remove Pinned Page", comment: "Menu item for one picked pinned page: takes it out of Pinned, back among the tabs.")
+                                 : String(localized: "Remove \(pins.count) Pinned Pages", comment: "Menu item for several picked pinned pages: takes them out of Pinned, back among the tabs.")) {
                 controller.unpinMarked(pins)
             })
         }
         // In Every Space is a tick on the picked pages already saved, never a way to save one.
         if !isPrivate, !controller.markedSavedIDs(items).isEmpty {
-            organize.append(Item(InEverySpace.title) { controller.favoriteMarked(items) })
+            organize.append(Item(String(localized: "Add \(items.count) to Favorites", comment: "Menu item for several picked sidebar rows")) { controller.favoriteMarked(items) })
         }
         if !isPrivate || rows.isEmpty {
             organize += folderItems(new: String(localized: "Add \(count) to New Folder", comment: "Menu item for several picked sidebar rows"),
@@ -175,7 +175,7 @@ enum SidebarMenus {
     }
 
     static var unpinGroupTitle: String {
-        String(localized: "Unsave Group", comment: "Item in a saved tab's context menu in the sidebar. The tab is in a saved group; the whole group goes back to the tabs.")
+        String(localized: "Unpin Group", comment: "Item in a pinned tab's context menu in the sidebar. The tab is in a pinned group; the whole group goes back to the tabs.")
     }
 
     /// "Remove Pinned Page", or for several, how many.
@@ -222,9 +222,9 @@ enum SidebarMenus {
         // as one, so the item says which. Pinned pages are shared by every window: a private one's tabs stay out.
         if !isPrivate, tab.bookmarkID == nil, tab.url != nil {
             let pinsPair = manager.partner(of: tab).map { $0.bookmarkID == nil && $0.url != nil } ?? false
-            let saveTitle = manager.pinsGroup(tab) ? String(localized: "Save Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is saved as a folder.")
-                : pinsPair ? String(localized: "Save Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are saved together.")
-                : String(localized: "Save Page", comment: "Item in a tab's context menu in the sidebar: saves the page into Pinned, and with ⇧ held, asks which folder.")
+            let saveTitle = manager.pinsGroup(tab) ? String(localized: "Pin Group", comment: "Item in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is pinned as a folder.")
+                : pinsPair ? String(localized: "Pin Split View", comment: "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are pinned together.")
+                : String(localized: "Pin Tab", comment: "Item in a tab's context menu in the sidebar: pins the page into Pinned, and with ⇧ held, asks which folder.")
             organize.append(keyed(Item(saveTitle) { controller.bookmarkWithUndo(tab, at: nil, in: tab.spaceID) }, #selector(C.savePage(_:))))
         }
         if tab.bookmarkID == nil { organize += groupItems(for: tab, controller: controller) }
@@ -285,7 +285,7 @@ enum SidebarMenus {
             context.append(Item(String(localized: "Back to Pinned Page", comment: "Item in a pinned tab's context menu in the sidebar. Goes back to the page the tab was pinned with.")) { manager.resetBookmarkTab(bookmark.id) })
             // A private window never writes where it's been into your pins.
             if !isPrivate {
-                context.append(Item(String(localized: "Save This Page Instead", comment: "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the saved one.")) {
+                context.append(Item(String(localized: "Set Current Page as Pinned", comment: "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the pinned one.")) {
                     controller.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.updateBookmark(bookmark.id, url: url) }
                 })
             }
@@ -312,8 +312,8 @@ enum SidebarMenus {
         // Pins are shared by every window: a private one doesn't take them away.
         if !isPrivate {
             let unpin = Library.shared.pinnedGroup(containing: bookmark.id) != nil ? unpinGroupTitle
-                : pinned != nil ? String(localized: "Unsave Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
-                : String(localized: "Unsave Page", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
+                : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
+                : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
             organize.append(Item(unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
         }
         organize.append(Item(InEverySpace.title) {

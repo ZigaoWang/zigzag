@@ -271,12 +271,12 @@ enum SavePath {
 
     /// What ⌘Z says after a save.
     static var saveName: String {
-        String(localized: "Save", comment: "Undo action name, shown in the Edit menu as Undo Save.")
+        String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")
     }
 
     /// What ⌘Z says after a saved page is taken out of Pinned.
     static var unsaveName: String {
-        String(localized: "Unsave Page", comment: "Undo action name, shown in the Edit menu as Undo Unsave Page.")
+        String(localized: "Unpin Tab", comment: "Undo action name, shown in the Edit menu as Undo Unpin Tab.")
     }
 
     // MARK: The saved toast's chevron (#326)

@@ -54,9 +54,9 @@ enum SavePlaceSheet {
         ]
 
         let sheet = FormSheet.show(in: host,
-                                   title: String(localized: "Save Page", comment: "Title of the sheet that saves the page you're on, with where in the space it goes and its name."),
+                                   title: String(localized: "Pin Page", comment: "Title of the sheet that pins the page you're on, with where in the space it goes and its name."),
                                    symbol: "star",
-                                   message: String(localized: "The page is saved in \(space). In Every Space shows it in all of the profile’s spaces instead.", comment: "Under the title of the sheet that saves a page: the space it's saved in, which the sheet doesn't let you change, and what In Every Space means. The placeholder is the space's name."),
+                                   message: String(localized: "The page is pinned in \(space). Add to Favorites shows it in all of the profile’s spaces instead.", comment: "Under the title of the sheet that pins a page: the space it's pinned in, which the sheet doesn't let you change, and what Add to Favorites means. The placeholder is the space's name."),
                                    rows: rows,
                                    confirmTitle: SavePath.saveName,
                                    canConfirm: { !name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) { confirmed in
@@ -93,6 +93,6 @@ enum SavePlaceSheet {
 /// The words of the In Every Space tick, shared by the picker and a saved page's menu.
 enum InEverySpace {
     static var title: String {
-        String(localized: "In Every Space", comment: "A tick on a saved page: it shows in every space of its profile, as a favorite does.")
+        String(localized: "Add to Favorites", comment: "A tick on a pinned page: it shows in every space of its profile, as a favorite does.")
     }
 }
