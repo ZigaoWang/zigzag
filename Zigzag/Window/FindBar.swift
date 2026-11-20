@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// A floating text field we draw ourselves: no bezel, our font, our colors.
-final class PlainTextField: NSTextField {
+class PlainTextField: NSTextField {
     var onCancel: (() -> Void)?
     /// Room at the sides for a selection and the first letter to draw whole (the address). Zero for fields lined up
     /// with a label they replace, like renaming.

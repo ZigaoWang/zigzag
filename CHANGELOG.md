@@ -23,6 +23,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Thin rounded fields have round ends again, like the address you edit in Zigzag Mini's strip. Its ends came to a point because its corners were rounder than half its height.
 - On a split view's row in the sidebar, the × sits inside the page it closes. Point at a page and its part lights up with its own ×, named Close and the page's title; on the row you're in, the page you're in shows it. It used to sit alone at the row's end, where it looked like it closed the whole split. A part too narrow for its icon and the × shows the × in its icon's place while you point at it.
 - Clicking the address in a split view page's strip edits it in a field the address's own size and place, light or dark with the page, as in Zigzag Mini's strip. It used to open as a taller white box over the strip's buttons, whatever the page's color.
+- Clicking a pop-up window's address shows it selected in the same address field as Zigzag Mini's and split view's strips, with the same type and selection color, instead of as plain text.
 
 ## [0.9.3] - 2026-11-18
 
