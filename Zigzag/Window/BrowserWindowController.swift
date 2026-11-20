@@ -515,10 +515,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The star at the end of the address (#326) and the share button beside it: the star is the quick save, or with ⇧
-    /// held the place picker; Share opens the page's sharing services from the address bar.
+    /// The star: a quick pin, or with ⇧ held the place picker.
     private func wireAddressButtons() {
         sidebar.address.saveButton.onClick = { [weak self] _ in self?.saveFromStar() }
-        sidebar.address.shareButton.onClick = { [weak self] _ in self?.sharePage(nil) }
     }
 
     private func reloadFavorites() {

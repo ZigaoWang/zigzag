@@ -114,7 +114,7 @@ enum SidebarMenus {
                 controller.unpinMarked(pins)
             })
         }
-        // In Every Space is a tick on the picked pages already saved, never a way to save one.
+        // Add to Favorites is a tick on the picked pages already pinned, never a way to pin one.
         if !isPrivate, !controller.markedSavedIDs(items).isEmpty {
             organize.append(Item(String(localized: "Add \(items.count) to Favorites", comment: "Menu item for several picked sidebar rows")) { controller.favoriteMarked(items) })
         }
@@ -771,7 +771,7 @@ extension BrowserWindowController {
         sidebar.list.mark(pages: pages)
     }
 
-    /// Several tabs saved at once, each through `SavePath.save`, so a picked row lands where the star and ⌘D do.
+    /// Several tabs pinned at once, each through `SavePath.save`, so a picked row lands where the star and ⌘D do.
     func pinMarked(_ tabs: [Tab]) {
         Tutorial.complete("pin")
         pageChange(SavePath.saveName) { [tabManager] in
@@ -803,7 +803,7 @@ extension BrowserWindowController {
         sidebar.list.mark(pins: ids)
     }
 
-    /// In Every Space ticked on the picked pages already saved, in order. They leave the list for the grid, so nothing
+    /// Add to Favorites ticked on the picked pages already pinned, in order. They leave the list for the grid, so nothing
     /// stays picked.
     func favoriteMarked(_ items: [SidebarItem]) {
         let savedIDs = markedSavedIDs(items)
@@ -817,8 +817,8 @@ extension BrowserWindowController {
         }
     }
 
-    /// The picked rows that are already saved, so In Every Space can tick them: never a row that isn't, since the tick
-    /// isn't a way to save.
+    /// The picked rows already pinned, so Add to Favorites can tick them: never a row that isn't, since the tick
+    /// isn't a way to pin.
     func markedSavedIDs(_ items: [SidebarItem]) -> [UUID] {
         items.compactMap { item in
             switch item {

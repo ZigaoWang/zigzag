@@ -44,17 +44,15 @@ final class AddressView: InteractiveView {
     let siteControlsButton = AddressView.button("slider.horizontal.3", toolTip: String(localized: "Site Controls", comment: "Name of the button by the address that opens the site panel: its tooltip and VoiceOver name."))
     private var siteControlsBadge: BadgeView?
 
-    /// The star at the field's right end (#326): outline while the page isn't saved, filled while it is. A click saves
+    /// The star at the field's right end (#326): outline while the page isn't pinned, filled while it is. A click pins
     /// it into the space you're in; ⇧-click asks where.
     let saveButton = AddressView.button("star", toolTip: String(localized: "Pin Page", comment: "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where."))
-    /// Beside the star, as in every browser: shares the page from the address bar.
-    let shareButton = AddressView.button("square.and.arrow.up", toolTip: String(localized: "Share…", comment: "Tooltip of the address bar's share button: shares the page you're on."))
-    /// What the star shows: filled and accent for a page that's saved, outline for one that isn't.
+    /// What the star shows: filled and accent for a page that's pinned, outline for one that isn't.
     private(set) var isSaved = false
-    /// Whether the page can be saved at all (a new tab has no address).
+    /// Whether the page can be pinned at all (a new tab has no address).
     private(set) var canSave = false
 
-    /// The star's state for the page in the field. A page that isn't saved, or is a private window's, keeps the outline.
+    /// The star's state for the page in the field. A page that isn't pinned, or is a private window's, keeps the star.
     func setSaved(_ saved: Bool, canSave: Bool) {
         guard isSaved != saved || self.canSave != canSave else { return }
         isSaved = saved
@@ -398,9 +396,7 @@ final class AddressView: InteractiveView {
         addSubview(readerButton)
         saveButton.tint = Tokens.Color.icon
         saveButton.isHidden = true
-        shareButton.isHidden = true
         addSubview(saveButton)
-        addSubview(shareButton)
         addSubview(siteControlsButton)
         _ = drop
         setAccessibilityRole(.button)
@@ -557,7 +553,7 @@ final class AddressView: InteractiveView {
         let pinFramesBefore = showing.map(\.button.frame)
         if showingChanged { updatePinControls(Array(showing)) }
 
-        let trailing = others + showing.map(\.button) + [saveButton, shareButton, siteControlsButton]
+        let trailing = others + showing.map(\.button) + [saveButton, siteControlsButton]
         var right = bounds.width - end
         for (index, button) in trailing.enumerated().reversed() {
             let frame = NSRect(x: right - side, y: inset, width: side, height: side)
@@ -627,7 +623,7 @@ final class AddressView: InteractiveView {
     /// rather than opening the command bar.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        for button in [readerButton, captureButton, saveButton, shareButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
+        for button in [readerButton, captureButton, saveButton, siteControlsButton] + pinEntries.map(\.button) where !button.isHidden {
             if button.pressArea.contains(button.convert(local, from: self)) { return button }
         }
         // Buttons alone: the gaps belong to the bar and drag the window.
@@ -1199,7 +1195,6 @@ final class SidebarView: NSView {
         reloadButton.toolTip = Self.reloadTip(loading: tab?.isLoading ?? false)
         address.show(url: tab?.url, notSecure: tab?.isNotSecure ?? false)
         address.setSaved(tab?.bookmarkID != nil && tab?.isPrivate != true, canSave: tab?.url != nil && tab?.isPrivate != true)
-        address.shareButton.isEnabled = tab?.url != nil
     }
 
     /// "Reload (⌘R)", or "Stop (⌘.)" while the page loads: what the button does now, with its shortcut.

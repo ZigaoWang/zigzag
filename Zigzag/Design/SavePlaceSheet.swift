@@ -1,7 +1,7 @@
 import AppKit
 
-/// The place picker a save with ⇧ on it opens (#326): where in this space the page lands, a folder or a new one, and its
-/// name. It offers no other space, because a save never crosses spaces: a page saved from a space goes into that space.
+/// The place picker ⇧ opens (#326): where in this space the page lands, a folder or a new one, and its name. Never
+/// another space: a pin stays in the space it began in.
 enum SavePlaceSheet {
     /// What the picker was answered with: where in the space the page goes, and what it's called.
     struct Answer {
@@ -9,8 +9,8 @@ enum SavePlaceSheet {
         var name: String
     }
 
-    /// Shows the picker over `host` for a page saved from `spaceID`, opening on the last folder saved to in it. Only
-    /// a save that asks where comes here, so nothing here saves without a click on Save.
+    /// Shows the picker over `host` for a page pinned from `spaceID`, opening on the last folder used there. Nothing
+    /// is pinned until the button is clicked.
     @discardableResult
     static func show(page: SavePath.Page, spaceID: UUID, in host: NSView, completion: @escaping (Answer) -> Void) -> FormSheet {
         let library = Library.shared
@@ -58,12 +58,12 @@ enum SavePlaceSheet {
                                    symbol: "star",
                                    message: String(localized: "The page is pinned in \(space). Add to Favorites shows it in all of the profile’s spaces instead.", comment: "Under the title of the sheet that pins a page: the space it's pinned in, which the sheet doesn't let you change, and what Add to Favorites means. The placeholder is the space's name."),
                                    rows: rows,
-                                   confirmTitle: SavePath.saveName,
+                                   confirmTitle: String(localized: "Pin Page", comment: "Button of the sheet that pins the page, with where in the space it goes and its name."),
                                    canConfirm: { !name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) { confirmed in
             guard confirmed else { return }
             let typed = newFolder.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
             let folder = typed.isEmpty && folderIDs.indices.contains(folderChoice.selectedIndex) ? folderIDs[folderChoice.selectedIndex] : nil
-            let place = SavePath.place(in: spaceID, folder: folder, newFolder: typed.isEmpty ? nil : typed, inEverySpace: everySpace.isOn)
+            let place = SavePath.place(in: spaceID, folder: folder, newFolder: typed.isEmpty ? nil : typed, inEverySpace: everySpace.isOn, atTop: typed.isEmpty && folder == nil)
             SavePath.remember(place)
             completion(Answer(place: place, name: name.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)))
         }
@@ -90,7 +90,7 @@ enum SavePlaceSheet {
     }
 }
 
-/// The words of the In Every Space tick, shared by the picker and a saved page's menu.
+/// The words of the Add to Favorites tick, shared by the picker and a pinned page's menu.
 enum InEverySpace {
     static var title: String {
         String(localized: "Add to Favorites", comment: "A tick on a pinned page: it shows in every space of its profile, as a favorite does.")

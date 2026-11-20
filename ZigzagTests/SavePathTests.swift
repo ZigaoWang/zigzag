@@ -276,15 +276,32 @@ import Testing
     /// space's while the page is a favorite.
     @Test func thePlaceMenuTicksWhereThePageIs() {
         let folders = [BookmarkFolder(name: "Reading"), BookmarkFolder(name: "Work")]
-        let atTop = SavePath.placeEntries(folders: folders, folderID: nil, inEverySpace: false)
+        let atTop = SavePath.placeEntries(folders: folders, folderID: nil, inEverySpace: false, isAtTop: true)
         #expect(atTop == [SavePath.PlaceEntry(kind: .everySpace, isOn: false),
                           SavePath.PlaceEntry(kind: .top, isOn: true),
                           SavePath.PlaceEntry(kind: .folder(folders[0].id), isOn: false),
                           SavePath.PlaceEntry(kind: .folder(folders[1].id), isOn: false)])
-        let inWork = SavePath.placeEntries(folders: folders, folderID: folders[1].id, inEverySpace: false)
+        // At the bottom of Pinned, outside every folder: nothing is ticked, since Top of Pinned is where it isn't.
+        let atEnd = SavePath.placeEntries(folders: folders, folderID: nil, inEverySpace: false, isAtTop: false)
+        #expect(atEnd.filter(\.isOn).isEmpty)
+        let inWork = SavePath.placeEntries(folders: folders, folderID: folders[1].id, inEverySpace: false, isAtTop: false)
         #expect(inWork.filter(\.isOn).map(\.kind) == [.folder(folders[1].id)])
-        let everywhere = SavePath.placeEntries(folders: folders, folderID: folders[0].id, inEverySpace: true)
+        let everywhere = SavePath.placeEntries(folders: folders, folderID: folders[0].id, inEverySpace: true, isAtTop: true)
         #expect(everywhere.filter(\.isOn).map(\.kind) == [.everySpace])
+    }
+
+    /// Top of Pinned in the picker puts the page at the very top, as its name says, not at the end.
+    @Test func topOfPinnedIsTheTop() throws {
+        try scratch { space, _, _ in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let first = try #require(SavePath.save(page("one"), to: SavePath.quickPlace(in: space), in: manager))
+            let last = try #require(SavePath.save(page("two"), to: SavePath.quickPlace(in: space), in: manager))
+            #expect(library.bookmarks(in: space).map(\.id) == [first.id, last.id])
+            let place = SavePath.place(in: space, folder: nil, atTop: true)
+            #expect(SavePath.move(last.id, to: place))
+            #expect(library.bookmarks(in: space).map(\.id) == [last.id, first.id])
+        }
     }
 
     /// The chevron's moves change where an already saved page sits, without saving it twice: into a folder, out of

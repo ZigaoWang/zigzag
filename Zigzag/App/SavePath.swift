@@ -1,26 +1,25 @@
 import AppKit
 
-/// Where a page is saved, and the one function every save goes through (#326). Two ways in: a quick save, which is the
-/// star, ⌘D and Save in a page's or a link's menu, puts the page at the end of the space's Pinned pages with no
-/// question; and the same three with ⇧ ask where, offering the folders of the space you're in, a new one, and the
-/// page's name. A save never crosses spaces. Favorites aren't a destination: a page is saved once, and In Every Space is
-/// a tick on it afterwards.
+/// Where a page is pinned, and the one function every pin goes through (#326). The star, ⌘D and Pin in a page's or a
+/// link's menu pin it at the end of the space's Pinned pages, no question; with ⇧ they ask where: a folder of the space,
+/// a new one, and the page's name. A pin never crosses spaces. Favorites aren't a destination: a page is pinned once,
+/// and Add to Favorites is a tick on it afterwards.
 enum SavePath {
-    /// Where a save began: the star, one of the menu bar's two items, or a page's or a link's menu.
+    /// Where a pin began.
     enum Entry {
         /// The star at the end of the address.
         case star
-        /// File › Save Page (⌘D).
+        /// File › Pin Tab (⌘D).
         case savePageCommand
-        /// File › Save Page to Folder… (⇧⌘D).
+        /// File › Pin Tab to Folder… (⇧⌘D).
         case savePageToFolderCommand
-        /// Save Page in a page's (or a tab's) right-click menu.
+        /// Pin in a page's or a tab's right-click menu.
         case pageMenu
-        /// Save to Pins in a link's right-click menu.
+        /// Pin Link in a link's right-click menu.
         case linkMenu
     }
 
-    /// What an entry point asks for: the quick save, or the place picker.
+    /// What an entry point asks for: the quick pin, or the place picker.
     enum Request: Equatable {
         case quick
         case picker
@@ -35,14 +34,14 @@ enum SavePath {
         }
     }
 
-    /// A place in one space a page is saved to: a folder of its Pinned pages, or, with `inEverySpace`, Favorites, which
-    /// show in every space of the page's profile.
+    /// A place in one space a page is pinned to: a folder of its Pinned pages, or Favorites, which show in every space
+    /// of the page's profile.
     struct Place: Equatable {
-        /// The space: the one the save began in. Nothing offers another.
+        /// The space the pin began in; nothing offers another.
         var spaceID: UUID
         /// The folder of the space's Pinned pages it goes in; nil, among them at the top level.
         var folderID: UUID?
-        /// Favorites: the page shows in every space of its profile, a tick on the saved page.
+        /// Favorites: shows in every space of the profile, a tick on the pinned page.
         var inEverySpace = false
         /// A folder to make in the space, named as typed, when no folder is chosen.
         var newFolder: String?
@@ -50,12 +49,12 @@ enum SavePath {
         var index: Int?
     }
 
-    /// The page being saved: one open in a tab, or a link's saved without opening it.
+    /// The page being pinned: one open in a tab, or a link's, without opening it.
     struct Page {
         var url: URL
         var title: String
         var icon: String?
-        /// The tab its page is open in, when it is: saving keeps that page as the saved page's.
+        /// The tab its page is open in: pinning keeps that page as the pinned page's.
         var tab: Tab?
 
         init(url: URL, title: String, icon: String? = nil, tab: Tab? = nil) {
@@ -74,23 +73,21 @@ enum SavePath {
 
     // MARK: Saving
 
-    /// The quick save's place: the end of the space's Pinned pages, at the top level. The star, ⌘D and the menus' Save
-    /// all pass this, so none of them can drift from the others.
+    /// The quick pin's place: the end of the space's Pinned pages, at the top level. The star, ⌘D and the menus' Pin
+    /// all pass this, so none can drift from the others.
     static func quickPlace(in spaceID: UUID) -> Place { Place(spaceID: spaceID) }
 
-    /// Every save ends here. `manager`: the window saving, which keeps an open page as the saved page's; nil for a
-    /// page saved from somewhere with no window of its own. Nothing is written in a private window: pins and favorites
-    /// are shared by every window.
+    /// Every pin ends here. `manager`: the window pinning, which keeps an open page as the pinned page's; nil for one
+    /// pinned with no window of its own. Nothing is written in a private window: pins and favorites are shared.
     ///
-    /// `name`: what the saved page is to be called, when the picker asked; nil keeps the name it has, or the page's own
-    /// for a page saved for the first time.
+    /// `name`: what the pinned page is called, when the picker asked; nil keeps the name it has, or the page's own.
     @discardableResult
     static func save(_ page: Page, to place: Place, in manager: TabManager?, name typed: String? = nil) -> Bookmark? {
         guard manager?.isPrivate != true, Library.shared.space(place.spaceID) != nil else { return nil }
         let profile = Library.shared.profileID(ofSpace: place.spaceID)
         let name = named(typed) ?? name(of: page)
 
-        // In Every Space: a tick on the page already saved, never a second save of it.
+        // Add to Favorites: a tick on the page already pinned, never a second pin of it.
         if place.inEverySpace {
             let id: UUID
             if let tab = page.tab, let manager {
@@ -140,21 +137,19 @@ enum SavePath {
         return Library.shared.bookmark(id)
     }
 
-    /// Save to Pins in a link's menu: the link, saved without opening it, wherever the picker said (or at the end of
-    /// Pinned when the quick save said nothing).
+    /// Pin Link in a link's menu: the link, pinned without opening it, wherever the picker said, else at the end.
     @discardableResult
     static func saveLink(_ url: URL, title: String = "", to place: Place, in manager: TabManager?) -> Bookmark? {
         save(Page(url: url, title: title), to: place, in: manager)
     }
 
-    /// The page already saved with this address, if it is: saving it again files it, never saves it twice.
+    /// The page already pinned with this address, if it is: pinning it again files it, never twice.
     static func alreadySaved(_ url: URL, in spaceID: UUID) -> Bookmark? {
         let wanted = TabManager.normalize(url)
         return Library.shared.bookmarks(in: spaceID).first { TabManager.normalize($0.url) == wanted }
     }
 
-    /// What the place picker offers for a save that began in `spaceID`: the folders of that space, and no other space.
-    /// A save never crosses spaces, so there is nothing else to choose.
+    /// What the picker offers for a pin that began in `spaceID`: that space's folders, and no other space.
     struct Options: Equatable {
         var spaceID: UUID
         var folders: [BookmarkFolder]
@@ -164,9 +159,9 @@ enum SavePath {
         Options(spaceID: spaceID, folders: Library.shared.folders(in: spaceID))
     }
 
-    /// The place the picker's answers make: always in the space the save began in, with one of its folders, a new one,
-    /// or the top of its Pinned pages.
-    static func place(in spaceID: UUID, folder: UUID?, newFolder: String? = nil, inEverySpace: Bool = false) -> Place {
+    /// The place the picker's answers make: the space it began in, a folder, a new one, or the top of Pinned.
+    static func place(in spaceID: UUID, folder: UUID?, newFolder: String? = nil, inEverySpace: Bool = false,
+                      atTop: Bool = false) -> Place {
         var place = Place(spaceID: spaceID)
         place.inEverySpace = inEverySpace
         if !inEverySpace {
@@ -174,12 +169,14 @@ enum SavePath {
                 place.newFolder = typed
             } else if let folder, Library.shared.folders(in: spaceID).contains(where: { $0.id == folder }) {
                 place.folderID = folder
+            } else if atTop {
+                place.index = 0
             }
         }
         return place
     }
 
-    /// What a saved page is called: the title a home page shaves down to its site (`TabManager.bookmarkTitle`), or the
+    /// What a pinned page is called: the title a home page shaves down to its site (`TabManager.bookmarkTitle`), or the
     /// site itself when the page gave no name.
     static func name(of page: Page) -> String { name(ofTitle: page.title, url: page.url) }
 
@@ -201,20 +198,21 @@ enum SavePath {
         return id
     }
 
-    /// A page already saved with this address, when a link is saved again: ticking it is enough.
+    /// A page already pinned with this address, when a link is pinned again: ticking it is enough.
     private static func alreadySaved(_ page: Page, inEverySpace: Bool, profile: UUID, space: UUID) -> UUID? {
         let wanted = TabManager.normalize(page.url)
         let marks = inEverySpace ? Library.shared.favorites(in: profile) : Library.shared.bookmarks(in: space)
         return marks.first { TabManager.normalize($0.url) == wanted }?.id
     }
 
-    /// Files a page already saved where the picker said. Its folder is left as it was unless one was chosen.
+    /// Files a page already pinned where the picker said. Its folder is left as it was unless one was chosen.
     private static func file(_ id: UUID, into place: Place, folder: UUID?) {
-        if place.newFolder == nil, place.folderID == nil { return }
+        if place.newFolder == nil, place.folderID == nil, place.index == nil { return }
         if Library.shared.spaceID(ofBookmark: id) != place.spaceID {
             Library.shared.moveBookmark(id, to: Int.max, in: place.spaceID, folder: .some(folder))
         } else {
             Library.shared.setFolder(of: id, to: folder)
+            if let index = place.index { Library.shared.moveBookmark(id, to: index, in: place.spaceID, folder: .some(folder)) }
         }
     }
 
@@ -223,10 +221,10 @@ enum SavePath {
         Library.shared.updateBookmark(id, title: name)
     }
 
-    // MARK: In Every Space
+    // MARK: Favorites
 
-    /// In Every Space ticked on a page already saved: a favorite, which shows in every space of its profile. The tick
-    /// is the only way there: nothing saves straight into Favorites.
+    /// Add to Favorites on a page already pinned: it shows in every space of its profile. The tick is the only way
+    /// there: nothing pins straight into Favorites.
     @discardableResult
     static func keepInEverySpace(_ bookmarkID: UUID, profile: UUID) -> Bool {
         guard Library.shared.bookmark(bookmarkID) != nil else { return false }
@@ -290,9 +288,9 @@ enum SavePath {
 
     /// Every place a saved page can be moved to, in menu order, with the one it is in ticked. A favorite lives in
     /// every space, so the space's own places aren't ticked for it; a saved page without a folder is at the top.
-    static func placeEntries(folders: [BookmarkFolder], folderID: UUID?, inEverySpace: Bool) -> [PlaceEntry] {
+    static func placeEntries(folders: [BookmarkFolder], folderID: UUID?, inEverySpace: Bool, isAtTop: Bool) -> [PlaceEntry] {
         var entries = [PlaceEntry(kind: .everySpace, isOn: inEverySpace),
-                       PlaceEntry(kind: .top, isOn: !inEverySpace && folderID == nil)]
+                       PlaceEntry(kind: .top, isOn: !inEverySpace && folderID == nil && isAtTop)]
         entries += folders.map { PlaceEntry(kind: .folder($0.id), isOn: !inEverySpace && $0.id == folderID) }
         return entries
     }

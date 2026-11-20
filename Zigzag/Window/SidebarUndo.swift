@@ -220,7 +220,7 @@ extension BrowserWindowController {
 
     // MARK: Favorites
 
-    /// In Every Space ticked on a tab (#326): a page already saved, never a second save of it. A split's other half
+    /// Add to Favorites on a tab (#326): a page already pinned, never a second pin of it. A split's other half
     /// comes with it.
     func favoriteWithUndo(_ tab: Tab, at index: Int? = nil) {
         pageChange(SavePath.saveName) { [tabManager] in tabManager.favoriteTab(tab, at: index) }

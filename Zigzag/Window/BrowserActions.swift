@@ -472,38 +472,39 @@ extension BrowserWindowController: NSMenuItemValidation {
 
     // MARK: Saving
 
-    /// Whether ⇧ is held as a save runs: the same three ways in ask where, and only there (#326).
+    /// Whether ⇧ is held as a pin runs: the three ways in ask where, and only there (#326).
     static var shiftHeld: Bool { NSEvent.modifierFlags.contains(.shift) }
 
-    /// File › Save Page (⌘D): the quick save, into the space you're in at the end of its Pinned pages. ⇧⌘D, an item of
-    /// its own, is `savePageToFolder`.
+    /// File › Pin Tab (⌘D): the quick pin, into the space you're in at the end of its Pinned pages. ⇧⌘D is its own
+    /// item, `savePageToFolder`.
     @objc func savePage(_ sender: Any?) {
         guard let tab = selectedTab else { return }
-        save(tab, request: SavePath.request(for: .savePageCommand, shiftHeld: false))
+        // A menu item's click keeps ⇧ held while it runs: the tab menu's Pin Tab asks where, like ⇧⌘D.
+        save(tab, request: SavePath.request(for: .savePageCommand, shiftHeld: Self.shiftHeld))
     }
 
-    /// File › Save Page to Folder… (⇧⌘D): asks where in the space the page goes, with a folder or a new one, and its
-    /// name. A save never crosses spaces, so no other space is offered.
+    /// File › Pin Tab to Folder… (⇧⌘D): asks where in the space the page goes, with a folder or a new one, and its
+    /// name. No other space is offered.
     @objc func savePageToFolder(_ sender: Any?) {
         guard let tab = selectedTab else { return }
         save(tab, request: .picker)
     }
 
-    /// The star at the end of the address (#326): a quick save, or with ⇧ held the same picker ⌘D's twin opens.
+    /// The star at the end of the address (#326): a quick pin, or with ⇧ held the picker ⇧⌘D opens.
     func saveFromStar() {
         guard let tab = selectedTab else { return }
         save(tab, request: SavePath.request(for: .star, shiftHeld: Self.shiftHeld))
     }
 
-    /// The page's own menu (a tab's, or the page's): a quick save, or with ⇧ held the picker.
+    /// A quick pin from a tab's menu, or the picker with ⇧ held; also how an unsaved page is pinned from the command
+    /// bar's Unpin, so both ends share one path.
     @discardableResult
     func saveFromPageMenu(_ tab: Tab) -> Bool {
         save(tab, request: SavePath.request(for: .pageMenu, shiftHeld: Self.shiftHeld))
     }
 
-    /// A saved page out of Pinned, back among the tabs, and one that isn't saved saved: what the command bar's
-    /// commands and a pinned page's menu run. Pins and favorites are shared by every window, so a private one never
-    /// writes.
+    /// A pinned page out of Pinned, back among the tabs, and an unpinned one pinned: what the command bar and a pinned
+    /// page's menu run. Pins and favorites are shared, so a private window never writes.
     @discardableResult
     func toggleSavedState(of tab: Tab) -> Bool {
         guard !tabManager.isPrivate else { return false }
@@ -537,7 +538,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             // A tab in a group saves as the group, as it has since #325: one folder, one undo.
             if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
                 bookmarkWithUndo(tab, at: index, in: tab.spaceID)
-                Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star",
+                Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star.fill",
                            actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
                 refreshSavedState(of: tab)
                 done?()
@@ -545,7 +546,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             }
             // No sheet, no question: the end of this space's Pinned pages.
             guard save(page, to: SavePath.quickPlace(in: tab.spaceID)) else { return false }
-            Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star",
+            Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star.fill",
                        actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
             refreshSavedState(of: tab)
             done?()
@@ -553,7 +554,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         }
         SavePlaceSheet.show(page: page, spaceID: tab.spaceID, in: root.overlay) { [weak self] answer in
             guard let self, self.save(page, to: answer.place, named: answer.name) else { return }
-            Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star",
+            Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star.fill",
                        actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
             self.refreshSavedState(of: tab)
             done?()
@@ -562,14 +563,16 @@ extension BrowserWindowController: NSMenuItemValidation {
     }
 
     /// The places the page just saved can move to, from the toast that says it was saved (#326): every folder of the
-    /// space, the top of the space's Pinned pages and In Every Space, with the one it is in ticked.
+    /// space, the top of the space's Pinned pages and Add to Favorites, with the one it is in ticked.
     func savedPlacesMenu(for tab: Tab) -> NSMenu? {
         guard !tabManager.isPrivate, let id = tab.bookmarkID else { return nil }
         let spaceID = tab.spaceID
         let folders = Library.shared.folders(in: spaceID)
         let menu = NSMenu()
+        // Ticked only where the page really is: top level at the top, not simply outside every folder.
+        let isAtTop = Library.shared.bookmarks(in: spaceID).first?.id == id
         for entry in SavePath.placeEntries(folders: folders, folderID: Library.shared.folderID(containing: id),
-                                           inEverySpace: tab.isFavorite) {
+                                           inEverySpace: tab.isFavorite, isAtTop: isAtTop) {
             let item: NSMenuItem
             switch entry.kind {
             case .everySpace:
@@ -589,13 +592,31 @@ extension BrowserWindowController: NSMenuItemValidation {
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        menu.addItem(SidebarMenus.Item(String(localized: "New Folder…", comment: "Menu item beside a saved page: saves it into a folder named as typed.")) { [weak self] in
-            self?.savePageToFolder(nil)
+        menu.addItem(SidebarMenus.Item(String(localized: "New Folder…", comment: "Menu item beside a pinned page: pins it into a folder named as typed.")) { [weak self] in
+            self?.askNewFolder(forSaved: id)
         })
         menu.addItem(SidebarMenus.Item(String(localized: "Remove Pinned Page", comment: "Menu item on a saved page: takes it out of Pinned.")) { [weak self] in
             self?.toggleSavedState(of: tab)
         })
         return menu
+    }
+
+    /// New Folder… in the toast: one field for the name, then the pinned page goes into it, keeping its place in the
+    /// undo history. The picker's own new-folder row is for a page being pinned; this is for one already pinned.
+    private func askNewFolder(forSaved id: UUID) {
+        let field = FilledField(placeholder: String(localized: "Name", comment: "Placeholder of the name field in the sheet that names a new folder for a pinned page."))
+        let space = tabManager.currentSpaceID
+        FormSheet.show(in: root.overlay,
+                       title: String(localized: "New Folder", comment: "Title of the sheet that names a new folder for a pinned page, from its toast."),
+                       symbol: "folder.badge.plus",
+                       rows: [.init(label: nil, view: field)],
+                       confirmTitle: SavePath.saveName,
+                       canConfirm: { !field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) { [weak self] confirmed in
+            guard confirmed, let self else { return }
+            let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard SavePath.move(id, to: SavePath.place(in: space, folder: nil, newFolder: name)) else { return }
+            if let tab = self.tabManager.selectedTab { self.refreshSavedState(of: tab) }
+        }
     }
 
     private enum SavedPlace { case everySpace, top, folder(UUID) }
@@ -631,7 +652,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         return true
     }
 
-    /// Save to Pins in a link's right-click menu (#326): the link is saved without being opened, at the end of Pinned,
+    /// Pin Link in a link's right-click menu (#326): the link is pinned without being opened, at the end of Pinned,
     /// or with ⇧ held where the picker says.
     @discardableResult
     func saveLinkToPins(_ url: URL, title: String = "", shiftHeld: Bool = false) -> Bool {
@@ -640,17 +661,17 @@ extension BrowserWindowController: NSMenuItemValidation {
         let space = tabManager.currentSpaceID
         guard SavePath.request(for: .linkMenu, shiftHeld: shiftHeld) == .picker else {
             guard save(page, to: SavePath.quickPlace(in: space)) else { return false }
-            Toast.show(String(localized: "Pinned", comment: "Toast after a link is pinned from its right-click menu, without opening it."), symbol: "star", in: self)
+            Toast.show(String(localized: "Pinned", comment: "Toast after a link is pinned from its right-click menu, without opening it."), symbol: "star.fill", in: self)
             return true
         }
         SavePlaceSheet.show(page: page, spaceID: space, in: root.overlay) { [weak self] answer in
             guard let self, self.save(page, to: answer.place, named: answer.name) else { return }
-            Toast.show(String(localized: "Pinned", comment: "Toast after a link is pinned from its right-click menu, without opening it."), symbol: "star", in: self)
+            Toast.show(String(localized: "Pinned", comment: "Toast after a link is pinned from its right-click menu, without opening it."), symbol: "star.fill", in: self)
         }
         return true
     }
 
-    /// In Every Space ticked on a page already saved (#326): it shows in every space of its profile, as a favorite.
+    /// Add to Favorites on a page already pinned (#326): it shows in every space of its profile, as a favorite.
     /// Ticked off, the page stays saved, in this space.
     @objc func addToFavorites(_ sender: Any?) {
         guard let tab = selectedTab, !tabManager.isPrivate, let id = tab.bookmarkID else { return }
