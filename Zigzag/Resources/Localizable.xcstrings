@@ -1510,6 +1510,41 @@
         }
       }
     },
+    "%lld pages not put to sleep while they play or have text you typed" : {
+      "comment" : "Toast after Suspend N Pages in the sidebar's menu: some of the picked pages stay awake, because they play sound, are in a call, play in the mini player or Picture in Picture, or hold text you typed.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page not put to sleep while it plays or has text you typed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages not put to sleep while they play or have text you typed"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个页面在播放或有你输入的文字，没有休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld pages of history" : {
       "comment" : "Item in the list of what came over, in the Import window.",
       "localizations" : {
@@ -3013,7 +3048,7 @@
       }
     },
     "Always" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.\nAddress bar above the page: the bar stays above the page.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3601,17 +3636,6 @@
         }
       }
     },
-    "Autohide" : {
-      "comment" : "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自动隐藏"
-          }
-        }
-      }
-    },
     "Automatic" : {
       "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.\nA choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.",
       "localizations" : {
@@ -3718,6 +3742,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复为 Zigzag 的快捷键"
+          }
+        }
+      }
+    },
+    "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
+      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
           }
         }
       }
@@ -4030,6 +4065,61 @@
         }
       }
     },
+    "Not put to sleep while it has text you typed" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake so what you typed into it isn't lost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "里面有你输入的文字，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays in the mini player" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video plays in the window's mini player.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在小播放器里播放，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays sound" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's playing sound.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在播放声音，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it uses the camera or microphone" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's in a call.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在用摄像头或麦克风，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while its video is in Picture in Picture" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video floats in Picture in Picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的视频在画中画里，没有休眠"
+          }
+        }
+      }
+    },
     "Open “%@”" : {
       "comment" : "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name.",
       "localizations" : {
@@ -4070,6 +4160,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "边栏位置"
+          }
+        }
+      }
+    },
+    "Suspend %lld Pages" : {
+      "comment" : "Menu item for several picked tabs: puts their pages to sleep; each loads again when you click it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend Page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend %lld Pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "让 %lld 个页面休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Suspend Page" : {
+      "comment" : "File menu item: puts the tab's page to sleep; it loads again when you click the tab.\nItem in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让页面休眠"
           }
         }
       }
@@ -4191,6 +4327,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不再保留 %@ 的 Cookie"
+          }
+        }
+      }
+    },
+    "You put it to sleep. Loads when you click it." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: you put it to sleep with Suspend Page in its menu, and its page loads again once you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "是你让它休眠的，点按即可重新载入。"
           }
         }
       }
@@ -13287,7 +13434,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nAddress bar above the page: the address stays in the sidebar.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19420,17 +19567,6 @@
         }
       }
     },
-    "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top." : {
-      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后退、前进、重新载入和地址放在页面上方的栏里，不放在边栏中。选“自动隐藏”时，向下滚动会收起这一栏，向上滚动或把指针移到窗口顶部时会重新出现。"
-          }
-        }
-      }
-    },
     "The Last Hour…" : {
       "comment" : "Item in the Clear History menu on the History page.",
       "localizations" : {
@@ -24817,6 +24953,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取一张图像用作此网站的图标。"
+          }
+        }
+      }
+    },
+    "Trusted Certificates" : {
+      "comment" : "A heading in Settings › Developer: local servers whose certificate you chose to trust, so Zigzag doesn’t warn again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受信任的证书"
+          }
+        }
+      }
+    },
+    "Local servers whose certificate you chose to trust. Zigzag doesn’t warn again while a server shows that certificate. Removing a server brings the warning back." : {
+      "comment" : "Under Trusted Certificates in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你选择信任其证书的本地服务器。只要服务器继续使用该证书，Zigzag 就不会再次发出警告。移除某个服务器后会重新显示警告。"
+          }
+        }
+      }
+    },
+    "Add a Local Server" : {
+      "comment" : "Title of the sheet that opens a local server so its certificate can be trusted, from Settings › Developer › Trusted Certificates.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加本地服务器"
+          }
+        }
+      }
+    },
+    "Zigzag opens the server in a new tab. If its certificate isn’t trusted, choose Visit this site anyway on the warning. Only servers on this Mac or your network can be added." : {
+      "comment" : "Under the title of the sheet that opens a local server to trust its certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 会在新标签页中打开这个服务器。如果它的证书不受信任，请在警告页上选择“仍然访问此网站”。只有这台 Mac 上或你的网络中的服务器才能添加。"
           }
         }
       }

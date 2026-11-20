@@ -175,6 +175,11 @@ final class PageDialogSheet: NSView {
             let sheet = PageDialogSheet(title: title, message: message, fields: fields, confirmTitle: confirmTitle, showsCancel: showsCancel,
                                         offersBlock: offersBlock, savedLogins: savedLogins, choices: choices, remember: remember) { continuation.resume(returning: $0) }
             sheet.page = page
+            sheet.matchPage()
+            // The page turned dark or light while it asks: the sheet turns with it.
+            sheet.pageToken = (page?.uiDelegate as? Tab)?.changed.observe { [weak sheet] change in
+                if [.themeColor, .darkPage, .pdf, .settings, .webView].contains(change) { sheet?.matchPage() }
+            }
             sheet.answers = tag
             sheet.homeWindow = window
             open = open.filter { $0.sheet != nil } + [WeakBox(sheet: sheet)]
@@ -219,6 +224,26 @@ final class PageDialogSheet: NSView {
             WhatsNewSheet.makeRoom(in: host.window)
             host.addSubview(sheet)
         }
+    }
+
+    private var pageToken: SignalToken?
+
+    /// Light or dark as the page it covers, as the site's question card is (`PermissionPrompt.look`, #300): a light
+    /// space's window doesn't put a light sheet on a dark page. Without a page, the window's.
+    private func matchPage() {
+        guard let page else { return }
+        let name = Self.look(of: page)
+        if appearance?.name != name { appearance = name.flatMap(NSAppearance.init(named:)) }
+    }
+
+    static func look(of page: WKWebView) -> NSAppearance.Name? {
+        PermissionPrompt.look(pageColor: (page.uiDelegate as? Tab)?.pageColor, pageLook: page.appearance?.name)
+    }
+
+    /// The scrim's color is set once as a layer color: set again in the other mode.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        layer?.backgroundColor = cgColor(Tokens.Color.scrim)
     }
 
     /// Whether the keyboard is with this dialog: in one of its fields, or on the page it covers.
