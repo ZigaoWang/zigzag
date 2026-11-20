@@ -101,14 +101,24 @@ final class FaviconStore {
             try? FileManager.default.createDirectory(at: Paths.favicons, withIntermediateDirectories: true)
             UserDefaults.standard.set(true, forKey: "faviconNativeSize2")
         }
-        // A home-screen icon could be kept as a site's own; icons kept before the two were told apart are fetched
-        // again (#386). Marked in the folder itself, so it goes with the icons it describes.
-        let ownFirst = Paths.favicons.appendingPathComponent(".own-first")
-        if !FileManager.default.fileExists(atPath: ownFirst.path) {
-            try? FileManager.default.removeItem(at: Paths.favicons)
-            try? FileManager.default.createDirectory(at: Paths.favicons, withIntermediateDirectories: true)
-            FileManager.default.createFile(atPath: ownFirst.path, contents: Data())
+        Self.keepOldIconsAsStandIns(in: Paths.favicons)
+    }
+
+    /// A home-screen icon could be kept as a site's own before the two were told apart (#386). Icons kept before then
+    /// stay, as stand-ins that a site's own icon replaces when one of its pages loads. Marked in the folder itself,
+    /// so it goes with the icons it describes.
+    nonisolated static func keepOldIconsAsStandIns(in folder: URL) {
+        let fm = FileManager.default
+        let ownFirst = folder.appendingPathComponent(".own-first")
+        guard !fm.fileExists(atPath: ownFirst.path) else { return }
+        try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let files = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
+        for file in files where file.pathExtension == "png" && !file.lastPathComponent.hasSuffix(".touch.png") {
+            let standIn = file.deletingPathExtension().appendingPathExtension("touch.png")
+            guard !fm.fileExists(atPath: standIn.path) else { continue }
+            try? fm.moveItem(at: file, to: standIn)
         }
+        fm.createFile(atPath: ownFirst.path, contents: Data())
     }
 
     private func file(for key: String) -> URL {
