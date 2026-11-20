@@ -51,6 +51,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Settings › Developer’s lists keep the same spacing from the Add button to the first option row. Sites in Developer Mode used to sit closer than Page Sizes.
 - Services on one address keep their own icons. Two apps on one server, each on its own port, show their own favicon in their own tab. Before, the last one opened wore its icon in every tab on that address.
 - Typing in Settings' search no longer stutters, and switching to Settings › Shortcuts is quicker. Both made every shortcut's row again each time. ([#402](https://github.com/ZigaoWang/zigzag/issues/402))
+- Extensions like SingleFile can save a page they build in a hidden page of their own. A file an extension makes as a blob address was downloaded from a page of Zigzag's, which WebKit doesn't let read it, so the download ended interrupted and the extension reported that as an error. It now starts in the extension's own page and saves as usual.
 
 ## [0.9.3] - 2026-11-18
 
