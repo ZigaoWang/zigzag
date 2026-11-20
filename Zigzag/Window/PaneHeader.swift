@@ -32,7 +32,8 @@ final class PaneHeaderView: NSView {
                : String(localized: "Zoom Pane", comment: "Tooltip and menu item: enlarges one page of a split view over the others for a moment, without changing where it is.")
     }
     let close = PaneHeaderView.button("rectangle.split.2x1.slash", toolTip: String(localized: "Separate Tabs", comment: "Tooltip of a button in the strip on top of each page of a split view: ends the split view, keeping both tabs."))
-    /// Closes this pane's page; the other one fills the window, as closing either half from the sidebar does.
+    /// Closes this pane's page, as closing it from the sidebar does: in a split of two the other page fills the
+    /// window, and in a group of three or four the rest stay tiled.
     let closeTab = PaneHeaderView.button("xmark", toolTip: String(localized: "Close Tab", comment: "Tooltip of a button in the strip on top of each page of a split view: closes that page's tab, leaving the other page."))
     /// Where the split's own buttons go when the pane is too narrow for them beside its address.
     let more = PaneHeaderView.button("ellipsis", toolTip: String(localized: "More", comment: "Tooltip of a button in the strip on top of each page of a narrow split view: opens a menu with the split's buttons that don't fit."))
@@ -186,8 +187,8 @@ final class PaneHeaderView: NSView {
     }
 
     /// What the strip shows at a width, most first: its buttons give way one step at a time so the address keeps
-    /// `Pane.addressMinWidth` and the close button is never cut. Swap and the layout go into ⋯ first, then Separate,
-    /// then Forward, then Reload; Back and close stay.
+    /// `Pane.addressMinWidth` and the close button is never cut. Zoom, swap, the layout and Reset go into ⋯ first, then
+    /// Separate, then Forward, then Reload; Back and close stay.
     enum Fit: Int, CaseIterable, Comparable {
         case all, splitInMore, separateInMore, noForward, noReload
         static func < (a: Fit, b: Fit) -> Bool { a.rawValue < b.rawValue }

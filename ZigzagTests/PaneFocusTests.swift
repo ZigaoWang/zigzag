@@ -2,8 +2,8 @@ import AppKit
 import Testing
 @testable import Zigzag
 
-/// In a split, a click, a mouse's side button or a swipe acts on the page under the pointer: that pane becomes the
-/// one you're in first (#170).
+/// In a split, a click or a mouse's side button acts on the page under the pointer: that pane becomes the one you're
+/// in first (#170).
 struct PaneFocusTests {
     let ids = [UUID(), UUID(), UUID(), UUID()]
     let four = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])

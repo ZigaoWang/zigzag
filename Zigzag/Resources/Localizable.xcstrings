@@ -14590,7 +14590,7 @@
       }
     },
     "Open on the Left" : {
-      "comment" : "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.",
+      "comment" : "Shown over the left half of the page while a tab is dragged there, to open it in a split view.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14601,7 +14601,7 @@
       }
     },
     "Open on the Right" : {
-      "comment" : "Shown over the right half of the page while a link or tab is dragged there, to open it in a split view.",
+      "comment" : "Shown over the right half of the page while a tab is dragged there, to open it in a split view.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

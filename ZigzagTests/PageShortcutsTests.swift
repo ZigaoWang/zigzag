@@ -31,7 +31,7 @@ import WebKit
         add(#selector(Target.reopenClosedTab(_:)), "t", [.command, .shift])
         add(#selector(Target.savePageAs(_:)), "s")
         add(#selector(Target.goBack(_:)), "[")
-        // A shortcut moved in Settings: New Tab on ⌘K now.
+        // A shortcut moved in Settings: New Tab on ⌥⌘K now.
         add(#selector(Target.newTab(_:)), "k", [.command, .option])
         add(#selector(Target.nextSpace(_:)), String(UnicodeScalar(NSRightArrowFunctionKey)!), [.command, .option])
         add(#selector(Target.previousSpace(_:)), String(UnicodeScalar(NSLeftArrowFunctionKey)!), [.command, .option])

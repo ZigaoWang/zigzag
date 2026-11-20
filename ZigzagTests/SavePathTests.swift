@@ -255,6 +255,14 @@ import Testing
             controller.saveFromStar()
             #expect(tab.bookmarkID == nil)
             #expect(!controller.sidebar.address.isSaved)
+
+            controller.toggleBookmark(nil)
+            #expect(tab.bookmarkID != nil)
+            #expect(controller.sidebar.address.isSaved)
+
+            controller.toggleBookmark(nil)
+            #expect(tab.bookmarkID == nil)
+            #expect(!controller.sidebar.address.isSaved)
         }
     }
 
