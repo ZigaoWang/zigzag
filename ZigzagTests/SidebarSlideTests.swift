@@ -90,6 +90,24 @@ struct SidebarSlideTests {
         #expect(!SidebarContainer.usesLiquidGlass(isGlass: false, windowGlass: clear, hasClearGlass: true))
     }
 
+    @Test func onlyClearGlassMakesTheWindowSeeThrough() {
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), styleMask: [.titled], backing: .buffered, defer: false)
+        let frame = SpaceFrameView()
+        window.contentView = frame
+        var space = SpaceInfo(name: "See-through", color: .sky)
+        space.translucency = 0.6
+        let showsDesktop = SpaceFrameView.frameColors(of: space, isPrivate: false).clear
+        space.clearGlass = false
+        frame.paint(space, isPrivate: false, animated: false)
+        #expect(window.isOpaque)
+        space.clearGlass = nil
+        frame.paint(space, isPrivate: false, animated: false)
+        #expect(window.isOpaque == !(showsDesktop && space.usesClearGlass))
+        space.translucency = nil
+        frame.paint(space, isPrivate: false, animated: false)
+        #expect(window.isOpaque)
+    }
+
     @Test func theWindowKeepsTheGlassItShows() {
         let frame = SpaceFrameView()
         frame.setGlass(true, clear: true, tint: .systemPink)
