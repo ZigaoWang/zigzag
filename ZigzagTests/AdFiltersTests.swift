@@ -552,7 +552,12 @@ struct AdFiltersTests {
         #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("zigzag-fixes.txt").path))
 
         let deepSeek = URL(string: "https://chat.deepseek.com/a/chat/s/x")!
-        let fixes = await engine.injection(for: deepSeek)
+        // The copy in the app can come in just after the lists, under load.
+        var fixes = await engine.injection(for: deepSeek)
+        for _ in 0..<100 where fixes.page.count != 2 {
+            try await Task.sleep(for: .milliseconds(50))
+            fixes = await engine.injection(for: deepSeek)
+        }
         #expect(fixes.page.count == 2)
         #expect(fixes.page.contains { $0.contains("preventFetch") && $0.contains("/api/v0/telemetry") })
         #expect(fixes.page.contains { $0.contains("preventXhr") && $0.contains("/api/v0/telemetry") })
