@@ -1515,9 +1515,12 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         menu.addItem(SidebarMenus.Item(String(localized: "Manage Extensions…", comment: "Item at the bottom of the extensions menu: opens Settings › Extensions."), symbol: "puzzlepiece.extension") { [weak self] in
             if let self { SettingsPage.open(.extensions, in: self) }
         })
-        menu.addItem(SidebarMenus.Item(String(localized: "Get Extensions…", comment: "Item at the bottom of the extensions menu: opens the Chrome Web Store."), symbol: "bag") { [weak self] in
-            self?.tabManager.newTab(url: ExtensionStore.webStoreURL)
+        let get = SidebarMenus.Submenu(String(localized: "Get Extensions", comment: "Item at the bottom of the extensions menu: a submenu of the Chrome Web Store and Firefox Add-ons."),
+                                       ExtensionStore.Shop.allCases.map { shop in
+            SidebarMenus.Item(shop.title) { [weak self] in self?.tabManager.newTab(url: shop.url) }
         })
+        get.image = Tokens.Symbol.image("bag")
+        menu.addItem(get)
         return menu
     }
 

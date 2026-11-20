@@ -249,7 +249,8 @@ final class ResizeHandle: NSView {
     var segment: TileShape.Segment?
     var corner: TileShape.Corner?
     var onBegin: (() -> Void)?
-    /// The line's new place, and whether Shift is held: the fine adjustment that keeps a near line from snapping.
+    /// The line's new place, and whether Shift is held: in a grid of four Shift moves only this segment, and once the
+    /// grid is parted it keeps a near line from snapping.
     var onDrag: ((CGFloat, Bool) -> Void)?
     /// Both coordinates at once, for a corner: dragging it moves a line each way (#309).
     var onDragPoint: ((NSPoint, Bool) -> Void)?
@@ -2079,8 +2080,8 @@ final class SplitDropHint: NSView {
             return String(localized: "Open Here", comment: "Shown over a page of a split view while a tab is dragged there: the tab opens in that page's place, and the page goes back to being a tab of its own.")
         }
         return switch region {
-        case .left: String(localized: "Open on the Left", comment: "Shown over the left half of the page while a link or tab is dragged there, to open it in a split view.")
-        case .right: String(localized: "Open on the Right", comment: "Shown over the right half of the page while a link or tab is dragged there, to open it in a split view.")
+        case .left: String(localized: "Open on the Left", comment: "Shown over the left half of the page while a tab is dragged there, to open it in a split view.")
+        case .right: String(localized: "Open on the Right", comment: "Shown over the right half of the page while a tab is dragged there, to open it in a split view.")
         case .top: String(localized: "Open at the Top", comment: "Shown over the top half of the page while a tab is dragged there, to open it in a split view, above the page.")
         case .bottom: String(localized: "Open at the Bottom", comment: "Shown over the bottom half of the page while a tab is dragged there, to open it in a split view, below the page.")
         case .topLeft: String(localized: "Open Top Left", comment: "Shown over the top left quarter of the page while a tab is dragged there, to open it there in a split view.")

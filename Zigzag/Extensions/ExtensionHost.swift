@@ -199,6 +199,14 @@ final class ExtensionHost: NSObject {
     private var firefoxMarked: Set<String> = []
     /// When each extension last started helpers for a connection, to slow down one that keeps reconnecting.
     fileprivate var helperStarts: [String: [Date]] = [:]
+    /// Where and when you last used each extension yourself, and last clicked or typed in a page: a note that its
+    /// app is waiting on you shows only right after that, in that window.
+    private var ownUses: [String: (window: WeakWindow, at: Date)] = [:]
+    private var pageUse: (tab: WeakTab, at: Date)?
+    /// The use each extension's app note last answered, so one use brings it up once.
+    private var appNoticeUse: [String: Date] = [:]
+    private struct WeakWindow { weak var value: BrowserWindowController? }
+    private struct WeakTab { weak var value: Tab? }
     private var socketBridges: [ObjectIdentifier: WebSocketBridge] = [:]
     /// Each background's port for staying awake while its companion app is connected (ExtensionShims.nativeKeepAlive).
     private var keepAlivePorts = KeepAlivePorts<WKWebExtension.MessagePort>()
@@ -421,12 +429,38 @@ final class ExtensionHost: NSObject {
 
     /// You used the extension on a tab: by its button, its item in the page's menu or its shortcut.
     func noteInvocation(_ id: String, tab: Tab?) {
+        noteOwnUse(id, in: tab.flatMap { WindowManager.shared.window(of: $0) })
         guard let tab, PrivateAccess.sees(isPrivate: tab.isPrivate, allowed: seesPrivate(id)) else { use.touched(id); return }
         use.invoked(id, tabID: tab.id, origin: SiteOrigin.of(tab.webView?.url ?? tab.url))
     }
 
     /// Whether you did something with the extension a moment ago: clicked it, or clicked or typed in one of its pages.
     func hasRecentGesture(_ id: String) -> Bool { use.hasGesture(id) }
+
+    private func noteOwnUse(_ id: String, in window: BrowserWindowController?) {
+        ownUses[id] = (WeakWindow(value: window ?? WindowManager.shared.keyController), Date())
+    }
+
+    /// The window to point at `id`'s app in while a connection that began at `since` waits: only when you used the
+    /// extension, or a field in a page, around then (`CompanionAppNotice`). Answers at most once per use.
+    fileprivate func windowForAppNotice(_ id: String, waitingSince since: Date, found: @escaping (BrowserWindowController) -> Void) {
+        let now = Date()
+        if let mark = ownUses[id], let window = mark.window.value, appNoticeUse[id] != mark.at,
+           CompanionAppNotice.follows(use: mark.at, waitingSince: since, now: now) {
+            appNoticeUse[id] = mark.at
+            found(window)
+            return
+        }
+        // A page click or key counts when it left a field focused: a login you're filling, or the extension's menu in it.
+        guard let page = pageUse, let tab = page.tab.value, let webView = tab.webView, appNoticeUse[id] != page.at,
+              CompanionAppNotice.follows(use: page.at, waitingSince: since, now: now) else { return }
+        appNoticeUse[id] = page.at
+        webView.evaluateJavaScript(CompanionAppNotice.fieldFocusedScript, in: nil, in: .defaultClient) { result in
+            guard case .success(let value) = result, value as? Bool == true,
+                  let window = WindowManager.shared.window(of: tab) else { return }
+            found(window)
+        }
+    }
 
     /// A click or key in one of an extension's own pages (its popup, its window, its side panel, its options) is
     /// you using it. A page's script can't make these.
@@ -447,8 +481,11 @@ final class ExtensionHost: NSObject {
             if let self, ExtensionUse.isGesture(event.type, isRepeat: event.type == .keyDown && event.isARepeat) {
                 if let id = self.extensionPage(under: event) {
                     self.use.touched(id)
+                    let window = WindowManager.shared.controller(for: event.window) ?? WindowManager.shared.controller(for: event.window?.parent)
+                    self.noteOwnUse(id, in: window)
                 } else if let tab = self.webPage(under: event) {
                     self.use.pageGesture(on: tab.webView?.url?.host() ?? tab.url?.host())
+                    self.pageUse = (WeakTab(value: tab), Date())
                 }
             }
             return event
@@ -1346,6 +1383,28 @@ final class ExtensionHost: NSObject {
     }
 }
 
+/// When a note that an extension's app is waiting on you may show: the connection has waited `patience`, and you
+/// used the extension in the `useWindow` before it began or while it waits. Background connects never show it.
+enum CompanionAppNotice {
+    static let patience: TimeInterval = 6
+    static let useWindow: TimeInterval = 10
+
+    static func follows(use: Date, waitingSince: Date, now: Date) -> Bool {
+        guard now.timeIntervalSince(waitingSince) >= patience else { return false }
+        guard use >= waitingSince.addingTimeInterval(-useWindow), use <= now else { return false }
+        return now.timeIntervalSince(use) <= useWindow + patience
+    }
+
+    /// Whether the page's focus is in a field, through shadow roots; an extension's menu frame counts too.
+    static let fieldFocusedScript = """
+    (() => {
+      let e = document.activeElement;
+      while (e && e.shadowRoot && e.shadowRoot.activeElement) e = e.shadowRoot.activeElement;
+      return !!e && (e.matches('input, textarea, select, iframe') || e.isContentEditable);
+    })()
+    """
+}
+
 /// What you last did with each extension, for the APIs Chrome lets act only in answer to you: the tab you used it on
 /// (and that tab's origin then), the window it opened in answer, and when you last clicked or typed in its pages.
 struct ExtensionUse {
@@ -1937,7 +1996,8 @@ final class NativeMessagingHost {
     private let executable: URL
     private let origin: String
     let extensionID: String
-    private static var pointedAtApp = false
+    /// This connection already pointed at its app.
+    private var pointedAtApp = false
     /// Every helper running, kept alive here until it ends, so quitting Zigzag or turning the extension off
     /// ends them too instead of leaving them running.
     private static var running: [ObjectIdentifier: NativeMessagingHost] = [:]
@@ -2213,22 +2273,32 @@ final class NativeMessagingHost {
     }
 
     /// No answer yet usually means the app is waiting on you in its own window (unlock, or allow Zigzag the
-    /// first time). Keep the connection open, never cut it, and point at that window once.
-    private func pointAtAppIfWaiting(received: @escaping () -> Int, sent: @escaping () -> Int) {
+    /// first time). Keep the connection open, never cut it, and point at that window once, only when you just used
+    /// the extension: a connect from its background on its own (start, wake, reconnect) never shows it.
+    private func pointAtAppIfWaiting(received: @escaping () -> Int, sent: @escaping () -> Int, since: Date = Date(), again: Bool = false) {
         let id = extensionID
-        DispatchQueue.main.asyncAfter(deadline: .now() + 6) { [weak self] in
-            guard let self, !self.finished, received() == 0, self.process?.isRunning == true else { return }
-            ExtensionLog.write("native host for \(id) waiting on the app after \(sent()) sent")
-            guard id == ExtensionStore.onePasswordID, !Self.pointedAtApp,
-                  let controller = WindowManager.shared.keyController ?? WindowManager.shared.controllers.first else { return }
-            Self.pointedAtApp = true
-            Toast.show(String(localized: "1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks.", comment: "Toast when the 1Password extension waits on the 1Password app."),
-                       symbol: "lock.open", action: (String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), {
-                           if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
-                               NSWorkspace.shared.openApplication(at: app, configuration: .init())
-                           }
-                       }), duration: 10, in: controller)
+        DispatchQueue.main.asyncAfter(deadline: .now() + (again ? 1 : CompanionAppNotice.patience)) { [weak self] in
+            guard let self, !self.finished, !self.pointedAtApp, received() == 0, self.process?.isRunning == true else { return }
+            if !again { ExtensionLog.write("native host for \(id) waiting on the app after \(sent()) sent") }
+            guard id == ExtensionStore.onePasswordID else { return }
+            self.owner?.windowForAppNotice(id, waitingSince: since) { [weak self] controller in
+                guard let self, !self.finished, !self.pointedAtApp, received() == 0 else { return }
+                self.pointedAtApp = true
+                self.pointAtApp(in: controller)
+            }
+            // Checked again each second while it waits, for a use that comes later.
+            self.pointAtAppIfWaiting(received: received, sent: sent, since: since, again: true)
         }
+    }
+
+    private func pointAtApp(in controller: BrowserWindowController) {
+        ExtensionLog.write("native host for \(extensionID) pointing at the app after a use")
+        Toast.show(String(localized: "1Password is waiting for you in its app. Unlock it, or allow Zigzag if it asks.", comment: "Toast when the 1Password extension waits on the 1Password app."),
+                   symbol: "lock.open", action: (String(localized: "Open 1Password", comment: "Button that opens the 1Password app. 1Password is a product name."), {
+                       if let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.1password.1password") {
+                           NSWorkspace.shared.openApplication(at: app, configuration: .init())
+                       }
+                   }), duration: 10, in: controller)
     }
 }
 

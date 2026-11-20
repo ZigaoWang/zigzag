@@ -111,6 +111,83 @@ struct AddonsMozillaPageTests {
         #expect(ExtensionStore.addonsAPIURL(slug: "ublock-origin")?.host() == "addons.mozilla.org")
         #expect(ExtensionStore.addonsAPIURL(slug: "ublock-origin")?.scheme == "https")
     }
+
+    // MARK: A click on Add to Firefox, from click to install sheet (#429)
+
+    private static let file = URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!
+    private static let listing = URL(string: "https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/")!
+    private static let api = Data(#"{"guid":"uBlock0@raymondhill.net","current_version":{"file":{"url":"https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi","hash":"sha256:66d0e3f21ce3b32b1bc0a9399b93cb2c9aa598ef18805d92118c76f66e266c1e"}}}"#.utf8)
+
+    /// The listing is read from the page the click was made on: by the time the file starts saving, the tab's own
+    /// address can be the file's (mid-navigation), which names no listing and sent the file to Downloads.
+    @Test func theClickIsReadFromThePageItWasMadeOn() {
+        let click = ExtensionStore.AddonsClick(target: Self.file, page: Self.listing, userInitiated: true)
+        #expect(click?.slug == "ublock-origin")
+        #expect(ExtensionStore.AddonsClick(target: Self.file, page: URL(string: "https://addons.mozilla.org/firefox/addon/ublock-origin/versions/"), userInitiated: true)?.slug == "ublock-origin")
+        // The address the tab shows mid-navigation: no listing in it.
+        #expect(ExtensionStore.addonsSlug(from: Self.file) == nil)
+        #expect(ExtensionStore.AddonsClick(target: Self.file, page: Self.file, userInitiated: true) == nil)
+        // Not a click, not the store's file, not from the store.
+        #expect(ExtensionStore.AddonsClick(target: Self.file, page: Self.listing, userInitiated: false) == nil)
+        #expect(ExtensionStore.AddonsClick(target: Self.listing, page: Self.listing, userInitiated: true) == nil)
+        #expect(ExtensionStore.AddonsClick(target: URL(string: "https://example.com/firefox/downloads/file/1/x.xpi"), page: Self.listing, userInitiated: true) == nil)
+        #expect(ExtensionStore.AddonsClick(target: Self.file, page: URL(string: "https://example.com/firefox/addon/ublock-origin/"), userInitiated: true) == nil)
+    }
+
+    /// The click lasts through its own file (a redirect, a query), and nothing else.
+    @Test func theClickCoversItsOwnFileOnly() throws {
+        let click = try #require(ExtensionStore.AddonsClick(target: Self.file, page: Self.listing, userInitiated: true))
+        #expect(click.covers(Self.file))
+        #expect(click.covers(URL(string: Self.file.absoluteString + "?src=dp-btn-primary")))
+        #expect(!click.covers(URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257480/ublock_origin-1.76.3.xpi")))
+        #expect(!click.covers(URL(string: "https://example.com/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")))
+        #expect(!click.covers(Self.listing))
+        #expect(!click.covers(nil))
+    }
+
+    /// The API's answer decides: its current file installs, another file is a download, no answer is a notice.
+    @Test func theAPIsAnswerDecidesWhatTheFileBecomes() throws {
+        let published = try #require(ExtensionStore.publishedAddonsFile(fromAPI: Self.api))
+        #expect(ExtensionStore.addonsInstall(file: Self.file, published: published) == .install(published))
+        #expect(ExtensionStore.addonsInstall(file: URL(string: "https://addons.mozilla.org/firefox/downloads/file/5250345/ublock_origin-1.76.2.xpi"), published: published) == .notCurrent)
+        #expect(ExtensionStore.addonsInstall(file: Self.file, published: nil) == .unreachable)
+    }
+
+    /// One failed ask of the API used to send the file to Downloads; it's asked once more.
+    @Test func theAPIIsAskedAgainOnce() async {
+        let ok = HTTPURLResponse(url: ExtensionStore.addonsAPIURL(slug: "ublock-origin")!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        let busy = HTTPURLResponse(url: ok.url!, statusCode: 503, httpVersion: nil, headerFields: nil)!
+        let asked = Counter()
+        let second = await ExtensionStore.publishedAddonsFile(slug: "ublock-origin") { _ in
+            await asked.add() == 1 ? (Data(), busy as URLResponse) : (Self.api, ok as URLResponse)
+        }
+        #expect(second?.url.path == Self.file.path)
+        #expect(await asked.count == 2)
+        let never = Counter()
+        #expect(await ExtensionStore.publishedAddonsFile(slug: "ublock-origin") { _ in await never.add(); return nil } == nil)
+        #expect(await never.count == 2)
+    }
+
+    /// A checked click skips the download question (#428); a kept Block for the site still stops it.
+    @Test func aCheckedClickAsksOnlyInTheInstallSheet() {
+        #expect(Tab.skipsDownloadQuestion(kept: nil))
+        #expect(Tab.skipsDownloadQuestion(kept: true))
+        #expect(!Tab.skipsDownloadQuestion(kept: false))
+    }
+
+    @Test func onlyA200FromAMOCounts() {
+        let url = ExtensionStore.addonsAPIURL(slug: "ublock-origin")!
+        let answer = { (status: Int, at: URL) in HTTPURLResponse(url: at, statusCode: status, httpVersion: nil, headerFields: nil)! }
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: Self.api, response: answer(200, url)) != nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: Self.api, response: answer(403, url)) == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: Self.api, response: answer(200, URL(string: "https://example.com/api/")!)) == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: Self.api, response: answer(200, URL(string: "http://addons.mozilla.org/api/")!)) == nil)
+    }
+}
+
+private actor Counter {
+    private(set) var count = 0
+    @discardableResult func add() -> Int { count += 1; return count }
 }
 
 /// An XPI made byte by byte: stored entries, then the central index and its end record. Shared by every test that

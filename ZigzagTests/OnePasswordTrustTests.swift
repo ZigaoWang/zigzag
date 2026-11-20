@@ -95,3 +95,39 @@ struct OnePasswordTrustTests {
         #expect(!trust.connected)
     }
 }
+
+/// The "1Password is waiting for you" note follows only your own use of it, never a connect from its background alone.
+struct CompanionAppNoticeTests {
+    private let start = Date(timeIntervalSinceReferenceDate: 0)
+
+    private func shows(use: TimeInterval?, at now: TimeInterval) -> Bool {
+        guard let use else { return false }
+        return CompanionAppNotice.follows(use: start.addingTimeInterval(use), waitingSince: start, now: start.addingTimeInterval(now))
+    }
+
+    @Test func aClickJustBeforeTheConnectShowsItOnceItHasWaited() {
+        #expect(!shows(use: -1, at: 5))
+        #expect(shows(use: -1, at: 6))
+        #expect(shows(use: -10, at: 6))
+    }
+
+    @Test func aBackgroundConnectWithNoUseNeverShowsIt() {
+        #expect(!shows(use: nil, at: 6))
+        #expect(!shows(use: nil, at: 60))
+    }
+
+    @Test func aUseLongBeforeTheConnectDoesNotCount() {
+        #expect(!shows(use: -11, at: 6))
+        #expect(!shows(use: -300, at: 6))
+    }
+
+    @Test func aUseWhileItWaitsCountsForAShortWhile() {
+        #expect(shows(use: 30, at: 30))
+        #expect(shows(use: 30, at: 46))
+        #expect(!shows(use: 30, at: 47))
+    }
+
+    @Test func aUseAfterNowDoesNotCount() {
+        #expect(!shows(use: 10, at: 9))
+    }
+}

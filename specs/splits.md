@@ -1,0 +1,65 @@
+# Splits
+
+## Creating
+- Drag a tab or pinned row onto a page → a split; a top or bottom edge stacks them, anywhere else takes the left or right half, at even halves.
+  Test: TileLayoutTests.besideOnePageItIsHalvesAsBefore
+- Drop a row onto a split → corners give quarters, an edge gives a half, up to four pages.
+  Test: TileLayoutTests.besideTwoCornersAreQuartersAndEdgesHalves
+- Drop onto a quarter, or onto a group of four → the new page takes that page's place, and the old one becomes a plain tab.
+  Test: TileLayoutTests.aQuarterThatCannotSplitTakesTheNewPage
+- Drop a row onto the middle of another sidebar row → the two open side by side.
+  No test yet.
+- Drop a page of another split → no split; that split stays as it is.
+  Test: SplitDropTests.aSplitIsNeverBrokenByADrop
+- Drop a link or file on the page → it opens as a tab, not a split.
+  No test yet.
+- Open in Split View in a tab's sidebar menu or the command bar → it opens on the right of the current page.
+  No test yet.
+
+## The split row
+- A split shows as one sidebar row with a part per page; clicking a part selects that page.
+  Test: SplitDropTests.aSplitShowsInOneRow
+- Click × on the row → closes only the page of the part it sits in.
+  Test: SplitCloseTests.theRowsCloseButtonClosesOnePart
+- Middle-click the row → closes the page of the part under the pointer.
+  No test yet.
+- Close Split View in the row's menu → closes every page; one ⌘Z brings them all back.
+  Test: SplitCloseTests.theMenuOffersBoth
+- Separate Split View (or ⌥⌘\ Separate Tabs) → every page becomes its own tab and the selection stays.
+  Test: SidebarRowMenuTests.aSplitLeadsWithSeparatingItAndEachPageGetsItsOwnMenu
+- Remove from Split View on one page of three or four → only that page leaves; the rest close up.
+  Test: SidebarRowMenuTests.onePageOfThreeCanLeaveTheRestSideBySide
+- ⌘Z after closing one page of a split → the split comes back on the same side at the same size.
+  Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
+- Stack Vertically on a split of two → one above the other; the item then reads Side by Side.
+  No test yet.
+
+## Resizing
+- Plain drag on a line → the whole line moves; in a grid of four, ⇧-drag moves only the segment between two pages.
+  Test: DragZoneTests.aPlainDragMovesTheWholeLineAndShiftMovesOneSegment
+- Release a segment near the middle of a grid whose columns don't line up → it snaps to the middle, unless ⇧ is held.
+  Test: DragZoneTests.aNearEvenLineSnapsOnReleaseUnlessShiftHoldsIt
+- Double-click a line → that line goes to the middle; lines the other way stay put.
+  Test: DragZoneTests.aPlainDragOutsideAPartedGridIsTheDragItAlwaysWas
+- Drag a corner where lines meet → both lines move together, keeping the grab offset.
+  Test: DragZoneTests.aCornerIsEasyToCatchAndNeverJumps
+- Reset Tile Layout on the pane strip (only when the columns don't line up) → every line back to the middle.
+  Test: TileLayoutTests.evenAgainPutsEveryLineInTheMiddle
+- Quit and reopen → each split comes back at the sizes it had; new splits always start even.
+  Test: TileLayoutTests.aGroupsOwnLinesComeBackAsTheyWereSaved
+
+## Pane strips
+- Click a pane's address → that pane gets focus and the command bar opens over the address to edit it.
+  No test yet.
+- Back, Forward and Reload on a strip → act on that pane's page only.
+  No test yet.
+- Narrow a strip → its buttons move into ⋯ in stages; Back and × always stay.
+  Test: PaneHeaderTests.fewerButtonsAsItNarrows
+- Zoom on a strip (or ⇧⌘↩) → that pane fills the page; Zoom again puts it back.
+  Test: PaneMoveTests.aPaneZoomsAndGoesBack
+
+## Closing and suspending one page
+- Close one page of a split of two (⌘W, or × on its strip or row part) → the one left takes the split row's place as a plain tab.
+  Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
+- Suspend Page on one page of a split → that page leaves the split and sleeps; the other stays shown.
+  Test: SidebarRowMenuTests.onePageOfASplitSleepsAndTheOtherStaysShown

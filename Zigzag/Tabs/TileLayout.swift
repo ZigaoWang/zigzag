@@ -320,8 +320,8 @@ nonisolated struct TileShape: Equatable, Sendable {
         columnShares.allSatisfy { abs($0 - 0.5) < 0.001 } && rowShares.allSatisfy { abs($0 - 0.5) < 0.001 }
     }
 
-    /// Whether `share` is within `points` of the middle of a line `length` long: the drag shows the even guide and
-    /// snaps on release unless Shift holds it away.
+    /// Whether `share` is within `points` of the middle of a line `length` long. On a parted grid of four, the drag
+    /// then shows the even guide and snaps on release unless Shift holds it away; other drags never snap.
     static func nearEven(_ share: CGFloat, length: CGFloat, points: CGFloat = 8) -> Bool {
         abs(share - 0.5) * max(length, 1) <= points
     }

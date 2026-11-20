@@ -67,6 +67,16 @@ class CardRow: InteractiveView {
     /// list.
     var iconColumn: (x: CGFloat, width: CGFloat)? { didSet { needsLayout = true } }
 
+    /// The narrowest the row can be with `text` as its whole title, no detail.
+    func fittingWidth(title text: String) -> CGFloat {
+        let ink = ceil((text as NSString).size(withAttributes: [.font: title.font ?? Tokens.Font.row()]).width)
+        var x = Self.inset - Label.inset
+        if iconView.image != nil {
+            x = (iconColumn.map { $0.x + $0.width } ?? Self.inset + Tokens.Metric.favicon) + Self.inset - Label.inset
+        }
+        return ceil(x + ink + Label.inset * 2 + Self.inset)
+    }
+
     override func layout() {
         super.layout()
         let side = Tokens.Metric.favicon

@@ -906,6 +906,10 @@ final class Tab: NSObject {
     private var showsExtensionPage = false
     /// A navigation the page started is on its way: its address waits until it commits (see followAddress).
     private var addressWaitsForCommit = false
+    /// A click on AMO's file link, from the click until its response.
+    private var addonsClick: ExtensionStore.AddonsClick?
+    /// That file, checked against AMO's API, until it becomes a download.
+    private var addonsInstall: (click: ExtensionStore.AddonsClick, file: ExtensionStore.PublishedAddonsFile)?
     /// Its web view was made by WebKit for a page's new window, so that page (its opener) can script it: every
     /// address it goes to waits until it commits, Zigzag's own loads too.
     private var openedByPage = false
@@ -950,8 +954,6 @@ final class Tab: NSObject {
     private var ownHistoryTarget: URL?
     /// Download policy for its pages (same as pop-up windows').
     private let downloads = DownloadPolicy()
-    /// The current main-frame navigation was started by a click, key or the address bar.
-    var mainFrameWasClicked: Bool { downloads.mainFrameWasClicked }
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
@@ -1629,6 +1631,9 @@ extension Tab: WKNavigationDelegate {
         return url
     }
 
+    /// A checked Add to Firefox click goes straight to the install sheet, unless downloads from AMO are kept blocked.
+    nonisolated static func skipsDownloadQuestion(kept: Bool?) -> Bool { kept != false }
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
@@ -1638,6 +1643,12 @@ extension Tab: WKNavigationDelegate {
         let ownLoad = ownSender != nil
         let ownHistory = decidesMainFrame && ownHistoryTarget != nil && navigationAction.request.url == ownHistoryTarget
         if decidesMainFrame {
+            // A click on AMO's file, read from the page it was made on; any navigation to something else ends it.
+            if let click = ExtensionStore.AddonsClick(target: navigationAction.request.url, page: webView.url ?? url, userInitiated: userInitiated) {
+                addonsClick = click
+            } else if addonsClick?.covers(navigationAction.request.url) != true {
+                addonsClick = nil
+            }
             // Reset per navigation; redirects keep it. A rule's own load can't be taken by a rule, as a page or a
             // download.
             declinedRuleDownload = false
@@ -1969,6 +1980,25 @@ extension Tab: WKNavigationDelegate {
                 closeIfOnlyADownload(webView)
                 return .cancel
             }
+            // Add to Firefox: the clicked file is checked against AMO's API now, so the download knows it's the store's.
+            if navigationResponse.isForMainFrame, let click = addonsClick, click.covers(target),
+               DownloadPolicy.isExtensionPackage(mimeType: mime, filename: filename) {
+                addonsClick = nil
+                switch ExtensionStore.addonsInstall(file: target, published: await ExtensionStore.publishedAddonsFile(slug: click.slug)) {
+                case .install(let published):
+                    addonsInstall = (click, published)
+                    // The install sheet is the one question, as on the Chrome Web Store; a kept Block for AMO still wins.
+                    if Self.skipsDownloadQuestion(kept: SiteOrigin.of(webView.url ?? target).flatMap { SitePermissions.downloads(origin: $0, tab: self) }) { return policy }
+                case .unreachable:
+                    if let host = webView.window?.contentView {
+                        DownloadManager.noticeCouldNotAdd(String(localized: "Firefox Add-ons didn’t answer, so this extension couldn’t be checked and wasn’t added. Try again in a moment.",
+                                                                 comment: "Shown when Add to Firefox on addons.mozilla.org was clicked but the store's API couldn't be reached to check the file."), in: host)
+                    }
+                    return .cancel
+                case .notCurrent:
+                    break
+                }
+            }
             // No rule took it: the site's download permission decides. The request isn't available here and a guess
             // would turn a POST into a GET, so no retry is offered. Unclicked responses never ask.
             if await !mayDownload(target, in: webView, asking: wasClicked) { return .cancel }
@@ -2116,7 +2146,9 @@ extension Tab: WKNavigationDelegate {
         let declined = declinedRuleDownload || wasDeclined(download.originalRequest?.url)
         openedByRule = false
         declinedRuleDownload = false
-        DownloadManager.shared.track(download, window: host?.hostWindow, openedByRule: byRule, rulesAlreadyDeclined: declined)
+        let store = addonsInstall.flatMap { $0.click.covers(download.originalRequest?.url) ? $0.file : nil }
+        addonsInstall = nil
+        DownloadManager.shared.track(download, window: host?.hostWindow, openedByRule: byRule, rulesAlreadyDeclined: declined, addonsFile: store)
         closeIfOnlyADownload(webView)
     }
 

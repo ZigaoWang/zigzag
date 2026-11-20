@@ -73,6 +73,7 @@ The rules the catalog follows, checked by `LocalizationTests`:
 | What's New | 新功能 | 更新内容 | Apple uses 新功能. |
 | Beta (a version: 0.9.2 beta 1) | Beta | 测试版, 公测版 | As Settings' Beta 版更新: a version reads 0.9.2 Beta 1, the word in Latin with a capital, as Apple writes its own betas. |
 | Chrome Web Store | Chrome 网上应用店 | Chrome 应用商店 | Google's own Chinese name for it. |
+| Firefox Add-ons (addons.mozilla.org) | Firefox 附加组件 | Firefox 扩展商店, 火狐附加组件 | Mozilla's own Chinese name for it. |
 | Automation (the Settings section) | 自动化 | | macOS's Privacy & Security › Automation is 自动化. |
 | AI apps | AI 应用 | AI 程序, 人工智能应用 | Short, and what people say. MCP stays as it is. |
 | Key (for AI apps) | 密钥 | 令牌, 钥匙 | What apps send to connect; 密钥 is the plain word for a secret key. |

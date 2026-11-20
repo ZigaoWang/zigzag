@@ -428,8 +428,11 @@ struct ZoomStepperTests {
         // 100% is now the site's; the default needs no entry.
         ZoomLevels.set(1, for: mine)
         #expect(ZoomLevels.zoom(for: mine) == 1)
-        ZoomLevels.set(1.25, for: mine)
+        #expect(ZoomLevels.hasOwnZoom(mine))
+        // Actual Size sets the default (`actualSize(_:)`), which forgets the site's own.
+        ZoomLevels.set(ZoomLevels.defaultZoom, for: mine)
         #expect(!ZoomLevels.hasOwnZoom(mine))
+        #expect(ZoomLevels.zoom(for: mine) == 1.25)
 
         // Not a valid step: falls back to 100%.
         UserDefaults.standard.set(1.3, forKey: "DefaultZoom")

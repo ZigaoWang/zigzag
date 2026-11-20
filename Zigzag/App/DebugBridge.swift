@@ -2535,6 +2535,8 @@ enum DebugBridge {
         // settingspane <name>: that pane of Settings (tabs, appearance…).
         case "settingspane": if let pane = SettingsPane(rawValue: arg) { SettingsPage.open(pane, in: controller) }
         case "flipblocking": controller.tabManager.selectedTab?.settingsView?.debugFlipBlocking()
+        // getextensions: Settings › Extensions' Get Extensions menu, open.
+        case "getextensions": controller.tabManager.selectedTab?.settingsView?.debugShowGetExtensionsMenu()
         case "shortcutrecord":
             // shortcutrecord <command name>: starts recording keys on that row of Settings › Shortcuts.
             func rows(in view: NSView) -> [ShortcutRow] { view.subviews.flatMap { ($0 as? ShortcutRow).map { [$0] } ?? rows(in: $0) } }
