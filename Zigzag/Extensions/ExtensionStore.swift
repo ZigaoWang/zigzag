@@ -2033,8 +2033,9 @@ extension ExtensionStore {
     }
 
     /// Runs before content scripts in their world (ConnectGuard.file): keeps WebKit's `browser` (ExtensionBridgeScript.keepsBrowser),
-    /// keeps storage calls in order, adds requestIdleCallback, then the reconnect guard and the background wake.
-    nonisolated static let contentScriptsFirst = ExtensionBridgeScript.keepsBrowser + "\n" + ExtensionBridgeScript.storageInOrder + "\n" + ExtensionBridgeScript.idleCallbacks + "\n" + ConnectGuard.source + "\n" + BackgroundWake.source
+    /// keeps storage calls in order, adds requestIdleCallback, then the reconnect guard, the message listener count
+    /// (ExtensionBridgeScript.receivers) and the background wake.
+    nonisolated static let contentScriptsFirst = ExtensionBridgeScript.keepsBrowser + "\n" + ExtensionBridgeScript.storageInOrder + "\n" + ExtensionBridgeScript.idleCallbacks + "\n" + ConnectGuard.source + "\n" + ExtensionBridgeScript.receivers + "\n" + BackgroundWake.source
 
     /// One of a shim's patches, as plain text for making an overlay off the main thread.
     nonisolated struct OverlayPatch: Sendable {
@@ -2327,6 +2328,8 @@ extension ExtensionStore {
                 try page.text.write(to: target, atomically: true, encoding: .utf8)
             }
             if scripts != nil { try contentScriptsFirst.write(to: overlay.appendingPathComponent(ConnectGuard.file), atomically: true, encoding: .utf8) }
+            // bridge.js runs it in frames and before files the extension injects, with or without content scripts.
+            try ExtensionBridgeScript.receivers.write(to: overlay.appendingPathComponent(ExtensionBridgeScript.receiversFile), atomically: true, encoding: .utf8)
             return true
         } catch {
             return false

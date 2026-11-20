@@ -1054,6 +1054,177 @@
     try { api.runtime.getContexts = method('contexts', 'getContexts'); } catch (e) {}
   }
 
+  // A callback hears a failure through runtime.lastError, for as long as it runs. In extension pages and the
+  // background WebKit's runtime keeps its own lastError whatever is defined over it, and its namespace keeps its own
+  // runtime, so there the global `chrome` (and `browser`) is, for that time, one whose runtime answers lastError with
+  // the failure and everything else as WebKit's.
+  const withLastError = (callback, error) => {
+    const lastError = { message: String((error && error.message) || error) };
+    const undo = [];
+    const passing = (target, own) => {
+      const bound = new Map();
+      return new Proxy(target, {
+        get(object, name) {
+          if (Object.prototype.hasOwnProperty.call(own, name)) return own[name];
+          const member = Reflect.get(object, name);
+          if (typeof member !== 'function') return member;
+          if (!bound.has(member)) bound.set(member, member.bind(object));
+          return bound.get(member);
+        },
+      });
+    };
+    const shownFor = new Map();
+    for (const root of new Set([globalThis.chrome, globalThis.browser].filter(Boolean))) {
+      const runtime = root.runtime;
+      if (!runtime) continue;
+      const before = Object.getOwnPropertyDescriptor(runtime, 'lastError');
+      try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); } catch (e) {}
+      if (runtime.lastError === lastError) {
+        undo.push(() => { if (before) Object.defineProperty(runtime, 'lastError', before); else delete runtime.lastError; });
+        continue;
+      }
+      shownFor.set(root, passing(root, { runtime: passing(runtime, { lastError }) }));
+    }
+    for (const name of ['chrome', 'browser']) {
+      const shown = shownFor.get(globalThis[name]);
+      if (!shown) continue;
+      const held = Object.getOwnPropertyDescriptor(globalThis, name);
+      try { Object.defineProperty(globalThis, name, { value: shown, configurable: true, writable: true, enumerable: held ? held.enumerable : false }); } catch (e) {}
+      if (globalThis[name] === shown) undo.push(() => { if (held) Object.defineProperty(globalThis, name, held); else delete globalThis[name]; });
+    }
+    try { callback(); } finally {
+      for (const back of undo.reverse()) { try { back(); } catch (e) {} }
+    }
+  };
+  try { Object.defineProperty(globalThis, '__zigzagWithLastError', { value: withLastError, configurable: true }); } catch (e) {}
+
+  // tabs.sendMessage to a tab or frame where nothing listens: Chrome fails it with NO_RECEIVER, WebKit answers
+  // undefined, the same as when a listener gives no answer. Extensions take the error to mean their content script
+  // isn't there yet, inject it and send again; given undefined, they waited. So an undefined answer is checked: the
+  // frames it went to run RECEIVERS_FILE in the extension's content-script world, which counts that world's onMessage
+  // listeners (ExtensionBridgeScript.receivers), and with none in any of them it fails as in Chrome. The file also
+  // runs before the extension's content scripts and before the files it injects or registers, so their listeners are
+  // counted. Where it can't be run (no scripting), the answer stays WebKit's. Set up before the userScripts layer
+  // below, which reads this error as nothing in the tab having heard the message.
+  {
+    const NO_RECEIVER = 'Could not establish connection. Receiving end does not exist.';
+    const RECEIVERS_FILE = 'zigzag-receivers.js';
+    const RECEIVERS_MARK = '__zigzagListeners:';
+    const ours = (result) => typeof result === 'string' && result.startsWith(RECEIVERS_MARK);
+    const isMain = (world) => String(world || '').toUpperCase() === 'MAIN';
+    const put = (object, name, value) => {
+      try { object[name] = value; } catch (e) {}
+      if (object[name] !== value) { try { Object.defineProperty(object, name, { value, configurable: true, writable: true }); } catch (e) {} }
+      return object[name] === value;
+    };
+    const answered = (result, callback) => {
+      if (!callback) return result;
+      result.then((value) => callback(value), (error) => withLastError(callback, error));
+      return undefined;
+    };
+    const scriptingApi = api.scripting && typeof api.scripting.executeScript === 'function' ? api.scripting : null;
+    const inject = scriptingApi ? scriptingApi.executeScript.bind(scriptingApi) : null;
+    const tabsApi = api.tabs;
+    const injectMV2 = !inject && manifest.manifest_version === 2 && tabsApi && typeof tabsApi.executeScript === 'function' ? tabsApi.executeScript.bind(tabsApi) : null;
+
+    // Where a listener was found lately, by tab, frame and document: not asked again for a few seconds.
+    const found = new Map();
+    const listens = (tabId, options) => {
+      const key = [tabId, options.frameId, options.documentId].join('/');
+      if (Date.now() - (found.get(key) || -Infinity) < 5000) return Promise.resolve(true);
+      let asked;
+      if (inject) {
+        const target = { tabId };
+        if (options.documentId != null) target.documentIds = [options.documentId];
+        else if (options.frameId != null) target.frameIds = [options.frameId];
+        else target.allFrames = true;
+        asked = Promise.resolve().then(() => inject({ target, files: [RECEIVERS_FILE] }))
+          .then((results) => (Array.isArray(results) ? results.map((result) => result && result.result) : []));
+      } else if (injectMV2 && options.documentId == null) {
+        const details = options.frameId != null ? { file: RECEIVERS_FILE, frameId: options.frameId } : { file: RECEIVERS_FILE, allFrames: true };
+        asked = Promise.resolve().then(() => injectMV2(tabId, details)).then((results) => (Array.isArray(results) ? results : []));
+      } else {
+        return Promise.resolve(null);
+      }
+      // Refused (no access to a frame, a page WebKit won't script): can't tell, so no error.
+      return asked.then((results) => {
+        const yes = results.some((result) => result === RECEIVERS_MARK + 'true');
+        if (yes) { if (found.size > 500) found.clear(); found.set(key, Date.now()); }
+        return yes;
+      }, () => null);
+    };
+
+    if (tabsApi && typeof tabsApi.sendMessage === 'function' && (inject || injectMV2)) {
+      const sendToTab = tabsApi.sendMessage.bind(tabsApi);
+      put(tabsApi, 'sendMessage', function sendMessage(tabId, message, ...rest) {
+        const callback = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;
+        const options = rest[0] && typeof rest[0] === 'object' ? rest[0] : {};
+        const result = Promise.resolve(sendToTab(tabId, message, ...rest)).then((value) => {
+          if (value !== undefined) return value;
+          return listens(tabId, options).then((yes) => { if (yes === false) throw new Error(NO_RECEIVER); return undefined; });
+        });
+        return answered(result, callback);
+      });
+    }
+
+    // Files the extension injects into its content-script world come after RECEIVERS_FILE, in the same call; WebKit
+    // answers once per file and frame, and the file's answers are left out.
+    if (inject) {
+      put(scriptingApi, 'executeScript', function executeScript(injection, ...rest) {
+        const files = injection && Array.isArray(injection.files) ? injection.files : null;
+        // A function can add listeners too: the file runs just before it, as its own call, in the same frames.
+        if (!files && injection && typeof injection.func === 'function' && !isMain(injection.world)) {
+          try {
+            const first = { target: injection.target, files: [RECEIVERS_FILE] };
+            if (injection.injectImmediately !== undefined) first.injectImmediately = injection.injectImmediately;
+            const before = inject(first);
+            if (before && typeof before.catch === 'function') before.catch(() => {});
+          } catch (e) {}
+          return inject(injection, ...rest);
+        }
+        if (!files || !files.length || files.includes(RECEIVERS_FILE) || isMain(injection.world)) return inject(injection, ...rest);
+        const callback = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;
+        const result = Promise.resolve(inject(Object.assign({}, injection, { files: [RECEIVERS_FILE, ...files] }), ...rest))
+          .then((results) => (Array.isArray(results) ? results.filter((entry) => !(entry && ours(entry.result))) : results));
+        return answered(result, callback);
+      });
+      // Registered scripts likewise; the extension is shown its scripts as it registered them.
+      const counted = (scripts) => (Array.isArray(scripts) ? scripts.map((script) => (
+        script && Array.isArray(script.js) && script.js.length && !script.js.includes(RECEIVERS_FILE) && !isMain(script.world)
+          ? Object.assign({}, script, { js: [RECEIVERS_FILE, ...script.js] }) : script)) : scripts);
+      const shown = (scripts) => (Array.isArray(scripts) ? scripts.map((script) => (
+        script && Array.isArray(script.js) && script.js.includes(RECEIVERS_FILE)
+          ? Object.assign({}, script, { js: script.js.filter((file) => file !== RECEIVERS_FILE) }) : script)) : scripts);
+      for (const name of ['registerContentScripts', 'updateContentScripts']) {
+        if (typeof scriptingApi[name] !== 'function') continue;
+        const original = scriptingApi[name].bind(scriptingApi);
+        put(scriptingApi, name, function (scripts, ...rest) { return original(counted(scripts), ...rest); });
+      }
+      if (typeof scriptingApi.getRegisteredContentScripts === 'function') {
+        const original = scriptingApi.getRegisteredContentScripts.bind(scriptingApi);
+        put(scriptingApi, 'getRegisteredContentScripts', function getRegisteredContentScripts(...args) {
+          const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+          return answered(Promise.resolve(original(...args)).then(shown), callback);
+        });
+      }
+    }
+    // MV2's tabs.executeScript takes one file or code: the file goes first, as its own call made just before.
+    if (injectMV2) {
+      put(tabsApi, 'executeScript', function executeScript(...args) {
+        const details = typeof args[0] === 'number' || args[0] == null ? args[1] : args[0];
+        if (details && typeof details === 'object' && details.file !== RECEIVERS_FILE && (details.file || details.code)) {
+          const first = { file: RECEIVERS_FILE };
+          for (const key of ['allFrames', 'frameId', 'matchAboutBlank', 'runAt']) if (details[key] !== undefined) first[key] = details[key];
+          try {
+            const before = typeof args[0] === 'number' ? injectMV2(args[0], first) : injectMV2(first);
+            if (before && typeof before.catch === 'function') before.catch(() => {});
+          } catch (e) {}
+        }
+        return injectMV2(...args);
+      });
+    }
+  }
+
   // userScripts (BridgeUserScripts in Swift): Zigzag runs each user script in a world of its own, apart from the
   // page and from the extension's content scripts, as Chrome does. Calls run one at a time, as WebKit's would.
   // What a user script says reaches the extension from the content-script world of its frame, marked (MARK): it goes
@@ -1242,17 +1413,12 @@
     // its scripts and reloads its pages so). Zigzag sends it to those worlds while WebKit sends it to the content
     // scripts. As in Chrome, the first answer from any of them is the answer, without waiting on the rest: a user
     // script that keeps the channel open and never answers can't hold up a content script's answer. With no answer
-    // once all are done, it's undefined, or WebKit's "Receiving end does not exist" only when nothing at all heard it.
+    // once all are done, it's undefined, or "Receiving end does not exist" (above) only when nothing at all heard it.
     const tabs = api.tabs;
     if (tabs && typeof tabs.sendMessage === 'function') {
       const sendToTab = tabs.sendMessage.bind(tabs);
       const from = (() => { try { return { id: api.runtime.id, url: location.href, origin: location.origin }; } catch (e) { return { id: api.runtime.id }; } })();
-      const callWithError = (callback, error) => {
-        const runtime = api.runtime;
-        const before = Object.getOwnPropertyDescriptor(runtime, 'lastError');
-        try { Object.defineProperty(runtime, 'lastError', { get: () => ({ message: String((error && error.message) || error) }), configurable: true }); } catch (e) {}
-        try { callback(); } finally { try { if (before) Object.defineProperty(runtime, 'lastError', before); else delete runtime.lastError; } catch (e) {} }
-      };
+      const callWithError = withLastError;
       try {
         tabs.sendMessage = (tabId, message, ...rest) => {
           const callback = typeof rest[rest.length - 1] === 'function' ? rest.pop() : null;
