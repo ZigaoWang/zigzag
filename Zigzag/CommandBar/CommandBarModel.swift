@@ -257,7 +257,7 @@ enum CommandRanker {
                                    keywords: ["save", "folder", "pin", "tab", "file"], symbol: "folder.badge.plus"))
             }
         }
-        if c.hasPage, !c.isFavorite, c.isPinned || !c.isPrivate {
+        if c.hasPage, !c.isFavorite, !c.isPrivate {
             list.append(Action(id: "favorite", title: String(localized: "Add to Favorites", comment: "A command in the command bar, named as in the menu bar."),
                                keywords: ["add", "favorites", "favourites", "star", "bookmark"], symbol: "star"))
         }

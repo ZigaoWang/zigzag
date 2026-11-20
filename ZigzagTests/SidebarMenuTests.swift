@@ -395,4 +395,31 @@ struct SidebarRowMenuTests {
             #expect(!titles(places).contains("New Window") && !titles(places).contains("Zigzag Mini"))
         }
     }
+
+    /// A private window leaves your pins and favorites as they are: no Add to Favorites, Rename or Change Icon on
+    /// them, File › Add to Favorites is off, and a rename that gets through anyway writes nothing.
+    @Test func aPrivateWindowNeitherFavoritesNorRenamesYourPins() throws {
+        try inWindow(["A", "B"], isPrivate: true) { controller, _, space in
+            let pin = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/menu/pin")!, title: "Pin", to: space))
+            let favorite = Library.shared.addFavorite(url: URL(string: "https://example.com/menu/favorite")!, title: "Favorite", in: controller.tabManager.profile.id)
+            let writes = ["Add to Favorites", "Rename", "Rename…", SidebarMenus.changeIconTitle]
+            let pinned = titles(SidebarMenus.bookmarkMenu(for: pin, controller: controller))
+            #expect(!pinned.contains { writes.contains($0) }, "\(pinned)")
+            let favorites = titles(SidebarMenus.favoriteMenu(for: favorite, controller: controller))
+            #expect(!favorites.contains { writes.contains($0) }, "\(favorites)")
+
+            // On the pinned page itself, File › Add to Favorites is off and does nothing.
+            let manager = controller.tabManager
+            let tab = manager.pageTab(for: pin)
+            manager.select(tab)
+            let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.addToFavorites(_:)), keyEquivalent: "")
+            #expect(!controller.validateMenuItem(item))
+            controller.addToFavorites(item)
+            #expect(!Library.shared.isFavorite(pin.id))
+
+            BookmarkEditor.edit(pin.id, in: controller)
+            controller.listRenameBookmark(pin.id, to: "Renamed")
+            #expect(Library.shared.bookmark(pin.id)?.title == "Pin")
+        }
+    }
 }

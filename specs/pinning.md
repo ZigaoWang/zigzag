@@ -67,3 +67,5 @@
   Test: SavePathTests.aPrivateWindowWritesNothing
 - A private window's tab menu → no Pin Tab or Add to Favorites.
   Test: SidebarRowMenuTests.aPrivateWindowsTabKeepsOutOfSavesAndWindows
+- A pinned page or favorite in a private window → no Add to Favorites, Rename or Change Icon, and File › Add to Favorites is off.
+  Test: SidebarRowMenuTests.aPrivateWindowNeitherFavoritesNorRenamesYourPins

@@ -320,11 +320,11 @@ enum SidebarMenus {
                 : pinned != nil ? String(localized: "Unpin Split View", comment: "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.")
                 : String(localized: "Unpin Tab", comment: "Item in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.")
             organize.append(Item(unpin) { controller.unbookmarkWithUndo(bookmark.id, to: 0) })
+            organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
+                controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
+                live?.isFavorite = true
+            })
         }
-        organize.append(Item(String(localized: "Add to Favorites", comment: "Item in a pinned tab's context menu in the sidebar.")) {
-            controller.libraryChange(String(localized: "Add to Favorites", comment: "Undo action name, shown in Edit › Undo.")) { Library.shared.makeFavorite(bookmark.id, in: manager.profile.id) }
-            live?.isFavorite = true
-        })
         // Folders of this space's pinned pages.
         let folder = Library.shared.folderID(containing: bookmark.id)
         let spaceFolders = Library.shared.spaceID(ofBookmark: bookmark.id).map { Library.shared.folders(in: $0) } ?? []
@@ -353,10 +353,10 @@ enum SidebarMenus {
 
         // A pinned split's row is named after both its pages, so renaming one of them from it would be a puzzle.
         var edit: [NSMenuItem] = []
-        if pinned == nil {
+        // A private window never writes a name or an icon into your pins.
+        if pinned == nil, !isPrivate {
             edit.append(Item(String(localized: "Rename", comment: "Item in a pinned tab's context menu in the sidebar.")) { BookmarkEditor.edit(bookmark.id, in: controller) })
-            // So is its icon, which a private window never writes into your pins.
-            if !isPrivate { edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: bookmark.id) }) }
+            edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: bookmark.id) })
         }
 
         var close: [NSMenuItem] = []
@@ -491,9 +491,10 @@ enum SidebarMenus {
 
         // Not a split favorite: a new name or icon would only reach its left page.
         var edit: [NSMenuItem] = []
-        if pair == nil {
+        // A private window never writes a name or an icon into your favorites.
+        if pair == nil, !isPrivate {
             edit.append(Item(String(localized: "Rename…", comment: "Item in a favorite's context menu.")) { BookmarkEditor.edit(favorite.id, in: controller) })
-            if !isPrivate { edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: favorite.id) }) }
+            edit.append(Item(changeIconTitle) { controller.chooseIcon(forBookmark: favorite.id) })
         }
 
         var close: [NSMenuItem] = []
@@ -664,6 +665,8 @@ enum SpaceEditor {
 
 enum BookmarkEditor {
     static func edit(_ id: UUID, in controller: BrowserWindowController) {
+        // Pins and favorites are shared by every window: a private one leaves their names alone.
+        guard !controller.tabManager.isPrivate else { return }
         // A favorite has no row to type in; it's renamed in a small field on the page instead.
         if controller.sidebar.list.beginRenaming(bookmark: id) { return }
         guard let bookmark = Library.shared.bookmark(id) else { return }

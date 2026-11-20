@@ -2623,6 +2623,8 @@ extension BrowserWindowController: SidebarDelegate {
     func listClose(_ tabs: [Tab]) { closeManyWithUndo(tabs) }
 
     func listRenameBookmark(_ id: UUID, to name: String) {
+        // Pins and favorites are shared by every window: a private one leaves their names alone.
+        guard !tabManager.isPrivate else { return }
         libraryChange(String(localized: "Rename Pinned Tab", comment: "Undo action name, shown in the Edit menu as Undo Rename Pinned Tab.")) { Library.shared.updateBookmark(id, title: name) }
     }
 
