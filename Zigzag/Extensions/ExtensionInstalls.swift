@@ -22,7 +22,7 @@ final class ExtensionInstalls {
         var bridgeRecorded: Bool?
         /// Where it may read and change pages. Nil means the default: everywhere it was approved for.
         var siteAccess: SiteAccess?
-        /// For `.sites`: the sites it may use ("github.com"), and for `.click`, the ones clicked on so far.
+        /// For `.sites`: the sites it may use ("github.com"). Older records may hold sites clicked on; they count for nothing.
         var accessSites: [String]?
         /// Sites where it's off regardless of site access, set from EnergyWatch's high-energy notice.
         var offSites: [String]?
@@ -48,7 +48,7 @@ final class ExtensionInstalls {
     enum SiteAccess: String, Codable {
         /// Every site it was approved for.
         case all
-        /// Only a site where the person clicked its button.
+        /// Only the tab where the person clicked its button, while it stays on that site.
         case click
         /// Only the sites the person listed.
         case sites
@@ -120,7 +120,7 @@ final class ExtensionInstalls {
     func hasRecord(_ id: String) -> Bool { state(id) != nil }
     func isEnabled(_ id: String) -> Bool { state(id)?.enabled ?? false }
     func siteAccess(_ id: String) -> SiteAccess { state(id)?.siteAccess ?? .all }
-    func accessSites(_ id: String) -> [String] { state(id)?.accessSites ?? [] }
+    func accessSites(_ id: String) -> [String] { state(id).flatMap { $0.siteAccess == .sites ? $0.accessSites : nil } ?? [] }
     func offSites(_ id: String) -> [String] { state(id)?.offSites ?? [] }
     func allowsPrivate(_ id: String) -> Bool { state(id)?.allowsPrivate ?? false }
 
@@ -145,7 +145,7 @@ final class ExtensionInstalls {
     func setSiteAccess(_ id: String, _ access: SiteAccess, sites: [String]? = nil) {
         update(id) {
             $0.siteAccess = access
-            if let sites { $0.accessSites = sites } else if access == .all { $0.accessSites = nil }
+            if access == .sites, let sites { $0.accessSites = sites } else if access != .sites { $0.accessSites = nil }
         }
         profile.extensions.applySiteAccess(id)
     }

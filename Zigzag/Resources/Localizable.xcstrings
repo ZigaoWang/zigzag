@@ -24651,6 +24651,939 @@
           }
         }
       }
+    },
+    "%@ and all its subdomains." : {
+      "comment" : "Preview of a domain rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 及其所有子域名。"
+          }
+        }
+      }
+    },
+    "%@ and pages below it, such as %@/repo." : {
+      "comment" : "Preview of a path rule.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ and pages below it, such as %2$@/repo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 及其下的网页，例如 %2$@/repo。"
+          }
+        }
+      }
+    },
+    "%@, Off" : {
+      "comment" : "Beside a space rule that's turned off: its scope, like “and subdomains”, then that it's off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，已关闭"
+          }
+        }
+      }
+    },
+    "%lld pages not put to sleep while they play or have text you typed" : {
+      "comment" : "Toast after Suspend N Pages in the sidebar's menu: some of the picked pages stay awake, because they play sound, are in a call, play in the mini player or Picture in Picture, or hold text you typed.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page not put to sleep while it plays or has text you typed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages not put to sleep while they play or have text you typed"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个页面在播放或有你输入的文字，没有休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld updates need your approval." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld update needs your approval."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld updates need your approval."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个更新需要你批准。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Add Space Rule" : {
+      "comment" : "Title of the sheet that creates a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加空间规则"
+          }
+        }
+      }
+    },
+    "About Match Types" : {
+      "comment" : "Button opening space rule help.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于匹配方式"
+          }
+        }
+      }
+    },
+    "Add %lld to Favorites" : {
+      "comment" : "Menu item for several picked sidebar rows",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 项添加到收藏"
+          }
+        }
+      }
+    },
+    "Add to Favorites" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到收藏"
+          }
+        }
+      }
+    },
+    "Added to Favorites" : {
+      "comment" : "Toast after the tab is added to Favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加到收藏"
+          }
+        }
+      }
+    },
+    "All extensions are up to date." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when nothing changed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有扩展都已是最新版本。"
+          }
+        }
+      }
+    },
+    "and pages below it" : {
+      "comment" : "Short scope beside the path of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含下级路径"
+          }
+        }
+      }
+    },
+    "and subdomains" : {
+      "comment" : "Short scope beside the domain of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含子域名"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it has text you typed" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake so what you typed into it isn't lost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "里面有你输入的文字，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays in the mini player" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video plays in the window's mini player.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在小播放器里播放，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays sound" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's playing sound.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在播放声音，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it uses the camera or microphone" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's in a call.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在用摄像头或麦克风，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while its video is in Picture in Picture" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video floats in Picture in Picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的视频在画中画里，没有休眠"
+          }
+        }
+      }
+    },
+    "Suspend %lld Pages" : {
+      "comment" : "Menu item for several picked tabs: puts their pages to sleep; each loads again when you click it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend Page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend %lld Pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "让 %lld 个页面休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Suspend Page" : {
+      "comment" : "File menu item: puts the tab's page to sleep; it loads again when you click the tab.\nItem in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让页面休眠"
+          }
+        }
+      }
+    },
+    "You put it to sleep. Loads when you click it." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: you put it to sleep with Suspend Page in its menu, and its page loads again once you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "是你让它休眠的，点按即可重新载入。"
+          }
+        }
+      }
+    },
+    "this host only" : {
+      "comment" : "Short scope beside the address of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
+    "Domain and subdomains" : {
+      "comment" : "Space rule matching a domain and its subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "域名及其子域名"
+          }
+        }
+      }
+    },
+    "Edit Space Rule" : {
+      "comment" : "Existing space rule sheet title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则"
+          }
+        }
+      }
+    },
+    "Edit Space Rule…" : {
+      "comment" : "Edit the winning rule from Site Controls.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则…"
+          }
+        }
+      }
+    },
+    "Enter a host and path, such as github.com/org1." : {
+      "comment" : "Example input for a path rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入域名和路径，例如 github.com/org1。"
+          }
+        }
+      }
+    },
+    "Domain only" : {
+      "comment" : "Space rule matching only the named host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
+    "Matches pages on the exact hostname you enter (for example, github.com)." : {
+      "comment" : "Exact host example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只匹配你填写的这个域名下的网页（例如 github.com）。"
+          }
+        }
+      }
+    },
+    "Matches a path and pages below it on the same host (for example, github.com/org1 and github.com/org1/repo)." : {
+      "comment" : "Path example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配同一域名下的某个路径及其下的网页（例如 github.com/org1 和 github.com/org1/repo）。"
+          }
+        }
+      }
+    },
+    "Matches pages on a domain and its subdomains (for example, github.com and gist.github.com)." : {
+      "comment" : "Domain example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配某个域名及其所有子域名下的网页（例如 github.com 和 gist.github.com）。"
+          }
+        }
+      }
+    },
+    "Move Above %@" : {
+      "comment" : "Moves a space rule above the earlier rule that covers it. The placeholder is that rule's address, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到 %@ 上方"
+          }
+        }
+      }
+    },
+    "Pages on %@ only." : {
+      "comment" : "Preview of an exact host rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只匹配 %@ 上的网页。"
+          }
+        }
+      }
+    },
+    "Path and subpaths" : {
+      "comment" : "Space rule matching a path and its descendants on one host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "路径及其子路径"
+          }
+        }
+      }
+    },
+    "Never used: %@ above covers all of it." : {
+      "comment" : "Below a space rule that an earlier rule covers completely. The placeholder is the earlier rule's address, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会生效：上面的 %@ 已经包含了它。"
+          }
+        }
+      }
+    },
+    "Covers all of %@ below, so that rule is never used." : {
+      "comment" : "Below a space rule that covers a later rule completely. The placeholder is the later rule's address, like github.com/org1.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含了下面的 %@，那条规则不会生效。"
+          }
+        }
+      }
+    },
+    "Covers all of %@ below, so those rules are never used." : {
+      "comment" : "Below a space rule that covers several later rules completely. The placeholder lists their addresses.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含了下面的 %@，那些规则不会生效。"
+          }
+        }
+      }
+    },
+    "Enabled" : {
+      "comment" : "Switch in the space rule editor.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用"
+          }
+        }
+      }
+    },
+    "Rule %lld" : {
+      "comment" : "A rule's position in the ordered list in Settings.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 条规则"
+          }
+        }
+      }
+    },
+    "Enter one hostname, such as github.com, without a path." : {
+      "comment" : "Example input for a domain-only space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入一个域名，例如 github.com，不带路径。"
+          }
+        }
+      }
+    },
+    "Enter the parent hostname, such as github.com, without a wildcard or path." : {
+      "comment" : "Example input for a space rule that includes subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入上级域名，例如 github.com，不带通配符或路径。"
+          }
+        }
+      }
+    },
+    "The http:// or https:// prefix is optional." : {
+      "comment" : "Space rule address tooltip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以不写 http:// 或 https://。"
+          }
+        }
+      }
+    },
+    "The first enabled match chooses the space. Drag to reorder." : {
+      "comment" : "Byline under Sites in Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "链接在第一条匹配且已启用的规则所选的空间中打开。拖动可以调整顺序。"
+          }
+        }
+      }
+    },
+    "Check for Updates" : {
+      "comment" : "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新"
+          }
+        }
+      }
+    },
+    "Couldn’t check %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个扩展无法检查。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "open in" : {
+      "comment" : "Inline after a domain and its subdomains, or a path and the pages below it: example.com and subdomains open in Work.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开于"
+          }
+        }
+      }
+    },
+    "opens in" : {
+      "comment" : "Inline before the space menu for a single host: example.com (this host only) opens in Work.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开于"
+          }
+        }
+      }
+    },
+    "Larger Sidebar" : {
+      "comment" : "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大边栏"
+          }
+        }
+      }
+    },
+    "No extensions from the Chrome Web Store to check." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有来自 Chrome 网上应用店的扩展需要检查。"
+          }
+        }
+      }
+    },
+    "Pin %lld Tabs" : {
+      "comment" : "Menu item for several picked tabs",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Pin Tab"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Pin %lld Tabs"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "固定 %lld 个标签页"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Pin Group" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.\nUndo action name, shown in the Edit menu as Undo Pin Group.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定分组"
+          }
+        }
+      }
+    },
+    "Pin Split View" : {
+      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定分屏浏览"
+          }
+        }
+      }
+    },
+    "Pin Tab" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nMenu item\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定标签页"
+          }
+        }
+      }
+    },
+    "Pin this page" : {
+      "comment" : "A step's title in the getting-started guide, a card in the window.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定这个页面"
+          }
+        }
+      }
+    },
+    "Pinned" : {
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已固定"
+          }
+        }
+      }
+    },
+    "Right-click its tab, then Pin Tab" : {
+      "comment" : "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右键点按它的标签页，然后点按“固定标签页”"
+          }
+        }
+      }
+    },
+    "Sidebar size %@, Usual Size" : {
+      "comment" : "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏大小 %@，默认大小"
+          }
+        }
+      }
+    },
+    "Smaller Sidebar" : {
+      "comment" : "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小边栏"
+          }
+        }
+      }
+    },
+    "Unpin %lld Tabs" : {
+      "comment" : "Menu item for several picked pinned pages",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unpin Tab"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unpin %lld Tabs"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "取消固定 %lld 个标签页"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Unpin Group" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar. The tab is in a pinned group; the whole group goes back to the tabs.\nMenu bar item: unpins the whole pinned group the tab is in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定分组"
+          }
+        }
+      }
+    },
+    "Unpin Split View" : {
+      "comment" : "Item in a pinned tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定分屏浏览"
+          }
+        }
+      }
+    },
+    "Unpin Tab" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nMenu item\nUndo action name, shown in the Edit menu as Undo Unpin Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定标签页"
+          }
+        }
+      }
+    },
+    "Unpin Tabs" : {
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定标签页"
+          }
+        }
+      }
+    },
+    "Unpinned" : {
+      "comment" : "Toast after a pinned tab is unpinned.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消固定"
+          }
+        }
+      }
+    },
+    "Updated %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已更新 %lld 个扩展。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Usual Size" : {
+      "comment" : "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认大小"
+          }
+        }
+      }
+    },
+    "Trusted Certificates" : {
+      "comment" : "A heading in Settings › Developer: local servers whose certificate you chose to trust, so Zigzag doesn’t warn again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受信任的证书"
+          }
+        }
+      }
+    },
+    "Local servers whose certificate you chose to trust. Zigzag doesn’t warn again while a server shows that certificate. Removing a server brings the warning back." : {
+      "comment" : "Under Trusted Certificates in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你选择信任其证书的本地服务器。只要服务器继续使用该证书，Zigzag 就不会再次发出警告。移除某个服务器后会重新显示警告。"
+          }
+        }
+      }
+    },
+    "Add a Local Server" : {
+      "comment" : "Title of the sheet that opens a local server so its certificate can be trusted, from Settings › Developer › Trusted Certificates.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加本地服务器"
+          }
+        }
+      }
+    },
+    "Zigzag opens the server in a new tab. If its certificate isn’t trusted, choose Visit this site anyway on the warning. Only servers on this Mac or your network can be added." : {
+      "comment" : "Under the title of the sheet that opens a local server to trust its certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 会在新标签页中打开这个服务器。如果它的证书不受信任，请在警告页上选择“仍然访问此网站”。只有这台 Mac 上或你的网络中的服务器才能添加。"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

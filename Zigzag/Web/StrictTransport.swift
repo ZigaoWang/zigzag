@@ -216,7 +216,7 @@ import WebKit
         guard let http = response as? HTTPURLResponse, let url = http.url, url.scheme?.lowercased() == "https",
               let host = url.host()?.lowercased(), !host.isEmpty, !isAddress(host),
               let header = http.value(forHTTPHeaderField: "Strict-Transport-Security"), let policy = parse(header),
-              !CertificateExceptions.hasException(for: host, in: store, now: now) else { return }
+              !CertificateExceptions.hasException(for: host, port: url.port ?? 443, in: store, now: now) else { return }
         note(host, policy: policy, in: store, now: now)
     }
 

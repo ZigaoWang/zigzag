@@ -83,6 +83,12 @@ struct FindCountTests {
         _ = try await webView.evaluateJavaScript("document.body.insertAdjacentHTML('beforeend', '<p>one more apple</p>'); 0")
         #expect(await PageFind.count("apple", in: webView) == 4)
         _ = try await webView.evaluateJavaScript("document.querySelector('.gone').style.display = 'block'; 0")
-        #expect(await PageFind.count("apple", in: webView) == 6)
+        // The newly shown text counts once the page has laid it out, which can take a moment under load.
+        var count = await PageFind.count("apple", in: webView)
+        for _ in 0..<40 where count != 6 {
+            try await Task.sleep(for: .milliseconds(50))
+            count = await PageFind.count("apple", in: webView)
+        }
+        #expect(count == 6)
     }
 }

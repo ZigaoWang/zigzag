@@ -9,14 +9,16 @@ import AppKit
 
 /// The top left of a page: its title in the app's voice, large and light, as the sidebar names a space.
 final class PageTitleView: NSView {
-    private let label = Label("", font: Tokens.Font.voice(), color: Tokens.Color.textPrimary)
+    /// Medium's space name: a page keeps its size whatever size the sidebar is.
+    private static let size = Tokens.Sidebar.scaled(26, for: .medium)
+    private let label = Label("", font: Tokens.Font.voice(size), color: Tokens.Color.textPrimary)
     private var written = ""
 
     var title: String {
         get { written }
         set {
             written = newValue
-            label.attributedStringValue = Tokens.Font.voiceText(newValue)
+            label.attributedStringValue = Tokens.Font.voiceText(newValue, size: Self.size)
             setAccessibilityLabel(newValue); needsLayout = true
         }
     }

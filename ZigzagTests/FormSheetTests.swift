@@ -94,8 +94,8 @@ struct FormSheetTests {
     }
 }
 
-private extension NSView {
-    /// This view and its descendants of `kind`, outermost first. A copy of the form's `fileprivate` search.
+extension NSView {
+    /// Finds controls in a sheet so tests can exercise them through their normal actions.
     func selfAndDescendants<T: NSView>(of kind: T.Type) -> [T] {
         ((self as? T).map { [$0] } ?? []) + subviews.flatMap { $0.selfAndDescendants(of: kind) }
     }

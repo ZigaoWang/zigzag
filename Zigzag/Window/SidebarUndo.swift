@@ -291,10 +291,11 @@ extension BrowserWindowController {
             return Closed(window: window, isPrivate: window.tabManager.isPrivate, selected: selected,
                           tabs: order.compactMap { tabID in info[tabID].map { (id: tabID, url: $0.url, title: $0.title) } })
         }
+        let routes = Library.shared.siteRoutes.enumerated().filter { $0.element.spaceID == id }
         Library.shared.removeSpace(id)
         sidebarUndo.registerUndo(withTarget: self) { controller in
             // Only this space comes back, so whatever changed since in the others stays.
-            Library.shared.insertSpace(space, at: index)
+            Library.shared.insertSpace(space, at: index, routes: routes)
             var shown: Tab?
             for entry in closed {
                 // A window closed since: its tabs come back here, unless they were private.

@@ -136,14 +136,15 @@ struct SidebarMenuTests {
 struct SidebarRowMenuTests {
     /// A window over a fresh manager with tabs `titles` in the first space and a second space to move to; the
     /// library is restored after.
-    private func inWindow(_ titles: [String], isPrivate: Bool = false, _ body: (BrowserWindowController, [Tab], UUID) throws -> Void) rethrows {
+    /// `local`: blank pages, so tabs can be woken without reaching the network.
+    private func inWindow(_ titles: [String], isPrivate: Bool = false, local: Bool = false, _ body: (BrowserWindowController, [Tab], UUID) throws -> Void) rethrows {
         let before = Library.shared.snapshot
         defer { Library.shared.restore(before) }
         let space = Library.shared.spaces[0].id
         if Library.shared.spaces.count < 2 { _ = Library.shared.addSpace(name: "Other") }
         let manager = TabManager(spaceID: space, isPrivate: isPrivate)
         defer { manager.invalidate() }
-        let tabs = titles.enumerated().map { i, title in Tab(url: URL(string: "https://example.com/menu/\(i)")!, title: title, spaceID: space) }
+        let tabs = titles.enumerated().map { i, title in Tab(url: URL(string: local ? "about:blank#\(i)" : "https://example.com/menu/\(i)")!, title: title, spaceID: space) }
         manager.adopt(tabs, in: space)
         manager.select(tabs[0])
         let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
@@ -176,6 +177,49 @@ struct SidebarRowMenuTests {
             #expect(places.items.count > 3)
             // Not the tab you're on: the menu bar's keys would act on another, so none show.
             #expect(menu.items.allSatisfy { $0.keyEquivalent.isEmpty })
+        }
+    }
+
+    @Test func aRunningTabCanBePutToSleepFromItsMenu() throws {
+        try inWindow(["A", "B", "C"], local: true) { controller, tabs, _ in
+            // Not running: nothing to put to sleep.
+            #expect(!titles(SidebarMenus.tabMenu(for: tabs[1], controller: controller)).contains("Suspend Page"))
+            tabs[1].ensureWebView()
+            let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
+            #expect(Array(titles(menu).prefix(3)) == ["Reload Page", "Suspend Page", "Duplicate Tab"])
+            try run(menu.items.first { $0.title == "Suspend Page" })
+            #expect(tabs[1].isAsleep && !tabs[1].isLoaded)
+            #expect(tabs[1].notLoadedNote == "You put it to sleep. Loads when you click it.")
+            #expect(controller.tabManager.selectedTab === tabs[0])
+        }
+    }
+
+    @Test func theTabYoureOnGoesOutOfSightAsItSleeps() throws {
+        try inWindow(["A", "B"], local: true) { controller, tabs, _ in
+            tabs[0].ensureWebView()
+            #expect(controller.tabManager.maySuspend(tabs[0]))
+            controller.suspendPage(nil)
+            #expect(controller.tabManager.selectedTab === tabs[1])
+            #expect(tabs[0].isAsleep)
+        }
+    }
+
+    @Test func theOnlyTabHasNowhereToGoAndStaysAwake() throws {
+        try inWindow(["A"], local: true) { controller, tabs, _ in
+            tabs[0].ensureWebView()
+            #expect(!controller.tabManager.maySuspend(tabs[0]))
+            #expect(!titles(SidebarMenus.tabMenu(for: tabs[0], controller: controller)).contains("Suspend Page"))
+        }
+    }
+
+    @Test func pickedTabsSleepTogether() throws {
+        try inWindow(["A", "B", "C"], local: true) { controller, tabs, _ in
+            tabs[1].ensureWebView()
+            tabs[2].ensureWebView()
+            let menu = SidebarMenus.markedMenu(for: [.tab(tabs[1].id), .tab(tabs[2].id)], controller: controller)
+            #expect(Array(titles(menu).prefix(2)) == ["Suspend 2 Pages", "-"])
+            try run(menu.items.first)
+            #expect(tabs[1].isAsleep && tabs[2].isAsleep)
         }
     }
 
@@ -274,7 +318,8 @@ struct SidebarRowMenuTests {
     @Test func pickedRowsOrganizeThenClose() {
         inWindow(["A", "B", "C"]) { controller, tabs, _ in
             let menu = SidebarMenus.markedMenu(for: [.tab(tabs[0].id), .tab(tabs[1].id)], controller: controller)
-            #expect(titles(menu) == ["Save 2 Pages", "Add 2 to New Folder", "Group 2 Tabs", "Move 2 to Space", "-", "Close 2 Tabs"])
+            // Only the tab you're on is running, so only it can be suspended; saving replaces main's Pin and Favorites items.
+            #expect(titles(menu) == ["Suspend Page", "-", "Save 2 Pages", "Add 2 to New Folder", "Group 2 Tabs", "Move 2 to Space", "-", "Close 2 Tabs"])
         }
     }
 

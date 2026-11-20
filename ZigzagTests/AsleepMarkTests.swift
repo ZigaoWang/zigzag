@@ -56,13 +56,13 @@ import Testing
     }
 
     @Test func theNoteSaysWhyAndWhatItFreed() {
-        #expect(SleepMemory.note(forEnergy: false, freed: 180 * mb) == "Asleep to save memory. Freed about 180 MB.")
-        #expect(SleepMemory.note(forEnergy: true, freed: 180 * mb) == "Asleep to save energy. Freed about 180 MB.")
+        #expect(SleepMemory.note(.memory, freed: 180 * mb) == "Asleep to save memory. Freed about 180 MB.")
+        #expect(SleepMemory.note(.energy, freed: 180 * mb) == "Asleep to save energy. Freed about 180 MB.")
     }
 
     @Test func withoutAFigureTheNoteOnlySaysWhy() {
-        #expect(SleepMemory.note(forEnergy: false, freed: nil) == "Asleep to save memory.")
-        #expect(SleepMemory.note(forEnergy: true, freed: nil) == "Asleep to save energy.")
+        #expect(SleepMemory.note(.memory, freed: nil) == "Asleep to save memory.")
+        #expect(SleepMemory.note(.energy, freed: nil) == "Asleep to save energy.")
     }
 
     @Test func anAwakeTabSaysNothing() {

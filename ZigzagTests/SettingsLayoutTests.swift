@@ -185,4 +185,59 @@ struct SettingsLayoutTests {
         #expect(field.frame.minX >= -0.5)
         #expect(button.frame.maxX <= rowWidth + 0.5, "the button sits inside the row, not past its end")
     }
+
+    /// Sidebar size (#361) has a Custom choice, and the percentage beside it shows only for Custom: − and + step
+    /// the sidebar's size, and the percentage puts it back to 100%.
+    @Test func theCustomSidebarSizeShowsItsPercentageOnlyWhenChosen() {
+        let wasSize = Tokens.Sidebar.size
+        let wasScale = Tokens.Sidebar.customScale
+        // The tests run in the app, on its own preferences: the percentage goes back to unset if it was.
+        let wasKept = UserDefaults.standard.object(forKey: "SidebarSizePercent")
+        defer {
+            Tokens.Sidebar.size = wasSize
+            Tokens.Sidebar.customScale = wasScale
+            UserDefaults.standard.set(wasKept, forKey: "SidebarSizePercent")
+        }
+        Tokens.Sidebar.size = .medium
+        Tokens.Sidebar.customScale = 1
+
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 776), styleMask: [.borderless], backing: .buffered, defer: false)
+        let settings = SettingsView(pane: .appearance)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        window.contentView?.addSubview(settings)
+        settings.layoutSubtreeIfNeeded()
+
+        func find<T: NSView>(_ kind: T.Type, in view: NSView, matching: (T) -> Bool = { _ in true }) -> T? {
+            if let found = view as? T, matching(found) { return found }
+            for child in view.subviews {
+                if let found = find(kind, in: child, matching: matching) { return found }
+            }
+            return nil
+        }
+        let row = find(FormRow.self, in: settings) { $0.debugTitle == "Sidebar size" }
+        let stack = row?.control as? NSStackView
+        let menu = stack?.views.compactMap { $0 as? DropdownButton }.first
+        let stepper = stack?.views.compactMap { $0 as? ZoomStepper }.first
+        #expect(menu?.options.map(\.title) == ["Small", "Medium", "Large", "Custom"])
+        #expect(menu?.selectedIndex == 1)
+        #expect(stepper != nil)
+        #expect(stepper?.isHidden == true)
+
+        menu?.selectedIndex = 3
+        menu?.onSelect?(3)
+        #expect(Tokens.Sidebar.size == .custom)
+        #expect(stepper?.isHidden == false)
+        #expect(stepper?.zoom == 1)
+
+        stepper?.debugPress("in")
+        #expect(abs(Tokens.Sidebar.customScale - 1.05) < 0.0001)
+        #expect(stepper?.zoom == 1.05)
+        stepper?.debugPress("reset")
+        #expect(Tokens.Sidebar.customScale == 1)
+
+        menu?.selectedIndex = 1
+        menu?.onSelect?(1)
+        #expect(Tokens.Sidebar.size == .medium)
+        #expect(stepper?.isHidden == true)
+    }
 }
