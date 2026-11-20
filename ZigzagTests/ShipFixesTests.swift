@@ -453,6 +453,33 @@ struct BookmarkFolderTests {
         #expect(!SwipeDecision.commits(progress: 0.6, speed: -800))
     }
 
+    /// Taps a swipe would give over these steps of (progress, speed), and whether letting go at the end navigates.
+    private func arm(_ steps: [(CGFloat, CGFloat)]) -> (taps: Int, armed: Bool) {
+        var arming = SwipeArming()
+        let taps = steps.filter { arming.step(progress: $0.0, speed: $0.1) }.count
+        return (taps, arming.armed)
+    }
+
+    @Test func swipeTapsOnceAsItArms() {
+        // Mid speed: around a flick's speed, well past its start, the arrow arms once (#377).
+        let mid: [(CGFloat, CGFloat)] = (0..<12).map { (i: Int) -> (CGFloat, CGFloat) in
+            let speed: CGFloat = i % 2 == 0 ? 750 : 650
+            return (0.4 + CGFloat(i) * 0.05, speed)
+        }
+        #expect(arm(mid) == (1, true))
+        // Slow, hovering right at the distance.
+        #expect(arm([(0.9, 100), (1.01, 100), (0.98, 50), (1.02, 80), (0.96, 0), (1.0, 40)]) == (1, true))
+        // A flick that arms and goes on past the distance.
+        #expect(arm([(0.2, 1500), (0.45, 1800), (0.8, 1600), (1.2, 900)]) == (1, true))
+        // Pulled well back, it disarms, and crossing again is a second tap.
+        #expect(arm([(1.05, 100), (0.7, -300), (1.05, 200)]) == (2, true))
+        #expect(arm([(1.05, 100), (0.7, -300)]) == (1, false))
+        // Armed by a flick, then the fingers stop short: letting go there doesn't navigate.
+        #expect(arm([(0.5, 900), (0.55, 400), (0.55, 0)]) == (1, false))
+        // Never armed, never a tap.
+        #expect(arm([(0.2, 300), (0.5, 600), (0.8, 200)]) == (0, false))
+    }
+
     @Test func swipeScriptLooksPastShadowRoots() throws {
         // A sheet inside a web component: the cell's parent chain goes through the shadow root to its host.
         let context = try #require(JSContext())

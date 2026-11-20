@@ -24,6 +24,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - On a split view's row in the sidebar, the × sits inside the page it closes. Point at a page and its part lights up with its own ×, named Close and the page's title; on the row you're in, the page you're in shows it. It used to sit alone at the row's end, where it looked like it closed the whole split. A part too narrow for its icon and the × shows the × in its icon's place while you point at it.
 - Clicking the address in a split view page's strip edits it in a field the address's own size and place, light or dark with the page, as in Zigzag Mini's strip. It used to open as a taller white box over the strip's buttons, whatever the page's color.
 - Clicking a pop-up window's address shows it selected in the same address field as Zigzag Mini's and split view's strips, with the same type and selection color, instead of as plain text.
+- A swipe back or forward taps the trackpad once when the arrow fills, however fast you swipe. At a medium speed the arrow could fill and empty over and over near the point where letting go goes back, tapping each time. Once filled, it now stays filled until you swipe a little way back or stop short after a flick, and letting go does what the arrow shows. Thanks to [frarees](https://github.com/frarees). ([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 
 ## [0.9.3] - 2026-11-18
 
