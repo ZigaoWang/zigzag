@@ -601,18 +601,18 @@ enum Tokens {
         }
 
         /// How far an image's ink sits from its middle (x right, y up), for a symbol drawn some other way (a heavier
-        /// weight, a glyph of its own); `key` names it for the cache.
-        @MainActor static func inkOffset(of image: NSImage, key: String) -> CGSize {
-            let box = inkBox(of: image, key: key)
+        /// weight, a glyph of its own); `key` names it for the cache, `scale` is pixels per point.
+        @MainActor static func inkOffset(of image: NSImage, key: String, scale: CGFloat = 4) -> CGSize {
+            let box = inkBox(of: image, key: key, scale: scale)
             return CGSize(width: box.midX, height: box.midY)
         }
 
         /// The size of an image's ink; `key` names it for the cache.
-        @MainActor static func inkSize(of image: NSImage, key: String) -> CGSize { inkBox(of: image, key: key).size }
+        @MainActor static func inkSize(of image: NSImage, key: String, scale: CGFloat = 4) -> CGSize { inkBox(of: image, key: key, scale: scale).size }
 
-        @MainActor private static func inkBox(of image: NSImage, key: String) -> CGRect {
+        @MainActor private static func inkBox(of image: NSImage, key: String, scale: CGFloat = 4) -> CGRect {
+            let key = scale == 4 ? key : "\(key) @\(scale)x"
             if let known = inkBoxes[key] { return known }
-            let scale: CGFloat = 4
             let w = Int(image.size.width * scale), h = Int(image.size.height * scale)
             var box = CGRect.zero
             if w > 0, h > 0, let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h, bitsPerSample: 8,

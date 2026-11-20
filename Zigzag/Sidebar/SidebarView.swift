@@ -708,8 +708,7 @@ final class SpaceDotView: InteractiveView {
         let iconSide = min(Tokens.Sidebar.spaceIcon, max(10, min(bounds.width, bounds.height) - Tokens.Sidebar.spaceIconRoom))
         if let icon, iconSize != iconSide {
             iconSize = iconSide
-            // A symbol's glyph sits a little inside its square, as the 12pt one did in the 14pt square.
-            iconView.image = IconChoice.image(icon, size: IconChoice.isSymbol(icon) ? round(iconSide * 6 / 7) : iconSide)
+            iconView.image = IconChoice.mark(icon, side: iconSide)
         } else if icon == nil {
             iconView.image = nil
         }
@@ -726,7 +725,7 @@ final class SpaceDotView: InteractiveView {
             self.dot.backgroundColor = self.cgColor(dotFill)
             self.dot.borderWidth = 0
             self.dot.shadowOpacity = 0
-            self.dot.opacity = 1
+            self.dot.opacity = self.icon == nil ? 1 : 0
             self.numberLayer.isHidden = true
             self.tick.opacity = 0
         }

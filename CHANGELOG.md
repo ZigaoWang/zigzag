@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A link's right-click menu starts with Open Link in New Tab, then New Window, Private Window and Peek, as in Chrome. Open Link, which opens it in the tab you're on, moves below them instead of being first, where it did what a click already does. Thanks to [retorquere](https://github.com/retorquere). ([#419](https://github.com/ZigaoWang/zigzag/issues/419))
+- The space icons at the bottom of the sidebar line up. Each one sits in the middle of its key at the same size, so a flame, a book and a star read as one row, and an emoji no longer sits higher or lower than a symbol.
 
 ## [0.9.3] - 2026-11-18
 
