@@ -160,7 +160,8 @@ enum MainMenu {
             item(String(localized: "Back", comment: "View menu item."), #selector(C.goBack(_:)), "["),
             item(String(localized: "Forward", comment: "View menu item."), #selector(C.goForward(_:)), "]"),
             item(String(localized: "Reload Page", comment: "View menu item."), #selector(C.reloadPage(_:)), "r"),
-            item(DeveloperTool.reloadIgnoringCache.title, #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .option]),
+            // Chrome's and Arc's keys; Reader has ⌥⌘R.
+            item(DeveloperTool.reloadIgnoringCache.title, #selector(C.reloadPageFromOrigin(_:)), "r", [.command, .shift]),
             item(String(localized: "Stop", comment: "View menu item."), #selector(C.stopLoading(_:)), "."),
             .separator(),
             item(String(localized: "Next Tab", comment: "View menu item."), #selector(C.selectNextTab(_:)), String(UnicodeScalar(NSDownArrowFunctionKey)!), [.command, .option]),
@@ -180,7 +181,7 @@ enum MainMenu {
             item(String(localized: "Zoom Out", comment: "View menu item."), #selector(C.zoomOut(_:)), "-"),
             item(String(localized: "Mute Tab", comment: "View menu item."), #selector(C.toggleMute(_:)), "m", [.command, .shift]),
             item(String(localized: "Picture in Picture", comment: "View menu item."), #selector(C.togglePictureInPicture(_:)), "p", [.command, .option]),
-            item(String(localized: "Show Reader", comment: "View menu item."), #selector(C.toggleReader(_:)), "r", [.command, .shift]),
+            item(String(localized: "Show Reader", comment: "View menu item."), #selector(C.toggleReader(_:)), "r", [.command, .option]),
             item(String(localized: "Translate Page", comment: "View menu item."), #selector(C.translatePage(_:)), "t", [.command, .option]),
             .separator(),
             submenu(String(localized: "Developer", comment: "Submenu of the View menu."), [
@@ -289,7 +290,7 @@ enum MainMenu {
             item(String(localized: "Back", comment: "View menu item."), #selector(W.goBack(_:)), "["),
             item(String(localized: "Forward", comment: "View menu item."), #selector(W.goForward(_:)), "]"),
             item(String(localized: "Reload Page", comment: "View menu item."), #selector(W.reloadPage(_:)), "r"),
-            item(String(localized: "Reload Ignoring Cache", comment: "View menu item."), #selector(W.reloadPageFromOrigin(_:)), "r", [.command, .option]),
+            item(String(localized: "Reload Ignoring Cache", comment: "View menu item."), #selector(W.reloadPageFromOrigin(_:)), "r", [.command, .shift]),
             item(String(localized: "Stop", comment: "View menu item."), #selector(W.stopLoading(_:)), "."),
             .separator(),
             item(String(localized: "Actual Size", comment: "View menu item."), #selector(W.actualSize(_:)), "0"),

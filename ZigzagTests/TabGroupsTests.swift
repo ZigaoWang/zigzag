@@ -238,3 +238,147 @@ struct TabGroupRulesTests {
         #expect(try JSONDecoder().decode(SessionState.self, from: Data(old.utf8)).windows[0].tabGroups == nil)
     }
 }
+
+/// Which tab shows after closing the one you're on (#412), as in Chrome.
+@MainActor @Suite(.serialized) struct TabCloseSelectionTests {
+    private var space: UUID { Library.shared.spaces[0].id }
+
+    /// A window with tabs 0–4, links opening next to the tab they came from.
+    private func window(_ body: (TabManager, [Tab]) throws -> Void) rethrows {
+        let place = TabManager.newTabPlace, nests = TabManager.nestsOpenedLinks
+        TabManager.newTabPlace = .next
+        TabManager.nestsOpenedLinks = false
+        defer { TabManager.newTabPlace = place; TabManager.nestsOpenedLinks = nests }
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = (0..<5).map { Tab(url: nil, title: "\($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        try body(manager, tabs)
+    }
+
+    @Test func closingGoesToTheTabBelowNotTheOneYouWereOnBefore() {
+        window { manager, t in
+            manager.select(t[4])
+            manager.select(t[2])
+            manager.close(t[2])
+            #expect(manager.selectedTab === t[3])
+            // The last one goes up.
+            manager.select(t[4])
+            manager.close(t[4])
+            #expect(manager.selectedTab === t[3])
+        }
+    }
+
+    @Test func aLinkOpenedInFrontClosesBackToItsPage() {
+        window { manager, t in
+            manager.select(t[1])
+            let opened = manager.newTab(url: nil, spaceID: space, select: true, opener: t[1])
+            manager.close(opened)
+            #expect(manager.selectedTab === t[1])
+        }
+    }
+
+    @Test func linksOpenedBehindKeepTheirOrderAndCloseToTheNextOne() {
+        window { manager, t in
+            manager.select(t[1])
+            let links = (0..<3).map { _ in manager.newTab(url: nil, spaceID: space, select: false, opener: t[1]) }
+            #expect(Array(manager.tabs(in: space)[2...4]).map(\.id) == links.map(\.id))
+            // Opened in front after them: closing it goes to the last link the page opened, then up the row.
+            let front = manager.newTab(url: nil, spaceID: space, select: true, opener: t[1])
+            manager.close(front)
+            #expect(manager.selectedTab === links[2])
+        }
+    }
+
+    @Test func switchingTabsYourselfForgetsTheOpener() {
+        window { manager, t in
+            manager.select(t[1])
+            let links = (0..<3).map { _ in manager.newTab(url: nil, spaceID: space, select: false, opener: t[1]) }
+            // Reading the results one by one: each ⌘W lands on the next, not back on the page they came from.
+            manager.select(links[0])
+            manager.close(links[0])
+            #expect(manager.selectedTab === links[1])
+            manager.close(links[1])
+            #expect(manager.selectedTab === links[2])
+            // Opened in front, then left and come back to: it closes to the tab below, not its page.
+            let opened = manager.newTab(url: nil, spaceID: space, select: true, opener: t[0])
+            manager.select(t[4])
+            manager.select(opened)
+            manager.close(opened)
+            #expect(manager.selectedTab === t[1])
+        }
+    }
+
+    @Test func aTabInAShutGroupBelowIsPassedOver() throws {
+        try window { manager, t in
+            let id = try #require(manager.makeGroup(with: [t[3], t[4]], name: "G"))
+            manager.setGroupOpen(id, false)
+            manager.select(t[2])
+            manager.close(t[2])
+            #expect(manager.selectedTab === t[1])
+        }
+    }
+}
+
+/// ⇧⌘T brings back the latest closed tab or window across the app (#411), never a private tab into an everyday window.
+@MainActor @Suite(.serialized) struct ReopenLastClosedTests {
+    private var space: UUID { Library.shared.spaces[0].id }
+
+    private func manager(isPrivate: Bool = false) -> (TabManager, [Tab]) {
+        let manager = TabManager(spaceID: space, isPrivate: isPrivate)
+        let tabs = (0..<3).map { Tab(url: nil, title: "\($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        manager.select(tabs[0])
+        return (manager, tabs)
+    }
+
+    @Test func theLatestClosedComesBackFirst() {
+        let early = Date(timeIntervalSince1970: 1), late = Date(timeIntervalSince1970: 2)
+        #expect(WindowManager.lastClosed(tab: early, tabOfClosedWindow: nil, window: late) == .window)
+        #expect(WindowManager.lastClosed(tab: late, tabOfClosedWindow: nil, window: early) == .tab)
+        #expect(WindowManager.lastClosed(tab: early, tabOfClosedWindow: late, window: nil) == .tabOfClosedWindow)
+        #expect(WindowManager.lastClosed(tab: late, tabOfClosedWindow: late, window: late) == .tab)
+        #expect(WindowManager.lastClosed(tab: nil, tabOfClosedWindow: nil, window: nil) == nil)
+    }
+
+    @Test func aClosedTabComesBackIntoItsWindow() {
+        let (manager, t) = manager()
+        defer { manager.invalidate() }
+        manager.close(t[1])
+        manager.close(t[2])
+        #expect(manager.lastClosedTab?.id == t[2].id)
+        #expect(WindowManager.shared.canReopenLastClosed(from: manager))
+        WindowManager.shared.reopenLastClosed(from: manager)
+        #expect(manager.tabs(in: space).map(\.displayTitle) == ["0", "2"])
+    }
+
+    @Test func aPrivateTabNeverComesBackInAnEverydayWindow() {
+        let (secret, s) = manager(isPrivate: true)
+        defer { secret.invalidate() }
+        let (everyday, _) = manager()
+        defer { everyday.invalidate() }
+        secret.close(s[1])
+        #expect(!WindowManager.shared.canReopenLastClosed(from: everyday))
+        WindowManager.shared.reopenLastClosed(from: everyday)
+        #expect(everyday.tabs(in: space).count == 3)
+        // In its own private window it comes back.
+        #expect(WindowManager.shared.canReopenLastClosed(from: secret))
+        WindowManager.shared.reopenLastClosed(from: secret)
+        #expect(secret.tabs(in: space).map(\.displayTitle) == ["0", "1", "2"])
+    }
+
+    @Test func aTabOfAClosedWindowComesBackOnItsOwn() throws {
+        let (closing, t) = manager()
+        let group = try #require(closing.makeGroup(with: [t[1], t[2]], name: "G"))
+        closing.close(t[1])
+        let record = try #require(closing.closedTabRecords.last)
+        #expect(record.groupID == group)
+        closing.invalidate()
+        let (other, _) = manager()
+        defer { other.invalidate() }
+        let back = try #require(other.reopenFromClosedWindow(record))
+        #expect(back.groupID == nil && back.parentID == nil && back.spaceID == space)
+        #expect(other.tabs(in: space).count == 4)
+        #expect(other.selectedTab === back)
+    }
+}

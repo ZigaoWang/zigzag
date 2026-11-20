@@ -267,9 +267,6 @@ nonisolated enum CompatibilityText {
         case "extension.limit.desktopCapture":
             return String(localized: "extension.limit.desktopCapture", defaultValue: "Recording your screen",
                           comment: "A Chrome extension feature Zigzag cannot provide: the desktopCapture API.")
-        case "extension.limit.addressBarKeyword":
-            return String(localized: "extension.limit.addressBarKeyword", defaultValue: "Address bar keyword",
-                          comment: "A Chrome extension feature Zigzag cannot provide: an omnibox keyword.")
         case "extension.limit.publicSuffix":
             return String(localized: "extension.limit.publicSuffix", defaultValue: "Domain names",
                           comment: "A Chrome extension feature Zigzag cannot provide: the publicSuffix API.")

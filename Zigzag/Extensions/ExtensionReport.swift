@@ -1,6 +1,12 @@
 import AppKit
 import WebKit
 
+/// Which browser a package was built for, as its record keeps it.
+nonisolated enum ExtensionKind: String, Codable, Sendable {
+    case chromium
+    case firefox
+}
+
 /// What an extension will be able to do, and what it asks for that Zigzag can't give it, in plain words.
 /// Shown before installing and in Settings.
 ///

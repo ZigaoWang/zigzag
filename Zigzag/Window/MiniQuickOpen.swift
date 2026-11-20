@@ -41,7 +41,7 @@ final class MiniQuickOpen: NSWindowController, NSWindowDelegate {
         case .search(let query), .suggestion(let query): (Library.shared.searchEngine.searchURL(query), true, false)
         case .searchOn(let url): (url, true, false)
         case .bookmark(let id): Library.shared.bookmark(id).map { ($0.url, false, false) }
-        case .switchTo, .action, .note: nil
+        case .switchTo, .action, .note, .omnibox: nil
         }
     }
 

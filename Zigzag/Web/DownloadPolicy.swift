@@ -41,6 +41,15 @@ final class DownloadPolicy {
         return mainFrameClicked || mayDownloadUnasked(now: now) ? .download : .cancel
     }
 
+    /// Whether a download is a Firefox extension package, which is installed rather than kept as a file. AMO's
+    /// Add to Firefox hands over `application/x-xpinstall`; a package served as a plain file still names itself
+    /// `.xpi`. Only the type decides; the contents are checked by the store's own verification.
+    nonisolated static func isExtensionPackage(mimeType: String?, filename: String) -> Bool {
+        let mime = (mimeType ?? "").split(separator: ";").first.map { $0.trimmingCharacters(in: .whitespaces).lowercased() } ?? ""
+        if mime == "application/x-xpinstall" { return true }
+        return filename.lowercased().hasSuffix(".xpi")
+    }
+
     nonisolated static func downloads(mimeType: String?, contentDisposition: String?, canShowMIMEType: Bool) -> Bool {
         let mime = (mimeType ?? "").lowercased()
         let disposition = (contentDisposition ?? "").trimmingCharacters(in: .whitespaces).lowercased()

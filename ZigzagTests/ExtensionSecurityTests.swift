@@ -521,14 +521,14 @@ extension ExtensionSecurityTests {
         let report = ExtensionReport(extension: context.webExtension, manifest: manifest, id: id)
         #expect(Set(report.limits.map(\.text)) == [
             "Tab groups", "Blocking requests the old way", "Debugging pages", "Font settings", "Privacy settings",
-            "Saving pages", "Recording your screen", "Address bar keyword", "Reading aloud", "Your location",
+            "Saving pages", "Recording your screen", "Reading aloud", "Your location",
             "Reading what you copy",
         ])
         // Supported rows, and partial ones (management, tabCapture, proxy, identity.email), have no sheet lines yet.
         for gone in ["Side panel", "Your browsing history", "Your bookmarks", "Your top sites", "Notifications",
                      "Downloads", "Knowing when you’re away", "Background audio and clipboard", "Recording tabs",
                      "Display information", "Keeping your Mac awake", "Signing in with your account",
-                     "Tab video capture", "Managing other extensions", "Proxy scripts (PAC)"] {
+                     "Tab video capture", "Managing other extensions", "Proxy scripts (PAC)", "Address bar keyword"] {
             #expect(!report.limits.map(\.text).contains(gone), "\(gone)")
         }
     }

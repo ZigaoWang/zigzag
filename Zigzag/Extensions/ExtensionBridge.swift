@@ -34,6 +34,8 @@ final class ExtensionBridge {
     let webRequest: BridgeWebRequest
     /// User scripts, which every web view of the profile runs (Tab attaches its own).
     let userScripts: BridgeUserScripts
+    /// Address bar keywords, which the command bar hands what's typed after them.
+    let omnibox: BridgeOmnibox
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
@@ -50,7 +52,7 @@ final class ExtensionBridge {
         BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
         BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self,
         BridgeOffscreen.self, BridgeSidePanel.self, BridgeTabCapture.self, BridgeProxy.self,
-        BridgeWebRequest.self, BridgeUserScripts.self,
+        BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self,
     ]
 
     init(host: ExtensionHost) {
@@ -61,7 +63,8 @@ final class ExtensionBridge {
         proxy = BridgeProxy(host: host)
         webRequest = BridgeWebRequest(host: host)
         userScripts = BridgeUserScripts(host: host)
-        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts]
+        omnibox = BridgeOmnibox(host: host)
+        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts, omnibox]
         let directNames = Set(direct.map { type(of: $0).name })
         let others = Self.handlerTypes.filter { !directNames.contains($0.name) }.map { $0.init(host: host) }
         let all: [any BridgeNamespace] = others + direct
@@ -326,8 +329,25 @@ enum ExtensionBridgeScript {
         Bundle.main.url(forResource: "webkit-differences", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
     }()
 
+    /// Zigzag's own version, which a Firefox extension asking runtime.getBrowserInfo is told as the browser's. Read as
+    /// the rest of the app reads it; empty where there is no bundle to read it from (the local test build).
+    static let firefoxAppVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+
+    /// firefox-polyfill.js with the app version filled in; it acts only for a Firefox-kind record.
+    static let firefoxPolyfill: String = {
+        guard let url = Bundle.main.url(forResource: "firefox-polyfill", withExtension: "js"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
+        return text.replacingOccurrences(of: "__ZIGZAG_VERSION__", with: jsString(firefoxAppVersion))
+    }()
+
+    /// A Swift string as a JavaScript string literal, for the values written into the scripts.
+    private static func jsString(_ text: String) -> String {
+        String(data: (try? JSONSerialization.data(withJSONObject: [text])) ?? Data(), encoding: .utf8)
+            .map { String($0.dropFirst().dropLast()) } ?? "\"\""
+    }
+
     /// Everything Zigzag puts before an extension's own code, after the bridge and the compatibility layer.
-    static var afterCompatibility: String { differences + "\n" + surface }
+    static var afterCompatibility: String { differences + "\n" + surface + "\n" + firefoxPolyfill }
 
     /// The rest of Chrome's API, from Chrome's own definitions (api-surface.js over chrome-api.json): runs after the
     /// bridge and the compatibility layer, and fills only what's still missing.

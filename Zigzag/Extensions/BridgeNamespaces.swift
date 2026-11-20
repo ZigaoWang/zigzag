@@ -1034,6 +1034,40 @@ final class BridgeExtensionFetch: BridgeNamespace {
               let text = options.string("url"), let url = URL(string: text) else { throw BridgeError("Invalid extension request.") }
         let host = host
         guard let context = host.context(for: extensionID) else { throw BridgeError("The extension is no longer loaded.") }
+        // This Mac is its own door, opened by the Settings switch and this extension's own, not by a manifest
+        // permission. With either off, the call goes as it did before there was a door: host access decides.
+        if LocalReceivers.isLoopback(url) {
+            guard LocalReceivers.isEnabled, host.profile.installs.localReceivers(extensionID) else {
+                guard let before = Self.withoutDoor(options) else { return ["fallback": true] }
+                return try await sendWithHostAccess(before, url: url, context: context, extensionID: extensionID, requestID: requestID)
+            }
+            var local = try Self.localReceiverRequest(options, url: url)
+            let store = host.profile.store
+            if local.credentials.sendsCookies, let cookie = await LocalReceivers.cookies(for: url, in: store, crossSite: false) {
+                local.headers["Cookie"] = cookie
+            }
+            let answer = try await LocalReceivers.send(local, as: .webExtension(id: extensionID))
+            if local.credentials.sendsCookies { await LocalReceivers.store(answer, for: url, in: store) }
+            return Self.localReceiverAnswer(answer)
+        }
+        return try await sendWithHostAccess(options, url: url, context: context, extensionID: extensionID, requestID: requestID)
+    }
+
+    /// A loopback call as bridge.js sends it (its body base64, any credentials) in the shape the host-access path
+    /// took before there was a door: a text body and cookies sent. Nil: WebKit's own fetch takes it, as it did then.
+    static func withoutDoor(_ options: [String: Any]) -> [String: Any]? {
+        var options = options
+        guard ["include", "same-origin"].contains(options["credentials"] as? String ?? "same-origin") else { return nil }
+        if let encoded = options["body"] as? String {
+            guard let data = Data(base64Encoded: encoded), let text = String(data: data, encoding: .utf8) else { return nil }
+            options["body"] = text
+        }
+        return options
+    }
+
+    private func sendWithHostAccess(_ options: [String: Any], url: URL, context: WKWebExtensionContext, extensionID: String,
+                                    requestID: UUID) async throws -> Any? {
+        let host = host
         // Without host access, ordinary WebKit fetch decides what is available through the site's CORS policy.
         guard Self.allows(url, context: context) else { return ["fallback": true] }
         // Each hop of a redirect is checked against the extension's access as it is then.
@@ -1051,6 +1085,40 @@ final class BridgeExtensionFetch: BridgeNamespace {
     /// Whether the profile has a SameSite Lax or Strict cookie for the URL's host, the kind WebKit leaves out.
     static func keepsSameSiteCookies(_ url: URL, in store: WKWebsiteDataStore) async -> Bool {
         await ExtensionWrite.hasSameSite(await ExtensionWrite.profileCookies(for: url, in: store), for: url)
+    }
+
+    /// What bridge.js sent, as the runner's request: the method and body it already vetted, the headers as pairs,
+    /// and the credentials it asked for. A body too large to carry whole fails here rather than in memory.
+    static func localReceiverRequest(_ options: [String: Any], url: URL) throws -> LocalReceivers.Request {
+        let method = (options["method"] as? String ?? "GET").uppercased()
+        guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method) else {
+            throw BridgeError("That method is not sent to this Mac.")
+        }
+        // bridge.js sends a loopback call's body as base64, so the helper gets the bytes the extension wrote, text
+        // or not, rather than their text form.
+        let body: Data?
+        if let text = options["body"] as? String {
+            guard let decoded = Data(base64Encoded: text) else { throw BridgeError("That request's body is not readable.") }
+            body = decoded
+        } else {
+            body = nil
+        }
+        guard (body?.count ?? 0) <= LocalReceivers.responseLimit else { throw BridgeError("That request is too large.") }
+        var headers: [String: String] = [:]
+        for pair in options["headers"] as? [[String]] ?? [] where pair.count == 2 { headers[pair[0]] = pair[1] }
+        let credentials: LocalReceivers.Credentials = switch options["credentials"] as? String {
+        case "omit": .omit
+        case "include": .include
+        default: .sameOrigin
+        }
+        return LocalReceivers.Request(url: url, method: method, headers: headers, body: body, credentials: credentials)
+    }
+
+    /// The runner's answer in the shape `bridge.js` reads. The status line's text is the extension's own to read; the
+    /// bridge fills it in as it does for any other answer.
+    static func localReceiverAnswer(_ response: LocalReceivers.Response) -> [String: Any] {
+        ["status": response.status, "statusText": "", "headers": response.headers.map { [$0.key, $0.value] },
+         "body": response.body.base64EncodedString(), "url": response.url.absoluteString, "redirected": false]
     }
 
     func release(_ extensionID: String) { requests.release(extensionID) }
