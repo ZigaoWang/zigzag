@@ -2478,6 +2478,44 @@ final class TabManager {
         archiveStaleTabs(keeping: selectedIDs.union(windows.flatMap(\.selectedBySpace.values)))
     }
 
+    /// Whether Suspend Page is offered for a tab: an ordinary tab whose page is running (a pinned page or favorite
+    /// has Unload Page), and, while you're on it, with another tab to go to.
+    func maySuspend(_ tab: Tab) -> Bool {
+        guard tab.isLoaded, !tab.isClosed, tab.bookmarkID == nil, tab.url != nil else { return false }
+        guard let selected = selectedTab, panes(of: selected).contains(where: { $0 === tab }) else { return true }
+        return awayTarget(from: selected, leaving: [tab]) != nil
+    }
+
+    /// Puts tabs to sleep that you chose (Suspend Page), as Zigzag puts one to sleep: its page let go, where you were
+    /// and its history kept, loaded again when you click it. One you're on goes out of sight first, to where closing
+    /// it would go, and stays when there's nowhere. `refused` hears each that stayed awake, and why.
+    func suspend(chosen: [Tab], refused: @escaping (Tab, Tab.StaysAwake) -> Void) {
+        var sleepers: [Tab] = []
+        for tab in chosen where maySuspend(tab) {
+            if let why = tab.staysAwake { refused(tab, why) } else { sleepers.append(tab) }
+        }
+        if let selected = selectedTab, panes(of: selected).contains(where: { tab in sleepers.contains { $0 === tab } }) {
+            if let next = awayTarget(from: selected, leaving: sleepers) { select(next) }
+            else { sleepers.removeAll { tab in panes(of: selected).contains { $0 === tab } } }
+        }
+        for tab in sleepers {
+            tab.suspend(because: "chosen from its menu", chosen: true) { [weak tab] why in if let tab { refused(tab, why) } }
+        }
+    }
+
+    /// Where to go from the tab you're on when it's put to sleep: as closing it would go (its opener, the tab you were
+    /// on before, a neighbor), never to a page of its split or one going to sleep with it.
+    private func awayTarget(from tab: Tab, leaving: [Tab]) -> Tab? {
+        let away = panes(of: tab) + leaving
+        let fits = { (other: Tab) in !other.isClosed && other.spaceID == tab.spaceID && !away.contains { $0 === other } }
+        if let opener = tab.opener, fits(opener), self.tab(with: opener.id) === opener, !isShownElsewhere(opener) { return opener }
+        let recent = recentTabs
+        if let previous = recent.first(where: { fits($0) && !isShownElsewhere($0) }) ?? recent.first(where: fits) { return previous }
+        let list = tabs(in: tab.spaceID)
+        guard let index = list.firstIndex(where: { $0 === tab }) else { return list.first(where: fits) }
+        return list[(index + 1)...].first(where: fits) ?? list[..<index].reversed().first(where: fits)
+    }
+
     /// Whether a tab on its way to sleep (TabSleep.queue) still may: it's open and awake, and no window has come to
     /// show it, alone or beside another in a split, since it was chosen.
     static func mayStillSleep(_ tab: Tab) -> Bool {

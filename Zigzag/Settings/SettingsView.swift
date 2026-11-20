@@ -1087,6 +1087,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var heldLayouts = 0
     private var layoutIsWanted = false
     private var shortcutGroups: [(String, FormGroup)] = []
+    private var listedShortcuts: [String] = []
 
     private let engine = DropdownButton()
     /// The engines extensions give, listed after Zigzag's own, in the order the menu shows them.
@@ -1141,7 +1142,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let fullScreenFill = DropdownButton()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
-    private let addressPlaceMenu = DropdownButton()
+    private let addressAboveToggle = Toggle()
     private let sidebarSide = DropdownButton()
     /// Sidebar position's choices, Left then Right, as whether the sidebar is on the right (#360).
     static let sidebarSides = [false, true]
@@ -1229,6 +1230,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Install from Folder…", comment: "Button in Settings › Extensions: installs an extension from a folder on this Mac, one you're building or one that came with an app."))
+    private let checkUpdatesButton = PillButton(title: String(localized: "Check for Updates", comment: "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now."))
     private var spaceRows: [SpaceSettingsRow] = []
     /// Download rule rows in order with their rule ids, for drag reordering.
     private var downloadRuleRows: [(id: UUID, row: DraggableRow)] = []
@@ -1509,22 +1511,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window.", comment: "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys."),
                                     control: borderlessToggle))
-        addressPlaceMenu.options = AddressBarPlace.allCases.map { place in
-            switch place {
-            case .off: DropdownButton.Option(title: String(localized: "Off", comment: "Address bar above the page: the address stays in the sidebar."))
-            case .autohide: DropdownButton.Option(title: String(localized: "Autohide", comment: "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up."))
-            case .always: DropdownButton.Option(title: String(localized: "Always", comment: "Address bar above the page: the bar stays above the page."))
-            }
-        }
-        addressPlaceMenu.onSelect = { index in
-            let places = AddressBarPlace.allCases
-            guard places.indices.contains(index) else { return }
-            BrowserRootView.addressBarPlace = places[index]
-        }
+        addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
         let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
-                                 detail: String(localized: "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top.",
-                                                      comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
-                                 control: addressPlaceMenu)
+                                 detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
+                                 control: addressAboveToggle)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
         sidebarSide.options = [
@@ -1823,6 +1813,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Extensions
         getExtensionsButton.onClick = { [weak self] _ in self?.getExtensions() }
         loadUnpackedButton.onClick = { [weak self] _ in self?.loadUnpacked() }
+        checkUpdatesButton.onClick = { [weak self] _ in self?.checkForUpdates() }
 
         // One search for everything, shortcuts included (by name or by keys).
         settingSearch.field.delegate = self
@@ -2017,7 +2008,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshTitle()
         if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
         readSoon([pane])
-        if pane == .shortcuts { reloadShortcuts() }
+        if pane == .shortcuts { readShortcuts() }
         if pane == .extensions { findAppExtensions() }
         layoutDocument()
         documentView.scroll(.zero)
@@ -2816,6 +2807,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Every shortcut, read from the menu bar itself so the list is always right.
     private func reloadShortcuts() {
         let timing = SettingsTiming.begin("reloadShortcuts"); defer { timing.end() }
+        counted("shortcuts")
+        listedShortcuts = shortcutsInMenu
         var groups: [(String, FormGroup)] = []
         for top in NSApp.mainMenu?.items ?? [] {
             guard let menu = top.submenu else { continue }
@@ -2850,6 +2843,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         shortcutGroups = groups
     }
 
+    /// Each shortcut's menu item, name and keys as the menus have them now: a row holds its item.
+    private var shortcutsInMenu: [String] {
+        Shortcuts.allItems.map { "\(ObjectIdentifier($0).hashValue) \($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue) \($0.isHidden)" }
+    }
+
+    /// Makes the rows again only when the menus' shortcuts changed, not at every key typed in the search.
+    private func readShortcuts() {
+        if listedShortcuts != shortcutsInMenu { reloadShortcuts() }
+    }
+
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === settingSearch.field { searchChanged() }
         if (obj.object as? NSTextField) === flagSearch.field { layoutDocument() }
@@ -2866,7 +2869,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         items.forEach { $0.isSelected = !isSearching && $0.pane == pane }
         moveSectionSelection(animated: false)
         refreshTitle()
-        reloadShortcuts()
+        readShortcuts()
         if isSearching { readSoon(SettingsPane.allCases) }
         // "Find a setting" finds sites by name too: the list is read if no pane with it has been shown yet.
         if isSearching, siteDataList.model == nil || siteDataList.model?.state == .idle { reloadSiteData() }
@@ -3258,7 +3261,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
         case .developer:
             section(nil, developerToolsGroup)
-            section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton)
+            // Sites rows are one line, while Page Sizes rows carry a second: lower this group so the first Remove
+            // button lines up with Page Sizes.
+            section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton, groupTopInset: 7)
             note(String(localized: "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too.", comment: "Under the list in Settings › Developer."))
             section(Self.localServersHeading, localServersGroup)
             section(Self.trustedCertificatesHeading, trustedCertificatesGroup, accessory: trustedCertificatesAddSite, groupTopInset: 7)
@@ -3332,8 +3337,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
+            checkUpdatesButton.isHidden = !hasExtensions
             let buttons: NSStackView = made("buttons") {
-                let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
+                let buttons = NSStackView(views: [checkUpdatesButton, loadUnpackedButton, getExtensionsButton])
                 buttons.spacing = Tokens.Space.x2
                 return buttons
             }
@@ -3775,7 +3781,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
-        addressPlaceMenu.selectedIndex = BrowserRootView.addressBarPlace.menuIndex
+        addressAboveToggle.isOn = BrowserRootView.addressAbovePage
         sidebarSide.selectedIndex = Self.sidebarSides.firstIndex(of: BrowserRootView.sidebarOnRight) ?? 0
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
@@ -4669,6 +4675,27 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
 
+    /// Checks every extension from the store now and says what came of it; one update that wants more access opens
+    /// its review sheet (#406).
+    private func checkForUpdates() {
+        guard checkUpdatesButton.isEnabled else { return }
+        let title = checkUpdatesButton.title
+        checkUpdatesButton.title = String(localized: "Checking…", comment: "The Check for Updates button in Settings › Extensions while it checks.")
+        checkUpdatesButton.isEnabled = false
+        layoutDocument()
+        Task { @MainActor [weak self] in
+            let check = await ExtensionStore.checkForUpdatesIfDue(force: true)
+            guard let self else { return }
+            checkUpdatesButton.title = title
+            checkUpdatesButton.isEnabled = true
+            layoutDocument()
+            Toast.show(check.summary, symbol: check.failed > 0 ? "exclamationmark.triangle" : "checkmark", duration: 4, over: self, area: bounds)
+            if check.waiting.count == 1, let id = check.waiting.first, let controller = browser {
+                controller.reviewExtensionUpdate(id)
+            }
+        }
+    }
+
     private func getExtensions() {
         guard let controller = browser else { return }
         controller.tabManager.newTab(url: ExtensionStore.webStoreURL)
@@ -4952,8 +4979,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private func finish(taken: NSMenuItem?) {
         stopRecording()
         let name = taken.map { $0.title.hasSuffix("…") ? String($0.title.dropLast()) : $0.title }
-        onChange?()
         if let name { ShortcutRow.lastTaken = (item, name) }
+        onChange?()
     }
 
     /// The last change that took keys from another command, said on the row once the list redraws.

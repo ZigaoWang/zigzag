@@ -126,6 +126,7 @@ enum MainMenu {
             item(String(localized: "Import from Another Browser…", comment: "File menu item."), #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
             .separator(),
             // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.
+            item(String(localized: "Suspend Page", comment: "File menu item: puts the tab's page to sleep; it loads again when you click the tab."), #selector(C.suspendPage(_:)), ""),
             item(String(localized: "Duplicate Tab", comment: "File menu item."), #selector(C.duplicateTab(_:)), ""),
             item(String(localized: "Pin Tab", comment: "File menu item."), #selector(C.toggleBookmark(_:)), "d"),
             item(String(localized: "Add to Favorites", comment: "File menu item."), #selector(C.addToFavorites(_:)), ""),

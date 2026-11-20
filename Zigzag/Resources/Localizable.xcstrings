@@ -1510,6 +1510,41 @@
         }
       }
     },
+    "%lld pages not put to sleep while they play or have text you typed" : {
+      "comment" : "Toast after Suspend N Pages in the sidebar's menu: some of the picked pages stay awake, because they play sound, are in a call, play in the mini player or Picture in Picture, or hold text you typed.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page not put to sleep while it plays or has text you typed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages not put to sleep while they play or have text you typed"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个页面在播放或有你输入的文字，没有休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld pages of history" : {
       "comment" : "Item in the list of what came over, in the Import window.",
       "localizations" : {
@@ -1885,6 +1920,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld 个标签页在等你回答"
+          }
+        }
+      }
+    },
+    "%lld updates need your approval." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld update needs your approval."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld updates need your approval."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个更新需要你批准。"
+                }
+              }
+            }
           }
         }
       }
@@ -2858,6 +2928,17 @@
         }
       }
     },
+    "All extensions are up to date." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when nothing changed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有扩展都已是最新版本。"
+          }
+        }
+      }
+    },
     "All in Zigzag" : {
       "comment" : "Welcome window’s import step, once everything came over.",
       "localizations" : {
@@ -3013,7 +3094,7 @@
       }
     },
     "Always" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.\nAddress bar above the page: the bar stays above the page.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -3601,17 +3682,6 @@
         }
       }
     },
-    "Autohide" : {
-      "comment" : "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "自动隐藏"
-          }
-        }
-      }
-    },
     "Automatic" : {
       "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.\nA choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.",
       "localizations" : {
@@ -3718,6 +3788,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复为 Zigzag 的快捷键"
+          }
+        }
+      }
+    },
+    "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
+      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
           }
         }
       }
@@ -4030,6 +4111,61 @@
         }
       }
     },
+    "Not put to sleep while it has text you typed" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake so what you typed into it isn't lost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "里面有你输入的文字，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays in the mini player" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video plays in the window's mini player.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在小播放器里播放，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays sound" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's playing sound.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在播放声音，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it uses the camera or microphone" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's in a call.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在用摄像头或麦克风，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while its video is in Picture in Picture" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video floats in Picture in Picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的视频在画中画里，没有休眠"
+          }
+        }
+      }
+    },
     "Open “%@”" : {
       "comment" : "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name.",
       "localizations" : {
@@ -4070,6 +4206,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "边栏位置"
+          }
+        }
+      }
+    },
+    "Suspend %lld Pages" : {
+      "comment" : "Menu item for several picked tabs: puts their pages to sleep; each loads again when you click it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend Page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend %lld Pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "让 %lld 个页面休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Suspend Page" : {
+      "comment" : "File menu item: puts the tab's page to sleep; it loads again when you click the tab.\nItem in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让页面休眠"
           }
         }
       }
@@ -4191,6 +4373,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不再保留 %@ 的 Cookie"
+          }
+        }
+      }
+    },
+    "You put it to sleep. Loads when you click it." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: you put it to sleep with Suspend Page in its menu, and its page loads again once you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "是你让它休眠的，点按即可重新载入。"
           }
         }
       }
@@ -5000,6 +5193,17 @@
         }
       }
     },
+    "Check for Updates" : {
+      "comment" : "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "comment" : "Button in Settings › General, beside Zigzag's version.\nZigzag menu item.",
       "localizations" : {
@@ -5045,7 +5249,7 @@
       }
     },
     "Checking…" : {
-      "comment" : "On the certificate page of the site panel, while the certificate is read.",
+      "comment" : "On the certificate page of the site panel, while the certificate is read.\nThe Check for Updates button in Settings › Extensions while it checks.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6474,6 +6678,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "以下扩展未能添加："
+          }
+        }
+      }
+    },
+    "Couldn’t check %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个扩展无法检查。"
+                }
+              }
+            }
           }
         }
       }
@@ -12703,6 +12942,17 @@
         }
       }
     },
+    "No extensions from the Chrome Web Store to check." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有来自 Chrome 网上应用店的扩展需要检查。"
+          }
+        }
+      }
+    },
     "No extensions yet" : {
       "comment" : "A setting in Settings › Extensions.",
       "localizations" : {
@@ -13287,7 +13537,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nAddress bar above the page: the address stays in the sidebar.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19431,17 +19681,6 @@
         }
       }
     },
-    "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top." : {
-      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后退、前进、重新载入和地址放在页面上方的栏里，不放在边栏中。选“自动隐藏”时，向下滚动会收起这一栏，向上滚动或把指针移到窗口顶部时会重新出现。"
-          }
-        }
-      }
-    },
     "The Last Hour…" : {
       "comment" : "Item in the Clear History menu on the History page.",
       "localizations" : {
@@ -21378,6 +21617,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新请求更多权限"
+          }
+        }
+      }
+    },
+    "Updated %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已更新 %lld 个扩展。"
+                }
+              }
+            }
           }
         }
       }

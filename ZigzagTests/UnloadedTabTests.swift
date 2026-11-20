@@ -49,6 +49,34 @@ import Testing
         #expect(tab.notLoadedNote?.hasPrefix("Asleep to save memory.") == true)
     }
 
+    /// Suspend Page (#342): asleep as Zigzag would put it, said to be your doing, never memory freed.
+    @Test func oneYouPutToSleepSaysSo() {
+        let tab = restored()
+        tab.ensureWebView()
+        var refused: [Tab.StaysAwake] = []
+        tab.suspend(because: "test", chosen: true) { refused.append($0) }
+        #expect(refused.isEmpty)
+        #expect(tab.isAsleep && !tab.isLoaded)
+        #expect(tab.notLoadedNote == "You put it to sleep. Loads when you click it.")
+        #expect(!SleepMemory.note(.chosen, freed: 180 << 20).contains("Freed"))
+        tab.ensureWebView()
+        #expect(tab.notLoadedNote == nil)
+        tab.close()
+    }
+
+    @Test func aPageInTheMiniPlayerStaysAwakeAndSaysWhy() {
+        let tab = restored()
+        tab.ensureWebView()
+        tab.isInMiniPlayer = true
+        var refused: [Tab.StaysAwake] = []
+        tab.suspend(because: "test", chosen: true) { refused.append($0) }
+        #expect(refused == [.miniPlayer])
+        #expect(tab.isLoaded && !tab.isAsleep)
+        #expect(Tab.StaysAwake.miniPlayer.note == "Not put to sleep while it plays in the mini player")
+        tab.isInMiniPlayer = false
+        tab.close()
+    }
+
     @Test func wokenItIsLoadedAgainAndQuiet() {
         let tab = restored()
         tab.ensureWebView()
