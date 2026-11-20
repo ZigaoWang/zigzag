@@ -83,6 +83,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
             let field = NSRect(x: x * zoom, y: y * zoom, width: w * zoom, height: h * zoom)
             // Only visible fields; never open the menu for one scrolled away or offscreen.
             guard Self.isInView(field, viewport: webView.bounds.size) else { hide(); return }
+            // A click in the field its menu is open for leaves the menu as it is (#378).
+            if menu != nil, let target, target.webView === webView, target.origin == origin, Self.isSameField(field, self.field) { debugLog("autofill menu kept"); return }
             focusedByUser = body["byUser"] as? Bool == true
             let frame = message.frameInfo
             #if DEBUG
@@ -185,6 +187,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// Whether the field's center (web view points, top left) is inside the view.
     static func isInView(_ field: NSRect, viewport: NSSize) -> Bool {
         field.width > 0 && field.height > 0 && field.midX >= 0 && field.midX <= viewport.width && field.midY >= 0 && field.midY <= viewport.height
+    }
+
+    /// The same field, give or take a point of rounding.
+    static func isSameField(_ a: NSRect, _ b: NSRect) -> Bool {
+        abs(a.minX - b.minX) < 1 && abs(a.minY - b.minY) < 1 && abs(a.width - b.width) < 1 && abs(a.height - b.height) < 1
     }
 
     /// Whether a scroll hides the menu: one being made now, over the page or the menu.

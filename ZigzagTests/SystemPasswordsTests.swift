@@ -601,6 +601,15 @@ struct SystemPasswordsTests {
         #expect(!timed.isWatching)
     }
 
+    @Test func aClickInTheFieldKeepsItsMenu() {
+        let field = NSRect(x: 40, y: 120, width: 320, height: 32)
+        #expect(Autofill.isSameField(field, field))
+        #expect(Autofill.isSameField(field, NSRect(x: 40.4, y: 120.3, width: 320, height: 32)))
+        // Another field, or this one moved by a scroll: the menu comes up again for it.
+        #expect(!Autofill.isSameField(field, NSRect(x: 40, y: 170, width: 320, height: 32)))
+        #expect(!Autofill.isSameField(field, NSRect(x: 40, y: 120, width: 200, height: 32)))
+    }
+
     @Test func aScrollHidesTheMenuAsItStarts() {
         // Before, the menu went only once a scroll ended, and stayed while the pointer was on it (#378).
         #expect(Autofill.scrollHidesMenu(phase: .began, momentumPhase: [], overPage: true, overMenu: false))
