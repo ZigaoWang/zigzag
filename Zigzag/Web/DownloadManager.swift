@@ -566,11 +566,8 @@ extension DownloadManager: WKDownloadDelegate {
             try? FileManager.default.removeItem(at: earlier)
             return earlier
         }
-        // A Firefox package from the store is an install, not a download to keep: it goes to a temporary file,
-        // stays out of the list, and is offered with the store's own sheet once its bytes match the sha256 AMO
-        // publishes. Both ends must be AMO's: the click's page is a listing, and the file comes from its download
-        // path, so no other site can open the sheet. Rules don't apply, and a destination someone already chose
-        // (Save Page As, the bridge) is an explicit save and is left alone.
+        // Add to Firefox: a clicked AMO listing and an AMO file go to a temporary file and the install sheet, not
+        // the download list. Save Page As and the bridge keep their chosen file.
         let fromAMO = download.originalRequest?.mainDocumentURL.flatMap(ExtensionStore.addonsSlug)
             ?? (download.webView as? BrowserWebView)?.owner?.url.flatMap(ExtensionStore.addonsSlug)
         // Only a click opens the sheet: a script on the store's own page can't.

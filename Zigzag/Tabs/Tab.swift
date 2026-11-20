@@ -1691,8 +1691,7 @@ extension Tab: WKNavigationDelegate {
         // The page is asked for as the browser it's to be told it's in (the developer tools' User Agent): a request
         // made as another is made again, so no page off the list is asked for as one you chose for your own site.
         if decidesMainFrame {
-            // addons.mozilla.org offers an add-on to Firefox itself: a Firefox there, so its own button says Add to
-            // Firefox and hands over the .xpi, which Install from File adds. Everywhere else the chosen agent.
+            // addons.mozilla.org shows Add to Firefox only to Firefox.
             let storeAgent = Self.addonsPage(url) != nil ? DeveloperState.UserAgent.firefox.string : nil
             let wanted = storeAgent ?? developerInEffect(at: url).userAgent.string
             let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
