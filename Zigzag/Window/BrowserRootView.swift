@@ -383,6 +383,8 @@ final class BrowserRootView: SpaceFrameView {
     /// Whether the grid's line between the columns was parted when this drag began: until it is, a plain drag moves
     /// whole lines as it always did, and Shift moves one segment (#316).
     private var dragStartedParted = false
+    /// The group as the drag began: which of its lines were parted then decides what the drag moves (#316).
+    private var dragStart: TileShape?
 
     private struct DividerKey: Hashable {
         var axis: TileShape.Segment.Axis
@@ -1058,11 +1060,12 @@ final class BrowserRootView: SpaceFrameView {
             guard let self else { return }
             self.draggedSegment = handle?.segment
             self.dragStartedParted = self.tiles?.isParted ?? false
+            self.dragStart = self.tiles
         }
         handle.onDrag = { [weak self] value, shift in
             guard let self, let segment = self.draggedSegment, var shape = self.tiles else { return }
             let area = self.cardFrame
-            let whole = !self.dragStartedParted && !shift
+            let whole = !(self.dragStart?.movesAlone(segment.axis, shift: shift) ?? false)
             var snapColumn: CGFloat?, snapRow: CGFloat?
             if segment.axis == .column {
                 shape.moveColumnLine(in: segment.row, to: (value - area.minX) / area.width,
@@ -1096,6 +1099,7 @@ final class BrowserRootView: SpaceFrameView {
             guard let self else { return }
             self.draggedCorner = handle?.corner
             self.dragStartedParted = self.tiles?.isParted ?? false
+            self.dragStart = self.tiles
             if let handle, let corner = handle.corner, let shape = self.tiles {
                 let area = self.cardFrame, press = self.convert(handle.pressedAt, from: nil)
                 let x = area.minX + shape.columnShares[corner.rows.first ?? 0] * area.width
@@ -1112,8 +1116,9 @@ final class BrowserRootView: SpaceFrameView {
                              minimumWidth: Self.minimumPaneWidth, minimumHeight: Self.minimumPaneHeight, whole: whole)
             self.tiles = shape
             self.layoutSubtreeIfNeeded()
-            let snapColumn = !whole && !shift ? corner.rows.lazy.compactMap { shape.columnSnapShare(in: $0, whole: whole, length: area.width) }.first : nil
-            let snapRow = !whole && !shift ? corner.columns.lazy.compactMap { shape.rowSnapShare(in: $0, whole: whole, length: area.height) }.first : nil
+            // Only a parted line's segments snap.
+            let snapColumn = !shift && shape.columnsApart ? corner.rows.lazy.compactMap { shape.columnSnapShare(in: $0, whole: false, length: area.width) }.first : nil
+            let snapRow = !shift && shape.rowsApart ? corner.columns.lazy.compactMap { shape.rowSnapShare(in: $0, whole: false, length: area.height) }.first : nil
             self.showSnapGuides(column: snapColumn, row: snapRow)
             self.onTilesChange?(shape, false)
         }
@@ -1150,8 +1155,9 @@ final class BrowserRootView: SpaceFrameView {
     /// The drag is over: a line let go near a snap — the middle, or the line it would meet — snaps there, unless
     /// Shift held it away, and the group's lines are saved as they ended (#316).
     private func endTilesDrag(shift: Bool) {
-        // A whole line stays where it's let go, as it always did; only a segment snaps.
-        guard !shift, dragStartedParted, var shape = tiles else {
+        // A whole line stays where it's let go, as it always did; only a segment of a line parted before the drag
+        // snaps.
+        guard !shift, let start = dragStart, start.isParted, var shape = tiles else {
             finishTilesDrag()
             return
         }
@@ -1159,19 +1165,19 @@ final class BrowserRootView: SpaceFrameView {
         let whole = false
         var snapped = false
         if let segment = draggedSegment {
-            if segment.axis == .column, let share = shape.columnSnapShare(in: segment.row, whole: whole, length: area.width) {
+            if segment.axis == .column, start.columnsApart, let share = shape.columnSnapShare(in: segment.row, whole: whole, length: area.width) {
                 shape.snapColumnLine(in: segment.row, to: share, whole: whole)
                 snapped = true
-            } else if segment.axis == .row, let share = shape.rowSnapShare(in: segment.column, whole: whole, length: area.height) {
+            } else if segment.axis == .row, start.rowsApart, let share = shape.rowSnapShare(in: segment.column, whole: whole, length: area.height) {
                 shape.snapRowLine(in: segment.column, to: share, whole: whole)
                 snapped = true
             }
         } else if let corner = draggedCorner {
-            if let share = corner.rows.lazy.compactMap({ shape.columnSnapShare(in: $0, whole: whole, length: area.width) }).first {
+            if start.columnsApart, let share = corner.rows.lazy.compactMap({ shape.columnSnapShare(in: $0, whole: whole, length: area.width) }).first {
                 for row in corner.rows { shape.snapColumnLine(in: row, to: share, whole: whole) }
                 snapped = true
             }
-            if let share = corner.columns.lazy.compactMap({ shape.rowSnapShare(in: $0, whole: whole, length: area.height) }).first {
+            if start.rowsApart, let share = corner.columns.lazy.compactMap({ shape.rowSnapShare(in: $0, whole: whole, length: area.height) }).first {
                 for column in corner.columns { shape.snapRowLine(in: column, to: share, whole: whole) }
                 snapped = true
             }
@@ -1187,6 +1193,7 @@ final class BrowserRootView: SpaceFrameView {
         draggedSegment = nil
         draggedCorner = nil
         dragStartedParted = false
+        dragStart = nil
         hideSnapGuides()
         // Handles kept for the drag's sake go now, or a line that changed its pages would leave one behind.
         needsLayout = true

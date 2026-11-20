@@ -173,6 +173,35 @@ struct TileLayoutTests {
         #expect(shape.columnsApart && !shape.rowsApart)
     }
 
+    @Test func onlyShiftOrAPartedLineMovesASegmentAlone() {
+        let grid: [TileRegion] = [.topLeft, .topRight, .bottomLeft, .bottomRight]
+        let even = TileShape(regions: grid)
+        #expect(!even.movesAlone(.column, shift: false) && !even.movesAlone(.row, shift: false))
+        #expect(even.movesAlone(.column, shift: true) && even.movesAlone(.row, shift: true))
+        // Columns parted: their segments move alone; the row line stays one line, even with Shift.
+        var columns = even
+        columns.columnShares = [0.3, 0.6]
+        #expect(columns.movesAlone(.column, shift: false))
+        #expect(!columns.movesAlone(.row, shift: false) && !columns.movesAlone(.row, shift: true))
+        // And the other way round.
+        var rows = even
+        rows.rowShares = [0.3, 0.6]
+        #expect(rows.movesAlone(.row, shift: false) && !rows.movesAlone(.column, shift: true))
+        // Out of a grid nothing parts.
+        #expect(!TileShape(regions: [.left, .topRight, .bottomRight]).movesAlone(.row, shift: true))
+    }
+
+    @Test func aCornerOfPartedRowsMovesOnlyItsOwnSegment() throws {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.rowShares = [0.3, 0.6]
+        let corner = try #require(shape.corners(in: area, gap: 10, slop: 2).first { $0.columns == [1] })
+        shape.moveCorner(corner, to: CGPoint(x: area.minX + 0.45 * area.width, y: area.minY + 0.7 * area.height),
+                         in: area, minimumWidth: 100, minimumHeight: 100)
+        // The left column's line stays put; the column line stays one line.
+        #expect(shape.rowShares[0] == 0.3 && abs(shape.rowShares[1] - 0.7) < 1e-9)
+        #expect(shape.columnShares[0] == shape.columnShares[1] && abs(shape.columnShares[0] - 0.45) < 1e-9)
+    }
+
     @Test func aSegmentSnapsToTheOtherColumnsLineAndTheMiddle() {
         var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
         shape.moveRowLine(in: 0, to: 0.35, length: area.height, minimum: 100)

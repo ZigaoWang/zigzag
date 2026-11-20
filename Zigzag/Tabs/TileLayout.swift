@@ -280,8 +280,7 @@ nonisolated struct TileShape: Equatable, Sendable {
         }
         columnShares[row] = value
         // Parting one pair of lines joins the other: the rows are one line while the columns are apart.
-        let one = (rowShares[0] + rowShares[1]) / 2
-        rowShares = [one, one]
+        if columnsApart { joinRows() }
     }
 
     /// Moves the line between the rows in `column` to `share` of the height. `whole`, or any layout but a grid: one
@@ -294,8 +293,7 @@ nonisolated struct TileShape: Equatable, Sendable {
             return
         }
         rowShares[column] = value
-        let one = (columnShares[0] + columnShares[1]) / 2
-        columnShares = [one, one]
+        if rowsApart { joinColumns() }
     }
 
     /// Moves a corner to `point` (in the area's top-down coordinates): the line between the columns there and the line
@@ -304,10 +302,15 @@ nonisolated struct TileShape: Equatable, Sendable {
     mutating func moveCorner(_ corner: Corner, to point: CGPoint, in area: CGRect, minimumWidth: CGFloat, minimumHeight: CGFloat, whole: Bool = false) {
         let x = Self.clamped((point.x - area.minX) / max(area.width, 1), length: area.width, minimum: minimumWidth)
         let y = Self.clamped((point.y - area.minY) / max(area.height, 1), length: area.height, minimum: minimumHeight)
-        rowShares = [y, y]
         if whole || !isGrid {
             columnShares = [x, x]
+            rowShares = [y, y]
+        } else if rowsApart {
+            // The rows are parted: the column line is one, and only the row segments that meet here move.
+            columnShares = [x, x]
+            for column in corner.columns where rowShares.indices.contains(column) { rowShares[column] = y }
         } else {
+            rowShares = [y, y]
             for row in corner.rows where columnShares.indices.contains(row) { columnShares[row] = x }
         }
     }
@@ -372,8 +375,7 @@ nonisolated struct TileShape: Equatable, Sendable {
         }
         columnShares[row] = share
         if abs(share - columnShares[1 - row]) < 0.0001 { columnShares = [share, share] }
-        let one = (rowShares[0] + rowShares[1]) / 2
-        rowShares = [one, one]
+        if columnsApart { joinRows() }
     }
 
     /// Puts the line between the rows in `column` at `share` exactly: the snap when a drag lets go near one.
@@ -384,8 +386,28 @@ nonisolated struct TileShape: Equatable, Sendable {
         }
         rowShares[column] = share
         if abs(share - rowShares[1 - column]) < 0.0001 { rowShares = [share, share] }
+        if rowsApart { joinColumns() }
+    }
+
+    /// One line between the rows, where the two segments were.
+    private mutating func joinRows() {
+        let one = (rowShares[0] + rowShares[1]) / 2
+        rowShares = [one, one]
+    }
+
+    /// One line between the columns, where the two segments were.
+    private mutating func joinColumns() {
         let one = (columnShares[0] + columnShares[1]) / 2
         columnShares = [one, one]
+    }
+
+    /// Whether a drag on `axis` moves one segment alone: that line is parted already, or Shift parts it while the
+    /// other line is one (#316). Anything else moves the whole line, as a split always did.
+    func movesAlone(_ axis: Segment.Axis, shift: Bool) -> Bool {
+        guard isGrid else { return false }
+        let own = axis == .column ? columnsApart : rowsApart
+        let other = axis == .column ? rowsApart : columnsApart
+        return own || (shift && !other)
     }
 
     /// The even grid again: every line at the middle.
