@@ -25540,6 +25540,83 @@
           }
         }
       }
+    },
+    "Pin Tab to Folder…" : {
+      "comment" : "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将标签页固定到文件夹…"
+          }
+        }
+      }
+    },
+    "Pin Link" : {
+      "comment" : "Item in a page's right-click menu over a link: pins the link, without opening it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定链接"
+          }
+        }
+      }
+    },
+    "Pin Page" : {
+      "comment" : "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定页面"
+          }
+        }
+      }
+    },
+    "The page is pinned in %@. Add to Favorites shows it in all of the profile’s spaces instead." : {
+      "comment" : "Under the title of the sheet that pins a page: the space it's pinned in, which the sheet doesn't let you change, and what Add to Favorites means. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面会固定在“%@”中。“添加到收藏”则会让它显示在个人资料的所有空间中。"
+          }
+        }
+      }
+    },
+    "Where It's Pinned" : {
+      "comment" : "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定位置"
+          }
+        }
+      }
+    },
+    "Top of Pinned" : {
+      "comment" : "Choice in the sheet that pins a page: among the space's pinned pages, in no folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定页面顶部"
+          }
+        }
+      }
+    },
+    "New Folder…" : {
+      "comment" : "Item at the foot of the folder menu in the sheet that pins a page: names a new folder to pin the page in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建文件夹…"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -2411,7 +2411,7 @@ final class SidebarListView: NSView {
         case (.tab, .bookmarks):
             if let tab {
                 let index = drag.targetIndex
-                delegate?.listAsOne(String(localized: "Pin Tab", comment: "Undo action name, shown in Edit › Undo.")) { [weak self] in
+                delegate?.listAsOne(SavePath.saveName) { [weak self] in
                     if tab.spaceID != space { self?.delegate?.listMove(tab, to: 0, in: space) }
                     self?.delegate?.listBookmark(tab, at: index, in: space)
                     // Among a folder's pages: into that folder.
