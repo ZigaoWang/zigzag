@@ -7,6 +7,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ### Fixed
 - A private window no longer adds to Favorites or renames, files or moves pinned tabs and their folders; it leaves your saved pages as they are.
+- A space rule for a path of a site now also takes the site's www. address, as rules for a whole domain already did: github.com/org1 matches www.github.com/org1, and a rule written with www. matches the bare address too.
 
 ## [0.9.3] - 2026-11-18
 

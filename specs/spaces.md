@@ -37,8 +37,8 @@
 ## Sites that open in a space
 - Rules in Settings › Spaces → tried top to bottom; the first enabled rule that matches wins.
   Test: SiteRoutesTests.reorderingChangesWinnerAndWarningsTogether
-- Path and subpaths → matches whole segments on that one host; "github.com/org1" doesn't take /org10 or www.github.com.
-  Test: SiteRoutesTests.matchesPathsOnSegmentBoundariesAndPreservesHostScope
+- Path and subpaths → matches whole segments on that one host, with or without www.; "github.com/org1" doesn't take /org10 or gist.github.com.
+  Test: SiteRoutesTests.aPathRuleCoversTheSitesWWWAddress
 - A port in a rule (localhost:3000) → accepted but dropped; the rule covers every port.
   Test: SiteRoutesTests.portsAreAcceptedButDoNotRestrictTheRule
 - Type an address, click a link, or open one from another app → it opens in its rule's space, unless you're already there.

@@ -34,8 +34,9 @@ enum SiteRoutes {
             switch match {
             case .domain: SiteRoutes.covers(host, urlHost)
             case .host: host == urlHost
+            // A site's www. address is the same site, as for domain rules.
             case .path:
-                host == urlHost && Self.matchesPath(path, in: urlPath)
+                host.withoutWWW == urlHost.withoutWWW && Self.matchesPath(path, in: urlPath)
             }
         }
 
