@@ -1,14 +1,119 @@
 import Foundation
 
-/// Sites that always open in a chosen space (#286), like Arc's Air Traffic Control. A site is a host without "www." and
-/// covers its subdomains; the most specific entry wins.
-///
-/// Routes are stored on each space (`SpaceInfo.routedSites`), so removing a space removes its routes and ⌘Z restores
-/// them.
+/// Settings › Spaces tests these rules in display order. The first match owns the link.
 enum SiteRoutes {
-    struct Route: Equatable, Sendable {
+    enum Match: String, Codable, CaseIterable, Sendable {
+        case host, domain, path
+
+        var title: String {
+            switch self {
+            case .host: String(localized: "Domain only", comment: "Space rule matching only the named host.")
+            case .path: String(localized: "Path and subpaths", comment: "Space rule matching a path and its descendants on one host.")
+            case .domain: String(localized: "Domain and subdomains", comment: "Space rule matching a domain and its subdomains.")
+            }
+        }
+    }
+
+    struct Route: Codable, Identifiable, Equatable, Sendable {
+        var id = UUID()
+        var match: Match = .domain
         var site: String
         var spaceID: UUID
+        var isEnabled = true
+
+        /// Both editors validate and normalize the address before keeping an edit to this rule.
+        func edited(address: String, match: Match, spaceID: UUID, isEnabled: Bool) -> Self? {
+            guard let site = SiteRoutes.entry(from: address, match: match) else { return nil }
+            return Self(id: id, match: match, site: site, spaceID: spaceID, isEnabled: isEnabled)
+        }
+
+        private var host: String { String(site.prefix { $0 != "/" }) }
+        private var path: Substring { site.dropFirst(host.count) }
+
+        func matches(_ urlHost: String, path urlPath: String) -> Bool {
+            switch match {
+            case .domain: SiteRoutes.covers(host, urlHost)
+            case .host: host == urlHost
+            case .path:
+                host == urlHost && Self.matchesPath(path, in: urlPath)
+            }
+        }
+
+        private static func matchesPath(_ prefix: Substring, in path: String) -> Bool {
+            // Split before decoding so an escaped slash stays inside its original segment.
+            let expected = prefix.split(separator: "/", omittingEmptySubsequences: false)
+            let actual = path.split(separator: "/", omittingEmptySubsequences: false)
+            guard actual.count >= expected.count else { return false }
+            return zip(expected, actual).allSatisfy { lhs, rhs in
+                let a = lhs.removingPercentEncoding ?? String(lhs)
+                let b = rhs.removingPercentEncoding ?? String(rhs)
+                return a.caseInsensitiveCompare(b) == .orderedSame
+            }
+        }
+
+        /// True only when every URL covered by the later rule is also covered here.
+        func includes(_ other: Route) -> Bool {
+            if other.match == .domain { return match == .domain && SiteRoutes.covers(host, other.host) }
+            return matches(other.host, path: String(other.path))
+        }
+    }
+
+    /// On disk this is one ordered array. Keep future rules in their slots while this version edits the rules it knows.
+    struct StoredRules: Codable {
+        var rules: [Route]
+        private var future: [(index: Int, value: StoredValue)] = []
+
+        init(_ rules: [Route] = []) { self.rules = rules }
+
+        init(from decoder: Decoder) throws {
+            rules = []
+            var entries = try decoder.unkeyedContainer()
+            while !entries.isAtEnd {
+                let index = entries.currentIndex
+                let entry = try entries.superDecoder()
+                // A rule this version can't read, from a newer Zigzag or edited by hand, is kept as it is and never
+                // stops the library from opening.
+                if let rule = try? Route(from: entry) { rules.append(rule) }
+                else if let value = try? StoredValue(from: entry) { future.append((index, value)) }
+            }
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var entries = encoder.unkeyedContainer()
+            var known = rules.makeIterator()
+            for item in future {
+                while entries.count < item.index, let rule = known.next() { try entries.encode(rule) }
+                try entries.encode(item.value)
+            }
+            while let rule = known.next() { try entries.encode(rule) }
+        }
+
+        // A future rule can have fields this version has never seen, including nested objects.
+        private indirect enum StoredValue: Codable {
+            case null, bool(Bool), string(String), number(Decimal), array([Self]), object([String: Self])
+
+            init(from decoder: Decoder) throws {
+                let value = try decoder.singleValueContainer()
+                if value.decodeNil() { self = .null }
+                else if let bool = try? value.decode(Bool.self) { self = .bool(bool) }
+                else if let string = try? value.decode(String.self) { self = .string(string) }
+                else if let number = try? value.decode(Decimal.self) { self = .number(number) }
+                else if let array = try? value.decode([Self].self) { self = .array(array) }
+                else { self = .object(try value.decode([String: Self].self)) }
+            }
+
+            func encode(to encoder: Encoder) throws {
+                var value = encoder.singleValueContainer()
+                switch self {
+                case .null: try value.encodeNil()
+                case .bool(let v): try value.encode(v)
+                case .string(let v): try value.encode(v)
+                case .number(let v): try value.encode(v)
+                case .array(let v): try value.encode(v)
+                case .object(let v): try value.encode(v)
+                }
+            }
+        }
     }
 
     /// How a page was opened. Only user actions are routed, so a sign-in redirect never leaves its tab.
@@ -44,53 +149,143 @@ enum SiteRoutes {
 
     // MARK: Sites
 
-    /// Host without "www." or a trailing dot; nil for non-web URLs.
-    static func site(of url: URL?) -> String? {
+    private static func host(of url: URL?) -> String? {
         guard let url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               var host = url.host(percentEncoded: false)?.lowercased(), !host.isEmpty else { return nil }
-        if host.hasSuffix("."), host.count > 1 { host.removeLast() }
-        if host.hasPrefix("www."), host.count > 4 { host.removeFirst(4) }
+        if host.hasSuffix(".") { host.removeLast() }
+        if host.contains(":") && !host.hasPrefix("[") { return "[\(host)]" }
         return host.isEmpty ? nil : host
     }
 
-    /// True when `site` equals `entry` or is a subdomain of it.
+    static func site(of url: URL?) -> String? { host(of: url)?.withoutWWW }
+
     static func covers(_ entry: String, _ site: String) -> Bool { site == entry || site.hasSuffix("." + entry) }
 
-    /// Parses Add Site input: a host, a URL or a "*." pattern. Nil when there's no host.
-    static func entry(from text: String) -> String? {
-        var typed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !typed.isEmpty, !typed.contains(where: \.isWhitespace) else { return nil }
-        if !typed.contains("://") {
-            while typed.hasPrefix("*") || typed.hasPrefix(".") { typed.removeFirst() }
-            typed = "https://" + typed
+    static func address(_ text: String) -> URL? {
+        var input = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty, !input.contains(where: \.isWhitespace) else { return nil }
+        if !input.contains("://") { input = "https://" + input }
+        guard let parts = URLComponents(string: input), let url = parts.url,
+              let host = host(of: url), let schemeEnd = input.range(of: "://")?.upperBound,
+              parts.user == nil, parts.password == nil else { return nil }
+        // Validate the authority itself. URL accepts non-DNS characters, empty ports and escaped hostnames.
+        let authority = input[schemeEnd...]
+            .prefix { !"/?#".contains($0) }
+        guard !authority.contains("%"), !authority.contains("@") else { return nil }
+        // Rules match the hostname across ports, just as the old site lists did.
+        let portSuffix = authority.drop(while: { $0 != "]" }).dropFirst()
+        let port = host.hasPrefix("[") ? portSuffix : authority.drop(while: { $0 != ":" })
+        if !port.isEmpty {
+            let digits = port.dropFirst()
+            guard port.first == ":", !digits.isEmpty, digits.utf8.allSatisfy({ (48...57).contains($0) }),
+                  UInt16(digits) != nil else { return nil }
         }
-        guard let site = site(of: URL(string: typed)) else { return nil }
-        let name = site.trimmingCharacters(in: CharacterSet(charactersIn: "[]."))
-        return name.isEmpty ? nil : name
+        if host.hasPrefix("[") && host.hasSuffix("]") {
+            var bytes = in6_addr()
+            guard authority.dropLast(port.count).last == "]", inet_pton(AF_INET6, String(host.dropFirst().dropLast()), &bytes) == 1 else { return nil }
+        } else {
+            guard host.utf8.count <= 253 else { return nil }
+            let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+            guard labels.allSatisfy({ label in
+                (1...63).contains(label.utf8.count) && label.first != "-" && label.last != "-" &&
+                label.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }
+            }) else { return nil }
+            if labels.count > 1 && labels.allSatisfy({ $0.allSatisfy(\.isNumber) }) {
+                var bytes = in_addr()
+                guard inet_pton(AF_INET, host, &bytes) == 1 else { return nil }
+            }
+        }
+        return url
     }
 
-    // MARK: The list
-
-    /// All routes, in space order.
-    static func routes(in spaces: [SpaceInfo]) -> [Route] {
-        spaces.flatMap { space in (space.routedSites ?? []).map { Route(site: $0, spaceID: space.id) } }
+    private static func path(of url: URL) -> String {
+        var path = url.standardized.path(percentEncoded: true)
+        while path.hasSuffix("/") { path.removeLast() }
+        return path
     }
 
-    /// The most specific route covering `url`.
+    static func suggestedMatch(for text: String) -> Match {
+        guard let url = address(text), !path(of: url).isEmpty else { return .host }
+        return .path
+    }
+
+    static func entry(from text: String, match: Match = .domain) -> String? {
+        guard let url = address(text), let host = host(of: url) else { return nil }
+        switch match {
+        case .host, .domain:
+            let path = url.path(percentEncoded: true)
+            guard (path.isEmpty || path == "/"), url.query() == nil, url.fragment() == nil else { return nil }
+            // www.github.com would leave github.com and its other subdomains out.
+            return match == .domain ? host.withoutWWW : host
+        case .path:
+            let path = path(of: url)
+            return path.isEmpty ? nil : host + path
+        }
+    }
+
+    /// Each space's old sites in saved order, with a subdomain moved above its parent so it still wins as before.
+    static func migrated(from spaces: [SpaceInfo]) -> [Route] {
+        var rules: [Route] = []
+        for space in spaces {
+            for site in space.routedSites ?? [] where !rules.contains(where: { $0.site == site }) {
+                let rule = Route(match: .domain, site: site, spaceID: space.id)
+                rules.insert(rule, at: rules.firstIndex { covers($0.site, site) } ?? rules.endIndex)
+            }
+        }
+        return rules
+    }
+
+    /// Spaces with their old site lists filled from the enabled domain rules, so going back to an older Zigzag keeps them.
+    static func withLegacySites(_ spaces: [SpaceInfo], from rules: [Route]) -> [SpaceInfo] {
+        spaces.map { space in
+            var space = space
+            let sites = Set(rules.filter { $0.spaceID == space.id && $0.match == .domain && $0.isEnabled }.map(\.site))
+            space.routedSites = sites.isEmpty ? nil : sites.sorted()
+            return space
+        }
+    }
+
     static func route(for url: URL?, in routes: [Route]) -> Route? {
-        guard let site = site(of: url) else { return nil }
-        return routes.filter { covers($0.site, site) }.max { $0.site.count < $1.site.count }
+        guard let url, let host = host(of: url) else { return nil }
+        let path = path(of: url)
+        return routes.first { $0.isEnabled && $0.matches(host, path: path) }
     }
 
-    /// Moves `site` to `space` (nil: any space). A site belongs to at most one space.
-    static func setting(_ site: String, to space: UUID?, in spaces: [SpaceInfo]) -> [SpaceInfo] {
-        spaces.map { info in
-            var info = info
-            var sites = (info.routedSites ?? []).filter { $0 != site }
-            if info.id == space { sites.append(site) }
-            info.routedSites = sites.isEmpty ? nil : sites.sorted()
-            return info
+    /// Site Controls changes the winning rule. If there is none, reuse the exact domain rule it would create.
+    static func assigning(_ url: URL?, site: String, to space: UUID, in rules: [Route]) -> Route {
+        let existing = route(for: url, in: rules) ?? rules.first { !$0.isEnabled && $0.match == .domain && $0.site == site }
+        var rule = existing ?? Route(match: .domain, site: site, spaceID: space)
+        rule.spaceID = space
+        rule.isEnabled = true
+        return rule
+    }
+
+    static func blocker(for rule: Route, in rules: [Route]) -> Int? {
+        guard rule.isEnabled, !rule.site.isEmpty else { return nil }
+        return rules.prefix { $0.id != rule.id }.firstIndex { $0.isEnabled && !$0.site.isEmpty && $0.includes(rule) }
+    }
+
+    struct Coverage: Equatable {
+        var blockedBy: Int?
+        var blocks: [Int] = []
+    }
+
+    static func coverage(in rules: [Route]) -> [Coverage] {
+        var result = Array(repeating: Coverage(), count: rules.count)
+        for (index, rule) in rules.enumerated() {
+            if let first = blocker(for: rule, in: rules) {
+                result[index].blockedBy = first
+                result[first].blocks.append(index)
+            }
         }
+        return result
+    }
+
+    static func move(_ id: UUID, before next: UUID?, in rules: inout [Route]) {
+        guard id != next, let index = rules.firstIndex(where: { $0.id == id }) else { return }
+        let rule = rules.remove(at: index)
+        let target = rules.firstIndex { $0.id == next } ?? rules.endIndex
+        rules.insert(rule, at: target)
     }
 
     // MARK: Deciding
@@ -114,6 +309,17 @@ enum SiteRoutes {
         if Tab.isSignIn(url) { return true }
         let names = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.map { $0.name.lowercased() } ?? []
         return names.contains("redirect_uri") || names.contains("client_id")
+    }
+}
+
+extension SiteRoutes.Route {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        match = try values.decode(SiteRoutes.Match.self, forKey: .match)
+        site = try values.decode(String.self, forKey: .site)
+        spaceID = try values.decode(UUID.self, forKey: .spaceID)
+        isEnabled = try values.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
     }
 }
 

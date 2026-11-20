@@ -1057,6 +1057,15 @@ final class SitePanel: FloatingPanelView {
                 })
             case .openIn:
                 rows.append(openInRow())
+                if let rule = Library.shared.siteRoute(for: url) {
+                    let edit = IconButton(symbol: "slider.horizontal.3", size: .compact, toolTip: String(localized: "Edit Space Rule…", comment: "Edit the winning rule from Site Controls."))
+                    edit.onClick = { [weak self] _ in
+                        guard let self, let host = self.controller?.window?.contentView else { return }
+                        self.close()
+                        SiteRouteSheet.edit(rule, in: host)
+                    }
+                    rows.append(.custom(String(localized: "Edit Space Rule…", comment: "Edit the winning rule from Site Controls."), control: edit))
+                }
             case .localApps:
                 // This site's own scripts may reach a program listening on this Mac (LocalReceivers): a switch, never
                 // a question the page can raise. Off until it is turned on here.
@@ -1193,17 +1202,17 @@ final class SitePanel: FloatingPanelView {
     private func openInRow() -> PanelRow {
         let spaces = Library.shared.spaces
         let route = Library.shared.siteRoute(for: url)
-        let site = route?.site ?? SiteRoutes.site(of: url) ?? self.site
+        let site = SiteRoutes.site(of: url) ?? self.site
         let selected = route.flatMap { route in spaces.firstIndex { $0.id == route.spaceID }.map { $0 + 1 } } ?? 0
-        let pageSite = SiteRoutes.site(of: url)
-        return .choice(String(localized: "Open in", comment: "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from."),
+        return .choice(String(localized: "Open in", comment: "Destination space in Site Controls."),
                        options: [Self.anySpace] + spaces.map(\.name), selected: selected,
-                       status: { index in
-                           // Only when the choice belongs to a parent site: shows what else it covers.
-                           guard index > 0, site != pageSite else { return nil }
-                           return String(localized: "All of \(site)", comment: "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).")
-                       }) { index in
-            Library.shared.setSiteRoute(site, to: index > 0 && spaces.indices.contains(index - 1) ? spaces[index - 1].id : nil)
+                       status: { _ in route?.scopeDescription }) { [weak self] index in
+            guard let self else { return }
+            if index > 0, spaces.indices.contains(index - 1) {
+                let updated = SiteRoutes.assigning(url, site: site, to: spaces[index - 1].id, in: Library.shared.siteRoutes)
+                Library.shared.saveRoute(updated)
+            } else if let route { Library.shared.removeRoute(route.id) }
+            rebuildRows()
         }
     }
 
@@ -1949,27 +1958,45 @@ final class PanelLinkRow: InteractiveView {
     }
 }
 
-/// − 100% +: the page's zoom a step out or in, and the percentage, which sets it back to 100%.
+/// − 100% +: a value a step out or in, and the percentage, which sets it back. The page's zoom in the site panel,
+/// and the sidebar's size in Settings › Appearance with steps and words of its own (#361).
 final class ZoomStepper: NSView {
-    private let minus = IconButton(symbol: "minus", size: .compact, toolTip: String(localized: "Zoom Out", comment: "Tooltip of the − button on the Zoom row of the site panel."))
-    private let plus = IconButton(symbol: "plus", size: .compact, toolTip: String(localized: "Zoom In", comment: "Tooltip of the + button on the Zoom row of the site panel."))
+    /// The steps it goes through, in values where 1 is 100%: the page's zoom unless a caller sets its own.
+    var steps: [CGFloat] = ZoomLevels.steps {
+        didSet { invalidateIntrinsicContentSize(); refresh() }
+    }
+    /// Where the percentage puts it back: a page's default zoom unless a caller sets its own.
+    var reset: () -> CGFloat = { ZoomLevels.defaultZoom }
+    /// What its buttons say to the pointer and VoiceOver.
+    var lessTip = String(localized: "Zoom Out", comment: "Tooltip of the − button on the Zoom row of the site panel.") { didSet { refresh() } }
+    var moreTip = String(localized: "Zoom In", comment: "Tooltip of the + button on the Zoom row of the site panel.") { didSet { refresh() } }
+    var resetTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.") { didSet { refresh() } }
+    /// The percentage's VoiceOver name, a format with the value in it: "Zoom %@, Actual Size" for a page.
+    var percentName = String(localized: "Zoom %@, Actual Size", comment: "VoiceOver name of the percentage on the Zoom row of the site panel: the zoom now, then what pressing it does.") {
+        didSet { refresh() }
+    }
+    private let minus = IconButton(symbol: "minus", size: .compact)
+    private let plus = IconButton(symbol: "plus", size: .compact)
     private let percent = PillButton(title: "100%", style: .quiet)
     /// The zoom now, as the page has it.
     var zoom: CGFloat = 1 { didSet { refresh() } }
     var onChange: ((CGFloat) -> Void)?
 
-    /// Wide enough for any step ("300%"), so the buttons around it never move.
+    /// Wide enough for the widest step ("300%"), so the buttons around it never move.
     private var percentWidth: CGFloat {
-        ceil(("300%" as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width) + Tokens.Space.x4
+        let widest = ZoomLevels.percent(steps.max() ?? 1)
+        return ceil((widest as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width) + Tokens.Space.x4
     }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        percent.toolTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.")
         [minus, percent, plus].forEach { addSubview($0) }
         minus.onClick = { [weak self] _ in self?.go(-1) }
         plus.onClick = { [weak self] _ in self?.go(1) }
-        percent.onClick = { [weak self] _ in self?.set(ZoomLevels.defaultZoom) }
+        percent.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.set(self.reset())
+        }
         refresh()
     }
 
@@ -1987,14 +2014,14 @@ final class ZoomStepper: NSView {
         switch which {
         case "in": go(1)
         case "out": go(-1)
-        default: set(ZoomLevels.defaultZoom)
+        default: set(reset())
         }
     }
     #endif
 
     private func go(_ direction: Int) {
-        guard ZoomLevels.canStep(zoom, by: direction) else { return }
-        set(ZoomLevels.step(zoom, by: direction))
+        guard ZoomLevels.canStep(zoom, by: direction, in: steps) else { return }
+        set(ZoomLevels.step(zoom, by: direction, in: steps))
     }
 
     private func set(_ value: CGFloat) {
@@ -2004,10 +2031,13 @@ final class ZoomStepper: NSView {
     }
 
     private func refresh() {
+        minus.toolTip = lessTip
+        plus.toolTip = moreTip
+        percent.toolTip = resetTip
         percent.title = ZoomLevels.percent(zoom)
-        percent.setAccessibilityLabel(String(localized: "Zoom \(ZoomLevels.percent(zoom)), Actual Size", comment: "VoiceOver name of the percentage on the Zoom row of the site panel: the zoom now, then what pressing it does."))
-        minus.isEnabled = ZoomLevels.canStep(zoom, by: -1)
-        plus.isEnabled = ZoomLevels.canStep(zoom, by: 1)
+        percent.setAccessibilityLabel(String(format: percentName, ZoomLevels.percent(zoom)))
+        minus.isEnabled = ZoomLevels.canStep(zoom, by: -1, in: steps)
+        plus.isEnabled = ZoomLevels.canStep(zoom, by: 1, in: steps)
     }
 
     override func layout() {

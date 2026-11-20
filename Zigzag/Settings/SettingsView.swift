@@ -47,6 +47,24 @@ final class FormGroup: NSView {
         lines = []
     }
 
+    /// Keep the focused row and its controls attached when rules change order.
+    func setRows(_ ordered: [NSView]) {
+        let kept = Set(ordered.map(ObjectIdentifier.init))
+        for row in rows where !kept.contains(ObjectIdentifier(row)) { row.removeFromSuperview() }
+        rows = ordered
+        setAccessibilityChildren(ordered)
+        setAccessibilityChildrenInNavigationOrder(ordered)
+        let needed = max(0, ordered.count - 1)
+        while lines.count > needed { lines.removeLast().removeFromSuperview() }
+        while lines.count < needed {
+            let line = ColorView(color: Tokens.Color.separator)
+            lines.append(line)
+            addSubview(line)
+        }
+        for row in ordered where row.superview !== self { addSubview(row) }
+        needsLayout = true
+    }
+
     func fittingHeight(for width: CGFloat) -> CGFloat { rows.filter { !$0.isHidden }.map { rowHeight($0, width) }.reduce(0, +) }
 
     /// Shows only the rows that have every word of a search (all of them when `names`, its heading or its pane,
@@ -308,12 +326,14 @@ final class FormRow: NSView, SettingsSearchable {
         detail.isHidden ? 0 : ceil(detail.sizeThatFits(NSSize(width: textWidth(for: width, control) + Label.inset * 2, height: 400)).height)
     }
 
+    private var titleAndGap: CGFloat { title.stringValue.isEmpty ? 0 : title.lineHeight + Self.lineGap }
+
     /// The height this row needs at `width`.
     func height(for width: CGFloat) -> CGFloat {
         let size = controlSize
         let stack = isStacked(width, size) ? Tokens.Space.x3 + size.height : 0
         guard !detail.isHidden else { return stack > 0 ? Tokens.Page.groupRowPad * 2 + title.lineHeight + stack : Tokens.Page.groupRowHeight }
-        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + title.lineHeight + Self.lineGap + detailHeight(for: width, size) + stack)
+        return max(Tokens.Page.groupRowHeight, Tokens.Page.groupRowPad * 2 + titleAndGap + detailHeight(for: width, size) + stack)
     }
 
     override func layout() {
@@ -330,11 +350,11 @@ final class FormRow: NSView, SettingsSearchable {
         let x = textInset - Label.inset
         let width = textWidth(for: bounds.width, size) + Label.inset * 2
         let detailHeight = detailHeight(for: bounds.width, size)
-        let block = title.lineHeight + (detail.isHidden ? 0 : Self.lineGap + detailHeight)
+        let block = detail.isHidden ? title.lineHeight : titleAndGap + detailHeight
         // A lone title centers its caps, level with the control's text.
         let top = stacked ? Tokens.Page.groupRowPad : detail.isHidden ? title.centeredY(in: bounds.height) : round((bounds.height - block) / 2)
         title.frame = NSRect(x: x, y: top, width: width, height: title.lineHeight)
-        detail.frame = NSRect(x: x, y: title.frame.maxY + Self.lineGap, width: width, height: detailHeight)
+        detail.frame = NSRect(x: x, y: top + titleAndGap, width: width, height: detailHeight)
     }
 }
 
@@ -1008,6 +1028,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let ownProfileToggle = Toggle()
     /// Sites that always open in a space (#286).
     private let routesGroup = FormGroup()
+    private let routeHint = FormRow(title: "", detail: String(localized: "The first enabled match chooses the space. Drag to reorder.", comment: "Byline under Sites in Spaces."),
+                                    control: SiteRouteSheet.matchHelpButton())
+    private var routeRows: [(id: UUID, row: SiteRouteRow)] = []
     private let profilesGroup = FormGroup()
     private let appearanceGroup = FormGroup()
     private let miniGroup = FormGroup()
@@ -1083,6 +1106,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let favoritesPerRow = DropdownButton()
     private let pageZoom = DropdownButton()
     private let sidebarSize = DropdownButton()
+    /// The size of your own beside Sidebar size, there while Custom is chosen (#361).
+    private let sidebarSizeStepper = ZoomStepper()
+    private var sidebarSizeRow: FormRow?
     private let darkPages = DropdownButton()
     private let pureBlackToggle = Toggle()
     private lazy var pureBlackRow: FormRow = {
@@ -1113,7 +1139,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let fullScreenFill = DropdownButton()
     private let suggestionsToggle = Toggle()
     private let borderlessToggle = Toggle()
-    private let addressAboveToggle = Toggle()
+    private let addressPlaceMenu = DropdownButton()
     private let sidebarSide = DropdownButton()
     /// Sidebar position's choices, Left then Right, as whether the sidebar is on the right (#360).
     static let sidebarSides = [false, true]
@@ -1197,7 +1223,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let translateInto = DropdownButton()
     private var languages: [(id: String, name: String)] = []
     private let addSpaceButton = PillButton(title: String(localized: "New Space", comment: "Button beside Your Spaces in Settings › Spaces."))
-    private let addRouteButton = PillButton(title: String(localized: "Add Site…", comment: "Button beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space."))
+    private let addRouteButton = PillButton(title: String(localized: "Add Rule…", comment: "Add a space routing rule in Settings."))
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Install from Folder…", comment: "Button in Settings › Extensions: installs an extension from a folder on this Mac, one you're building or one that came with an app."))
@@ -1468,10 +1494,22 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         appearanceGroup.add(FormRow(title: String(localized: "Borderless page", comment: "A setting in Settings › Appearance."),
                                     detail: String(localized: "The page meets the window’s edges instead of floating inside it. Hold ⌥⌘ and drag anywhere on the page to move the window.", comment: "Explanation under “Borderless page” in Settings › Appearance. ⌥⌘ are the Option and Command keys."),
                                     control: borderlessToggle))
-        addressAboveToggle.onChange = { on in BrowserRootView.addressAbovePage = on }
+        addressPlaceMenu.options = AddressBarPlace.allCases.map { place in
+            switch place {
+            case .off: DropdownButton.Option(title: String(localized: "Off", comment: "Address bar above the page: the address stays in the sidebar."))
+            case .autohide: DropdownButton.Option(title: String(localized: "Autohide", comment: "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up."))
+            case .always: DropdownButton.Option(title: String(localized: "Always", comment: "Address bar above the page: the bar stays above the page."))
+            }
+        }
+        addressPlaceMenu.onSelect = { index in
+            let places = AddressBarPlace.allCases
+            guard places.indices.contains(index) else { return }
+            BrowserRootView.addressBarPlace = places[index]
+        }
         let addressRow = FormRow(title: String(localized: "Address bar above the page", comment: "A setting in Settings › Appearance."),
-                                 detail: String(localized: "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden.", comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
-                                 control: addressAboveToggle)
+                                 detail: String(localized: "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top.",
+                                                      comment: "Explanation under “Address bar above the page” in Settings › Appearance."),
+                                 control: addressPlaceMenu)
         addressRow.keywords = String(localized: "toolbar top bar url location", comment: "Words that find the Address bar above the page setting with Find a setting in Settings. Not shown.")
         appearanceGroup.add(addressRow)
         sidebarSide.options = [
@@ -1495,20 +1533,40 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         sideToken = NotificationCenter.default.addObserver(forName: BrowserRootView.sidebarSideChanged, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.sidebarSide.selectedIndex = BrowserRootView.sidebarOnRight ? 1 : 0 }
         }
-        // As macOS's System Settings › Appearance › Sidebar icon size: three sizes, Medium as Zigzag has always been.
+        // As macOS's System Settings › Appearance › Sidebar icon size, and a size of your own (#361): Medium as
+        // Zigzag has always been.
         sidebarSize.options = Tokens.Sidebar.Size.allCases.map { size in
             let title = switch size {
             case .small: String(localized: "Small", comment: "A choice for “Sidebar size” in Settings › Appearance.")
             case .medium: String(localized: "Medium", comment: "A choice for “Sidebar size” in Settings › Appearance: the usual size.")
             case .large: String(localized: "Large", comment: "A choice for “Sidebar size” in Settings › Appearance.")
+            case .custom: String(localized: "Custom", comment: "A choice for “Sidebar size” in Settings › Appearance: a percentage of Medium that you set.")
             }
             return DropdownButton.Option(title: title)
         }
-        sidebarSize.onSelect = { index in Tokens.Sidebar.size = Tokens.Sidebar.Size.allCases[index] }
+        sidebarSizeStepper.steps = Tokens.Sidebar.customSteps
+        sidebarSizeStepper.reset = { 1 }
+        sidebarSizeStepper.lessTip = String(localized: "Smaller Sidebar", comment: "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.")
+        sidebarSizeStepper.moreTip = String(localized: "Larger Sidebar", comment: "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.")
+        sidebarSizeStepper.resetTip = String(localized: "Usual Size", comment: "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.")
+        sidebarSizeStepper.percentName = String(localized: "Sidebar size %@, Usual Size", comment: "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.")
+        sidebarSizeStepper.onChange = { value in Tokens.Sidebar.customScale = value }
+        let sizeControls = NSStackView(views: [sidebarSize, sidebarSizeStepper])
+        sizeControls.spacing = Tokens.Space.x2
+        sizeControls.alignment = .centerY
+        sizeControls.detachesHiddenViews = true
         let sizeRow = FormRow(title: String(localized: "Sidebar size", comment: "A setting in Settings › Appearance: how large the sidebar's tabs, folders, space names, favorites and address are, as macOS's Sidebar icon size."),
                               detail: String(localized: "The size of the tabs, folders, favorites and address. To make everything on your Mac larger, use Larger Text in System Settings › Displays.",
                                              comment: "Explanation under “Sidebar size” in Settings › Appearance. Larger Text and System Settings › Displays are macOS's own names."),
-                              control: sidebarSize)
+                              control: sizeControls)
+        sidebarSizeRow = sizeRow
+        // The menu and the percentage both set the size; the row shows whichever is chosen.
+        sidebarSize.onSelect = { [weak self] index in
+            Tokens.Sidebar.size = Tokens.Sidebar.Size.allCases[index]
+            self?.refreshSidebarSize()
+            self?.laidOutWidth = -1
+            self?.needsLayout = true
+        }
         // 侧边栏 is what people type, though Zigzag says 边栏 (docs/i18n/glossary.md): found by it, never shown.
         sizeRow.keywords = String(localized: "text size font bigger larger smaller scale zoom interface ui", comment: "Words that find the Sidebar size setting with Find a setting in Settings. Not shown.") + " 侧边栏"
         appearanceGroup.add(sizeRow)
@@ -1649,7 +1707,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         ownProfileRow.keywords = String(localized: "separate profile per space each own container isolate new space", comment: "Words that find the Give new spaces their own profile setting with Find a setting in Settings. Not shown.")
         newSpacesGroup.add(ownProfileRow)
         addSpaceButton.onClick = { [weak self] _ in self?.addSpace() }
-        addRouteButton.onClick = { [weak self] _ in if let self { SiteRouteSheet.add(in: self) } }
+        addRouteButton.onClick = { [weak self] _ in self?.addRoute() }
         addProfileButton.onClick = { [weak self] _ in if let self { ProfileSheets.new(in: self) } }
         profilePicker.onSelect = { [weak self] index in self?.choseProfile(at: index) }
         refreshProfilePicker()
@@ -2511,36 +2569,39 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    /// Sites in Spaces: each routed site and its space.
+    private func addRoute() {
+        let library = Library.shared
+        guard let spaceID = BrowserWindowController.undoTarget?.tabManager.currentSpaceID ?? library.spaces.first?.id else { return }
+        guard let host = window?.contentView else { return }
+        SiteRouteSheet.edit(.init(site: "", spaceID: spaceID), in: host, isNew: true)
+    }
+
     private func reloadRoutes() {
-        routesGroup.removeAllRows()
-        let routes = Library.shared.siteRoutes.sorted { $0.site < $1.site }
-        if routes.isEmpty {
-            routesGroup.add(FormRow(title: String(localized: "None yet", comment: "A row under Sites in Spaces in Settings › Spaces, shown when no site always opens in a space."),
-                                    detail: String(localized: "To always open a site in a space, choose it under Open in, in the site’s controls.", comment: "Explanation under “None yet” in Settings › Spaces › Sites in Spaces. Open in is the row in the site panel."),
-                                    control: NSView()))
-        }
-        let spaces = Library.shared.spaces
-        for route in routes {
-            let site = route.site
-            let choice = DropdownButton()
-            choice.options = spaces.map { DropdownButton.Option(title: $0.name) }
-            choice.selectedIndex = spaces.firstIndex { $0.id == route.spaceID } ?? 0
-            choice.setAccessibilityLabel(String(localized: "Space for \(site)", comment: "VoiceOver name of the space menu on a row in Settings › Spaces › Sites in Spaces: a site, like youtube.com."))
-            choice.onSelect = { index in
-                guard spaces.indices.contains(index) else { return }
-                Library.shared.setSiteRoute(site, to: spaces[index].id)
+        let library = Library.shared
+        let rules = library.siteRoutes
+        let existing = Dictionary(uniqueKeysWithValues: routeRows.map { ($0.id, $0.row) })
+        routeRows = rules.enumerated().map { index, rule in
+            let row = existing[rule.id] ?? SiteRouteRow(rule)
+            row.refresh(rule, spaces: library.spaces, number: index + 1)
+            row.onDraftChange = { [weak self] in
+                self?.updateRouteWarnings()
+                self?.layoutDocument()
             }
-            let remove = PillButton(title: String(localized: "Remove", comment: "Button on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again."))
-            remove.setAccessibilityLabel(String(localized: "Remove \(site)", comment: "VoiceOver name of the Remove button on a row in Settings › Developer: a site, like localhost, or a page size, like iPhone."))
-            remove.onClick = { _ in Library.shared.setSiteRoute(site, to: nil) }
-            let stack = NSStackView(views: [remove, choice])
-            stack.spacing = Tokens.Space.x2
-            let favicon = URL(string: "https://\(site)").flatMap { FaviconStore.shared.cachedIcon(for: $0) } ?? SettingsIcon.symbol("globe")
-            let row = FormRow(title: site, icon: favicon, control: stack)
-            row.revealsOnHover(remove)
-            routesGroup.add(row)
+            row.onSave = library.saveRoute
+            row.onDragStart = { [weak self, weak row] event in
+                guard let self, let row, !row.isEditing else { return false }
+                return self.beginRouteDrag(row, event: event)
+            }
+            return (rule.id, row)
         }
+        routesGroup.setRows([routeHint] + routeRows.map(\.row))
+        updateRouteWarnings()
+    }
+
+    private func updateRouteWarnings() {
+        let rows = routeRows.map(\.row)
+        let rules = rows.map(\.ruleForValidation)
+        for (row, result) in zip(rows, SiteRoutes.coverage(in: rules)) { row.setWarning(result.warning(in: rules)) }
     }
 
     private func reloadSpaces() {
@@ -3238,8 +3299,6 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             if spaceRows.count > 1 {
                 note(String(localized: "Drag a space to change its order.", comment: "Hint under Your Spaces in Settings › Spaces."))
                 section(Self.routesHeading, routesGroup, accessory: addRouteButton)
-                note(String(localized: "A site opens in its space wherever its link comes from: another app, the command bar or another space. It covers the site’s subdomains. When a space is removed, its sites open in any space again.",
-                            comment: "Under Sites in Spaces in Settings › Spaces."))
             }
         case .profiles:
             section(Self.profilesHeading, profilesGroup, accessory: addProfileButton)
@@ -3723,6 +3782,15 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         needsLayout = true
     }
 
+    /// Sidebar size's row follows the size: the choice shown, and the percentage there only for Custom.
+    private func refreshSidebarSize() {
+        sidebarSize.selectedIndex = Tokens.Sidebar.Size.allCases.firstIndex(of: Tokens.Sidebar.size) ?? 1
+        sidebarSizeStepper.zoom = Tokens.Sidebar.customScale
+        sidebarSizeStepper.isHidden = Tokens.Sidebar.size != .custom
+        sidebarSizeRow?.needsLayout = true
+        appearanceGroup.needsLayout = true
+    }
+
     /// The custom address row shows only with Custom chosen.
     private func refreshCustomSearch() {
         let shown = Library.shared.searchEngine == .custom
@@ -3761,7 +3829,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         fullScreenFill.selectedIndex = PageFullScreen.Fill.allCases.firstIndex(of: PageFullScreen.fill) ?? 0
         suggestionsToggle.isOn = SuggestionFetcher.isOn
         borderlessToggle.isOn = BrowserRootView.isBorderless
-        addressAboveToggle.isOn = BrowserRootView.addressAbovePage
+        addressPlaceMenu.selectedIndex = BrowserRootView.addressBarPlace.menuIndex
         sidebarSide.selectedIndex = Self.sidebarSides.firstIndex(of: BrowserRootView.sidebarOnRight) ?? 0
         doubleClickTabToggle.isOn = SidebarView.doubleClickOpensNewTab
         largeNamesToggle.isOn = SpaceHeaderView.isLarge
@@ -3786,7 +3854,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshDownloadPlace()
         archiveAfter.selectedIndex = TabArchive.After.allCases.firstIndex(of: TabArchive.after) ?? 0
         favoritesPerRow.selectedIndex = FavoritesView.perRowChoices.firstIndex(of: FavoritesView.perRow) ?? 0
-        sidebarSize.selectedIndex = Tokens.Sidebar.Size.allCases.firstIndex(of: Tokens.Sidebar.size) ?? 1
+        // Sidebar size's dropdown, and whether the percentage beside it shows.
+        refreshSidebarSize()
         pageZoom.selectedIndex = ZoomLevels.steps.firstIndex { abs($0 - ZoomLevels.defaultZoom) < 0.001 } ?? ZoomLevels.steps.firstIndex(of: 1) ?? 0
         darkPages.selectedIndex = DarkPages.Mode.allCases.firstIndex(of: DarkPages.mode) ?? 0
         pureBlackToggle.isOn = DarkPages.pureBlack
@@ -3890,6 +3959,55 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         layoutSubtreeIfNeeded()
         row.alphaValue = 1
         copy.land(on: downloadRuleRows.first { $0.id == ruleID }?.row)
+        return true
+    }
+
+    // MARK: Reordering space rules
+
+    private func beginRouteDrag(_ row: SiteRouteRow, event: NSEvent) -> Bool {
+        let order = routeRows
+        let visible = order.filter { !$0.row.isHidden }
+        guard let window, visible.count > 1, let startIndex = visible.firstIndex(where: { $0.row === row }) else { return false }
+        let id = visible[startIndex].id
+        // Lifted for its picture: its own solid card, so the copy reads off the list.
+        row.isLifted = true
+        let copy = CarriedCopy(of: row, picture: CarriedCopy.picture(of: row), grabbedAt: window.convertPoint(toScreen: event.locationInWindow),
+                               ground: nil, radius: Tokens.Radius.row)
+        row.isLifted = false
+        let originalOpacity = row.alphaValue
+        row.alphaValue = CarriedCopy.faint
+        copy.lift()
+        let line = InsertionLineView()
+        line.isHidden = true
+        routesGroup.addSubview(line)
+        let others = visible.filter { $0.row !== row }
+        var target = startIndex
+        let released = CarriedCopy.track(in: window) { event in
+            copy.follow(window.convertPoint(toScreen: event.locationInWindow))
+            self.documentView.autoscroll(with: event)
+            // Its new place: after every other visible row whose middle is above the pointer.
+            let y = self.routesGroup.convert(event.locationInWindow, from: nil).y
+            target = others.filter { $0.row.frame.midY < y }.count
+            line.isHidden = target == startIndex
+            let edge = target < others.count ? others[target].row.frame.minY : others.last?.row.frame.maxY ?? 0
+            Tokens.Motion.withoutAnimation { line.frame = NSRect(x: 0, y: round(edge) - 3, width: self.routesGroup.bounds.width, height: 6) }
+        }
+        line.removeFromSuperview()
+        row.alphaValue = originalOpacity
+        if released != nil, target != startIndex {
+            // In search results the last visible row can have hidden rows below it. Drop just after that row.
+            let before: UUID?
+            if target < others.count {
+                before = others[target].id
+            } else if let last = others.last, let index = order.firstIndex(where: { $0.id == last.id }) {
+                before = order.dropFirst(index + 1).first(where: { $0.id != id })?.id
+            } else {
+                before = nil
+            }
+            Library.shared.moveRoute(id, before: before)
+        }
+        layoutSubtreeIfNeeded()
+        copy.land(on: routeRows.first { $0.id == id }?.row)
         return true
     }
 

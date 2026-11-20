@@ -805,8 +805,13 @@ enum DebugBridge {
             try? (rows + [controller.tabManager.selectedTab?.displayTitle ?? "-"]).joined(separator: "\n").write(toFile: arg, atomically: true, encoding: .utf8)
         // newtabclick <i>: clicks the i-th of those rows.
         case "newtabclick": controller.newTabNote.debugClick(Int(arg) ?? 0)
-        // topbar on|off: Settings › Appearance › Address bar above the page.
-        case "topbar": BrowserRootView.addressAbovePage = arg == "on"
+        // topbar off|autohide|always|on: Settings › Appearance › Address bar above the page.
+        case "topbar":
+            switch arg {
+            case "on", "always": BrowserRootView.addressBarPlace = .always
+            case "autohide": BrowserRootView.addressBarPlace = .autohide
+            default: BrowserRootView.addressBarPlace = .off
+            }
         // sidebarside right|left: Settings › Appearance › Sidebar position.
         case "sidebarside": BrowserRootView.sidebarOnRight = arg == "right"
         // sideframes: where the sidebar, the page and the traffic lights are, in the debug log.
@@ -1180,11 +1185,16 @@ enum DebugBridge {
         // spaces and tabs.
         case "route":
             let f = arg.split(separator: " ", maxSplits: 1).map(String.init)
-            guard let site = f.first.flatMap(SiteRoutes.entry(from:)) else { break }
+            guard let text = f.first else { break }
+            let match = SiteRoutes.suggestedMatch(for: text)
+            guard let site = SiteRoutes.entry(from: text, match: match) else { break }
+            let existing = Library.shared.siteRoutes.first { $0.site == site && $0.match == match }
             let name = f.count > 1 ? f[1] : "any"
-            Library.shared.setSiteRoute(site, to: Library.shared.spaces.first { $0.name == name }?.id)
-        // sendclick x y [cmd]: a click sent straight to the window (top-left points); posted events don't reach a
-        // background copy.
+            if let space = Library.shared.spaces.first(where: { $0.name == name }) {
+                Library.shared.saveRoute(.init(id: existing?.id ?? UUID(), match: match, site: site, spaceID: space.id))
+            } else if name == "any", let existing { Library.shared.removeRoute(existing.id) }
+        // sendclick x y [cmd]: a click handed straight to the window (window points, top-left origin), for a copy that
+        // stays behind the app you're using, where posted events don't reach the page.
         case "sendclick":
             let f = arg.split(separator: " ").map(String.init)
             guard f.count >= 2, let x = Double(f[0]), let y = Double(f[1]), let window = controller.window else { break }
