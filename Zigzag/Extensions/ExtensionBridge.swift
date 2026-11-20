@@ -333,10 +333,7 @@ enum ExtensionBridgeScript {
     /// the rest of the app reads it; empty where there is no bundle to read it from (the local test build).
     static let firefoxAppVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 
-    /// Firefox's one runtime member WebKit has no counterpart for (firefox-polyfill.js): getBrowserInfo. WebKit's own
-    /// `browser` stays as it is: what an add-on reads through it is WebKit's, prototypes and all. The script gates
-    /// itself on the installed record, not the manifest, since a Chrome Web Store package may carry Firefox's keys too.
-    /// The app's version is written in where the polyfill reads it.
+    /// firefox-polyfill.js with the app version filled in; it acts only for a Firefox-kind record.
     static let firefoxPolyfill: String = {
         guard let url = Bundle.main.url(forResource: "firefox-polyfill", withExtension: "js"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
