@@ -12,6 +12,14 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+### 新功能
+- 边栏可以从屏幕边缘拉出来，盖在你正在做的事情上面，就像程序坞一样。在“设置 › 外观”里打开“从屏幕边缘拉出边栏”，把指针移到边栏所在的那一侧边缘：整个边栏都会显示在那里，空间、收藏、地址栏、标签页和正在播放的内容都在，盖在你正在用的 App 上面。点按标签页会让那个页面在边栏旁边以 Zigzag Mini 打开，盖在你正在用的 App 上，不会离开它，也不会切换空间；再点同一个标签页就放回去，点另一个就换过去。“回到 [空间]”会把页面放回原来的标签页，并让 Zigzag 来到前面。收藏，或者 Mini 接不了的页面（固定、无痕、Zigzag 自己的），会让 Zigzag 带着它来到前面。切换空间时边栏不会收起，把指针移开就会收回去，也不会把你正在用的东西的焦点抢走。窗口自己的边栏保持原样，这个开关默认是关着的。([#363](https://github.com/ZigaoWang/zigzag/issues/363))
+- 可以从文件安装 Firefox 扩展了：在“设置 › 扩展 › 从文件安装…”里选 **.xpi** 文件。扩展用的是 WebKit 自带的 `browser` API，和 Chrome 扩展一样，另外补上了 Firefox 的 `runtime.getBrowserInfo` 和 `runtime.getPlatformInfo`。容器这类 Firefox 独有的 API 暂不支持。感谢 [Lakeland97](https://github.com/Lakeland97)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
+- 在 addons.mozilla.org 上点“添加到 Firefox”就能装扩展：Zigzag 会先用商店公布的 sha256 核对文件，再弹出平常的安装面板。为了让这个按钮出现，打开 addons.mozilla.org 时会以 Firefox 的身份请求页面，不管你给它选了什么用户代理。其他网站的 .xpi 还是当普通文件下载。感谢 [Lakeland97](https://github.com/Lakeland97)。([#414](https://github.com/ZigaoWang/zigzag/issues/414))
+- 你允许的网站可以访问这台 Mac 上监听端口的程序，比如编辑器、下载助手或配套 App 运行的本地代理。Chrome 和 Firefox 允许安全页面访问 `http://localhost` 和 `ws://localhost`，WebKit 却把它当作混合内容拒绝，所以改由 Zigzag 以网站自己的身份发出请求，再把结果交给它。默认关闭：先在“设置 › 隐私 › 允许网站访问这台 Mac 上的 App”里开启，再在网站设置里打开该网站的“这台 Mac 上的 App”。网页无法自己申请这两项。扩展访问这台 Mac 上的程序和以前一样。开启这项设置后，“设置 › 扩展”里每个扩展还会多一个“这台 Mac 上的 App”开关，默认关闭，打开后即使扩展没有这个地址的访问权限，它的 `http://localhost` 请求也能通过。只限本机回环：不包括本地网络，不包括其他机器，不包括浏览器屏蔽的端口（比如邮件用的 25），也不包括图片、脚本和样式表。([#321](https://github.com/ZigaoWang/zigzag/issues/321))
+- 在三四个页面的分屏浏览里，拖动页面之间分隔线交汇的地方，可以同时调整两个方向的大小，指针在那里会变成斜向的调整箭头。在四个页面的网格里，按住 ⇧ 拖动左右页面之间的分隔线，只会移动指针这一侧的那一段，这样上面两个页面的宽度可以和下面的不一样。分开之后每一段都能单独拖动，在中间附近松开会吸附到中间，页面顶部条里的“重置平铺布局”会让网格重新均分。不按 ⇧ 拖动仍然和以前一样移动整条线，连按两下分隔线仍会让它回到中间。感谢 [Lakeland97](https://github.com/Lakeland97)。([#316](https://github.com/ZigaoWang/zigzag/issues/316)、[#309](https://github.com/ZigaoWang/zigzag/issues/309))
+- 扩展的地址栏关键词可以用了，比如 Raindrop.io 的“rd”。在命令栏里输入关键词，再按空格或 Tab：输入框前面会显示扩展的名称，接下来输入的内容会交给这个扩展，它给出的建议显示在下面。按 Return 交给扩展处理，⌘Return 在后台的新标签页中打开，⌘⇧Return 或 ⌥Return 在前台的新标签页中打开。按 Esc，或者什么都没输入时按删除键，就会退出关键词。两个扩展用了同一个关键词时，先安装的那个优先；Zigzag 已经用来搜索网站的关键词，比如 YouTube 的“yt”，仍然归那个网站。在无痕浏览窗口中，只有允许在那里使用的扩展的关键词有效。“设置 › 扩展”里不会再提示关键词无法使用。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
+
 ### 修复
 - 链接的右键菜单现在和 Chrome 一样，第一项是“在新标签页中打开链接”，然后是新窗口、无痕浏览窗口和速览。“打开链接”会在当前标签页打开，和直接点按一样，现在放到它们下面，不再排在第一。感谢 [retorquere](https://github.com/retorquere)。([#419](https://github.com/ZigaoWang/zigzag/issues/419))
 - 侧边栏底部的空间图标对齐了。每个图标都在按键正中，大小一致，火焰、书本和星星看起来是整齐的一排，表情符号也不再比符号偏高或偏低。

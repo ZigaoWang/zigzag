@@ -155,6 +155,8 @@ final class TabPreviewController {
     /// Hover can end without a word: the row closes under the pointer, or you switch apps. This checks while a
     /// preview is up and takes it away once the pointer has really left.
     private var watchTimer: Timer?
+    /// A click in the sidebar puts the preview away at once.
+    nonisolated(unsafe) private var clickMonitor: Any?
     #if DEBUG
     /// The debug bridge's hover: this row counts as under the pointer, wherever the real one is.
     weak var debugRow: NSView?
@@ -178,7 +180,10 @@ final class TabPreviewController {
         ]
     }
 
-    deinit { menuTokens.forEach(NotificationCenter.default.removeObserver) }
+    deinit {
+        menuTokens.forEach(NotificationCenter.default.removeObserver)
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+    }
 
     func hover(_ tab: Tab?, row: NSView?, bookmark: Bookmark?) {
         // No preview over an open panel or menu, or for a tab under the mini player while hovering or dragging it.
@@ -220,6 +225,15 @@ final class TabPreviewController {
         let panel = self.panel ?? TabPreviewView()
         self.panel = panel
         self.row = row
+        if clickMonitor == nil {
+            clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+                MainActor.assumeIsolated {
+                    guard let self, let controller = self.controller, event.window === controller.window else { return }
+                    if controller.root.sidebarFrame.contains(event.locationInWindow) { self.hide() }
+                }
+                return event
+            }
+        }
         // A split's row is one card: its first page, then the other, laid out as they share the window.
         let manager = controller.tabManager
         let pair = tab.flatMap { manager.split(for: $0) }
@@ -322,6 +336,8 @@ final class TabPreviewController {
         watchTimer = nil
         refreshTimer?.invalidate()
         refreshTimer = nil
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        clickMonitor = nil
         keepWatched()
         snapshotTokens = []
         guard let panel else { return }

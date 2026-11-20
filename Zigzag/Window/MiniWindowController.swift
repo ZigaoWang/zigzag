@@ -1,6 +1,20 @@
 import AppKit
 import WebKit
 
+/// The edge sidebar's floating Mini: a panel, not a browser window, so it can sit over other apps and full-screen
+/// Spaces without switching desktops. The browser window's own Mini keeps its traffic lights and title bar.
+final class MiniPanel: NSPanel {
+    var eventInterceptor: ((NSEvent) -> Bool)?
+
+    override func sendEvent(_ event: NSEvent) {
+        if eventInterceptor?(event) == true { return }
+        super.sendEvent(event)
+    }
+
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
+}
+
 /// Zigzag Mini: one page in a small, quiet window of its own, with no sidebar, for a link from another app or a
 /// quick look-up. A slim strip on top in the page's own color (`PageBar`), the page under it edge to edge: the space
 /// it goes to, the page's site, Keep on Top, Copy Link and Open in. Its page is a real tab, so
@@ -42,6 +56,18 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var tokens: [SignalToken] = []
     /// The page went into a browser window: closing this one must leave it alone.
     private var movedOut = false
+    /// A tab borrowed from a browser window: it stays in the sidebar, and Return puts its page back where it was.
+    private struct BorrowedOrigin {
+        weak var browser: BrowserWindowController?
+        weak var pane: NSView?
+        var frame: NSRect
+        var wasSelected: Bool
+    }
+    private var borrowedOrigin: BorrowedOrigin?
+    /// Called when a borrowed Mini closes, however it closes: the edge sidebar lets its row go.
+    var onBorrowedClose: (() -> Void)?
+    /// Whether this Mini is showing a tab borrowed from a browser, not a page it owns.
+    private var isBorrowed: Bool { borrowedOrigin != nil }
     /// Sent once the page has left (into a browser window, or closed with the window), so questions over it go too.
     private let pageGone = Signal<Void>()
     /// Sent when the window becomes or stops being key, which shows or holds its page's queued question.
@@ -207,13 +233,57 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
-    /// Whether a tab's page can go into Zigzag Mini: an ordinary tab's web page or file. Not a pinned page's or a
-    /// favorite's, which belong to the sidebar, nor Zigzag's own pages, nor a private window's: Zigzag Mini isn't
-    /// private.
-    nonisolated static func canTake(_ url: URL?, isPinned: Bool, isPrivate: Bool) -> Bool {
-        guard !isPinned, !isPrivate, let url else { return false }
-        return ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "")
+    /// Borrows a tab that stays in the sidebar: the page is shown live in Mini, and Return puts it back in the tab
+    /// and window it came from. The tab is not released or reinserted.
+    @discardableResult
+    static func open(borrowing tab: Tab, from browser: BrowserWindowController, origin: NSRect? = nil,
+                     frame: NSRect? = nil, overFullScreen: Bool? = nil,
+                     floating: Bool = false) -> MiniWindowController {
+        let screen = origin.flatMap { rect in NSScreen.screens.first { $0.frame.intersects(rect) } }
+            ?? browser.window?.screen ?? NSScreen.main
+        let area = screen?.visibleFrame ?? NSRect(origin: .zero, size: Tokens.Metric.windowDefaultSize)
+        let size = openingSize
+        let taken = all.compactMap { $0.window?.frame }
+        let targetFrame = frame ?? origin.map { Self.frame(size: size, under: $0, in: area) }
+            ?? Self.frame(size: size, in: area, taken: taken,
+                          around: browser.window.map { NSPoint(x: $0.frame.midX, y: $0.frame.midY) })
+        let pane = tab.pageHolder?.superview
+        let originFrame = tab.pageHolder?.frame ?? .zero
+        let borrowed = BorrowedOrigin(browser: browser, pane: pane, frame: originFrame,
+                                      wasSelected: browser.tabManager.selectedTab === tab)
+        tab.pageHolder?.removeFromSuperview()
+        let controller = MiniWindowController(tab: tab, frame: targetFrame,
+                                              overFullScreen: overFullScreen ?? (browser.window?.styleMask.contains(.fullScreen) == true),
+                                              borrowedOrigin: borrowed, floating: floating)
+        all.append(controller)
+        Diagnostics.note("Zigzag Mini borrowed a tab", site: tab.url?.host())
+        // The page has the keyboard before the window comes forward, as when a tab moves into Mini.
+        if let webView = controller.tab.webView { controller.window?.makeFirstResponder(webView) }
+        // The edge sidebar's Mini swells out of the sidebar card and over to the page's side.
+        if floating, let window = controller.window, let origin, origin != targetFrame, !Tokens.Motion.reduceMotion {
+            window.setFrame(origin, display: false)
+        }
+        controller.appear(from: origin)
+        if floating, let window = controller.window, let origin, origin != targetFrame, !Tokens.Motion.reduceMotion {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.28
+                context.timingFunction = Tokens.Motion.easeOut
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        }
+        if #available(macOS 15.4, *) { ExtensionCenter.miniOpened(controller) }
+        return controller
     }
+
+    /// Whether a tab's page can go into Zigzag Mini. Any tab's page can, as in a browser's picture-in-picture or a
+    /// second window: the page is the tab's own live one, moved and moved back, so a pinned page, a private window's
+    /// tab and even Zigzag's own pages go as they are. Modern pages draw with their own scripts, so split view's
+    /// wait is skipped.
+    nonisolated static func canTake(_ url: URL?) -> Bool { url != nil }
+
+    /// Whether the tab's page has to be made first: one just opened, or a picked pinned page never looked at in this
+    /// session, has no web view until it is shown. Made beside the panel, in the tab's own profile and window rules.
+    static func needsPage(_ tab: Tab) -> Bool { !tab.isClosed && tab.pageHolder == nil }
 
     /// The app a link came from, to go back to when this closes, if you're still only here. Using a browser window
     /// in between means you're in Zigzag now, so closing this stays in Zigzag.
@@ -235,27 +305,56 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     private var browserKeyToken: NSObjectProtocol?
     private var keepOnTopToken: NSObjectProtocol?
 
-    private init(tab: Tab, frame: NSRect, overFullScreen: Bool) {
+    private init(tab: Tab, frame: NSRect, overFullScreen: Bool, borrowedOrigin: BorrowedOrigin? = nil,
+                 floating: Bool = false) {
         self.tab = tab
-        // Zigzag's own PDF viewer and Back to the page that opened it belong to a browser window's tabs; here the page
-        // is shown as in peek, and becomes a full tab once it moves.
-        tab.isPeek = true
+        self.borrowedOrigin = borrowedOrigin
+        // A borrowed tab is already a real tab in the sidebar; it must stay one. A page opened here is a peek until
+        // it moves into a browser window.
+        if borrowedOrigin == nil { tab.isPeek = true }
 
-        let window = BrowserWindow(contentRect: frame)
+        let window: NSWindow
+        if floating {
+            let panel = MiniPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
+                                  backing: .buffered, defer: false)
+            panel.level = .statusBar
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
+            panel.hasShadow = true
+            panel.isMovableByWindowBackground = true
+            panel.hidesOnDeactivate = false
+            panel.isReleasedWhenClosed = false
+            panel.animationBehavior = .none
+            panel.becomesKeyOnlyIfNeeded = false
+            window = panel
+        } else {
+            let browserWindow = BrowserWindow(contentRect: frame)
+            browserWindow.collectionBehavior.remove(.fullScreenPrimary)
+            // Opened over a full-screen window, it stays there in the same Space instead of opening off in another one.
+            if overFullScreen { browserWindow.collectionBehavior.insert(.fullScreenAuxiliary) }
+            window = browserWindow
+        }
         window.minSize = Tokens.Metric.miniWindowMinSize
-        window.collectionBehavior.remove(.fullScreenPrimary)
-        // Opened over a full-screen window, it stays there in the same Space instead of opening off in another one.
-        if overFullScreen { window.collectionBehavior.insert(.fullScreenAuxiliary) }
         window.setFrame(frame, display: false)
         super.init(window: window)
         window.delegate = self
         window.contentView = root
-        window.eventInterceptor = { [weak self] event in
+        let eventInterceptor: (NSEvent) -> Bool = { [weak self] event in
             guard let self else { return false }
             if self.linksNote?.takes(event) == true { return true }
             return self.noteEscape(event)
         }
+        if let browserWindow = window as? BrowserWindow {
+            browserWindow.eventInterceptor = eventInterceptor
+        } else if let panel = window as? MiniPanel {
+            panel.eventInterceptor = eventInterceptor
+        }
         window.setAccessibilityTitle(Self.name)
+        if floating {
+            strip.trafficLightsWidth = 0
+            strip.needsLayout = true
+        }
         // A waiting question while the window isn't key: the edge glows, and clicking it brings the window forward.
         root.attentionWaiting = { [weak self] in self?.questionsWaitingForPage ?? 0 }
         root.attentionClicked = { [weak self] in
@@ -305,8 +404,12 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         showPage()
         refreshStrip()
         refreshBar(animated: false)
-        window.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - window.trafficLightHeight) / 2))
-        strip.trafficLightsWidth = window.trafficLightsWidth
+        if let browserWindow = window as? BrowserWindow {
+            browserWindow.trafficLightOrigin = NSPoint(x: Tokens.Sidebar.lightsX, y: round((Tokens.Metric.miniStripHeight - browserWindow.trafficLightHeight) / 2))
+            strip.trafficLightsWidth = browserWindow.trafficLightsWidth
+        } else {
+            strip.trafficLightsWidth = 0
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -352,7 +455,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// The spaces, from the strip's space: the one chosen is where Open in takes the page, and the window wears it.
     private func showSpaceMenu() {
-        guard !isLeaving else { return }
+        guard !isLeaving, !isBorrowed else { return }
         let current = space.id
         func entry(_ other: SpaceInfo) -> MenuPanel.Entry {
             let symbol = other.icon.flatMap { IconChoice.isSymbol($0) ? $0 : nil }
@@ -466,14 +569,19 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         strip.refreshColors()
     }
 
-    /// "Open in Work": what the button and ⌘O's menu item say, with the space the page goes to.
+    /// "Open in Work" for a page opened here, or "Return to Work" for a tab borrowed from a browser: what the button
+    /// and ⌘O's menu item say, with the space the page goes back to.
     private var openTitle: String {
-        String(localized: "Open in \(space.name)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
+        if isBorrowed {
+            return String(localized: "Return to \(space.name)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: puts a borrowed tab's live page back in the tab and browser window it came from.")
+        }
+        return String(localized: "Open in \(space.name)", comment: "The button in Zigzag Mini's top strip, and the File menu item in place of Open File… while it's in front: moves its page into a browser window as a tab, in this space. The placeholder is the space's name.")
     }
 
     private func refreshStrip() {
         strip.title.show(tab)
         strip.spaceChip.show(space)
+        strip.spaceChip.isEnabled = !isBorrowed
         strip.openButton.show(openTitle, keys: Shortcuts.keys(for: #selector(openDocument(_:))))
         strip.openButton.isEnabled = tab.url != nil
         strip.copyButton.isEnabled = tab.url != nil
@@ -566,7 +674,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         defer { lastEscape = now }
         if now - lastEscape < Self.doubleEscape, !isLeaving, !commandBar.isVisible,
            !overlay.subviews.contains(where: { $0 is PermissionPrompt || $0 is SavePasswordPrompt }) {
-            window?.performClose(nil)
+            closeWindow()
             return true
         }
         guard !commandBar.isVisible, !isLeaving, let webView = tab.webView,
@@ -579,7 +687,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
                 guard let self, let webView else { return }
                 let state = (try? result.get()) as? String ?? ""
                 if state.isEmpty {
-                    self.window?.performClose(nil)
+                    self.closeWindow()
                 } else {
                     // Noted for the Esc the page leaves alone, which comes back to `escape`: typing, the field lets go.
                     webView.evaluateJavaScript("window.__zigzagEsc = '\(state)'", in: nil, in: .defaultClient)
@@ -652,7 +760,55 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
 
     /// Moves the page, live, into a browser window as its selected tab, in the space chosen on the strip: this window
     /// fades away first, then the page is there.
-    @objc func openInZigzag(_ sender: Any? = nil) { moveOut() }
+    @objc func openInZigzag(_ sender: Any? = nil) {
+        if isBorrowed { returnToBrowser() } else { moveOut() }
+    }
+
+    /// A borrowed tab's page goes back into the tab and window it came from, and that window comes forward. No new
+    /// tab, no space routing, no reload.
+    private func returnToBrowser() {
+        guard let origin = borrowedOrigin, !movedOut, !isLeaving, !tab.isClosed else { return }
+        commandBar.dismiss(restoringFocus: false)
+        linkStatus.hide()
+        restoreBorrowed(origin, bringForward: true)
+        movedOut = true
+        window?.close()
+    }
+
+    /// Closes a borrowed Mini from the edge sidebar. A borderless panel has no close button for `performClose`, so this
+    /// takes the same fade-out path directly.
+    func closeBorrowed() {
+        guard isBorrowed, !isLeaving else { return }
+        fadeAway { [weak self] in self?.window?.close() }
+    }
+
+    /// Esc and ⌘W in a borrowed Mini take the same path as its close button would.
+    private func closeWindow() {
+        if isBorrowed { closeBorrowed() } else { window?.performClose(nil) }
+    }
+
+    /// Puts the page back in its own pane. `bringForward` also selects the tab and brings its browser window forward;
+    /// closing the Mini silently leaves the browser where it was unless the tab was the one on screen.
+    private func restoreBorrowed(_ origin: BorrowedOrigin, bringForward: Bool) {
+        guard !tab.isClosed else { borrowedOrigin = nil; return }
+        tab.pageHolder?.removeFromSuperview()
+        if let pane = origin.pane, pane.window != nil, let holder = tab.pageHolder {
+            holder.frame = origin.frame
+            pane.addSubview(holder)
+            pane.needsLayout = true
+        }
+        borrowedOrigin = nil
+        if let browser = origin.browser, browser.window != nil {
+            if bringForward || origin.wasSelected {
+                browser.tabManager.select(tab)
+            }
+            if bringForward {
+                // The person is looking at this Space now, which may not be the one the browser was left on: the
+                // window comes to it rather than the screen going back to the window.
+                browser.bringForwardHere()
+            }
+        }
+    }
 
     /// `then`: runs in the browser window the page went to.
     private func moveOut(then: ((BrowserWindowController) -> Void)? = nil) {
@@ -743,7 +899,7 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Menu commands while it's in front
 
     /// ⌘W closes the page, and with it the window: it holds nothing else.
-    @objc func closeTab(_ sender: Any?) { window?.performClose(sender) }
+    @objc func closeTab(_ sender: Any?) { closeWindow() }
     @objc func goBack(_ sender: Any?) { tab.goBack() }
     @objc func goForward(_ sender: Any?) { tab.goForward() }
     @objc func reloadPage(_ sender: Any?) { tab.reload() }
@@ -823,10 +979,16 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         Autofill.shared.forget(windowOf: window)
         if !movedOut {
             tokens.removeAll()
-            if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
-            tab.close()
+            if let origin = borrowedOrigin {
+                restoreBorrowed(origin, bringForward: false)
+            } else {
+                if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab, windowClosing: true) }
+                tab.close()
+            }
         }
         if #available(macOS 15.4, *) { ExtensionCenter.miniClosed(self) }
+        onBorrowedClose?()
+        onBorrowedClose = nil
         keepOnTopToken.map(NotificationCenter.default.removeObserver)
         keepOnTopToken = nil
         Self.all.removeAll { $0 === self }
@@ -1035,7 +1197,7 @@ extension MiniWindowController: TabHost {
         return newTab.ensureWebView()
     }
 
-    func tabDidRequestClose(_ tab: Tab) { window?.performClose(nil) }
+    func tabDidRequestClose(_ tab: Tab) { closeWindow() }
     func tabWantsToReturnToOpener(_ tab: Tab) {}
     func tabWantsToBeShown(_ tab: Tab) {
         NSApp.activate()

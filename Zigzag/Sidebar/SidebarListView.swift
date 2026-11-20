@@ -159,6 +159,16 @@ final class SidebarListView: NSView {
     weak var delegate: SidebarListDelegate?
     /// Shows this space instead of the current one (the neighbor that slides in during a swipe).
     var spaceOverride: UUID?
+    /// The tab the peek popout is showing: a temporary highlight, separate from the browser's selection.
+    var peekTabID: UUID?
+    /// The row a pick came from, on screen: the peek grows from it and shrinks back into it.
+    private(set) var lastPickedRowFrame: NSRect?
+
+    func setPeek(_ id: UUID?) {
+        guard peekTabID != id else { return }
+        peekTabID = id
+        reload(animated: false)
+    }
     /// In a private window, the header says "Private" instead of the space name.
     var privateLabel = false
     private var shownSpaceID: UUID? { spaceOverride ?? manager?.currentSpaceID }
@@ -178,6 +188,16 @@ final class SidebarListView: NSView {
     private var items: [SidebarItem] = []
     private var rows: [SidebarItem: NSView] = [:]
     private var drag: DragState?
+    /// A tab or page picked with a click: the edge sidebar sets this to bring its window forward. The window's own
+    /// list leaves it nil, and its delegate selects as before.
+    var onPickTab: ((Tab) -> Void)?
+    /// New Tab picked with a click: the edge sidebar sets this to open the browser's bar over the screen, in place.
+    /// The window's own list leaves it nil, and its delegate opens it in the window.
+    var onNewTab: (() -> Void)?
+    /// The pointer entered or left a row, with its frame on screen: the edge sidebar shows a still preview there.
+    var onHoverTab: ((Tab?, NSRect?) -> Void)?
+    /// Whether rows can be dragged out. The edge sidebar's list can't: a drag would leave the panel.
+    var allowsDragging = true
     /// Rows picked with ⌘-click or ⇧-click, in list order, to drag or act on together.
     private(set) var marked: [SidebarItem] = [] {
         didSet {
@@ -890,7 +910,9 @@ final class SidebarListView: NSView {
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         if let hoverArea { removeTrackingArea(hoverArea) }
-        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited,
+                                                         tracksHoverWhileInactive ? .activeAlways : .activeInKeyWindow,
+                                                         .inVisibleRect], owner: self)
         addTrackingArea(area)
         hoverArea = area
     }
@@ -985,7 +1007,10 @@ final class SidebarListView: NSView {
             return NSView()
         case .newTab:
             let row = NewTabRowView()
-            row.onClick = { [weak self] _ in self?.delegate?.listNewTab() }
+            row.onClick = { [weak self] _ in
+                guard let self else { return }
+                if let onNewTab { onNewTab() } else { delegate?.listNewTab() }
+            }
             return row
         case .tab(let id):
             let row = TabRowView()
@@ -1001,7 +1026,8 @@ final class SidebarListView: NSView {
                 }
                 if self.mark(item, with: event) { return }
                 // A split row: each half selects its own page, and each part of a tile group's.
-                self.delegate?.listSelect(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
+                self.lastPickedRowFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
+                self.pick(row.page(at: row.convert(event.locationInWindow, from: nil)) ?? tab)
                 _ = id
             }
             // In a row of several pages, the part double-clicked is the page renamed.
@@ -1054,7 +1080,8 @@ final class SidebarListView: NSView {
                         opening = pinned.ids[part]
                     } else if part == 1, let partner = row.partner, partner.bookmarkID == nil {
                         // The tab split beside it, riding in this row.
-                        self.delegate?.listSelect(partner)
+                        self.lastPickedRowFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
+                        self.pick(partner)
                         return
                     }
                 }
@@ -1124,6 +1151,7 @@ final class SidebarListView: NSView {
             row.configure(partners: partners)
             row.partnerLeads = partners.count == 1 && manager.split(for: tab)?.left == partner?.id
             row.isSelected = tab === selected || partners.contains { $0 === selected }
+            row.isPeeked = tab.id == peekTabID || partners.contains { $0.id == peekTabID }
             row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
             row.closesPart = !partners.isEmpty
             // The pane zoomed over the rest: its part of the row is lit (#160).
@@ -1643,8 +1671,11 @@ final class SidebarListView: NSView {
                 var bookmark: Bookmark?
                 if case .bookmark(let id)? = self.rows.first(where: { $0.value === row })?.key { bookmark = Library.shared.bookmark(id) }
                 self.delegate?.listHover(row.tab, row: row, bookmark: bookmark)
+                let screenFrame = row.window.map { $0.convertToScreen(row.convert(row.bounds, to: nil)) }
+                self.onHoverTab?(row.tab, screenFrame)
             } else {
                 self.delegate?.listHover(nil, row: nil, bookmark: nil)
+                self.onHoverTab?(nil, nil)
             }
         }
     }
@@ -1888,8 +1919,13 @@ final class SidebarListView: NSView {
     /// Where a tab from another window would land, for a screen point over this list.
     func dropIndex(at screenPoint: NSPoint) -> Int { dropTarget(at: screenPoint, allowsPinned: false).index }
 
+    /// A page picked with a click: the edge sidebar's own hook, or the window's delegate.
+    private func pick(_ tab: Tab) {
+        if let onPickTab { onPickTab(tab) } else { delegate?.listSelect(tab) }
+    }
+
     private func beginDrag(_ item: SidebarItem, view: NSView, event: NSEvent) -> Bool {
-        guard let window, let manager, item.isDraggable else { return false }
+        guard allowsDragging, let window, let manager, item.isDraggable else { return false }
         delegate?.listHover(nil, row: nil, bookmark: nil)
         // Dragging one of several picked rows carries them all, landing together in list order.
         let picked = marked.count > 1 && marked.contains(item) ? marked : [item]

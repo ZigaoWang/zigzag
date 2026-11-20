@@ -903,8 +903,21 @@ final class SidebarView: NSView {
             guard holdsAddress != oldValue else { return }
             // Leaving the top bar: back to the field with the site.
             if holdsAddress { address.buttonsOnly = false; addressViews.forEach(addSubview) }
+            refreshAddressButtons()
             needsLayout = true
         }
+    }
+    /// The window's sidebar lends its back, forward, reload and address to the bar above the page. A mirror at the
+    /// screen's edge has no bar to lend them to, so with the address above the page it hides its own instead of
+    /// leaving them at the frames they last had.
+    var hasTopBar = true { didSet { refreshAddressButtons() } }
+    /// Whether everything in it keeps its hover states while Zigzag is inactive and its panel isn't key: the sidebar
+    /// at the screen's edge, which shows over another app.
+    var hoversWhileInactive = false
+
+    private func refreshAddressButtons() {
+        let shows = holdsAddress || hasTopBar
+        addressButtons.forEach { $0.isHidden = !shows }
     }
     /// Where the favorites start while the address is above the page: the page's top, so the two line up under the
     /// top row (set by the window as it lays out the page).
@@ -1022,8 +1035,17 @@ final class SidebarView: NSView {
             delegate?.sidebarDoubleClickedBlank()
             return
         }
+        // A single click on empty space does nothing in a window's sidebar; the edge panel uses it to put itself away.
+        if event.clickCount == 1, let blankClick {
+            blankClick()
+            return
+        }
         window?.titleBarMouseDown(event)
     }
+
+    /// What a single click on empty space does, for the sidebar shown over the screen: the edge panel goes away, as it
+    /// would if the pointer had left it. Nil in a window's sidebar, where such a click only prepares a drag.
+    var blankClick: (() -> Void)?
 
     /// Settings › Appearance › Double-click the sidebar for a new tab. On by default.
     static var doubleClickOpensNewTab: Bool {
@@ -2523,3 +2545,5 @@ enum SpaceReorder {
         return to == from ? nil : to
     }
 }
+
+extension SidebarView: HoverTrackingWhileInactive {}
