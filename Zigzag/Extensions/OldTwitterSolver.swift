@@ -17,7 +17,6 @@ final class OldTwitterSolver: NSObject {
     static let home = "https://github.com/dimdengd/oldtwitter"
     /// The handler the extension's content script calls, and the name Zigzag gives it.
     static let handlerName = "zigzagOldTwitterSolver"
-    /// The handler the sandbox world posts back to.
     /// The one function Zigzag puts in the extension's world. It answers with a promise.
     static let callName = "__zigzagOldTwitterCall"
     static let bridge = """
@@ -30,8 +29,7 @@ final class OldTwitterSolver: NSObject {
       try {
         Object.defineProperty(window, "\(callName)", { value: (message) => handler.postMessage(message), configurable: true });
       } catch (e) {}
-      // The sandbox world has no handlers of its own; its replies come through the page's own window, with a token
-      // only this extension and the sandbox know. A page can send one too, but a token it doesn't have is ignored.
+      // The sandbox world's replies come through the window with its token; the page's own scripts can see them too.
       window.addEventListener("message", (event) => {
         const data = event.data;
         if (event.source !== window || !data || !data.__zigzagSolverReply || typeof data.token !== "string") return;
@@ -56,8 +54,6 @@ final class OldTwitterSolver: NSObject {
       } catch (e) {}
     })();
     """
-
-
 
     struct Failure: LocalizedError {
         let message: String
@@ -166,7 +162,7 @@ final class OldTwitterSolver: NSObject {
 
     /// One transaction id for the address and method. A solve that arrives while the tab's init runs waits for it.
     func solve(for webView: WKWebView, key: String, frame: WKFrameInfo, path: String, method: String) async throws -> String {
-        guard let token = sandboxes.first(where: { $0.value.key == key })?.key, var sandbox = sandboxes[token] else {
+        guard let token = sandboxes.first(where: { $0.value.key == key })?.key, let sandbox = sandboxes[token] else {
             throw Failure("Solver timed out")
         }
         if let task = sandbox.initTask {

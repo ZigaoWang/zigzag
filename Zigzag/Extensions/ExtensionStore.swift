@@ -1347,11 +1347,11 @@ enum ExtensionShims {
 
     /// OldTwitter signs every request to X with a transaction id from X's own challenge script. Chrome runs that
     /// script in a sandbox page. Here the site's Content-Security-Policy blocks both the blob iframe it uses and eval,
-    /// so it never starts and every request times out. Zigzag runs the extension's own `sandbox.html` in a hidden page
-    /// outside the site's policy and without extension APIs (OldTwitterSolver); these patches send the challenge there
-    /// instead of an iframe. Checked against OldTwitter 1.9.10.3.
+    /// so it never starts and every request times out. Zigzag runs the extension's own `sandbox.html` script in a content
+    /// world of its own for each tab, outside the site's policy and without extension APIs (OldTwitterSolver); these
+    /// patches send the challenge there instead of an iframe. Checked against OldTwitter 1.9.10.3.
     static let oldTwitterPatches: [Patch] = [
-        // No blob iframe: the sandbox is a page Zigzag keeps, one per profile.
+        // No blob iframe: Zigzag makes the sandbox for each init.
         Patch(file: "scripts/twchallenge.js",
               find: #"function createSolverFrame\(\) \{[\s\S]*?\n\}\ncreateSolverFrame\(\);"#,
               replace: #"""
@@ -1395,7 +1395,7 @@ async function sendInit() {
         }
         await sendInit();
 """#, pattern: true),
-        // The sandbox's own message listener becomes a function Zigzag's hidden page calls, not an iframe's parent.
+        // The sandbox's own message listener becomes a function Zigzag calls in the sandbox's world.
         Patch(file: "sandbox.html",
               find: #"window\.addEventListener\('message', (async function \(event\) \{[\s\S]*?\n        \})\);"#,
               replace: #"window.__zigzagSolveMessage = $1;"#, pattern: true),
