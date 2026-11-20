@@ -462,7 +462,8 @@ extension ExtensionBridgeTests {
         // A made-up site that can't be reached directly: only the proxy can answer for it.
         _ = try? await ExtensionFetchRequests().response(["method": "POST", "body": "{}"], url: URL(string: "https://proxied.example/write")!,
                                                          extensionID: "test", store: store)
-        #expect(proxy.requests.withLock { $0 } == 1)
+        // The connection to the proxy can be tried again when it can't finish the tunnel.
+        #expect(proxy.requests.withLock { $0 } >= 1)
     }
 
     @Test func writeCancellationAndRevokedAccessPreventDispatch() async throws {
