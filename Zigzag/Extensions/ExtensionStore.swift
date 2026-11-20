@@ -689,15 +689,10 @@ enum ExtensionStore {
         return context?.webExtension.displayName
     }
 
-    /// The record a folder's manifest calls for. A folder carrying Firefox's own keys is Firefox with its gecko ID,
-    /// so the record, its sheet and its polyfill agree; the folder itself is never normalized — it is the
-    /// person's, read where it is.
+    /// The record for a folder: always Chrome's. Firefox's keys in a manifest don't make it Firefox, since many
+    /// cross-browser builds carry them; only an .xpi install is. The folder is the person's, read where it is.
     static func unpackedPackage(for url: URL) -> Package {
-        let manifest = manifest(in: url) ?? [:]
-        let isFirefox = FirefoxManifest.isFirefox(manifest)
-        return Package(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path,
-                       kind: isFirefox ? ExtensionKind.firefox.rawValue : ExtensionKind.chromium.rawValue,
-                       firefoxID: isFirefox ? XPIPackage.geckoID(of: manifest) : nil)
+        Package(version: manifestVersion(in: url) ?? "0", unpackedPath: url.standardizedFileURL.path)
     }
 
     /// Re-reads an unpacked extension's files, in every profile running it.

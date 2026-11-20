@@ -517,10 +517,9 @@ struct FirefoxInstallTests {
         #expect((onDisk["browser_specific_settings"] as? [String: Any])?["gecko"] != nil)
     }
 
-    /// A folder installed from disk that carries Firefox's own keys is recorded as Firefox with its gecko ID, so its
-    /// record, its sheet and its polyfill agree — and the person's own folder is left exactly as it is, never
-    /// normalized. A folder without those keys stays Chrome's.
-    @Test func aFirefoxFolderIsRecordedFirefoxWithItsGeckoIDAndLeftAsItIs() async throws {
+    /// A folder carrying Firefox's own keys is still recorded as Chrome's: the manifest doesn't decide the kind.
+    /// The person's own folder is left exactly as it is, never normalized.
+    @Test func aFolderWithFirefoxKeysStaysChromeAndIsLeftAsItIs() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
         let folder = work.folder.appendingPathComponent("firefox-folder", isDirectory: true)
@@ -530,8 +529,8 @@ struct FirefoxInstallTests {
         try XPIArchive.json(manifest).write(to: folder.appendingPathComponent("manifest.json"))
 
         let record = ExtensionStore.unpackedPackage(for: folder)
-        #expect(record.kind == "firefox")
-        #expect(record.firefoxID == "folder@example.com")
+        #expect(record.kind == "chromium")
+        #expect(record.firefoxID == nil)
         #expect(record.unpackedPath == folder.standardizedFileURL.path)
         // The sheet reads the same shipped overlay as any package; a permission only Firefox knows is reported by
         // its own name, since WebKit doesn't supply it and no claim words it.
