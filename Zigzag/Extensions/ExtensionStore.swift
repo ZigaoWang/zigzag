@@ -303,8 +303,10 @@ enum ExtensionStore {
     /// Whether a downloaded package is the file the store said it was: AMO publishes each file's sha256, and a
     /// package whose bytes don't match is a different file, never installed.
     nonisolated static func matchesPublishedHash(_ data: Data, sha256: String?) -> Bool {
-        guard let published = sha256?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-              published.count == 64, published.allSatisfy(\.isHexDigit) else { return false }
+        // AMO's API writes it as `sha256:<hex>`.
+        guard var published = sha256?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else { return false }
+        if published.hasPrefix("sha256:") { published.removeFirst("sha256:".count) }
+        guard published.count == 64, published.allSatisfy(\.isHexDigit) else { return false }
         let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         return actual == published
     }

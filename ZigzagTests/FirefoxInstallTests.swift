@@ -51,6 +51,9 @@ struct AddonsMozillaPageTests {
         let good = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
         #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good))
         #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good.uppercased()))
+        // As AMO's API writes it; another algorithm's prefix is not taken.
+        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: "sha256:" + good))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: "sha1:" + good))
         // A different file, a truncated hash, an empty one, none at all, and one with something appended: refused.
         #expect(!ExtensionStore.matchesPublishedHash(Data("other bytes".utf8), sha256: good))
         #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: String(good.prefix(63))))
