@@ -1,7 +1,8 @@
 # Contributing to Zigzag
 
-Thanks for helping. Bug reports, fixes and ideas are all welcome. For anything bigger than a small fix, please
-open an issue first so we can agree on the shape of it before you spend time on code.
+Thanks for helping. Bug reports, fixes and ideas are all welcome. For anything bigger than a small fix, and for
+any change to how something already works, please open an issue or comment on the existing one first, so we can
+agree on the shape of it before you spend time on code.
 
 Security problems don't go in issues or pull requests: see [SECURITY.md](SECURITY.md) for how to report them
 privately.
@@ -46,7 +47,7 @@ them those tests are skipped and everything else runs. Don't commit them.
 ## Code style
 
 - **Match the surrounding code.** Read the file you're changing and follow its naming, structure and comments.
-  Comments say why, in plain sentences.
+  A code comment is one short, factual line, and only where the code doesn't say it already.
 - **Zigzag's own drawn controls.** New UI uses the controls in `Zigzag/Design` (`Controls.swift`,
   `ConfirmSheet.swift` and friends) and the values in `Tokens.swift` for spacing, type, color and motion, not
   stock AppKit buttons, alerts or sheets.
@@ -54,6 +55,21 @@ them those tests are skipped and everything else runs. Don't commit them.
 - **US English** in code, comments and everything people read in the app ("color", "favorite").
 - Keep debug-only code inside `#if DEBUG`, so it never ships in a release build.
 - Privacy first: nothing a person browses, types or saves leaves their Mac unless they ask for it.
+
+## Behavior
+
+Most people come to Zigzag from Chrome or Arc, so their behavior is the default: a shortcut, a menu order or what
+happens when a tab closes should work the way those users expect, unless an issue agreed otherwise.
+
+[specs/](specs/) lists how Zigzag behaves today, one line per behavior, each naming the test that checks it.
+
+- A change to existing behavior is stated plainly in the changelog line (what it did before, what it does now), and
+  the matching line in `specs/` is updated in the same pull request.
+- A bug fix that brings back behavior `specs/` already describes doesn't touch `specs/`.
+- Don't remove an option, a look or a shortcut people may have chosen. If something has to change, keep the old way
+  as a choice, and ask in the issue first.
+- Settled, so please open an issue before reopening: Pin and Favorites keep their names (#354), and Zigzag has no
+  built-in AI assistant, only the optional, off-by-default MCP server for AI apps (#99).
 
 ## Localization
 
@@ -82,16 +98,21 @@ has none; `scripts/release.sh` warns when the version it releases has no Chinese
   `test: …`, `chore: …`. Subjects are short and plain, and say what changed for the person using Zigzag. `style:`
   is for code formatting only, never for how something looks.
 - Add `(#N)` to the subject when the commit is for an issue, as in `fix: scripts check the page again once it has loaded (#26)`.
-- No trailers: no `Co-Authored-By` or other lines at the end of the message.
 - **Small commits**, one logical change each.
 - **Small, focused pull requests**: one feature or fix each, so it can be reviewed and tried in the app. A pull
   request that changes a lot at once, or moves code around while changing it, is hard to review and slow to land;
   split it up, and talk big changes through in an issue before you start.
 - Don't add CI workflows or other files under `.github/workflows`.
 - Write `Fixes #N` in the pull request so the issue closes with it.
-- If your change is something people will notice, add a line for it under `## [Unreleased]` in both changelogs.
+- Every change people will notice gets a line under `## [Unreleased]`, in `### New` or `### Fixed`, in
+  [CHANGELOG.md](CHANGELOG.md), and the same line under `### 新功能` or `### 修复` in
+  [CHANGELOG.zh-Hans.md](CHANGELOG.zh-Hans.md). Write the Chinese as a person would say it, not word for word. End
+  the line with the issue link, and separate several with ", ": `([#311](…), [#312](…))`.
 - Make sure the app builds and the tests pass, and say in the pull request how you checked your change. For UI,
-  add screenshots in light and dark.
+  add before and after screenshots in light and dark.
+- Draft pull requests aren't reviewed for merge. Mark yours ready when it is.
+- Before merging, a maintainer may push small fixes on top of your branch, such as wording, a missing Chinese string
+  or a test, and say so when merging.
 
 ## License of contributions
 
