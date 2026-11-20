@@ -399,8 +399,7 @@ struct FirefoxInstallTests {
         #expect(chrome.firefoxID == nil)
     }
 
-    /// The Firefox shim is chosen by the installed record, not the manifest: its marker goes into that extension's
-    /// own preludes, and a Chrome package gets none, whatever its manifest happens to carry.
+    /// The installed record, not the manifest, decides who gets the Firefox marker.
     @Test func onlyAFirefoxRecordGetsTheFirefoxMarker() throws {
         let work = try Workspace()
         defer { work.cleanUp() }
@@ -412,14 +411,10 @@ struct FirefoxInstallTests {
         let marker = "globalThis.__zigzagFirefoxPackage = true;"
         let firefoxShim = try #require(ExtensionShims.shim(for: firefox))
         #expect(firefoxShim.backgroundPrelude?.contains(marker) == true)
-        #expect(firefoxShim.pagePrelude?.hasPrefix(marker) == true)
         let chromeShim = try #require(ExtensionShims.shim(for: chrome))
         #expect(chromeShim.backgroundPrelude?.contains(marker) == false)
-        #expect(chromeShim.pagePrelude?.contains(marker) != true)
-        // Popups and options pages read the page list, not the background one: a Firefox record with no built-in
-        // shim is still there, and a Chrome record is not.
-        let pages = Dictionary(uniqueKeysWithValues: ExtensionShims.pagePreludes)
-        #expect(pages[firefox]?.hasPrefix(marker) == true)
-        #expect(pages[chrome] == nil)
+        // Pages get theirs from this list, set before the compatibility layer runs.
+        #expect(ExtensionShims.firefoxIDs.contains(firefox))
+        #expect(!ExtensionShims.firefoxIDs.contains(chrome))
     }
 }

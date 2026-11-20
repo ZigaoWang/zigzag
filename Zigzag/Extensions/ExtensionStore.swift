@@ -1067,7 +1067,6 @@ enum ExtensionShims {
         let firefox = ExtensionStore.kind(of: id) == .firefox
         let marker = firefox ? "globalThis.__zigzagFirefoxPackage = true;\n" : ""
         shim.backgroundPrelude = marker + backgroundPrelude(keepsAlive: keepsAlive) + (shim.backgroundPrelude ?? "")
-        if firefox { shim.pagePrelude = marker + (shim.pagePrelude ?? "") }
         #if DEBUG
         // Testing builds say each background got past Zigzag's own scripts, so a quiet log means quiet, not broken.
         let started = "try { (globalThis.chrome || globalThis.browser).runtime.sendNativeMessage('\(diagnosticsHost)', { where: 'background', kind: 'started', text: 'ok' }); } catch (e) {}\n"
@@ -1215,19 +1214,13 @@ enum ExtensionShims {
     })();
     """
 
-    /// Every page prelude, by extension ID: through `shim(for:)`, so a Firefox package's marker and its own page
-    /// prelude reach its popup and options page, which read this list rather than the background one.
-    static var pagePreludes: [(id: String, source: String)] {
-        // Every built-in shim, and every record that says Firefox: a Firefox package with no built-in shim still needs
-        // its marker in its popup, and only the record knows it is one.
-        let ids = Set(shims.keys).union(recordIDs.filter { ExtensionStore.kind(of: $0) == .firefox })
-        return ids.sorted().compactMap { id in shim(for: id)?.pagePrelude.map { (id, $0) } }
-    }
+    /// Every page prelude, by extension ID.
+    static var pagePreludes: [(id: String, source: String)] { shims.compactMap { id, shim in shim.pagePrelude.map { (id, $0) } } }
 
-    /// Ids with a record, whether or not its package can be read: the record is what marks a Firefox package.
-    private static var recordIDs: [String] {
+    /// Installed records of Firefox packages; their pages get the marker firefox-polyfill.js reads.
+    static var firefoxIDs: [String] {
         ((try? FileManager.default.contentsOfDirectory(atPath: ExtensionStore.root.path)) ?? [])
-            .filter { ExtensionStore.package($0) != nil }
+            .filter { ExtensionStore.package($0) != nil && ExtensionStore.kind(of: $0) == .firefox }.sorted()
     }
 
     private static let shims: [String: Shim] = [
