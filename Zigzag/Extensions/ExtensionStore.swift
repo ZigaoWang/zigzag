@@ -1935,8 +1935,8 @@ extension ExtensionStore {
     }
 
     /// Runs before content scripts in their world (ConnectGuard.file): keeps WebKit's `browser` (ExtensionBridgeScript.keepsBrowser),
-    /// keeps storage calls in order, adds requestIdleCallback, then the reconnect guard.
-    nonisolated static let contentScriptsFirst = ExtensionBridgeScript.keepsBrowser + "\n" + ExtensionBridgeScript.storageInOrder + "\n" + ExtensionBridgeScript.idleCallbacks + "\n" + ConnectGuard.source
+    /// keeps storage calls in order, adds requestIdleCallback, then the reconnect guard and the background wake.
+    nonisolated static let contentScriptsFirst = ExtensionBridgeScript.keepsBrowser + "\n" + ExtensionBridgeScript.storageInOrder + "\n" + ExtensionBridgeScript.idleCallbacks + "\n" + ConnectGuard.source + "\n" + BackgroundWake.source
 
     /// One of a shim's patches, as plain text for making an overlay off the main thread.
     nonisolated struct OverlayPatch: Sendable {

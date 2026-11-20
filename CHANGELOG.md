@@ -24,6 +24,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - ⌥⌘← and ⌥⌘→ always switch spaces, even on a page that uses those keys itself, as the tab and window keys already did. Before, a page that used them got them first and the space stayed.
 - Close Tabs Below is listed in Settings › Shortcuts and can have a shortcut of yours. It was meant to be there but was left out, so it could never get one.
 - A tab's speaker goes away once its sound stops. A video whose sound goes through the page's own audio, as TikTok's embedded player does, kept the speaker on long after you paused it, though nothing played, and kept its card at the bottom of the sidebar in place of the tab really playing. The tab could also not be put to sleep then, as if it still played.
+- 1Password's menu in a sign-in field comes up again after the browser has sat for a while, and it fills the password on the next step of a sign-in like Apple's. Its background could stop and not start again when a page asked it something, so the menu and the fill waited until you clicked 1Password's button. Zigzag now starts it when a page's message goes unanswered, for every extension.
 
 ## [0.9.3] - 2026-11-18
 

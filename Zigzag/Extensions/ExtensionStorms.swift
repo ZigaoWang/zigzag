@@ -169,6 +169,79 @@ nonisolated enum ConnectGuard {
     """
 }
 
+/// Starts a service worker background that a content script's message is waiting on.
+///
+/// WebKit stops an idle service worker and should start it again for the next message. Sometimes it doesn't: the
+/// content script's `runtime.sendMessage` then waits for good, with no answer and no error, until something else
+/// starts the background (a click on the extension's button). 1Password's field menu and its fill of the next sign-in
+/// step wait on such messages, so they stopped working until the button was clicked (2026-11).
+///
+/// This runs in the extension's content-script world, after ConnectGuard. A message still unanswered after `wait`
+/// tells Zigzag, which asks WebKit to start the background; one already running is left as it is. A frame tells at
+/// most once per `gap`, and Zigzag asks at most once per `gap` per extension.
+nonisolated enum BackgroundWake {
+    static let wait = 3_000
+    static let gap = 10_000
+    static let kind = "unanswered"
+
+    /// `install(runtime, later, now, tell)` wraps one `runtime.sendMessage`; runs on the world's `chrome.runtime` (and
+    /// `browser.runtime` if different), once per frame. Answers and errors reach the caller as before.
+    static let source = """
+    (() => {
+      'use strict';
+      const install = (runtime, later, cancel, now, tell) => {
+        const native = runtime && runtime.sendMessage;
+        if (typeof native !== 'function' || native.__zigzagWakes) return false;
+        let toldAt = -Infinity;
+        const unanswered = () => {
+          if (now() - toldAt < \(gap)) return;
+          toldAt = now();
+          try { tell({ kind: '\(kind)' }); } catch (e) {}
+        };
+        const wrapped = function sendMessage(...args) {
+          let timer = later(unanswered, \(wait));
+          const done = () => { if (timer !== null) { cancel(timer); timer = null; } };
+          const last = args.length - 1;
+          if (last >= 0 && typeof args[last] === 'function') {
+            const callback = args[last];
+            // Read inside the callback, where runtime.lastError is expected.
+            args[last] = function (...values) { done(); return callback.apply(this, values); };
+          }
+          let result;
+          try { result = native.apply(runtime, args); } catch (error) { done(); throw error; }
+          if (result && typeof result.then === 'function') result.then(done, done);
+          return result;
+        };
+        wrapped.__zigzagWakes = true;
+        (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []).push(runtime);
+        try { runtime.sendMessage = wrapped; } catch (e) {}
+        if (runtime.sendMessage !== wrapped) {
+          try { Object.defineProperty(runtime, 'sendMessage', { value: wrapped, configurable: true, writable: true }); } catch (e) {}
+        }
+        return runtime.sendMessage === wrapped;
+      };
+      globalThis.__zigzagBackgroundWake = install;
+      if (globalThis.__zigzagWakesBackground || typeof document === 'undefined') return;
+      const tell = (info) => {
+        const handler = globalThis.webkit && globalThis.webkit.messageHandlers && globalThis.webkit.messageHandlers.\(ConnectGuard.handlerName);
+        const sent = handler && handler.postMessage(info);
+        if (sent && sent.catch) sent.catch(() => {});
+      };
+      const runtimes = new Set([globalThis.chrome && globalThis.chrome.runtime, globalThis.browser && globalThis.browser.runtime].filter(Boolean));
+      if (!runtimes.size) return;
+      globalThis.__zigzagWakesBackground = true;
+      for (const runtime of runtimes) install(runtime, (f, ms) => setTimeout(f, ms), (id) => clearTimeout(id), () => Date.now(), tell);
+    })();
+
+    """
+
+    /// Whether Zigzag asks WebKit again: not within `gap` of the last time for the same extension.
+    static func due(last: Date?, now: Date) -> Bool {
+        guard let last else { return true }
+        return now.timeIntervalSince(last) * 1000 >= Double(gap)
+    }
+}
+
 /// Handles a throttled content script (ConnectGuard): logs once and shows one window notice naming the extension, with
 /// a way to turn it off.
 @available(macOS 15.4, *)
@@ -192,10 +265,35 @@ final class ExtensionStorms {
     func receive(_ message: WKScriptMessage) {
         guard let world = message.world.name, world.hasPrefix("WebExtension-") else { return }
         let id = String(world.dropFirst("WebExtension-".count))
+        if (message.body as? [String: Any])?["kind"] as? String == BackgroundWake.kind {
+            wakeBackground(id)
+            return
+        }
         guard let context = host.context(for: id), let tab = (message.webView as? BrowserWebView)?.owner,
               byTab[tab.id]?.contains(id) != true else { return }
         let rate = ((message.body as? [String: Any])?["perSecond"] as? NSNumber)?.intValue ?? 0
         noted(id, name: context.webExtension.displayName ?? id, rate: rate, in: tab)
+    }
+
+    /// When each extension's background was last asked to start (BackgroundWake).
+    private var wokenAt: [String: Date] = [:]
+
+    /// A content script's message went unanswered: asks WebKit to start the background, which does nothing to one
+    /// that's running.
+    func wakeBackground(_ id: String) {
+        guard let context = host.context(for: id), context.webExtension.hasBackgroundContent,
+              BackgroundWake.due(last: wokenAt[id], now: Date()) else { return }
+        let first = wokenAt[id] == nil
+        wokenAt[id] = Date()
+        let name = context.webExtension.displayName ?? id
+        Task {
+            do {
+                try await context.loadBackgroundContent()
+                if first { ExtensionLog.write("\(name): a page's message waited on its background; asked it to start") }
+            } catch {
+                ExtensionLog.write("\(name): a page's message waited on its background, which didn't start: \(error.localizedDescription)")
+            }
+        }
     }
 
     func noted(_ id: String, name: String, rate: Int, in tab: Tab) {
