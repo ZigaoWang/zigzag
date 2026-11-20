@@ -238,3 +238,84 @@ struct TabGroupRulesTests {
         #expect(try JSONDecoder().decode(SessionState.self, from: Data(old.utf8)).windows[0].tabGroups == nil)
     }
 }
+
+/// Which tab shows after closing the one you're on (#412), as in Chrome.
+@MainActor @Suite(.serialized) struct TabCloseSelectionTests {
+    private var space: UUID { Library.shared.spaces[0].id }
+
+    /// A window with tabs 0–4, links opening next to the tab they came from.
+    private func window(_ body: (TabManager, [Tab]) throws -> Void) rethrows {
+        let place = TabManager.newTabPlace, nests = TabManager.nestsOpenedLinks
+        TabManager.newTabPlace = .next
+        TabManager.nestsOpenedLinks = false
+        defer { TabManager.newTabPlace = place; TabManager.nestsOpenedLinks = nests }
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = (0..<5).map { Tab(url: nil, title: "\($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        try body(manager, tabs)
+    }
+
+    @Test func closingGoesToTheTabBelowNotTheOneYouWereOnBefore() {
+        window { manager, t in
+            manager.select(t[4])
+            manager.select(t[2])
+            manager.close(t[2])
+            #expect(manager.selectedTab === t[3])
+            // The last one goes up.
+            manager.select(t[4])
+            manager.close(t[4])
+            #expect(manager.selectedTab === t[3])
+        }
+    }
+
+    @Test func aLinkOpenedInFrontClosesBackToItsPage() {
+        window { manager, t in
+            manager.select(t[1])
+            let opened = manager.newTab(url: nil, spaceID: space, select: true, opener: t[1])
+            manager.close(opened)
+            #expect(manager.selectedTab === t[1])
+        }
+    }
+
+    @Test func linksOpenedBehindKeepTheirOrderAndCloseToTheNextOne() {
+        window { manager, t in
+            manager.select(t[1])
+            let links = (0..<3).map { _ in manager.newTab(url: nil, spaceID: space, select: false, opener: t[1]) }
+            #expect(Array(manager.tabs(in: space)[2...4]).map(\.id) == links.map(\.id))
+            // Opened in front after them: closing it goes to the last link the page opened, then up the row.
+            let front = manager.newTab(url: nil, spaceID: space, select: true, opener: t[1])
+            manager.close(front)
+            #expect(manager.selectedTab === links[2])
+        }
+    }
+
+    @Test func switchingTabsYourselfForgetsTheOpener() {
+        window { manager, t in
+            manager.select(t[1])
+            let links = (0..<3).map { _ in manager.newTab(url: nil, spaceID: space, select: false, opener: t[1]) }
+            // Reading the results one by one: each ⌘W lands on the next, not back on the page they came from.
+            manager.select(links[0])
+            manager.close(links[0])
+            #expect(manager.selectedTab === links[1])
+            manager.close(links[1])
+            #expect(manager.selectedTab === links[2])
+            // Opened in front, then left and come back to: it closes to the tab below, not its page.
+            let opened = manager.newTab(url: nil, spaceID: space, select: true, opener: t[0])
+            manager.select(t[4])
+            manager.select(opened)
+            manager.close(opened)
+            #expect(manager.selectedTab === t[1])
+        }
+    }
+
+    @Test func aTabInAShutGroupBelowIsPassedOver() throws {
+        try window { manager, t in
+            let id = try #require(manager.makeGroup(with: [t[3], t[4]], name: "G"))
+            manager.setGroupOpen(id, false)
+            manager.select(t[2])
+            manager.close(t[2])
+            #expect(manager.selectedTab === t[1])
+        }
+    }
+}
