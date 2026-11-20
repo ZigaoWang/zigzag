@@ -2775,9 +2775,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         shortcutGroups = groups
     }
 
-    /// Each shortcut's name and keys as the menus have them now.
+    /// Each shortcut's menu item, name and keys as the menus have them now: a row holds its item.
     private var shortcutsInMenu: [String] {
-        Shortcuts.allItems.map { "\($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue) \($0.isHidden)" }
+        Shortcuts.allItems.map { "\(ObjectIdentifier($0).hashValue) \($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue) \($0.isHidden)" }
     }
 
     /// Makes the shortcuts' rows again only when the menus' shortcuts changed, instead of on each key typed in setting searchbar.
