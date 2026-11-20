@@ -2972,7 +2972,11 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// Whether a tab's menu offers Open in Zigzag Mini (and a tab ⌥-dragged out of the windows goes there).
     func canOpenInMini(_ tab: Tab) -> Bool {
-        !tab.isClosed && MiniWindowController.canTake(tab.url)
+        // Mini's old rules from the window's menus: an ordinary tab's web page or file, never a pinned page, a private
+        // window's tab or Zigzag's own pages. The edge sidebar borrows tabs under its own rule.
+        guard !tab.isClosed, !tabManager.isPrivate, tab.bookmarkID == nil, let url = tab.url,
+              ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "") else { return false }
+        return true
     }
 
     /// Open in Zigzag Mini: the tab's page, live, goes into a Zigzag Mini window over this one (or where the tab was

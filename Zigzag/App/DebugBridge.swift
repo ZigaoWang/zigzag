@@ -220,8 +220,7 @@ enum DebugBridge {
         case "minimove": mini?.openInZigzag()
         case "miniborrow":
             guard let browser = WindowManager.shared.keyController,
-                  let tab = browser.tabManager.selectedTab,
-                  MiniWindowController.canTake(tab.url)
+                  let tab = browser.tabManager.selectedTab, browser.canOpenInMini(tab)
             else { break }
             MiniWindowController.open(borrowing: tab, from: browser)
         case "mininote": mini?.debugLinksNote(arg)
