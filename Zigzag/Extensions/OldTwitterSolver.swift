@@ -34,7 +34,7 @@ final class OldTwitterSolver: NSObject {
       // only this extension and the sandbox know. A page can send one too, but a token it doesn't have is ignored.
       window.addEventListener("message", (event) => {
         const data = event.data;
-        if (!data || !data.__zigzagSolverReply || typeof data.token !== "string") return;
+        if (event.source !== window || !data || !data.__zigzagSolverReply || typeof data.token !== "string") return;
         try { handler.postMessage({ op: "reply", token: data.token, message: data.message }).catch(() => {}); } catch (e) {}
       });
       // OldTwitter's own pages write Chrome's address for their icons and fonts. WebKit serves them at its own, so
