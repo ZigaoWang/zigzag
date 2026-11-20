@@ -642,32 +642,79 @@ enum ExtensionStore {
 
     // MARK: Updating
 
-    /// Checks every installed extension for a new version, at most once a day.
-    static func checkForUpdatesIfDue(force: Bool = false) async {
+    /// What checking one extension came to.
+    enum UpdateOutcome: Equatable { case upToDate, updated, waitingForApproval, failed }
+
+    /// What checking every extension came to, said in Settings › Extensions (#406).
+    struct UpdateCheck: Equatable {
+        var checked = 0
+        var updated = 0
+        /// Extensions whose update asks for more access, in the order checked.
+        var waiting: [String] = []
+        var failed = 0
+
+        mutating func add(_ outcome: UpdateOutcome, for id: String) {
+            checked += 1
+            switch outcome {
+            case .upToDate: break
+            case .updated: updated += 1
+            case .waitingForApproval: waiting.append(id)
+            case .failed: failed += 1
+            }
+        }
+
+        var summary: String {
+            guard checked > 0 else { return String(localized: "No extensions from the Chrome Web Store to check.", comment: "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.") }
+            var parts: [String] = []
+            if updated > 0 { parts.append(String(localized: "Updated \(updated) extensions.", comment: "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.")) }
+            if !waiting.isEmpty { parts.append(String(localized: "\(waiting.count) updates need your approval.", comment: "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.")) }
+            if failed > 0 { parts.append(String(localized: "Couldn’t check \(failed) extensions.", comment: "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.")) }
+            return parts.isEmpty ? String(localized: "All extensions are up to date.", comment: "Toast after Check for Updates in Settings › Extensions when nothing changed.") : parts.joined(separator: " ")
+        }
+    }
+
+    /// The check under way, so a second one waits for it instead of downloading the same updates again.
+    private static var checking: Task<UpdateCheck, Never>?
+
+    /// Checks every installed extension for a new version, at most once a day unless `force`d.
+    @discardableResult
+    static func checkForUpdatesIfDue(force: Bool = false) async -> UpdateCheck {
+        if let checking { return await checking.value }
         let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
-        guard force || Date().timeIntervalSince(last) > 24 * 3600 else { return }
+        guard force || Date().timeIntervalSince(last) > 24 * 3600 else { return UpdateCheck() }
         UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
-        for id in packageIDs where !isUnpacked(id) { await updateIfNewer(id) }
+        let task = Task { @MainActor in
+            var check = UpdateCheck()
+            for id in packageIDs where !isUnpacked(id) { check.add(await updateIfNewer(id), for: id) }
+            return check
+        }
+        checking = task
+        let check = await task.value
+        checking = nil
+        return check
     }
 
     /// Asks the store for the latest version only; downloads it when it's newer. An update that asks for
     /// nothing new replaces the running version; one that asks for more waits for approval.
-    static func updateIfNewer(_ id: String) async {
-        guard #available(macOS 15.4, *), let current = package(id), let latest = await latestVersion(of: id, current: current.version),
-              isVersion(latest, newerThan: current.version), latest != current.pendingVersion else { return }
-        guard case .success(let package) = await download(id) else { return }
+    @discardableResult
+    static func updateIfNewer(_ id: String) async -> UpdateOutcome {
+        guard #available(macOS 15.4, *), let current = package(id) else { return .failed }
+        guard let latest = await latestVersion(of: id, current: current.version) else { return .failed }
+        guard isVersion(latest, newerThan: current.version) else { return .upToDate }
+        guard latest != current.pendingVersion else { return .waitingForApproval }
+        guard case .success(let package) = await download(id) else { return .failed }
         // Package must match the store's version; never accept an older one.
         guard package.version == latest else {
             try? FileManager.default.removeItem(at: package.folder)
-            return
+            return .failed
         }
-        guard store(package, for: id), let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return }
+        guard store(package, for: id), let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return .failed }
         if asksForMore(new, than: old) {
             update(id) { $0.pendingVersion = package.version }
             ExtensionCenter.noteChanged()
-            return
+            return .waitingForApproval
         }
-        await switchVersion(of: id, to: package.version)
+        return await switchVersion(of: id, to: package.version) ? .updated : .failed
     }
 
     /// Approves a held-back update: its new permissions are granted and it replaces the running version.
@@ -684,9 +731,11 @@ enum ExtensionStore {
         await switchVersion(of: id, to: pending)
     }
 
-    /// Makes a version current and reloads the extension with it, going back to the old one if it won't load.
-    private static func switchVersion(of id: String, to version: String) async {
-        guard #available(macOS 15.4, *), let previous = package(id)?.version else { return }
+    /// Makes a version current and reloads the extension with it, going back to the old one if it won't load. True
+    /// when the new version runs.
+    @discardableResult
+    private static func switchVersion(of id: String, to version: String) async -> Bool {
+        guard #available(macOS 15.4, *), let previous = package(id)?.version else { return false }
         update(id) { $0.version = version; $0.pendingVersion = nil }
         // Every profile running it moves to the new version together; if one can't load it, all go back.
         let running = profiles(with: id).filter { $0.installs.isEnabled(id) }
@@ -706,6 +755,7 @@ enum ExtensionStore {
         }
         // A version that no longer gives a search engine gives back the one you had.
         ExtensionSearchProvider.reconcile()
+        return loadedEverywhere
     }
 
     private static func latestVersion(of id: String, current: String) async -> String? {
@@ -717,9 +767,16 @@ enum ExtensionStore {
             .init(name: "x", value: "id=\(id)&v=\(current)&uc"),
         ]
         guard let url = components.url, let (data, response) = try? await URLSession.cookieless.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200, let xml = String(data: data, encoding: .utf8),
-              let check = xml.range(of: "<updatecheck[^>]*>", options: .regularExpression) else { return nil }
+              (response as? HTTPURLResponse)?.statusCode == 200, let xml = String(data: data, encoding: .utf8) else { return nil }
+        return latestVersion(inUpdateCheck: xml, current: current)
+    }
+
+    /// The store's answer: its version, `current` when it has nothing newer, nil when it gave neither (an
+    /// extension it no longer lists, an error).
+    nonisolated static func latestVersion(inUpdateCheck xml: String, current: String) -> String? {
+        guard let check = xml.range(of: "<updatecheck[^>]*>", options: .regularExpression) else { return nil }
         let tag = String(xml[check])
+        if tag.contains("status=\"noupdate\"") { return current }
         guard tag.contains("status=\"ok\""), let version = tag.range(of: "version=\"[^\"]+\"", options: .regularExpression) else { return nil }
         return String(tag[version].dropFirst("version=\"".count).dropLast())
     }

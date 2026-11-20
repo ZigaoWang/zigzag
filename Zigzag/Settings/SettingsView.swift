@@ -1230,6 +1230,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Install from Folder…", comment: "Button in Settings › Extensions: installs an extension from a folder on this Mac, one you're building or one that came with an app."))
+    private let checkUpdatesButton = PillButton(title: String(localized: "Check for Updates", comment: "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now."))
     private var spaceRows: [SpaceSettingsRow] = []
     /// Download rule rows in order with their rule ids, for drag reordering.
     private var downloadRuleRows: [(id: UUID, row: DraggableRow)] = []
@@ -1812,6 +1813,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Extensions
         getExtensionsButton.onClick = { [weak self] _ in self?.getExtensions() }
         loadUnpackedButton.onClick = { [weak self] _ in self?.loadUnpacked() }
+        checkUpdatesButton.onClick = { [weak self] _ in self?.checkForUpdates() }
 
         // One search for everything, shortcuts included (by name or by keys).
         settingSearch.field.delegate = self
@@ -3335,8 +3337,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
+            checkUpdatesButton.isHidden = !hasExtensions
             let buttons: NSStackView = made("buttons") {
-                let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
+                let buttons = NSStackView(views: [checkUpdatesButton, loadUnpackedButton, getExtensionsButton])
                 buttons.spacing = Tokens.Space.x2
                 return buttons
             }
@@ -4671,6 +4674,27 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
+
+    /// Checks every extension from the store now and says what came of it; one update that wants more access opens
+    /// its review sheet (#406).
+    private func checkForUpdates() {
+        guard checkUpdatesButton.isEnabled else { return }
+        let title = checkUpdatesButton.title
+        checkUpdatesButton.title = String(localized: "Checking…", comment: "The Check for Updates button in Settings › Extensions while it checks.")
+        checkUpdatesButton.isEnabled = false
+        layoutDocument()
+        Task { @MainActor [weak self] in
+            let check = await ExtensionStore.checkForUpdatesIfDue(force: true)
+            guard let self else { return }
+            checkUpdatesButton.title = title
+            checkUpdatesButton.isEnabled = true
+            layoutDocument()
+            Toast.show(check.summary, symbol: check.failed > 0 ? "exclamationmark.triangle" : "checkmark", duration: 4, over: self, area: bounds)
+            if check.waiting.count == 1, let id = check.waiting.first, let controller = browser {
+                controller.reviewExtensionUpdate(id)
+            }
+        }
+    }
 
     private func getExtensions() {
         guard let controller = browser else { return }

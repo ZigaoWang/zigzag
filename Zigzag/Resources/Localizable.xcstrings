@@ -1924,6 +1924,41 @@
         }
       }
     },
+    "%lld updates need your approval." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld update needs your approval."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld updates need your approval."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个更新需要你批准。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld zapped" : {
       "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.",
       "localizations" : {
@@ -2889,6 +2924,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有发行说明"
+          }
+        }
+      }
+    },
+    "All extensions are up to date." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when nothing changed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有扩展都已是最新版本。"
           }
         }
       }
@@ -5147,6 +5193,17 @@
         }
       }
     },
+    "Check for Updates" : {
+      "comment" : "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "comment" : "Button in Settings › General, beside Zigzag's version.\nZigzag menu item.",
       "localizations" : {
@@ -5192,7 +5249,7 @@
       }
     },
     "Checking…" : {
-      "comment" : "On the certificate page of the site panel, while the certificate is read.",
+      "comment" : "On the certificate page of the site panel, while the certificate is read.\nThe Check for Updates button in Settings › Extensions while it checks.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6621,6 +6678,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "以下扩展未能添加："
+          }
+        }
+      }
+    },
+    "Couldn’t check %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个扩展无法检查。"
+                }
+              }
+            }
           }
         }
       }
@@ -12846,6 +12938,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未找到表情符号"
+          }
+        }
+      }
+    },
+    "No extensions from the Chrome Web Store to check." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有来自 Chrome 网上应用店的扩展需要检查。"
           }
         }
       }
@@ -21503,6 +21606,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新请求更多权限"
+          }
+        }
+      }
+    },
+    "Updated %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已更新 %lld 个扩展。"
+                }
+              }
+            }
           }
         }
       }
