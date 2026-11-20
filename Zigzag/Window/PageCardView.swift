@@ -48,6 +48,39 @@ final class PageCardView: NSView {
     /// ground shows there in the page's own color (`ground`), so the bar and the page read as one card: its
     /// corners, edge and shadow are the card's, and it moves with it.
     var band: CGFloat = 0 { didSet { if band != oldValue { needsLayout = true } } }
+
+    /// Moves the band from where it is to `target` on `curve`: Autohide slides the bar up and the page's top by the
+    /// same amount, so the page and the bar travel as one. The page keeps its place for the first frame and glides to
+    /// the new one on the render server, with the card's own frame when that changes too.
+    func moveBand(to target: CGFloat, with curve: Tokens.Motion.Curve) {
+        guard band != target else { return }
+        let fromFrame = frame
+        let oldBand = band
+        band = target
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        let toFrame = frame
+        frame = fromFrame
+        if fromFrame != toFrame {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = curve.duration
+                context.timingFunction = curve.timing
+                animator().frame = toFrame
+            }
+        }
+        // The clip and the header were laid out at the new band. Start them where they were, in the clip's own
+        // (unflipped) coordinates, and let both travel the difference on the same curve as the bar.
+        let shift = target - oldBand
+        guard abs(shift) > 0.5 else { return }
+        for view in [clip, header] {
+            let animation = CABasicAnimation(keyPath: "transform.translation.y")
+            animation.fromValue = shift
+            animation.toValue = 0
+            animation.duration = curve.duration
+            animation.timingFunction = curve.timing
+            view.layer?.add(animation, forKey: "autohideBand")
+        }
+    }
     /// The page's own color (`Tab.pageColor`), for the card's ground and what lies on it. None for a page at a
     /// size of its own: it stands on plain ground, so its edges show.
     var pageColor: NSColor? { pageSize == nil ? (webView as? BrowserWebView)?.owner?.pageColor : nil }
