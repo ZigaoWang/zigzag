@@ -17,6 +17,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 按网站路径设置的空间规则现在也适用于这个网站的 www. 地址，和整个域名的规则一样：github.com/org1 也会匹配 www.github.com/org1，写了 www. 的规则也会匹配不带 www. 的地址。
 - 空间编辑器会说明“透明”玻璃为什么显示成了“磨砂”：使用电池或在低电量模式下，“玻璃”下方会有一行说明，接上电源或关闭低电量模式后就会消失。
 - 从窗口右侧的按钮打开的菜单（比如“设置 › 扩展”里的“获取扩展”）现在向内展开，和按钮右边缘对齐，不再超出按钮。
+- 从工具栏按钮登录 Passbolt 能成功了，不会再转一会儿后提示“Authentication is required to continue”。Passbolt 用表单数据发送登录请求，Zigzag 把这类请求交给了 WebKit，而 WebKit 丢掉了 Passbolt 服务器返回的会话 Cookie，所以下一个请求被当成未登录。现在扩展向它有权访问的网站发送表单数据、文件等非文本内容时，也会带上并保存这个网站的 Cookie，和文本请求以及 Chrome 里一样。感谢 [bkonia](https://github.com/bkonia)。([#393](https://github.com/ZigaoWang/zigzag/issues/393))
 
 ## [0.9.3] - 2026-11-18
 

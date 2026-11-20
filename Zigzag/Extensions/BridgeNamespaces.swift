@@ -1193,7 +1193,7 @@ final class ExtensionFetchRequests {
             // Over plain HTTP that session knows nothing of the sites WebKit keeps on HTTPS (HSTS) and would send
             // their cookies in the clear, so outside this Mac those stay with WebKit's own fetch.
             if url.scheme == "http", !Self.isLoopback(url) { return ["fallback": true] }
-            if ((options["body"] as? String)?.utf8.count ?? 0) > Self.responseLimit { return ["fallback": true] }
+            if (Self.body(options)?.count ?? 0) > Self.responseLimit { return ["fallback": true] }
             let request = try Self.writeRequest(options, url: url, extensionID: extensionID)
             return try await send(request, key: key, store: store, authorize: authorize)
         }
@@ -1238,11 +1238,11 @@ final class ExtensionFetchRequests {
         if let when = cancelled.removeValue(forKey: key), when.timeIntervalSinceNow > -40 { throw BridgeError("Extension request cancelled.") }
         guard pages[key] == nil, writes[key] == nil else { throw BridgeError("Extension request is already running.") }
         let method = (options["method"] as? String ?? "GET").uppercased()
-        let body = options["body"] as? String
+        let body = Self.body(options)
         let headers = options["headers"] as? [[String]] ?? []
         let streams = headers.contains { $0.count == 2 && $0[0].lowercased() == "accept" && $0[1].lowercased().contains("event-stream") }
         guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method),
-              url.scheme == "https" || Self.isLoopback(url), !streams, (body?.utf8.count ?? 0) <= Self.responseLimit,
+              url.scheme == "https" || Self.isLoopback(url), !streams, (body?.count ?? 0) <= Self.responseLimit,
               options["body"] == nil || options["body"] is NSNull || body != nil, body == nil || !["GET", "HEAD"].contains(method)
         else { return ["fallback": true] }
         let request = try Self.writeRequest(options, url: url, extensionID: extensionID, methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
@@ -1279,12 +1279,19 @@ final class ExtensionFetchRequests {
             && host.split(separator: ".").count == 4 && host.split(separator: ".").allSatisfy { UInt8($0) != nil }
     }
 
+    /// A request's body as bridge.js sent it: text, or base64 bytes for form data, a Blob or a buffer. Nil when there
+    /// is none or it doesn't decode.
+    nonisolated static func body(_ options: [String: Any]) -> Data? {
+        guard let text = options["body"] as? String else { return nil }
+        return options["encoding"] as? String == "base64" ? Data(base64Encoded: text) : Data(text.utf8)
+    }
+
     /// What a write sends, read from the extension's message here so the rest can leave the main thread.
     private static func writeRequest(_ options: [String: Any], url: URL, extensionID: String,
                                      methods: Set<String> = ["POST", "PUT", "PATCH", "DELETE", "OPTIONS"]) throws -> ExtensionWrite.Request {
         let method = (options["method"] as? String ?? "POST").uppercased()
-        guard methods.contains(method),
-              options["body"] == nil || options["body"] is NSNull || options["body"] is String else {
+        let body = Self.body(options)
+        guard methods.contains(method), options["body"] == nil || options["body"] is NSNull || body != nil else {
             throw BridgeError("Unsupported extension request.")
         }
         var headers = (options["headers"] as? [[String]] ?? []).filter { $0.count == 2 }
@@ -1293,7 +1300,7 @@ final class ExtensionFetchRequests {
             headers.append(["User-Agent", agent])
         }
         // Derived from the native-message sender, never a payload-supplied Origin or a website's origin.
-        return ExtensionWrite.Request(url: url, method: method, body: (options["body"] as? String).map { Data($0.utf8) },
+        return ExtensionWrite.Request(url: url, method: method, body: body,
                                       headers: headers,
                                       cache: options["cache"] as? String, redirect: options["redirect"] as? String,
                                       origin: "chrome-extension://\(extensionID)")

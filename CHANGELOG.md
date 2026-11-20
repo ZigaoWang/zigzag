@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A space rule for a path of a site now also takes the site's www. address, as rules for a whole domain already did: github.com/org1 matches www.github.com/org1, and a rule written with www. matches the bare address too.
 - The space editor says when Clear glass is showing as Frosted: on battery or in Low Power Mode, a line under Glass explains it, and goes away when you plug in or turn Low Power Mode off.
 - A menu opened from a button on the right side of a window, like Get Extensions in Settings › Extensions, now opens inward, lined up with the button's right edge, instead of hanging past it.
+- Signing in to Passbolt from its toolbar button works, instead of spinning and then saying "Authentication is required to continue". Passbolt sends its sign-in as form data, which Zigzag left to WebKit, and WebKit dropped the session cookie your Passbolt server sent back, so the next request looked signed out. Form data, files and other non-text bodies an extension sends to a site it has access to now keep that site's cookies, as text already did and as in Chrome. Thanks to [bkonia](https://github.com/bkonia). ([#393](https://github.com/ZigaoWang/zigzag/issues/393))
 
 ## [0.9.3] - 2026-11-18
 
