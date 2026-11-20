@@ -75,6 +75,18 @@ struct AddonsMozillaPageTests {
         #expect(ExtensionStore.publishedAddonsFile(fromAPI: Data("not json".utf8)) == nil)
     }
 
+    /// The API's guid comes with the file when it reads as an ID.
+    @Test func theAPIsGUIDIsRead() {
+        func answer(_ guid: String) -> Data {
+            Data(("{\"guid\":\"" + guid + "\",\"current_version\":{\"file\":{\"url\":\"https://addons.mozilla.org/firefox/downloads/file/1/x.xpi\",\"hash\":\"sha256:00\"}}}").utf8)
+        }
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer("uBlock0@raymondhill.net"))?.guid == "uBlock0@raymondhill.net")
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer("{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"))?.guid == "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}")
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer(""))?.guid == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer("a/b"))?.guid == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer(String(repeating: "a", count: 256)))?.guid == nil)
+    }
+
     /// Only the exact file the API names goes to the install sheet: same AMO host and path.
     @Test func onlyThePublishedFileIsInstalled() {
         let published = URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!
@@ -447,6 +459,31 @@ struct FirefoxInstallTests {
         #expect(ExtensionStore.packageIDs == [id])
         #expect(work.record(id)?.firefoxID == nil)
         #expect(SettingsView.packageKindDetail(id) == ["Firefox"])
+    }
+
+    /// From Add to Firefox, a package with no gecko ID is named by AMO's guid: two versions are one record.
+    @Test func twoVersionsFromTheStoreWithNoGeckoIDAreOneRecord() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        for version in ["1.0", "1.1"] {
+            let bytes = try Self.xpi(Self.manifest(nil, version))
+            guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(data: bytes, storeID: "store@example.com") else {
+                Issue.record("\(version) didn't prepare")
+                return
+            }
+            _ = try Self.installed(await ExtensionStore.finishInstall(prepared, in: work.profile))
+        }
+        let id = ExtensionStore.xpiID(forGeckoID: "store@example.com", data: Data())
+        #expect(ExtensionStore.packageIDs == [id])
+        #expect(work.record(id)?.version == "1.1")
+        // A guid that doesn't read as one isn't used: the bytes name it, as from a file.
+        let bytes = try Self.xpi(Self.manifest(nil, "2.0"))
+        guard case .success(let odd) = await ExtensionStore.prepareInstallXPI(data: bytes, storeID: "../x") else {
+            Issue.record("odd guid didn't prepare")
+            return
+        }
+        #expect(odd.id == ExtensionStore.xpiID(forGeckoID: nil, data: bytes))
+        ExtensionStore.discard(odd)
     }
 
     /// A signature file in the package changes nothing Zigzag says: its presence isn't a check that the signature is

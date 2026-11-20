@@ -315,6 +315,14 @@ enum ExtensionStore {
     struct PublishedAddonsFile: Equatable, Sendable {
         let url: URL
         let hash: String
+        /// The add-on's ID on AMO, the same across its versions; nil when the API gives none that reads as an ID.
+        var guid: String? = nil
+    }
+
+    /// An AMO `guid` as an ID: an email-like name or a `{UUID}`, in ASCII, of a sane length.
+    nonisolated static func isAddonsGUID(_ guid: String) -> Bool {
+        (1...255).contains(guid.count)
+            && guid.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "@.-_{}+".contains($0)) }
     }
 
     /// `current_version.file` from an AMO API answer; nil unless it names an AMO file URL and a hash.
@@ -324,7 +332,8 @@ enum ExtensionStore {
               let file = current["file"] as? [String: Any],
               let text = file["url"] as? String, let url = URL(string: text), isAddonsFile(url),
               let hash = file["hash"] as? String, !hash.isEmpty else { return nil }
-        return PublishedAddonsFile(url: url, hash: hash)
+        let guid = (root["guid"] as? String).flatMap { isAddonsGUID($0) ? $0 : nil }
+        return PublishedAddonsFile(url: url, hash: hash, guid: guid)
     }
 
     /// Whether a download fetched exactly the published file: same https AMO host and path.
@@ -518,10 +527,13 @@ enum ExtensionStore {
     }
 
     /// The same, from bytes already read, so bytes that were checked are the bytes unpacked.
+    /// `storeID` is AMO's guid for a package from Add to Firefox: one with no gecko ID of its own is named by it, so
+    /// each version of it is the same record.
     @available(macOS 15.4, *)
-    static func prepareInstallXPI(data: Data) async -> Result<PreparedInstall, InstallError> {
+    static func prepareInstallXPI(data: Data, storeID: String? = nil) async -> Result<PreparedInstall, InstallError> {
         guard let package = try? XPIPackage(data) else { return .failure(.unpack) }
-        let id = xpiID(forGeckoID: package.firefoxID, data: data)
+        let geckoID = package.firefoxID ?? storeID.flatMap { isAddonsGUID($0) ? $0 : nil }
+        let id = xpiID(forGeckoID: geckoID, data: data)
         let staging = FileManager.default.temporaryDirectory.appendingPathComponent("\(xpiStagingPrefix)\(UUID().uuidString)")
         do {
             try package.unpack(into: staging)
@@ -554,7 +566,7 @@ enum ExtensionStore {
             return .failure(.unsupported)
         }
         let report = ExtensionReport(extension: ext, manifest: normalized, id: id)
-        return .success(PreparedInstall(id: id, version: version, kind: .firefox, firefoxID: package.firefoxID,
+        return .success(PreparedInstall(id: id, version: version, kind: .firefox, firefoxID: geckoID,
                                         folder: staging, extensionInfo: ext, report: report))
     }
 
