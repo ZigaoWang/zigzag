@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import WebKit
 @testable import Zigzag
 
 @MainActor
@@ -174,5 +175,16 @@ struct PermissionPromptTests {
         #expect(PermissionPrompt.look(pageColor: nil, pageLook: .darkAqua) == .darkAqua)
         #expect(PermissionPrompt.look(pageColor: nil, pageLook: .aqua) == .aqua)
         #expect(PermissionPrompt.look(pageColor: nil, pageLook: nil) == nil)
+    }
+
+    /// A page's alert, confirm or prompt sheet takes the page's look as the card does (#300).
+    @Test func thePageDialogSheetTakesItsPagesLook() {
+        let page = WKWebView()
+        page.appearance = NSAppearance(named: .darkAqua)
+        #expect(PageDialogSheet.look(of: page) == .darkAqua)
+        page.appearance = NSAppearance(named: .aqua)
+        #expect(PageDialogSheet.look(of: page) == .aqua)
+        page.appearance = nil
+        #expect(PageDialogSheet.look(of: page) == nil)
     }
 }
