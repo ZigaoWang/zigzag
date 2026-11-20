@@ -1506,7 +1506,8 @@ final class Tab: NSObject {
     /// page committed in a tab keeps the icon it was restored with.
     nonisolated static func keepsIcon(from previous: URL?, to committed: URL) -> Bool {
         guard let previous else { return true }
-        return FaviconStore.siteKey(for: previous) == FaviconStore.siteKey(for: committed)
+        func site(_ url: URL) -> String { FaviconStore.siteKey(for: url) ?? url.scheme ?? "" }
+        return site(previous) == site(committed)
     }
     /// The title waiting to go into History, a moment after the page last changed it.
     private var titleWrite: DispatchWorkItem?

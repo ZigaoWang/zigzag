@@ -135,5 +135,7 @@ extension SiteIconChoiceTests {
         #expect(Tab.keepsIcon(from: first, to: URL(string: "http://\(host):8080/deeper")!))
         // The scheme's own port is the same site, so its icon stays across the move.
         #expect(Tab.keepsIcon(from: URL(string: "http://\(host)/")!, to: URL(string: "http://\(host):80/")!))
+        // A page with no host is its scheme's.
+        #expect(!Tab.keepsIcon(from: URL(string: "file:///tmp/a.html")!, to: URL(string: "about:blank")!))
     }
 }
