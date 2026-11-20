@@ -1004,6 +1004,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var trustedCertificatesToken: SignalToken?
     /// Kept cookies' sites, changed in Site Controls or here (#334).
     private var keptCookiesToken: SignalToken?
+    private var sitePermissionsToken: SignalToken?
     /// Clear Cookies…, Add Site… and the quit switch, for the debug bridge.
     private weak var clearCookiesButton: PillButton?
     private weak var addKeptButton: PillButton?
@@ -1455,6 +1456,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         addSiteButton.onClick = { [weak self] _ in if let self { DevelopmentSiteSheet.add(in: self) } }
         addSizeButton.onClick = { [weak self] _ in if let self { PageSizeSheet.add(in: self) } }
         keptCookiesToken = KeptCookies.changed.observe { [weak self] in
+            guard let self, self.showsWebsiteData else { return }
+            self.reloadPrivacy()
+            self.layoutDocument()
+        }
+        // Changed in Site Controls, maybe in another window: the site rows follow (#420).
+        sitePermissionsToken = SitePermissions.changed.observe { [weak self] in
             guard let self, self.showsWebsiteData else { return }
             self.reloadPrivacy()
             self.layoutDocument()
@@ -3034,6 +3041,35 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             .compactMap { $0.isHidden ? nil : ($0 as? FormRow)?.debugTitle }
     }
 
+    /// The headings on the page, top to bottom.
+    var debugHeadings: [String] {
+        documentView.subviews.compactMap { $0 as? Label }.filter { !$0.isHidden && !$0.stringValue.isEmpty }
+            .sorted { $0.frame.minY < $1.frame.minY }.map(\.stringValue)
+    }
+
+    /// The space between the Site Permissions heading and its rows.
+    var debugSitesGap: CGFloat? {
+        documentView.subviews.compactMap { $0 as? Label }.first { $0.stringValue == Self.sitesHeading }
+            .map { sitesGroup.frame.minY - $0.frame.maxY }
+    }
+
+    /// Site Permissions' rows: a title, then ": " and the dropdown's choice where it has one.
+    var debugSiteRows: [String] {
+        sitesGroup.rows.compactMap { $0 as? FormRow }.map { row in
+            let dropdown = (row.control as? NSStackView)?.arrangedSubviews.first as? DropdownButton
+            return dropdown.map { "\(row.debugTitle): \($0.options[$0.selectedIndex].title)" } ?? row.debugTitle
+        }
+    }
+
+    /// Picks a choice in a site's permission dropdown, as a click there does.
+    func debugChooseSitePermission(_ title: String, _ choice: String) {
+        guard let row = sitesGroup.rows.compactMap({ $0 as? FormRow }).first(where: { $0.debugTitle == title }),
+              let dropdown = (row.control as? NSStackView)?.arrangedSubviews.first as? DropdownButton,
+              let index = dropdown.options.firstIndex(where: { $0.title == choice }) else { return }
+        dropdown.selectedIndex = index
+        dropdown.onSelect?(index)
+    }
+
     var debugScroll: NSScrollView? { scroll }
     var debugSiteDataReady: Bool { siteDataList.model?.state == .loaded && siteDataList.debugListed > 0 }
     var debugSiteDataCount: Int { siteDataList.model?.entries.count ?? 0 }
@@ -3388,9 +3424,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .passwords, .websiteData:
             for (title, group) in groups(of: pane) { section(title, group) }
         case .privacy:
-            section(nil, blockingGroup)
-            section(Self.sitesHeading, sitesGroup, accessory: sitesReset)
-            for (title, group) in groups(of: pane).dropFirst(2) { section(title, group) }
+            // Each group once, in groups(of:) order: counting them here laid Site Permissions out twice (#420).
+            for (title, group) in groups(of: pane) { section(title, group, accessory: group === sitesGroup ? sitesReset : nil) }
         case .translation:
             section(nil, translationGroup)
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)

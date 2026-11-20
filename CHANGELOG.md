@@ -10,6 +10,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The space icons at the bottom of the sidebar line up. Each one sits in the middle of its key at the same size, so a flame, a book and a star read as one row, and an emoji no longer sits higher or lower than a symbol.
 - A favorite's icon stays square and in the middle of its tile at every sidebar width, instead of growing a point and sitting half a point off.
 - Extension icons in Site Controls' grid sit on whole points, so the rows below the first are as sharp as the first.
+- Settings › Privacy › Site Permissions shows its sites again, right under its heading. In beta 6 the list was drawn a whole list's height lower, under a second Site Permissions heading, so the section looked empty, and the Allow websites to reach apps on this Mac switch was missing. A change made in Site Controls now also shows in Settings while it's open, in any window. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#420](https://github.com/ZigaoWang/zigzag/issues/420))
 
 ## [0.9.3] - 2026-11-18
 
