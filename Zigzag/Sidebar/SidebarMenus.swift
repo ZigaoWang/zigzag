@@ -487,7 +487,7 @@ enum SidebarMenus {
 
         let page = [Item(String(localized: "Copy Link", comment: "Item in a favorite's context menu.")) { controller.copyLink(favorite.url, title: favorite.title) }]
         // Favorites are shared by every window: a private one doesn't take them away.
-        let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite back into a pinned tab.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
+        let organize = isPrivate ? [] : [Item(String(localized: "Move to Tabs", comment: "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in.")) { controller.unfavoriteWithUndo(favorite.id, to: 0) }]
 
         // Not a split favorite: a new name or icon would only reach its left page.
         var edit: [NSMenuItem] = []

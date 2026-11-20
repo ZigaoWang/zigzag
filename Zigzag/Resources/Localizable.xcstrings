@@ -12657,7 +12657,7 @@
       }
     },
     "Move to Tabs" : {
-      "comment" : "Item in a favorite's context menu. Turns the favorite back into a pinned tab.\nMenu bar item: moves the favorite back to the tabs.\nUndo action name, shown in the Edit menu as Undo Move to Tabs.",
+      "comment" : "Item in a favorite's context menu. Turns the favorite into a plain tab of the space you're in.\nMenu bar item: moves the favorite back to the tabs.\nUndo action name, shown in the Edit menu as Undo Move to Tabs.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
