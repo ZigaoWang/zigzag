@@ -180,17 +180,6 @@ final class DownloadManager: NSObject {
     /// Downloads whose handoff question was put off; don't ask the same rule again.
     private var ruleDeclinedDownloads: Set<ObjectIdentifier> = []
 
-    /// A Firefox package coming in from a page (the store's Add to Firefox): it is installed, not kept. The file is
-    /// temporary, and the window and profile are the ones the page was in, for the install sheet.
-    private struct PendingExtensionInstall {
-        let file: URL
-        weak var window: NSWindow?
-        let profile: UUID
-        /// The listing it came from, when it came from AMO: the package must match the sha256 that listing publishes.
-        let slug: String?
-    }
-    private var pendingExtensionInstalls: [ObjectIdentifier: PendingExtensionInstall] = [:]
-
     private static func isPrivate(_ download: WKDownload) -> Bool {
         !(download.webView?.configuration.websiteDataStore.isPersistent ?? false)
     }
@@ -557,37 +546,20 @@ extension DownloadManager: WKDownloadDelegate {
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String) async -> URL? {
         let inProgress = Set(items.filter { $0.state == .downloading }.compactMap { $0.destination?.path })
         let name = suggestedFilename.isEmpty ? "Download" : suggestedFilename
-        let identifier = ObjectIdentifier(download)
         var destination = Self.uniqueDestination(for: name, avoiding: inProgress)
-        let window = windows.removeValue(forKey: identifier)
-        let startedAt = origins.removeValue(forKey: identifier)
+        let window = windows.removeValue(forKey: ObjectIdentifier(download))
+        let startedAt = origins.removeValue(forKey: ObjectIdentifier(download))
         if let url = download.originalRequest?.url, let earlier = restarts.removeValue(forKey: url) {
             // A paused download started over: it replaces its own partial file.
             try? FileManager.default.removeItem(at: earlier)
             return earlier
-        }
-        // A Firefox package from the store is an install, not a download to keep: it goes to a temporary file,
-        // stays out of the list, and is offered with the store's own sheet once its bytes match the sha256 AMO
-        // publishes. Only AMO's own listing page counts, so no other site can open the sheet. Rules don't apply,
-        // and a destination someone already chose (Save Page As, the bridge) is an explicit save and is left alone.
-        let fromAMO = download.originalRequest?.mainDocumentURL.flatMap(ExtensionStore.addonsSlug)
-            ?? (download.webView as? BrowserWebView)?.owner?.url.flatMap(ExtensionStore.addonsSlug)
-        if let slug = fromAMO, chosenDestinations[identifier] == nil,
-           DownloadPolicy.isExtensionPackage(mimeType: response.mimeType, filename: name) {
-            let file = FileManager.default.temporaryDirectory
-                .appendingPathComponent("Zigzag-\(UUID().uuidString)-\(Self.safeFilename(name))")
-            pendingExtensionInstalls[identifier] = PendingExtensionInstall(file: file, window: window,
-                                                                          profile: item(for: download)?.profile ?? Profile.defaultID,
-                                                                          slug: slug)
-            items.removeAll { $0.download === download }
-            changed.send(nil)
-            return file
         }
         // Download rules for downloads the navigation never saw: context-menu Download Linked File, or a page's
         // startDownload. Save Page As already chose its file. Handing off cancels WebKit's copy and removes its row.
         // Only page downloads can be handed off; pop-ups and extensions have no page to answer, so theirs stay in
         // Zigzag. A rule-opened page's download and a just-put-off one aren't offered again, or a rule that matches
         // its own file would loop.
+        let identifier = ObjectIdentifier(download)
         defer {
             ruleOpenedDownloads.remove(identifier)
             ruleDeclinedDownloads.remove(identifier)
@@ -721,10 +693,6 @@ extension DownloadManager: WKDownloadDelegate {
     }
 
     func downloadDidFinish(_ download: WKDownload) {
-        if let pending = pendingExtensionInstalls.removeValue(forKey: ObjectIdentifier(download)) {
-            offerExtensionInstall(pending)
-            return
-        }
         guard let item = item(for: download) else { return }
         helpers[item.id] = nil
         // Done: now it takes the place of the file it replaces.
@@ -758,65 +726,6 @@ extension DownloadManager: WKDownloadDelegate {
         if item.opensWhenFinished { openWhenFinished(item) }
 }
 
-    /// A package arrived: verify and unpack it, offer it with the store's own sheet in the profile it came from,
-    /// and delete the download's own copy either way. The store keeps its staged copy until it's installed or
-    /// declined.
-    private func offerExtensionInstall(_ pending: PendingExtensionInstall) {
-        let file = pending.file
-        let profile = Profiles.shared.profile(pending.profile)
-        let window = pending.window ?? WindowManager.shared.keyController?.window
-        guard #available(macOS 15.4, *), let host = window?.contentView else {
-            try? FileManager.default.removeItem(at: file)
-            return
-        }
-        Task { @MainActor in
-            // From AMO, the package must be the file the store published: its listing names each file's sha256,
-            // and one that doesn't match is a different file, so it is not installed.
-            if let slug = pending.slug {
-                let data = try? Data(contentsOf: file)
-                let published = await Self.publishedXPIHash(slug: slug)
-                guard let data, ExtensionStore.matchesPublishedHash(data, sha256: published) else {
-                    try? FileManager.default.removeItem(at: file)
-                    Self.noticeCouldNotAdd(String(localized: "This extension’s package doesn’t match the one the Firefox Add-ons store publishes, so it wasn’t installed.",
-                                                  comment: "Shown when an .xpi downloaded from addons.mozilla.org doesn't match the sha256 the store publishes for it."), in: host)
-                    return
-                }
-            }
-            let prepared = await ExtensionStore.prepareInstallXPI(at: file)
-            // The store read the file into its own staging folder; the download copy is never kept.
-            try? FileManager.default.removeItem(at: file)
-            switch prepared {
-            case .failure(let error):
-                Self.noticeCouldNotAdd(error.message, in: host)
-            case .success(let install):
-                ExtensionSheet.offer(install, in: profile, over: host, onInstalled: { result in
-                    if case .failure(let error) = result { Self.noticeCouldNotAdd(error.message, in: host) }
-                })
-            }
-        }
-    }
-
-    /// The sha256 AMO publishes for a listing's current file, from its API. Nil when the store can't be reached or
-    /// names no hash, and then nothing is installed: a package that can't be checked isn't taken on trust.
-    @available(macOS 15.4, *)
-    private static func publishedXPIHash(slug: String) async -> String? {
-        guard let url = URL(string: "https://addons.mozilla.org/api/v5/addons/addon/\(slug)/?lang=en-US"),
-              let answered = try? await ExtensionStore.fetch(url),
-              let data = answered.0,
-              (answered.1 as? HTTPURLResponse)?.statusCode == 200,
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let current = root["current_version"] as? [String: Any],
-              let file = current["file"] as? [String: Any] else { return nil }
-        return file["hash"] as? String
-    }
-
-    private static func noticeCouldNotAdd(_ message: String, in host: NSView) {
-        ConfirmSheet.notice(in: host,
-                            title: String(localized: "Couldn’t add this extension",
-                                          comment: "Title of the notice when a picked extension file can't be added."),
-                            message: message)
-    }
-
     /// Marks a finished file as downloaded from the web by Zigzag, as Safari does. WebKit marks it as from the
     /// internet but names no app, so opening it asked about a file "created by the app (null)". A private window's
     /// download names no addresses.
@@ -846,10 +755,6 @@ extension DownloadManager: WKDownloadDelegate {
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        // A package that never arrived leaves no temporary file behind.
-        if let pending = pendingExtensionInstalls.removeValue(forKey: ObjectIdentifier(download)) {
-            try? FileManager.default.removeItem(at: pending.file)
-        }
         // A failed or cancelled download never reaches the destination decision; clear its state here.
         origins.removeValue(forKey: ObjectIdentifier(download))
         windows.removeValue(forKey: ObjectIdentifier(download))

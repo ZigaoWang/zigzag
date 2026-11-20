@@ -112,35 +112,28 @@ nonisolated struct CompatibilityOverlay: Codable, Sendable {
     var manifest: [String: CompatibilityPermission]
 
     enum LoadError: LocalizedError {
-        case missingResource(String)
-        case malformed(String, String)
+        case missingResource
+        case malformed(String)
 
         var errorDescription: String? {
             switch self {
-            case .missingResource(let name):
-                return "\(name).json is missing from the app"
-            case .malformed(let name, let reason):
-                return "\(name).json is malformed: \(reason)"
+            case .missingResource:
+                return "compatibility.json is missing from the app"
+            case .malformed(let reason):
+                return "compatibility.json is malformed: \(reason)"
             }
         }
     }
 
-    /// The overlay for Chrome, which the app ships. `bundle` is the app's or a test's.
+    /// The shipped overlay. `bundle` is the app's or a test's.
     static func load(bundle: Bundle = .main) throws -> CompatibilityOverlay {
-        try load(kind: .chromium, bundle: bundle)
-    }
-
-    /// The overlay for one package kind: Chrome's `compatibility.json`, or Firefox's own `firefox-compatibility.json`.
-    /// The two are separate files; a Firefox-only member never reaches Chrome's matrix or the other way round.
-    static func load(kind: ExtensionKind, bundle: Bundle = .main) throws -> CompatibilityOverlay {
-        let name = kind == .firefox ? "firefox-compatibility" : "compatibility"
-        guard let url = bundle.url(forResource: name, withExtension: "json") else {
-            throw LoadError.missingResource(name)
+        guard let url = bundle.url(forResource: "compatibility", withExtension: "json") else {
+            throw LoadError.missingResource
         }
         do {
             return try JSONDecoder().decode(CompatibilityOverlay.self, from: Data(contentsOf: url))
         } catch {
-            throw LoadError.malformed(name, error.localizedDescription)
+            throw LoadError.malformed(error.localizedDescription)
         }
     }
 }
@@ -193,9 +186,6 @@ nonisolated enum CompatibilityText {
         case "extension.limit.sidePanel":
             return String(localized: "extension.limit.sidePanel", defaultValue: "Side panel",
                           comment: "A Chrome extension feature Zigzag limits: the side panel's layout and open/close events.")
-        case "extension.limit.sidebarAction":
-            return String(localized: "extension.limit.sidebarAction", defaultValue: "Side panel toolbar controls (the panel itself is shown)",
-                          comment: "A Firefox extension feature Zigzag limits: the side panel from sidebar_action is shown, but nothing answers browser.sidebarAction's open, close, toggle and other controls.")
         case "extension.limit.systemDisplay":
             return String(localized: "extension.limit.systemDisplay", defaultValue: "Display information",
                           comment: "A Chrome extension feature Zigzag limits: changing display settings.")
@@ -307,21 +297,6 @@ nonisolated enum CompatibilityText {
         case "extension.limit.deprecatedChannel":
             return String(localized: "extension.limit.deprecatedChannel", defaultValue: "Deprecated Google APIs",
                           comment: "A Chrome extension feature Chrome removed: its old Google messaging channels.")
-        case "extension.limit.contextualIdentities":
-            return String(localized: "extension.limit.contextualIdentities", defaultValue: "Containers",
-                          comment: "A Firefox extension feature Zigzag cannot provide: containers, Firefox's separate identities for tabs.")
-        case "extension.limit.browserSettings":
-            return String(localized: "extension.limit.browserSettings", defaultValue: "Browser settings",
-                          comment: "A Firefox extension feature Zigzag cannot provide: changing the browser's own settings.")
-        case "extension.limit.pkcs11":
-            return String(localized: "extension.limit.pkcs11", defaultValue: "Security modules",
-                          comment: "A Firefox extension feature Zigzag cannot provide: PKCS#11 security modules.")
-        case "extension.limit.dns":
-            return String(localized: "extension.limit.dns", defaultValue: "DNS resolution",
-                          comment: "A Firefox extension feature Zigzag cannot provide: resolving host names itself.")
-        case "extension.limit.theme":
-            return String(localized: "extension.limit.theme", defaultValue: "Themes",
-                          comment: "A Firefox extension feature Zigzag cannot provide: installing browser themes.")
         default:
             return fallback
         }
@@ -349,25 +324,11 @@ nonisolated struct CompatibilityImplementations: Sendable {
     /// Chrome still lists (`management.getSelf`, `storage.managed`), so `emulated` claims name it.
     @MainActor
     static func shipped(bundle: Bundle = .main) -> CompatibilityImplementations {
-        shipped(kind: .chromium, bundle: bundle)
-    }
-
-    /// The code one kind's claims may name. `webkit-differences.js` and the compatibility shim answer both kinds;
-    /// `firefox-polyfill.js` answers only Firefox's, where `getBrowserInfo` and `getPlatformInfo` live. Scoping the
-    /// scan by kind keeps a Chrome claim from validating against a Firefox-only symbol, and the other way round.
-    @MainActor
-    static func shipped(kind: ExtensionKind, bundle: Bundle = .main) -> CompatibilityImplementations {
         let differences = bundle.url(forResource: "webkit-differences", withExtension: "js")
             .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-        var script = differences + "\n" + ExtensionShims.compatibility
-        if kind == .firefox {
-            let polyfill = bundle.url(forResource: "firefox-polyfill", withExtension: "js")
-                .flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-            script += "\n" + polyfill
-        }
         return CompatibilityImplementations(handlers: ExtensionBridge.handlerNames
                                                 .union(ExtensionBridge.handlerTypeNames),
-                                            script: script)
+                                            script: differences + "\n" + ExtensionShims.compatibility)
     }
 
     /// Whether an implementation name exists. Dotted `js:` names are checked part by part (`cookies.onChanged`).
@@ -631,19 +592,6 @@ nonisolated struct ExtensionCompatibility {
     /// Nil when there is none, as in tests.
     static let shared = ExtensionCompatibility(overlay: try? CompatibilityOverlay.load(),
                                                universe: try? ChromeUniverse.load())
-
-    /// Firefox's own pair, loaded once: `firefox-compatibility.json` over `firefox-api.json`. A claim never crosses
-    /// from one kind's overlay to the other's universe.
-    private static let firefox = ExtensionCompatibility(overlay: try? CompatibilityOverlay.load(kind: .firefox),
-                                                        universe: try? ChromeUniverse.load(resource: "firefox-api"))
-
-    /// The pair a package kind words its sheet with: Chrome's overlay over `chrome-api.json`, or Firefox's own.
-    static func shared(for kind: ExtensionKind) -> ExtensionCompatibility {
-        switch kind {
-        case .chromium: return shared
-        case .firefox: return firefox
-        }
-    }
 
     let overlay: CompatibilityOverlay?
     let universe: ChromeUniverse?

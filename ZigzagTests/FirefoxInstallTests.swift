@@ -1,43 +1,9 @@
 import Foundation
-import CryptoKit
 import Testing
 @testable import Zigzag
 
-struct AddonsMozillaPageTests {
-    /// The listing's slug in an AMO page address, with or without the locale prefix and a trailing path.
-    @Test func theListingIsReadFromAnAMOPage() {
-        let slug = ExtensionStore.addonsSlug(from:)
-        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/")!) == "ublock-origin")
-        #expect(slug(URL(string: "https://addons.mozilla.org/firefox/addon/darkreader")!) == "darkreader")
-        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/darkreader/reviews/")!) == "darkreader")
-        // Only this store, only a listing, and never a slug that could be a path.
-        #expect(slug(URL(string: "https://example.com/firefox/addon/ublock-origin/")!) == nil)
-        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/")!) == nil)
-        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/")!) == nil)
-        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/..%2F..%2Fetc/")!) == nil)
-        #expect(slug(nil) == nil)
-        // The AMO site is the store, not its API.
-        #expect(ExtensionStore.addonsHost("addons.mozilla.org"))
-        #expect(!ExtensionStore.addonsHost("services.addons.mozilla.org"))
-    }
-
-    /// AMO publishes each file's sha256; a package whose bytes don't match it is refused, not installed.
-    @Test func anAMOPackageMustMatchTheHashTheStorePublishes() {
-        let bytes = Data("an xpi's bytes".utf8)
-        let good = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
-        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good))
-        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good.uppercased()))
-        // A different file, a truncated hash, an empty one, none at all, and one with something appended: refused.
-        #expect(!ExtensionStore.matchesPublishedHash(Data("other bytes".utf8), sha256: good))
-        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: String(good.prefix(63))))
-        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: ""))
-        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: nil))
-        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: good + "00"))
-    }
-}
-
 /// An XPI made byte by byte: stored entries, then the central index and its end record. Shared by every test that
-/// needs one — `FirefoxInstallTests`, `FirefoxImportTests`, `FirefoxCompatibilityTests` and `XPIPackageTests` — so
+/// needs one — `FirefoxInstallTests` and `XPIPackageTests` — so
 /// there is one zip writer, not a copy per file. The local gate compiles the requested suites together (and CI
 /// compiles the whole target), so a declaration here reaches the other suites.
 ///
@@ -455,9 +421,10 @@ struct FirefoxInstallTests {
         #expect(record.kind == "firefox")
         #expect(record.firefoxID == "folder@example.com")
         #expect(record.unpackedPath == folder.standardizedFileURL.path)
-        // The sheet reads Firefox's overlay for it, as its record says.
+        // The sheet reads the same shipped overlay as any package; a permission only Firefox knows is reported by
+        // its own name, since WebKit doesn't supply it and no claim words it.
         let reviewed = try #require(await ExtensionStore.reviewUnpacked(folder))
-        #expect(reviewed.report.limits.map(\.text).contains("Containers"))
+        #expect(reviewed.report.limits.map(\.text).contains("contextualIdentities"))
         // Nothing was written back: no normalized side_panel twin in the person's own folder.
         let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
         #expect(onDisk["side_panel"] == nil)

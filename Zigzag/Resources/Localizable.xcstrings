@@ -4449,41 +4449,8 @@
       }
     },
 
-    "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s and Safari’s come from their own stores." : {
-      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "扩展来自 Chrome 及基于它的浏览器，经由 Chrome 网上应用店。Firefox 和 Safari 的扩展来自它们各自的商店。"
-          }
-        }
-      }
-    },
 
-    "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s own are listed above; Safari’s come from its own store." : {
-      "comment" : "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari and Firefox’s downloaded extensions are listed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "扩展来自 Chrome 及基于它的浏览器，经由 Chrome 网上应用店。Firefox 自己的扩展列在上方；Safari 的扩展来自它自己的商店。"
-          }
-        }
-      }
-    },
 
-    "Extensions in Firefox" : {
-      "comment" : "Heading over the extensions Firefox already downloaded, in the Import window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Firefox 里的扩展"
-          }
-        }
-      }
-    },
 
     "Firefox" : {
       "comment" : "Under an extension's name in Settings › Extensions: it is a Firefox extension (.xpi).",
@@ -4509,17 +4476,6 @@
       }
     },
 
-    "Firefox profile %@" : {
-      "comment" : "On a Firefox extension in the Import window: the Firefox profile folder it was found in.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Firefox 个人资料 %@"
-          }
-        }
-      }
-    },
 
     "Follow Setting" : {
       "comment" : "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript.",

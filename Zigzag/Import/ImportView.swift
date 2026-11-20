@@ -18,9 +18,6 @@ final class ImportView: NSView {
             guard oldValue != stage else { return }
             // A row's Try Again waits while anything is importing.
             rows.forEach { $0.fixesEnabled = stage != .importing }
-            // The Firefox extensions are for choosing; once importing they give way like the rest.
-            firefoxRows.forEach { $0.isHidden = stage != .choose }
-            firefoxHeading.isHidden = stage != .choose
             onStageChange?(stage)
         }
     }
@@ -63,26 +60,14 @@ final class ImportView: NSView {
     /// What Sign-ins means, in a line, while it's offered.
     private let signInsNote = NSTextField(wrappingLabelWithString: String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
                                                                               comment: "Note under the choices in the Import window, explaining Sign-ins."))
-    /// The note's lines: what Sign-ins are, and, with Firefox or Safari chosen too, where each browser's extensions
-    /// come from.
+    /// The note's lines: what Sign-ins are, and, with Firefox or Safari chosen too, that extensions come only from
+    /// Chrome and its kin.
     private static let signInsText = String(localized: "Sign-ins keep you signed in to your sites, so you don’t have to sign in again. They come from this Mac and stay on it.",
                                             comment: "Note under the choices in the Import window, explaining Sign-ins.")
-    /// Where each browser's extensions come from, with no Firefox rows to point at: the truth whether Firefox is
-    /// found or not.
-    private static let extensionsText = String(localized: "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s and Safari’s come from their own stores.",
+    private static let extensionsText = String(localized: "Extensions come from Chrome and browsers built on it. Firefox and Safari get theirs from stores of their own.",
                                                comment: "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari.")
-    /// The same, once the extensions Firefox already downloaded are listed: the line may point at them.
-    private static let extensionsListedText = String(localized: "Extensions come from Chrome and browsers built on it, through the Chrome Web Store. Firefox’s own are listed above; Safari’s come from its own store.",
-                                                     comment: "Note under the choices in the Import window, when Extensions is chosen along with Firefox or Safari and Firefox’s downloaded extensions are listed.")
     /// The extensions coming over, under the browsers, once there are any.
     private let extensionsRow = ImportExtensionsRow()
-    /// The extensions Firefox already downloaded, one row each, under a heading of their own.
-    private let firefoxHeading = ImportSectionHeading(String(localized: "Extensions in Firefox",
-                                                             comment: "Heading over the extensions Firefox already downloaded, in the Import window."))
-    private var firefoxRows: [FirefoxExtensionRow] = []
-    /// Which Firefox scan is current: a reload starts a new one, and an older, slower one that finishes late adds
-    /// nothing.
-    private var firefoxScan = 0
     /// The one question before they're added, in place of the list while it's asked.
     private var review: ImportExtensionsReview?
     private var reviewAnswer: CheckedContinuation<Bool, Never>?
@@ -191,55 +176,8 @@ final class ImportView: NSView {
             rowList.addSubview(row)
             return row
         }
-        loadFirefoxExtensions()
         choicesChanged()
         fitWindow()
-    }
-
-    /// The extensions Firefox already downloaded, offered beside the browsers. Only in its own window, and only
-    /// when Firefox is one of the browsers found, so a run without one never opens its profiles. Reading and
-    /// inflating every `.xpi` takes a moment, so the scan runs off the main actor, as the other rows' previews do.
-    private func loadFirefoxExtensions() {
-        firefoxScan += 1
-        let scan = firefoxScan
-        firefoxRows.forEach { $0.removeFromSuperview() }
-        firefoxRows = []
-        firefoxHeading.removeFromSuperview()
-        guard presentation == .window,
-              sources.contains(where: { if case .firefox = $0.kind { true } else { false } }) else { return }
-        Task { @MainActor [weak self] in
-            let found = await Task.detached(priority: .utility) { FirefoxImporter.found() }.value
-            guard let self, self.firefoxScan == scan, self.stage == .choose, !found.isEmpty else { return }
-            self.rowList.addSubview(self.firefoxHeading)
-            self.firefoxRows = found.map { one in
-                let row = FirefoxExtensionRow(one)
-                row.onAdd = { [weak self, weak row] in
-                    guard let self, let row else { return }
-                    self.addFirefox(one, row: row)
-                }
-                self.rowList.addSubview(row)
-                return row
-            }
-            // The note now has rows to point at: recompose it, and make room for them.
-            self.choicesChanged()
-        }
-    }
-
-    /// Adds a Firefox extension through the store's own path: verified, offered with the store's own sheet, then
-    /// installed. The row says what happened; declining leaves it as it was.
-    private func addFirefox(_ found: FirefoxImporter.Found, row: FirefoxExtensionRow) {
-        guard #available(macOS 15.4, *), let host = window?.contentView else { return }
-        let profile = target
-        row.beginWorking()
-        Task { @MainActor in
-            switch await ExtensionStore.prepareInstallXPI(at: found.path) {
-            case .failure(let error): row.finished(.failure(error))
-            case .success(let prepared):
-                ExtensionSheet.offer(prepared, in: profile, over: host,
-                                     onInstalled: { result in row.finished(result) },
-                                     onDeclined: { row.returned() })
-            }
-        }
     }
 
     /// Whether there are browsers to choose from and what to bring from them: not with none found, nor once importing.
@@ -247,15 +185,6 @@ final class ImportView: NSView {
     var foundNone: Bool { sources.isEmpty }
     /// With no browser found, a file is the only way in, so choosing one is the main button.
     private var choosesFileFirst: Bool { stage == .choose && sources.isEmpty }
-
-    /// The note under the choices, from what the pane is showing: what Sign-ins are, and, with Firefox or Safari
-    /// chosen too, where each browser's extensions come from. `firefoxListed`: the extensions Firefox already
-    /// downloaded are showing, so that line may point at them; with none, it says where they come from instead.
-    static func choicesNote(signIns: Bool, otherStores: Bool, firefoxListed: Bool) -> String {
-        let extensions = firefoxListed ? extensionsListedText : extensionsText
-        return [signIns ? signInsText : nil, otherStores ? extensions : nil].compactMap { $0 }
-            .reduce("") { Words.sentences($0, $1) }
-    }
 
     @objc private func choicesChanged() {
         func anyChosen(offering choice: ImportCoordinator.Choice) -> Bool { rows.contains { $0.isChosen && $0.source.offers.contains(choice) } }
@@ -279,7 +208,7 @@ final class ImportView: NSView {
         choiceLabel.isHidden = !showsChoices
         let extensionsPill = choiceButtons.first { $0.0 == .extensions }?.1
         let otherStores = extensionsPill.map { !$0.isHidden && $0.isOn } == true && rows.contains { $0.isChosen && !$0.source.offers.contains(.extensions) }
-        signInsNote.stringValue = Self.choicesNote(signIns: anySignIns, otherStores: otherStores, firefoxListed: !firefoxRows.isEmpty)
+        signInsNote.stringValue = [anySignIns ? Self.signInsText : nil, otherStores ? Self.extensionsText : nil].compactMap { $0 }.reduce("") { Words.sentences($0, $1) }
         emptyState.isHidden = !choosesFileFirst
         if stage == .choose {
             chooseFile.isHidden = choosesFileFirst
@@ -633,8 +562,6 @@ final class ImportView: NSView {
         }
         let subtitleHeight = ceil(subtitle.sizeThatFits(NSSize(width: width, height: 200)).height)
         var items: [any ImportListItem] = rows
-        if !firefoxRows.isEmpty { items.append(firefoxHeading) }
-        items.append(contentsOf: firefoxRows)
         items.append(extensionsRow)
         if let review { items.append(review) }
         let visibleRows = items.filter { !$0.isHidden && $0.superview === rowList }

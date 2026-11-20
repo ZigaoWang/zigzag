@@ -277,28 +277,6 @@ enum ExtensionStore {
         host.lowercased() == "addons.mozilla.org"
     }
 
-    /// The listing's slug in an AMO page address: `/en-US/firefox/addon/ublock-origin/reviews/` → `ublock-origin`.
-    /// The locale segment is optional, only this store's listing pages count, and a slug is never a path of its own.
-    nonisolated static func addonsSlug(from url: URL?) -> String? {
-        guard let url, let host = url.host(), addonsHost(host),
-              url.scheme?.lowercased() == "https", url.port == nil || url.port == 443 else { return nil }
-        let parts = url.pathComponents.filter { $0 != "/" }
-        guard let addon = parts.firstIndex(of: "addon"), parts.indices.contains(addon + 1) else { return nil }
-        let slug = parts[addon + 1]
-        guard !slug.isEmpty, slug != "..", slug != ".",
-              slug.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { return nil }
-        return slug
-    }
-
-    /// Whether a downloaded package is the file the store said it was: AMO publishes each file's sha256, and a
-    /// package whose bytes don't match is a different file, never installed.
-    nonisolated static func matchesPublishedHash(_ data: Data, sha256: String?) -> Bool {
-        guard let published = sha256?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-              published.count == 64, published.allSatisfy(\.isHexDigit) else { return false }
-        let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
-        return actual == published
-    }
-
     /// WebKit keeps a service worker background's registration from one launch to the next, and on a later launch
     /// can bring it back without running its script: WebKit says the background loaded, but it never starts, and the
     /// extension's popup waits forever (1Password, from the second launch on). Chrome starts each worker afresh at
@@ -488,7 +466,7 @@ enum ExtensionStore {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unsupported)
         }
-        let report = ExtensionReport(extension: ext, manifest: normalized, id: id, kind: .firefox)
+        let report = ExtensionReport(extension: ext, manifest: normalized, id: id)
         return .success(PreparedInstall(id: id, version: version, kind: .firefox, firefoxID: package.firefoxID,
                                         folder: staging, extensionInfo: ext, report: report))
     }
@@ -591,8 +569,7 @@ enum ExtensionStore {
         guard let pending = package(id)?.pendingVersion, let new = packageDirectory(for: id, version: pending),
               let old = packageDirectory(for: id), let newManifest = manifest(in: new), let oldManifest = manifest(in: old),
               let ext = try? await WKWebExtension(resourceBaseURL: new) else { return nil }
-        // The record's kind words the sheet: a Firefox package's update reads Firefox's overlay, not Chrome's.
-        return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id, kind: kind(of: id)))
+        return (ext, ExtensionReport(newIn: ext, manifest: newManifest, comparedTo: oldManifest, id: id))
     }
 
     /// The ID of an extension read from a folder: from the folder's path, the way Chrome makes it, so loading the
@@ -607,8 +584,7 @@ enum ExtensionStore {
     @available(macOS 15.4, *)
     static func reviewUnpacked(_ url: URL) async -> (extension: WKWebExtension, report: ExtensionReport)? {
         guard let manifest = manifest(in: url), let ext = try? await WKWebExtension(resourceBaseURL: url) else { return nil }
-        return (ext, ExtensionReport(extension: ext, manifest: manifest, id: unpackedID(for: url),
-                                     kind: FirefoxManifest.isFirefox(manifest) ? .firefox : .chromium))
+        return (ext, ExtensionReport(extension: ext, manifest: manifest, id: unpackedID(for: url)))
     }
 
     /// Loads an unpacked extension (Install from Folder, or bundled in an app) in place, never modified. Settings reviews

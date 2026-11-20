@@ -95,22 +95,6 @@ struct DownloadPolicyTests {
         #expect(policy.decide(shouldDownload: true, clicked: false, isMainFrame: true, now: now.addingTimeInterval(17)) == .cancel)
     }
 
-    /// Firefox's Add to Firefox hands over an `.xpi`: an install, not a file to keep.
-    @Test func firefoxPackagesAreInstalledNotSaved() {
-        // AMO's own type, with or without a filename that says so.
-        #expect(DownloadPolicy.isExtensionPackage(mimeType: "application/x-xpinstall", filename: "addon.xpi"))
-        #expect(DownloadPolicy.isExtensionPackage(mimeType: "application/x-xpinstall; charset=binary", filename: "download"))
-        #expect(DownloadPolicy.isExtensionPackage(mimeType: "Application/X-XPInstall", filename: "Download"))
-        // A package served as a plain file still names itself.
-        #expect(DownloadPolicy.isExtensionPackage(mimeType: "application/octet-stream", filename: "ublock_origin-1.60.0.xpi"))
-        #expect(DownloadPolicy.isExtensionPackage(mimeType: nil, filename: "ADDON.XPI"))
-        // A zip that happens to mention .xpi, a page, and a normal download are not packages.
-        #expect(!DownloadPolicy.isExtensionPackage(mimeType: "application/zip", filename: "addon.xpi.zip"))
-        #expect(!DownloadPolicy.isExtensionPackage(mimeType: "text/html", filename: "xpi.html"))
-        #expect(!DownloadPolicy.isExtensionPackage(mimeType: nil, filename: "Download"))
-        #expect(!DownloadPolicy.isExtensionPackage(mimeType: "application/x-xpinstall-backup", filename: "notes.txt"))
-    }
-
     /// A popup's first unprompted download saves.
     @Test func aPopUpGoingStraightToAFileSaves() {
         let policy = DownloadPolicy()

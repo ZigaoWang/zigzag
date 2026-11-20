@@ -665,7 +665,7 @@ final class ExtensionHost: NSObject {
                 ?? String(localized: "This extension wants more access", comment: "Title of the sheet shown when an extension with no name asks for more access."),
             subtitle: String(localized: "Its files changed and now ask for more. Until you allow it, it runs without it.", comment: "Under the title of the sheet shown when an extension read from a folder (one that comes inside an app, or added from a folder) changed its files to ask for more access."),
             heading: String(localized: "It would also be able to", comment: "Heading over the list of what an extension could also do, in the sheet shown when it asks for more access."),
-            report: ExtensionReport(requesting: wanted, id: context.uniqueIdentifier, kind: ExtensionStore.kind(of: context.uniqueIdentifier)),
+            report: ExtensionReport(requesting: wanted, id: context.uniqueIdentifier),
             confirm: String(localized: "Allow", comment: "Button in the sheet shown when an extension asks for more access: gives it."),
             cancel: String(localized: "Not Now", comment: "Button that leaves an extension's update waiting."))
         ExtensionSheet.present(content, in: window, onConfirm: { [weak self, weak context] in
@@ -1514,8 +1514,7 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
                 ?? String(localized: "This extension wants more access", comment: "Title of the sheet shown when an extension with no name asks for more access."),
             subtitle: String(localized: "Allow it only if it needs this for what you just asked it to do.", comment: "Under the title of the sheet shown when an extension asks for more access."),
             heading: String(localized: "It would also be able to", comment: "Heading over the list of what an extension could also do, in the sheet shown when it asks for more access."),
-            report: ExtensionReport(requesting: Set(asked.map(\.rawValue)), id: extensionContext.uniqueIdentifier,
-                                    kind: ExtensionStore.kind(of: extensionContext.uniqueIdentifier)),
+            report: ExtensionReport(requesting: Set(asked.map(\.rawValue)), id: extensionContext.uniqueIdentifier),
             confirm: String(localized: "Allow", comment: "Button in the sheet shown when an extension asks for more access: gives it."),
             cancel: String(localized: "Don’t Allow", comment: "Button in the sheet shown when an extension asks for more access: refuses it."))
         ExtensionSheet.present(content, in: window, onConfirm: { finish(permissions, true) }, onCancel: { finish(quiet, false) })

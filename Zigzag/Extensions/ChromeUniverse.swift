@@ -1,12 +1,8 @@
 import Foundation
 
-/// A browser's extension API as its generated JSON lists it: every namespace and the functions, events, constants,
-/// enums and objects beneath it, nested ones included (`storage.local.get`, `privacy.network.webRTCIPHandlingPolicy.get`).
-///
-/// A compatibility claim is a path in this universe, so a claim cannot name a member the browser doesn't have. The
-/// JSON is generated from the browser's own types (`scripts/chrome-api.py`, `scripts/firefox-api.py`), never written
-/// by hand. The name is Chrome's because Chrome's was the first; the same shape and loader serve Firefox's
-/// `firefox-api.json`, and a claim overlay is validated against the universe of the package kind it words.
+/// Chrome's extension API from `chrome-api.json`: every namespace and its nested functions, events, constants, enums
+/// and objects (`storage.local.get`, `privacy.network.webRTCIPHandlingPolicy.get`). Claims must be paths here. Generated
+/// by scripts/chrome-api.py from chrome-types; never edit by hand.
 nonisolated struct ChromeUniverse: Sendable {
     /// What a path names in Chrome's API.
     enum NodeKind: String, Hashable, Sendable {
@@ -32,28 +28,23 @@ nonisolated struct ChromeUniverse: Sendable {
     func kind(of path: String) -> NodeKind? { nodes[path] }
 
     enum LoadError: LocalizedError {
-        case missingResource(String)
+        case missingResource
         case malformed(String)
 
         var errorDescription: String? {
             switch self {
-            case .missingResource(let name):
-                return "\(name).json is missing from the app"
+            case .missingResource:
+                return "chrome-api.json is missing from the app"
             case .malformed(let reason):
-                return "the extension API universe is malformed: \(reason)"
+                return "chrome-api.json is malformed: \(reason)"
             }
         }
     }
 
     /// The shipped universe. `bundle` is the app's or a test's.
     static func load(bundle: Bundle = .main) throws -> ChromeUniverse {
-        try load(resource: "chrome-api", bundle: bundle)
-    }
-
-    /// The same, from a named resource: `chrome-api` for a Chrome package, `firefox-api` for a Firefox one.
-    static func load(resource name: String, bundle: Bundle = .main) throws -> ChromeUniverse {
-        guard let url = bundle.url(forResource: name, withExtension: "json") else {
-            throw LoadError.missingResource(name)
+        guard let url = bundle.url(forResource: "chrome-api", withExtension: "json") else {
+            throw LoadError.missingResource
         }
         let data = try Data(contentsOf: url)
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
