@@ -714,9 +714,9 @@ final class ExtensionHost: NSObject {
         (Set(context.grantedPermissionMatchPatterns.keys.map(\.string)), Set(context.deniedPermissionMatchPatterns.keys.map(\.string)))
     }
 
-    /// Whether a site granted before isn't now, or one more is denied.
+    /// Whether a site granted before isn't now. A newly denied site needs no restart: WebKit stops injecting there.
     static func narrowed(from before: SiteGrants, to after: SiteGrants) -> Bool {
-        !before.granted.isSubset(of: after.granted) || !after.denied.isSubset(of: before.denied)
+        !before.granted.isSubset(of: after.granted)
     }
 
     /// Turns the approved site patterns into what the person chose: every approved site, no site until a click gives
