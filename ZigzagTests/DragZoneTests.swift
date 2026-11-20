@@ -212,6 +212,28 @@ struct DragZoneTests {
         let nearMiddle = (0.5 - 0.45) * root.cardFrame.width - 4
         let kept = try press(pair, row: 0, by: nearMiddle)
         #expect(kept.column != 0.5)
+        // Columns parted: a plain drag on the line between the rows still moves that whole line, and the columns stay.
+        var parted = TileShape(regions: grid)
+        parted.columnShares = [0.3, 0.6]
+        root.setTiles(parted, animated: false)
+        window.layoutIfNeeded()
+        let rowSegment = try #require(root.tiles?.segments(in: root.cardFrame, gap: root.paneGap, slop: Tokens.Metric.dragReach)
+            .first { $0.axis == .row && $0.column == 1 })
+        let rowStart = root.convert(NSPoint(x: rowSegment.frame.midX, y: rowSegment.frame.midY), to: nil)
+        let rowHandle = try #require(frame.hitTest(frame.convert(rowStart, from: nil)) as? ResizeHandle)
+        for (type, dy) in [(NSEvent.EventType.leftMouseDown, 0.0), (.leftMouseDragged, -50), (.leftMouseUp, -50)] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: NSPoint(x: rowStart.x, y: rowStart.y + dy), modifierFlags: [.shift],
+                                                        timestamp: ProcessInfo.processInfo.systemUptime,
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                        clickCount: 1, pressure: 1))
+            switch type {
+            case .leftMouseDown: rowHandle.mouseDown(with: event)
+            case .leftMouseDragged: rowHandle.mouseDragged(with: event)
+            default: rowHandle.mouseUp(with: event)
+            }
+        }
+        let afterRows = try #require(root.tiles)
+        #expect(afterRows.columnShares == [0.3, 0.6] && afterRows.rowShares[0] == afterRows.rowShares[1] && afterRows.rowShares[0] > 0.5)
         // A double-click on the line between the columns evens that line alone.
         let three = try press(TileShape(regions: [.left, .topRight, .bottomRight], column: 0.3, row: 0.3), row: 0, by: 0, clicks: 2)
         #expect(three.columnShares == [0.5, 0.5] && three.rowShares == [0.3, 0.3])

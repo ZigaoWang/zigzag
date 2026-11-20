@@ -415,9 +415,10 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   divides panes. Panes sit `Metric.paneGutter` (4) apart where the page meets the window's edges, the frame's
   inset (8) framed and 1 edge to edge; a narrower gap keeps the inset's drag strip. A plain drag moves a whole line, as a split always did, and a double-click puts it back in the middle;
   where a line each way meet, a square a little larger than the crossing drags both, with the diagonal resize cursor
-  (#309). In a grid of four, ⇧-dragging the line between the columns parts it, a segment per row (#316); parted, each
-  segment drags alone, snaps to the middle near it, and the strip's Reset Tile Layout evens the grid. A grid keeps one
-  line between its rows, since four rectangles covering the page can't hold both pairs apart. A tab dragged over
+  (#309). In a grid of four, ⇧-dragging a line parts it, a segment per row or column (#316, #426); parted, each
+  segment drags alone, snaps to the middle or the other segment, whichever is nearer, and the strip's Reset Tile Layout
+  evens the grid. One line is parted at a time, since four rectangles covering the page can't hold both pairs apart:
+  while one is, the other moves whole even with ⇧. A tab dragged over
   the page: its edges are halves, its corners quarters, anywhere else the half of the pane under the pointer (beside a
   page alone, the left or right half, as always), and a quarter that can't split takes the tab in its place. The drop
   hint shows where it lands, in the split's one style, named for the place ("Open Top Left") on a toast's pill so it
