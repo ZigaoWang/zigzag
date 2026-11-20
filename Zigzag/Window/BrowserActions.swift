@@ -76,7 +76,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             HistoryPage.clearedToast(in: self)
         }
     }
-    @objc func reopenClosedTab(_ sender: Any?) { tabManager.reopenClosedTab() }
+    @objc func reopenClosedTab(_ sender: Any?) { WindowManager.shared.reopenLastClosed(from: tabManager) }
 
     static var openFileTitle: String { String(localized: "Open File…", comment: "File menu item.") }
 
@@ -736,7 +736,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = count > 1 ? String(localized: "Close \(count) Tabs", comment: "File menu item while several sidebar rows are picked")
                 : String(localized: "Close Tab", comment: "File menu item")
             return true
-        case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
+        case #selector(reopenClosedTab(_:)): return WindowManager.shared.canReopenLastClosed(from: tabManager)
         case #selector(toggleBrowserSidebar(_:)):
             item.title = root.sidebarVisible ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
                                               : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")

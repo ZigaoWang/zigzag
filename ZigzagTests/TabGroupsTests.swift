@@ -319,3 +319,66 @@ struct TabGroupRulesTests {
         }
     }
 }
+
+/// ⇧⌘T brings back the latest closed tab or window across the app (#411), never a private tab into an everyday window.
+@MainActor @Suite(.serialized) struct ReopenLastClosedTests {
+    private var space: UUID { Library.shared.spaces[0].id }
+
+    private func manager(isPrivate: Bool = false) -> (TabManager, [Tab]) {
+        let manager = TabManager(spaceID: space, isPrivate: isPrivate)
+        let tabs = (0..<3).map { Tab(url: nil, title: "\($0)", spaceID: space) }
+        manager.adopt(tabs, in: space)
+        manager.select(tabs[0])
+        return (manager, tabs)
+    }
+
+    @Test func theLatestClosedComesBackFirst() {
+        let early = Date(timeIntervalSince1970: 1), late = Date(timeIntervalSince1970: 2)
+        #expect(WindowManager.lastClosed(tab: early, tabOfClosedWindow: nil, window: late) == .window)
+        #expect(WindowManager.lastClosed(tab: late, tabOfClosedWindow: nil, window: early) == .tab)
+        #expect(WindowManager.lastClosed(tab: early, tabOfClosedWindow: late, window: nil) == .tabOfClosedWindow)
+        #expect(WindowManager.lastClosed(tab: late, tabOfClosedWindow: late, window: late) == .tab)
+        #expect(WindowManager.lastClosed(tab: nil, tabOfClosedWindow: nil, window: nil) == nil)
+    }
+
+    @Test func aClosedTabComesBackIntoItsWindow() {
+        let (manager, t) = manager()
+        defer { manager.invalidate() }
+        manager.close(t[1])
+        manager.close(t[2])
+        #expect(manager.lastClosedTab?.id == t[2].id)
+        #expect(WindowManager.shared.canReopenLastClosed(from: manager))
+        WindowManager.shared.reopenLastClosed(from: manager)
+        #expect(manager.tabs(in: space).map(\.displayTitle) == ["0", "2"])
+    }
+
+    @Test func aPrivateTabNeverComesBackInAnEverydayWindow() {
+        let (secret, s) = manager(isPrivate: true)
+        defer { secret.invalidate() }
+        let (everyday, _) = manager()
+        defer { everyday.invalidate() }
+        secret.close(s[1])
+        #expect(!WindowManager.shared.canReopenLastClosed(from: everyday))
+        WindowManager.shared.reopenLastClosed(from: everyday)
+        #expect(everyday.tabs(in: space).count == 3)
+        // In its own private window it comes back.
+        #expect(WindowManager.shared.canReopenLastClosed(from: secret))
+        WindowManager.shared.reopenLastClosed(from: secret)
+        #expect(secret.tabs(in: space).map(\.displayTitle) == ["0", "1", "2"])
+    }
+
+    @Test func aTabOfAClosedWindowComesBackOnItsOwn() throws {
+        let (closing, t) = manager()
+        let group = try #require(closing.makeGroup(with: [t[1], t[2]], name: "G"))
+        closing.close(t[1])
+        let record = try #require(closing.closedTabRecords.last)
+        #expect(record.groupID == group)
+        closing.invalidate()
+        let (other, _) = manager()
+        defer { other.invalidate() }
+        let back = try #require(other.reopenFromClosedWindow(record))
+        #expect(back.groupID == nil && back.parentID == nil && back.spaceID == space)
+        #expect(other.tabs(in: space).count == 4)
+        #expect(other.selectedTab === back)
+    }
+}

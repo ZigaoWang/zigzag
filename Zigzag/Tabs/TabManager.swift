@@ -101,6 +101,8 @@ final class TabManager {
         var isCollapsed = false
         /// Its tab group; reopening restores it (and the group if it was removed).
         var groupID: UUID? = nil
+        /// When it closed, so ⇧⌘T takes the latest closed anywhere, tab or window.
+        var closedAt = Date()
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -1630,6 +1632,28 @@ final class TabManager {
     }
 
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
+
+    /// The latest closed tab here, by when it closed: windows that came to share tabs keep theirs in turn.
+    var lastClosedTab: ClosedTab? {
+        guard let latest = closedTabs.map(\.closedAt).max() else { return nil }
+        return closedTabs.last { $0.closedAt == latest }
+    }
+
+    /// The closed tabs, oldest first, to keep once this window closes (`WindowManager.reopenLastClosed`).
+    var closedTabRecords: [ClosedTab] { closedTabs }
+
+    /// A tab closed in a window since closed, brought back here: in its own space if that's still there, on its own,
+    /// since its split, group and tree stayed with that window.
+    @discardableResult
+    func reopenFromClosedWindow(_ record: ClosedTab) -> Tab? {
+        var closed = record
+        closed.split = nil
+        closed.parentID = nil
+        closed.childIDs = []
+        closed.groupID = nil
+        closedTabs.append(closed)
+        return reopenClosedTab(closed.id)
+    }
 
     /// Closed tabs with a page, newest first, for History › Recently Closed; reopen with `reopenClosedTab(id)`.
     var recentlyClosedTabs: [(id: UUID, url: URL, title: String)] {
