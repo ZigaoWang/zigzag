@@ -422,4 +422,35 @@ struct SidebarRowMenuTests {
             #expect(Library.shared.bookmark(pin.id)?.title == "Pin")
         }
     }
+
+    /// A private window leaves your pins where they are: no filing, moving or folder edits in its menus, and a drop
+    /// or a menu action that gets through anyway changes nothing.
+    @Test func aPrivateWindowLeavesYourPinsWhereTheyAre() throws {
+        try inWindow(["A", "B"], isPrivate: true) { controller, _, space in
+            let first = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/menu/first")!, title: "First", to: space))
+            let second = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/menu/second")!, title: "Second", to: space))
+            let folder = try #require(Library.shared.addFolder(named: "Kept", with: [first.id], in: space))
+            let other = try #require(Library.shared.spaces.first { $0.id != space }?.id)
+            let before = Library.shared.snapshot
+
+            let pinned = titles(SidebarMenus.bookmarkMenu(for: first, controller: controller))
+            for title in ["Add to New Folder", "Add to Folder", "Remove from Folder", "Move to Space"] { #expect(!pinned.contains(title), "\(title)") }
+            let picked = titles(SidebarMenus.markedMenu(for: [.bookmark(first.id), .bookmark(second.id)], controller: controller))
+            #expect(!picked.contains { $0.hasPrefix("Add 2 to") || $0.hasPrefix("Unpin") }, "\(picked)")
+            let shelf = titles(SidebarMenus.folderMenu(for: folder, controller: controller))
+            for title in ["New Folder Inside", "Rename", SidebarMenus.changeIconTitle, "Remove Folder"] { #expect(!shelf.contains(title), "\(title)") }
+            #expect(shelf.contains("Open All in Tabs"))
+
+            controller.listMoveBookmark(second.id, to: 0, in: space, folder: nil)
+            controller.listMoveBookmark(second.id, to: Int.max, in: other)
+            controller.listSetFolder(of: second.id, to: folder.id)
+            controller.listMoveFolder(folder.id, to: Int.max, in: other, parent: nil)
+            controller.listRenameFolder(folder.id, to: "Renamed")
+            controller.newFolder(with: [second.id])
+            controller.fileMarked([.bookmark(second.id)], in: nil)
+            controller.unpinMarked([second.id])
+            controller.favoriteMarked([.bookmark(second.id)])
+            #expect(Library.shared.snapshot == before)
+        }
+    }
 }

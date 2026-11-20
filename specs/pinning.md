@@ -69,3 +69,5 @@
   Test: SidebarRowMenuTests.aPrivateWindowsTabKeepsOutOfSavesAndWindows
 - A pinned page or favorite in a private window → no Add to Favorites, Rename or Change Icon, and File › Add to Favorites is off.
   Test: SidebarRowMenuTests.aPrivateWindowNeitherFavoritesNorRenamesYourPins
+- Pinned pages and folders in a private window → no filing, moving or folder edits in their menus, and dragging them changes nothing.
+  Test: SidebarRowMenuTests.aPrivateWindowLeavesYourPinsWhereTheyAre

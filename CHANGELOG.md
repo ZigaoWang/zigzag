@@ -6,7 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
-- A private window no longer adds to Favorites or renames pinned tabs; it leaves your saved pages as they are.
+- A private window no longer adds to Favorites or renames, files or moves pinned tabs and their folders; it leaves your saved pages as they are.
 
 ## [0.9.3] - 2026-11-18
 
