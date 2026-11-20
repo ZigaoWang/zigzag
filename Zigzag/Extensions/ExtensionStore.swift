@@ -1471,10 +1471,24 @@ function createSolverFrame() {
 }
 createSolverFrame();
 """#, pattern: true),
-        // Each transaction id comes from the sandbox through the bridge, not an iframe message.
+        // Each transaction id comes from the sandbox through the bridge, not an iframe message. A page's first request
+        // can come before the challenge has started: it waits for it, as the iframe's queue did, rather than failing.
         Patch(file: "scripts/twchallenge.js",
               find: #"function solveChallenge\(path, method\) \{[\s\S]*?\n\}\n\nfunction recoverSolver"#,
-              replace: "function solveChallenge(path, method) {\n    return window.__zigzagOldTwitterCall({ op: \"solve\", path, method });\n}\n\nfunction recoverSolver", pattern: true),
+              replace: #"""
+async function solveChallenge(path, method) {
+    if (!solverReady && !solverErrored) {
+        await initChallenge();
+        let start = Date.now();
+        while (!solverReady && !solverErrored && Date.now() - start < 15000) {
+            await new Promise((r) => setTimeout(r, 50));
+        }
+    }
+    return window.__zigzagOldTwitterCall({ op: "solve", path, method });
+}
+
+function recoverSolver
+"""#, pattern: true),
         // The codes its page worked out go to the sandbox too; ready means it can sign requests. A failed init stops
         // signing, as in Chrome, but a timeout or a restart doesn't: the next solve starts a new sandbox over.
         Patch(file: "scripts/twchallenge.js",
