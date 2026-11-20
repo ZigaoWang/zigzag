@@ -190,6 +190,13 @@ final class DownloadRowView: InteractiveView, NSDraggingSource {
     /// File icon column from the row edge; the folder row centers its glyph in it so names and title align.
     static let iconColumn: (x: CGFloat, width: CGFloat) = (CardRow.inset - 2, Tokens.Space.x8)
 
+    /// The narrowest the row can be with its status whole. The name isn't counted: a long one shortens in the middle.
+    var fittingWidth: CGFloat {
+        let x = Self.iconColumn.x + Self.iconColumn.width + CardRow.inset - Label.inset
+        let buttons = actionButton.frame.width + (pauseButton.isHidden ? 0 : pauseButton.frame.width)
+        return ceil(x + status.inkWidth + Label.inset * 2 + Tokens.Space.x2 + buttons + Self.iconColumn.x)
+    }
+
     override func layout() {
         super.layout()
         // The icon sits as far from the row's edge as a sidebar row's does; the buttons as far from the other end.
@@ -284,7 +291,10 @@ final class DownloadsPanelView: FloatingPanelView {
     }()
     private let clearButton = PillButton(title: String(localized: "Clear", comment: "Button in the downloads panel: takes finished downloads off the list."), style: .quiet)
     /// The last row: the folder, or the whole list when the panel opened on one download.
-    private let folderButton = CardRow(title: String(localized: "Open Downloads Folder", comment: "Last row of the downloads panel: opens the folder downloads are saved to."), symbol: "folder", font: Tokens.Font.body())
+    private let folderButton = CardRow(title: "", symbol: "folder", font: Tokens.Font.body())
+    /// The last row's two wordings: the panel is wide enough for either, so it keeps its width when one becomes the other.
+    private var folderTitles = (open: String(localized: "Open Downloads Folder", comment: "Last row of the downloads panel: opens the folder downloads are saved to."),
+                                showAll: String(localized: "Show All Downloads", comment: "Last row of the downloads panel, opened on one download: shows the rest of the list."))
     /// The folder button shows the rest of the list here, rather than opening the folder.
     private var offersAll = false
     /// Nothing downloaded yet: an arrow and a line, so the panel says what it's for.
@@ -302,7 +312,28 @@ final class DownloadsPanelView: FloatingPanelView {
     private let inset = Tokens.Space.x1
     private var footer: CGFloat { Tokens.Space.x1 + Tokens.Metric.rowHeight + inset }
     private let emptyHeight = Tokens.Space.x10
-    /// Lined up with the sidebar's rows: the same left and right edges, so it never spills onto the page.
+    /// Where the title and the empty line start: lined up with the rows' icons.
+    private var textX: CGFloat { inset + CardRow.inset - 2 - Label.inset }
+    /// The widest it has been while open, so a download's changing status never makes it narrower and wider again.
+    private var widest: CGFloat = 0
+    /// The narrowest it can be with every label whole (#430): the title beside More, the empty line, the last row in
+    /// either wording, each download's status. Names aren't counted: a long one shortens in the middle.
+    var fittingWidth: CGFloat {
+        let header = textX + title.inkWidth + Label.inset * 2 + Tokens.Space.x2 + Tokens.Metric.iconButton + Tokens.Space.x2
+        let empty = rows.isEmpty ? textX + emptyNote.inkWidth + Label.inset * 2 + Tokens.Space.x3 : 0
+        let folder = inset * 2 + max(folderButton.fittingWidth(title: folderTitles.open), folderButton.fittingWidth(title: folderTitles.showAll))
+        let status = rows.map { inset * 2 + $0.fittingWidth }.max() ?? 0
+        return ceil(max(header, empty, folder, status))
+    }
+
+    /// As wide as the lane, or as its labels need if that's more, up to the sidebar's widest and the window's edge.
+    private func width(lane: CGFloat, room: CGFloat) -> CGFloat {
+        let most = min(max(lane, Tokens.Metric.sidebarMaxWidth - Tokens.Sidebar.edge * 2), room)
+        widest = max(widest, min(fittingWidth, most))
+        return max(lane, widest)
+    }
+
+    /// Lined up with the sidebar's rows: the same left and right edges, unless its labels need more.
     private var sidebarLane: (x: CGFloat, width: CGFloat)? {
         guard let controller else { return nil }
         // The address bar's edges in the sidebar, the same as the site panel's, wherever the address is.
@@ -339,6 +370,25 @@ final class DownloadsPanelView: FloatingPanelView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    #if DEBUG
+    /// For tests: the panel's words in another language.
+    func debugRelabel(title text: String, empty: String, open: String, showAll: String) {
+        title.attributedStringValue = Tokens.Font.voiceText(text)
+        emptyNote.stringValue = empty
+        folderTitles = (open, showAll)
+        widest = 0
+        reload()
+        layoutSubtreeIfNeeded()
+    }
+
+    /// For tests: each label with the width it was given and the width it needs to show whole.
+    var debugLabels: [(name: String, given: CGFloat, needs: CGFloat)] {
+        var labels: [(Label, String)] = [(title, "title"), (folderButton.title, "folder")]
+        if rows.isEmpty { labels.append((emptyNote, "empty")) }
+        return labels.map { ($0.1, $0.0.frame.width, $0.0.inkWidth + Label.inset * 2) }
+    }
+    #endif
 
     private var isPrivate: Bool { controller?.tabManager.isPrivate ?? false }
 
@@ -439,8 +489,7 @@ final class DownloadsPanelView: FloatingPanelView {
         // Focused with more to see: the button shows the rest here; otherwise it opens the folder.
         let more = focused != nil && all.count > items.count
         offersAll = more
-        folderButton.title.stringValue = more ? String(localized: "Show All Downloads", comment: "Last row of the downloads panel, opened on one download: shows the rest of the list.")
-                                               : String(localized: "Open Downloads Folder", comment: "Last row of the downloads panel: opens the folder downloads are saved to.")
+        folderButton.title.stringValue = more ? folderTitles.showAll : folderTitles.open
         folderButton.symbol = more ? "list.bullet" : "folder"
         folderButton.setAccessibilityLabel(folderButton.title.stringValue)
         while rows.count < items.count {
@@ -486,15 +535,23 @@ final class DownloadsPanelView: FloatingPanelView {
         // Sidebar hidden: above the stand-in Downloads button in the same corner, at the sidebar's usual width.
         guard controller.root.sidebarVisible || controller.root.isSidebarFloatingVisible else {
             let button = anchor.convert(anchor.bounds, to: controller.root.overlay)
-            let width = controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2
+            let onRight = controller.root.sidebarOnRight
+            let overlay = controller.root.overlay.bounds.width, margin = Tokens.Metric.cardInset
+            let width = width(lane: controller.root.sidebarWidth - Tokens.Metric.sidebarPadding * 2,
+                              room: onRight ? button.maxX - margin : overlay - margin - button.minX)
             // Its edge in line with the button's outer edge: the left one, or the right one for a sidebar on the right.
-            let x = controller.root.sidebarOnRight ? button.maxX - width : button.minX
+            let x = onRight ? button.maxX - width : button.minX
             frame = NSRect(x: x, y: button.minY - Tokens.Space.x2 - height, width: width, height: height)
             return
         }
         let anchorFrame = anchor.convert(anchor.bounds, to: controller.root.overlay)
         let lane = sidebarLane ?? (max(Tokens.Metric.cardInset, anchorFrame.minX), 300)
-        frame = NSRect(x: lane.x, y: anchorFrame.minY - Tokens.Space.x2 - height, width: lane.width, height: height)
+        // Wider than the lane: out over the page, from the sidebar's outer edge.
+        let onRight = controller.root.sidebarOnRight
+        let overlay = controller.root.overlay.bounds.width, margin = Tokens.Metric.cardInset
+        let width = width(lane: lane.width, room: onRight ? lane.x + lane.width - margin : overlay - margin - lane.x)
+        let x = onRight ? lane.x + lane.width - width : lane.x
+        frame = NSRect(x: x, y: anchorFrame.minY - Tokens.Space.x2 - height, width: width, height: height)
     }
 
     private func layoutContent() {
@@ -506,7 +563,7 @@ final class DownloadsPanelView: FloatingPanelView {
         clearButton.frame = NSRect(x: more.frame.minX - Tokens.Space.x1 - cw, y: more.frame.midY - control / 2, width: cw, height: control)
         // The title lines up with the rows' icons below it.
         let h = title.lineHeight
-        let x = inset + CardRow.inset - 2 - Label.inset
+        let x = textX
         let end = clearButton.isHidden ? more.frame.minX : clearButton.frame.minX
         // Caps aligned with More's dots.
         title.frame = NSRect(x: x, y: more.frame.minY + title.centeredY(in: more.frame.height), width: max(0, end - x - Tokens.Space.x2), height: h)
