@@ -105,6 +105,8 @@ enum LocalReceiverShim {
       if (window.__zigzagLocalReceivers) return;
       const messages = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.localReceivers;
       if (!messages) return;
+      // Looked up per call: a page back from the back-forward cache gets a new handler.
+      const door = () => window.webkit.messageHandlers.localReceivers || messages;
       // Not a page-visible name to enumerate or copy: the script only marks that it has already run.
       Object.defineProperty(window, '__zigzagLocalReceivers', { value: true, configurable: true });
       const nativeFetch = window.fetch.bind(window);
@@ -159,7 +161,7 @@ enum LocalReceiverShim {
         }
         let answer;
         try {
-          answer = await messages.postMessage({
+          answer = await door().postMessage({
             kind: 'fetch', url: request.url, method: request.method,
             headers: Array.from(request.headers), body, credentials: request.credentials,
           });
@@ -321,7 +323,7 @@ enum LocalReceiverShim {
             }
             let answer;
             try {
-              answer = await messages.postMessage({
+              answer = await door().postMessage({
                 kind: 'fetch', url: request.url, method: request.method,
                 headers, body: payload, credentials: this.withCredentials ? 'include' : 'same-origin',
               });
@@ -437,7 +439,7 @@ enum LocalReceiverShim {
           this.id = id;
           const list = protocols == null ? [] : (typeof protocols === 'string' ? [protocols] : Array.from(protocols));
           sockets[id] = this;
-          messages.postMessage({ kind: 'socket-open', id, url: this.url, protocols: list })
+          door().postMessage({ kind: 'socket-open', id, url: this.url, protocols: list })
             .then((answer) => {
               if (!answer || answer.error) { this.fail(); return; }
               if (this.readyState !== 0) return;
@@ -494,7 +496,7 @@ enum LocalReceiverShim {
           if (this.readyState === 0) throw new DOMException('Still connecting', 'InvalidStateError');
           if (this.readyState !== 1) return;
           encodeData(data).then((payload) => {
-            messages.postMessage({ kind: 'socket-send', id: this.id, text: payload.text, base64: payload.base64 })
+            door().postMessage({ kind: 'socket-send', id: this.id, text: payload.text, base64: payload.base64 })
               .catch(() => this.fail());
           }).catch(() => this.fail());
         }
@@ -502,7 +504,7 @@ enum LocalReceiverShim {
           if (this.readyState === 3) return;
           if (this.readyState === 0) { this.readyState = 2; return; }
           this.readyState = 2;
-          messages.postMessage({ kind: 'socket-close', id: this.id, code, reason })
+          door().postMessage({ kind: 'socket-close', id: this.id, code, reason })
             .catch(() => this.fail());
         }
       }
