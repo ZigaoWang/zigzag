@@ -671,6 +671,14 @@ extension ExtensionBridgeTests {
         #expect(BridgeDownloads.safeName("a:b.txt") == "a-b.txt")
     }
 
+    /// A blob: download names the extension that made it, so only that extension's own page is used to read it. A page's
+    /// blob, or an ordinary address, names none.
+    @Test func blobDownloadsKnowWhichExtensionMadeThem() throws {
+        #expect(BridgeDownloads.blobOwner(try #require(URL(string: "blob:webkit-extension://abc/1234"))) == "abc")
+        #expect(BridgeDownloads.blobOwner(try #require(URL(string: "blob:https://example.com/1234"))) == nil)
+        #expect(BridgeDownloads.blobOwner(try #require(URL(string: "https://example.com/report.pdf"))) == nil)
+    }
+
     /// `chrome.downloads` in one profile sees that profile's downloads only, and never a private window's: what it
     /// can't see it can't erase, open or trash either.
     @Test func downloadsAreSeenOnlyInTheirOwnProfile() {

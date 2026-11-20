@@ -284,8 +284,18 @@ nonisolated enum SleepMemory {
         return formatter.string(fromByteCount: Int64(rounded))
     }
 
-    /// Said of a tab Zigzag put to sleep: why, and about how much memory that gave back when it's known.
-    static func note(forEnergy: Bool, freed: UInt64?) -> String {
+    /// Why a tab sleeps: Zigzag put it to sleep for memory or energy, or you did (Suspend Page).
+    enum Cause: Sendable {
+        case memory, energy, chosen
+    }
+
+    /// Said of a sleeping tab: why, and about how much memory that gave back when Zigzag asked for it and it's known.
+    /// One you put to sleep isn't down as memory freed: nothing asked for the memory (#342).
+    static func note(_ cause: Cause, freed: UInt64?) -> String {
+        if cause == .chosen {
+            return String(localized: "You put it to sleep. Loads when you click it.", comment: "Under a sleeping tab's title in its hover card, or its tooltip: you put it to sleep with Suspend Page in its menu, and its page loads again once you click it.")
+        }
+        let forEnergy = cause == .energy
         if let freed {
             let size = formatted(freed)
             return forEnergy

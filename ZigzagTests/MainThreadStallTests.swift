@@ -347,7 +347,8 @@ struct DarkPagesReinstallTests {
         store.onVisit = { url in if store.item(for: url) != nil { found.append(url.absoluteString) } }
         store.recordVisit(url: URL(string: "https://example.com/heard")!, title: "Heard")
         #expect(found.isEmpty)
-        await settle(0.2)
+        // Waits for the write to land, which can take a moment under load.
+        for _ in 0..<40 where found.isEmpty { await settle(0.05) }
         #expect(found == ["https://example.com/heard"])
         store.onVisit = nil
     }

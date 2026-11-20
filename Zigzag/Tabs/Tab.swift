@@ -297,7 +297,8 @@ final class Tab: NSObject {
     func debugVisitAnyway() {
         guard let webView, let host = certificateWarningHost, certificateWarningNonce != nil, let url = webView.url,
               url.host()?.lowercased() == host,
-              CertificateExceptions.allow(host, certificate: certificateWarningCertificate, in: webView.configuration.websiteDataStore) else { return }
+              CertificateExceptions.allow(host, port: url.port ?? 443, certificate: certificateWarningCertificate,
+                                          in: webView.configuration.websiteDataStore) else { return }
         certificateWarningHost = nil
         certificateWarningNonce = nil
         load(url)
@@ -364,14 +365,14 @@ final class Tab: NSObject {
             ? String(localized: "Not loaded since Zigzag reopened. Loads when you click it.", comment: "Under a tab's title in its hover card, or a favorite's tooltip: the tab came back after Zigzag was quit and opened again, and its page loads only once you click it.")
             : String(localized: "Not loaded yet. Loads when you click it.", comment: "Under a tab's title in its hover card, or a favorite's tooltip: the tab's page hasn't loaded yet and loads once you click it.")
     }
-    /// Put to sleep this run (not merely not loaded yet after a relaunch), and whether it was for using a lot of energy:
-    /// the sidebar marks it, so a tab never seems to have lost its page for no reason.
-    private(set) var isAsleep = false
-    private(set) var sleptForEnergy = false
+    /// Why it was put to sleep this run (not merely not loaded yet after a relaunch), nil awake: the sidebar marks it,
+    /// so a tab never seems to have lost its page for no reason.
+    private(set) var sleepCause: SleepMemory.Cause?
+    var isAsleep: Bool { sleepCause != nil }
     /// About how much memory its page gave back as it slept (`SleepMemory.share`), for the hover card; nil awake.
     private(set) var freedMemory: UInt64?
     /// What the sidebar says of it while it sleeps, nil awake.
-    var asleepNote: String? { isAsleep ? SleepMemory.note(forEnergy: sleptForEnergy, freed: freedMemory) : nil }
+    var asleepNote: String? { sleepCause.map { SleepMemory.note($0, freed: freedMemory) } }
     /// A name you gave the tab (double-click to rename); it stays whatever the page calls itself.
     /// While a pinned page is first loading, where it ends up on its own (a site that redirects, like
     /// calendar.google.com) counts as the pinned page, so it's never "moved on" before you've done anything.
@@ -508,9 +509,8 @@ final class Tab: NSObject {
     @discardableResult
     func ensureWebView() -> BrowserWebView {
         if let webView { return webView }
-        isAsleep = false
+        sleepCause = nil
         isRestored = false
-        sleptForEnergy = false
         freedMemory = nil
         let fromWebKit = pendingConfiguration != nil
         let extensionConfiguration = fromWebKit ? nil : Self.extensionConfiguration(for: url, in: profile)
@@ -610,36 +610,67 @@ final class Tab: NSObject {
         return webView
     }
 
+    /// What keeps its page awake when you'd put it to sleep (Suspend Page), as it keeps it from sleeping on its own.
+    enum StaysAwake: Equatable {
+        case sound, call, miniPlayer, pictureInPicture, typedText
+
+        /// Said in the toast when it stays awake.
+        var note: String {
+            switch self {
+            case .sound: String(localized: "Not put to sleep while it plays sound", comment: "Toast after Suspend Page in a tab's menu: the page stays awake because it's playing sound.")
+            case .call: String(localized: "Not put to sleep while it uses the camera or microphone", comment: "Toast after Suspend Page in a tab's menu: the page stays awake because it's in a call.")
+            case .miniPlayer: String(localized: "Not put to sleep while it plays in the mini player", comment: "Toast after Suspend Page in a tab's menu: the page stays awake because its video plays in the window's mini player.")
+            case .pictureInPicture: String(localized: "Not put to sleep while its video is in Picture in Picture", comment: "Toast after Suspend Page in a tab's menu: the page stays awake because its video floats in Picture in Picture.")
+            case .typedText: String(localized: "Not put to sleep while it has text you typed", comment: "Toast after Suspend Page in a tab's menu: the page stays awake so what you typed into it isn't lost.")
+            }
+        }
+    }
+
+    /// Why it can't be put to sleep now, nil when it can. Text you typed is known only once the page is asked.
+    var staysAwake: StaysAwake? {
+        guard let webView else { return nil }
+        if isInMiniPlayer { return .miniPlayer }
+        if webView.cameraCaptureState != .none || webView.microphoneCaptureState != .none { return .call }
+        if webView.isPictureInPictureActive { return .pictureInPicture }
+        if isPlayingAudio { return .sound }
+        return nil
+    }
+
     /// Releases the web view but keeps everything needed to bring it back. Not while something you typed is in it.
-    /// `because`: why, for Help › Report a Problem.
-    func suspend(because reason: String? = nil) {
-        guard let webView, !isPlayingAudio, !isInMiniPlayer else { return }
+    /// `because`: why, for Help › Report a Problem. `chosen`: you asked (Suspend Page): a page still loading sleeps
+    /// too, and `refused` hears what kept it awake.
+    func suspend(because reason: String? = nil, chosen: Bool = false, refused: ((StaysAwake) -> Void)? = nil) {
+        guard let webView else { return }
+        if chosen, let why = staysAwake { refused?(why); return }
+        guard !isPlayingAudio, !isInMiniPlayer else { return }
         sleepTicket += 1
         let ticket = sleepTicket
-        readPageState { [weak self] state in self?.sleep(webView, ticket: ticket, state: state, because: reason) }
+        readPageState { [weak self] state in self?.sleep(webView, ticket: ticket, state: state, because: reason, chosen: chosen, refused: refused) }
         // A page stuck in a loop (what EnergyWatch sleeps) never answers: what was read as you left it decides.
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            MainActor.assumeIsolated { self?.sleep(webView, ticket: ticket, state: self?.pageState, because: reason) }
+            MainActor.assumeIsolated { self?.sleep(webView, ticket: ticket, state: self?.pageState, because: reason, chosen: chosen, refused: refused) }
         }
     }
 
     /// The asking for `suspend` still waiting, so whichever of the page's answer and the wait for it comes first decides.
     private var sleepTicket = 0
 
-    private func sleep(_ webView: BrowserWebView, ticket: Int, state: PageState?, because reason: String?) {
+    private func sleep(_ webView: BrowserWebView, ticket: Int, state: PageState?, because reason: String?, chosen: Bool,
+                       refused: ((StaysAwake) -> Void)?) {
         guard sleepTicket == ticket, self.webView === webView else { return }
         sleepTicket += 1
-        guard state?.hasTypedText != true else { return }
+        guard state?.hasTypedText != true else { refused?(.typedText); return }
         // Let a loading page finish (a redirect after wake, #305); retry next time. Not one stuck in a loop.
-        guard !webView.isLoading || reason == EnergyWatch.sleepReason else { return }
+        guard !webView.isLoading || chosen || reason == EnergyWatch.sleepReason else { return }
+        // Shown again while the page was asked: it stays.
+        if chosen, !TabManager.mayStillSleep(self) { return }
         captureSnapshot { [weak self] in
             guard let self, self.webView === webView else { return }
             self.pendingInteractionState = webView.interactionState as? Data
-            let freed = self.memoryInUse(by: webView)
+            let freed = chosen ? nil : self.memoryInUse(by: webView)
             self.tearDown(webView)
             self.freedMemory = freed
-            self.isAsleep = true
-            self.sleptForEnergy = reason == EnergyWatch.sleepReason
+            self.sleepCause = chosen ? .chosen : reason == EnergyWatch.sleepReason ? .energy : .memory
             self.changed.send(.webView)
             if let reason { Diagnostics.note("Tab put to sleep", site: self.url?.host(), reason, isPrivate: self.isPrivate) }
         }
@@ -1069,7 +1100,7 @@ final class Tab: NSObject {
     /// Takes the web view's address as the tab's: the page shown now, or one Zigzag itself is loading.
     private func followAddress(of wv: WKWebView) {
         guard let url = wv.url else { return }
-        let hostChanged = url.host() != self.url?.host()
+        let siteChanged = FaviconStore.siteKey(for: url) != self.url.flatMap { FaviconStore.siteKey(for: $0) }
         if url != self.url, self.isArticle { self.isArticle = false; self.changed.send(.reader) }
         leavePage(for: url)
         let changedPage = url != self.url
@@ -1081,7 +1112,7 @@ final class Tab: NSObject {
         // Its language too, once the new page has drawn: it never finishes loading to be read then (#218).
         if changedPage, !wv.isLoading { self.checkLanguage(of: wv, after: 1.5) }
         // Another site: never the last site's icon. Its own if it's known, otherwise none until the page offers one.
-        if hostChanged {
+        if siteChanged {
             self.favicon = FaviconStore.shared.cachedIcon(for: url)
             self.changed.send(.favicon)
             if self.favicon == nil { self.refreshFavicon() }
@@ -1510,14 +1541,11 @@ final class Tab: NSObject {
         errorPage ? errorPageIcon : FaviconStore.shared.cachedIcon(for: url)
     }
 
-    /// Whether the icon stays as a new page commits: only on the same site (www. or not). The first page committed
-    /// in a tab keeps the icon it was restored with.
+    /// Whether the icon stays as a new page commits: only on the same site (www. or not, on its own port). The first
+    /// page committed in a tab keeps the icon it was restored with.
     nonisolated static func keepsIcon(from previous: URL?, to committed: URL) -> Bool {
         guard let previous else { return true }
-        func site(_ url: URL) -> String {
-            let host = url.host()?.lowercased() ?? url.scheme ?? ""
-            return host.withoutWWW
-        }
+        func site(_ url: URL) -> String { FaviconStore.siteKey(for: url) ?? url.scheme ?? "" }
         return site(previous) == site(committed)
     }
     /// The title waiting to go into History, a moment after the page last changed it.
@@ -1545,7 +1573,8 @@ final class Tab: NSObject {
                 let links = ((try? answer.get()) as? [[String: String]]) ?? []
                 if let self, self.favicon != nil, let source = self.iconSource, source.page == pageURL, source.links == links { return }
                 FaviconStore.shared.resolve(pageURL: pageURL, links: links) { image in
-                    guard let self, let image, self.url?.host() == pageURL.host(), !self.showsErrorPage else { return }
+                    guard let self, let image, let shown = self.url,
+                          FaviconStore.siteKey(for: shown) == FaviconStore.siteKey(for: pageURL), !self.showsErrorPage else { return }
                     self.iconSource = (pageURL, links)
                     self.favicon = image
                     self.changed.send(.favicon)
@@ -1660,7 +1689,8 @@ extension Tab: WKNavigationDelegate {
                                                     pageHost: webView.url?.host()?.lowercased(), warnedHost: certificateWarningHost)
             if fromWarning, let nonce = certificateWarningNonce,
                let real = CertificateExceptions.destination(of: url, warnedHost: certificateWarningHost, nonce: nonce), let host = real.host() {
-                CertificateExceptions.allow(host, certificate: certificateWarningCertificate, in: webView.configuration.websiteDataStore)
+                CertificateExceptions.allow(host, port: real.port ?? 443, certificate: certificateWarningCertificate,
+                                            in: webView.configuration.websiteDataStore)
                 certificateWarningHost = nil
                 certificateWarningNonce = nil
                 DispatchQueue.main.async { [weak self] in self?.load(real) }

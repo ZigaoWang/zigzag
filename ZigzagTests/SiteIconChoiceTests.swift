@@ -78,3 +78,64 @@ struct SiteIconChoiceTests {
         #expect(!FileManager.default.fileExists(atPath: files(host).standIn.path))
     }
 }
+
+// MARK: - One service per port
+
+extension SiteIconChoiceTests {
+    private func files(for url: URL) -> (own: URL, standIn: URL)? {
+        guard let key = FaviconStore.siteKey(for: url) else { return nil }
+        let base = key.replacingOccurrences(of: "/", with: "_")
+        return (Paths.favicons.appendingPathComponent(base + ".png"), Paths.favicons.appendingPathComponent(base + ".touch.png"))
+    }
+
+    private func clear(_ urls: [URL]) {
+        FaviconStore.finishWriting()
+        for url in urls {
+            guard let files = files(for: url) else { continue }
+            try? FileManager.default.removeItem(at: files.own)
+            try? FileManager.default.removeItem(at: files.standIn)
+        }
+    }
+
+    @Test func aPortIsPartOfTheSite() {
+        func key(_ text: String) -> String? { FaviconStore.siteKey(for: URL(string: text)!) }
+        #expect(key("http://10.0.0.10:8080/") == "10.0.0.10:8080")
+        #expect(key("http://10.0.0.10:8081/") == "10.0.0.10:8081")
+        // The port a scheme uses by default is the same site with or without it.
+        #expect(key("http://10.0.0.10/") == "10.0.0.10")
+        #expect(key("http://10.0.0.10:80/") == "10.0.0.10")
+        #expect(key("https://example.com:443/") == "example.com")
+        // Another port is another site, even on the same host.
+        #expect(key("https://example.com:8443/") == "example.com:8443")
+        // As before: www. is left out, and Google's apps stay apart.
+        #expect(key("https://www.example.com:8443/") == "example.com:8443")
+        #expect(key("https://www.google.com:8443/maps") == "google.com:8443/maps")
+    }
+
+    @Test func eachPortKeepsItsOwnIcon() async throws {
+        let host = "favicon-ports-\(UUID().uuidString.prefix(8).lowercased()).test"
+        let firstService = try #require(URL(string: "http://\(host):8080/"))
+        let secondService = try #require(URL(string: "http://\(host):8081/"))
+        defer { clear([firstService, secondService]) }
+        // One address, two services, a different icon on each.
+        #expect(color(await resolve(firstService.absoluteString, [own])) == "green")
+        #expect(color(await resolve(secondService.absoluteString, [touch])) == "red")
+        #expect(color(FaviconStore.shared.cachedIcon(for: firstService)) == "green")
+        #expect(color(FaviconStore.shared.cachedIcon(for: secondService)) == "red")
+    }
+
+    @Test func anotherPortNeverStartsWithTheLastOneIcon() async throws {
+        let host = "favicon-ports-\(UUID().uuidString.prefix(8).lowercased()).test"
+        let first = try #require(URL(string: "http://\(host):8080/"))
+        let second = try #require(URL(string: "http://\(host):8081/"))
+        defer { clear([first, second]) }
+        #expect(color(await resolve(first.absoluteString, [own])) == "green")
+        #expect(FaviconStore.shared.cachedIcon(for: second) == nil)
+        #expect(!Tab.keepsIcon(from: first, to: second))
+        #expect(Tab.keepsIcon(from: first, to: URL(string: "http://\(host):8080/deeper")!))
+        // The scheme's own port is the same site, so its icon stays across the move.
+        #expect(Tab.keepsIcon(from: URL(string: "http://\(host)/")!, to: URL(string: "http://\(host):80/")!))
+        // A page with no host is its scheme's.
+        #expect(!Tab.keepsIcon(from: URL(string: "file:///tmp/a.html")!, to: URL(string: "about:blank")!))
+    }
+}

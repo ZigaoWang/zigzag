@@ -158,9 +158,26 @@ struct ExtensionOverlayTests {
         defer { try? FileManager.default.removeItem(at: fixture.work) }
 
         #expect(ExtensionStore.writeOverlayManifest(in: fixture.overlay, from: fixture.package, prelude: Self.prelude))
-        #expect(try Self.background(in: fixture.overlay)["service_worker"] as? String == "zigzag-entry.js")
-        #expect(try Self.text("zigzag-entry.js", in: fixture.overlay) == "importScripts('zigzag-prelude.js', 'js/background.js');\n")
+        // Beside the worker, so its relative imports resolve as in Chrome (#393).
+        #expect(try Self.background(in: fixture.overlay)["service_worker"] as? String == "js/zigzag-entry.js")
+        #expect(try Self.text("js/zigzag-entry.js", in: fixture.overlay) == "importScripts('/zigzag-prelude.js', 'background.js');\n")
         #expect(try Self.text("zigzag-prelude.js", in: fixture.overlay) == Self.prelude)
+        #expect(!FileManager.default.fileExists(atPath: fixture.overlay.appendingPathComponent("zigzag-entry.js").path))
+
+        // A worker at the root keeps its entry there.
+        let root = try Self.fixture(
+            ["manifest_version": 3, "name": "Root worker", "version": "1.0", "background": ["service_worker": "background.js"]],
+            files: ["background.js": "work();"])
+        defer { try? FileManager.default.removeItem(at: root.work) }
+        #expect(ExtensionStore.writeOverlayManifest(in: root.overlay, from: root.package, prelude: Self.prelude))
+        #expect(try Self.background(in: root.overlay)["service_worker"] as? String == "zigzag-entry.js")
+        #expect(try Self.text("zigzag-entry.js", in: root.overlay) == "importScripts('zigzag-prelude.js', 'background.js');\n")
+
+        // Quotes in a file name stay inside the string.
+        #expect(ExtensionStore.workerEntry(for: "a/it's.js", module: false).text == "importScripts('/zigzag-prelude.js', 'it\\'s.js');\n")
+        let nested = ExtensionStore.workerEntry(for: "a/b/sw.js", module: true)
+        #expect(nested.path == "a/b/zigzag-entry.js")
+        #expect(nested.text == "import '/zigzag-prelude.js';\nimport './sw.js';\n")
 
         // A module worker keeps its imports, prelude first.
         let module = try Self.fixture(

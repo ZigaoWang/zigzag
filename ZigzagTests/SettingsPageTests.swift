@@ -245,6 +245,21 @@ struct SettingsReadingTests {
         #expect(settings.debugReads["privacy"] == nil)
     }
 
+    /// Typing in the search bar keeps the shortcut rows, made again only after shortcut changes.
+    @Test func shortcutsAreReadOnlyWhenChanged() throws {
+        let settings = SettingsView(pane: .general)
+        settings.debugFind("d")
+        settings.debugFind("do")
+        #expect(settings.debugReads["shortcuts"] == 1)
+
+        let item = try #require(Shortcuts.allItems.first { !$0.keyEquivalent.isEmpty })
+        let mask = item.keyEquivalentModifierMask
+        defer { item.keyEquivalentModifierMask = mask }
+        item.keyEquivalentModifierMask = mask.symmetricDifference(.option)
+        settings.debugFind("dow")
+        #expect(settings.debugReads["shortcuts"] == 2)
+    }
+
     @Test func websiteDataIsReadWhenShown() {
         let settings = SettingsView(pane: .general)
         settings.show(SettingsPane.websiteData(manyProfiles: Library.shared.hasManyProfiles))
