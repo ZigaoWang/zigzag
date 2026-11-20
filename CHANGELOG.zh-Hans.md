@@ -24,6 +24,8 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 输入框下的密码菜单在你开始滚动时就会隐藏，鼠标停在菜单上也一样，不再等滚动结束才消失。点按菜单已经打开的那个输入框，菜单会保持打开，不再关掉又重新打开。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - “1Password 正在它的 App 中等你”的提示，现在只在你刚用过 1Password 之后出现：点了它的按钮、在它的弹出窗口里操作、用了它的快捷键，或者正在填登录栏。提示只出现在你操作的那个窗口。Mac 唤醒或扩展重启后 1Password 自己重新连接时，不会再在你做别的事时弹出来。
 - “设置 › 扩展”和扩展菜单里的“获取扩展”除了 Chrome 网上应用店，现在也能打开 Firefox 附加组件；还没有扩展时，设置里也会提到这两个地方。在 addons.mozilla.org 的扩展页面上，安装按钮会和 Chrome 网上应用店的一样显示“添加到 Zigzag”，不再是“添加到 Firefox”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#423](https://github.com/ZigaoWang/zigzag/issues/423), [#424](https://github.com/ZigaoWang/zigzag/issues/424))
+- 在 addons.mozilla.org 上点“添加到 Firefox”，每次都会打开安装面板。Zigzag 现在在你点按的那一刻就检查这次点按和 Firefox 附加组件公布的文件，不再等文件开始下载时才检查；那时标签页的地址可能已经变了，.xpi 就会落到“下载”里。商店没有回应时会再问一次，还是没有回应就会提示原因，不会把文件存下来。感谢 [Lakeland97](https://github.com/Lakeland97)。([#429](https://github.com/ZigaoWang/zigzag/issues/429))
+- 从 addons.mozilla.org 添加扩展时，只会在安装面板里问一次，和 Chrome 网上应用店一样，不再先问是否允许这个网站下载文件。这个网站或其他网站的其他下载仍然照旧询问，你为这个网站选的“阻止”也仍然有效。感谢 [Lakeland97](https://github.com/Lakeland97)。([#428](https://github.com/ZigaoWang/zigzag/issues/428))
 
 ## [0.9.3] - 2026-11-18
 
