@@ -1439,10 +1439,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                    control: developerToolsToggle)
         developerToolsGroup.add(developerRow)
         developerBarToggle.onChange = { on in DeveloperTools.showsInBar = on }
-        developerToolsGroup.add(FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a site in Developer Mode, the developer tools are in the bar above the page, with its full address."),
-                                        detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
-                                                       comment: "Explanation under “Tools above the page” in Settings › Developer."),
-                                        control: developerBarToggle))
+        let developerBarRow = FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a site in Developer Mode, the developer tools are in the bar above the page, with its full address."),
+                                      detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
+                                                     comment: "Explanation under “Tools above the page” in Settings › Developer."),
+                                      control: developerBarToggle)
+        developerBarRow.keywords = String(localized: "toolbar top bar tools buttons copy link console inspect dark light page size reload developer bar", comment: "Words that find the Tools above the page setting with Find a setting in Settings. Not shown.")
+        developerToolsGroup.add(developerBarRow)
         developerTrustToggle.onChange = { on in DeveloperTools.trustsLocalServers = on }
         localServersGroup.add(FormRow(title: String(localized: "Trust certificates of servers on this Mac", comment: "A setting in Settings › Developer, under Local Servers: a development site served from this Mac over https with a certificate of its own opens without the warning."),
                                       detail: String(localized: "A development site at localhost or 127.0.0.1 that uses its own certificate for https opens without the warning. Only for servers on this Mac, and only the certificate first shown.",

@@ -25204,6 +25204,39 @@
           }
         }
       }
+    },
+    "Hide Tools Above the Page" : {
+      "comment" : "View › Developer menu item: hides the bar of developer tools above a page in Developer Mode.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏页面上方的工具"
+          }
+        }
+      }
+    },
+    "Show Tools Above the Page" : {
+      "comment" : "View › Developer menu item: shows the bar of developer tools above a page in Developer Mode.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在页面上方显示工具"
+          }
+        }
+      }
+    },
+    "toolbar top bar tools buttons copy link console inspect dark light page size reload developer bar" : {
+      "comment" : "Words that find the Tools above the page setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具栏 顶栏 工具 按钮 拷贝链接 控制台 检查元素 深色 浅色 页面尺寸 重新载入 开发者 toolbar top bar tools console inspect"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -436,6 +436,14 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let tab = selectedTab { toggleZoom(tab) }
     }
 
+    /// View › Developer: Settings › Developer › Tools above the page, the bar over a page in Developer Mode (#405).
+    @objc func toggleDeveloperBar(_ sender: Any?) { DeveloperTools.showsInBar.toggle() }
+
+    static func developerBarTitle(shown: Bool) -> String {
+        shown ? String(localized: "Hide Tools Above the Page", comment: "View › Developer menu item: hides the bar of developer tools above a page in Developer Mode.")
+              : String(localized: "Show Tools Above the Page", comment: "View › Developer menu item: shows the bar of developer tools above a page in Developer Mode.")
+    }
+
     @objc func closeSplitView(_ sender: Any?) {
         if let tab = selectedTab { unsplitWithUndo(tab) }
     }
@@ -722,6 +730,9 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = root.sidebarVisible ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
                                               : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")
             return true
+        case #selector(toggleDeveloperBar(_:)):
+            item.title = Self.developerBarTitle(shown: DeveloperTools.showsInBar)
+            return DeveloperTools.isOn
         case #selector(toggleSidebarSide(_:)):
             item.title = BrowserRootView.sidebarOnRight
                 ? String(localized: "Move Sidebar to Left", comment: "View menu item: puts the sidebar back along the window's left edge.")
