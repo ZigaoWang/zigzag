@@ -244,9 +244,9 @@ struct FirefoxManifestTests {
         #expect(try text(manifest) == before)
     }
 
-    /// The keys firefox-polyfill.js gates on survive normalization: a Firefox package the store installed is still
-    /// recognized as Firefox, so its pages get getBrowserInfo and getPlatformInfo.
-    @Test func normalizingKeepsTheKeysThePolyfillGatesOn() {
+    /// Mozilla's keys survive normalization, so the gecko ID and Firefox's own fields are still readable from the
+    /// manifest Zigzag keeps. The kind that decides getBrowserInfo is the installed record's, not these keys.
+    @Test func normalizingKeepsMozillasKeys() {
         let modern: [String: Any] = [
             "manifest_version": 3,
             "background": ["scripts": ["a.js"]],

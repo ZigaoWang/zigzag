@@ -424,9 +424,9 @@ struct FirefoxInstallTests {
         #expect(SettingsView.packageKindDetail(id) == ["Firefox"])
     }
 
-    /// The manifest Zigzag stores is the normalized copy, and it still carries the keys firefox-polyfill.js gates on:
-    /// a key-pruning step that dropped them would silently darken every Firefox extension.
-    @Test func theInstalledManifestKeepsTheKeysThePolyfillGatesOn() async throws {
+    /// The manifest Zigzag stores is the normalized copy, and it still carries Mozilla's keys, so the gecko ID and
+    /// Firefox's own fields stay readable; the polyfill's gate is the record's kind, not these keys.
+    @Test func theInstalledManifestKeepsMozillasKeys() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
         let url = try work.xpiFile(try Self.xpi(Self.manifest("keys@example.com", "1.0", ["background": ["scripts": ["a.js"]]])))
@@ -468,5 +468,24 @@ struct FirefoxInstallTests {
         let chrome = ExtensionStore.unpackedPackage(for: chromeFolder)
         #expect(chrome.kind == "chromium")
         #expect(chrome.firefoxID == nil)
+    }
+
+    /// The Firefox shim is chosen by the installed record, not the manifest: its marker goes into that extension's
+    /// own preludes, and a Chrome package gets none, whatever its manifest happens to carry.
+    @Test func onlyAFirefoxRecordGetsTheFirefoxMarker() throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let firefox = "pbcodepdghnilmnkaebcgmmcgnenlfan"
+        let chrome = "abcdefghijklmnopabcdefghijklmnop"
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0", kind: "firefox"), for: firefox)
+        ExtensionStore.save(ExtensionStore.Package(version: "1.0"), for: chrome)
+        // The assignment, not the name: the polyfill itself reads the global, so its text names it in every package.
+        let marker = "globalThis.__zigzagFirefoxPackage = true;"
+        let firefoxShim = try #require(ExtensionShims.shim(for: firefox))
+        #expect(firefoxShim.backgroundPrelude?.contains(marker) == true)
+        #expect(firefoxShim.pagePrelude?.hasPrefix(marker) == true)
+        let chromeShim = try #require(ExtensionShims.shim(for: chrome))
+        #expect(chromeShim.backgroundPrelude?.contains(marker) == false)
+        #expect(chromeShim.pagePrelude?.contains(marker) != true)
     }
 }

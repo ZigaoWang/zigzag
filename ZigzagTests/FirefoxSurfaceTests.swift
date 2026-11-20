@@ -5,8 +5,9 @@ import Testing
 
 /// Firefox's `browser`: WebKit already gives a Firefox add-on a promise-based one, so firefox-polyfill.js copies
 /// nothing and wraps nothing. It only adds the two runtime members Firefox has and WebKit does not, on WebKit's own
-/// objects, and only for a package whose manifest carries Mozilla's keys. A copy broke storage, whose methods live on
-/// a prototype, and answered runtime.id with a gecko ID no message's sender.id matched.
+/// objects, and only for a package Zigzag's record says is a Firefox one. The manifest is not the test: a Chrome Web
+/// Store package may carry Mozilla's keys too. A copy broke storage, whose methods live on a prototype, and answered
+/// runtime.id with a gecko ID no message's sender.id matched.
 ///
 /// The world here follows the JavaScriptCore harness in ExtensionScriptTests: `chrome` and `browser` are WebKit's
 /// (two objects, as WebKit keeps them), the bridge is loaded over `chrome`, and the timers are driven by hand.
@@ -27,7 +28,7 @@ struct FirefoxSurfaceTests {
     /// when the polyfill runs, exactly as they are in the app. `polyfill` replaces the injected script, for a test
     /// that injects something of its own.
     private static func firefoxWorld(manifest: String, extra: String = "", surface: Bool = false,
-                                     polyfill: String? = nil) -> JSContext {
+                                     polyfill: String? = nil, firefoxPackage: Bool = true) -> JSContext {
         let context = JSContext()!
         context.exceptionHandler = { _, exception in Issue.record("\(exception?.toString() ?? "")") }
         context.evaluateScript("""
@@ -58,6 +59,8 @@ struct FirefoxSurfaceTests {
         """)
         context.evaluateScript(extra)
         context.evaluateScript(ExtensionBridgeScript.source)
+        // What ExtensionStore.shim(for:) writes into a Firefox record's preludes; a Chrome one gets no marker.
+        context.evaluateScript("globalThis.__zigzagFirefoxPackage = \(firefoxPackage);")
         if surface { context.evaluateScript(ExtensionBridgeScript.surface) }
         context.evaluateScript(polyfill ?? ExtensionBridgeScript.firefoxPolyfill)
         return context
@@ -67,7 +70,7 @@ struct FirefoxSurfaceTests {
 
     /// WebKit's `browser` is left as it is and gets the two members: nothing is copied, so what a prototype holds
     /// still answers, and the events are the same objects WebKit delivers through.
-    @Test func aFirefoxManifestAddsOnlyFirefoxsTwoRuntimeMembers() {
+    @Test func aFirefoxPackageAddsOnlyFirefoxsTwoRuntimeMembers() {
         let context = Self.firefoxWorld(manifest: Self.firefoxManifest)
         context.evaluateScript("var __browser = browser, __storage = browser.storage.local;")
         #expect(context.evaluateScript("browser === __browser")?.toBool() == true)
@@ -80,17 +83,20 @@ struct FirefoxSurfaceTests {
         #expect(context.evaluateScript("browser.storage.local === __storage")?.toBool() == true)
     }
 
-    @Test func aChromeManifestLeavesBrowserExactlyAsItWas() {
-        // A package with neither browser_specific_settings nor applications: not Firefox's, so untouched.
-        let context = Self.firefoxWorld(manifest: "{ manifest_version: 3 }", extra: "var __before = browser;")
+    @Test func aChromePackageLeavesBrowserExactlyAsItWas() {
+        // The record says Chrome. The manifest deliberately carries Firefox's keys, as Chrome Web Store packages
+        // often do: they must not make it look like a Firefox package.
+        let context = Self.firefoxWorld(manifest: Self.firefoxManifest, extra: "var __before = browser;",
+                                        firefoxPackage: false)
         #expect(context.evaluateScript("browser === __before")?.toBool() == true)
         #expect(context.evaluateScript("typeof browser.runtime.getBrowserInfo")?.toString() == "undefined")
         #expect(context.evaluateScript("browser.runtime === __before.runtime")?.toBool() == true)
         #expect(context.evaluateScript("chrome.runtime.id")?.toString() == "x")
     }
 
-    /// Mozilla's older key, `applications`, still names a Firefox package.
-    @Test func theOlderApplicationsKeyCountsToo() {
+    /// A Firefox package whose manifest carries the older `applications` key is still a Firefox package, as the
+    /// record says; the key itself proves nothing either way.
+    @Test func aFirefoxPackageWithTheOlderApplicationsKeyIsStillOne() {
         let context = Self.firefoxWorld(manifest: Self.legacyManifest)
         #expect(context.evaluateScript("typeof browser.runtime.getBrowserInfo")?.toString() == "function")
         // The ID is WebKit's, the same one a message's sender carries.

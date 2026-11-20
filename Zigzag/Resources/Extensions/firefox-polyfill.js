@@ -6,9 +6,10 @@
 // on WebKit's own object, so a listener or a method read through `browser` is the one WebKit delivers through.
 //
 // The prelude is injected once per profile, into every extension's pages and background, so it cannot know what kind
-// of package it is in. The package's own manifest does: a Firefox one carries browser_specific_settings (or the older
-// applications), a Chrome one has neither. Without them nothing is touched, so an extension in a Chrome package keeps
-// exactly the `browser` WebKit gave it.
+// of package it is in. Zigzag's record of the install does, and it sets __zigzagFirefoxPackage in that extension's own
+// preludes (ExtensionStore.shim(for:)). The manifest cannot decide it: Chrome Web Store packages often carry Firefox's
+// browser_specific_settings too. Without the marker nothing is touched, so a Chrome package keeps exactly the `browser`
+// WebKit gave it.
 (() => {
   // The app's own version and machine architecture, written in by ExtensionBridge.swift: what a Firefox extension
   // asking getBrowserInfo is told as the browser's version, and what the platform answer falls back to. Neither is
@@ -65,10 +66,9 @@
     const api = globalThis.chrome || globalThis.browser;
     if (!api || !api.runtime || typeof api.runtime.getManifest !== 'function') return false;
 
-    let manifest = null;
-    try { manifest = api.runtime.getManifest() || null; } catch (e) { return false; }
-    // Mozilla's mark on the package: the newer key, or the one before it.
-    if (!manifest || !(manifest.browser_specific_settings || manifest.applications)) {
+    // The installed record's kind, set by Zigzag, not the manifest: a Chrome Web Store package may carry
+    // browser_specific_settings too, and WebKit tells no extension which store it came from.
+    if (globalThis.__zigzagFirefoxPackage !== true) {
       done = true;   // A Chrome package: nothing of Firefox's is added to it.
       return true;
     }

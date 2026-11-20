@@ -1106,7 +1106,13 @@ enum ExtensionShims {
     /// suspend, so their prelude skips it.
     static func shim(for id: String, keepsAlive: Bool = true) -> Shim? {
         var shim = shims[id] ?? Shim()
-        shim.backgroundPrelude = backgroundPrelude(keepsAlive: keepsAlive) + (shim.backgroundPrelude ?? "")
+        // firefox-polyfill.js adds Firefox's two runtime members only to a Firefox package. The installed record's
+        // kind says which that is, and the marker below is what the shim reads; the manifest can't decide it, since a
+        // Chrome Web Store package may carry browser_specific_settings too.
+        let firefox = ExtensionStore.kind(of: id) == .firefox
+        let marker = firefox ? "globalThis.__zigzagFirefoxPackage = true;\n" : ""
+        shim.backgroundPrelude = marker + backgroundPrelude(keepsAlive: keepsAlive) + (shim.backgroundPrelude ?? "")
+        if firefox { shim.pagePrelude = marker + (shim.pagePrelude ?? "") }
         #if DEBUG
         // Testing builds say each background got past Zigzag's own scripts, so a quiet log means quiet, not broken.
         let started = "try { (globalThis.chrome || globalThis.browser).runtime.sendNativeMessage('\(diagnosticsHost)', { where: 'background', kind: 'started', text: 'ok' }); } catch (e) {}\n"
