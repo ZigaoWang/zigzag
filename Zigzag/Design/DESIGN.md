@@ -410,7 +410,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Esc, a click beside it, zooming it again or going to another pane puts it back; so does any change to the group.
   Nothing is saved. The row lights the zoomed part with the pressed fill. With Reduce Motion, a crossfade.
 - **Tiling** (`TileLayout.swift`): two to four panes on a 2×2 grid, halves and quarters, each line run only where it
-  divides panes. A plain drag moves a whole line, as a split always did, and a double-click puts it back in the middle;
+  divides panes. Panes sit `Metric.paneGutter` (4) apart where the page meets the window's edges, the frame's
+  inset (8) framed and 1 edge to edge; a narrower gap keeps the inset's drag strip. A plain drag moves a whole line, as a split always did, and a double-click puts it back in the middle;
   where a line each way meet, a square a little larger than the crossing drags both, with the diagonal resize cursor
   (#309). In a grid of four, ⇧-dragging the line between the columns parts it, a segment per row (#316); parted, each
   segment drags alone, snaps to the middle near it, and the strip's Reset Tile Layout evens the grid. A grid keeps one

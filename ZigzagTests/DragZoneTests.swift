@@ -37,6 +37,37 @@ struct DragZoneTests {
         #expect(even.column == CGRect(x: x - 2, y: area.minY, width: gap + 4, height: area.height))
     }
 
+    /// Borderless beside the sidebar, the panes sit a tight gutter apart, and the line still takes the pointer across
+    /// as wide a band as the frame's inset gave it.
+    @Test func aTightGutterKeepsTheLinesDragBand() throws {
+        guard BrowserRootView.isBorderless else { return }
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        guard root.sidebarVisible else { return }
+        root.setTiles(TileShape(regions: [.left, .right]), animated: false)
+        window.layoutIfNeeded()
+        #expect(root.paneGap == Tokens.Metric.paneGutter)
+        let frames = root.tileFrames
+        #expect(frames[1].minX - frames[0].maxX == Tokens.Metric.paneGutter)
+        let frame = try #require(window.contentView?.superview)
+        // Both ends of the band, widened by what the gutter saves.
+        let widen = (Tokens.Metric.cardInset - Tokens.Metric.paneGutter) / 2
+        let reach = Tokens.Metric.dragReach
+        for x in [frames[0].maxX - reach / 2 - widen + 0.5, frames[1].minX + reach + widen - 0.5] {
+            let point = root.convert(NSPoint(x: x, y: frames[0].midY), to: nil)
+            #expect(frame.hitTest(frame.convert(point, from: nil)) is ResizeHandle, "\(x)")
+        }
+    }
+
     @Test func aPressAwayFromTheLineMovesItFromWhereItIs() {
         // Pressed 6pt right of the line at 240, then moved 10pt: the line goes to 250, not to the pointer at 256.
         #expect(ResizeHandle.dragged(256, grab: 6) == 250)

@@ -58,6 +58,8 @@ enum Tokens {
 
     enum Metric {
         static let cardInset: CGFloat = Space.x2
+        /// The gap between split panes whose page meets the window's edges (borderless beside the sidebar).
+        static let paneGutter: CGFloat = Space.x1
         static let sidebarWidth: CGFloat = 240
         /// The narrowest the sidebar gets: room for the traffic lights and the toolbar's four icon buttons.
         static let sidebarMinWidth: CGFloat = 216
