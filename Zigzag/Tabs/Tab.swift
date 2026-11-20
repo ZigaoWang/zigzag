@@ -1631,6 +1631,9 @@ extension Tab: WKNavigationDelegate {
         return url
     }
 
+    /// A checked Add to Firefox click goes straight to the install sheet, unless downloads from AMO are kept blocked.
+    nonisolated static func skipsDownloadQuestion(kept: Bool?) -> Bool { kept != false }
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
@@ -1984,6 +1987,8 @@ extension Tab: WKNavigationDelegate {
                 switch ExtensionStore.addonsInstall(file: target, published: await ExtensionStore.publishedAddonsFile(slug: click.slug)) {
                 case .install(let published):
                     addonsInstall = (click, published)
+                    // The install sheet is the one question, as on the Chrome Web Store; a kept Block for AMO still wins.
+                    if Self.skipsDownloadQuestion(kept: SiteOrigin.of(webView.url ?? target).flatMap { SitePermissions.downloads(origin: $0, tab: self) }) { return policy }
                 case .unreachable:
                     if let host = webView.window?.contentView {
                         DownloadManager.noticeCouldNotAdd(String(localized: "Firefox Add-ons didn’t answer, so this extension couldn’t be checked and wasn’t added. Try again in a moment.",

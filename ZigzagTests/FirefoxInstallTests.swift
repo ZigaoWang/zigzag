@@ -168,6 +168,13 @@ struct AddonsMozillaPageTests {
         #expect(await never.count == 2)
     }
 
+    /// A checked click skips the download question (#428); a kept Block for the site still stops it.
+    @Test func aCheckedClickAsksOnlyInTheInstallSheet() {
+        #expect(Tab.skipsDownloadQuestion(kept: nil))
+        #expect(Tab.skipsDownloadQuestion(kept: true))
+        #expect(!Tab.skipsDownloadQuestion(kept: false))
+    }
+
     @Test func onlyA200FromAMOCounts() {
         let url = ExtensionStore.addonsAPIURL(slug: "ublock-origin")!
         let answer = { (status: Int, at: URL) in HTTPURLResponse(url: at, statusCode: status, httpVersion: nil, headerFields: nil)! }
