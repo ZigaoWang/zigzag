@@ -255,6 +255,10 @@ enum SidebarMenus {
         // As in the menu bar: the tab's split partner is part of it, so neither closes it.
         let tabs = manager.tabs(in: tab.spaceID)
         let panes = manager.panes(of: tab)
+        // Close Tab closes this page alone; this closes every page of the split.
+        if panes.count > 1 {
+            close.append(Item(String(localized: "Close Split View", comment: "Item in a tab's context menu in the sidebar, for a page of a split view: closes all its pages.")) { controller.closeManyWithUndo(panes) })
+        }
         if let last = tabs.lastIndex(where: { page in panes.contains { $0 === page } }) {
             let below = Array(tabs.dropFirst(last + 1))
             if !below.isEmpty {

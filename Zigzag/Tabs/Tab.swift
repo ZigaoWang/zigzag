@@ -650,6 +650,27 @@ final class Tab: NSObject {
     /// The asking for `suspend` still waiting, so whichever of the page's answer and the wait for it comes first decides.
     private var sleepTicket = 0
 
+    /// Whether the page holds text you typed, asked as `suspend` asks: a page that doesn't answer in two seconds goes
+    /// by what was read as you left it.
+    func checkTypedText(_ completion: @escaping (Bool) -> Void) {
+        let answer = Once { (state: PageState?) in completion(state?.hasTypedText == true) }
+        readPageState { answer.call($0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            MainActor.assumeIsolated { answer.call(self?.pageState) }
+        }
+    }
+
+    /// Runs its closure the first time it's called only.
+    private final class Once {
+        private var body: ((PageState?) -> Void)?
+        init(_ body: @escaping (PageState?) -> Void) { self.body = body }
+        func call(_ state: PageState?) {
+            let run = body
+            body = nil
+            run?(state)
+        }
+    }
+
     private func sleep(_ webView: BrowserWebView, ticket: Int, state: PageState?, because reason: String?, chosen: Bool,
                        refused: ((StaysAwake) -> Void)?) {
         guard sleepTicket == ticket, self.webView === webView else { return }
@@ -1725,6 +1746,14 @@ extension Tab: WKNavigationDelegate {
         let toTheWeb = Self.route(forPageLink: url, from: self.url) == .load
         // A page navigation to the link a ⇧ or ⌥ click was just on is that click's; a real link click clears the mark.
         if isLinkClick { followedClick = nil }
+        // A frame's link opens a tab on ⌘ or a middle click, as on the page; every other click stays the frame's.
+        if isLinkClick, !isMainFrame, toTheWeb,
+           case .newTab(let inFront) = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: false,
+                                                           modifiers: navigationAction.modifierFlags, buttonNumber: navigationAction.buttonNumber) {
+            if userInitiated, host?.tab(self, routesLink: url, arrival: .linkNewTab, inBackground: !inFront) == true { return (.cancel, preferences) }
+            host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
+            return (.cancel, preferences)
+        }
         let followed = isMainFrame && toTheWeb && navigationAction.navigationType == .other ? followedActivation(for: url) : nil
         if (isLinkClick || followed != nil) && isMainFrame && toTheWeb {
             let flags = navigationAction.modifierFlags
@@ -1789,7 +1818,11 @@ extension Tab: WKNavigationDelegate {
 
     nonisolated static func linkActivation(type: WKNavigationType, isMainFrame: Bool, modifiers: NSEvent.ModifierFlags,
                                            buttonNumber: Int, followed: LinkActivation? = nil) -> LinkActivation {
-        guard isMainFrame else { return .page }
+        guard isMainFrame else {
+            // In a frame, only ⌘ and the middle button: ⇧ and ⌥ stay the frame's.
+            let opensTab = type == .linkActivated && (buttonNumber == 4 || modifiers.contains(.command))
+            return opensTab ? .newTab(inFront: modifiers.contains(.shift)) : .page
+        }
         if type == .linkActivated {
             // ⌘ wins over ⌥, as in Chrome.
             if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }

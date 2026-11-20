@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import WebKit
 @testable import Zigzag
 
 /// The sidebar's own menus, the + and a right-click on its empty space: Zigzag's drawn menu, the same items in the
@@ -221,6 +222,63 @@ struct SidebarRowMenuTests {
             try run(menu.items.first)
             #expect(tabs[1].isAsleep && tabs[2].isAsleep)
         }
+    }
+
+    /// One page of a split you're on sleeps and leaves the split; you stay on the other.
+    @Test func onePageOfASplitSleepsAndTheOtherStaysShown() throws {
+        try inWindow(["A", "B", "C"], local: true) { controller, tabs, _ in
+            let manager = controller.tabManager
+            manager.makeSplit(tabs[0], with: tabs[1])
+            manager.select(tabs[0])
+            tabs[0].ensureWebView()
+            #expect(manager.maySuspend(tabs[0]))
+            controller.suspendPage(nil)
+            #expect(tabs[0].isAsleep)
+            #expect(manager.split(for: tabs[1]) == nil)
+            #expect(manager.selectedTab === tabs[1])
+            #expect(!tabs[1].isAsleep)
+        }
+    }
+
+    @Test func theSplitPageYoureNotInSleepsAndYouStay() throws {
+        try inWindow(["A", "B", "C"], local: true) { controller, tabs, _ in
+            let manager = controller.tabManager
+            manager.makeSplit(tabs[0], with: tabs[1])
+            manager.select(tabs[0])
+            controller.suspendWithToast([tabs[1]])
+            #expect(tabs[1].isAsleep)
+            #expect(manager.split(for: tabs[0]) == nil)
+            #expect(manager.selectedTab === tabs[0])
+        }
+    }
+
+    /// Text you typed keeps the page awake, and you're not moved off it first.
+    @Test func aPageWithTypedTextKeepsYouOnIt() async throws {
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let tabs = ["A", "B"].enumerated().map { i, title in Tab(url: URL(string: "about:blank#\(i)")!, title: title, spaceID: space) }
+        manager.adopt(tabs, in: space)
+        manager.select(tabs[0])
+        let page = tabs[0].ensureWebView()
+        page.loadHTMLString("<html><body><input id='note'></body></html>", baseURL: URL(string: "https://example.com/"))
+        var ready = false
+        for _ in 0..<200 where !ready {
+            try await Task.sleep(for: .milliseconds(50))
+            guard tabs[0].hasLoadedOnce, !page.isLoading else { continue }
+            ready = (try? await page.evaluateJavaScript("!!document.getElementById('note')")) as? Bool == true
+        }
+        try #require(ready)
+        _ = try await page.evaluateJavaScript("const el = document.getElementById('note'); el.value = 'half written'; window.__zigzagTyped.add(el); true",
+                                              in: nil, contentWorld: .defaultClient)
+        let why = await withCheckedContinuation { (done: CheckedContinuation<Tab.StaysAwake, Never>) in
+            manager.suspend(chosen: [tabs[0]]) { _, why in done.resume(returning: why) }
+        }
+        #expect(why == .typedText)
+        #expect(manager.selectedTab === tabs[0])
+        #expect(tabs[0].isLoaded && !tabs[0].isAsleep)
     }
 
     @Test func theTabYoureOnShowsTheMenuBarsKeys() throws {

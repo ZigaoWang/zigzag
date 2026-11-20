@@ -522,11 +522,13 @@ final class ExtensionHost: NSObject {
     @discardableResult
     func load(_ id: String) async -> WKWebExtensionContext? {
         if let existing = context(for: id) { return existing }
-        guard let directory = await profile.installs.loadDirectory(for: id) else { return nil }
+        guard profile.installs.isEnabled(id), let directory = await profile.installs.loadDirectory(for: id) else { return nil }
         do {
             let ext = try await WKWebExtension(resourceBaseURL: directory)
             // Asked for twice at once (the profile's extensions starting as one is added): the first to finish stands.
             if let existing = context(for: id) { return existing }
+            // Turned off while it was being read.
+            guard profile.installs.isEnabled(id) else { return nil }
             installed[id] = ext
             let context = WKWebExtensionContext(for: ext)
             // The store ID, so runtime.id matches Chrome's and storage persists across launches.
@@ -714,9 +716,9 @@ final class ExtensionHost: NSObject {
         (Set(context.grantedPermissionMatchPatterns.keys.map(\.string)), Set(context.deniedPermissionMatchPatterns.keys.map(\.string)))
     }
 
-    /// Whether a site granted before isn't now, or one more is denied.
+    /// Whether a site granted before isn't now. A newly denied site needs no restart: WebKit stops injecting there.
     static func narrowed(from before: SiteGrants, to after: SiteGrants) -> Bool {
-        !before.granted.isSubset(of: after.granted) || !after.denied.isSubset(of: before.denied)
+        !before.granted.isSubset(of: after.granted)
     }
 
     /// Turns the approved site patterns into what the person chose: every approved site, no site until a click gives

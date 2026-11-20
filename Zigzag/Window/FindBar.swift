@@ -193,7 +193,8 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     /// `animated` off: it comes back with the tab it belongs to, as part of that page, not as something new.
-    func show(query newQuery: String? = nil, focus: Bool = true, animated: Bool = true) {
+    /// `searches` off: the caller runs the search itself.
+    func show(query newQuery: String? = nil, focus: Bool = true, animated: Bool = true, searches: Bool = true) {
         guard let window else { return }
         if let newQuery { query = newQuery; field.stringValue = newQuery }
         // With their shortcuts, as the sidebar's buttons say theirs; read each time, since shortcuts can be changed.
@@ -214,7 +215,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
             window.window?.makeFirstResponder(field)
             field.currentEditor()?.selectAll(nil)
         }
-        if !query.isEmpty { search(backwards: false, fromStart: !focus) }
+        if searches, !query.isEmpty { search(backwards: false, fromStart: !focus) }
     }
 
     /// Esc closes the bar from the page too, not only from its field, so you never need the mouse for it.
@@ -277,7 +278,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     func next(backwards: Bool) {
-        if !isVisible { show() }
+        if !isVisible { show(searches: false) }
         search(backwards: backwards)
     }
 
@@ -389,7 +390,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
     }
 
     /// The match you're on, from 0, so a recount can keep saying where you are.
-    private var place: Int?
+    private(set) var place: Int?
 
     /// The page being searched: once it finishes loading something new, its count is read again, so it never
     /// says what an earlier page had.

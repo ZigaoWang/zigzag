@@ -125,8 +125,8 @@ enum MainMenu {
             .separator(),
             item(String(localized: "Import from Another Browser…", comment: "File menu item."), #selector(AppDelegate.importFromBrowser(_:)), "i", [.command, .shift]),
             .separator(),
-            // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.
             item(String(localized: "Suspend Page", comment: "File menu item: puts the tab's page to sleep; it loads again when you click the tab."), #selector(C.suspendPage(_:)), ""),
+            // No key: ⌥⌘D belongs to macOS (hide the Dock) and always wins.
             item(String(localized: "Duplicate Tab", comment: "File menu item."), #selector(C.duplicateTab(_:)), ""),
             // One verb for saving (#326): ⌘D saves into the space you're in with no question, and its ⇧ twin asks where
             // in that space. Two items, so neither depends on a key held down.
@@ -189,6 +189,7 @@ enum MainMenu {
                 item(DeveloperTool.console.title, #selector(C.showJavaScriptConsole(_:)), "j", [.command, .option]),
                 item(DeveloperTool.inspect.title, #selector(C.inspectElement(_:)), "c", [.command, .option]),
                 item(DeveloperTool.viewSource.title, #selector(C.viewSource(_:)), "u", [.command, .option]),
+                item(C.developerBarTitle(shown: true), #selector(C.toggleDeveloperBar(_:)), ""),
             ]),
             .separator(),
             item(String(localized: "Enter Full Screen", comment: "View menu item."), #selector(NSWindow.toggleFullScreen(_:)), "f", [.command, .control]),

@@ -126,7 +126,7 @@ final class SiteExtensionsSection: NSView {
         let access: SiteExtensionAccess
         /// What its toolbar button does: its popup, or its action.
         let run: (NSView) -> Void
-        /// Its menu: settings, site access, pinning, turning off, removing.
+        /// Its menu: pinning, settings, site access, turning off, removing.
         let menu: () -> NSMenu?
     }
 
@@ -149,7 +149,7 @@ final class SiteExtensionsSection: NSView {
     private let stripMore = StripMore()
     /// Each extension's button while open: a row, or a tile of the grid.
     private(set) var buttons: [InteractiveView] = []
-    private var pins: [(id: String, button: InteractiveView, pin: HoverPin)] = []
+    private var pins: [(id: String, button: InteractiveView, mark: PinMark)] = []
     private let manageRow: PanelLinkRow
     /// With no extensions yet: one quiet way to the store.
     private let getRow: PanelLinkRow
@@ -212,11 +212,11 @@ final class SiteExtensionsSection: NSView {
                 button = tile(side: SiteExtensionsLayout.iconSide)
             }
             buttons.append(button)
-            pins.append((item.id, button, HoverPin()))
+            pins.append((item.id, button, PinMark()))
             stripTiles.append(tile(side: Tokens.Space.x4))
         }
-        // Over its button.
-        for entry in pins { addSubview(entry.pin) }
+        // Over its button; it takes no clicks.
+        for entry in pins { addSubview(entry.mark) }
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
         setAccessibilityLabel(Self.title)
@@ -228,35 +228,25 @@ final class SiteExtensionsSection: NSView {
 
     // MARK: Pins
 
-    /// The address's pins on each extension's button, as Settings and its menu have them.
-    func wirePins(state: @escaping (String) -> HoverPin.State, toggle: @escaping (String) -> Void, title: @escaping (String) -> String?) {
-        for entry in pins {
-            let id = entry.id
-            entry.pin.onClick = { _ in toggle(id) }
-            let update: (Bool) -> Void = { [weak button = entry.button, weak pin = entry.pin] _ in
-                guard let button, let pin else { return }
-                pin.isWanted = button.isHovered || button.hasKeyboardFocus || (pin.isShowing && pin.isHovered)
-            }
-            entry.button.hoverChanged = update
-            entry.button.keyboardFocusChanged = update
-            entry.pin.hoverChanged = update
-        }
+    /// Whether each extension is pinned to the address, shown by a mark on its button. Pinning is in its menu, and
+    /// for VoiceOver an action of the button: a click on the button only ever opens the extension.
+    func wirePins(state: @escaping (String) -> PinMark.State, toggle: @escaping (String) -> Void, title: @escaping (String) -> String?) {
         pinState = state
         pinToggle = toggle
         pinTitle = title
         refreshPins()
     }
-    private var pinState: ((String) -> HoverPin.State)?
+    private var pinState: ((String) -> PinMark.State)?
     private var pinToggle: ((String) -> Void)?
     private var pinTitle: ((String) -> String?)?
 
-    /// What each pin says now. Runs on every change, from here or another window, so the limit is always the truth.
+    /// What each mark says now. Runs on every change, from here or another window, so the limit is always the truth.
     func refreshPins() {
         guard let pinState else { return }
         for entry in pins {
-            entry.pin.state = pinState(entry.id)
+            entry.mark.state = pinState(entry.id)
             let id = entry.id
-            if let name = pinTitle?(id), let toggle = pinToggle, entry.pin.state != .atLimit {
+            if let name = pinTitle?(id), let toggle = pinToggle, entry.mark.state != .atLimit {
                 entry.button.setAccessibilityCustomActions([NSAccessibilityCustomAction(name: name) {
                     MainActor.assumeIsolated { toggle(id) }
                     return true
@@ -264,8 +254,8 @@ final class SiteExtensionsSection: NSView {
             } else {
                 entry.button.setAccessibilityCustomActions(nil)
             }
+            entry.mark.isHidden = !(isOpen && entry.mark.state == .pinned)
         }
-        needsLayout = true
     }
 
     // MARK: Folding
@@ -294,11 +284,11 @@ final class SiteExtensionsSection: NSView {
             (getRow, count == 0),
         ]
         for button in buttons { wanted.append((button, isOpen)) }
+        for entry in pins { wanted.append((entry.mark, isOpen && entry.mark.state == .pinned)) }
         for (i, tile) in stripTiles.enumerated() { wanted.append((tile, !isOpen && i < strip.icons)) }
         stripMore.text = "+\(strip.more)"
         let fade = Tokens.Motion.Curve(duration: Self.drawer(opening: opening).duration)
         for (view, shows) in wanted { show(view, shows, animated: animated, fade: fade) }
-        for entry in pins where !isOpen { entry.pin.isWanted = false }
         needsLayout = true
     }
 
@@ -398,11 +388,10 @@ final class SiteExtensionsSection: NSView {
         row(manageRow, top + SiteExtensionsLayout.bodyHeight(count: count, width: width) + Tokens.Space.x2)
         for entry in pins {
             if let row = entry.button as? SiteExtensionRow {
-                entry.pin.frame = row.pinFrame.offsetBy(dx: row.frame.minX, dy: row.frame.minY)
+                entry.mark.frame = row.pinFrame.offsetBy(dx: row.frame.minX, dy: row.frame.minY)
             } else if let tile = entry.button as? PanelTile {
-                entry.pin.frame = SitePanel.pinFrame(on: tile.frame, left: !tile.badge.isEmpty)
+                entry.mark.frame = PinMark.frame(on: tile.frame, left: tile.isAttention)
             }
-            if entry.button.isHidden { entry.pin.isHidden = true }
         }
     }
 
@@ -423,24 +412,17 @@ final class SiteExtensionsSection: NSView {
         }
     }
 
-    /// pinhover: the pointer on an extension, or its pin, as a real pointer would put it there.
-    func debugHover(_ arg: String) {
-        let f = arg.split(separator: " ").map(String.init)
-        for entry in pins where entry.id != f.first {
-            entry.pin.isHovered = false
-            entry.button.isHovered = false
-        }
-        guard let entry = pins.first(where: { $0.id == f.first }) else { return }
-        if f.contains("limit") { entry.pin.state = .atLimit }
-        entry.button.isHovered = true
-        if f.contains("pin") { entry.pin.isHovered = true }
-    }
+    /// Whether each extension's pin mark shows.
+    var debugPinMarks: [String: Bool] { Dictionary(uniqueKeysWithValues: pins.map { ($0.id, !$0.mark.isHidden) }) }
+
+    /// An extension's button, by id.
+    func debugButton(_ id: String) -> InteractiveView? { pins.first { $0.id == id }?.button }
     #endif
 }
 
 /// One extension as a row, while there are only a few: its icon on the panel's text column, with its badge on the
 /// icon's corner as the address draws it, and its name after it. The row is its button, with the panel's row washes;
-/// its pin comes up at the trailing end, as a row's delete does. One that doesn't work on the site is faded, and says
+/// a pinned one has its pin mark at the trailing end. One that doesn't work on the site is faded, and says
 /// why under the pointer.
 final class SiteExtensionRow: InteractiveView {
     static let height = PanelLinkRow.height
@@ -476,11 +458,10 @@ final class SiteExtensionRow: InteractiveView {
     var debugName: String { title.stringValue }
     #endif
 
-    /// Where its pin goes, in its own terms: the chip's edge on the text column's end, in the middle of the row.
+    /// Where its pin mark goes, in its own terms: its edge on the text column's end, in the middle of the row.
     var pinFrame: NSRect {
-        let side = Tokens.Sidebar.hoverPin, chip = Tokens.Sidebar.hoverPinChip
-        let margin = (side - chip) / 2
-        return NSRect(x: bounds.width - PanelLinkRow.outset - chip - margin, y: (bounds.height - side) / 2, width: side, height: side)
+        let side = Tokens.Sidebar.pinMark
+        return NSRect(x: bounds.width - PanelLinkRow.outset - side, y: (bounds.height - side) / 2, width: side, height: side)
     }
 
     override func layout() {
@@ -489,7 +470,7 @@ final class SiteExtensionRow: InteractiveView {
         let x = PanelLinkRow.outset
         iconView.frame = NSRect(x: x, y: (bounds.height - side) / 2, width: side, height: side)
         let textX = x + side + Tokens.Space.x2
-        // Short of the pin, so the name never runs under it.
+        // Short of the pin mark, so the name never runs under it.
         let right = pinFrame.minX - Tokens.Space.x1
         title.frame = NSRect(x: textX - Label.inset, y: title.centeredY(in: bounds.height), width: max(0, right - textX + Label.inset * 2), height: title.lineHeight)
         iconView.subviews.forEach { $0.needsLayout = true }

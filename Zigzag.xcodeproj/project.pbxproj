@@ -72,6 +72,8 @@
 		C0C1E3340000000000000001 /* KeptCookies.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000002 /* KeptCookies.swift */; };
 		C0C1E3340000000000000003 /* KeptCookiesSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000004 /* KeptCookiesSheet.swift */; };
 		DE0DEF000000000000000003 /* DevDefaultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE0DEF000000000000000004 /* DevDefaultsTests.swift */; };
+		7AB4040000000000000000A1 /* SplitCloseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AB4040000000000000000A2 /* SplitCloseTests.swift */; };
+		7AB4030000000000000000A1 /* TabNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AB4030000000000000000A2 /* TabNavigationTests.swift */; };
 		C0C1E3340000000000000005 /* KeptCookiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C1E3340000000000000006 /* KeptCookiesTests.swift */; };
 		C297C0DE0000000000000001 /* ClientCertificates.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000002 /* ClientCertificates.swift */; };
 		C297C0DE0000000000000003 /* ClientCertificatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C297C0DE0000000000000004 /* ClientCertificatesTests.swift */; };
@@ -637,6 +639,8 @@
 		C0C1E3340000000000000002 /* KeptCookies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookies.swift; sourceTree = "<group>"; };
 		C0C1E3340000000000000004 /* KeptCookiesSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesSheet.swift; sourceTree = "<group>"; };
 		DE0DEF000000000000000004 /* DevDefaultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevDefaultsTests.swift; sourceTree = "<group>"; };
+		7AB4040000000000000000A2 /* SplitCloseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitCloseTests.swift; sourceTree = "<group>"; };
+		7AB4030000000000000000A2 /* TabNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabNavigationTests.swift; sourceTree = "<group>"; };
 		C0C1E3340000000000000006 /* KeptCookiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeptCookiesTests.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000002 /* ClientCertificates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificates.swift; sourceTree = "<group>"; };
 		C297C0DE0000000000000004 /* ClientCertificatesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClientCertificatesTests.swift; sourceTree = "<group>"; };
@@ -1727,6 +1731,8 @@
 				501B90ADF75ED2EF79493586 /* CertificateTrustTests.swift */,
 				C297C0DE0000000000000004 /* ClientCertificatesTests.swift */,
 				DE0DEF000000000000000004 /* DevDefaultsTests.swift */,
+				7AB4040000000000000000A2 /* SplitCloseTests.swift */,
+				7AB4030000000000000000A2 /* TabNavigationTests.swift */,
 				C0C1E3340000000000000006 /* KeptCookiesTests.swift */,
 				C1EA411C0000000000000004 /* CleanLinkTests.swift */,
 				6B6C77CFE33BFCD7CC963266 /* ChromeProfilesImportTests.swift */,
@@ -2588,6 +2594,8 @@
 				CE33211DE5E98DCFE4811C4A /* CertificateTrustTests.swift in Sources */,
 				C297C0DE0000000000000003 /* ClientCertificatesTests.swift in Sources */,
 				DE0DEF000000000000000003 /* DevDefaultsTests.swift in Sources */,
+				7AB4040000000000000000A1 /* SplitCloseTests.swift in Sources */,
+				7AB4030000000000000000A1 /* TabNavigationTests.swift in Sources */,
 				C0C1E3340000000000000005 /* KeptCookiesTests.swift in Sources */,
 				C1EA411C0000000000000003 /* CleanLinkTests.swift in Sources */,
 				D7DA27736AE177FF489E42C3 /* ChromeProfilesImportTests.swift in Sources */,
@@ -2899,7 +2907,7 @@
 				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 126;
+				CURRENT_PROJECT_VERSION = 127;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 432GL3WKY2;
@@ -3018,7 +3026,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 126;
+				CURRENT_PROJECT_VERSION = 127;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 432GL3WKY2;
