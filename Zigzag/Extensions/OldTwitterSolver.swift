@@ -35,6 +35,43 @@ final class OldTwitterSolver: NSObject {
         if (event.source !== window || !data || !data.__zigzagSolverReply || typeof data.token !== "string") return;
         try { handler.postMessage({ op: "reply", token: data.token, message: data.message }).catch(() => {}); } catch (e) {}
       });
+      // OldTwitter's layout names its own files with Chrome's address. WebKit serves the same files at its own
+      // address, which the page's security policy lets through, so the addresses are fixed as the layout is made:
+      // its icon font, the loading picture, its images and the tab's icon.
+      const api = globalThis.chrome || globalThis.browser;
+      const id = api && api.runtime && api.runtime.id;
+      if (!id) return;
+      const from = "chrome-extension://" + id;
+      const to = "webkit-extension://" + id;
+      const fixed = (text) => (text.includes(from) ? text.split(from).join(to) : text);
+      const fix = (element) => {
+        if (!element || element.nodeType !== 1) return;
+        if (element.tagName === "STYLE") {
+          const text = element.textContent;
+          if (text && text.includes(from)) element.textContent = fixed(text);
+          return;
+        }
+        for (const name of ["src", "href", "srcset", "poster", "data"]) {
+          const value = element.getAttribute(name);
+          if (value && value.includes(from)) element.setAttribute(name, fixed(value));
+        }
+        const style = element.getAttribute("style");
+        if (style && style.includes(from)) element.setAttribute("style", fixed(style));
+      };
+      const fixTree = (node) => {
+        fix(node);
+        if (node.querySelectorAll) node.querySelectorAll("style,img,link,source,video,use,[style]").forEach(fix);
+      };
+      fixTree(document.documentElement);
+      new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === "attributes") fix(mutation.target);
+          else if (mutation.type === "characterData") { if (mutation.target.parentElement) fix(mutation.target.parentElement); }
+          else mutation.addedNodes.forEach((node) => { if (node.nodeType === 1) fixTree(node); });
+        }
+      }).observe(document.documentElement || document, {
+        childList: true, subtree: true, attributes: true, attributeFilter: ["src", "href", "srcset", "poster", "style", "data"], characterData: true,
+      });
     })();
     """
 
