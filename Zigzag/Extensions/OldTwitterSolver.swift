@@ -123,19 +123,6 @@ final class OldTwitterSolver: NSObject {
         let script = try script()
         var data = data
         data["action"] = "init"
-        if data["challengeUrl"] == nil, data["vendorData"] == nil,
-           let vendorCode = data["vendorCode"] as? String, let challengeCode = data["challengeCode"] as? String {
-            let base = "https://abs.twimg.com/responsive-web/client-web/"
-            async let vendor = fetchText(URL(string: base + "vendor.\(vendorCode).js"))
-            async let challenge = fetchText(URL(string: base + "ondemand.s.\(challengeCode)a.js"))
-            let (vendorData, challengeData) = await (vendor, challenge)
-            if let vendorData, let challengeData {
-                data["vendorData"] = vendorData
-                data["challengeData"] = challengeData
-            } else {
-                ExtensionLog.write("OldTwitter solver: challenge scripts couldn't be fetched here")
-            }
-        }
         let world = WKContentWorld.world(name: "ZigzagOldTwitter-\(UUID().uuidString)")
         let token = UUID().uuidString
         var sandbox = Sandbox(token: token, key: key, world: world, frame: frame, webView: webView)
@@ -259,25 +246,6 @@ final class OldTwitterSolver: NSObject {
         let code = String(html[start.upperBound..<end.lowerBound])
         sandboxScript = code
         return code
-    }
-
-    /// A challenge script, fetched by Zigzag rather than the sandbox, so a proxy or the page can't stop it.
-    private func fetchText(_ url: URL?) async -> String? {
-        guard let url else { return nil }
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.proxyConfigurations = host.profile.store.proxyConfigurations
-        configuration.timeoutIntervalForRequest = 15
-        configuration.timeoutIntervalForResource = 20
-        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        let session = URLSession(configuration: configuration)
-        defer { session.finishTasksAndInvalidate() }
-        do {
-            let (data, response) = try await session.data(from: url)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-            return String(data: data, encoding: .utf8)
-        } catch {
-            return nil
-        }
     }
 
     private func closeSandbox(for key: String, because reason: String) {
