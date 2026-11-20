@@ -1137,6 +1137,9 @@ enum ExtensionShims {
         var coveredPermissions: Set<String> = []
         /// Small fixes to the extension's own files where it misbehaves in WebKit, applied to a copy at load.
         var patches: [Patch] = []
+        /// Whether every patch must fit. False applies the ones that do; true leaves the files alone when one doesn't,
+        /// so a newer extension version never gets half a fix.
+        var patchesTogether = false
         /// What's known not to work, said before installing ("its popup").
         var knownIssue: String?
     }
@@ -1157,6 +1160,11 @@ enum ExtensionShims {
     /// suspend, so their prelude skips it.
     static func shim(for id: String, keepsAlive: Bool = true) -> Shim? {
         var shim = shims[id] ?? Shim()
+        // An unpacked copy has an identifier from where it was loaded: its files say it's OldTwitter.
+        if shim.patches.isEmpty, let manifest = ExtensionStore.manifest(for: id), OldTwitterSolver.isOldTwitter(id: id, manifest: manifest) {
+            shim.patches = oldTwitterPatches
+            shim.patchesTogether = true
+        }
         // firefox-polyfill.js adds Firefox's two runtime members only to a Firefox package. The installed record's
         // kind says which that is, and the marker below is what the shim reads; the manifest can't decide it, since a
         // Chrome Web Store package may carry browser_specific_settings too.
@@ -1335,6 +1343,94 @@ enum ExtensionShims {
         tampermonkeyBetaID: Shim(patches: tampermonkeyBetaPatches),
         // Motrix, which hands downloads to the Motrix app.
         motrixID: Shim(backgroundPrelude: motrixPrelude),
+    ]
+
+    /// OldTwitter signs every request to X with a transaction id from X's own challenge script. Chrome runs that
+    /// script in a sandbox page. Here the site's Content-Security-Policy blocks both the blob iframe it uses and eval,
+    /// so it never starts and every request times out. Zigzag runs the extension's own `sandbox.html` in a hidden page
+    /// outside the site's policy and without extension APIs (OldTwitterSolver); these patches send the challenge there
+    /// instead of an iframe. Checked against OldTwitter 1.9.10.3.
+    static let oldTwitterPatches: [Patch] = [
+        // No blob iframe: the sandbox is a page Zigzag keeps, one per profile.
+        Patch(file: "scripts/twchallenge.js",
+              find: #"function createSolverFrame\(\) \{[\s\S]*?\n\}\ncreateSolverFrame\(\);"#,
+              replace: #"""
+function createSolverFrame() {
+    solverReady = false;
+    requeuePendingSolves();
+    solverGeneration++;
+}
+createSolverFrame();
+"""#, pattern: true),
+        // Each transaction id comes from the sandbox through the bridge, not an iframe message.
+        Patch(file: "scripts/twchallenge.js",
+              find: #"function solveChallenge\(path, method\) \{[\s\S]*?\n\}\n\nfunction recoverSolver"#,
+              replace: "function solveChallenge(path, method) {\n    return window.__zigzagOldTwitterCall({ op: \"solve\", path, method });\n}\n\nfunction recoverSolver", pattern: true),
+        // The codes its page worked out go to the sandbox too; ready means it can sign requests.
+        Patch(file: "scripts/twchallenge.js",
+              find: #"async function sendInit\(\) \{[\s\S]*?\n        \}\n        await sendInit\(\);"#,
+              replace: #"""
+async function sendInit() {
+            if (generation !== solverGeneration) return;
+            sentData = true;
+            try {
+                await window.__zigzagOldTwitterCall({
+                    op: "init",
+                    data: {
+                        ...initData,
+                        anims,
+                        verificationCode: OLDTWITTER_CONFIG.verificationKey,
+                    },
+                });
+                solverReady = true;
+            } catch (e) {
+                solverErrored = true;
+                console.error("Error initializing solver:", e);
+            }
+        }
+        await sendInit();
+"""#, pattern: true),
+        // The sandbox's own message listener becomes a function Zigzag's hidden page calls, not an iframe's parent.
+        Patch(file: "sandbox.html",
+              find: #"window\.addEventListener\('message', (async function \(event\) \{[\s\S]*?\n        \})\);"#,
+              replace: #"window.__zigzagSolveMessage = $1;"#, pattern: true),
+        // A fresh init starts over, as a new iframe did.
+        Patch(file: "sandbox.html", find: "if (data.action === 'init') {\n                try {",
+              replace: "if (data.action === 'init') {\n                initError = false;\n                try {"),
+        // The sandbox has no body of its own here: the page it sets up the challenge in is the real one, so it makes
+        // the two pieces the script reads when they aren't there.
+        Patch(file: "sandbox.html", find: """
+        function setPageData(data) {
+            let animsDiv = document.getElementById('anims');
+            animsDiv.innerHTML = '';
+            for (let anim of data.anims) {
+                animsDiv.innerHTML += `\\n${anim}`;
+            }
+            let verif = document.querySelector('meta[name="twitter-site-verification"]');
+            verif.content = data.verificationCode;
+        }
+""", replace: """
+        function setPageData(data) {
+            let animsDiv = document.getElementById('anims');
+            if (!animsDiv) {
+                animsDiv = document.createElement('div');
+                animsDiv.id = 'anims';
+                animsDiv.style.display = 'none';
+                (document.body || document.documentElement).appendChild(animsDiv);
+            }
+            animsDiv.innerHTML = '';
+            for (let anim of data.anims) {
+                animsDiv.innerHTML += `\\n${anim}`;
+            }
+            let verif = document.querySelector('meta[name="twitter-site-verification"]');
+            if (!verif) {
+                verif = document.createElement('meta');
+                verif.name = 'twitter-site-verification';
+                (document.head || document.documentElement).appendChild(verif);
+            }
+            verif.content = data.verificationCode;
+        }
+"""),
     ]
 
     static let motrixID = "lggbokfckofcgjndaboioakcmincinpo"
@@ -1704,15 +1800,16 @@ extension ExtensionStore {
         let shim = ExtensionShims.shim(for: id, keepsAlive: ExtensionShims.keepsAlive(manifest: packageManifest))
         let prelude = shim?.backgroundPrelude
         let patches = (shim?.patches ?? []).map { OverlayPatch(file: $0.file, find: $0.find, replace: $0.replace, pattern: $0.pattern) }
+        let together = shim?.patchesTogether ?? false
         guard prelude != nil || !patches.isEmpty else { return package }
         let overlay = overlayFolder(in: folder, version: state.version)
         let fill = fills
-        let signature = overlaySignature(prelude: prelude, patches: patches, fill: fill, package: package)
+        let signature = overlaySignature(prelude: prelude, patches: patches, together: together, fill: fill, package: package)
             + (webKitDropsWasmKeyword ? "wasm-policy" : "")
         // Asked for twice at once (a profile's extensions starting as one is added): made once.
         if let making = overlaysMaking[overlay.path] { return await making.value }
         let making = Task.detached(priority: .userInitiated) {
-            makeOverlay(overlay, from: package, prelude: prelude, patches: patches, signature: signature, fill: fill, id: id)
+            makeOverlay(overlay, from: package, prelude: prelude, patches: patches, together: together, signature: signature, fill: fill, id: id)
         }
         overlaysMaking[overlay.path] = making
         let made = await making.value
@@ -1724,8 +1821,10 @@ extension ExtensionStore {
 
     /// Overlay marker contents. A new format version, prelude, patch, language fill, or background manifest/page change
     /// rebuilds the copy once. Install report data is excluded: it can change without the loaded files changing.
-    nonisolated static func overlaySignature(prelude: String?, patches: [OverlayPatch], fill: Fills, package: URL) -> String {
+    nonisolated static func overlaySignature(prelude: String?, patches: [OverlayPatch], together: Bool = false,
+                                            fill: Fills, package: URL) -> String {
         var parts = ["overlay format \(overlayFormatVersion)", prelude ?? ""]
+        if together { parts.append("together") }
         parts += patches.map { [$0.file, $0.find, $0.replace, $0.pattern ? "pattern" : "text"].joined(separator: "\u{0}") }
         parts += [fill.language, fill.webLocks, fill.webLocksMark, contentScriptsFirst]
         parts.append(backgroundDigest(in: package))
@@ -1775,9 +1874,14 @@ extension ExtensionStore {
 
     /// The overlay, made afresh unless it's already the one `signature` describes; the package itself if it can't be.
     nonisolated private static func makeOverlay(_ overlay: URL, from package: URL, prelude: String?, patches: [OverlayPatch],
-                                                signature: String, fill: Fills, id: String) -> URL? {
+                                                together: Bool, signature: String, fill: Fills, id: String) -> URL? {
         let marker = overlay.appendingPathComponent("zigzag-profile.txt")
         if (try? String(contentsOf: marker, encoding: .utf8)) == signature { return overlay }
+        var patches = patches
+        if together, !patchesFit(patches, in: package) {
+            ExtensionLog.write("patches for \(id) skipped: this version changed")
+            patches = []
+        }
         try? FileManager.default.removeItem(at: overlay.deletingLastPathComponent())
         guard linkTree(from: package, to: overlay) else { return package }
         if let prelude {
@@ -1792,6 +1896,21 @@ extension ExtensionStore {
         fillLanguage(in: overlay, fill: fill)
         try? signature.write(to: marker, atomically: true, encoding: .utf8)
         return overlay
+    }
+
+    /// Whether every patch still finds its text in the package, in the order they would apply.
+    nonisolated static func patchesFit(_ patches: [OverlayPatch], in package: URL) -> Bool {
+        for file in Array(NSOrderedSet(array: patches.map(\.file))) as? [String] ?? [] {
+            guard var text = try? String(contentsOf: package.appendingPathComponent(file), encoding: .utf8) else { return false }
+            for patch in patches where patch.file == file {
+                guard let changed = patched(text, by: patch) else {
+                    ExtensionLog.write("patch for \(file) didn't fit: \(patch.find.prefix(80))")
+                    return false
+                }
+                text = changed
+            }
+        }
+        return true
     }
 
     /// The loaded copy's folder, where Zigzag may add files of its own (user scripts' code). Nil when WebKit loads the
