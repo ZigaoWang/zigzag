@@ -31,6 +31,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 扩展的地址栏关键词可以用了，比如 Raindrop.io 的“rd”。在命令栏里输入关键词，再按空格或 Tab：输入框前面会显示扩展的名称，接下来输入的内容会交给这个扩展，它给出的建议显示在下面。按 Return 交给扩展处理，⌘Return 在后台的新标签页中打开，⌘⇧Return 或 ⌥Return 在前台的新标签页中打开。按 Esc，或者什么都没输入时按删除键，就会退出关键词。两个扩展用了同一个关键词时，先安装的那个优先。在无痕浏览窗口中，只有允许在那里使用的扩展的关键词有效。“设置 › 扩展”里不会再提示关键词无法使用。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
 
 ### 修复
+- 在磨砂玻璃的空间里，120 Hz 屏幕上的滚动和动画流畅了。以前这种空间的窗口是透明的，而 macOS 每秒只把透明窗口上屏 80 次，所以滚动一顿一顿的；现在只有透明玻璃需要透明窗口，磨砂空间看起来不变，并按屏幕的完整刷新率上屏。感谢 [FammasMaz](https://github.com/FammasMaz)。([#394](https://github.com/ZigaoWang/zigzag/issues/394))
 - 按住 ⇧ 点链接仍然交给网页处理，所以在一排本身是链接的行上按住 ⇧ 选取一段，和以前一样好用；但网页如果随后把当前标签页送到这个链接，比如 GitHub 的文件列表，它会在“速览”卡片中打开，不再移动当前标签页。按住 ⌥ 也一样：网页原本会跳转的链接改为下载。感谢 [Lakeland97](https://github.com/Lakeland97)。([#322](https://github.com/ZigaoWang/zigzag/issues/322))
 - Zigzag 启动后第一次按 ⌘, 会马上打开设置，不再要等好几秒。以前打开设置时会把每个部分要列的内容都读一遍，比如网站数据、扩展和已安装的 App；现在只在你第一次打开某个部分或搜索时才读取。感谢 [Lakeland97](https://github.com/Lakeland97)。([#357](https://github.com/ZigaoWang/zigzag/issues/357))
 - 固定标签页收起时，打开着的固定页面会显示在所在文件夹的名字下面，和展开时一样缩进，而不是一个个单独列出。以前收起时固定一个分组，看起来像散成了几个单独的固定标签页；现在会显示成它那一个文件夹。没有打开页面的文件夹仍然隐藏。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
