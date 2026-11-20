@@ -364,26 +364,28 @@ struct SystemPasswordsTests {
         var outcome: SystemPasswordPicker.Outcome?
         let rect = NSRect(x: 0, y: 0, width: 200, height: 30)
         // Taken away by hand.
+        // Each request first closes whatever was left open, then closes its own as it ends.
         tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
-        tracked.cancel()
         #expect(dismissed == 1)
+        tracked.cancel()
+        #expect(dismissed == 2)
         // Escape.
         tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         let editor = try #require(tracked.passwordField.currentEditor() as? NSTextView)
         #expect(tracked.control(tracked.passwordField, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:))))
-        #expect(dismissed == 2)
+        #expect(dismissed == 4)
         // A login picked.
         tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         tracked.passwordField.stringValue = "fake-pass"
         tracked.fieldsDidChange()
         try await wait(0.4)
         guard case .filled = outcome else { Issue.record("expected a fill, got \(String(describing: outcome))"); return }
-        #expect(dismissed == 3)
+        #expect(dismissed == 6)
         // Left open.
         tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         try await wait(1)
         guard case .cancelled(.timedOut) = outcome else { Issue.record("expected a timeout, got \(String(describing: outcome))"); return }
-        #expect(dismissed == 4)
+        #expect(dismissed == 8)
         #expect(window.firstResponder === stand)
     }
 
@@ -450,22 +452,23 @@ struct SystemPasswordsTests {
         let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: { dismissed += 1 })
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
         picker.cancel()
-        #expect(dismissed == 1)
+        #expect(dismissed == 2)
         NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
         try await wait(0.1)
-        #expect(dismissed == 2)
+        #expect(dismissed == 3)
         // Opened again: the new list is left alone.
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
+        #expect(dismissed == 4)
         NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
         try await wait(0.1)
-        #expect(dismissed == 2)
+        #expect(dismissed == 4)
         picker.cancel()
-        #expect(dismissed == 3)
+        #expect(dismissed == 5)
         // And only for a moment.
         try await wait(SystemPasswordPicker.reshowGuardTime + 0.3)
         NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
         try await wait(0.1)
-        #expect(dismissed == 3)
+        #expect(dismissed == 5)
     }
 
     @Test func theListClosesWhenTheWindowMovesOrResizes() async throws {
@@ -591,7 +594,7 @@ struct SystemPasswordsTests {
     @Test func appKitHasTheCallThatClosesItsAutoFill() throws {
         let type = try #require(NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type)
         #expect(type.responds(to: NSSelectorFromString("sharedInstance")))
-        #expect(type.instancesRespond(to: NSSelectorFromString("_dismissAutoFill")))
+        #expect(SystemPasswordPicker.dismissSelectors.allSatisfy { type.instancesRespond(to: $0) })
         // With nothing showing, it does nothing.
         SystemPasswordPicker.dismissSystemAutoFill()
     }
@@ -612,7 +615,8 @@ struct SystemPasswordsTests {
             let editor = try #require(picker.passwordField.currentEditor() as? NSTextView)
             _ = picker.control(picker.passwordField, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:)))
             guard case .cancelled(.dismissed) = outcome else { Issue.record("round \(round): expected dismissed"); return }
-            #expect(dismissed == round)
+            // Closed as it opened and as it ended: nothing from one round is left for the next (#378).
+            #expect(dismissed == round * 2)
             #expect(!picker.isPresented)
             #expect(window.firstResponder === stand)
         }

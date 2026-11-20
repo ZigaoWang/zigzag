@@ -112,6 +112,8 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
                  ask: @escaping @MainActor (NSTextField) -> Bool = SystemPasswordPicker.askSystem, completion: @escaping (Outcome) -> Void) {
         if isPresented { finish(.cancelled(.replaced)) }
         endReshowGuard()
+        // Whatever AppKit still has open from before is closed first, so every request starts clean (#378).
+        dismissSystem()
         self.completion = completion
         restoreTo = responder
         opened = false
@@ -177,11 +179,15 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     /// AppKit's AutoFill panel and suggestion outlive the fields they were opened for, and come back each time the
     /// window becomes key, so they're closed with the fields. Private, so only where AppKit has it.
     static func dismissSystemAutoFill() {
-        let shared = NSSelectorFromString("sharedInstance"), dismiss = NSSelectorFromString("_dismissAutoFill")
+        let shared = NSSelectorFromString("sharedInstance")
         guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
-              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.responds(to: dismiss) else { return }
-        controller.perform(dismiss)
+              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject else { return }
+        for selector in dismissSelectors where controller.responds(to: selector) { controller.perform(selector) }
     }
+
+    /// The suggestion under a field, then the Passwords panel. AppKit closes the panel itself only for a field that
+    /// lets go of the focus in a key window, and the window isn't key while the panel is in front (#378).
+    static let dismissSelectors = [NSSelectorFromString("_dismissAutoFill"), NSSelectorFromString("_hideAutoFillPanel")]
 
     /// Takes the fields away with nothing filled.
     func cancel() {
