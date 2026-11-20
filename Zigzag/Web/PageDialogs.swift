@@ -88,12 +88,19 @@ enum PageDialogs {
 }
 
 /// HTTP authentication (basic/digest) and client certificate prompts.
-/// Sites whose certificate you chose to trust anyway, from the warning page. Until Zigzag quits, as Safari does, and
-/// never longer than `lifetime`, as Chrome's are. Kept per website data store, so a private window's choices stay in
-/// that window and go when it does.
+/// Sites whose certificate you chose to trust anyway, from the warning page. A choice for a local server (a NAS, a
+/// container on this Mac's network) is remembered in Settings › Developer until its certificate changes or you remove
+/// it. Every other choice lasts until Zigzag quits, as Safari's do, and never longer than `lifetime`, as Chrome's.
+/// Kept per website data store, so a private window's choices stay in that window and go when it does.
 @MainActor enum CertificateExceptions {
     /// How long a choice lasts at most, if Zigzag is left open that long.
     static let lifetime: TimeInterval = 24 * 60 * 60
+
+    /// A remembered choice changed: Settings › Developer's list follows.
+    static let changed = Signal<Void>()
+
+    /// Where remembered local certificates are kept; tests use their own.
+    static var defaults: UserDefaults = .standard
 
     /// The one certificate a host may show, and until when.
     private final class Exception {
@@ -106,6 +113,114 @@ enum PageDialogs {
     /// chose to trust, not whatever that host shows next.
     private static let trusted = NSMapTable<WKWebsiteDataStore, NSMutableDictionary>.weakToStrongObjects()
 
+    /// Local servers whose certificate you chose to trust for good, by host and port, as base64. A private window
+    /// never reads or writes them, so its choices still go with it. One list for the whole app: Chromium and Firefox
+    /// keep their exceptions per profile. A future PR can store these per profile, with the profile named on each row,
+    /// if that isolation is wanted.
+    private static let rememberedKey = "TrustedCertificates"
+
+    /// A local server whose certificate is trusted across launches: one web address, not one host with every port.
+    struct RememberedSite: Equatable {
+        let host: String
+        let port: Int
+        var name: String { CertificateExceptions.name(host: host, port: port) }
+    }
+
+    private static func key(host: String, port: Int) -> String { "\(host.lowercased())|\(port)" }
+
+    private static func host(of key: String) -> String? {
+        key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init)
+    }
+
+    /// How a remembered server is named in Settings › Developer, as a page's address names it.
+    static func name(host: String, port: Int) -> String {
+        let host = host.lowercased()
+        return (host.contains(":") ? "[\(host)]" : host) + ":\(port)"
+    }
+
+    private static var remembered: [String: String] {
+        get { defaults.dictionary(forKey: rememberedKey)?.compactMapValues { $0 as? String } ?? [:] }
+        set {
+            if newValue.isEmpty { defaults.removeObject(forKey: rememberedKey) }
+            else { defaults.set(newValue, forKey: rememberedKey) }
+        }
+    }
+
+    /// The local servers whose certificate is trusted across launches, as Settings › Developer lists them.
+    static var rememberedSites: [RememberedSite] {
+        remembered.keys.compactMap { key in
+            let parts = key.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2, let port = Int(parts[1]) else { return nil }
+            return RememberedSite(host: String(parts[0]), port: port)
+        }.sorted { $0.name < $1.name }
+    }
+
+    /// Whether a choice for `host` in `store` should outlast this launch: only a local server, where a certificate
+    /// of its own is the norm, and never a private window.
+    static func mayRemember(host: String, in store: WKWebsiteDataStore) -> Bool {
+        guard store.isPersistent else { return false }
+        var parts = URLComponents()
+        parts.scheme = "https"
+        // An address with colons goes in brackets, as it does in a page's address.
+        parts.host = host.contains(":") && !host.hasPrefix("[") ? "[\(host)]" : host
+        guard let url = parts.url else { return false }
+        return ErrorPage.isOnThisMac(url) || IconAddress.isLocal(url)
+    }
+
+    /// Forgets one remembered certificate, in every window. The site's warning comes back the next time it loads.
+    static func forgetRemembered(_ site: RememberedSite) { forgetRemembered(host: site.host, port: site.port) }
+
+    static func forgetRemembered(host: String, port: Int) {
+        var kept = remembered
+        let had = kept.removeValue(forKey: key(host: host, port: port)) != nil
+        if had { remembered = kept }
+        forgetSession(host: host, port: port)
+        if had { changed.send() }
+    }
+
+    /// Whether `host` is `site` or covered by it, as site data's names cover subdomains and a parent domain.
+    private static func covered(_ host: String, by site: String) -> Bool {
+        host == site || host.hasSuffix("." + site) || site.hasSuffix("." + host)
+    }
+
+    private static func remember(_ host: String, port: Int, certificate: Data) {
+        var kept = remembered
+        kept[key(host: host, port: port)] = certificate.base64EncodedString()
+        remembered = kept
+        changed.send()
+    }
+
+    private static func rememberedCertificate(for host: String, port: Int) -> Data? {
+        remembered[key(host: host, port: port)].flatMap { Data(base64Encoded: $0) }
+    }
+
+    private static func forgetSession(site: String?) {
+        guard let site else {
+            trusted.removeAllObjects()
+            return
+        }
+        for store in stores {
+            guard let hosts = trusted.object(forKey: store) else { continue }
+            for case let key as String in hosts.allKeys {
+                guard let host = host(of: key), covered(host, by: site) else { continue }
+                hosts.removeObject(forKey: key)
+            }
+        }
+    }
+
+    private static func forgetSession(host: String, port: Int) {
+        let siteKey = key(host: host, port: port)
+        for store in stores { (trusted.object(forKey: store))?.removeObject(forKey: siteKey) }
+    }
+
+    /// The stores that have a choice in memory, without keeping one alive.
+    private static var stores: [WKWebsiteDataStore] {
+        var stores: [WKWebsiteDataStore] = []
+        let enumerator = trusted.keyEnumerator()
+        while let store = enumerator.nextObject() as? WKWebsiteDataStore { stores.append(store) }
+        return stores
+    }
+
     /// Whether the warning may offer "Visit anyway": only with the certificate it's about in hand, the one choice
     /// is for, and never for a site that asked to be reached only securely (HSTS), as in Chrome.
     static func mayOffer(certificate: Data?, strictTransport: Bool) -> Bool {
@@ -113,54 +228,80 @@ enum PageDialogs {
         return !strictTransport
     }
 
-    /// Trusts `certificate` for `host` in `store`. Refused without a certificate: an empty one would stand for any.
+    /// Trusts `certificate` for `host:port` in `store`. Refused without a certificate: an empty one would stand for
+    /// any. A local server's choice is remembered across launches; any other's lasts this session.
     @discardableResult
-    static func allow(_ host: String, certificate: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
+    static func allow(_ host: String, port: Int = 443, certificate: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
         guard let certificate, !certificate.isEmpty, !host.isEmpty else { return false }
+        let host = host.lowercased()
+        let siteKey = key(host: host, port: port)
         let hosts = trusted.object(forKey: store) ?? NSMutableDictionary()
-        hosts[host.lowercased()] = Exception(leaf: certificate, until: now.addingTimeInterval(lifetime))
+        hosts[siteKey] = Exception(leaf: certificate, until: now.addingTimeInterval(lifetime))
         trusted.setObject(hosts, forKey: store)
+        if mayRemember(host: host, in: store) { remember(host, port: port, certificate: certificate) }
         return true
     }
 
-    static func allows(_ host: String, trust: SecTrust, in store: WKWebsiteDataStore) -> Bool {
-        allows(host, leaf: leaf(of: trust), in: store)
+    static func allows(_ host: String, port: Int = 443, trust: SecTrust, in store: WKWebsiteDataStore) -> Bool {
+        allows(host, port: port, leaf: leaf(of: trust), in: store)
     }
 
-    /// Whether `leaf` is the certificate you chose to trust for `host`, and the choice still holds.
-    static func allows(_ host: String, leaf: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
-        guard let leaf, !leaf.isEmpty, let hosts = trusted.object(forKey: store),
-              let exception = hosts[host.lowercased()] as? Exception else { return false }
-        return now < exception.until && exception.leaf == leaf
+    /// Whether `leaf` is the certificate you chose to trust for `host:port`, and the choice still holds. A local
+    /// server's remembered choice has no time limit; it ends when its certificate changes or you remove it. None holds
+    /// once the host is known for HSTS, which covers every port, as in Chrome.
+    static func allows(_ host: String, port: Int = 443, leaf: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
+        guard let leaf, !leaf.isEmpty, !StrictTransport.isKnown(host, in: store, now: now) else { return false }
+        if let exception = trusted.object(forKey: store)?[key(host: host, port: port)] as? Exception,
+           now < exception.until, exception.leaf == leaf { return true }
+        return store.isPersistent && rememberedCertificate(for: host, port: port) == leaf
     }
 
     /// Whether the shown page was loaded through a certificate trusted from the warning page.
     static func isShowingException(in webView: WKWebView?) -> Bool {
         guard let webView, let url = webView.url, url.scheme?.lowercased() == "https", let host = url.host(),
               let trust = webView.serverTrust else { return false }
-        return wasTrusted(host, leaf: leaf(of: trust), in: webView.configuration.websiteDataStore)
+        return wasTrusted(host, port: url.port ?? 443, leaf: leaf(of: trust), in: webView.configuration.websiteDataStore)
     }
 
-    /// Whether you trusted `leaf` for `host`, even if that has since expired: a page still showing it isn't secure.
-    static func wasTrusted(_ host: String, leaf: Data?, in store: WKWebsiteDataStore) -> Bool {
-        guard let leaf, !leaf.isEmpty, let exception = trusted.object(forKey: store)?[host.lowercased()] as? Exception else { return false }
-        return exception.leaf == leaf
+    /// Whether you trusted `leaf` for `host:port`, even if that has since expired: a page still showing it isn't secure.
+    static func wasTrusted(_ host: String, port: Int = 443, leaf: Data?, in store: WKWebsiteDataStore) -> Bool {
+        guard let leaf, !leaf.isEmpty else { return false }
+        if let exception = trusted.object(forKey: store)?[key(host: host, port: port)] as? Exception { return exception.leaf == leaf }
+        return store.isPersistent && rememberedCertificate(for: host, port: port) == leaf
     }
 
-    /// Whether `host` has a choice to trust a certificate in `store` (it may be the one it shows, or not).
-    static func hasException(for host: String, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
-        guard let exception = trusted.object(forKey: store)?[host.lowercased()] as? Exception else { return false }
-        return now < exception.until
+    /// Whether `host:port` has a choice to trust a certificate in `store` (it may be the one it shows, or not).
+    static func hasException(for host: String, port: Int = 443, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
+        if let exception = trusted.object(forKey: store)?[key(host: host, port: port)] as? Exception, now < exception.until { return true }
+        return store.isPersistent && rememberedCertificate(for: host, port: port) != nil
     }
 
-    /// Clears choices after site data is cleared: all, or one site's (its subdomains and parent domains).
+    /// Clears choices after site data is cleared: all, or one site's (its subdomains and parent domains, on every
+    /// port). A private window's own data never clears a normal window's remembered local servers.
     static func forget(in store: WKWebsiteDataStore, site: String? = nil) {
+        var forgotRemembered = false
+        if store.isPersistent {
+            if let site = site?.lowercased() {
+                var kept = remembered
+                for key in Array(kept.keys) {
+                    guard let host = host(of: key), covered(host, by: site) else { continue }
+                    kept.removeValue(forKey: key)
+                    forgotRemembered = true
+                }
+                if forgotRemembered { remembered = kept }
+            } else if !remembered.isEmpty {
+                defaults.removeObject(forKey: rememberedKey)
+                forgotRemembered = true
+            }
+        }
+        if forgotRemembered { changed.send() }
         guard let site = site?.lowercased() else {
             trusted.removeObject(forKey: store)
             return
         }
         guard let hosts = trusted.object(forKey: store) else { return }
-        for case let key as String in hosts.allKeys where key == site || key.hasSuffix("." + site) || site.hasSuffix("." + key) {
+        for case let key as String in hosts.allKeys {
+            guard let host = host(of: key), covered(host, by: site) else { continue }
             hosts.removeObject(forKey: key)
         }
     }
@@ -240,7 +381,8 @@ enum AuthenticationPrompt {
         let method = challenge.protectionSpace.authenticationMethod
         // A certificate you chose to trust on the warning page: accepted for this session.
         if method == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust,
-           CertificateExceptions.allows(challenge.protectionSpace.host, trust: trust, in: store) {
+           CertificateExceptions.allows(challenge.protectionSpace.host, port: challenge.protectionSpace.port,
+                                        trust: trust, in: store) {
             return (.useCredential, URLCredential(trust: trust))
         }
         // A development server on this Mac, asked for by a development page (Settings › Developer › Local Servers).
