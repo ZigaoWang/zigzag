@@ -1684,7 +1684,8 @@ final class MenuPanel: FloatingPanelView {
     }
 
     /// Where it opens: with item `index` right over the control, its text `textInset` from the control's edge, as a
-    /// pop-up button's menu does (below it when there's no room); under the control, as a button's menu does; above
+    /// pop-up button's menu does (below it when there's no room); under the control, as a button's menu does (its
+    /// trailing edge lined up with the control's when the control is in the window's right half); above
     /// it with their trailing edges lined up, for a button at the bottom of the window (the sidebar's +); or with its
     /// top left corner at a point in the window, as a right-click's menu opens under the pointer.
     enum Placement { case over(Int, textInset: CGFloat), below, aboveTrailing, at(NSPoint) }
@@ -1848,6 +1849,8 @@ final class MenuPanel: FloatingPanelView {
                 growsY = min(max((maxY - a.midY) / height, 0), 1)
             }
         case .below:
+            // A button on the right opens its menu inward, so it never hangs past the button's end.
+            if a.midX > area.midX { x = a.maxX - width }
             if fits(a.minY - Tokens.Space.x1) {
                 maxY = a.minY - Tokens.Space.x1
             } else if fits(a.maxY + Tokens.Space.x1 + height) {

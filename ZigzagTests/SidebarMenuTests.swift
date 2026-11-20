@@ -119,6 +119,24 @@ struct SidebarMenuTests {
         #expect(MenuPanel.current == nil)
     }
 
+    @Test func aButtonsMenuOpensInwardFromTheRightHalf() throws {
+        let (_, left) = host()
+        let leftMenu = try #require(MenuPanel.show(entries { _ in }, from: left))
+        let leftFrame = leftMenu.convert(leftMenu.bounds, to: nil), leftButton = left.convert(left.bounds, to: nil)
+        leftMenu.close(animated: false)
+        #expect(abs(leftFrame.minX - leftButton.minX) < 0.5)
+
+        let (window, _) = host()
+        let right = NSView(frame: NSRect(x: 680, y: 500, width: 110, height: 28))
+        window.contentView?.addSubview(right)
+        let rightMenu = try #require(MenuPanel.show(entries { _ in }, from: right))
+        defer { rightMenu.close(animated: false) }
+        let frame = rightMenu.convert(rightMenu.bounds, to: nil), button = right.convert(right.bounds, to: nil)
+        #expect(abs(frame.maxX - button.maxX) < 0.5)
+        #expect(abs(frame.maxY - (button.minY - Tokens.Space.x1)) < 0.5)
+        #expect(frame.maxX <= 800)
+    }
+
     @Test func isAMenuOfMenuItemsForVoiceOver() throws {
         let (_, anchor) = host()
         let menu = try #require(MenuPanel.show(entries { _ in }, from: anchor, placement: .aboveTrailing))
