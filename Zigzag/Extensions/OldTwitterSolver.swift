@@ -42,7 +42,8 @@ final class OldTwitterSolver: NSObject {
       const api = globalThis.chrome || globalThis.browser;
       const nativeFetch = window.fetch;
       try {
-        Object.defineProperty(window, "fetch", { configurable: true, value: async (input, options) => {
+        // Writable, so OldTwitter's own `fetch = ...` that signs requests still takes, whichever script runs first.
+        Object.defineProperty(window, "fetch", { configurable: true, writable: true, value: async (input, options) => {
           const response = await nativeFetch.call(window, input, options);
           const url = typeof input === "string" ? input : (input && input.url) || "";
           if (!/^webkit-extension:/i.test(url) || !/[.](html|css)([?#]|$)/i.test(url)) return response;
