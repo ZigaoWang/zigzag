@@ -1420,7 +1420,7 @@ extension ExtensionStore {
     }
 
     /// Writer format version, part of the signature so older markers rebuild once even if their text matches.
-    nonisolated static let overlayFormatVersion = 2
+    nonisolated static let overlayFormatVersion = 3
 
     /// The manifest's background section plus a background page's bytes. Stable until the extension's files change.
     nonisolated private static func backgroundDigest(in package: URL) -> String {
@@ -1640,22 +1640,21 @@ extension ExtensionStore {
     /// Writes the loaded copy's manifest and the files its background needs first. False when the manifest is unreadable or
     /// points outside the package; WebKit then loads the package directly.
     ///
-    /// - `background.service_worker`: `zigzag-entry.js` runs the prelude, then the worker.
+    /// - `background.service_worker`: `zigzag-entry.js`, beside the worker, runs the prelude, then the worker.
     /// - `background.page`: copied with a prelude script before its first script; the key stays.
     /// - `background.scripts`: prelude first, then the scripts in order.
     /// - No background: the manifest is still written so patches and the language fill reach content scripts and pages.
     nonisolated static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
         guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
               var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
-        var entry: String?
+        var entry: (path: String, text: String)?
         var page: (path: String, text: String)?
         if var background = manifest["background"] as? [String: Any] {
             if let worker = background["service_worker"] as? String {
                 guard let path = packagePath(worker) else { return false }
-                entry = (background["type"] as? String) == "module"
-                    ? "import './zigzag-prelude.js';\nimport './\(path)';\n"
-                    : "importScripts('zigzag-prelude.js', '\(path)');\n"
-                background["service_worker"] = "zigzag-entry.js"
+                let made = workerEntry(for: path, module: (background["type"] as? String) == "module")
+                entry = made
+                background["service_worker"] = made.path
             } else if let pageFile = background["page"] as? String {
                 guard let path = packagePath(pageFile),
                       let html = try? String(contentsOf: package.appendingPathComponent(path), encoding: .utf8) else { return false }
@@ -1699,7 +1698,12 @@ extension ExtensionStore {
         do {
             try out.write(to: overlay.appendingPathComponent("manifest.json"))
             try prelude.write(to: overlay.appendingPathComponent("zigzag-prelude.js"), atomically: true, encoding: .utf8)
-            if let entry { try entry.write(to: overlay.appendingPathComponent("zigzag-entry.js"), atomically: true, encoding: .utf8) }
+            if let entry {
+                let target = overlay.appendingPathComponent(entry.path)
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? FileManager.default.removeItem(at: target)
+                try entry.text.write(to: target, atomically: true, encoding: .utf8)
+            }
             if let page {
                 let target = overlay.appendingPathComponent(page.path)
                 try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1726,6 +1730,19 @@ extension ExtensionStore {
         }
         let tags = scripts.map { "<script\(modules ? " type=\"module\"" : "") src=\"/\(escaped($0))\"></script>" }
         return "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n<body>\n" + tags.joined(separator: "\n") + "\n</body>\n"
+    }
+
+    /// The worker's entry script, in the worker's own folder, so its relative `importScripts` and `fetch` resolve
+    /// against the worker's address as in Chrome (#393). The prelude stays at the package root.
+    nonisolated static func workerEntry(for path: String, module: Bool) -> (path: String, text: String) {
+        let folder = (path as NSString).deletingLastPathComponent
+        let file = (path as NSString).lastPathComponent
+        let prelude = folder.isEmpty ? "zigzag-prelude.js" : "/zigzag-prelude.js"
+        let quoted = { (text: String) in "'" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'") + "'" }
+        let text = module
+            ? "import \(quoted(folder.isEmpty ? "./" + prelude : prelude));\nimport \(quoted("./" + file));\n"
+            : "importScripts(\(quoted(prelude)), \(quoted(file)));\n"
+        return (folder.isEmpty ? "zigzag-entry.js" : folder + "/zigzag-entry.js", text)
     }
 
     /// A background page with a prelude script before its first script. Bytes, CSP and order are unchanged; the prelude
