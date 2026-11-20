@@ -63,6 +63,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 像 SingleFile 这样的扩展，可以把它在自己的隐藏页面里生成的网页保存下来了。扩展用 blob 地址生成的文件，以前是从 Zigzag 自己的页面开始下载的，WebKit 不允许那个页面读取它，下载就中断了，扩展会把它当成错误提示出来。现在下载从扩展自己的页面开始，能照常保存。感谢 [datarip](https://github.com/datarip)。
 - 网站在页面上弹出的询问，比如带“好”和“取消”的“github.com 提示”、登录框或选择证书，现在会跟着下面的网页变成浅色或深色，和摄像头、位置的请求卡片一样。以前在浅色的空间里，深色网站弹出的询问还是白色的；询问显示时网页变了，它也会跟着变。感谢 [Lakeland97](https://github.com/Lakeland97)。([#300](https://github.com/ZigaoWang/zigzag/issues/300))
 - Passbolt 能正常启动了，点按它的工具栏按钮也有反应了。有些扩展的后台放在一个文件夹里，并按名称载入同一文件夹里的其他脚本，Passbolt 就是这样。在 Zigzag 里它们找不到这些脚本，后台一直没能启动，点按按钮也就没反应。现在它们会从后台自己的文件夹载入，和在 Chrome 里一样。感谢 [bkonia](https://github.com/bkonia)。([#393](https://github.com/ZigaoWang/zigzag/issues/393))
+- 全屏不太会再卡在一半了（窗口能被拖动、也看不到窗口按钮）。macOS 还在把窗口切进或切出全屏时，Zigzag 不再去挪窗口按钮；如果 macOS 没能进入全屏，窗口会恢复平常的标题栏和按钮。感谢 [Lakeland97](https://github.com/Lakeland97)。([#401](https://github.com/ZigaoWang/zigzag/issues/401))
 
 ## [0.9.3] - 2026-11-18
 
