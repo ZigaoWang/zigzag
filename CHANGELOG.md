@@ -26,6 +26,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Clicking the address in a split view page's strip edits it in a field the address's own size and place, light or dark with the page, as in Zigzag Mini's strip. It used to open as a taller white box over the strip's buttons, whatever the page's color.
 - Clicking a pop-up window's address shows it selected in the same address field as Zigzag Mini's and split view's strips, with the same type and selection color, instead of as plain text.
 - A swipe back or forward taps the trackpad once when the arrow fills, however fast you swipe. At a medium speed the arrow could fill and empty over and over near the point where letting go goes back, tapping each time. Once filled, it now stays filled until you swipe a little way back or stop short after a flick, and letting go does what the arrow shows. Thanks to [frarees](https://github.com/frarees). ([#377](https://github.com/ZigaoWang/zigzag/issues/377))
+- OldTwitter works on x.com again. Its request signing uses a sandbox page that X's security policy blocks in WebKit. Zigzag now runs the extension's own sandbox script in a content world of its own, with no extension APIs, so the site's policy is left alone. Its icons and fonts load again too: the extension's pages name their own files with Chrome's `chrome-extension://` address, which Zigzag reads as its own. Thanks to [datarip](https://github.com/datarip). ([#417](https://github.com/ZigaoWang/zigzag/issues/417))
 
 ## [0.9.3] - 2026-11-18
 
