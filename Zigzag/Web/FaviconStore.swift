@@ -1,7 +1,7 @@
 import AppKit
 import ImageIO
 
-/// Site icons, cached in memory and on disk by host.
+/// Site icons, cached in memory and on disk by site: its host, and the port when it isn't the scheme's own.
 final class FaviconStore {
     static let shared = FaviconStore()
 
@@ -56,21 +56,36 @@ final class FaviconStore {
             .fetch(URLRequest(url: icon), configuration: configuration)
     }
 
-    /// Fires with the host whose icon changed.
+    /// Fires with the site whose icon changed.
     let updated = Signal<String>()
 
     /// The site an icon is kept for: what `updated` sends when one arrives, so a view can tell whether it's its own.
     nonisolated func iconKey(for url: URL?) -> String? { url.flatMap(key(for:)) }
 
-    nonisolated private func key(for url: URL) -> String? {
+    /// A site's icons are kept apart by port as well as by host: two services on one address, each on its own port,
+    /// each have their own icon. The port a scheme uses by default is left out, so `example.com` and
+    /// `example.com:443` stay one site.
+    nonisolated static func siteKey(for url: URL) -> String? {
         guard let host = url.host()?.lowercased() else { return nil }
-        let site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        var site = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        if let port = url.port, port > 0, port != defaultPort(for: url.scheme) { site += ":\(port)" }
         // Google runs separate apps under one host, each with its own icon: Maps mustn't become Search's icon.
-        if site == "google.com", let app = url.pathComponents.dropFirst().first?.lowercased(), Self.googleApps.contains(app) {
+        if let app = url.pathComponents.dropFirst().first?.lowercased(), site == "google.com" || site.hasPrefix("google.com:"),
+           Self.googleApps.contains(app) {
             return site + "/" + app
         }
         return site
     }
+
+    nonisolated private static func defaultPort(for scheme: String?) -> Int? {
+        switch scheme?.lowercased() {
+        case "http": 80
+        case "https": 443
+        default: nil
+        }
+    }
+
+    nonisolated private func key(for url: URL) -> String? { Self.siteKey(for: url) }
 
     nonisolated private static let googleApps: Set<String> = ["maps", "travel", "flights", "finance", "shopping", "books", "earth"]
 

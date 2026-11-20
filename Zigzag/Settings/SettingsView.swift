@@ -1087,6 +1087,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var heldLayouts = 0
     private var layoutIsWanted = false
     private var shortcutGroups: [(String, FormGroup)] = []
+    private var listedShortcuts: [String] = []
 
     private let engine = DropdownButton()
     /// The engines extensions give, listed after Zigzag's own, in the order the menu shows them.
@@ -1122,6 +1123,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }()
     private let newTabPlace = DropdownButton()
     private var newTabRow: FormRow!
+    private let controlTabOrder = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
     private let shareTabsToggle = Toggle()
@@ -1229,6 +1231,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
     private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Install from File…", comment: "Button in Settings › Extensions: installs an extension from a folder or a Firefox package file (.xpi) on this Mac."))
+    private let checkUpdatesButton = PillButton(title: String(localized: "Check for Updates", comment: "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now."))
     private var spaceRows: [SpaceSettingsRow] = []
     /// Download rule rows in order with their rule ids, for drag reordering.
     private var downloadRuleRows: [(id: UUID, row: DraggableRow)] = []
@@ -1436,10 +1439,12 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                                    control: developerToolsToggle)
         developerToolsGroup.add(developerRow)
         developerBarToggle.onChange = { on in DeveloperTools.showsInBar = on }
-        developerToolsGroup.add(FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a site in Developer Mode, the developer tools are in the bar above the page, with its full address."),
-                                        detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
-                                                       comment: "Explanation under “Tools above the page” in Settings › Developer."),
-                                        control: developerBarToggle))
+        let developerBarRow = FormRow(title: String(localized: "Tools above the page", comment: "A setting in Settings › Developer: on a site in Developer Mode, the developer tools are in the bar above the page, with its full address."),
+                                      detail: String(localized: "In the bar above a page in Developer Mode: its full address, the console, inspecting an element, the page’s look and size, and more. Off, they’re in the site’s controls.",
+                                                     comment: "Explanation under “Tools above the page” in Settings › Developer."),
+                                      control: developerBarToggle)
+        developerBarRow.keywords = String(localized: "toolbar top bar tools buttons copy link console inspect dark light page size reload developer bar", comment: "Words that find the Tools above the page setting with Find a setting in Settings. Not shown.")
+        developerToolsGroup.add(developerBarRow)
         developerTrustToggle.onChange = { on in DeveloperTools.trustsLocalServers = on }
         localServersGroup.add(FormRow(title: String(localized: "Trust certificates of servers on this Mac", comment: "A setting in Settings › Developer, under Local Servers: a development site served from this Mac over https with a certificate of its own opens without the warning."),
                                       detail: String(localized: "A development site at localhost or 127.0.0.1 that uses its own certificate for https opens without the warning. Only for servers on this Mac, and only the certificate first shown.",
@@ -1642,6 +1647,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         newTabRow.keywords = String(localized: "new tab homepage home page start page position order same site domain group organize", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
         tabsGroup.add(newTabRow)
         refreshNewTabPlace()
+        controlTabOrder.options = TabSwitcher.Order.allCases.map { order in
+            let title = switch order {
+            case .recent: String(localized: "Recent Tabs", comment: "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab shows the tabs you used last, most recent first.")
+            case .sidebar: String(localized: "Next Tab in the Sidebar", comment: "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab goes to the tab below in the sidebar, as in Chrome.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        controlTabOrder.onSelect = { index in TabSwitcher.order = TabSwitcher.Order.allCases[index] }
+        let controlTabRow = FormRow(title: String(localized: "⌃Tab switches to", comment: "A setting in Settings › Tabs: what Control-Tab does. ⌃ is the Control key. Followed by Recent Tabs or Next Tab in the Sidebar."),
+                                    detail: String(localized: "Recent Tabs shows the tabs you used last, as ⌘Tab does with apps. ⌥⌘↓ and ⌥⌘↑ always go down and up the sidebar.",
+                                                   comment: "Explanation under “⌃Tab switches to” in Settings › Tabs. ⌘, ⌥ are the Command and Option keys."),
+                                    control: controlTabOrder)
+        controlTabRow.keywords = String(localized: "control tab ctrl tab switcher recent order next previous cycle keyboard shortcut chrome arc", comment: "Words that find the ⌃Tab switches to setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(controlTabRow)
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
         let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
                               detail: String(localized: "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
@@ -1811,6 +1830,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         // Extensions
         getExtensionsButton.onClick = { [weak self] _ in self?.getExtensions() }
         loadUnpackedButton.onClick = { [weak self] _ in self?.loadUnpacked() }
+        checkUpdatesButton.onClick = { [weak self] _ in self?.checkForUpdates() }
 
         // One search for everything, shortcuts included (by name or by keys).
         settingSearch.field.delegate = self
@@ -2005,7 +2025,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshTitle()
         if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
         readSoon([pane])
-        if pane == .shortcuts { reloadShortcuts() }
+        if pane == .shortcuts { readShortcuts() }
         if pane == .extensions { findAppExtensions() }
         layoutDocument()
         documentView.scroll(.zero)
@@ -2842,6 +2862,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Every shortcut, read from the menu bar itself so the list is always right.
     private func reloadShortcuts() {
         let timing = SettingsTiming.begin("reloadShortcuts"); defer { timing.end() }
+        counted("shortcuts")
+        listedShortcuts = shortcutsInMenu
         var groups: [(String, FormGroup)] = []
         for top in NSApp.mainMenu?.items ?? [] {
             guard let menu = top.submenu else { continue }
@@ -2876,6 +2898,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         shortcutGroups = groups
     }
 
+    /// Each shortcut's menu item, name and keys as the menus have them now: a row holds its item.
+    private var shortcutsInMenu: [String] {
+        Shortcuts.allItems.map { "\(ObjectIdentifier($0).hashValue) \($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue) \($0.isHidden)" }
+    }
+
+    /// Makes the rows again only when the menus' shortcuts changed, not at every key typed in the search.
+    private func readShortcuts() {
+        if listedShortcuts != shortcutsInMenu { reloadShortcuts() }
+    }
+
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === settingSearch.field { searchChanged() }
         if (obj.object as? NSTextField) === flagSearch.field { layoutDocument() }
@@ -2892,7 +2924,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         items.forEach { $0.isSelected = !isSearching && $0.pane == pane }
         moveSectionSelection(animated: false)
         refreshTitle()
-        reloadShortcuts()
+        readShortcuts()
         if isSearching { readSoon(SettingsPane.allCases) }
         // "Find a setting" finds sites by name too: the list is read if no pane with it has been shown yet.
         if isSearching, siteDataList.model == nil || siteDataList.model?.state == .idle { reloadSiteData() }
@@ -3284,7 +3316,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
         case .developer:
             section(nil, developerToolsGroup)
-            section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton)
+            // Sites rows are one line, while Page Sizes rows carry a second: lower this group so the first Remove
+            // button lines up with Page Sizes.
+            section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton, groupTopInset: 7)
             note(String(localized: "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too.", comment: "Under the list in Settings › Developer."))
             section(Self.localServersHeading, localServersGroup)
             section(Self.trustedCertificatesHeading, trustedCertificatesGroup, accessory: trustedCertificatesAddSite, groupTopInset: 7)
@@ -3358,8 +3392,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         case .extensions:
             // With nothing installed, the empty row already offers Get Extensions; once said is enough.
             getExtensionsButton.isHidden = !hasExtensions
+            checkUpdatesButton.isHidden = !hasExtensions
             let buttons: NSStackView = made("buttons") {
-                let buttons = NSStackView(views: [loadUnpackedButton, getExtensionsButton])
+                let buttons = NSStackView(views: [checkUpdatesButton, loadUnpackedButton, getExtensionsButton])
                 buttons.spacing = Tokens.Space.x2
                 return buttons
             }
@@ -3813,6 +3848,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         developerTrustToggle.isOn = DeveloperTools.trustsLocalServers
         refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
+        controlTabOrder.selectedIndex = TabSwitcher.Order.allCases.firstIndex(of: TabSwitcher.order) ?? 0
         refreshNewTabPlace()
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks
@@ -4695,6 +4731,27 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }
 
 
+    /// Checks every extension from the store now and says what came of it; one update that wants more access opens
+    /// its review sheet (#406).
+    private func checkForUpdates() {
+        guard checkUpdatesButton.isEnabled else { return }
+        let title = checkUpdatesButton.title
+        checkUpdatesButton.title = String(localized: "Checking…", comment: "The Check for Updates button in Settings › Extensions while it checks.")
+        checkUpdatesButton.isEnabled = false
+        layoutDocument()
+        Task { @MainActor [weak self] in
+            let check = await ExtensionStore.checkForUpdatesIfDue(force: true)
+            guard let self else { return }
+            checkUpdatesButton.title = title
+            checkUpdatesButton.isEnabled = true
+            layoutDocument()
+            Toast.show(check.summary, symbol: check.failed > 0 ? "exclamationmark.triangle" : "checkmark", duration: 4, over: self, area: bounds)
+            if check.waiting.count == 1, let id = check.waiting.first, let controller = browser {
+                controller.reviewExtensionUpdate(id)
+            }
+        }
+    }
+
     private func getExtensions() {
         guard let controller = browser else { return }
         controller.tabManager.newTab(url: ExtensionStore.webStoreURL)
@@ -4978,8 +5035,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private func finish(taken: NSMenuItem?) {
         stopRecording()
         let name = taken.map { $0.title.hasSuffix("…") ? String($0.title.dropLast()) : $0.title }
-        onChange?()
         if let name { ShortcutRow.lastTaken = (item, name) }
+        onChange?()
     }
 
     /// The last change that took keys from another command, said on the row once the list redraws.

@@ -1924,6 +1924,41 @@
         }
       }
     },
+    "%lld updates need your approval." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld update needs your approval."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld updates need your approval."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个更新需要你批准。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld zapped" : {
       "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.",
       "localizations" : {
@@ -2893,6 +2928,17 @@
         }
       }
     },
+    "All extensions are up to date." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when nothing changed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有扩展都已是最新版本。"
+          }
+        }
+      }
+    },
     "All in Zigzag" : {
       "comment" : "Welcome window’s import step, once everything came over.",
       "localizations" : {
@@ -3560,7 +3606,7 @@
       }
     },
     "At most %lld pins. Unpin one first." : {
-      "comment" : "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.",
+      "comment" : "Tooltip of the disabled Pin to Address item in an extension's menu, when the most extensions that can be pinned already are. The number is that limit.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5369,6 +5415,17 @@
         }
       }
     },
+    "Check for Updates" : {
+      "comment" : "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "comment" : "Button in Settings › General, beside Zigzag's version.\nZigzag menu item.",
       "localizations" : {
@@ -5414,7 +5471,7 @@
       }
     },
     "Checking…" : {
-      "comment" : "On the certificate page of the site panel, while the certificate is read.",
+      "comment" : "On the certificate page of the site panel, while the certificate is read.\nThe Check for Updates button in Settings › Extensions while it checks.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6843,6 +6900,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "以下扩展未能添加："
+          }
+        }
+      }
+    },
+    "Couldn’t check %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个扩展无法检查。"
+                }
+              }
+            }
           }
         }
       }
@@ -13072,6 +13164,17 @@
         }
       }
     },
+    "No extensions from the Chrome Web Store to check." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有来自 Chrome 网上应用店的扩展需要检查。"
+          }
+        }
+      }
+    },
     "No extensions yet" : {
       "comment" : "A setting in Settings › Extensions.",
       "localizations" : {
@@ -15344,7 +15447,7 @@
       }
     },
     "Pin to Address" : {
-      "comment" : "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: gives the extension a button in the address bar.",
+      "comment" : "Item in an extension's menu, and VoiceOver action of its tile in the site panel: gives the extension a button in the address bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -21609,7 +21712,7 @@
       }
     },
     "Unpin from Address" : {
-      "comment" : "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.",
+      "comment" : "Item in an extension's menu, and VoiceOver action of its tile in the site panel: takes the extension's button out of the address bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -21725,6 +21828,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新请求更多权限"
+          }
+        }
+      }
+    },
+    "Updated %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已更新 %lld 个扩展。"
+                }
+              }
+            }
           }
         }
       }
@@ -25219,6 +25357,105 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zigzag 会在新标签页中打开这个服务器。如果它的证书不受信任，请在警告页上选择“仍然访问此网站”。只有这台 Mac 上或你的网络中的服务器才能添加。"
+          }
+        }
+      }
+    },
+    "Close Split View" : {
+      "comment" : "Item in a tab's context menu in the sidebar, for a page of a split view: closes all its pages.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭整个分屏浏览"
+          }
+        }
+      }
+    },
+    "Recent Tabs" : {
+      "comment" : "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab shows the tabs you used last, most recent first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近用过的标签页"
+          }
+        }
+      }
+    },
+    "Next Tab in the Sidebar" : {
+      "comment" : "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab goes to the tab below in the sidebar, as in Chrome.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏里的下一个标签页"
+          }
+        }
+      }
+    },
+    "⌃Tab switches to" : {
+      "comment" : "A setting in Settings › Tabs: what Control-Tab does. ⌃ is the Control key. Followed by Recent Tabs or Next Tab in the Sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃Tab 切换到"
+          }
+        }
+      }
+    },
+    "Recent Tabs shows the tabs you used last, as ⌘Tab does with apps. ⌥⌘↓ and ⌥⌘↑ always go down and up the sidebar." : {
+      "comment" : "Explanation under “⌃Tab switches to” in Settings › Tabs. ⌘, ⌥ are the Command and Option keys.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“最近用过的标签页”按你用过的先后列出标签页，就像 ⌘Tab 切换 App。⌥⌘↓ 和 ⌥⌘↑ 总是在边栏里上下移动。"
+          }
+        }
+      }
+    },
+    "control tab ctrl tab switcher recent order next previous cycle keyboard shortcut chrome arc" : {
+      "comment" : "Words that find the ⌃Tab switches to setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "control tab ctrl tab 切换 最近 顺序 下一个 上一个 循环 键盘 快捷键 chrome arc"
+          }
+        }
+      }
+    },
+    "Hide Tools Above the Page" : {
+      "comment" : "View › Developer menu item: hides the bar of developer tools above a page in Developer Mode.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏页面上方的工具"
+          }
+        }
+      }
+    },
+    "Show Tools Above the Page" : {
+      "comment" : "View › Developer menu item: shows the bar of developer tools above a page in Developer Mode.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在页面上方显示工具"
+          }
+        }
+      }
+    },
+    "toolbar top bar tools buttons copy link console inspect dark light page size reload developer bar" : {
+      "comment" : "Words that find the Tools above the page setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具栏 顶栏 工具 按钮 拷贝链接 控制台 检查元素 深色 浅色 页面尺寸 重新载入 开发者 toolbar top bar tools console inspect"
           }
         }
       }

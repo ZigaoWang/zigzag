@@ -121,6 +121,32 @@ struct CRXPackageTests {
         #expect(!ExtensionStore.isVersion("1.0", newerThan: "1.0.0"))
         #expect(!ExtensionStore.isVersion("8.12.42.36", newerThan: "8.12.42.36"))
     }
+
+    @Test func readsTheStoresUpdateCheck() {
+        let app = { (check: String) in #"<gupdate><app appid="x" status="ok">"# + check + "</app></gupdate>" }
+        #expect(ExtensionStore.latestVersion(inUpdateCheck: app(#"<updatecheck codebase="https://a/b.crx" status="ok" version="5.18.1"/>"#), current: "5.0") == "5.18.1")
+        #expect(ExtensionStore.latestVersion(inUpdateCheck: app(#"<updatecheck _esbAllowlist="true" status="noupdate"/>"#), current: "5.18.1") == "5.18.1")
+        // An extension the store no longer lists has no update check at all.
+        #expect(ExtensionStore.latestVersion(inUpdateCheck: #"<gupdate><app appid="x" status="error-unknownApplication"/></gupdate>"#, current: "1.0") == nil)
+        #expect(ExtensionStore.latestVersion(inUpdateCheck: app(#"<updatecheck status="error-internal"/>"#), current: "1.0") == nil)
+    }
+
+    @Test func checkForUpdatesSaysWhatHappened() {
+        func check(_ outcomes: [ExtensionStore.UpdateOutcome]) -> ExtensionStore.UpdateCheck {
+            var check = ExtensionStore.UpdateCheck()
+            for (i, outcome) in outcomes.enumerated() { check.add(outcome, for: "id\(i)") }
+            return check
+        }
+        #expect(check([]).summary == "No extensions from the Chrome Web Store to check.")
+        #expect(check([.upToDate, .upToDate]).summary == "All extensions are up to date.")
+        #expect(check([.updated, .upToDate]).summary == "Updated 1 extension.")
+        #expect(check([.updated, .updated]).summary == "Updated 2 extensions.")
+        #expect(check([.waitingForApproval]).summary == "1 update needs your approval.")
+        #expect(check([.waitingForApproval, .upToDate, .waitingForApproval]).waiting == ["id0", "id2"])
+        #expect(check([.failed]).summary == "Couldn’t check 1 extension.")
+        #expect(check([.updated, .waitingForApproval, .waitingForApproval, .failed, .failed]).summary
+            == "Updated 1 extension. 2 updates need your approval. Couldn’t check 2 extensions.")
+    }
 }
 
 private final class Marker {}

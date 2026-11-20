@@ -824,13 +824,56 @@ enum ExtensionStore {
 
     // MARK: Updating
 
-    /// Checks every installed extension for a new version, at most once a day. A Firefox package came from a file,
-    /// not from the Chrome Web Store, so the store has nothing to say about it and it isn't asked.
-    static func checkForUpdatesIfDue(force: Bool = false) async {
+    /// What checking one extension came to.
+    enum UpdateOutcome: Equatable { case upToDate, updated, waitingForApproval, failed }
+
+    /// What checking every extension came to, said in Settings › Extensions (#406).
+    struct UpdateCheck: Equatable {
+        var checked = 0
+        var updated = 0
+        /// Extensions whose update asks for more access, in the order checked.
+        var waiting: [String] = []
+        var failed = 0
+
+        mutating func add(_ outcome: UpdateOutcome, for id: String) {
+            checked += 1
+            switch outcome {
+            case .upToDate: break
+            case .updated: updated += 1
+            case .waitingForApproval: waiting.append(id)
+            case .failed: failed += 1
+            }
+        }
+
+        var summary: String {
+            guard checked > 0 else { return String(localized: "No extensions from the Chrome Web Store to check.", comment: "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.") }
+            var parts: [String] = []
+            if updated > 0 { parts.append(String(localized: "Updated \(updated) extensions.", comment: "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.")) }
+            if !waiting.isEmpty { parts.append(String(localized: "\(waiting.count) updates need your approval.", comment: "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.")) }
+            if failed > 0 { parts.append(String(localized: "Couldn’t check \(failed) extensions.", comment: "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.")) }
+            return parts.isEmpty ? String(localized: "All extensions are up to date.", comment: "Toast after Check for Updates in Settings › Extensions when nothing changed.") : parts.joined(separator: " ")
+        }
+    }
+
+    /// The check under way, so a second one waits for it instead of downloading the same updates again.
+    private static var checking: Task<UpdateCheck, Never>?
+
+    /// Checks every installed extension for a new version, at most once a day unless `force`d.
+    @discardableResult
+    static func checkForUpdatesIfDue(force: Bool = false) async -> UpdateCheck {
+        if let checking { return await checking.value }
         let last = UserDefaults.standard.object(forKey: lastUpdateKey) as? Date ?? .distantPast
-        guard force || Date().timeIntervalSince(last) > 24 * 3600 else { return }
+        guard force || Date().timeIntervalSince(last) > 24 * 3600 else { return UpdateCheck() }
         UserDefaults.standard.set(Date(), forKey: lastUpdateKey)
-        for id in updateCandidates(packageIDs) { await updateIfNewer(id) }
+        let task = Task { @MainActor in
+            var check = UpdateCheck()
+            for id in updateCandidates(packageIDs) { check.add(await updateIfNewer(id), for: id) }
+            return check
+        }
+        checking = task
+        let check = await task.value
+        checking = nil
+        return check
     }
 
     /// Which records the store is asked about: packages the store delivered. A Firefox one came from a file, and an
@@ -843,25 +886,29 @@ enum ExtensionStore {
     }
 
     /// Asks the store for the latest version only; downloads it when it's newer. An update that asks for
-    /// nothing new replaces the running version; one that asks for more waits for approval. A Firefox package is
-    /// never updated here: its file isn't in the store, and its ID names no store listing.
-    static func updateIfNewer(_ id: String) async {
-        guard kind(of: id) == .chromium else { return }
-        guard #available(macOS 15.4, *), let current = package(id), let latest = await latestVersion(of: id, current: current.version),
-              isVersion(latest, newerThan: current.version), latest != current.pendingVersion else { return }
-        guard case .success(let package) = await download(id) else { return }
+    /// nothing new replaces the running version; one that asks for more waits for approval.
+    @discardableResult
+    static func updateIfNewer(_ id: String) async -> UpdateOutcome {
+        // A Firefox package came from a file, not the Chrome Web Store: its ID names no listing there, so it is not
+        // asked, and nothing pretends a check happened.
+        guard kind(of: id) == .chromium else { return .upToDate }
+        guard #available(macOS 15.4, *), let current = package(id) else { return .failed }
+        guard let latest = await latestVersion(of: id, current: current.version) else { return .failed }
+        guard isVersion(latest, newerThan: current.version) else { return .upToDate }
+        guard latest != current.pendingVersion else { return .waitingForApproval }
+        guard case .success(let package) = await download(id) else { return .failed }
         // Package must match the store's version; never accept an older one.
         guard package.version == latest else {
             try? FileManager.default.removeItem(at: package.folder)
-            return
+            return .failed
         }
-        guard store(package, for: id), let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return }
+        guard store(package, for: id), let old = packageDirectory(for: id), let new = packageDirectory(for: id, version: package.version) else { return .failed }
         if asksForMore(new, than: old) {
             update(id) { $0.pendingVersion = package.version }
             ExtensionCenter.noteChanged()
-            return
+            return .waitingForApproval
         }
-        await switchVersion(of: id, to: package.version)
+        return await switchVersion(of: id, to: package.version) ? .updated : .failed
     }
 
     /// Approves a held-back update: its new permissions are granted and it replaces the running version.
@@ -878,9 +925,11 @@ enum ExtensionStore {
         await switchVersion(of: id, to: pending)
     }
 
-    /// Makes a version current and reloads the extension with it, going back to the old one if it won't load.
-    private static func switchVersion(of id: String, to version: String) async {
-        guard #available(macOS 15.4, *), let previous = package(id)?.version else { return }
+    /// Makes a version current and reloads the extension with it, going back to the old one if it won't load. True
+    /// when the new version runs.
+    @discardableResult
+    private static func switchVersion(of id: String, to version: String) async -> Bool {
+        guard #available(macOS 15.4, *), let previous = package(id)?.version else { return false }
         update(id) { $0.version = version; $0.pendingVersion = nil }
         // Every profile running it moves to the new version together; if one can't load it, all go back.
         let running = profiles(with: id).filter { $0.installs.isEnabled(id) }
@@ -900,6 +949,7 @@ enum ExtensionStore {
         }
         // A version that no longer gives a search engine gives back the one you had.
         ExtensionSearchProvider.reconcile()
+        return loadedEverywhere
     }
 
     private static func latestVersion(of id: String, current: String) async -> String? {
@@ -911,9 +961,16 @@ enum ExtensionStore {
             .init(name: "x", value: "id=\(id)&v=\(current)&uc"),
         ]
         guard let url = components.url, let (data, response) = try? await URLSession.cookieless.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200, let xml = String(data: data, encoding: .utf8),
-              let check = xml.range(of: "<updatecheck[^>]*>", options: .regularExpression) else { return nil }
+              (response as? HTTPURLResponse)?.statusCode == 200, let xml = String(data: data, encoding: .utf8) else { return nil }
+        return latestVersion(inUpdateCheck: xml, current: current)
+    }
+
+    /// The store's answer: its version, `current` when it has nothing newer, nil when it gave neither (an
+    /// extension it no longer lists, an error).
+    nonisolated static func latestVersion(inUpdateCheck xml: String, current: String) -> String? {
+        guard let check = xml.range(of: "<updatecheck[^>]*>", options: .regularExpression) else { return nil }
         let tag = String(xml[check])
+        if tag.contains("status=\"noupdate\"") { return current }
         guard tag.contains("status=\"ok\""), let version = tag.range(of: "version=\"[^\"]+\"", options: .regularExpression) else { return nil }
         return String(tag[version].dropFirst("version=\"".count).dropLast())
     }
@@ -1614,7 +1671,7 @@ extension ExtensionStore {
     }
 
     /// Writer format version, part of the signature so older markers rebuild once even if their text matches.
-    nonisolated static let overlayFormatVersion = 2
+    nonisolated static let overlayFormatVersion = 3
 
     /// The manifest's background section plus a background page's bytes. Stable until the extension's files change.
     nonisolated private static func backgroundDigest(in package: URL) -> String {
@@ -1834,22 +1891,21 @@ extension ExtensionStore {
     /// Writes the loaded copy's manifest and the files its background needs first. False when the manifest is unreadable or
     /// points outside the package; WebKit then loads the package directly.
     ///
-    /// - `background.service_worker`: `zigzag-entry.js` runs the prelude, then the worker.
+    /// - `background.service_worker`: `zigzag-entry.js`, beside the worker, runs the prelude, then the worker.
     /// - `background.page`: copied with a prelude script before its first script; the key stays.
     /// - `background.scripts`: prelude first, then the scripts in order.
     /// - No background: the manifest is still written so patches and the language fill reach content scripts and pages.
     nonisolated static func writeOverlayManifest(in overlay: URL, from package: URL, prelude: String) -> Bool {
         guard let data = try? Data(contentsOf: package.appendingPathComponent("manifest.json")),
               var manifest = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
-        var entry: String?
+        var entry: (path: String, text: String)?
         var page: (path: String, text: String)?
         if var background = manifest["background"] as? [String: Any] {
             if let worker = background["service_worker"] as? String {
                 guard let path = packagePath(worker) else { return false }
-                entry = (background["type"] as? String) == "module"
-                    ? "import './zigzag-prelude.js';\nimport './\(path)';\n"
-                    : "importScripts('zigzag-prelude.js', '\(path)');\n"
-                background["service_worker"] = "zigzag-entry.js"
+                let made = workerEntry(for: path, module: (background["type"] as? String) == "module")
+                entry = made
+                background["service_worker"] = made.path
             } else if let pageFile = background["page"] as? String {
                 guard let path = packagePath(pageFile),
                       let html = try? String(contentsOf: package.appendingPathComponent(path), encoding: .utf8) else { return false }
@@ -1893,7 +1949,12 @@ extension ExtensionStore {
         do {
             try out.write(to: overlay.appendingPathComponent("manifest.json"))
             try prelude.write(to: overlay.appendingPathComponent("zigzag-prelude.js"), atomically: true, encoding: .utf8)
-            if let entry { try entry.write(to: overlay.appendingPathComponent("zigzag-entry.js"), atomically: true, encoding: .utf8) }
+            if let entry {
+                let target = overlay.appendingPathComponent(entry.path)
+                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? FileManager.default.removeItem(at: target)
+                try entry.text.write(to: target, atomically: true, encoding: .utf8)
+            }
             if let page {
                 let target = overlay.appendingPathComponent(page.path)
                 try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1920,6 +1981,19 @@ extension ExtensionStore {
         }
         let tags = scripts.map { "<script\(modules ? " type=\"module\"" : "") src=\"/\(escaped($0))\"></script>" }
         return "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n<body>\n" + tags.joined(separator: "\n") + "\n</body>\n"
+    }
+
+    /// The worker's entry script, in the worker's own folder, so its relative `importScripts` and `fetch` resolve
+    /// against the worker's address as in Chrome (#393). The prelude stays at the package root.
+    nonisolated static func workerEntry(for path: String, module: Bool) -> (path: String, text: String) {
+        let folder = (path as NSString).deletingLastPathComponent
+        let file = (path as NSString).lastPathComponent
+        let prelude = folder.isEmpty ? "zigzag-prelude.js" : "/zigzag-prelude.js"
+        let quoted = { (text: String) in "'" + text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "'", with: "\\'") + "'" }
+        let text = module
+            ? "import \(quoted(folder.isEmpty ? "./" + prelude : prelude));\nimport \(quoted("./" + file));\n"
+            : "importScripts(\(quoted(prelude)), \(quoted(file)));\n"
+        return (folder.isEmpty ? "zigzag-entry.js" : folder + "/zigzag-entry.js", text)
     }
 
     /// A background page with a prelude script before its first script. Bytes, CSP and order are unchanged; the prelude

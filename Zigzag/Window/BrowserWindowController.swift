@@ -1531,10 +1531,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let right = SidebarMenus.Item(AddressView.moveRightTitle, symbol: "arrow.right") { [weak self] in self?.sidebar.address.movePin(id, by: 1) }
         right.isEnabled = index < visible.count - 1
         menu.addItem(right)
-        menu.addItem(.separator())
     }
 
-    /// An extension's menu: its settings, site access for `tab`, pinning, turning off, and removing, which asks over
+    /// An extension's menu: pinning, its settings, site access for `tab`, turning off, and removing, which asks over
     /// `overlay`. A browser window's, and an installed app's window's (#356).
     @available(macOS 15.4, *)
     static func extensionMenu(for context: WKWebExtensionContext, profile: Profile, tab: Tab?, isPrivate: Bool, over overlay: NSView,
@@ -1546,11 +1545,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let title = NSMenuItem(title: context.webExtension.displayName ?? String(localized: "Extension", comment: "Heading of an extension's menu when the extension has no name."), action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
+        // Pinning first: Site Controls' tiles pin only from here.
+        pins(menu, id)
+        menu.addItem(.separator())
         if let options = context.optionsPageURL {
             menu.addItem(SidebarMenus.Item(String(localized: "Settings", comment: "Item in an extension's menu: opens the extension's own settings page."), symbol: "gearshape") { openOptions(options) })
         }
         menu.addItem(siteAccessItem(for: id, profile: profile, tab: tab, isPrivate: isPrivate))
-        pins(menu, id)
         menu.addItem(SidebarMenus.Item(String(localized: "Turn Off", comment: "Item in an extension's menu: turns the extension off."), symbol: "pause.circle") { installs.setEnabled(id, false) })
         menu.addItem(SidebarMenus.Item(String(localized: "Remove from Zigzag…", comment: "Item in an extension's menu: removes the extension."), symbol: "trash") { [weak overlay] in
             guard let overlay else { return }
@@ -2282,25 +2283,40 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// is everywhere else, it left them floating over the page; there it gets the system's bar behind them, as in Safari.
     func windowWillEnterFullScreen(_ notification: Notification) {
         windowedFrame = window?.frame
-        browserWindow.titlebarAppearsTransparent = false
+        fullScreenChanged(.willEnter)
     }
 
-    func windowDidEnterFullScreen(_ notification: Notification) {
-        browserWindow.titlebarAppearsTransparent = false
-        showFullScreenBar(true)
-        layoutTrafficLights()
-        root.needsLayout = true
+    func windowDidEnterFullScreen(_ notification: Notification) { fullScreenChanged(.didEnter) }
+
+    /// macOS gave up on full screen: the window is as it was, so its title bar and buttons are too (#401).
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        Diagnostics.note("Full screen didn't start")
+        windowedFrame = nil
+        fullScreenChanged(.didFailToEnter)
     }
 
-    func windowWillExitFullScreen(_ notification: Notification) {
-        showFullScreenBar(false)
-        browserWindow.titlebarAppearsTransparent = true
-    }
+    func windowWillExitFullScreen(_ notification: Notification) { fullScreenChanged(.willExit) }
 
     func windowDidExitFullScreen(_ notification: Notification) {
-        showFullScreenBar(false)
-        browserWindow.titlebarAppearsTransparent = true
         windowedFrame = nil
+        fullScreenChanged(.didExit)
+    }
+
+    func windowDidFailToExitFullScreen(_ window: NSWindow) {
+        Diagnostics.note("Full screen didn't end")
+        fullScreenChanged(.didFailToExit)
+    }
+
+    /// One place for the title bar through full screen: what each phase wants, and the buttons laid out once AppKit
+    /// is done moving them.
+    private func fullScreenChanged(_ event: FullScreenPhase.Event) {
+        let phase = browserWindow.fullScreenPhase.after(event)
+        browserWindow.fullScreenPhase = phase
+        if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
+            browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
+        }
+        if (fullScreenBar != nil) != phase.showsFullScreenBar { showFullScreenBar(phase.showsFullScreenBar) }
+        guard !phase.isMoving else { return }
         layoutTrafficLights()
         root.needsLayout = true
     }
