@@ -243,6 +243,7 @@
 		6E7C92A60154EF30AE8E1983 /* SitePermissions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */; };
 		6F00D32C32387168F17DADDA /* Passkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BA1C91E3BBFB79F23D274B4 /* Passkeys.swift */; };
 		6FAA00CCE4CED77788B5D1C3 /* DownloadRuleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDE5F88B8769F540831A7940 /* DownloadRuleSheet.swift */; };
+		689E7D1B46055A22C2F3FE3A /* SiteRouteRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5729983AF049602057502EBA /* SiteRouteRow.swift */; };
 		2860A1B0C0DE4E5F286A0003 /* SiteRouteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2860A1B0C0DE4E5F286A0004 /* SiteRouteSheet.swift */; };
 		6FDFEF87DF632826DEA0447E /* MCPSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88166CA759B416DF4C5BCE2 /* MCPSetup.swift */; };
 		6FF18123789D7B94380C69D5 /* EmojiSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A5F13F7F71BE34AE017E82A /* EmojiSearch.swift */; };
@@ -1041,6 +1042,7 @@
 		CD6F20366D4AE7C0A87CD0DA /* CommandBarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarModel.swift; sourceTree = "<group>"; };
 		CD73DB21121F7F1EB8BE3022 /* DownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadManager.swift; sourceTree = "<group>"; };
 		CDE5F88B8769F540831A7940 /* DownloadRuleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadRuleSheet.swift; sourceTree = "<group>"; };
+		5729983AF049602057502EBA /* SiteRouteRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRouteRow.swift; sourceTree = "<group>"; };
 		2860A1B0C0DE4E5F286A0004 /* SiteRouteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiteRouteSheet.swift; sourceTree = "<group>"; };
 		CE540F10C9C2A1FC95F65083 /* SitePermissions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SitePermissions.swift; sourceTree = "<group>"; };
 		CE6475CD75E987F5A8B0D182 /* CommandBarHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandBarHistoryTests.swift; sourceTree = "<group>"; };
@@ -1482,6 +1484,7 @@
 			isa = PBXGroup;
 			children = (
 				CDE5F88B8769F540831A7940 /* DownloadRuleSheet.swift */,
+				5729983AF049602057502EBA /* SiteRouteRow.swift */,
 				2860A1B0C0DE4E5F286A0004 /* SiteRouteSheet.swift */,
 				C0C1E3340000000000000004 /* KeptCookiesSheet.swift */,
 				68FEA7FFF224DCD2FCBF7716 /* SettingsPage.swift */,
@@ -2324,6 +2327,7 @@
 				16533A8F18B300E1F88BEEB7 /* DownloadPlace.swift in Sources */,
 				8EA95217D924645FA2CB7FF8 /* DownloadPolicy.swift in Sources */,
 				6FAA00CCE4CED77788B5D1C3 /* DownloadRuleSheet.swift in Sources */,
+				689E7D1B46055A22C2F3FE3A /* SiteRouteRow.swift in Sources */,
 				2860A1B0C0DE4E5F286A0003 /* SiteRouteSheet.swift in Sources */,
 				5D2E83178AF509AB8C92B352 /* DownloadRules.swift in Sources */,
 				DE32415EDF4688B7C215720A /* OpenInZigzag.swift in Sources */,

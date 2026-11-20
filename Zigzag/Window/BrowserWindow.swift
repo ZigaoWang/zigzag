@@ -366,15 +366,25 @@ final class BrowserWindow: NSWindow {
         [.closeButton, .miniaturizeButton, .zoomButton].compactMap { standardWindowButton($0) }
     }
 
-    /// Hidden while the sidebar is collapsed or sliding; shown in full screen only when AppKit wants them.
+    /// Where the window is on its way into or out of full screen, from the controller's notifications (#401).
+    var fullScreenPhase = FullScreenPhase.windowed
+
+    /// Hidden while the sidebar is collapsed or sliding; shown in full screen only when AppKit wants them. Left as
+    /// they are while AppKit moves them into or out of full screen.
     var trafficLightsHidden = false {
-        didSet { buttons.forEach { $0.isHidden = trafficLightsHidden && !styleMask.contains(.fullScreen) } }
+        didSet {
+            guard !fullScreenPhase.isMoving else { return }
+            buttons.forEach { $0.isHidden = trafficLightsHidden && !styleMask.contains(.fullScreen) }
+        }
     }
 
 
     /// Moves the system buttons into our top row. AppKit re-lays them out on resize, so this runs often.
     func layoutTrafficLights() {
         guard let origin = trafficLightOrigin else { return }
+        // AppKit moves the title bar between the window and the full screen bar meanwhile; resizing it then could
+        // leave full screen half made (#401). The controller lays them out once it's done.
+        guard !fullScreenPhase.isMoving else { return }
         // In full screen AppKit shows them in the title bar that slides down with the menu bar, flashing them in
         // the wrong place; they stay hidden there, and the sidebar's buttons move into their space.
         // In full screen they belong to the title bar that slides down with the menu bar, where AppKit puts them,
@@ -409,6 +419,31 @@ final class BrowserWindow: NSWindow {
     }
 
     var trafficLightHeight: CGFloat { standardWindowButton(.closeButton)?.frame.height ?? 14 }
+}
+
+/// A browser window's way into and out of full screen. Every will is followed by its did or did-fail, and a full
+/// screen that doesn't start (or end) gives back the title bar the window had (#401).
+enum FullScreenPhase: Equatable {
+    case windowed, entering, fullScreen, exiting
+
+    enum Event { case willEnter, didEnter, didFailToEnter, willExit, didExit, didFailToExit }
+
+    func after(_ event: Event) -> FullScreenPhase {
+        switch event {
+        case .willEnter: .entering
+        case .didEnter, .didFailToExit: .fullScreen
+        case .willExit: .exiting
+        case .didExit, .didFailToEnter: .windowed
+        }
+    }
+
+    /// AppKit is moving the title bar and its buttons: Zigzag leaves them alone.
+    var isMoving: Bool { self == .entering || self == .exiting }
+    /// Transparent as everywhere in Zigzag, except in full screen, where the buttons come down with the menu bar and
+    /// would float over the page.
+    var titlebarAppearsTransparent: Bool { self == .windowed || self == .exiting }
+    /// The system's bar behind the buttons in full screen.
+    var showsFullScreenBar: Bool { self == .fullScreen }
 }
 
 /// Keeps traffic lights where Zigzag places them. AppKit resets them on every title bar layout (title, key window,

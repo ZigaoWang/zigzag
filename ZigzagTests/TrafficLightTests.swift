@@ -45,4 +45,55 @@ struct TrafficLightTests {
             #expect(topLefts() == placed, "change \(change)")
         }
     }
+
+    /// Every way through full screen ends windowed or full screen, never between, with the title bar each wants (#401).
+    @Test func fullScreenPhasesEndSettled() {
+        let paths: [([FullScreenPhase.Event], FullScreenPhase)] = [
+            ([.willEnter, .didEnter], .fullScreen),
+            ([.willEnter, .didFailToEnter], .windowed),
+            ([.willEnter, .didEnter, .willExit, .didExit], .windowed),
+            ([.willEnter, .didEnter, .willExit, .didFailToExit], .fullScreen),
+            // A did with no will before it still lands where it says.
+            ([.didEnter], .fullScreen),
+            ([.didExit], .windowed),
+        ]
+        for (events, end) in paths {
+            let phase = events.reduce(FullScreenPhase.windowed) { $0.after($1) }
+            #expect(phase == end, "\(events)")
+            #expect(!phase.isMoving)
+        }
+        #expect(FullScreenPhase.windowed.titlebarAppearsTransparent && !FullScreenPhase.windowed.showsFullScreenBar)
+        #expect(!FullScreenPhase.fullScreen.titlebarAppearsTransparent && FullScreenPhase.fullScreen.showsFullScreenBar)
+        #expect(!FullScreenPhase.entering.titlebarAppearsTransparent && !FullScreenPhase.entering.showsFullScreenBar)
+        #expect(FullScreenPhase.exiting.titlebarAppearsTransparent && !FullScreenPhase.exiting.showsFullScreenBar)
+    }
+
+    /// While AppKit moves the title bar into or out of full screen, Zigzag doesn't move or hide the buttons (#401).
+    @Test func buttonsAreLeftAloneMidTransition() throws {
+        let window = BrowserWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 500))
+        window.alphaValue = 0
+        window.setFrameOrigin(NSPoint(x: -6000, y: 200))
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil); window.close() }
+        let close = try #require(window.standardWindowButton(.closeButton))
+        func topLeft() -> NSPoint {
+            let r = close.convert(close.bounds, to: nil)
+            return NSPoint(x: r.minX, y: (window.contentView?.frame.height ?? 0) - r.maxY)
+        }
+        window.trafficLightOrigin = NSPoint(x: 40, y: 15)
+        #expect(topLeft() == NSPoint(x: 40, y: 15))
+
+        window.fullScreenPhase = .entering
+        window.trafficLightOrigin = NSPoint(x: 90, y: 15)
+        window.trafficLightsHidden = true
+        #expect(topLeft() == NSPoint(x: 40, y: 15))
+        #expect(!close.isHidden)
+
+        // Given up: the window lays them out again.
+        window.fullScreenPhase = window.fullScreenPhase.after(.didFailToEnter)
+        window.layoutTrafficLights()
+        window.trafficLightsHidden = true
+        #expect(topLeft() == NSPoint(x: 90, y: 15))
+        #expect(close.isHidden)
+    }
 }

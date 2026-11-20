@@ -21,6 +21,15 @@ final class BridgeDownloads: BridgeNamespace {
     private var lastSeen: [UUID: [String: Any]] = [:]
     /// The fetcher for downloads no tab started: your normal cookies, never a private window's.
     private lazy var fetcher = WKWebView(frame: .zero, configuration: WebKitSetup.makeConfiguration(for: host.profile))
+    /// A page of each extension's own, for a blob: download when it has no offscreen page open. WebKit lets only
+    /// the origin that made a blob read it, and a page of Zigzag's has an origin of its own.
+    private var originViews: [String: WKWebView] = [:]
+    /// The loads of those pages still under way, so a second download waits for the page too.
+    private var originLoads: [String: Task<Void, Never>] = [:]
+    /// Blank page written into an extension's loaded copy for a blob download with no offscreen page open. It has no
+    /// scripts: only its origin matters.
+    private static let originPageFile = "zigzag-download.html"
+    private static let originPage = "<!DOCTYPE html>\n<meta charset=\"utf-8\">\n"
 
     func call(_ fn: String, args: [Any], extensionID: String) async throws -> Any? {
         switch fn {
@@ -109,11 +118,56 @@ final class BridgeDownloads: BridgeNamespace {
             guard await panel.beginSheetModal(for: window) == .OK, let chosen = panel.url else { throw BridgeError("Download canceled") }
             destination = chosen
         }
-        let webView = fetcher
+        let webView = try await downloadView(for: url, extensionID: extensionID)
         let window = WindowManager.shared.keyController?.window
         let download: WKDownload = await withCheckedContinuation { done in webView.startDownload(using: request) { done.resume(returning: $0) } }
         let item = manager.track(download, window: window, saveTo: destination)
         return number(for: item)
+    }
+
+    /// The view a download starts in: a blob: in a view on the origin that made it, the only one WebKit lets read it.
+    private func downloadView(for url: URL, extensionID: String) async throws -> WKWebView {
+        guard url.scheme?.lowercased() == "blob" else { return fetcher }
+        guard Self.blobOwner(url) == extensionID else { throw BridgeError("Invalid URL") }
+        guard let view = await originView(for: extensionID) else {
+            throw BridgeError("Saving a blob needs a page of the extension's own to read it")
+        }
+        return view
+    }
+
+    /// A view on the extension's origin: its offscreen page when one is open, else a small blank page of its own kept
+    /// for this. Nil when Zigzag has no writable copy of the extension.
+    private func originView(for extensionID: String) async -> WKWebView? {
+        if let open = host.bridge.offscreen.page(for: extensionID) { return open }
+        if let kept = originViews[extensionID] {
+            await originLoads[extensionID]?.value
+            return kept
+        }
+        guard let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
+              let directory = host.profile.installs.overlayDirectory(for: extensionID) else { return nil }
+        let file = directory.appendingPathComponent(Self.originPageFile)
+        if !FileManager.default.fileExists(atPath: file.path),
+           (try? Self.originPage.write(to: file, atomically: true, encoding: .utf8)) == nil { return nil }
+        guard let page = URL(string: Self.originPageFile, relativeTo: context.baseURL)?.absoluteURL else { return nil }
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        originViews[extensionID] = view
+        let loaded = PageLoadWaiter()
+        view.navigationDelegate = loaded
+        view.load(URLRequest(url: page))
+        let load = Task { await loaded.wait(seconds: 3) }
+        originLoads[extensionID] = load
+        await load.value
+        originLoads[extensionID] = nil
+        view.navigationDelegate = nil
+        return view
+    }
+
+    /// The extension that made a blob: URL, as `blob:webkit-extension://<id>/…`. Nil for one a page made.
+    nonisolated static func blobOwner(_ url: URL) -> String? {
+        guard url.scheme?.lowercased() == "blob" else { return nil }
+        let inner = String(url.absoluteString.dropFirst("blob:".count))
+        guard let made = URL(string: inner), made.scheme?.lowercased() == "webkit-extension" else { return nil }
+        return made.host()
     }
 
     /// Headers a page can't set either: they'd let an extension pass for someone else.
@@ -265,4 +319,36 @@ final class BridgeDownloads: BridgeNamespace {
             bridge.emit("downloads.onErased", [was["id"] ?? 0], isPrivate: was["incognito"] as? Bool == true)
         }
     }
+
+    func release(_ extensionID: String) {
+        originViews.removeValue(forKey: extensionID)?.stopLoading()
+    }
+}
+
+/// Waits for the hidden page a blob download starts in to load, or to fail, or for a few seconds.
+@MainActor
+private final class PageLoadWaiter: NSObject, WKNavigationDelegate {
+    private var waiting: CheckedContinuation<Void, Never>?
+    private var finished = false
+
+    func wait(seconds: Double) async {
+        guard !finished else { return }
+        await withCheckedContinuation { continuation in
+            waiting = continuation
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(seconds))
+                self?.finish()
+            }
+        }
+    }
+
+    private func finish() {
+        finished = true
+        waiting?.resume()
+        waiting = nil
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish() }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish() }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish() }
 }

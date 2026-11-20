@@ -2298,25 +2298,40 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     /// is everywhere else, it left them floating over the page; there it gets the system's bar behind them, as in Safari.
     func windowWillEnterFullScreen(_ notification: Notification) {
         windowedFrame = window?.frame
-        browserWindow.titlebarAppearsTransparent = false
+        fullScreenChanged(.willEnter)
     }
 
-    func windowDidEnterFullScreen(_ notification: Notification) {
-        browserWindow.titlebarAppearsTransparent = false
-        showFullScreenBar(true)
-        layoutTrafficLights()
-        root.needsLayout = true
+    func windowDidEnterFullScreen(_ notification: Notification) { fullScreenChanged(.didEnter) }
+
+    /// macOS gave up on full screen: the window is as it was, so its title bar and buttons are too (#401).
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        Diagnostics.note("Full screen didn't start")
+        windowedFrame = nil
+        fullScreenChanged(.didFailToEnter)
     }
 
-    func windowWillExitFullScreen(_ notification: Notification) {
-        showFullScreenBar(false)
-        browserWindow.titlebarAppearsTransparent = true
-    }
+    func windowWillExitFullScreen(_ notification: Notification) { fullScreenChanged(.willExit) }
 
     func windowDidExitFullScreen(_ notification: Notification) {
-        showFullScreenBar(false)
-        browserWindow.titlebarAppearsTransparent = true
         windowedFrame = nil
+        fullScreenChanged(.didExit)
+    }
+
+    func windowDidFailToExitFullScreen(_ window: NSWindow) {
+        Diagnostics.note("Full screen didn't end")
+        fullScreenChanged(.didFailToExit)
+    }
+
+    /// One place for the title bar through full screen: what each phase wants, and the buttons laid out once AppKit
+    /// is done moving them.
+    private func fullScreenChanged(_ event: FullScreenPhase.Event) {
+        let phase = browserWindow.fullScreenPhase.after(event)
+        browserWindow.fullScreenPhase = phase
+        if browserWindow.titlebarAppearsTransparent != phase.titlebarAppearsTransparent {
+            browserWindow.titlebarAppearsTransparent = phase.titlebarAppearsTransparent
+        }
+        if (fullScreenBar != nil) != phase.showsFullScreenBar { showFullScreenBar(phase.showsFullScreenBar) }
+        guard !phase.isMoving else { return }
         layoutTrafficLights()
         root.needsLayout = true
     }
