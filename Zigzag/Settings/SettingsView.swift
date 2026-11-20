@@ -2780,7 +2780,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         Shortcuts.allItems.map { "\(ObjectIdentifier($0).hashValue) \($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue) \($0.isHidden)" }
     }
 
-    /// Makes the shortcuts' rows again only when the menus' shortcuts changed, instead of on each key typed in setting searchbar.
+    /// Makes the rows again only when the menus' shortcuts changed, not at every key typed in the search.
     private func readShortcuts() {
         if listedShortcuts != shortcutsInMenu { reloadShortcuts() }
     }
