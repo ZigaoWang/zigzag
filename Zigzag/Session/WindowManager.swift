@@ -286,11 +286,16 @@ final class WindowManager {
         if !controller.tabManager.isPrivate, controllers.filter({ !$0.tabManager.isPrivate }).count == 1 { saveNow(synchronously: true) }
         // With shared tabs (#162), closing a window closes no tabs, so nothing to reopen.
         let isLastView = controller.tabManager.isLastView
+        // Tabs closed in it before it closed: ⇧⌘T brings them back into another window after it. Never private ones.
+        if isLastView, !controller.tabManager.isPrivate {
+            orphanedClosedTabs = (orphanedClosedTabs + controller.tabManager.closedTabRecords).sorted { $0.closedAt < $1.closedAt }
+            if orphanedClosedTabs.count > 50 { orphanedClosedTabs.removeFirst(orphanedClosedTabs.count - 50) }
+        }
         // Kept to reopen (⇧⌘T's sibling in the File menu), with each tab's back/forward list. Never private windows.
         if isLastView, !controller.tabManager.isPrivate, controller.tabManager.allTabs.contains(where: { $0.url != nil }) {
             var history: [UUID: Data] = [:]
             for tab in controller.tabManager.allTabs { if let data = tab.interactionStateForSaving { history[tab.id] = data } }
-            closedWindows.append((UUID(), windowState(controller), history))
+            closedWindows.append((UUID(), windowState(controller), history, Date()))
             if closedWindows.count > 10 { closedWindows.removeFirst() }
         }
         controllers.removeAll { $0 === controller }
@@ -485,7 +490,75 @@ final class WindowManager {
     }
 
     /// Windows closed this session, newest last, to bring back with ⇧⌘N's neighbor, Reopen Closed Window.
-    private var closedWindows: [(id: UUID, state: SessionState.WindowState, history: [UUID: Data])] = []
+    private var closedWindows: [(id: UUID, state: SessionState.WindowState, history: [UUID: Data], closedAt: Date)] = []
+    /// Tabs closed in everyday windows that have closed since, oldest first.
+    private var orphanedClosedTabs: [TabManager.ClosedTab] = []
+
+    /// What ⇧⌘T brings back: a tab, into the window it closed in, a tab of a window since closed, or a window.
+    enum LastClosed: Equatable { case tab, tabOfClosedWindow, window }
+
+    /// The latest of the three, by when each closed; a tie goes to the tab.
+    static func lastClosed(tab: Date?, tabOfClosedWindow: Date?, window: Date?) -> LastClosed? {
+        var best: (kind: LastClosed, at: Date)?
+        for (kind, date) in [(LastClosed.tab, tab), (.tabOfClosedWindow, tabOfClosedWindow), (.window, window)] {
+            guard let date else { continue }
+            if best.map({ date > $0.at }) ?? true { best = (kind, date) }
+        }
+        return best?.kind
+    }
+
+    /// The everyday window views with closed tabs, `front`'s first, one per shared store, and each one's latest.
+    private func latestClosedTab(from front: TabManager?) -> (manager: TabManager, tab: TabManager.ClosedTab)? {
+        var managers = controllers.map(\.tabManager).filter { !$0.isPrivate && !$0.isInvalidated }
+        if let front { managers.insert(front, at: 0) }
+        var stores = Set<ObjectIdentifier>()
+        var best: (manager: TabManager, tab: TabManager.ClosedTab)?
+        for manager in managers where stores.insert(ObjectIdentifier(manager.store)).inserted {
+            guard let last = manager.lastClosedTab else { continue }
+            if best.map({ last.closedAt > $0.tab.closedAt }) ?? true { best = (manager, last) }
+        }
+        return best
+    }
+
+    private func lastClosed(from front: TabManager?) -> (kind: LastClosed, manager: TabManager?, id: UUID?)? {
+        // A private window brings back only its own tabs; an everyday one never a private tab.
+        if let front, front.isPrivate { return front.lastClosedTab.map { (.tab, front, $0.id) } }
+        let tab = latestClosedTab(from: front)
+        let open = openTabIDs
+        let window = closedWindows.last { !isBack($0.state, open: open) }
+        switch Self.lastClosed(tab: tab?.tab.closedAt, tabOfClosedWindow: orphanedClosedTabs.last?.closedAt, window: window?.closedAt) {
+        case .tab: return tab.map { (.tab, $0.manager, $0.tab.id) }
+        case .tabOfClosedWindow: return (.tabOfClosedWindow, nil, nil)
+        case .window: return (.window, nil, nil)
+        case nil: return nil
+        }
+    }
+
+    /// ⇧⌘T: anything closed to bring back, from the window `front` shows.
+    func canReopenLastClosed(from front: TabManager?) -> Bool { lastClosed(from: front) != nil }
+
+    /// ⇧⌘T, as in Chrome: the latest closed tab or window anywhere. A tab goes back into its window if that's still
+    /// open, else into `front`'s.
+    func reopenLastClosed(from front: TabManager?) {
+        guard let last = lastClosed(from: front) else { return }
+        switch last.kind {
+        case .tab:
+            guard let manager = last.manager, let id = last.id else { return }
+            if manager !== front, let controller = controllers.first(where: { $0.tabManager === manager }) {
+                controller.window?.makeKeyAndOrderFront(nil)
+            }
+            manager.reopenClosedTab(id)
+        case .tabOfClosedWindow:
+            if !controllers.contains(where: { !$0.tabManager.isPrivate }) { reopen() }
+            let into = front.flatMap { $0.isPrivate ? nil : $0 } ?? controllers.first { !$0.tabManager.isPrivate }?.tabManager
+            guard let into, let record = orphanedClosedTabs.popLast() else { return }
+            controllers.first { $0.tabManager === into }?.window?.makeKeyAndOrderFront(nil)
+            into.reopenFromClosedWindow(record)
+        case .window:
+            reopenClosedWindow()
+        }
+    }
+
     var canReopenClosedWindow: Bool {
         let open = openTabIDs
         return closedWindows.contains { !isBack($0.state, open: open) }

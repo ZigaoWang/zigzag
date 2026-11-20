@@ -76,7 +76,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             HistoryPage.clearedToast(in: self)
         }
     }
-    @objc func reopenClosedTab(_ sender: Any?) { tabManager.reopenClosedTab() }
+    @objc func reopenClosedTab(_ sender: Any?) { WindowManager.shared.reopenLastClosed(from: tabManager) }
 
     static var openFileTitle: String { String(localized: "Open File…", comment: "File menu item.") }
 
@@ -417,6 +417,17 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let tab = selectedTab { tabManager.toggleSplitOrientation(for: tab) }
     }
 
+    /// Puts a parted grid's lines back in the middle: the standard even grid, and its plain drags move whole lines
+    /// again (#316).
+    @objc func resetTileLayout(_ sender: Any?) {
+        guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, shape.isParted else { return }
+        shape.evenOut()
+        tabManager.setTileShape(shape, for: tab)
+        root.setTiles(shape, animated: true)
+        root.paneCards.forEach { $0.header.resetsLayout = false }
+        onStateChange?()
+    }
+
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
     @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
@@ -725,7 +736,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             item.title = count > 1 ? String(localized: "Close \(count) Tabs", comment: "File menu item while several sidebar rows are picked")
                 : String(localized: "Close Tab", comment: "File menu item")
             return true
-        case #selector(reopenClosedTab(_:)): return tabManager.canReopenClosedTab
+        case #selector(reopenClosedTab(_:)): return WindowManager.shared.canReopenLastClosed(from: tabManager)
         case #selector(toggleBrowserSidebar(_:)):
             item.title = root.sidebarVisible ? String(localized: "Hide Sidebar", comment: "Menu bar item: hides the sidebar.")
                                               : String(localized: "Show Sidebar", comment: "Menu bar item: shows the sidebar.")

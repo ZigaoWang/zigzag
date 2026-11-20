@@ -13,7 +13,7 @@ Goal: the tools someone building a website reaches for, on the sites they build 
 ## What exists today
 
 - View › Developer: Web Inspector (⌥⌘I, F12), JavaScript Console (⌥⌘J), Inspect Element (⌥⌘C), View Source (⌥⌘U). The inspector docks inside the page's own holder (`PageHolder`, #148).
-- View › Reload Ignoring Cache (⌥⌘R).
+- View › Reload Ignoring Cache (⇧⌘R).
 - Site Controls › ⋯: Clear Cache for This Site…, Clear Cookies for This Site….
 - `PageErrors` hears every page's uncaught errors and rejected promises, for Help › Report a Problem.
 - Settings › Extensions › Developer mode is about extensions and stays where it is.

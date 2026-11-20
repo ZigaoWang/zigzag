@@ -54,14 +54,33 @@ enum Shortcuts {
         item.keyEquivalentModifierMask = combo.flags
     }
 
-    /// Call once the menu bar is built: remembers the shipped shortcuts, then applies yours.
+    /// Call once the menu bar is built: remembers the shipped shortcuts, then applies yours. An item whose new
+    /// shipped keys you'd already given to something else comes in without them, so your choice stands.
     static func apply() {
-        let saved = overrides
-        for item in allItems {
+        var saved = overrides
+        let items = allItems
+        for item in items {
             guard let id = id(item) else { continue }
             if defaults[id] == nil { defaults[id] = combo(of: item) }
-            if let combo = saved[id] { write(combo, to: item) }
         }
+        let shipped = items.compactMap { item in id(item).map { (id: $0, combo: combo(of: item)) } }
+        let losing = shippedKeysTaken(shipped: shipped, saved: saved)
+        for item in items {
+            guard let id = id(item) else { continue }
+            if let combo = saved[id] {
+                write(combo, to: item)
+            } else if losing.contains(id) {
+                write(Combo.none, to: item)
+                saved[id] = Combo.none
+            }
+        }
+        if saved != overrides { overrides = saved }
+    }
+
+    /// Items with no change of yours whose shipped keys you gave to another item.
+    static func shippedKeysTaken(shipped: [(id: String, combo: Combo)], saved: [String: Combo]) -> Set<String> {
+        let yours = saved.values.filter { !$0.key.isEmpty }
+        return Set(shipped.filter { saved[$0.id] == nil && !$0.combo.key.isEmpty && yours.contains($0.combo) }.map(\.id))
     }
 
     /// Your shortcuts on another menu bar's items that do the same (an installed app's, `MainMenu.buildWebApp`), so

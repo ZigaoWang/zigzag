@@ -29,6 +29,8 @@ nonisolated enum TileRegion: String, Codable, CaseIterable, Sendable {
     var isHalf: Bool { cells.nonzeroBitCount == 2 }
     /// A half that runs top to bottom: the left or right one.
     var isColumn: Bool { self == .left || self == .right }
+    /// A half that runs left to right: the top or bottom one.
+    var isRowHalf: Bool { self == .top || self == .bottom }
 
     /// The half across from this one.
     var opposite: TileRegion? {
@@ -46,21 +48,68 @@ nonisolated enum TileRegion: String, Codable, CaseIterable, Sendable {
     var rows: ClosedRange<Int> { cells & 0b0011 != 0 ? (cells & 0b1100 != 0 ? 0...1 : 0...0) : 1...1 }
 }
 
-/// How a tile group's pages share the page area: where each one sits (in the group's order) and where the two
-/// dividers are. Two pages are halves, side by side or stacked, as a split always was; three are a half and two
+/// How a tile group's pages share the page area: where each one sits (in the group's order) and where the lines
+/// between them are. Two pages are halves, side by side or stacked, as a split always was; three are a half and two
 /// quarters; four a grid of quarters. Worked out top-down, as the window lays its panes out.
+///
+/// A grid of four quarters can part its line between the columns, a segment per row (#316), so the top left can be
+/// wider than the bottom left. Every other line is one line: a half spans the rows or columns beside it, and four
+/// rectangles covering the area cannot hold both pairs of lines apart without leaving a hole between them.
 nonisolated struct TileShape: Equatable, Sendable {
     var regions: [TileRegion]
-    /// The share of the width left of the line between the columns.
-    var column: CGFloat = 0.5
-    /// The share of the height above the line between the rows.
-    var row: CGFloat = 0.5
+    /// The share of the width left of the line between the columns, in each row (top, bottom).
+    var columnShares: [CGFloat] = [0.5, 0.5]
+    /// The share of the height above the line between the rows, in each column (left, right). Where the rows share one
+    /// line, both hold it.
+    var rowShares: [CGFloat] = [0.5, 0.5]
 
     static let maxPanes = 4
+
+    /// Pages that sit as `regions`, their lines where `column` and `row` put them: one line each, as a split always
+    /// had. A grid of four starts from them too, and the segments move apart from there.
+    init(regions: [TileRegion], column: CGFloat = 0.5, row: CGFloat = 0.5) {
+        self.regions = regions
+        self.columnShares = [column, column]
+        self.rowShares = [row, row]
+        normalize()
+    }
 
     /// A split of two: side by side, the first `ratio` of the width, or stacked, of the height.
     static func pair(ratio: CGFloat, vertical: Bool) -> TileShape {
         vertical ? TileShape(regions: [.top, .bottom], row: ratio) : TileShape(regions: [.left, .right], column: ratio)
+    }
+
+    /// The share of the width left of the line between the columns: the one line where a page spans both rows, else the
+    /// top row's.
+    var column: CGFloat {
+        get { columnShares[0] }
+        set { columnShares = [newValue, newValue] }
+    }
+
+    /// The share of the height above the line between the rows: the one line where a page spans both columns, else the
+    /// line in the column that has one.
+    var row: CGFloat {
+        get { rowShares[rowLineColumn] }
+        set { rowShares = [newValue, newValue] }
+    }
+
+    /// The column whose line between the rows divides pages: the one across from a half page, else the left.
+    private var rowLineColumn: Int {
+        if regions.contains(.left) { return 1 }
+        if regions.contains(.right) { return 0 }
+        return 0
+    }
+
+    /// A page runs down both rows, so the columns share one line between them; and one runs across both columns, so
+    /// the rows share one.
+    private var spansRows: Bool { regions.contains(where: \.isColumn) }
+    private var spansColumns: Bool { regions.contains(where: \.isRowHalf) }
+
+    /// One line where the pages need one: a page spanning both rows makes the column line one, a page spanning both
+    /// columns makes the row line one, and a grid of four keeps the line between its rows one.
+    mutating func normalize() {
+        if spansRows { columnShares[1] = columnShares[0] }
+        if spansColumns || regions.count == 4 { rowShares[1] = rowShares[0] }
     }
 
     /// Pages that cover the area once each: two to four of them, none overlapping, nothing left over.
@@ -81,8 +130,20 @@ nonisolated struct TileShape: Equatable, Sendable {
 
     /// Each page's frame in `area`, in the group's order, `gap` apart.
     func frames(in area: CGRect, gap: CGFloat) -> [CGRect] {
-        let x = area.minX + floor(max(0, area.width - gap) * column)
-        let y = area.minY + floor(max(0, area.height - gap) * row)
+        let width = max(0, area.width - gap), height = max(0, area.height - gap)
+        let xs: [CGFloat]
+        let ys: [CGFloat]
+        if spansRows {
+            // A page runs down both rows: one line between the columns, and a line in each column between the rows.
+            let x = area.minX + floor(width * columnShares[0])
+            xs = [x, x]
+            ys = rowShares.map { area.minY + floor(height * $0) }
+        } else {
+            // A line in each row between the columns; the line between the rows is one.
+            xs = columnShares.map { area.minX + floor(width * $0) }
+            let y = area.minY + floor(height * rowShares[0])
+            ys = [y, y]
+        }
         func span(_ range: ClosedRange<Int>, from start: CGFloat, to end: CGFloat, split: CGFloat) -> (CGFloat, CGFloat) {
             switch (range.lowerBound, range.upperBound) {
             case (0, 0): (start, split)
@@ -91,50 +152,187 @@ nonisolated struct TileShape: Equatable, Sendable {
             }
         }
         return regions.map { region in
-            let (minX, maxX) = span(region.columns, from: area.minX, to: area.maxX, split: x)
-            let (minY, maxY) = span(region.rows, from: area.minY, to: area.maxY, split: y)
+            let (minX, maxX) = span(region.columns, from: area.minX, to: area.maxX, split: xs[region.rows.lowerBound])
+            let (minY, maxY) = span(region.rows, from: area.minY, to: area.maxY, split: ys[region.columns.lowerBound])
             return CGRect(x: minX, y: minY, width: max(0, maxX - minX), height: max(0, maxY - minY))
         }
     }
 
-    /// Which page covers a cell of the grid (0 top left, 1 top right, 2 bottom left, 3 bottom right).
-    private func page(atCell cell: Int) -> Int? { regions.firstIndex { $0.cells & (1 << cell) != 0 } }
-
-    /// Where the line between the columns divides two pages: in the top row, the bottom row, or both.
-    var columnLineRows: ClosedRange<Int>? {
-        let top = page(atCell: 0) != page(atCell: 1), bottom = page(atCell: 2) != page(atCell: 3)
-        return top && bottom ? 0...1 : top ? 0...0 : bottom ? 1...1 : nil
+    /// A stretch of the line between two pages, which you drag to resize them (#316): the two either side trade width
+    /// or height, and the rest stay put.
+    nonisolated struct Segment: Equatable, Sendable {
+        nonisolated enum Axis: Hashable, Sendable { case column, row }
+        var axis: Axis
+        /// The row whose line between the columns this is, for a column segment.
+        var row: Int
+        /// The column whose line between the rows this is, for a row segment.
+        var column: Int
+        /// The pages either side, in the group's order: left and right, or top and bottom.
+        var first: Int
+        var second: Int
+        /// The strip you drag, `slop` wider on each side.
+        var frame: CGRect
     }
 
-    /// Where the line between the rows divides two pages: in the left column, the right one, or both.
-    var rowLineColumns: ClosedRange<Int>? {
-        let left = page(atCell: 0) != page(atCell: 2), right = page(atCell: 1) != page(atCell: 3)
-        return left && right ? 0...1 : left ? 0...0 : right ? 1...1 : nil
+    /// Where a line between the columns and one between the rows meet. Dragging here moves both, so the page at the
+    /// corner grows or shrinks both ways and the other pages give way (#309).
+    nonisolated struct Corner: Equatable, Sendable {
+        /// The rows whose line between the columns ends here, and the columns whose line between the rows does.
+        var rows: [Int]
+        var columns: [Int]
+        /// The square you drag.
+        var frame: CGRect
     }
 
-    /// The strips between pages you drag to resize them: the gap between the columns where it divides pages, and the
-    /// gap between the rows, each `slop` wider on both sides so it's easy to catch; the column line `leading` (when
-    /// given) on its left instead.
-    func dividers(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> (column: CGRect?, row: CGRect?) {
-        let left = leading ?? slop
-        let x = area.minX + floor(max(0, area.width - gap) * column)
-        let y = area.minY + floor(max(0, area.height - gap) * row)
-        func extent(_ range: ClosedRange<Int>, start: CGFloat, end: CGFloat, split: CGFloat) -> (CGFloat, CGFloat) {
-            switch (range.lowerBound, range.upperBound) {
-            case (0, 0): (start, split)
-            case (1, 1): (split + gap, end)
-            default: (start, end)
+    /// The strips between pages you drag to resize them: one between each pair beside each other, as tall or as wide as
+    /// the two pages, `slop` wider on both sides so it's easy to catch; the column line `leading` (when given) on its
+    /// left instead, so a page's scroll bar side keeps more of its edge (#362).
+    func segments(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> [Segment] {
+        let leftReach = leading ?? slop
+        let frames = frames(in: area, gap: gap)
+        var segments: [Segment] = []
+        for a in frames.indices {
+            for b in frames.indices where b != a {
+                let first = frames[a], second = frames[b]
+                if first.minX < second.minX, abs(first.maxX + gap - second.minX) <= 0.5 {
+                    let top = max(first.minY, second.minY), bottom = min(first.maxY, second.maxY)
+                    guard bottom - top > 0.5 else { continue }
+                    // The page that keeps to one row names it; a half names the row of the page across from it.
+                    let row = regions[a].rows.count == 1 ? regions[a].rows.lowerBound : regions[b].rows.lowerBound
+                    segments.append(Segment(axis: .column, row: row, column: 0, first: a, second: b,
+                                            frame: CGRect(x: first.maxX - leftReach, y: top,
+                                                          width: gap + leftReach + slop, height: bottom - top)))
+                }
+                if first.minY < second.minY, abs(first.maxY + gap - second.minY) <= 0.5 {
+                    let left = max(first.minX, second.minX), right = min(first.maxX, second.maxX)
+                    guard right - left > 0.5 else { continue }
+                    let column = regions[a].columns.count == 1 ? regions[a].columns.lowerBound : regions[b].columns.lowerBound
+                    segments.append(Segment(axis: .row, row: 0, column: column, first: a, second: b,
+                                            frame: CGRect(x: left, y: first.maxY - slop, width: right - left,
+                                                          height: gap + slop * 2)))
+                }
             }
         }
-        let columnLine = columnLineRows.map { rows -> CGRect in
-            let (top, bottom) = extent(rows, start: area.minY, end: area.maxY, split: y)
-            return CGRect(x: x - left, y: top, width: gap + left + slop, height: max(0, bottom - top))
+        return segments
+    }
+
+    /// Where the segments meet, the square you drag to move both at once (#309).
+    func corners(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> [Corner] {
+        let strips = segments(in: area, gap: gap, slop: slop, leading: leading)
+        let vertical = strips.filter { $0.axis == .column }, horizontal = strips.filter { $0.axis == .row }
+        // Larger than where the two strips cross, so the corner is easy to catch.
+        let side = gap + slop * 4, reach = gap + slop + 0.5
+        var corners: [Corner] = []
+        for line in vertical {
+            for across in horizontal {
+                let x = line.frame.midX, y = across.frame.midY
+                guard y >= line.frame.minY - reach, y <= line.frame.maxY + reach,
+                      x >= across.frame.minX - reach, x <= across.frame.maxX + reach else { continue }
+                if let i = corners.firstIndex(where: { abs($0.frame.midX - x) <= 0.5 && abs($0.frame.midY - y) <= 0.5 }) {
+                    if !corners[i].rows.contains(line.row) { corners[i].rows.append(line.row) }
+                    if !corners[i].columns.contains(across.column) { corners[i].columns.append(across.column) }
+                } else {
+                    corners.append(Corner(rows: [line.row], columns: [across.column],
+                                          frame: CGRect(x: x - side / 2, y: y - side / 2, width: side, height: side)))
+                }
+            }
         }
-        let rowLine = rowLineColumns.map { columns -> CGRect in
-            let (left, right) = extent(columns, start: area.minX, end: area.maxX, split: x)
-            return CGRect(x: left, y: y - slop, width: max(0, right - left), height: gap + slop * 2)
+        return corners
+    }
+
+    /// The strips between pages, one per line where it divides them, as the whole line each way: what a thumbnail
+    /// draws, and what a split of two always had.
+    func dividers(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> (column: CGRect?, row: CGRect?) {
+        let strips = segments(in: area, gap: gap, slop: slop, leading: leading)
+        func union(_ axis: Segment.Axis) -> CGRect? {
+            let frames = strips.filter { $0.axis == axis }.map(\.frame)
+            guard let first = frames.first else { return nil }
+            return frames.dropFirst().reduce(first) { $0.union($1) }
         }
-        return (columnLine, rowLine)
+        return (union(.column), union(.row))
+    }
+
+    /// A grid of four, the one layout whose line between the columns has a segment in each row.
+    var isGrid: Bool { regions.count == 4 }
+
+    /// A grid whose rows have moved their lines between the columns apart (#316).
+    var isParted: Bool { isGrid && abs(columnShares[0] - columnShares[1]) > 0.0001 }
+
+    /// Moves the line between the columns in `row` to `share` of the width, kept so no page gets smaller than `minimum`
+    /// points. `whole`, or any layout but a grid: every row's line moves together, the old full-height split;
+    /// otherwise only the segment in `row` moves (#316).
+    mutating func moveColumnLine(in row: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
+        let value = Self.clamped(share, length: length, minimum: minimum)
+        if whole || !isGrid {
+            columnShares = [value, value]
+        } else if columnShares.indices.contains(row) {
+            columnShares[row] = value
+        }
+    }
+
+    /// Moves the line between the rows to `share` of the height. It is one line in every layout: a grid's runs across
+    /// both columns, and elsewhere only one column has one, so the other column's share follows it.
+    mutating func moveRowLine(in column: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
+        let value = Self.clamped(share, length: length, minimum: minimum)
+        rowShares = [value, value]
+    }
+
+    /// Moves a corner to `point` (in the area's top-down coordinates): the line between the columns there and the line
+    /// between the rows, each kept so no page gets smaller than `minimumWidth` by `minimumHeight`. `whole`: both
+    /// full lines move, as the old corner did; otherwise only the segments that meet there (#309).
+    mutating func moveCorner(_ corner: Corner, to point: CGPoint, in area: CGRect, minimumWidth: CGFloat, minimumHeight: CGFloat, whole: Bool = false) {
+        let x = Self.clamped((point.x - area.minX) / max(area.width, 1), length: area.width, minimum: minimumWidth)
+        let y = Self.clamped((point.y - area.minY) / max(area.height, 1), length: area.height, minimum: minimumHeight)
+        rowShares = [y, y]
+        if whole || !isGrid {
+            columnShares = [x, x]
+        } else {
+            for row in corner.rows where columnShares.indices.contains(row) { columnShares[row] = x }
+        }
+    }
+
+    /// Whether every line sits in the middle: the standard even grid.
+    var isEven: Bool {
+        columnShares.allSatisfy { abs($0 - 0.5) < 0.001 } && rowShares.allSatisfy { abs($0 - 0.5) < 0.001 }
+    }
+
+    /// Whether `share` is within `points` of the middle of a line `length` long: the drag shows the even guide and
+    /// snaps on release unless Shift holds it away.
+    static func nearEven(_ share: CGFloat, length: CGFloat, points: CGFloat = 8) -> Bool {
+        abs(share - 0.5) * max(length, 1) <= points
+    }
+
+    /// Whether the line between the columns in `row` is near the middle: one row's segment, or the whole line where
+    /// the rows share it, or `whole` (#316).
+    func columnLineIsNearEven(in row: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
+        let shares = whole || !isGrid ? columnShares : columnShares.indices.contains(row) ? [columnShares[row]] : []
+        return !shares.isEmpty && shares.allSatisfy { Self.nearEven($0, length: length, points: points) }
+    }
+
+    /// Whether the line between the rows is near the middle; it is one line in every layout.
+    func rowLineIsNearEven(in column: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
+        rowShares.allSatisfy { Self.nearEven($0, length: length, points: points) }
+    }
+
+    /// Puts the line between the columns in `row` back in the middle, exactly: the snap when a drag lets go near
+    /// even. `whole`, or the rows sharing one line, puts every row's line there.
+    mutating func snapColumnLine(in row: Int, whole: Bool = false) {
+        if whole || !isGrid {
+            columnShares = [0.5, 0.5]
+        } else if columnShares.indices.contains(row) {
+            columnShares[row] = 0.5
+        }
+    }
+
+    /// Puts the line between the rows back in the middle, exactly: the snap when a drag lets go near even.
+    mutating func snapRowLine(in column: Int, whole: Bool = false) {
+        rowShares = [0.5, 0.5]
+    }
+
+    /// The even grid again: every line at the middle.
+    mutating func evenOut() {
+        columnShares = [0.5, 0.5]
+        rowShares = [0.5, 0.5]
     }
 
     /// A divider's share, from where it was dragged to, kept so no page gets smaller than `minimum` points (or a
@@ -250,8 +448,15 @@ nonisolated struct TileDrop: Equatable, Sendable {
         func place(_ target: TileRegion) -> TileDrop? {
             guard let placed = TileShape.placing(target, beside: shape?.regions ?? []) else { return nil }
             var after = TileShape(regions: placed + [target], column: ratio.column, row: ratio.row)
-            // Beside a page alone the two get even halves, as a split always opened.
-            if shape == nil { after.column = 0.5; after.row = 0.5 }
+            // Beside a page alone the two get even halves, as a split always opened; in a group, the lines it has.
+            if shape == nil {
+                after.column = 0.5
+                after.row = 0.5
+            } else {
+                after.columnShares = ratio.columnShares
+                after.rowShares = ratio.rowShares
+                after.normalize()
+            }
             guard let frame = after.frames(in: area, gap: gap).last else { return nil }
             return TileDrop(kind: .place(region: target, regions: placed), frame: frame)
         }
@@ -366,7 +571,13 @@ extension TabManager.SplitPair {
     /// How its pages share the page area.
     var shape: TileShape {
         if let regions, regions.count == count {
-            return TileShape(regions: regions, column: CGFloat(ratio), row: CGFloat(otherRatio))
+            var shape = TileShape(regions: regions, column: CGFloat(ratio), row: CGFloat(otherRatio))
+            if let shares, shares.count == 4 {
+                shape.columnShares = [CGFloat(shares[0]), CGFloat(shares[1])]
+                shape.rowShares = [CGFloat(shares[2]), CGFloat(shares[3])]
+                shape.normalize()
+            }
+            return shape
         }
         return vertical ? TileShape(regions: [.top, .bottom], column: CGFloat(otherRatio), row: CGFloat(ratio))
             : TileShape(regions: [.left, .right], column: CGFloat(ratio), row: CGFloat(otherRatio))
@@ -379,11 +590,22 @@ extension TabManager.SplitPair {
             ratio = Double(vertical ? shape.row : shape.column)
             otherRatio = Double(vertical ? shape.column : shape.row)
             regions = nil
+            shares = nil
         } else {
             regions = shape.regions
             ratio = Double(shape.column)
             otherRatio = Double(shape.row)
+            shares = shape.columnShares.map(Double.init) + shape.rowShares.map(Double.init)
         }
+    }
+
+    /// Takes `shape`'s lines, the places kept: each row's line between the columns and each column's between the rows.
+    mutating func setLines(of shape: TileShape) {
+        var after = self.shape
+        after.columnShares = shape.columnShares
+        after.rowShares = shape.rowShares
+        after.normalize()
+        setShape(after)
     }
 
     /// The lines moved, the places kept.
@@ -407,6 +629,11 @@ extension TabManager.SplitPair {
         rest.remove(at: index)
         var after = shape
         after.regions = regions
+        // A parted grid's quarter that grows into a half keeps its row's width.
+        if shape.isParted, let half = regions.firstIndex(where: \.isColumn),
+           let grown = ids.firstIndex(of: rest[half]) {
+            after.column = shape.columnShares[shape.regions[grown].rows.lowerBound]
+        }
         return Self(ids: rest, shape: after)
     }
 

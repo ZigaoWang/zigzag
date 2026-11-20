@@ -29,6 +29,10 @@ final class TabManager {
     private(set) var currentSpaceID: UUID { didSet { extensionLists.removeAll() } }
     /// MRU order in this window, for Control+Tab.
     private(set) var recentTabIDs: [UUID] = []
+    /// Tabs opened from another since you last switched tabs: closing one goes back toward its opener, as in Chrome.
+    private var openedSinceSwitch: Set<UUID> = []
+    /// Set while a selection is Zigzag's own (a new tab, after a close), which keeps `openedSinceSwitch`.
+    private var selectingQuietly = false
     private var closedTabs: [ClosedTab] {
         get { store.closedTabs }
         _modify { yield &store.closedTabs }
@@ -97,6 +101,8 @@ final class TabManager {
         var isCollapsed = false
         /// Its tab group; reopening restores it (and the group if it was removed).
         var groupID: UUID? = nil
+        /// When it closed, so ⇧⌘T takes the latest closed anywhere, tab or window.
+        var closedAt = Date()
     }
 
     /// Private windows share one throwaway store between their tabs, gone when the window closes.
@@ -475,6 +481,7 @@ final class TabManager {
         tab.host = host
         watch(tab)
         tab.opener = opener
+        if opener != nil { openedSinceSwitch.insert(tab.id) }
         // Placed once, as Settings says; the list never reorders itself after that.
         // `site`: the page a tab made empty is about to load, for Next to Tabs from the Same Site.
         let place = newTabPlacement(in: space, opener: opener, select: select, site: url ?? site)
@@ -497,7 +504,7 @@ final class TabManager {
         }
         structureChanged()
         if select {
-            self.select(tab)
+            selectQuietly(tab)
         } else {
             recentTabIDs.insert(tab.id, at: min(1, recentTabIDs.count))
             // Background tabs start loading right away, so they're ready when you get to them.
@@ -631,7 +638,9 @@ final class TabManager {
         tabsBySpace[currentSpaceID] = list
         if #available(macOS 15.4, *) { ExtensionCenter.tabOpened(tab) }
         structureChanged()
-        select(tab)
+        // A Peek made a tab still goes back to the page it came from.
+        if tab.opener != nil { openedSinceSwitch.insert(tab.id) }
+        selectQuietly(tab)
     }
 
     /// A tab from another window's list into this one at `index`, its page as it is, and shown (#167). Half of a
@@ -709,6 +718,8 @@ final class TabManager {
             changed.send(.space)
         }
         let previous = selectedTab
+        // Switching tabs yourself forgets which tabs opened which, as in Chrome.
+        if !selectingQuietly, previous !== tab { openedSinceSwitch.removeAll() }
         previous?.captureSnapshot()
         // Where you were and what you'd typed, in case its page has to load again while you're away.
         if previous !== tab { previous?.readPageState() }
@@ -728,6 +739,14 @@ final class TabManager {
         for loser in losers { loser.pageTaken() }
     }
 
+    /// Selects without counting as your switch, so tabs opened from others still close back toward them.
+    private func selectQuietly(_ tab: Tab, claiming: Bool = true) {
+        let was = selectingQuietly
+        selectingQuietly = true
+        defer { selectingQuietly = was }
+        select(tab, claiming: claiming)
+    }
+
     private func promote(_ tab: Tab) {
         recentTabIDs.removeAll { $0 == tab.id }
         recentTabIDs.insert(tab.id, at: 0)
@@ -738,22 +757,13 @@ final class TabManager {
         selectionChanged()
     }
 
-    func selectNext(offset: Int) {
-        let list = navigableTabs
-        guard !list.isEmpty else { return }
-        guard let current = selectedTab, let index = list.firstIndex(where: { $0 === current }) else {
-            select(list[0]); return
-        }
-        select(list[(index + offset + list.count) % list.count])
-    }
-
     func select(at index: Int) {
         let list = navigableTabs
         guard !list.isEmpty else { return }
         select(index >= list.count ? list[list.count - 1] : list[index])
     }
 
-    /// Favorites, bookmarks, then tabs, in sidebar order: what Cmd+Option+Up/Down walk.
+    /// Open favorites, open pinned tabs, then tabs, in sidebar order.
     var navigableTabs: [Tab] {
         let favoriteLive = Library.shared.favorites(in: profile.id).compactMap { bookmarkTabs[$0.id] }
         let bookmarkLive = Library.shared.bookmarks(in: currentSpaceID).compactMap { bookmarkTabs[$0.id] }
@@ -1455,7 +1465,7 @@ final class TabManager {
         if selectedTab === tab, let partnerTab {
             if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
             closeKeepingSelection(tab, split: pair, heir: heir)
-            select(partnerTab)
+            selectQuietly(partnerTab)
             return
         }
         let wasSelected = selectedTab === tab
@@ -1567,28 +1577,83 @@ final class TabManager {
         return close(tabs)
     }
 
-    /// After closing the current tab: its opener, else the previous tab in this space, else its list neighbor. With
-    /// shared tabs (#162), prefer one no other window shows; if none, show a placeholder for it.
+    /// After closing the current tab, as in Chrome: opened from another tab since you last switched, the next tab
+    /// that one opened, else the opener; otherwise the tab below, else the one above. A pinned page or favorite
+    /// goes to its opener, else the tab you were on before, else the top tab. With shared tabs (#162), prefer one no
+    /// other window shows; if none, show a placeholder for it.
     private func selectAfterClosing(_ closed: Tab, index: Int) {
         let list = tabs(in: closed.spaceID)
         let recent = recentTabs
         let before = { (tab: Tab) in tab !== closed && tab.spaceID == closed.spaceID && !tab.isClosed }
-        if let opener = closed.opener, list.contains(where: { $0 === opener }), !isShownElsewhere(opener) {
-            select(opener, claiming: false)
-        } else if !leavesSpaceEmpty, let previous = recent.first(where: { before($0) && !isShownElsewhere($0) }) ?? recent.first(where: before) {
-            select(previous, claiming: false)
+        let openerCounts = openedSinceSwitch.remove(closed.id) != nil
+        if closed.bookmarkID == nil, let next = heir(closing: closed, at: index, in: list, openerCounts: openerCounts) {
+            selectQuietly(next, claiming: false)
+        } else if closed.bookmarkID != nil, let opener = closed.opener, list.contains(where: { $0 === opener }), !isShownElsewhere(opener) {
+            selectQuietly(opener, claiming: false)
+        } else if closed.bookmarkID != nil, !leavesSpaceEmpty,
+                  let previous = recent.first(where: { before($0) && !isShownElsewhere($0) }) ?? recent.first(where: before) {
+            selectQuietly(previous, claiming: false)
         } else if !list.isEmpty {
             let near = list[min(index, list.count - 1)]
-            select(isShownElsewhere(near) ? list.first { !isShownElsewhere($0) } ?? near : near, claiming: false)
+            selectQuietly(isShownElsewhere(near) ? list.first { !isShownElsewhere($0) } ?? near : near, claiming: false)
         } else if !leavesSpaceEmpty, let recent = recent.first(where: { $0.spaceID == closed.spaceID }) {
-            select(recent, claiming: false)
+            selectQuietly(recent, claiming: false)
         } else {
             selectedBySpace[closed.spaceID] = nil
             selectionChanged()
         }
     }
 
+    /// Chrome's choice after closing an ordinary tab that stood at `index` in `list` (as it is without it).
+    private func heir(closing closed: Tab, at index: Int, in list: [Tab], openerCounts: Bool) -> Tab? {
+        let free = { (tab: Tab) in !tab.isClosed && !self.isShownElsewhere(tab) }
+        if openerCounts, let opener = closed.opener, !opener.isClosed, opener.spaceID == closed.spaceID,
+           self.tab(with: opener.id) === opener {
+            let siblings = list.indices.filter { list[$0].opener === opener && openedSinceSwitch.contains(list[$0].id) && free(list[$0]) }
+            if let at = siblings.first(where: { $0 >= index }) ?? siblings.last { return list[at] }
+            if free(opener) { return opener }
+        }
+        let start = min(index, list.count)
+        let shown = { (tab: Tab) in free(tab) && !self.isFoldedAway(tab) }
+        return list[start...].first(where: shown) ?? list[..<start].reversed().first(where: shown)
+    }
+
+    /// Out of sight in the sidebar: in a shut group, or under a folded tab.
+    private func isFoldedAway(_ tab: Tab) -> Bool {
+        if let group = tab.groupID, groups[group]?.isOpen == false { return true }
+        var parent = tab.parentID
+        var steps = 0
+        while let id = parent, steps < 64, let up = self.tab(with: id) {
+            if up.isCollapsed { return true }
+            parent = up.parentID
+            steps += 1
+        }
+        return false
+    }
+
     var canReopenClosedTab: Bool { !closedTabs.isEmpty }
+
+    /// The latest closed tab here, by when it closed: windows that came to share tabs keep theirs in turn.
+    var lastClosedTab: ClosedTab? {
+        guard let latest = closedTabs.map(\.closedAt).max() else { return nil }
+        return closedTabs.last { $0.closedAt == latest }
+    }
+
+    /// The closed tabs, oldest first, to keep once this window closes (`WindowManager.reopenLastClosed`).
+    var closedTabRecords: [ClosedTab] { closedTabs }
+
+    /// A tab closed in a window since closed, brought back here: in its own space if that's still there, on its own,
+    /// since its split, group and tree stayed with that window.
+    @discardableResult
+    func reopenFromClosedWindow(_ record: ClosedTab) -> Tab? {
+        var closed = record
+        closed.split = nil
+        closed.parentID = nil
+        closed.childIDs = []
+        closed.groupID = nil
+        closedTabs.append(closed)
+        return reopenClosedTab(closed.id)
+    }
 
     /// Closed tabs with a page, newest first, for History › Recently Closed; reopen with `reopenClosedTab(id)`.
     var recentlyClosedTabs: [(id: UUID, url: URL, title: String)] {
@@ -1798,6 +1863,10 @@ final class TabManager {
         /// The other line's share: in a group of more, of the height above the line between the rows; with two,
         /// kept for when a third comes.
         var otherRatio: Double = 0.5
+        /// A group's own lines (#316): the line between the columns in the top row and in the bottom, then the line
+        /// between the rows in the left column and in the right. Nil for two, whose one line each `ratio` and
+        /// `vertical` say, and for a group saved before its rows had lines of their own.
+        var shares: [Double]? = nil
 
         init(left: UUID, right: UUID) {
             self.left = left
@@ -1818,7 +1887,12 @@ final class TabManager {
                Set([left, right] + more).count == more.count + 2 {
                 self.more = more
                 self.regions = regions
+                shares = ((try? c.decodeIfPresent([Double].self, forKey: .shares)) ?? nil).flatMap { $0.count == 4 ? $0 : nil }
             }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case left, right, ratio, vertical, more, regions, otherRatio, shares
         }
     }
 
@@ -2057,6 +2131,14 @@ final class TabManager {
     func setTileRatios(column: CGFloat, row: CGFloat, for tab: Tab) {
         guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return }
         splits[index].setRatios(column: min(max(column, 0.2), 0.8), row: min(max(row, 0.2), 0.8))
+        rememberPinnedLayout(splits[index])
+    }
+
+    /// Where each of a tile group's lines between its pages is, as the page area's shares (#316): each row's line
+    /// between the columns and each column's between the rows.
+    func setTileShape(_ shape: TileShape, for tab: Tab) {
+        guard let index = splits.firstIndex(where: { $0.contains(tab.id) }) else { return }
+        splits[index].setLines(of: shape)
         rememberPinnedLayout(splits[index])
     }
 
@@ -2492,28 +2574,71 @@ final class TabManager {
     func maySuspend(_ tab: Tab) -> Bool {
         guard tab.isLoaded, !tab.isClosed, tab.bookmarkID == nil, tab.url != nil else { return false }
         guard let selected = selectedTab, panes(of: selected).contains(where: { $0 === tab }) else { return true }
-        return awayTarget(from: selected, leaving: [tab]) != nil
+        return panes(of: selected).count > 1 || awayTarget(from: selected, leaving: [tab]) != nil
     }
 
     /// Puts tabs to sleep that you chose (Suspend Page), as Zigzag puts one to sleep: its page let go, where you were
-    /// and its history kept, loaded again when you click it. One you're on goes out of sight first, to where closing
-    /// it would go, and stays when there's nowhere. `refused` hears each that stayed awake, and why.
+    /// and its history kept, loaded again when you click it. One you're on goes out of sight first, once its page has
+    /// said it holds nothing you typed: one page of a split leaves the split, which stays on the rest, as closing it
+    /// does; a page alone, or a whole split, goes to where closing it would go, and stays when there's nowhere.
+    /// `refused` hears each that stayed awake, and why.
     func suspend(chosen: [Tab], refused: @escaping (Tab, Tab.StaysAwake) -> Void) {
         var sleepers: [Tab] = []
         for tab in chosen where maySuspend(tab) {
             if let why = tab.staysAwake { refused(tab, why) } else { sleepers.append(tab) }
         }
-        if let selected = selectedTab, panes(of: selected).contains(where: { tab in sleepers.contains { $0 === tab } }) {
-            if let next = awayTarget(from: selected, leaving: sleepers) { select(next) }
-            else { sleepers.removeAll { tab in panes(of: selected).contains { $0 === tab } } }
-        }
-        for tab in sleepers {
-            tab.suspend(because: "chosen from its menu", chosen: true) { [weak tab] why in if let tab { refused(tab, why) } }
+        let shown = selectedTab.map(panes(of:)) ?? []
+        let onScreen = sleepers.filter { tab in shown.contains { $0 === tab } }
+        for tab in sleepers where !onScreen.contains(where: { $0 === tab }) { putToSleep(tab, refused: refused) }
+        guard !onScreen.isEmpty else { return }
+        // Asked before you're moved, so a page that stays awake never takes you off it.
+        var typed: [Tab] = []
+        var waiting = onScreen.count
+        for tab in onScreen {
+            tab.checkTypedText { [weak self] hasTyped in
+                if hasTyped { typed.append(tab) }
+                waiting -= 1
+                guard waiting == 0, let self else { return }
+                for tab in typed { refused(tab, .typedText) }
+                self.leaveScreen(onScreen.filter { tab in !typed.contains { $0 === tab } && self.maySuspend(tab) }, refused: refused)
+            }
         }
     }
 
-    /// Where to go from the tab you're on when it's put to sleep: as closing it would go (its opener, the tab you were
-    /// on before, a neighbor), never to a page of its split or one going to sleep with it.
+    private func putToSleep(_ tab: Tab, refused: @escaping (Tab, Tab.StaysAwake) -> Void) {
+        tab.suspend(because: "chosen from its menu", chosen: true) { [weak tab] why in if let tab { refused(tab, why) } }
+    }
+
+    /// Takes the tabs you're on out of sight, then puts them to sleep.
+    private func leaveScreen(_ sleepers: [Tab], refused: @escaping (Tab, Tab.StaysAwake) -> Void) {
+        guard let selected = selectedTab else { sleepers.forEach { putToSleep($0, refused: refused) }; return }
+        let panes = panes(of: selected)
+        let leaving = sleepers.filter { tab in panes.contains { $0 === tab } }
+        var asleep = sleepers.filter { tab in !leaving.contains { $0 === tab } }
+        if !leaving.isEmpty, leaving.count < panes.count {
+            // Some of the split stays: those pages leave it, and you stay on the rest.
+            var taker: Tab?
+            for tab in leaving {
+                let next = leaveGroup(tab, notify: false)
+                if tab === selected { taker = next }
+            }
+            structureChanged()
+            if leaving.contains(where: { $0 === selected }) {
+                let rest = panes.filter { pane in !leaving.contains { $0 === pane } }
+                if let next = taker.flatMap({ taker in rest.first { $0 === taker } }) ?? rest.first { select(next) }
+            } else {
+                selectionChanged()
+            }
+            asleep += leaving
+        } else if !leaving.isEmpty, let next = awayTarget(from: selected, leaving: sleepers) {
+            select(next)
+            asleep += leaving
+        }
+        asleep.forEach { putToSleep($0, refused: refused) }
+    }
+
+    /// Where to go from the tab you're on when it's put to sleep: its opener, the tab you were on before, else a
+    /// neighbor, never to a page of its split or one going to sleep with it.
     private func awayTarget(from tab: Tab, leaving: [Tab]) -> Tab? {
         let away = panes(of: tab) + leaving
         let fits = { (other: Tab) in !other.isClosed && other.spaceID == tab.spaceID && !away.contains { $0 === other } }
