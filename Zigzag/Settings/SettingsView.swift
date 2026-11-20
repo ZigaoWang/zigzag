@@ -1232,7 +1232,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private let addSpaceButton = PillButton(title: String(localized: "New Space", comment: "Button beside Your Spaces in Settings › Spaces."))
     private let addRouteButton = PillButton(title: String(localized: "Add Rule…", comment: "Add a space routing rule in Settings."))
     private let addProfileButton = PillButton(title: String(localized: "New Profile…", comment: "Button beside Your Profiles in Settings › Profiles: opens the sheet that makes a profile."))
-    private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
+    private let getExtensionsButton = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens a menu of the Chrome Web Store and Firefox Add-ons."))
     private let loadUnpackedButton = PillButton(title: String(localized: "Install from File…", comment: "Button in Settings › Extensions: installs an extension from a folder or a Firefox package file (.xpi) on this Mac."))
     private let checkUpdatesButton = PillButton(title: String(localized: "Check for Updates", comment: "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now."))
     private var spaceRows: [SpaceSettingsRow] = []
@@ -1837,7 +1837,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
 
         // Extensions
-        getExtensionsButton.onClick = { [weak self] _ in self?.getExtensions() }
+        getExtensionsButton.onClick = { [weak self] _ in if let self { self.showGetExtensionsMenu(from: self.getExtensionsButton) } }
         loadUnpackedButton.onClick = { [weak self] _ in self?.loadUnpacked() }
         checkUpdatesButton.onClick = { [weak self] _ in self?.checkForUpdates() }
 
@@ -2274,10 +2274,10 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             ($0.value.displayName ?? $0.key).localizedCaseInsensitiveCompare($1.value.displayName ?? $1.key) == .orderedAscending
         }
         if installed.isEmpty {
-            let get = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens the Chrome Web Store."))
-            get.onClick = { [weak self] _ in self?.getExtensions() }
+            let get = PillButton(title: String(localized: "Get Extensions", comment: "Button in Settings › Extensions: opens a menu of the Chrome Web Store and Firefox Add-ons."))
+            get.onClick = { [weak self, weak get] _ in if let get { self?.showGetExtensionsMenu(from: get) } }
             extensionsGroup.add(FormRow(title: String(localized: "No extensions yet", comment: "A setting in Settings › Extensions."),
-                                        detail: String(localized: "Find one in the Chrome Web Store and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions."),
+                                        detail: String(localized: "Find one in the Chrome Web Store or Firefox Add-ons and choose Add to Zigzag.", comment: "Explanation under “No extensions yet” in Settings › Extensions. Firefox Add-ons is addons.mozilla.org."),
                                         control: get))
         }
         for (id, ext) in installed {
@@ -4868,11 +4868,30 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
     }
 
-    private func getExtensions() {
+    /// Get Extensions: which store to open.
+    private func showGetExtensionsMenu(from button: PillButton) {
+        let entries: [MenuPanel.Entry] = ExtensionStore.Shop.allCases.map { shop in
+            .item(MenuPanel.Item(title: shop.title) { [weak self] in self?.getExtensions(from: shop) })
+        }
+        button.isSelected = true
+        MenuPanel.show(entries, from: button) { [weak button] in button?.isSelected = false }
+    }
+
+    private func getExtensions(from shop: ExtensionStore.Shop) {
         guard let controller = browser else { return }
-        controller.tabManager.newTab(url: ExtensionStore.webStoreURL)
+        controller.tabManager.newTab(url: shop.url)
         controller.window?.makeKeyAndOrderFront(nil)
     }
+
+    #if DEBUG
+    /// The bridge's getextensions: the Get Extensions menu, as a click opens it.
+    func debugShowGetExtensionsMenu() {
+        func pills(in view: NSView) -> [PillButton] { view.subviews.flatMap { ($0 as? PillButton).map { [$0] } ?? pills(in: $0) } }
+        let title = getExtensionsButton.title
+        guard let button = pills(in: self).first(where: { $0.title == title && !$0.isHidden && $0.window != nil }) else { return }
+        showGetExtensionsMenu(from: button)
+    }
+    #endif
 
     /// Favicons come in at any size; a menu wants 16 points.
     private static func menuIcon(_ icon: NSImage) -> NSImage {

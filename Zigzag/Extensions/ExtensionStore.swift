@@ -256,6 +256,26 @@ enum ExtensionStore {
     static let chromeVersion = "157.0"
 
     static let webStoreURL = URL(string: "https://chromewebstore.google.com/category/extensions")!
+    static let addonsURL = URL(string: "https://addons.mozilla.org/firefox/extensions/")!
+
+    /// The stores Get Extensions offers, in its menu's order.
+    enum Shop: CaseIterable {
+        case chromeWebStore, firefoxAddons
+
+        var title: String {
+            switch self {
+            case .chromeWebStore: String(localized: "Chrome Web Store", comment: "Item in the Get Extensions menu: opens the Chrome Web Store.")
+            case .firefoxAddons: String(localized: "Firefox Add-ons", comment: "Item in the Get Extensions menu: opens addons.mozilla.org, Mozilla's store of Firefox extensions.")
+            }
+        }
+
+        var url: URL {
+            switch self {
+            case .chromeWebStore: ExtensionStore.webStoreURL
+            case .firefoxAddons: ExtensionStore.addonsURL
+            }
+        }
+    }
 
     /// The extension id in a Chrome Web Store page address, e.g. chromewebstore.google.com/detail/ublock-origin-lite/ddkjiahejlhfcafbddmgiahcphecmpfh.
     static func webStoreID(from url: URL?) -> String? {

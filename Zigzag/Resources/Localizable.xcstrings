@@ -1139,6 +1139,39 @@
         }
       }
     },
+    "Chrome Web Store" : {
+      "comment" : "Item in the Get Extensions menu: opens the Chrome Web Store.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chrome 网上应用店"
+          }
+        }
+      }
+    },
+    "Firefox Add-ons" : {
+      "comment" : "Item in the Get Extensions menu: opens addons.mozilla.org, Mozilla's store of Firefox extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 附加组件"
+          }
+        }
+      }
+    },
+    "Find one in the Chrome Web Store or Firefox Add-ons and choose Add to Zigzag." : {
+      "comment" : "Explanation under “No extensions yet” in Settings › Extensions. Firefox Add-ons is addons.mozilla.org.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 Chrome 网上应用店或 Firefox 附加组件中找一个扩展，然后选择“添加到 Zigzag”。"
+          }
+        }
+      }
+    },
     "I Understand" : {
       "comment" : "Button that acknowledges the briefing and turns the setting on.",
       "localizations" : {
@@ -10032,17 +10065,6 @@
         }
       }
     },
-    "Find one in the Chrome Web Store and choose Add to Zigzag." : {
-      "comment" : "Explanation under “No extensions yet” in Settings › Extensions.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在 Chrome 网上应用店中找一个扩展，然后选择“添加到 Zigzag”。"
-          }
-        }
-      }
-    },
     "Find your extensions in site controls, by the address. You can bring more over anytime from Settings." : {
       "comment" : "Import window when the import is done and only extensions came over. Site controls is the panel by the address.",
       "localizations" : {
@@ -10407,23 +10429,12 @@
       }
     },
     "Get Extensions" : {
-      "comment" : "Button in Settings › Extensions: opens the Chrome Web Store.\nRow in the Extensions section of Site Controls when you have none: opens the Chrome Web Store.",
+      "comment" : "Button in Settings › Extensions: opens a menu of the Chrome Web Store and Firefox Add-ons.\nItem at the bottom of the extensions menu: a submenu of the Chrome Web Store and Firefox Add-ons.\nRow in the Extensions section of Site Controls when you have none: opens the Chrome Web Store.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "获取扩展"
-          }
-        }
-      }
-    },
-    "Get Extensions…" : {
-      "comment" : "Item at the bottom of the extensions menu: opens the Chrome Web Store.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "获取扩展…"
           }
         }
       }
