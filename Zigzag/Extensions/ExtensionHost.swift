@@ -691,65 +691,90 @@ final class ExtensionHost: NSObject {
     /// Whether this extension may see private windows' tabs, downloads and pages.
     func seesPrivate(_ id: String) -> Bool { context(for: id)?.hasAccessToPrivateData ?? false }
 
-    /// Sites "When You Click It" got from a click in a private window, never written down. WebKit grants a site to
-    /// the whole extension, not one window, so each is kept only while a private tab here is on it.
-    private var privateClickSites: [String: [String]] = [:]
-
-    /// A private tab left a site or closed: click grants no private tab is on any more go.
-    private func dropLeftPrivateClickSites() {
-        guard !privateClickSites.isEmpty else { return }
-        let open = Set(WindowManager.shared.controllers.filter(\.tabManager.isPrivate).flatMap(\.tabManager.allTabs)
-            .filter { $0.profile === profile }.compactMap { ContentBlocker.site(of: $0.url) })
-        let kept = Self.privateClickSites(privateClickSites, stillOpen: open)
-        let changed = Set(privateClickSites.keys).filter { kept[$0] != privateClickSites[$0] }
-        privateClickSites = kept
-        changed.forEach(applySiteAccess)
-    }
-
-    /// The click grants that stay: those on a site a private tab still shows.
-    static func privateClickSites(_ sites: [String: [String]], stillOpen open: Set<String>) -> [String: [String]] {
-        sites.compactMapValues { list in
-            let kept = list.filter(open.contains)
-            return kept.isEmpty ? nil : kept
-        }
-    }
-
     // MARK: Site access
 
     func applySiteAccess(_ id: String) {
         guard let context = context(for: id) else { return }
+        let before = Self.access(of: context)
         applySiteAccess(to: context)
+        // WebKit keeps the content scripts and background's cross-site access it had: with less access it starts again.
+        if Self.narrowed(from: before, to: Self.access(of: context)) {
+            ExtensionLog.write("\(displayName(for: id)) has less site access; starting it again")
+            unload(id)
+            Task { await load(id) }
+            return
+        }
         bridge.userScripts.refresh()
         changed.send()
     }
 
-    /// Turns the approved site patterns into what the person chose: every approved site, only sites they
-    /// clicked the extension on, or only sites they listed. Sites where extensions are off are denied to all.
+    typealias SiteGrants = (granted: Set<String>, denied: Set<String>)
+
+    static func access(of context: WKWebExtensionContext) -> SiteGrants {
+        (Set(context.grantedPermissionMatchPatterns.keys.map(\.string)), Set(context.deniedPermissionMatchPatterns.keys.map(\.string)))
+    }
+
+    /// Whether a site granted before isn't now, or one more is denied.
+    static func narrowed(from before: SiteGrants, to after: SiteGrants) -> Bool {
+        !before.granted.isSubset(of: after.granted) || !after.denied.isSubset(of: before.denied)
+    }
+
+    /// Turns the approved site patterns into what the person chose: every approved site, no site until a click gives
+    /// it the tab it's on, or only sites they listed. Sites where extensions are off are denied to all.
     private func applySiteAccess(to context: WKWebExtensionContext) {
         let id = context.uniqueIdentifier
         let state = profile.installs.state(id)
         let approved = (state?.grantedMatchPatterns ?? []).compactMap { try? WKWebExtension.MatchPattern(string: $0) }
+        Self.applySiteAccess(state?.siteAccess, approved: approved, sites: profile.installs.accessSites(id),
+                             offSites: ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)),
+                             approvesActiveTab: state?.grantedPermissions?.contains(WKWebExtension.Permission.activeTab.rawValue) ?? false,
+                             to: context)
+    }
+
+    static func applySiteAccess(_ access: ExtensionInstalls.SiteAccess?, approved: [WKWebExtension.MatchPattern], sites: [String],
+                                offSites: Set<String>, approvesActiveTab: Bool, to context: WKWebExtensionContext) {
         // Forget earlier decisions first (clearing one pattern can clear an overlapping one), then make the current ones.
         for pattern in context.grantedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
         for pattern in context.deniedPermissionMatchPatterns.keys { context.setPermissionStatus(.unknown, for: pattern) }
-        let clicked = state?.siteAccess == .click ? privateClickSites[id] ?? [] : []
-        for pattern in Self.siteAccessPatterns(state?.siteAccess, approved: approved, optional: context.webExtension.optionalPermissionMatchPatterns,
-                                               sites: profile.installs.accessSites(id) + clicked) {
+        for pattern in siteAccessPatterns(access, approved: approved, optional: context.webExtension.optionalPermissionMatchPatterns, sites: sites) {
             context.setPermissionStatus(.grantedExplicitly, for: pattern)
         }
-        for site in ExtensionStore.extensionsOffSites(in: profile).union(profile.installs.offSites(id)) {
-            for pattern in Self.patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        for site in offSites {
+            for pattern in patterns(for: site) { context.setPermissionStatus(.deniedExplicitly, for: pattern) }
+        }
+        // When You Click It: a click gives the tab's site through activeTab, which WebKit drops when the tab leaves it.
+        if access == .click {
+            context.setPermissionStatus(.grantedExplicitly, for: .activeTab)
+        } else if !approvesActiveTab {
+            context.setPermissionStatus(.unknown, for: .activeTab)
         }
     }
 
     /// The sites a site access choice grants (nil: never chosen). Chosen, "On All Sites" adds the optional host permissions too.
+    /// "When You Click It" grants none: a click gives only the tab it's on.
     static func siteAccessPatterns(_ access: ExtensionInstalls.SiteAccess?, approved: [WKWebExtension.MatchPattern],
                                    optional: Set<WKWebExtension.MatchPattern>, sites: [String]) -> [WKWebExtension.MatchPattern] {
         switch access {
         case nil: approved
         case .all: approved + optional.filter { !approved.contains($0) }
-        case .click, .sites: sites.flatMap(patterns(for:))
+        case .click: []
+        case .sites: sites.flatMap(patterns(for:))
         }
+    }
+
+    /// Whether a click (or the extension's shortcut or menu item) gives it the tab's site, as Chrome's activeTab does.
+    /// Under "When You Click It", Zigzag allows activeTab itself, so one that never asked for it gets only sites it asked for.
+    func grantsTabOnGesture(_ context: WKWebExtensionContext, url: URL?) -> Bool {
+        let id = context.uniqueIdentifier
+        guard profile.installs.siteAccess(id) == .click,
+              profile.installs.state(id)?.grantedPermissions?.contains(WKWebExtension.Permission.activeTab.rawValue) != true else { return true }
+        return Self.asksFor(url, in: context.webExtension)
+    }
+
+    /// Whether a site is one the extension asked for: its host permissions, optional ones, or content scripts' matches.
+    static func asksFor(_ url: URL?, in ext: WKWebExtension) -> Bool {
+        guard let url else { return false }
+        return ext.allRequestedMatchPatterns.union(ext.optionalPermissionMatchPatterns).contains { $0.matches(url) }
     }
 
     /// Asks for sites only as optional and has none yet, so "On All Sites" isn't its state until chosen.
@@ -768,7 +793,12 @@ final class ExtensionHost: NSObject {
     fileprivate func saveGrants(of context: WKWebExtensionContext, approving: Set<String> = []) {
         defer { bridge.userScripts.refresh() }
         let before = Set(profile.installs.state(context.uniqueIdentifier)?.grantedPermissions ?? [])
-        let permissions = Self.recordedGrants(Set(context.grantedPermissions.keys.map(\.rawValue)), before: before, approving: approving).sorted()
+        var granted = Set(context.grantedPermissions.keys.map(\.rawValue))
+        // The activeTab "When You Click It" lends isn't an approval.
+        if profile.installs.siteAccess(context.uniqueIdentifier) == .click, !before.union(approving).contains(WKWebExtension.Permission.activeTab.rawValue) {
+            granted.remove(WKWebExtension.Permission.activeTab.rawValue)
+        }
+        let permissions = Self.recordedGrants(granted, before: before, approving: approving).sorted()
         // Per-site grants come from site access, not approval; only an "all sites" extension's grants are its approvals.
         guard profile.installs.siteAccess(context.uniqueIdentifier) == .all || profile.installs.state(context.uniqueIdentifier)?.grantedMatchPatterns == nil else {
             profile.installs.update(context.uniqueIdentifier) {
@@ -1005,18 +1035,8 @@ final class ExtensionHost: NSObject {
             Toast.show(String(localized: "\(attention.title): in its settings, choose Browser, then Add Browser", comment: "Toast when an extension needs a step in its own app. The placeholder is a title like “Connect 1Password to Zigzag”. Browser and Add Browser are names in 1Password's settings."), symbol: "exclamationmark.triangle",
                        action: open, duration: 6, in: controller)
         }
-        // "When you click it": clicking gives it this site from now on; in a private window, while a private tab is on it.
-        if profile.installs.siteAccess(item.id) == .click, let site = ContentBlocker.site(of: tab?.url),
-           !profile.installs.accessSites(item.id).contains(site) {
-            if tab?.isPrivate == true {
-                // Not written down: a private window's sites stay out of what's kept.
-                if !(privateClickSites[item.id] ?? []).contains(site) { privateClickSites[item.id, default: []].append(site) }
-                applySiteAccess(item.id)
-            } else {
-                profile.installs.setSiteAccess(item.id, .click, sites: profile.installs.accessSites(item.id) + [site])
-            }
-            tab?.reload()
-        }
+        // "When You Click It": the click gives it this tab's site until the tab leaves it or closes (activeTab).
+        if profile.installs.siteAccess(item.id) == .click, let tab { item.context.userGesturePerformed(in: tab) }
         // A click always does something: if the extension has no popup at all and opens no page, its options page
         // opens instead. One with a popup is left alone, however long it takes: a locked 1Password is slow, not broken.
         popupShownAt = nil
@@ -1173,7 +1193,6 @@ final class ExtensionHost: NSObject {
     private func tells(_ tab: Tab) -> Bool { !tab.isPrivate || runsInPrivate }
     func tabOpened(_ tab: Tab) { if tells(tab) { controller.didOpenTab(tab) } }
     func tabClosed(_ tab: Tab, windowClosing: Bool = false) {
-        if tab.isPrivate { DispatchQueue.main.async { [weak self] in self?.dropLeftPrivateClickSites() } }
         if tells(tab) { controller.didCloseTab(tab, windowIsClosing: windowClosing) }
     }
     func tabActivated(_ tab: Tab, previous: Tab?) {
@@ -1186,7 +1205,6 @@ final class ExtensionHost: NSObject {
         controller.didMoveTab(tab, from: index, in: window)
     }
     func tabChanged(_ tab: Tab, _ change: Tab.Change) {
-        if tab.isPrivate, change == .url { dropLeftPrivateClickSites() }
         guard tells(tab) else { return }
         switch change {
         // An address or sound is told at once, after what was waiting for that tab, so the order is as it happened.
@@ -1261,7 +1279,6 @@ final class ExtensionHost: NSObject {
     func miniFocused(_ mini: MiniWindowController) { controller.didFocusWindow(mini) }
     func miniClosed(_ mini: MiniWindowController) { controller.didCloseWindow(mini) }
     func windowClosed(_ window: BrowserWindowController) {
-        if window.tabManager.isPrivate { DispatchQueue.main.async { [weak self] in self?.dropLeftPrivateClickSites() } }
         guard !window.tabManager.isPrivate || runsInPrivate else { return }
         controller.didCloseWindow(window)
     }
@@ -1779,6 +1796,7 @@ extension Tab: WKWebExtensionTab {
     func isMuted(for context: WKWebExtensionContext) -> Bool { isMuted }
     func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool {
         PrivateAccess.sees(isPrivate: isPrivate, allowed: context.hasAccessToPrivateData)
+            && profile.startedExtensions?.grantsTabOnGesture(context, url: webView?.url ?? url) == true
     }
 
     func activate(for context: WKWebExtensionContext, completionHandler: @escaping ((any Error)?) -> Void) {

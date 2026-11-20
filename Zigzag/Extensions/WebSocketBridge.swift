@@ -81,7 +81,7 @@ import WebKit
     }
 
     /// Allowed socket targets for a background. Chrome needs no host access here; Zigzag limits it to what the extension
-    /// could reach anyway: this Mac (a companion app's server), host_permissions, or granted optional hosts. `wss://host`
+    /// could reach anyway: this Mac (a companion app's server), or the hosts its site access grants now. `wss://host`
     /// matches as `https://host`.
     static func allows(_ url: URL, context: WKWebExtensionContext, localReceivers: Bool) -> Bool {
         guard let scheme = url.scheme?.lowercased(), ["ws", "wss"].contains(scheme), let host = url.host(), !host.isEmpty,
@@ -93,7 +93,7 @@ import WebKit
         if isLoopback(host) { return localReceivers }
         parts.scheme = scheme == "wss" ? "https" : "http"
         guard let web = parts.url else { return false }
-        return context.hasAccess(to: web) || context.webExtension.requestedPermissionMatchPatterns.contains { $0.matches(web) }
+        return context.hasAccess(to: web)
     }
 
     /// localhost, 127.0.0.0/8 or ::1: this Mac.
