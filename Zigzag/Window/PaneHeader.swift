@@ -148,7 +148,7 @@ final class PaneHeaderView: NSView {
         // Up in the bar on the window's frame, the bar's own appearance is the strip's; over its card, its card's.
         appearance = overCard ? PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:)) : nil
         let onPage = overCard && ground != nil
-        [back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab, address.siteControls].forEach { $0.isOnPage = onPage }
+        [back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab, address.siteControls].forEach { $0.isOnPage = onPage; $0.ground = ground }
     }
 
     func setVertical(_ vertical: Bool) {

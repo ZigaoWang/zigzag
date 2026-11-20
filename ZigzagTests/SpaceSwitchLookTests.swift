@@ -30,9 +30,9 @@ struct SpaceSwitchLookTests {
         #expect(key.pressScales && !key.pressSinks)
         #expect(key.layer?.backgroundColor == nil || rgba(key.layer?.backgroundColor)[3] == 0)
         key.isHovered = true
-        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.hover, in: light)))
+        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.buttonWash(pressed: false), in: light)))
         key.isPressed = true
-        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.pressed, in: light)))
+        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.buttonWash(pressed: true), in: light)))
         let layer = key.layer!
         // Scaled around its middle: the middle stays where it was.
         let t = layer.transform

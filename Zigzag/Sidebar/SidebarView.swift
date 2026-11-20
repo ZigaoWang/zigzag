@@ -748,7 +748,8 @@ final class SpaceDotView: InteractiveView {
             Tokens.Motion.withoutAnimation(apply)
         }
         // The key answers the pointer as the toolbar's buttons do; a drop over it lights it as the drop target.
-        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
+        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.buttonWash(pressed: true, on: frameGrounds)
+            : isHovered ? Tokens.Chrome.buttonWash(pressed: false, on: frameGrounds) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }

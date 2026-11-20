@@ -1545,6 +1545,49 @@ enum Tokens {
         /// Pressed: a step further from the space than hover (`showSink`).
         static let pressed = Color.dynamic(light: black(0.10), dark: white(0.10),
             highLight: black(0.16), highDark: white(0.16))
+
+        /// A button's hover and press wash against its ground, as WCAG contrast ratios; and with Increase Contrast.
+        nonisolated static let washContrast = (hover: 1.2, pressed: 1.36)
+        nonisolated static let highWashContrast = (hover: 1.4, pressed: 1.6)
+        /// The strongest a button's wash gets.
+        nonisolated static let washMaxAlpha: CGFloat = 0.3
+
+        /// A button's hover or press wash: white at night, black by day, just strong enough to reach `washContrast` on
+        /// every one of `grounds`; with none known, on black at night and white by day.
+        nonisolated static func buttonWash(pressed: Bool, on grounds: [NSColor] = []) -> NSColor {
+            NSColor(name: nil) { appearance in
+                let dark = appearance.isDark
+                let goals = Contrast.isHigh(appearance) ? highWashContrast : washContrast
+                var shown: [NSColor] = []
+                appearance.performAsCurrentDrawingAppearance { shown = grounds.compactMap { $0.usingColorSpace(.sRGB) } }
+                if shown.isEmpty { shown = [NSColor(srgbRed: dark ? 0 : 1, green: dark ? 0 : 1, blue: dark ? 0 : 1, alpha: 1)] }
+                let alpha = shown.map { washAlpha(on: $0, white: dark, contrast: pressed ? goals.pressed : goals.hover) }.max() ?? 0
+                return NSColor(srgbRed: dark ? 1 : 0, green: dark ? 1 : 0, blue: dark ? 1 : 0, alpha: alpha)
+            }
+        }
+
+        /// The least alpha of white (or black) laid over the sRGB `ground` that parts from it by `contrast`.
+        nonisolated static func washAlpha(on ground: NSColor, white: Bool, contrast: Double) -> CGFloat {
+            let ink: CGFloat = white ? 1 : 0
+            let channels = [ground.redComponent, ground.greenComponent, ground.blueComponent]
+            func luminance(_ c: [CGFloat]) -> Double {
+                let linear = c.map { v -> Double in let v = Double(v); return v <= 0.04045 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+                return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+            }
+            let base = luminance(channels)
+            func parts(_ a: CGFloat) -> Bool {
+                let laid = luminance(channels.map { $0 * (1 - a) + ink * a })
+                return (max(laid, base) + 0.05) / (min(laid, base) + 0.05) >= contrast
+            }
+            guard parts(washMaxAlpha) else { return washMaxAlpha }
+            var low: CGFloat = 0, high = washMaxAlpha
+            for _ in 0..<16 {
+                let mid = (low + high) / 2
+                if parts(mid) { high = mid } else { low = mid }
+            }
+            return high
+        }
+
         /// The address and the favorites: a soft field of the space's color, no line around it.
         static let field = Color.dynamic(light: white(0.45), dark: white(0.065),
             highLight: white(0.72), highDark: white(0.12))

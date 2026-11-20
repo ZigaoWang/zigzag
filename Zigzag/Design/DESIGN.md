@@ -186,8 +186,10 @@ Pills (pill buttons, pill fields, the Clear chip) are capsules: radius = height 
 One look for each state, everywhere:
 
 - Rest: nothing (rows), `fieldFill` (fields, plain pills), `Chrome.field` (the sidebar's address and favorites), `glassFill` (glass tiles).
-- Hover: on the frame `Chrome.hover` (rows, the toolbar's buttons, the space dots); elsewhere `Color.hoverFill`
-  (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
+- Hover: icon buttons and the space keys, anywhere, `Chrome.buttonWash`: white at night, black by day, as strong as
+  it takes to part from the ground under it by 1.2:1 (pressed 1.36:1), measured on the space's or the page's color
+  and on black or white when that isn't known; rows on the frame `Chrome.hover`; elsewhere `Color.hoverFill`
+  (rows), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
   primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
