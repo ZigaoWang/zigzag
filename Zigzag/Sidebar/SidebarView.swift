@@ -485,9 +485,12 @@ final class AddressView: InteractiveView {
         }
     }
 
+    /// The buttons always at the field's end, after the pins.
+    private var endButtons: [IconButton] { [saveButton, siteControlsButton] }
+
     /// Width of the unframed buttons with every pin showing (`buttonsOnly`).
     var buttonsWidth: CGFloat {
-        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + 3
+        let count = (wantsReader ? 1 : 0) + (wantsCapture ? 1 : 0) + pinEntries.count + endButtons.count
         return CGFloat(count) * Self.pinStep - 2
     }
 
@@ -544,7 +547,7 @@ final class AddressView: InteractiveView {
         let room = buttonsOnly ? bounds.width + 2 : bounds.width - x - inset - Tokens.Space.x1
         // Pins make room for the site.
         let text = (label.stringValue as NSString).size(withAttributes: [.font: label.font ?? Tokens.Font.sidebarRow()]).width
-        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + 3, room: room, text: buttonsOnly ? nil : text)
+        let fit = Self.pinsThatFit(count: pinEntries.count, otherButtons: others.count + endButtons.count, room: room, text: buttonsOnly ? nil : text)
         // The one furthest from Site Controls gives way first.
         let showing = pinEntries.suffix(fit)
         for entry in pinEntries.dropLast(fit) { takeAway(entry.button, animated: animated, removing: false) }
@@ -553,7 +556,7 @@ final class AddressView: InteractiveView {
         let pinFramesBefore = showing.map(\.button.frame)
         if showingChanged { updatePinControls(Array(showing)) }
 
-        let trailing = others + showing.map(\.button) + [saveButton, siteControlsButton]
+        let trailing = others + showing.map(\.button) + endButtons
         var right = bounds.width - end
         for (index, button) in trailing.enumerated().reversed() {
             let frame = NSRect(x: right - side, y: inset, width: side, height: side)

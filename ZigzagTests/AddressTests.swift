@@ -137,7 +137,8 @@ struct AddressTests {
         AddressView.Pin(id: id, image: nil, label: id, badge: badge, action: { _ in }, menu: { nil })
     }
 
-    private func field() -> AddressView { AddressView(frame: NSRect(x: 0, y: 0, width: 224, height: 30)) }
+    /// Room for three pins beside the star and Site Controls.
+    private func field() -> AddressView { AddressView(frame: NSRect(x: 0, y: 0, width: 224 + AddressView.buttonSide + 2, height: 30)) }
 
     @Test func aPinKeepsItsButtonAcrossUpdates() {
         let address = field()
@@ -163,21 +164,32 @@ struct AddressTests {
     }
 
     @Test func thePinFurthestFromSiteControlsHidesFirst() {
-        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200, height: 30))
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200 + AddressView.buttonSide + 2, height: 30))
         address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
         #expect(address.visiblePinIDs == ["b", "c"])
         #expect(address.pinButton(for: "a")?.isHidden == true)
     }
 
-    /// On a 224pt field the pins sit at 112, 140 and 168 (middles 125, 153, 181), Site Controls at 196.
+    @Test func theStarSitsBetweenThePinsAndSiteControls() throws {
+        let address = field()
+        address.setPins([pin("a"), pin("b")], animated: false)
+        let last = try #require(address.pinButton(for: "b")?.frame)
+        #expect(address.visiblePinIDs == ["a", "b"])
+        #expect(address.saveButton.frame.minX > last.maxX)
+        #expect(address.saveButton.frame.maxX < address.siteControlsButton.frame.minX)
+    }
+
+    /// Points along the field, from where its pins are laid out, so the buttons after them can change.
     private func at(_ x: CGFloat, _ y: CGFloat = 15) -> NSPoint { NSPoint(x: x, y: y) }
+    /// The middle of a pin's button.
+    private func mid(_ address: AddressView, _ id: String) -> CGFloat { address.pinButton(for: id)?.frame.midX ?? .nan }
 
     @Test func aCarriedPinStaysFaintInItsPlaceAndNothingElseMoves() {
         let address = field()
         address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
         let frames = ["a", "b", "c"].map { address.pinButton(for: $0)?.frame }
-        #expect(address.beginPinDrag("a", at: at(125)))
-        address.movePinDrag(to: at(190))
+        #expect(address.beginPinDrag("a", at: at(mid(address, "a"))))
+        address.movePinDrag(to: at(mid(address, "c") + 9))
         #expect(["a", "b", "c"].map { address.pinButton(for: $0)?.frame } == frames)
         #expect(address.pinButton(for: "a")?.alphaValue == CarriedCopy.faint)
         #expect(address.pinButton(for: "b")?.alphaValue == 1)
@@ -186,12 +198,13 @@ struct AddressTests {
         #expect(address.pinButton(for: "a")?.alphaValue == 1)
     }
 
-    @Test(arguments: [(100.0, nil), (130.0, nil), (150.0, nil), (160.0, 1), (190.0, 2), (215.0, 2), (230.0, nil)] as [(Double, Int?)])
-    func aPinDropsIntoTheGapUnderThePointer(x: Double, destination: Int?) {
+    /// Offsets from a pin's middle; past the last pin, over the buttons after it, is still the end; past the field, nowhere.
+    @Test(arguments: [("a", -25.0, nil), ("a", 5.0, nil), ("b", -3.0, nil), ("b", 7.0, 1), ("c", 9.0, 2), ("c", 34.0, 2), ("c", 80.0, nil)] as [(String, Double, Int?)])
+    func aPinDropsIntoTheGapUnderThePointer(pin near: String, offset: Double, destination: Int?) {
         let address = field()
         address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
-        address.beginPinDrag("a", at: at(125))
-        address.movePinDrag(to: at(x))
+        address.beginPinDrag("a", at: at(mid(address, "a")))
+        address.movePinDrag(to: at(mid(address, near) + offset))
         #expect(address.pinDropDestination == destination)
     }
 
@@ -200,8 +213,8 @@ struct AddressTests {
         address.setPins([pin("a"), pin("b")], animated: false)
         var order: [String]?
         address.onPinsReordered = { order = $0 }
-        address.beginPinDrag("a", at: at(153))
-        address.movePinDrag(to: at(190, 60))
+        address.beginPinDrag("a", at: at(mid(address, "a")))
+        address.movePinDrag(to: at(mid(address, "b") + 9, 60))
         #expect(address.pinDropDestination == nil)
         address.endPinDrag(drop: true)
         #expect(order == nil)
@@ -212,7 +225,7 @@ struct AddressTests {
         let address = field()
         address.setPins([pin("a"), pin("b")], animated: false)
         let button = address.pinButton(for: "a")
-        #expect(address.beginPinDrag("b", at: at(181)))
+        #expect(address.beginPinDrag("b", at: at(mid(address, "b"))))
         address.setPins([pin("b", badge: "3")], animated: false)
         #expect(address.pinButton(for: "a") === button)
         #expect(address.pinButton(for: "b")?.subviews.compactMap { $0 as? BadgeView }.first?.text == "3")
@@ -225,8 +238,8 @@ struct AddressTests {
         address.setPins([pin("a"), pin("b")], animated: false)
         var order: [String]?
         address.onPinsReordered = { order = $0 }
-        address.beginPinDrag("a", at: at(153))
-        address.movePinDrag(to: at(190))
+        address.beginPinDrag("a", at: at(mid(address, "a")))
+        address.movePinDrag(to: at(mid(address, "b") + 9))
         address.endPinDrag(drop: true)
         #expect(order == ["b", "a"])
     }
@@ -236,8 +249,8 @@ struct AddressTests {
         address.setPins([pin("a"), pin("b")], animated: false)
         var order: [String]?
         address.onPinsReordered = { order = $0 }
-        address.beginPinDrag("a", at: at(153))
-        address.movePinDrag(to: at(190))
+        address.beginPinDrag("a", at: at(mid(address, "a")))
+        address.movePinDrag(to: at(mid(address, "b") + 9))
         address.endPinDrag(drop: false)
         #expect(order == nil)
         #expect(address.visiblePinIDs == ["a", "b"])
@@ -250,7 +263,7 @@ struct AddressTests {
         address.setReader(available: true, active: false)
         address.setPins([pin("a", badge: "18"), pin("b")], animated: false)
         guard let a = address.pinButton(for: "a"), let b = address.pinButton(for: "b") else { Issue.record("no pins"); return }
-        let row = [address.readerButton, a, b, address.siteControlsButton]
+        let row = [address.readerButton, a, b, address.saveButton, address.siteControlsButton]
         for button in row {
             #expect(button.frame.size == NSSize(width: AddressView.buttonSide, height: AddressView.buttonSide))
             #expect(button.frame.minY == AddressView.buttonInset)
@@ -348,7 +361,7 @@ struct AddressTests {
     }
 
     @Test func removingAHiddenPinRemovesItsButton() {
-        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200, height: 30))
+        let address = AddressView(frame: NSRect(x: 0, y: 0, width: 200 + AddressView.buttonSide + 2, height: 30))
         address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
         let button = address.pinButton(for: "a")
         #expect(button?.superview === address)
@@ -359,8 +372,8 @@ struct AddressTests {
     @Test func aPinRemovedDuringADragGoesEvenIfTheStoreSaysNothing() {
         let address = field()
         address.setPins([pin("a"), pin("b")], animated: false)
-        address.beginPinDrag("a", at: at(153))
-        address.movePinDrag(to: at(190))
+        address.beginPinDrag("a", at: at(mid(address, "a")))
+        address.movePinDrag(to: at(mid(address, "b") + 9))
         address.setPins([pin("a")], animated: false)
         address.endPinDrag(drop: true)
         #expect(address.pinButton(for: "b") == nil)
@@ -370,8 +383,8 @@ struct AddressTests {
     @Test func aDropWithPendingChangesKeepsTheDroppedOrder() {
         let address = field()
         address.setPins([pin("a"), pin("b"), pin("c")], animated: false)
-        address.beginPinDrag("a", at: at(125))
-        address.movePinDrag(to: at(170))
+        address.beginPinDrag("a", at: at(mid(address, "a")))
+        address.movePinDrag(to: at(mid(address, "b") + 17))
         address.setPins([pin("a"), pin("b", badge: "2"), pin("c")], animated: false)
         address.endPinDrag(drop: true)
         #expect(address.visiblePinIDs == ["b", "a", "c"])
