@@ -6820,7 +6820,7 @@
       }
     },
     "Custom" : {
-      "comment" : "A search engine choice in Settings: one you give an address for.\nTooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own.",
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance: a percentage of Medium that you set.\nA search engine choice in Settings: one you give an address for.\nTooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11301,6 +11301,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "大号空间名称"
+          }
+        }
+      }
+    },
+    "Larger Sidebar" : {
+      "comment" : "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大边栏"
           }
         }
       }
@@ -18192,6 +18203,17 @@
         }
       }
     },
+    "Sidebar size %@, Usual Size" : {
+      "comment" : "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏大小 %@，默认大小"
+          }
+        }
+      }
+    },
     "Sign In" : {
       "comment" : "Button in a site's HTTP sign-in sheet.",
       "localizations" : {
@@ -18430,6 +18452,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "小"
+          }
+        }
+      }
+    },
+    "Smaller Sidebar" : {
+      "comment" : "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小边栏"
           }
         }
       }
@@ -21719,6 +21752,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在使用你的麦克风"
+          }
+        }
+      }
+    },
+    "Usual Size" : {
+      "comment" : "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认大小"
           }
         }
       }

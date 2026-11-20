@@ -1947,27 +1947,45 @@ final class PanelLinkRow: InteractiveView {
     }
 }
 
-/// − 100% +: the page's zoom a step out or in, and the percentage, which sets it back to 100%.
+/// − 100% +: a value a step out or in, and the percentage, which sets it back. The page's zoom in the site panel,
+/// and the sidebar's size in Settings › Appearance with steps and words of its own (#361).
 final class ZoomStepper: NSView {
-    private let minus = IconButton(symbol: "minus", size: .compact, toolTip: String(localized: "Zoom Out", comment: "Tooltip of the − button on the Zoom row of the site panel."))
-    private let plus = IconButton(symbol: "plus", size: .compact, toolTip: String(localized: "Zoom In", comment: "Tooltip of the + button on the Zoom row of the site panel."))
+    /// The steps it goes through, in values where 1 is 100%: the page's zoom unless a caller sets its own.
+    var steps: [CGFloat] = ZoomLevels.steps {
+        didSet { invalidateIntrinsicContentSize(); refresh() }
+    }
+    /// Where the percentage puts it back: a page's default zoom unless a caller sets its own.
+    var reset: () -> CGFloat = { ZoomLevels.defaultZoom }
+    /// What its buttons say to the pointer and VoiceOver.
+    var lessTip = String(localized: "Zoom Out", comment: "Tooltip of the − button on the Zoom row of the site panel.") { didSet { refresh() } }
+    var moreTip = String(localized: "Zoom In", comment: "Tooltip of the + button on the Zoom row of the site panel.") { didSet { refresh() } }
+    var resetTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.") { didSet { refresh() } }
+    /// The percentage's VoiceOver name, a format with the value in it: "Zoom %@, Actual Size" for a page.
+    var percentName = String(localized: "Zoom %@, Actual Size", comment: "VoiceOver name of the percentage on the Zoom row of the site panel: the zoom now, then what pressing it does.") {
+        didSet { refresh() }
+    }
+    private let minus = IconButton(symbol: "minus", size: .compact)
+    private let plus = IconButton(symbol: "plus", size: .compact)
     private let percent = PillButton(title: "100%", style: .quiet)
     /// The zoom now, as the page has it.
     var zoom: CGFloat = 1 { didSet { refresh() } }
     var onChange: ((CGFloat) -> Void)?
 
-    /// Wide enough for any step ("300%"), so the buttons around it never move.
+    /// Wide enough for the widest step ("300%"), so the buttons around it never move.
     private var percentWidth: CGFloat {
-        ceil(("300%" as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width) + Tokens.Space.x4
+        let widest = ZoomLevels.percent(steps.max() ?? 1)
+        return ceil((widest as NSString).size(withAttributes: [.font: Tokens.Font.control()]).width) + Tokens.Space.x4
     }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        percent.toolTip = String(localized: "Actual Size", comment: "Tooltip of the percentage on the Zoom row of the site panel: sets the page back to 100%.")
         [minus, percent, plus].forEach { addSubview($0) }
         minus.onClick = { [weak self] _ in self?.go(-1) }
         plus.onClick = { [weak self] _ in self?.go(1) }
-        percent.onClick = { [weak self] _ in self?.set(ZoomLevels.defaultZoom) }
+        percent.onClick = { [weak self] _ in
+            guard let self else { return }
+            self.set(self.reset())
+        }
         refresh()
     }
 
@@ -1985,14 +2003,14 @@ final class ZoomStepper: NSView {
         switch which {
         case "in": go(1)
         case "out": go(-1)
-        default: set(ZoomLevels.defaultZoom)
+        default: set(reset())
         }
     }
     #endif
 
     private func go(_ direction: Int) {
-        guard ZoomLevels.canStep(zoom, by: direction) else { return }
-        set(ZoomLevels.step(zoom, by: direction))
+        guard ZoomLevels.canStep(zoom, by: direction, in: steps) else { return }
+        set(ZoomLevels.step(zoom, by: direction, in: steps))
     }
 
     private func set(_ value: CGFloat) {
@@ -2002,10 +2020,13 @@ final class ZoomStepper: NSView {
     }
 
     private func refresh() {
+        minus.toolTip = lessTip
+        plus.toolTip = moreTip
+        percent.toolTip = resetTip
         percent.title = ZoomLevels.percent(zoom)
-        percent.setAccessibilityLabel(String(localized: "Zoom \(ZoomLevels.percent(zoom)), Actual Size", comment: "VoiceOver name of the percentage on the Zoom row of the site panel: the zoom now, then what pressing it does."))
-        minus.isEnabled = ZoomLevels.canStep(zoom, by: -1)
-        plus.isEnabled = ZoomLevels.canStep(zoom, by: 1)
+        percent.setAccessibilityLabel(String(format: percentName, ZoomLevels.percent(zoom)))
+        minus.isEnabled = ZoomLevels.canStep(zoom, by: -1, in: steps)
+        plus.isEnabled = ZoomLevels.canStep(zoom, by: 1, in: steps)
     }
 
     override func layout() {
