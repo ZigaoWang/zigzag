@@ -13,6 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
+- 你允许的网站可以访问这台 Mac 上监听端口的程序，比如编辑器、下载助手或配套 App 运行的本地代理。Chrome 和 Firefox 允许安全页面访问 `http://localhost` 和 `ws://localhost`，WebKit 却把它当作混合内容拒绝，所以改由 Zigzag 以网站自己的身份发出请求，再把结果交给它。默认关闭：先在“设置 › 隐私 › 允许网站访问这台 Mac 上的 App”里开启，再在网站设置里打开该网站的“这台 Mac 上的 App”。网页无法自己申请这两项。扩展自己的 `ws://localhost` 连接和以前一样可用；它的 `http://localhost` 请求走“设置 › 扩展”里它自己的“这台 Mac 上的 App”开关，默认关闭。只限本机回环：不包括本地网络，不包括其他机器，也不包括图片、脚本和样式表。([#321](https://github.com/ZigaoWang/zigzag/issues/321))
 - 同一网站的不同路径可以在不同空间中打开，比如 github.com/org1 在“工作”中打开，github.com/org2 在“个人”中打开。“设置 › 空间”里的规则从上往下排，用第一条匹配的规则。点按规则即可编辑，右键点按可启用或停用，拖动可调整优先级。如果一条规则覆盖了另一条，两条规则都会显示提示。路径不区分大小写，地址可以带端口，如 localhost:3000。原来设好的网站会变成规则，仍然在原来的空间中打开。感谢 [pyoio](https://github.com/pyoio)。([#289](https://github.com/ZigaoWang/zigzag/issues/289))
 - “设置 › 外观 › 边栏大小”新增“自定”：选它以后，用 − 和 + 把边栏设成 80% 到 150%，点按百分比会回到 100%。感谢 [Lakeland97](https://github.com/Lakeland97)。([#361](https://github.com/ZigaoWang/zigzag/issues/361))
 - 网站要打开 App 时，提示会说清楚是谁在请求（“claude.ai 想要打开 Claude 应用。”），“取消”和“打开 Claude”放在右边，“仅此一次”菜单换成了“始终允许”复选框。其他网站请求也改用“记住对此网站的选择”复选框，窗口太窄时按钮会竖着排，不会被截断。
@@ -81,7 +82,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 可以为你选择的网站保留 Cookie。“清除 Cookie…”会让你在其他所有网站上退出登录，这些网站则不受影响；打开“设置 › 隐私”中的“退出 Zigzag 时清除 Cookie”后，每次退出都会清除其余网站的 Cookie。在网站设置中打开“保留 Cookie”，或在“设置 › 隐私”中添加网站；一个网站同时包括 http、https 和所有子域名。感谢 [mrfragger](https://github.com/mrfragger)。([#334](https://github.com/ZigaoWang/zigzag/issues/334))
 - 用到 Hyper 键（⌃⌥⇧⌘ 一起按）的快捷键，在“设置 › 快捷键”、命令栏和录制快捷键时只显示一个 ✦ 键帽，不再列出四个修饰键。在设置里搜“hyper”也能找到。感谢 [JonasNowak](https://github.com/JonasNowak)。([#352](https://github.com/ZigaoWang/zigzag/pull/352))
 - “设置 › 隐私 › 网站”里，给一个网站做的每个选择各占一行，用的是和网站设置里一样的控件，每行都有一个 ×，只忘记那一项，不再是一句话加一个“忘记”。JavaScript 和扩展现在放在网站设置的“权限”页，和摄像头等放在一起；给某个网站关掉扩展会按个人资料分别记住。感谢 [Lakeland97](https://github.com/Lakeland97)。([#311](https://github.com/ZigaoWang/zigzag/issues/311)、[#312](https://github.com/ZigaoWang/zigzag/issues/312)、[#313](https://github.com/ZigaoWang/zigzag/issues/313)、[#314](https://github.com/ZigaoWang/zigzag/issues/314))
-- 你允许的网站可以访问这台 Mac 上监听端口的程序，比如编辑器、下载助手或配套 App 运行的本地代理。Chrome 和 Firefox 允许安全页面访问 `http://localhost` 和 `ws://localhost`，WebKit 却把它当作混合内容拒绝，所以改由 Zigzag 以网站自己的身份发出请求，再把结果交给它。默认关闭：先在“设置 › 隐私 › 允许网站访问这台 Mac 上的 App”里开启，再在网站设置里打开该网站的“这台 Mac 上的 App”。网页无法自己申请这两项。扩展也有同样的通道，开关在“设置 › 扩展”里它自己的“这台 Mac 上的 App”，默认关闭。**此前无需任何许可就能打开 `ws://localhost` 的扩展，现在需要开启这个开关**，依赖它的配套 App 请在那里允许一次。只限本机回环：不包括本地网络，不包括其他机器，也不包括图片、脚本和样式表。([#321](https://github.com/ZigaoWang/zigzag/issues/321))
 
 ### 修复
 - 固定一个分组时，整个分组会保持完整：固定成一个以分组名称命名的文件夹，里面的标签页按原顺序放好，而不是每个标签页各自固定。取消固定其中任何一个页面，整个分组都会回来。([#325](https://github.com/ZigaoWang/zigzag/issues/325))

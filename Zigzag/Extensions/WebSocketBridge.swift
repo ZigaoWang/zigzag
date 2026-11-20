@@ -83,14 +83,11 @@ import WebKit
     /// Allowed socket targets for a background. Chrome needs no host access here; Zigzag limits it to what the extension
     /// could reach anyway: this Mac (a companion app's server), or the hosts its site access grants now. `wss://host`
     /// matches as `https://host`.
-    static func allows(_ url: URL, context: WKWebExtensionContext, localReceivers: Bool) -> Bool {
+    static func allows(_ url: URL, context: WKWebExtensionContext) -> Bool {
         guard let scheme = url.scheme?.lowercased(), ["ws", "wss"].contains(scheme), let host = url.host(), !host.isEmpty,
               url.user == nil, url.password == nil,
               var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
-        // This Mac used to be allowed with nothing asked, because WebKit's own socket couldn't reach it at all. Now it
-        // is a door like the site's: the person's switch for this extension, and nothing else. A host permission cannot
-        // stand in for it, since a loopback address is never one a manifest can ask for.
-        if isLoopback(host) { return localReceivers }
+        if isLoopback(host) { return true }
         parts.scheme = scheme == "wss" ? "https" : "http"
         guard let web = parts.url else { return false }
         return context.hasAccess(to: web)

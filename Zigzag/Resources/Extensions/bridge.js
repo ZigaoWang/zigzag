@@ -107,13 +107,41 @@
       });
       return response;
     };
+    // The bytes of a body, base64, as the native side reads a loopback call.
+    const encoded = (buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(binary);
+    };
     globalThis.fetch = async (input, init) => {
       const isRequest = input instanceof Request;
       const option = (name, fallback) => init && init[name] !== undefined ? init[name] : isRequest ? input[name] : fallback;
       const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
       const loopback = localLoopback(url);
       const method = String(option('method', 'GET')).toUpperCase();
-      const body = init && init.body != null ? init.body : isRequest ? input.body : null;
+      // The body is read here as bytes. A loopback call carries them base64, so a Request's own body, a Blob or a
+      // buffer reaches the helper exactly as it was written; any other call keeps its body for WebKit.
+      let body = null;
+      let bodyBytes = null;
+      if (init && init.body != null) {
+        const given = init.body;
+        if (typeof given === 'string') body = given;
+        else if (given instanceof URLSearchParams) bodyBytes = new TextEncoder().encode(given.toString()).buffer;
+        else if (given instanceof Blob) bodyBytes = await given.arrayBuffer();
+        else if (given instanceof ArrayBuffer) bodyBytes = given;
+        else if (ArrayBuffer.isView(given)) bodyBytes = given.buffer.slice(given.byteOffset, given.byteOffset + given.byteLength);
+        else return nativeFetch(input, init);
+      } else if (isRequest && input.body !== null) {
+        // A copy, so the request handed on is not disturbed: its bytes are read once, here.
+        bodyBytes = await input.clone().arrayBuffer();
+      }
+      if (loopback) {
+        if (bodyBytes == null && body != null) bodyBytes = new TextEncoder().encode(body).buffer;
+        body = bodyBytes == null ? null : encoded(bodyBytes);
+      } else if (bodyBytes != null) {
+        return nativeFetch(input, init);
+      }
       // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
       // A loopback call is the exception: it is another origin on this Mac, and the helper is a plain server with no
       // CORS reply of its own to read, so the switch alone decides and the default credentials stand.
@@ -123,8 +151,7 @@
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
           || !['', 'about:client'].includes(option('referrer', 'about:client'))
-          || option('redirect', 'follow') === 'manual' || option('cache', 'default') === 'only-if-cached'
-          || (isRequest && input.body !== null) || (body != null && typeof body !== 'string')) return nativeFetch(input, init);
+          || option('redirect', 'follow') === 'manual' || option('cache', 'default') === 'only-if-cached') return nativeFetch(input, init);
       const headers = new Headers(option('headers', undefined));
       if (/text\/event-stream|application\/(?:x-ndjson|ndjson|stream\+json)/i.test(headers.get('accept') || '')) return nativeFetch(input, init);
       const request = new Request(input, init);

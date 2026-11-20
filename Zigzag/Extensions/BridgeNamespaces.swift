@@ -1074,7 +1074,15 @@ final class BridgeExtensionFetch: BridgeNamespace {
         guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(method) else {
             throw BridgeError("That method is not sent to this Mac.")
         }
-        let body = (options["body"] as? String).map { Data($0.utf8) }
+        // bridge.js sends a loopback call's body as base64, so the helper gets the bytes the extension wrote, text
+        // or not, rather than their text form.
+        let body: Data?
+        if let text = options["body"] as? String {
+            guard let decoded = Data(base64Encoded: text) else { throw BridgeError("That request's body is not readable.") }
+            body = decoded
+        } else {
+            body = nil
+        }
         guard (body?.count ?? 0) <= LocalReceivers.responseLimit else { throw BridgeError("That request is too large.") }
         var headers: [String: String] = [:]
         for pair in options["headers"] as? [[String]] ?? [] where pair.count == 2 { headers[pair[0]] = pair[1] }

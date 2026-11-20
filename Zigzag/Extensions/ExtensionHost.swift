@@ -1696,11 +1696,8 @@ extension ExtensionHost: WKWebExtensionControllerDelegate {
             let key = ObjectIdentifier(port)
             socketBridges[key] = WebSocketBridge(port: port, extensionID: extensionContext.uniqueIdentifier,
                                                  proxies: profile.store.proxyConfigurations,
-                                                 mayConnect: { [weak extensionContext, weak self] url in
-                                                     guard let self, let extensionContext else { return false }
-                                                     // Read when the socket is opened, so the switch takes effect at once.
-                                                     return WebSocketBridge.allows(url, context: extensionContext,
-                                                                                   localReceivers: self.profile.installs.localReceivers(extensionContext.uniqueIdentifier))
+                                                 mayConnect: { [weak extensionContext] url in
+                                                     extensionContext.map { WebSocketBridge.allows(url, context: $0) } ?? false
                                                  }) { [weak self] in
                 self?.socketBridges[key] = nil
             }

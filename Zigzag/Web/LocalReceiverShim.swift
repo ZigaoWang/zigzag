@@ -58,7 +58,8 @@ enum LocalReceiverShim {
       if (window.__zigzagLocalReceivers) return;
       const messages = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.localReceivers;
       if (!messages) return;
-      window.__zigzagLocalReceivers = true;
+      // Not a page-visible name to enumerate or copy: the script only marks that it has already run.
+      Object.defineProperty(window, '__zigzagLocalReceivers', { value: true, configurable: true });
       const nativeFetch = window.fetch.bind(window);
 
       // This Mac by the names loopback is reached by; http only, because that is what WebKit blocks from https.
@@ -154,12 +155,14 @@ enum LocalReceiverShim {
           this._sent = false;
           this._timeout = 0;
           this._withCredentials = false;
-          this.upload = { addEventListener() {}, removeEventListener() {}, onprogress: null, onload: null, onerror: null };
+          this._upload = { addEventListener() {}, removeEventListener() {}, onprogress: null, onload: null, onerror: null };
           // The native object's own events go to the same listeners while this is a real request.
           for (const type of xhrEvents) {
             this.native.addEventListener(type, (event) => { if (!this._loopback) this._emit(type, event); });
           }
         }
+        // A real request's upload is WebKit's own, so progress reaches the page as before; a loopback call has none.
+        get upload() { return this._loopback ? this._upload : this.native.upload; }
         get readyState() { return this._loopback ? this._ready : this.native.readyState; }
         get status() { return this._loopback ? this._status : this.native.status; }
         get statusText() { return this._loopback ? this._statusText : this.native.statusText; }

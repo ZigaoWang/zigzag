@@ -35,7 +35,7 @@ struct ExtensionLocalReceiversTests {
         let url = URL(string: "http://localhost:9990/save")!
         let request = try BridgeExtensionFetch.localReceiverRequest(
             ["method": "post", "headers": [["Content-Type", "application/json"], ["X-Token", "abc"]],
-             "body": #"{"ok":true}"#, "credentials": "include"], url: url)
+             "body": Data(#"{"ok":true}"#.utf8).base64EncodedString(), "credentials": "include"], url: url)
         #expect(request.method == "POST")
         #expect(request.headers["Content-Type"] == "application/json")
         #expect(request.headers["X-Token"] == "abc")
