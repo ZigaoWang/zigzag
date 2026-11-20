@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- In a split view of four pages, ⇧-dragging the line between the rows moves only the part beside the pointer, so a page can be taller or shorter than the one beside it, as ⇧ already did for the line between the columns. One line is parted at a time: while the other is parted, ⇧ moves this one whole. A parted part snaps to the middle or to the other part, whichever is nearer, and the guide shows where it will land. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#426](https://github.com/ZigaoWang/zigzag/issues/426))
 - A link's right-click menu starts with Open Link in New Tab, then New Window, Private Window and Peek, as in Chrome. Open Link, which opens it in the tab you're on, moves below them instead of being first, where it did what a click already does. Thanks to [retorquere](https://github.com/retorquere). ([#419](https://github.com/ZigaoWang/zigzag/issues/419))
 - The space icons at the bottom of the sidebar line up. Each one sits in the middle of its key at the same size, so a flame, a book and a star read as one row, and an emoji no longer sits higher or lower than a symbol.
 - A favorite's icon stays square and in the middle of its tile at every sidebar width, instead of growing a point and sitting half a point off.
