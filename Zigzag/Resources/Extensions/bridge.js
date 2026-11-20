@@ -120,27 +120,27 @@
       const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
       const loopback = localLoopback(url);
       const method = String(option('method', 'GET')).toUpperCase();
-      // The body is read here as bytes. A loopback call carries them base64, so a Request's own body, a Blob or a
-      // buffer reaches the helper exactly as it was written; any other call keeps its body for WebKit.
+      // A loopback call carries its body as base64 bytes, so a Request's own body, a Blob or a buffer reaches the
+      // helper exactly as it was written. Any other call sends only a text body here, and leaves the rest to WebKit.
       let body = null;
-      let bodyBytes = null;
-      if (init && init.body != null) {
-        const given = init.body;
-        if (typeof given === 'string') body = given;
-        else if (given instanceof URLSearchParams) bodyBytes = new TextEncoder().encode(given.toString()).buffer;
-        else if (given instanceof Blob) bodyBytes = await given.arrayBuffer();
-        else if (given instanceof ArrayBuffer) bodyBytes = given;
-        else if (ArrayBuffer.isView(given)) bodyBytes = given.buffer.slice(given.byteOffset, given.byteOffset + given.byteLength);
-        else return nativeFetch(input, init);
-      } else if (isRequest && input.body !== null) {
-        // A copy, so the request handed on is not disturbed: its bytes are read once, here.
-        bodyBytes = await input.clone().arrayBuffer();
-      }
       if (loopback) {
-        if (bodyBytes == null && body != null) bodyBytes = new TextEncoder().encode(body).buffer;
+        let bodyBytes = null;
+        if (init && init.body != null) {
+          const given = init.body;
+          if (typeof given === 'string') bodyBytes = new TextEncoder().encode(given).buffer;
+          else if (given instanceof URLSearchParams) bodyBytes = new TextEncoder().encode(given.toString()).buffer;
+          else if (given instanceof Blob) bodyBytes = await given.arrayBuffer();
+          else if (given instanceof ArrayBuffer) bodyBytes = given;
+          else if (ArrayBuffer.isView(given)) bodyBytes = given.buffer.slice(given.byteOffset, given.byteOffset + given.byteLength);
+          else return nativeFetch(input, init);
+        } else if (isRequest && input.body !== null) {
+          // A copy, so the request handed on is not disturbed: its bytes are read once, here.
+          bodyBytes = await input.clone().arrayBuffer();
+        }
         body = bodyBytes == null ? null : encoded(bodyBytes);
-      } else if (bodyBytes != null) {
-        return nativeFetch(input, init);
+      } else {
+        body = init && init.body != null ? init.body : isRequest ? input.body : null;
+        if ((isRequest && input.body !== null) || (body != null && typeof body !== 'string')) return nativeFetch(input, init);
       }
       // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
       // A loopback call is the exception: it is another origin on this Mac, and the helper is a plain server with no
@@ -216,11 +216,12 @@
         this._sent = false;
         this._timeout = 0;
         this._withCredentials = false;
-        this.upload = { addEventListener() {}, removeEventListener() {}, onprogress: null, onload: null, onerror: null };
+        this._upload = { addEventListener() {}, removeEventListener() {}, onprogress: null, onload: null, onerror: null };
         for (const type of types) {
           this.native.addEventListener(type, (event) => { if (!this._local) this._emit(type, event); });
         }
       }
+      get upload() { return this._local ? this._upload : this.native.upload; }
       get readyState() { return this._local ? this._ready : this.native.readyState; }
       get status() { return this._local ? this._status : this.native.status; }
       get statusText() { return this._local ? this._statusText : this.native.statusText; }
@@ -264,6 +265,7 @@
         } catch (error) { target = null; }
         if (!target) return this.native.open(method, url, async, user, password);
         this._local = true;
+        this._open = [method, url, async, user, password];
         this._request = { method: String(method || 'GET').toUpperCase(), url: target.href, headers: Object.create(null) };
         this._setState(1);
         return undefined;
@@ -320,7 +322,7 @@
           if (contentType && !request.headers['content-type']) headers.push(['content-type', contentType]);
           if (this.timeout > 0) {
             setTimeout(() => {
-              if (this._ready === 4 || this._aborted) return;
+              if (!this._local || this._ready === 4 || this._aborted) return;
               this._timedOut = true;
               try { send('extensionFetch', 'cancel', [requestID]).catch(() => {}); } catch (e) {}
               this._finishError('timeout');
@@ -334,9 +336,9 @@
             }]);
           } catch (error) { answer = null; }
           if (this._aborted || this._timedOut || this._ready === 4) return;
-          // With the person's switch off, native code hands the call back to WebKit. WebKit refuses this Mac, so the
-          // request fails as it did before there was a door.
-          if (!answer || answer.fallback) { this._finishError('error'); return; }
+          // With the switches off and no host access, WebKit's own XHR sends it, as before there was a door.
+          if (answer && answer.fallback) { this._sendNatively(body); return; }
+          if (!answer) { this._finishError('error'); return; }
           const noBody = answer.status === 204 || answer.status === 205 || answer.status === 304;
           const bytes = noBody ? new Uint8Array(0) : bytesOf(answer.body || '');
           this._status = answer.status;
@@ -352,6 +354,16 @@
           this._emit('loadend', event);
         };
         run().catch(() => { if (!this._aborted && !this._timedOut) this._finishError('error'); });
+      }
+      _sendNatively(body) {
+        this._local = false;
+        const native = this.native;
+        native.open(...this._open);
+        for (const [name, value] of Object.entries(this._request.headers)) native.setRequestHeader(name, value);
+        native.timeout = this._timeout;
+        native.withCredentials = this._withCredentials;
+        if (this._responseType) native.responseType = this._responseType;
+        native.send(body);
       }
       abort() {
         if (!this._local) return this.native.abort();

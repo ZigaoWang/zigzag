@@ -60,6 +60,17 @@ struct ExtensionLocalReceiversTests {
         }
     }
 
+    /// With the switches off, a loopback call goes the way it did before there was a door: its text body as text,
+    /// and a call without cookies, or with bytes that aren't text, left to WebKit's own fetch.
+    @Test func withTheDoorShutALoopbackCallGoesAsBefore() {
+        let text = Data(#"{"ok":true}"#.utf8).base64EncodedString()
+        let before = BridgeExtensionFetch.withoutDoor(["method": "POST", "body": text, "credentials": "include"])
+        #expect(before?["body"] as? String == #"{"ok":true}"#)
+        #expect(BridgeExtensionFetch.withoutDoor(["method": "GET"]) != nil)
+        #expect(BridgeExtensionFetch.withoutDoor(["credentials": "omit"]) == nil)
+        #expect(BridgeExtensionFetch.withoutDoor(["body": Data([0xFF, 0xFE, 0x00]).base64EncodedString()]) == nil)
+    }
+
     @Test func aLoopbackAnswerIsWhatTheBridgeExpects() {
         let response = LocalReceivers.Response(url: URL(string: "http://localhost:9990/")!, status: 200,
                                                headers: ["content-type": "application/json"],

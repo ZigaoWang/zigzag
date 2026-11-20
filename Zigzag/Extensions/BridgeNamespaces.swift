@@ -1034,11 +1034,13 @@ final class BridgeExtensionFetch: BridgeNamespace {
               let text = options.string("url"), let url = URL(string: text) else { throw BridgeError("Invalid extension request.") }
         let host = host
         guard let context = host.context(for: extensionID) else { throw BridgeError("The extension is no longer loaded.") }
-        // This Mac is its own door: a loopback address would fail the host-access test, and the answer is the person's
-        // switch for this extension rather than a manifest permission. With it off, WebKit's own fetch runs and
-        // refuses the address as it does today, so an extension learns nothing about why.
+        // This Mac is its own door, opened by the Settings switch and this extension's own, not by a manifest
+        // permission. With either off, the call goes as it did before there was a door: host access decides.
         if LocalReceivers.isLoopback(url) {
-            guard host.profile.installs.localReceivers(extensionID) else { return ["fallback": true] }
+            guard LocalReceivers.isEnabled, host.profile.installs.localReceivers(extensionID) else {
+                guard let before = Self.withoutDoor(options) else { return ["fallback": true] }
+                return try await sendWithHostAccess(before, url: url, context: context, extensionID: extensionID, requestID: requestID)
+            }
             var local = try Self.localReceiverRequest(options, url: url)
             let store = host.profile.store
             if local.credentials.sendsCookies, let cookie = await LocalReceivers.cookies(for: url, in: store, crossSite: false) {
@@ -1048,6 +1050,24 @@ final class BridgeExtensionFetch: BridgeNamespace {
             if local.credentials.sendsCookies { await LocalReceivers.store(answer, for: url, in: store) }
             return Self.localReceiverAnswer(answer)
         }
+        return try await sendWithHostAccess(options, url: url, context: context, extensionID: extensionID, requestID: requestID)
+    }
+
+    /// A loopback call as bridge.js sends it (its body base64, any credentials) in the shape the host-access path
+    /// took before there was a door: a text body and cookies sent. Nil: WebKit's own fetch takes it, as it did then.
+    static func withoutDoor(_ options: [String: Any]) -> [String: Any]? {
+        var options = options
+        guard ["include", "same-origin"].contains(options["credentials"] as? String ?? "same-origin") else { return nil }
+        if let encoded = options["body"] as? String {
+            guard let data = Data(base64Encoded: encoded), let text = String(data: data, encoding: .utf8) else { return nil }
+            options["body"] = text
+        }
+        return options
+    }
+
+    private func sendWithHostAccess(_ options: [String: Any], url: URL, context: WKWebExtensionContext, extensionID: String,
+                                    requestID: UUID) async throws -> Any? {
+        let host = host
         // Without host access, ordinary WebKit fetch decides what is available through the site's CORS policy.
         guard Self.allows(url, context: context) else { return ["fallback": true] }
         // Each hop of a redirect is checked against the extension's access as it is then.
