@@ -947,13 +947,14 @@ extension BrowserWindowController: NSMenuItemValidation {
                 : String(localized: "Move Sidebar to Right", comment: "View menu item: puts the sidebar along the window's right edge.")
             return true
         case #selector(toggleBookmark(_:)):
-            // ⌘D: the quick save, into this space's Pinned pages, with no question (#326). A whole group or split
-            // view saves as one, so the item says which.
-            let unsaved = tab?.bookmarkID == nil
-            let pair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
-            item.title = unsaved && tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
-                : unsaved && pair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
-                : String(localized: "Pin Tab", comment: "File menu item, with ⌘D: pins the page you're on, into the space you're in, without asking.")
+            // Same names as the sidebar menus.
+            let pinsPair = tab.flatMap { tabManager.partner(of: $0) }.map { $0.bookmarkID == nil && $0.url != nil } ?? false
+            item.title = tab?.isFavorite == true ? String(localized: "Move to Tabs", comment: "Menu bar item: moves the favorite back to the tabs.")
+                : tab?.bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)) != nil ? String(localized: "Unpin Group", comment: "Menu bar item: unpins the whole pinned group the tab is in.")
+                : tab?.bookmarkID != nil ? String(localized: "Unpin Tab", comment: "Menu bar item: unpins the tab.")
+                : tab.map(tabManager.pinsGroup) == true ? String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder.")
+                : pinsPair ? String(localized: "Pin Split View", comment: "Menu bar item: pins both pages of the split view.")
+                : String(localized: "Pin Tab", comment: "Menu bar item: pins the tab.")
             return tab?.url != nil && !tabManager.isPrivate
         case #selector(savePageToFolder(_:)):
             // ⇧⌘D: the same save, asking where in the space it goes. One word for the verb, everywhere.
