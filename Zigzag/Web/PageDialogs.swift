@@ -247,9 +247,10 @@ enum PageDialogs {
     }
 
     /// Whether `leaf` is the certificate you chose to trust for `host:port`, and the choice still holds. A local
-    /// server's remembered choice has no time limit; it ends when its certificate changes or you remove it.
+    /// server's remembered choice has no time limit; it ends when its certificate changes or you remove it. None holds
+    /// once the host is known for HSTS, which covers every port, as in Chrome.
     static func allows(_ host: String, port: Int = 443, leaf: Data?, in store: WKWebsiteDataStore, now: Date = Date()) -> Bool {
-        guard let leaf, !leaf.isEmpty else { return false }
+        guard let leaf, !leaf.isEmpty, !StrictTransport.isKnown(host, in: store, now: now) else { return false }
         if let exception = trusted.object(forKey: store)?[key(host: host, port: port)] as? Exception,
            now < exception.until, exception.leaf == leaf { return true }
         return store.isPersistent && rememberedCertificate(for: host, port: port) == leaf

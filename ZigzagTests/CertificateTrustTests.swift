@@ -433,6 +433,19 @@ extension CertificateTrustTests {
         }
     }
 
+    @Test func hstsFromAnotherPortEndsTheChoice() {
+        withDefaults { _ in
+            withStore { store in
+                let leaf = Data([3, 3, 3])
+                #expect(CertificateExceptions.allow("nas.lan", port: 8443, certificate: leaf, in: store))
+                #expect(CertificateExceptions.allows("nas.lan", port: 8443, leaf: leaf, in: store))
+                StrictTransport.note("nas.lan", policy: .init(maxAge: 600, includesSubdomains: false), in: store)
+                #expect(!CertificateExceptions.allows("nas.lan", port: 8443, leaf: leaf, in: store))
+                StrictTransport.forget(in: store, site: "nas.lan")
+            }
+        }
+    }
+
     @Test func addSiteAcceptsOnlyLocalHTTPS() throws {
         let first = try #require(TrustedCertificateSheet.url(from: "https://10.0.0.10:8443"))
         #expect(first.scheme == "https" && first.host() == "10.0.0.10" && first.port == 8443)
