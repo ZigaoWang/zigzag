@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- An extension that messages a tab where its content script isn't running yet now gets Chrome's "Could not establish connection. Receiving end does not exist." error, so it can inject the script and try again, instead of getting no answer and waiting. A message from a content script or extension page that nothing in the extension listens for fails the same way. A message that a listener heard but didn't answer still comes back empty, without an error.
 - A private window no longer adds to Favorites or renames, files or moves pinned tabs and their folders; it leaves your saved pages as they are.
 - A space rule for a path of a site now also takes the site's www. address, as rules for a whole domain already did: github.com/org1 matches www.github.com/org1, and a rule written with www. matches the bare address too.
 - The space editor says when Clear glass is showing as Frosted: on battery or in Low Power Mode, a line under Glass explains it, and goes away when you plug in or turn Low Power Mode off.

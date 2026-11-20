@@ -187,6 +187,8 @@ struct ExtensionOverlayTests {
         defer { try? FileManager.default.removeItem(at: module.work) }
         #expect(ExtensionStore.writeOverlayManifest(in: module.overlay, from: module.package, prelude: Self.prelude))
         #expect(try Self.text("zigzag-entry.js", in: module.overlay) == "import './zigzag-prelude.js';\nimport './background.js';\n")
+        // With no content scripts, bridge.js still runs it in frames and before the files the extension injects.
+        #expect(try Self.text(ExtensionBridgeScript.receiversFile, in: module.overlay) == ExtensionBridgeScript.receivers)
     }
 
     @Test func aManifestWithNoBackgroundStillGetsPatchesAndTheConnectGuard() throws {
@@ -204,6 +206,7 @@ struct ExtensionOverlayTests {
         let scripts = try #require((manifest["content_scripts"] as? [[String: Any]])?.first?["js"] as? [String])
         #expect(scripts == [ConnectGuard.file, "content.js"])
         #expect(FileManager.default.fileExists(atPath: fixture.overlay.appendingPathComponent(ConnectGuard.file).path))
+        #expect(try Self.text(ExtensionBridgeScript.receiversFile, in: fixture.overlay) == ExtensionBridgeScript.receivers)
     }
 
     /// Background paths resolve inside the package only; `..` or absolute paths find nothing.

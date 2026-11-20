@@ -319,6 +319,95 @@ enum ExtensionBridgeScript {
     })();
     """
 
+    /// A message nothing listens for: Chrome fails tabs.sendMessage and runtime.sendMessage with this, WebKit answers
+    /// undefined, as when a listener gives no answer. Extensions take the error to mean their content script isn't in
+    /// the tab yet, inject it and send again; given undefined, they waited.
+    nonisolated static let noReceiver = "Could not establish connection. Receiving end does not exist."
+    /// `receivers` as a file of the loaded copy, which bridge.js runs in a tab's frames to ask whether they listen.
+    nonisolated static let receiversFile = "zigzag-receivers.js"
+    nonisolated static let receiversMark = "__zigzagListeners:"
+
+    /// Runs in the extension's content-script world, before its content scripts (ExtensionStore.contentScriptsFirst)
+    /// and, as `receiversFile`, before files it injects or registers and when bridge.js asks. It counts the world's
+    /// runtime.onMessage listeners, which WebKit can't say; its last line answers whether there are any. And it fails
+    /// an unanswered runtime.sendMessage when none of the extension's pages listens (webkit-differences.js answers for
+    /// them), as Chrome does. Once per world.
+    nonisolated static let receivers = """
+    (() => {
+      'use strict';
+      if (typeof globalThis.__zigzagMessageListeners === 'function') return;
+      const runtimes = [...new Set([globalThis.chrome, globalThis.browser].map((api) => api && api.runtime).filter(Boolean))];
+      const held = (globalThis.__zigzagHeld = globalThis.__zigzagHeld || []);
+      held.push(...runtimes);
+      const put = (object, name, value) => {
+        try { object[name] = value; } catch (e) {}
+        if (object[name] !== value) { try { Object.defineProperty(object, name, { value, configurable: true, writable: true }); } catch (e) {} }
+        return object[name] === value;
+      };
+      // Where a listener can't be counted, the world says it listens.
+      const listening = new Set();
+      let unsure = !runtimes.length;
+      const events = [];
+      for (const runtime of runtimes) {
+        const event = runtime.onMessage;
+        if (!event || typeof event.addListener !== 'function') { unsure = true; continue; }
+        if (events.includes(event)) continue;
+        events.push(event);
+        held.push(event);
+        const add = event.addListener, remove = event.removeListener;
+        const added = put(event, 'addListener', function addListener(listener, ...rest) {
+          const result = add.call(event, listener, ...rest);
+          if (typeof listener === 'function') listening.add(listener);
+          return result;
+        });
+        const removed = typeof remove !== 'function' || put(event, 'removeListener', function removeListener(listener, ...rest) {
+          listening.delete(listener);
+          return remove.call(event, listener, ...rest);
+        });
+        if (!added || !removed) unsure = true;
+      }
+      Object.defineProperty(globalThis, '__zigzagMessageListeners', { value: () => unsure || listening.size > 0, configurable: true });
+
+      const withError = (callback, error) => {
+        const lastError = { message: String((error && error.message) || error) };
+        const before = runtimes.map((runtime) => Object.getOwnPropertyDescriptor(runtime, 'lastError'));
+        for (const runtime of runtimes) { try { Object.defineProperty(runtime, 'lastError', { get: () => lastError, configurable: true }); } catch (e) {} }
+        try { callback(); } finally {
+          runtimes.forEach((runtime, index) => {
+            try { if (before[index]) Object.defineProperty(runtime, 'lastError', before[index]); else delete runtime.lastError; } catch (e) {}
+          });
+        }
+      };
+      // A listener found is trusted for a few seconds.
+      let foundAt = -Infinity;
+      for (const runtime of runtimes) {
+        const native = runtime.sendMessage;
+        if (typeof native !== 'function' || native.__zigzagChecksReceiver) continue;
+        const listens = () => {
+          if (Date.now() - foundAt < 10000) return Promise.resolve(true);
+          return Promise.resolve().then(() => native.call(runtime, { \(receiverProbe): true }))
+            .then((answer) => { if (answer === true) foundAt = Date.now(); return answer === true; }, () => null);
+        };
+        const sendMessage = function sendMessage(...args) {
+          const callback = typeof args[args.length - 1] === 'function' ? args.pop() : null;
+          // To another extension: as WebKit has it.
+          if (args.length >= 2 && typeof args[0] === 'string' && args[0] !== runtime.id) return native.apply(runtime, callback ? [...args, callback] : args);
+          const result = Promise.resolve(native.apply(runtime, args)).then((value) => {
+            if (value !== undefined) { foundAt = Date.now(); return value; }
+            return listens().then((yes) => { if (yes === false) throw new Error('\(noReceiver)'); return undefined; });
+          });
+          if (!callback) return result;
+          result.then((value) => callback(value), (error) => withError(callback, error));
+          return undefined;
+        };
+        sendMessage.__zigzagChecksReceiver = true;
+        put(runtime, 'sendMessage', sendMessage);
+      }
+    })();
+    '\(receiversMark)' + (typeof globalThis.__zigzagMessageListeners !== 'function' || globalThis.__zigzagMessageListeners());
+    """
+    nonisolated static let receiverProbe = "__zigzagReceiverProbe"
+
     /// The stand-in for navigator.locks (web-locks.js); also goes in front of worker scripts that use it.
     static let webLocks: String = {
         Bundle.main.url(forResource: "web-locks", withExtension: "js").flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""

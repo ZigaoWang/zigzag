@@ -67,3 +67,7 @@
 ## Background
 - A page's message to an extension unanswered after 3 seconds → Zigzag starts that extension's background, at most once every 10 seconds.
   Test: ExtensionStormTests.anUnansweredMessageAsksForTheBackgroundOnce
+- A message to a tab or frame where no content script listens → fails with "Could not establish connection. Receiving end does not exist.", as in Chrome; one a listener heard and didn't answer → undefined, no error.
+  Test: ExtensionScriptTests.aTabMessageNothingHearsFails
+- A content script's or page's message that none of the extension's pages listens for → fails the same way.
+  Test: ExtensionScriptTests.aRuntimeMessageNothingHearsFails
