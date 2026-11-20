@@ -432,6 +432,39 @@ struct SystemPasswordsTests {
         #expect(!view.isAccessibilityElement())
     }
 
+    /// The password view gives its text to nothing: no copy, cut, drag, service or Select All, accessibility reads it
+    /// as empty, and no spelling, correction or replacement is kept for it.
+    @Test func thePasswordViewGivesItsTextToNothing() {
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        let view = picker.passwordView
+        view.string = "fake-pass"
+        view.setSelectedRange(NSRange(location: 0, length: 9))
+        let board = NSPasteboard(name: NSPasteboard.Name("zigzag-test-\(UUID().uuidString)"))
+        defer { board.releaseGlobally() }
+        board.clearContents()
+        #expect(!view.writeSelection(to: board, types: [.string]))
+        #expect(board.string(forType: .string) == nil)
+        #expect(view.writablePasteboardTypes.isEmpty)
+        #expect(view.validRequestor(forSendType: .string, returnType: nil) == nil)
+        let copy = NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        #expect(!view.validateUserInterfaceItem(copy))
+        view.setSelectedRange(NSRange(location: 0, length: 0))
+        view.selectAll(nil)
+        #expect(view.selectedRange().length == 0)
+        #expect(view.accessibilityValue() as? String == "")
+        #expect(view.accessibilityNumberOfCharacters() == 0)
+        #expect(view.accessibilityString(for: NSRange(location: 0, length: 4)) == nil)
+        #expect(view.isAutomaticSpellingCorrectionEnabled, "AutoFill pairs only a field with autocorrection")
+        let range = NSRange(location: 0, length: 9)
+        let checks = [NSTextCheckingResult.spellCheckingResult(range: range),
+                      NSTextCheckingResult.correctionCheckingResult(range: range, replacementString: "fake pass"),
+                      NSTextCheckingResult.replacementCheckingResult(range: range, replacementString: "fake—pass")]
+        #expect(SystemPasswordPicker.keptChecks(checks).isEmpty)
+        #expect(picker.textView(view, didCheckTextIn: range, types: NSTextCheckingAllTypes, options: [:], results: checks,
+                                orthography: NSOrthography.defaultOrthography(forLanguage: "en"), wordCount: 1).isEmpty)
+        view.string = ""
+    }
+
     @Test func aLoginSetWithoutAWordIsStillRead() async throws {
         // AutoFill sets the username field's value and the password view's text directly, telling no delegate.
         let (window, overlay, stand) = host()

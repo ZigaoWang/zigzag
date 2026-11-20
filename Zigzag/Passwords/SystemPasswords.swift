@@ -59,7 +59,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
     /// one around whatever has the focus, and works the pair out again each time the window becomes key, as it does
     /// around the list. A secure field's focus is its field editor, which isn't one of the window's fields, so the
     /// pair was lost and only the password came back (#378).
-    let passwordView = NSTextView(frame: .zero)
+    let passwordView = SecretTextView(frame: .zero)
     private var storageObserver: NSObjectProtocol?
     private var completion: ((Outcome) -> Void)?
     private weak var restoreTo: NSResponder?
@@ -285,6 +285,21 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
 
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool { endsRequest(selector) }
 
+    /// Autocorrection stays on for AutoFill, which only pairs a field that has it, but nothing it finds is kept or
+    /// put in: no spelling, correction or replacement ever touches a password.
+    func textView(_ view: NSTextView, didCheckTextIn range: NSRange, types checkingTypes: NSTextCheckingTypes,
+                  options: [NSSpellChecker.OptionKey: Any], results: [NSTextCheckingResult], orthography: NSOrthography,
+                  wordCount: Int) -> [NSTextCheckingResult] {
+        guard view === passwordView else { return results }
+        return Self.keptChecks(results)
+    }
+
+    /// What of a check of the password view is kept: nothing that would change or remember its text.
+    nonisolated static func keptChecks(_ results: [NSTextCheckingResult]) -> [NSTextCheckingResult] {
+        let changes: NSTextCheckingResult.CheckingType = [.spelling, .grammar, .correction, .replacement, .quote, .dash, .link, .date, .address, .phoneNumber, .transitInformation]
+        return results.filter { changes.intersection($0.resultType).isEmpty }
+    }
+
     /// Escape, Tab and Return take the fields away.
     private func endsRequest(_ selector: Selector) -> Bool {
         switch selector {
@@ -311,6 +326,8 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         usernameField.abortEditing()
         usernameField.stringValue = ""
         passwordView.string = ""
+        // Whatever the spell checker kept for this view (words it was told to ignore) goes with the password.
+        NSSpellChecker.shared.closeSpellDocument(withTag: passwordView.spellCheckerDocumentTag)
         // Focus handed back while the fields are still in the window, so AppKit sees them let go of it.
         if focused, let window { window.makeFirstResponder(restoreTo.flatMap { ($0 as? NSView)?.window === window ? $0 : nil }) }
         dismissSystem()
@@ -565,4 +582,32 @@ enum AutofillKeyIcon {
       }).catch(() => {});
     })();
     """
+}
+
+/// The password half of `SystemPasswordPicker`: a text view, so AppKit pairs it with the username field, that never
+/// gives its text away while it holds a password. Nothing copies, cuts, drags or hands it to a service, Select All does
+/// nothing, and accessibility reads it as empty, as a secure field reads.
+final class SecretTextView: NSTextView {
+    override func copy(_ sender: Any?) {}
+    override func cut(_ sender: Any?) {}
+    override func selectAll(_ sender: Any?) {}
+    override func writeSelection(to pboard: NSPasteboard, types: [NSPasteboard.PasteboardType]) -> Bool { false }
+    override var writablePasteboardTypes: [NSPasteboard.PasteboardType] { [] }
+    override func dragSelection(with event: NSEvent, offset mouseOffset: NSSize, slideBack: Bool) -> Bool { false }
+    override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?, returnType: NSPasteboard.PasteboardType?) -> Any? { nil }
+    override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
+        if let action = item.action, Self.withheld.contains(action) { return false }
+        return super.validateUserInterfaceItem(item)
+    }
+    override func menu(for event: NSEvent) -> NSMenu? { nil }
+
+    /// The edits that would hand the text on.
+    static let withheld: Set<Selector> = [#selector(copy(_:)), #selector(cut(_:)), #selector(selectAll(_:)), NSSelectorFromString("orderFrontSharingServicePicker:")]
+
+    override func accessibilityValue() -> String? { "" }
+    override func accessibilityNumberOfCharacters() -> Int { 0 }
+    override func accessibilitySelectedText() -> String? { nil }
+    override func accessibilityString(for range: NSRange) -> String? { nil }
+    override func accessibilityAttributedString(for range: NSRange) -> NSAttributedString? { nil }
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? { .secureTextField }
 }
