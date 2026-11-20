@@ -945,6 +945,8 @@ final class Tab: NSObject {
     private var ownHistoryTarget: URL?
     /// Download policy for its pages (same as pop-up windows').
     private let downloads = DownloadPolicy()
+    /// The current main-frame navigation was started by a click, key or the address bar.
+    var mainFrameWasClicked: Bool { downloads.mainFrameWasClicked }
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
@@ -1614,6 +1616,14 @@ final class Tab: NSObject {
 // MARK: - WKNavigationDelegate
 
 extension Tab: WKNavigationDelegate {
+    /// The AMO page being read, when the address is one. Asked for as Firefox so the store's own button offers the
+    /// add-on ("Add to Firefox" → hand over the .xpi) instead of a browser download.
+    nonisolated static func addonsPage(_ url: URL) -> URL? {
+        guard let host = url.host(), ExtensionStore.addonsHost(host),
+              url.scheme?.lowercased() == "https", url.port == nil || url.port == 443 else { return nil }
+        return url
+    }
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
@@ -1681,7 +1691,9 @@ extension Tab: WKNavigationDelegate {
         // The page is asked for as the browser it's to be told it's in (the developer tools' User Agent): a request
         // made as another is made again, so no page off the list is asked for as one you chose for your own site.
         if decidesMainFrame {
-            let wanted = developerInEffect(at: url).userAgent.string
+            // addons.mozilla.org shows Add to Firefox only to Firefox.
+            let storeAgent = Self.addonsPage(url) != nil ? DeveloperState.UserAgent.firefox.string : nil
+            let wanted = storeAgent ?? developerInEffect(at: url).userAgent.string
             let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
                                        type: navigationAction.navigationType)
             if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }

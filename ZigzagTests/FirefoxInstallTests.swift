@@ -1,6 +1,105 @@
 import Foundation
+import CryptoKit
 import Testing
 @testable import Zigzag
+
+struct AddonsMozillaPageTests {
+    /// The listing's slug in an AMO page address, with or without the locale prefix and a trailing path.
+    @Test func theListingIsReadFromAnAMOPage() {
+        let slug = ExtensionStore.addonsSlug(from:)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/")!) == "ublock-origin")
+        #expect(slug(URL(string: "https://addons.mozilla.org/firefox/addon/darkreader")!) == "darkreader")
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/darkreader/reviews/")!) == "darkreader")
+        // Only this store, only a listing, and never a slug that could be a path.
+        #expect(slug(URL(string: "https://example.com/firefox/addon/ublock-origin/")!) == nil)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/")!) == nil)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/")!) == nil)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/..%2F..%2Fetc/")!) == nil)
+        #expect(slug(nil) == nil)
+        // A lookalike host is not the store, and neither is its API host.
+        #expect(ExtensionStore.addonsHost("addons.mozilla.org"))
+        #expect(!ExtensionStore.addonsHost("services.addons.mozilla.org"))
+        #expect(!ExtensionStore.addonsHost("addons.mozilla.org.evil.example"))
+    }
+
+    /// The file half of the boundary: only AMO's own download path hands over a package. A page there can point a
+    /// button anywhere, and another host's copy of the path is not the store.
+    @Test func onlyTheStoresOwnDownloadPathIsAPackage() {
+        let file = ExtensionStore.isAddonsFile
+        #expect(file(URL(string: "https://addons.mozilla.org/firefox/downloads/file/4242/ublock_origin-1.60.0.xpi")!))
+        #expect(file(URL(string: "https://addons.mozilla.org/en-US/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(URL(string: "https://example.com/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(URL(string: "https://addons.mozilla.org/firefox/addon/ublock-origin/")!))
+        #expect(!file(URL(string: "http://addons.mozilla.org/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(URL(string: "https://addons.mozilla.org.evil.example/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(nil))
+    }
+
+    /// The store's pages are asked for as Firefox, so its button is Add to Firefox; nowhere else is.
+    @Test func theStorePagesAreAskedAsFirefox() {
+        let page = Tab.addonsPage
+        #expect(page(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/")!) != nil)
+        #expect(page(URL(string: "https://addons.mozilla.org/firefox/addon/darkreader")!) != nil)
+        #expect(page(URL(string: "https://example.com/firefox/addon/ublock-origin/")!) == nil)
+        #expect(page(URL(string: "http://addons.mozilla.org/firefox/addon/ublock-origin/")!) == nil)
+        #expect(page(URL(string: "https://addons.mozilla.org.evil.example/firefox/addon/x/")!) == nil)
+    }
+
+    /// AMO publishes each file's sha256; a package whose bytes don't match it is refused, not installed.
+    @Test func anAMOPackageMustMatchTheHashTheStorePublishes() {
+        let bytes = Data("an xpi's bytes".utf8)
+        let good = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good))
+        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good.uppercased()))
+        // As AMO's API writes it; another algorithm's prefix is not taken.
+        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: "sha256:" + good))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: "sha1:" + good))
+        // A different file, a truncated hash, an empty one, none at all, and one with something appended: refused.
+        #expect(!ExtensionStore.matchesPublishedHash(Data("other bytes".utf8), sha256: good))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: String(good.prefix(63))))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: ""))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: nil))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: good + "00"))
+    }
+
+    /// The API's current file counts only when it names an AMO file address and a hash.
+    @Test func theAPIsCurrentFileIsRead() {
+        let good = Data(#"{"current_version":{"file":{"url":"https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi","hash":"sha256:66d0e3f21ce3b32b1bc0a9399b93cb2c9aa598ef18805d92118c76f66e266c1e"}}}"#.utf8)
+        let file = ExtensionStore.publishedAddonsFile(fromAPI: good)
+        #expect(file?.url.path == "/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")
+        #expect(file?.hash.hasPrefix("sha256:") == true)
+        let elsewhere = Data(#"{"current_version":{"file":{"url":"https://example.com/firefox/downloads/file/1/x.xpi","hash":"sha256:00"}}}"#.utf8)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: elsewhere) == nil)
+        let noHash = Data(#"{"current_version":{"file":{"url":"https://addons.mozilla.org/firefox/downloads/file/1/x.xpi"}}}"#.utf8)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: noHash) == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: Data("not json".utf8)) == nil)
+    }
+
+    /// Only the exact file the API names goes to the install sheet: same AMO host and path.
+    @Test func onlyThePublishedFileIsInstalled() {
+        let published = URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!
+        let match = ExtensionStore.isPublishedAddonsFile
+        #expect(match(published, published))
+        #expect(match(URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi?src=dp-btn-primary")!, published))
+        #expect(!match(URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257480/ublock_origin-1.76.3.xpi")!, published))
+        #expect(!match(URL(string: "https://addons.cdn.mozilla.net/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!, published))
+        #expect(!match(URL(string: "http://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!, published))
+        #expect(!match(nil, published))
+    }
+
+    /// The API request never follows a redirect.
+    @Test func theAPIRequestRefusesRedirects() {
+        let response = HTTPURLResponse(url: URL(string: "https://addons.mozilla.org/api/v5/addons/addon/x/")!, statusCode: 302,
+                                       httpVersion: nil, headerFields: ["Location": "https://example.com/"])!
+        var followed: URLRequest? = URLRequest(url: URL(string: "https://example.com/")!)
+        ExtensionStore.NoRedirects().urlSession(.shared, task: URLSession.shared.dataTask(with: response.url!),
+                                                willPerformHTTPRedirection: response,
+                                                newRequest: URLRequest(url: URL(string: "https://example.com/")!)) { followed = $0 }
+        #expect(followed == nil)
+        #expect(ExtensionStore.addonsAPIURL(slug: "ublock-origin")?.host() == "addons.mozilla.org")
+        #expect(ExtensionStore.addonsAPIURL(slug: "ublock-origin")?.scheme == "https")
+    }
+}
 
 /// An XPI made byte by byte: stored entries, then the central index and its end record. Shared by every test that
 /// needs one — `FirefoxInstallTests` and `XPIPackageTests` — so
@@ -146,6 +245,20 @@ struct FirefoxInstallTests {
     }
 
     // MARK: Tests
+
+    /// Bytes already checked are prepared as they are, never read again from disk.
+    @Test func checkedBytesArePreparedAsTheyAre() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        let bytes = try Self.xpi(Self.manifest("bytes@example.com", "1.0"))
+        guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(data: bytes) else {
+            Issue.record("bytes didn't prepare")
+            return
+        }
+        #expect(prepared.kind == .firefox)
+        #expect(prepared.firefoxID == "bytes@example.com")
+        ExtensionStore.discard(prepared)
+    }
 
     @Test func installingAnXPIRecordsItsKindGeckoIDAndOpaqueID() async throws {
         let work = try Workspace()

@@ -20677,6 +20677,17 @@
         }
       }
     },
+    "This extension’s package doesn’t match the one the Firefox Add-ons store publishes, so it wasn’t installed." : {
+      "comment" : "Shown when an .xpi downloaded from addons.mozilla.org doesn't match the sha256 the store publishes for it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此扩展的安装包与 Firefox 附加组件商店发布的不一致，所以没有安装。"
+          }
+        }
+      }
+    },
     "This extension’s package is damaged, so it wasn’t installed." : {
       "comment" : "Shown when an extension couldn't be installed because its package is damaged.",
       "localizations" : {
