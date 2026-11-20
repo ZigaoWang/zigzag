@@ -5640,6 +5640,17 @@
         }
       }
     },
+    "Close %@" : {
+      "comment" : "Tooltip of the close button on one page's part of a split view's row in the sidebar. The name is that page's title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭“%@”"
+          }
+        }
+      }
+    },
     "Close %lld Duplicates" : {
       "comment" : "In the tab overview (all spaces' tabs as cards), a button beside a space's name: closes the tabs that show a page already open.",
       "localizations" : {

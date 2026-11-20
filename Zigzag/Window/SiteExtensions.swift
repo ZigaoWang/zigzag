@@ -95,7 +95,7 @@ enum SiteExtensionsLayout {
         let columns = columns(width: width)
         let pitch = pitch(width: width, columns: columns)
         let row = index / columns, column = index % columns
-        return NSRect(x: (CGFloat(column) * pitch).rounded(), y: CGFloat(row) * (tileSide + rowGap(width: width, columns: columns)),
+        return NSRect(x: (CGFloat(column) * pitch).rounded(), y: (CGFloat(row) * (tileSide + rowGap(width: width, columns: columns))).rounded(),
                       width: tileSide, height: tileSide)
     }
 
@@ -105,7 +105,7 @@ enum SiteExtensionsLayout {
         if listed(count: count) { return CGFloat(count) * SiteExtensionRow.height + CGFloat(count - 1) * PanelLinkRow.gap }
         let columns = columns(width: width)
         let rows = (count + columns - 1) / columns
-        return CGFloat(rows) * tileSide + CGFloat(rows - 1) * rowGap(width: width, columns: columns)
+        return (CGFloat(rows) * tileSide + CGFloat(rows - 1) * rowGap(width: width, columns: columns)).rounded()
     }
 }
 

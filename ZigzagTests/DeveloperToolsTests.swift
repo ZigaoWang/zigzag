@@ -40,3 +40,48 @@ struct DeveloperToolsTests {
         #expect(keys(#selector(BrowserWindowController.inspectElement(_:))) == ["\(commandOption) c"])
     }
 }
+
+/// A link's menu starts as Chrome's does, not with an Open Link that a click already does (#419).
+@MainActor
+struct LinkMenuTests {
+    private func menu(_ items: [(String, String?)]) -> NSMenu {
+        let menu = NSMenu()
+        for (title, identifier) in items {
+            if title == "-" { menu.addItem(.separator()); continue }
+            let item = NSMenuItem(title: title, action: #selector(NSText.copy(_:)), keyEquivalent: "")
+            item.identifier = identifier.map { NSUserInterfaceItemIdentifier($0) }
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    private func titles(_ menu: NSMenu) -> [String] { menu.items.map { $0.isSeparatorItem ? "-" : $0.title } }
+
+    private let opens = ["Open Link in New Tab", "Open Link in New Window", "Open Link in Private Window", "Open Link in Peek", "Open Link"]
+
+    @Test func newTabComesFirst() {
+        let link = menu([("Open Link", "WKMenuItemIdentifierOpenLink"), ("Open Link in New Window", "WKMenuItemIdentifierOpenLinkInNewWindow"),
+                         ("Download Linked File", "WKMenuItemIdentifierDownloadLinkedFile"), ("-", nil), ("Copy Link", "WKMenuItemIdentifierCopyLink")])
+        BrowserWebView.arrangeLinkItems(in: link, target: nil)
+        #expect(titles(link) == opens + ["Download Linked File", "-", "Copy Link"])
+        // Zigzag's four open through WebKit's new-window item, which is off the menu.
+        let original = link.items[0].representedObject as? NSMenuItem
+        #expect(original?.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow")
+        #expect(link.items.prefix(4).allSatisfy { ($0.representedObject as? NSMenuItem) === original })
+        #expect(!link.items.contains { $0 === original })
+        #expect(link.items[4].identifier?.rawValue == "WKMenuItemIdentifierOpenLink")
+    }
+
+    @Test func anImageLinkStartsTheSameWay() {
+        let link = menu([("Open Link", "WKMenuItemIdentifierOpenLink"), ("Open Link in New Window", "WKMenuItemIdentifierOpenLinkInNewWindow"),
+                         ("-", nil), ("Open Image in New Window", "WKMenuItemIdentifierOpenImageInNewWindow"), ("Copy Image", "WKMenuItemIdentifierCopyImageToClipboard")])
+        BrowserWebView.arrangeLinkItems(in: link, target: nil)
+        #expect(titles(link) == opens + ["-", "Open Image in New Window", "Copy Image"])
+    }
+
+    @Test func aMenuWithoutALinkIsLeftAlone() {
+        let page = menu([("Back", "WKMenuItemIdentifierGoBack"), ("Reload", "WKMenuItemIdentifierReload")])
+        BrowserWebView.arrangeLinkItems(in: page, target: nil)
+        #expect(titles(page) == ["Back", "Reload"])
+    }
+}

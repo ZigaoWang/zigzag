@@ -1,6 +1,9 @@
 import AppKit
 
 extension NSView {
+    /// The window frame's colors behind this view; none on a see-through frame.
+    var frameGrounds: [NSColor] { Brand.Theme.for(self).inkGrounds }
+
     /// Resolves a dynamic color for this view's appearance.
     func cgColor(_ color: NSColor) -> CGColor {
         var result = color.cgColor
@@ -89,6 +92,23 @@ extension CALayer {
             add(animation, forKey: "backgroundColor")
         }
         Tokens.Motion.withoutAnimation { backgroundColor = color }
+    }
+
+    /// Rounds the corners for a shape of `size`: never more than half its short side, and a capsule's ends true
+    /// half-circles, since a continuous curve that big comes to a point.
+    func round(_ radius: CGFloat, size: CGSize) {
+        let fitted = Self.cornerRadius(radius, size: size)
+        cornerRadius = fitted
+        cornerCurve = Self.isCapsule(fitted, size: size) ? .circular : .continuous
+    }
+
+    nonisolated static func cornerRadius(_ radius: CGFloat, size: CGSize) -> CGFloat {
+        max(0, min(radius, min(size.width, size.height) / 2))
+    }
+
+    /// A continuous curve needs about 1.53 times its radius on each side; past that, circular.
+    nonisolated static func isCapsule(_ radius: CGFloat, size: CGSize) -> Bool {
+        radius > 0 && radius * 2 * 1.528 > min(size.width, size.height)
     }
 }
 
@@ -615,6 +635,8 @@ final class IconButton: InteractiveView {
     /// On a page's own color (the bar above the page), not the frame: the neutral hover and press fills, which show
     /// on any color, rather than the frame's white washes.
     var isOnPage = false { didSet { if isOnPage != oldValue { stateDidChange(animated: false) } } }
+    /// The page's color under it while `isOnPage`, which its hover and press washes are measured against.
+    var ground: NSColor? { didSet { if ground != oldValue { stateDidChange(animated: false) } } }
 
     /// Over a playing video (the mini player): a white glyph on a soft shadow, a round target, and white washes for
     /// hover and press (`Color.mediaHover`, `mediaPressed`) that show over any picture. The glyph's shadow goes
@@ -648,9 +670,9 @@ final class IconButton: InteractiveView {
             imageView.alphaValue = isEnabled ? 1 : Tokens.Opacity.disabled
             return
         }
-        // On the window's frame, hover and press are washes of the space's own color, like the rows beside them.
-        let pressed = isChrome && !isOnPage ? Tokens.Chrome.pressed : Tokens.Color.pressedFill
-        let hover = isChrome && !isOnPage ? Tokens.Chrome.hover : Tokens.Color.hoverFill
+        let grounds = isOnPage ? [ground].compactMap { $0 } : isChrome ? frameGrounds : []
+        let pressed = Tokens.Chrome.buttonWash(pressed: true, on: grounds)
+        let hover = Tokens.Chrome.buttonWash(pressed: false, on: grounds)
         let fill: NSColor? = !isEnabled ? nil : isPressed ? pressed : (isHovered || isSelected) ? hover : showsFillAtRest ? Tokens.Color.fieldFill : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
         imageView.contentTintColor = image == nil ? tint : nil

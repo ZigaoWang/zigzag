@@ -809,15 +809,13 @@ final class BrowserRootView: SpaceFrameView {
         guard showsSidePanel else { return whole }
         // The side panel takes the right, a gap away; the page keeps at least a pane's worth.
         let width = min(ExtensionSidePanelView.width, max(0, whole.width - Self.minimumPaneWidth - Tokens.Metric.cardInset))
-        let gap = isEdgeToEdge ? 1 : Tokens.Metric.cardInset
-        return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - gap, height: whole.height)
+        return NSRect(x: whole.minX, y: whole.minY, width: whole.width - width - paneGap, height: whole.height)
     }
 
     /// Where the side panel sits: beside the page, a gap away, over the same height, reaching as far right as the page
     /// would have. It reads as a second pane, like a split's.
     var sidePanelFrame: NSRect {
-        let whole = pageAreaFrame, page = cardFrame
-        let gap = isEdgeToEdge ? 1 : Tokens.Metric.cardInset
+        let whole = pageAreaFrame, page = cardFrame, gap = paneGap
         return NSRect(x: page.maxX + gap, y: whole.minY, width: max(0, whole.maxX - page.maxX - gap), height: whole.height)
     }
 
@@ -857,8 +855,12 @@ final class BrowserRootView: SpaceFrameView {
         return (frames[0], frames.count > 1 ? frames[1] : nil)
     }
 
-    /// The gap between panes. Borderless, the pages meet at a hairline instead of floating apart.
-    var paneGap: CGFloat { isEdgeToEdge ? 1 : Tokens.Metric.cardInset }
+    /// The gap between panes: a hairline edge to edge, a tight gutter where the page meets the window's edges, and
+    /// framed the frame's own inset, as wide as the margins around the page.
+    var paneGap: CGFloat { isEdgeToEdge ? 1 : Self.isBorderless ? Tokens.Metric.paneGutter : Tokens.Metric.cardInset }
+
+    /// Extra drag strip on each side of a gutter narrower than the frame's inset, so the strip keeps the inset's width.
+    private var dividerWiden: CGFloat { paneGap == Tokens.Metric.paneGutter ? (Tokens.Metric.cardInset - paneGap) / 2 : 0 }
 
     /// Every pane's frame inside the page area, in the group's order; the whole of it with one page.
     var tileFrames: [NSRect] {
@@ -988,8 +990,8 @@ final class BrowserRootView: SpaceFrameView {
     /// While a pane is enlarged the lines rest under the dimming.
     private func placeDividers() {
         let area = cardFrame
-        let reach = Tokens.Metric.dragReach
-        let leading = reach / 2
+        let reach = Tokens.Metric.dragReach + dividerWiden
+        let leading = Tokens.Metric.dragReach / 2 + dividerWiden
         tileHandles.frame = bounds
         let segments = zoomedPane == nil
             ? tiles?.segments(in: area, gap: paneGap, slop: reach, leading: leading) ?? [] : []

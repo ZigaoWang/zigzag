@@ -41,7 +41,7 @@ final class SwipeNavigator {
     private var gesture = 0
     /// Something covering the page has this gesture (a zoomed-in PDF), and says what room it has.
     private var covered = false
-    private var armed = false
+    private var arming = SwipeArming()
     /// Recent finger movement, to tell a quick flick from a slow drag.
     private var samples: [(time: TimeInterval, dx: CGFloat)] = []
     /// Clears the arrow if the gesture's end never arrives (macOS sometimes drops it between quick swipes).
@@ -91,7 +91,7 @@ final class SwipeNavigator {
             stopWatchingRest()
             guard webView.window != nil else { state = .idle; return false }
             state = .deciding
-            dx = 0; dy = 0; direction = 0; armed = false; pageScrolls = nil; overFrame = false; samples = []
+            dx = 0; dy = 0; direction = 0; arming = SwipeArming(); pageScrolls = nil; overFrame = false; samples = []
             began = event.timestamp
             beganAt = (Date().timeIntervalSince1970 - (ProcessInfo.processInfo.systemUptime - event.timestamp)) * 1000
             gesture += 1
@@ -141,7 +141,9 @@ final class SwipeNavigator {
             watchdog?.cancel()
             stopWatchingRest()
             if wasTracking {
-                if event.phase == .ended, SwipeDecision.commits(progress: progress, speed: speed(at: event.timestamp)) { go() } else { cancel() }
+                // Letting go does what the arrow showed, read once more at the release.
+                _ = arming.step(progress: progress, speed: speed(at: event.timestamp))
+                if event.phase == .ended, arming.armed { go() } else { cancel() }
                 state = .finishing
             } else {
                 state = .idle
@@ -247,7 +249,7 @@ final class SwipeNavigator {
         if state != .tracking || direction != wanted {
             if state == .tracking { cancel() }
             direction = wanted
-            armed = false
+            arming = SwipeArming()
             state = .tracking
             showArrow()
         }
@@ -296,17 +298,14 @@ final class SwipeNavigator {
         let page = overlay.convert(webView.bounds, from: webView)
         arrow.frame = SwipeArrowView.frame(in: page, offset: offset, back: direction < 0)
         // Filled whenever letting go now would navigate, a quick flick short of the distance too.
-        let commits = SwipeDecision.commits(progress: progress, speed: speed(at: now))
-        arrow.progress = commits ? 1 : min(progress, 1)
-        if commits != armed {
-            armed = commits
-            arrow.isArmed = commits
-            if commits { Haptics.snap() }
-        }
+        // One tap as it arms; hovering at the line doesn't arm it again (#377).
+        if arming.step(progress: progress, speed: speed(at: now)) { Haptics.snap() }
+        arrow.progress = arming.armed ? 1 : min(progress, 1)
+        if arrow.isArmed != arming.armed { arrow.isArmed = arming.armed }
         recheck?.cancel()
         recheck = nil
         // Armed by speed alone: fingers that stop there no longer flick, though no event says so.
-        guard commits, progress < 1 else { return }
+        guard arming.armed, progress < 1 else { return }
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.state == .tracking else { return }
             self.update()
@@ -357,6 +356,19 @@ final class SwipeNavigator {
     }
 }
 
+/// Whether letting go of a swipe now navigates, step by step through the gesture: it arms at `commits` and stays armed
+/// until `holds` no longer does.
+struct SwipeArming {
+    private(set) var armed = false
+
+    /// Returns true when this step armed it, the one moment for a tap.
+    mutating func step(progress: CGFloat, speed: CGFloat) -> Bool {
+        let was = armed
+        armed = was ? SwipeDecision.holds(progress: progress, speed: speed) : SwipeDecision.commits(progress: progress, speed: speed)
+        return armed && !was
+    }
+}
+
 /// Whether a two-finger swipe on a page goes back or forward, from how far the fingers have gone and what the page
 /// said about it.
 enum SwipeDecision: Equatable {
@@ -378,6 +390,12 @@ enum SwipeDecision: Equatable {
     /// the swipe's way: all the way, or a quick flick that got well started. Pulled back, it doesn't.
     static func commits(progress: CGFloat, speed: CGFloat) -> Bool {
         progress >= 1 || (progress >= 0.4 && speed > 700)
+    }
+
+    /// Whether a swipe already armed stays armed: a little short of the distance or a little slower than a flick still
+    /// counts, so fingers hovering at the line don't flip it back and forth (#377).
+    static func holds(progress: CGFloat, speed: CGFloat) -> Bool {
+        progress >= 0.85 || (progress >= 0.3 && speed > 250)
     }
 
     /// How far back a flick's speed is measured.

@@ -77,6 +77,27 @@ import Testing
         }
     }
 
+    /// The × sits inside the part it closes, named for that page, and only on the row you're in or point at.
+    @Test func theCloseButtonSitsInItsPart() throws {
+        try inWindow(["A", "B"]) { controller, tabs in
+            let row = row(tabs[0], partners: [tabs[1]])
+            row.isSelected = true
+            row.focusedHalf = 1
+            row.layoutSubtreeIfNeeded()
+            #expect(!row.closeButton.isHidden)
+            #expect(row.closeButton.frame.minX > row.bounds.midX && row.closeButton.frame.maxX < row.bounds.maxX)
+            #expect(row.closeButton.toolTip == "Close B")
+            row.focusedHalf = 0
+            row.layoutSubtreeIfNeeded()
+            #expect(row.closeButton.frame.maxX < row.bounds.midX)
+            #expect(row.closeButton.toolTip == "Close A")
+            row.isSelected = false
+            row.layoutSubtreeIfNeeded()
+            #expect(row.closeButton.isHidden)
+            _ = controller
+        }
+    }
+
     /// Close Tab closes the page alone; Close Split View all of it, and one ⌘Z puts it all back where it was.
     @Test func theMenuOffersBoth() throws {
         try inWindow(["A", "C", "B"]) { controller, tabs in

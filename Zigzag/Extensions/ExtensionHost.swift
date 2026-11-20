@@ -188,9 +188,15 @@ final class ExtensionHost: NSObject {
     private(set) lazy var bridge = ExtensionBridge(host: self)
     /// Content scripts held back for reconnecting in a loop (ConnectGuard).
     private(set) lazy var storms = ExtensionStorms(host: self)
+    /// The sandbox OldTwitter's request signing needs, outside its content scripts and the site's policy.
+    private(set) lazy var oldTwitterSolver = OldTwitterSolver(host: self)
     /// Passes its two signals on to the ones views watch for any profile (ExtensionCenter).
     private var forwarding: [SignalToken] = []
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
+    /// The scripts every extension page of this profile gets, shared with the controller's pages.
+    private(set) var pageScripts = WKUserContentController()
+    /// The Firefox packages whose pages are marked as theirs.
+    private var firefoxMarked: Set<String> = []
     /// When each extension last started helpers for a connection, to slow down one that keeps reconnecting.
     fileprivate var helperStarts: [String: [Date]] = [:]
     private var socketBridges: [ObjectIdentifier: WebSocketBridge] = [:]
@@ -214,11 +220,12 @@ final class ExtensionHost: NSObject {
         // Profiles' page preludes reach every extension page through the shared configuration; each runs only on
         // its own extension's pages, before their scripts.
         // Set before the compatibility layer, which reads it to add Firefox's runtime members.
-        for id in ExtensionShims.firefoxIDs {
-            configuration.webViewConfiguration.userContentController.addUserScript(
-                WKUserScript(source: "if (location.host === '\(id)') { globalThis.__zigzagFirefoxPackage = true; }",
-                             injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        let firefoxIDs = ExtensionShims.firefoxIDs.filter(ExtensionStore.isExtensionID)
+        for id in firefoxIDs {
+            configuration.webViewConfiguration.userContentController.addUserScript(Self.firefoxMarker(id))
         }
+        pageScripts = configuration.webViewConfiguration.userContentController
+        firefoxMarked = Set(firefoxIDs)
         // The compatibility layer on every extension page too (popups, options), before their own scripts.
         configuration.webViewConfiguration.userContentController.addUserScript(
             WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.source)\n\(ExtensionShims.compatibility)\n\(ExtensionBridgeScript.afterCompatibility)\n}",
@@ -283,6 +290,27 @@ final class ExtensionHost: NSObject {
     private(set) var finishedLoading = false
 
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
+
+    /// Marks a Firefox package's pages, once, for firefox-polyfill.js: before it at setup, after it for one installed
+    /// later, which its setter still takes.
+    func addFirefoxMarker(_ id: String) {
+        guard ExtensionStore.isExtensionID(id), firefoxMarked.insert(id).inserted else { return }
+        pageScripts.addUserScript(Self.firefoxMarker(id))
+    }
+
+    private static func firefoxMarker(_ id: String) -> WKUserScript {
+        WKUserScript(source: "if (location.host === '\(id)') { globalThis.__zigzagFirefoxPackage = true; }",
+                     injectionTime: .atDocumentStart, forMainFrameOnly: false)
+    }
+
+    /// OldTwitter's challenge call, in this web view's extension world, when the extension is on.
+    func attachOldTwitterSolver(to configuration: WKWebViewConfiguration) {
+        guard let id = profile.installs.installedIDs.first(where: {
+                  OldTwitterSolver.isOldTwitter(id: $0, manifest: ExtensionStore.manifest(for: $0) ?? [:])
+              }),
+              profile.installs.state(id)?.enabled == true else { return }
+        oldTwitterSolver.attach(to: configuration, extensionID: id)
+    }
 
     /// The extension, loaded in this profile, that the page at this address is one of.
     func context(forPage url: URL?) -> WKWebExtensionContext? {
@@ -489,6 +517,7 @@ final class ExtensionHost: NSObject {
         // Its companion-app helpers end with it, whether or not WebKit closed their ports.
         NativeMessagingHost.terminateAll(for: id, of: self)
         bridge.release(id)
+        if oldTwitterSolver.extensionID == id { oldTwitterSolver.release() }
         use.forget(id)
         Passkeys.refresh()
         changed.send()
@@ -549,6 +578,8 @@ final class ExtensionHost: NSObject {
             context.hasAccessToPrivateData = profile.installs.allowsPrivate(id)
             try controller.load(context)
             contexts.append(context)
+            // Installed since the profile's pages were set up: its pages are marked from their next load.
+            if ExtensionStore.kind(of: id) == .firefox { addFirefoxMarker(id) }
             // Its user scripts, in every web view, from their next page.
             bridge.userScripts.refresh()
             announceExistingWindows(to: context)

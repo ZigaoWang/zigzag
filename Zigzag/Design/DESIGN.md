@@ -186,8 +186,10 @@ Pills (pill buttons, pill fields, the Clear chip) are capsules: radius = height 
 One look for each state, everywhere:
 
 - Rest: nothing (rows), `fieldFill` (fields, plain pills), `Chrome.field` (the sidebar's address and favorites), `glassFill` (glass tiles).
-- Hover: on the frame `Chrome.hover` (rows, the toolbar's buttons, the space dots); elsewhere `Color.hoverFill`
-  (rows, quiet buttons), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
+- Hover: icon buttons and the space keys, anywhere, `Chrome.buttonWash`: white at night, black by day, as strong as
+  it takes to part from the ground under it by 1.2:1 (pressed 1.36:1), measured on the space's or the page's color
+  and on black or white when that isn't known; rows on the frame `Chrome.hover`; elsewhere `Color.hoverFill`
+  (rows), `controlHover` (outlined buttons, dropdowns), `glassHover` (tiles), a step lighter on the
   primary. Instant both ways, in and out: a fade on something you sweep past all day reads as lag.
 - Pressed: a step darker (`pressedFill`, `controlPressed`, `primaryPressed`, `Chrome.pressed` on the frame) at
   once; the address and the favorites step back from their hover to `Chrome.fieldPressed`, never below the field at
@@ -410,7 +412,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   Esc, a click beside it, zooming it again or going to another pane puts it back; so does any change to the group.
   Nothing is saved. The row lights the zoomed part with the pressed fill. With Reduce Motion, a crossfade.
 - **Tiling** (`TileLayout.swift`): two to four panes on a 2×2 grid, halves and quarters, each line run only where it
-  divides panes. A plain drag moves a whole line, as a split always did, and a double-click puts it back in the middle;
+  divides panes. Panes sit `Metric.paneGutter` (4) apart where the page meets the window's edges, the frame's
+  inset (8) framed and 1 edge to edge; a narrower gap keeps the inset's drag strip. A plain drag moves a whole line, as a split always did, and a double-click puts it back in the middle;
   where a line each way meet, a square a little larger than the crossing drags both, with the diagonal resize cursor
   (#309). In a grid of four, ⇧-dragging the line between the columns parts it, a segment per row (#316); parted, each
   segment drags alone, snaps to the middle near it, and the strip's Reset Tile Layout evens the grid. A grid keeps one

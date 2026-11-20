@@ -290,3 +290,82 @@ struct SettingsReadingTests {
         #expect(settings.debugReads["orphans"] == 1)
     }
 }
+
+/// Settings › Privacy › Site Permissions lists what Site Controls keeps, and a change in either shows in the other
+/// (#420).
+@MainActor
+struct SettingsSitePermissionsTests {
+    private func withStore(_ body: (UserDefaults) throws -> Void) rethrows {
+        let name = "SettingsSitePermissionsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        defer {
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        try body(defaults)
+    }
+
+    private func privacy() -> SettingsView {
+        let settings = SettingsView(pane: .privacy)
+        settings.frame = NSRect(x: 0, y: 0, width: 1040, height: 776)
+        settings.debugReadNow()
+        return settings
+    }
+
+    @Test func eachSectionIsLaidOutOnceWithItsRowsUnderIt() throws {
+        try withStore { _ in
+            SitePermissions.setChoice(.allow, for: .camera, origin: "https://example.com")
+            let settings = privacy()
+            let headings = settings.debugHeadings
+            #expect(headings.filter { $0 == "Site Permissions" }.count == 1)
+            #expect(headings.contains("Apps on This Mac"))
+            // The rows start right under their heading, not a section's height further down.
+            let gap = try #require(settings.debugSitesGap)
+            #expect(gap >= 0 && gap < Tokens.Metric.sectionLabelHeight)
+        }
+    }
+
+    @Test func listsWhatSiteControlsKeeps() {
+        withStore { _ in
+            SitePermissions.setChoice(.allow, for: .camera, origin: "https://example.com")
+            SitePermissions.setChoice(.block, for: .notifications, origin: "https://example.org")
+            let rows = privacy().debugSiteRows
+            #expect(rows.contains("example.com"))
+            #expect(rows.contains("Camera: Allow"))
+            #expect(rows.contains("example.org"))
+            #expect(rows.contains("Notifications: Block"))
+        }
+    }
+
+    /// Answers kept by beta 5 and earlier, Bools in the old store, list and still apply.
+    @Test func listsAnswersKeptByEarlierBuilds() {
+        withStore { defaults in
+            defaults.set(["https://example.com|camera": true, "https://example.com|location": false], forKey: "SitePermissions")
+            let rows = privacy().debugSiteRows
+            #expect(rows.contains("example.com"))
+            #expect(rows.contains("Camera: Allow"))
+            #expect(rows.contains("Location: Block"))
+            #expect(SitePermissions.choice(.camera, origin: "https://example.com") == .allow)
+            #expect(SitePermissions.location(origin: "https://example.com") == false)
+        }
+    }
+
+    @Test func aChangeInEitherShowsInTheOther() {
+        withStore { _ in
+            let origin = "https://example.com"
+            SitePermissions.setChoice(.allow, for: .camera, origin: origin)
+            let settings = privacy()
+
+            // Site Controls, while Settings shows: its row follows without Settings being opened again.
+            SitePermissions.setChoice(.block, for: .camera, origin: origin)
+            #expect(settings.debugSiteRows.contains("Camera: Block"))
+
+            // Settings: Site Controls reads the same choice.
+            settings.debugChooseSitePermission("Camera", "Allow")
+            #expect(SitePermissions.choice(.camera, origin: origin) == .allow)
+            #expect(settings.debugSiteRows.contains("Camera: Allow"))
+        }
+    }
+}

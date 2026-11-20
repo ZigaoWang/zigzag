@@ -733,8 +733,7 @@ final class SpaceDotView: InteractiveView {
         let iconSide = min(Tokens.Sidebar.spaceIcon, max(10, min(bounds.width, bounds.height) - Tokens.Sidebar.spaceIconRoom))
         if let icon, iconSize != iconSide {
             iconSize = iconSide
-            // A symbol's glyph sits a little inside its square, as the 12pt one did in the 14pt square.
-            iconView.image = IconChoice.image(icon, size: IconChoice.isSymbol(icon) ? round(iconSide * 6 / 7) : iconSide)
+            iconView.image = IconChoice.mark(icon, side: iconSide)
         } else if icon == nil {
             iconView.image = nil
         }
@@ -751,7 +750,7 @@ final class SpaceDotView: InteractiveView {
             self.dot.backgroundColor = self.cgColor(dotFill)
             self.dot.borderWidth = 0
             self.dot.shadowOpacity = 0
-            self.dot.opacity = 1
+            self.dot.opacity = self.icon == nil ? 1 : 0
             self.numberLayer.isHidden = true
             self.tick.opacity = 0
         }
@@ -773,7 +772,8 @@ final class SpaceDotView: InteractiveView {
             Tokens.Motion.withoutAnimation(apply)
         }
         // The key answers the pointer as the toolbar's buttons do; a drop over it lights it as the drop target.
-        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.pressed : isHovered ? Tokens.Chrome.hover : nil
+        let fill: NSColor? = isDropTarget || isPressed ? Tokens.Chrome.buttonWash(pressed: true, on: frameGrounds)
+            : isHovered ? Tokens.Chrome.buttonWash(pressed: false, on: frameGrounds) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: animated && !isHovered)
     }
 }

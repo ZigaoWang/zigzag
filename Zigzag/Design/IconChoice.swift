@@ -63,12 +63,58 @@ enum IconChoice {
     /// Exactly `size` square, like a symbol of that size, so it lines up wherever a symbol would. An emoji's glyph
     /// runs wider than its font size, so it's set a little smaller and centered on its own ink.
     private static func emoji(_ text: String, size: CGFloat) -> NSImage {
-        let string = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: size * 0.8)])
-        let ink = string.boundingRect(with: NSSize(width: size * 4, height: size * 4), options: [.usesLineFragmentOrigin, .usesFontLeading])
-        return NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            string.draw(at: NSPoint(x: rect.midX - ink.midX, y: rect.midY - ink.midY))
+        centered(emojiText(text, fontSize: size * 0.8), key: "emoji \(text) \(size * 0.8)", side: size, template: false)
+    }
+
+    /// An emoji set at `fontSize` on an image of its own, with room around it.
+    private static func emojiText(_ text: String, fontSize: CGFloat) -> NSImage {
+        let string = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: fontSize)])
+        let side = ceil(fontSize * 2)
+        let box = string.boundingRect(with: NSSize(width: side * 2, height: side * 2), options: [.usesLineFragmentOrigin, .usesFontLeading])
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            string.draw(at: NSPoint(x: rect.midX - box.midX, y: rect.midY - box.midY))
             return true
         }
+    }
+
+    /// `image` on a `side` square with its ink, not its image, in the middle.
+    private static func centered(_ image: NSImage, key: String, side: CGFloat, template: Bool) -> NSImage {
+        // Measured as drawn at 2x, then moved by whole pixels so it draws the same.
+        let ink = Tokens.Symbol.inkOffset(of: placed(image, side: side, shift: .zero), key: "placed \(key) \(side)", scale: 2)
+        let result = placed(image, side: side, shift: CGSize(width: (ink.width * 2).rounded() / 2, height: (ink.height * 2).rounded() / 2))
+        result.isTemplate = template
+        return result
+    }
+
+    /// `image` in the middle of a `side` square, moved by `shift`.
+    private static func placed(_ image: NSImage, side: CGFloat, shift: CGSize) -> NSImage {
+        let size = image.size
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            image.draw(in: NSRect(x: rect.midX - size.width / 2 - shift.width, y: rect.midY - size.height / 2 - shift.height,
+                                  width: size.width, height: size.height))
+            return true
+        }
+    }
+
+    /// How much of a mark's square its ink takes, by the ink's geometric mean side.
+    static let markInk: CGFloat = 0.8
+
+    /// The scale that brings `ink`'s geometric mean side to `markInk` of `side`, its longer side never past `side`.
+    static func markScale(ink: CGSize, side: CGFloat) -> CGFloat {
+        guard ink.width > 0, ink.height > 0 else { return 1 }
+        return min(markInk * side / (ink.width * ink.height).squareRoot(), side / max(ink.width, ink.height))
+    }
+
+    /// A space's icon on a `side` square: sized by its ink, so a flame and a book read alike, with its ink in the middle.
+    static func mark(_ icon: String, side: CGFloat) -> NSImage {
+        if PageImageIcon.isImage(icon) { return image(icon, size: side) }
+        let symbol = isSymbol(icon)
+        let draw: (CGFloat) -> NSImage = { symbol ? Tokens.Symbol.image(icon, size: $0) : emojiText(icon, fontSize: $0) }
+        let key: (CGFloat) -> String = { "mark \(icon) \($0)" }
+        let base = side
+        let ink = Tokens.Symbol.inkSize(of: placed(draw(base), side: side * 2, shift: .zero), key: "placed \(key(base)) \(side * 2)", scale: 2)
+        let size = (base * markScale(ink: ink, side: side) * 4).rounded() / 4
+        return centered(draw(size), key: key(size), side: side, template: symbol)
     }
 
     /// A folder with its icon inside. Closed, the folder is solid and the icon cut out of it; open, it's an outline

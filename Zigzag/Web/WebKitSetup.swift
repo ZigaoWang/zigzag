@@ -121,6 +121,7 @@ enum WebKitSetup {
         }
         // Sites an extension lets message it get Chrome's name for that messaging.
         if #available(macOS 15.4, *) {
+            profile.extensions.attachOldTwitterSolver(to: configuration)
             let patterns = profile.installs.externallyConnectablePatterns()
             // Once: a new tab's setup is made and then configured again, which put it in twice.
             if !patterns.isEmpty {

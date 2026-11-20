@@ -188,6 +188,8 @@ final class DownloadManager: NSObject {
         let profile: UUID
         /// The sha256 AMO's API publishes for the file; the bytes must match it.
         let hash: String
+        /// AMO's ID for the add-on, for a package that names none itself.
+        let storeID: String?
     }
     private var pendingExtensionInstalls: [ObjectIdentifier: PendingExtensionInstall] = [:]
 
@@ -582,7 +584,7 @@ extension DownloadManager: WKDownloadDelegate {
                 .appendingPathComponent("Zigzag-\(UUID().uuidString)-\(Self.safeFilename(name))")
             pendingExtensionInstalls[identifier] = PendingExtensionInstall(file: file, window: window,
                                                                           profile: item(for: download)?.profile ?? Profile.defaultID,
-                                                                          hash: published.hash)
+                                                                          hash: published.hash, storeID: published.guid)
             items.removeAll { $0.download === download }
             changed.send(nil)
             return file
@@ -782,7 +784,7 @@ extension DownloadManager: WKDownloadDelegate {
                                               comment: "Shown when an .xpi downloaded from addons.mozilla.org doesn't match the sha256 the store publishes for it."), in: host)
                 return
             }
-            let prepared = await ExtensionStore.prepareInstallXPI(data: data)
+            let prepared = await ExtensionStore.prepareInstallXPI(data: data, storeID: pending.storeID)
             switch prepared {
             case .failure(let error):
                 Self.noticeCouldNotAdd(error.message, in: host)

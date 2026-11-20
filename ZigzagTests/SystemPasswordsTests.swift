@@ -403,6 +403,191 @@ struct SystemPasswordsTests {
         #expect(inWindowOnDismiss)
     }
 
+    @Test func thePasswordFieldIsMarkedOnlyAsTheListIsAskedFor() async throws {
+        // Focused while marked, AppKit put its own Passwords… suggestion under it before the list opened (#378).
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0.2, dismissSystem: {})
+        var markedWhenAsked: NSTextContentType?
+        var asked = 0
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { field in
+            asked += 1
+            markedWhenAsked = field.contentType
+            return true
+        }) { outcome = $0 }
+        #expect(picker.passwordField.currentEditor() != nil)
+        #expect(picker.passwordField.contentType == nil)
+        try await wait(0.4)
+        #expect(asked == 1, "outcome \(String(describing: outcome))")
+        #expect(markedWhenAsked == .password, "marked \(String(describing: markedWhenAsked?.rawValue))")
+        picker.cancel()
+        #expect(picker.passwordField.contentType == nil)
+        #expect(picker.usernameField.contentType == .username)
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func aFieldOffThePageAsksNothing() async throws {
+        // The list points at the field: without one on the page, it opened at the screen's corner (#378).
+        let bounds = NSRect(x: 0, y: 0, width: 600, height: 400)
+        #expect(SystemPasswordPicker.anchorIsValid(NSRect(x: 40, y: 60, width: 280, height: 32), in: bounds))
+        #expect(!SystemPasswordPicker.anchorIsValid(NSRect(x: 40, y: 900, width: 280, height: 32), in: bounds))
+        #expect(!SystemPasswordPicker.anchorIsValid(NSRect(x: -400, y: 60, width: 280, height: 32), in: bounds))
+        #expect(!SystemPasswordPicker.anchorIsValid(.zero, in: bounds))
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        var asked = false
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 40, y: 900, width: 280, height: 32), in: overlay, restoringFocusTo: stand, ask: { _ in asked = true; return true }) { outcome = $0 }
+        #expect(!asked)
+        guard case .cancelled(.unavailable) = outcome else { Issue.record("expected unavailable, got \(String(describing: outcome))"); return }
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func theMacsListIsClosedAgainWhenTheWindowIsNextKey() async throws {
+        // AppKit brings it back for whatever has the focus, with no field to point at (#378).
+        let (window, overlay, stand) = host()
+        var dismissed = 0
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: { dismissed += 1 })
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
+        picker.cancel()
+        #expect(dismissed == 1)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        try await wait(0.1)
+        #expect(dismissed == 2)
+        // Opened again: the new list is left alone.
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        try await wait(0.1)
+        #expect(dismissed == 2)
+        picker.cancel()
+        #expect(dismissed == 3)
+        // And only for a moment.
+        try await wait(SystemPasswordPicker.reshowGuardTime + 0.3)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        try await wait(0.1)
+        #expect(dismissed == 3)
+    }
+
+    @Test func theListClosesWhenTheWindowMovesOrResizes() async throws {
+        let (webView, window, _) = await page(form)
+        let triggers: [(Notification.Name, SystemPanelWatch.Trigger)] = [
+            (NSWindow.willMoveNotification, .windowMoved), (NSWindow.didResizeNotification, .windowResized),
+            (NSWindow.willStartLiveResizeNotification, .windowResized), (NSWindow.willEnterFullScreenNotification, .windowResized),
+            (NSWindow.willMiniaturizeNotification, .windowHidden), (NSWindow.willCloseNotification, .windowClosed),
+        ]
+        for (name, expected) in triggers {
+            var ends: [SystemPanelWatch.Trigger] = []
+            let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+            NotificationCenter.default.post(name: name, object: window)
+            NotificationCenter.default.post(name: name, object: window)
+            #expect(ends == [expected])
+            #expect(!watch.isWatching)
+        }
+        // Another window moving is nothing to it.
+        let other = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+        NotificationCenter.default.post(name: NSWindow.willMoveNotification, object: other)
+        watch.scrolled(in: other)
+        #expect(ends.isEmpty && watch.isWatching)
+        watch.stop()
+    }
+
+    @Test func theListClosesWhenThePageScrolls() async throws {
+        let (webView, window, _) = await page(form)
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+        // The glide of a scroll from before, and fingers resting or lifting, leave it open.
+        watch.scrolled(in: window, phase: [], momentumPhase: .began)
+        watch.scrolled(in: window, phase: [], momentumPhase: .changed)
+        watch.scrolled(in: window, phase: [], momentumPhase: .ended)
+        watch.scrolled(in: window, phase: .ended)
+        watch.scrolled(in: window, phase: .cancelled)
+        watch.scrolled(in: window, phase: .mayBegin)
+        #expect(ends.isEmpty && watch.isWatching)
+        watch.scrolled(in: window, phase: .changed)
+        watch.scrolled(in: window, phase: .changed)
+        #expect(ends == [.scrolled])
+        #expect(!watch.isWatching)
+    }
+
+    /// A wheel (no phase) and fingers moving close it; a glide, or fingers resting or lifting, don't.
+    @Test func onlyAScrollBeingMadeCountsAsOne() {
+        #expect(SystemPanelWatch.isUserScroll(phase: [], momentumPhase: []))
+        #expect(SystemPanelWatch.isUserScroll(phase: .began, momentumPhase: []))
+        #expect(SystemPanelWatch.isUserScroll(phase: .changed, momentumPhase: []))
+        #expect(!SystemPanelWatch.isUserScroll(phase: [], momentumPhase: .began))
+        #expect(!SystemPanelWatch.isUserScroll(phase: [], momentumPhase: .changed))
+        #expect(!SystemPanelWatch.isUserScroll(phase: [], momentumPhase: .ended))
+        #expect(!SystemPanelWatch.isUserScroll(phase: .ended, momentumPhase: []))
+        #expect(!SystemPanelWatch.isUserScroll(phase: .cancelled, momentumPhase: []))
+        #expect(!SystemPanelWatch.isUserScroll(phase: .mayBegin, momentumPhase: []))
+    }
+
+    @Test func theListClosesWhenThePageGoesElsewhere() async throws {
+        let (webView, window, loading) = await page(form)
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<p>next</p>", baseURL: URL(string: "https://example.com/next"))
+        }
+        #expect(ends == [.navigated])
+        #expect(!watch.isWatching)
+        // A page that changes only its address (a history step in a web app) counts too.
+        var steps: [SystemPanelWatch.Trigger] = []
+        let again = SystemPanelWatch(webView: webView, window: window) { steps.append($0) }
+        _ = try await webView.evaluateJavaScript("history.pushState({}, '', '/elsewhere'); 1")
+        try await wait(0.2)
+        #expect(steps == [.navigated])
+        #expect(!again.isWatching)
+    }
+
+    @Test func stoppingTheWatchCallsNothing() async throws {
+        let (webView, window, _) = await page(form)
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window, timeout: 0.2) { ends.append($0) }
+        watch.stop()
+        NotificationCenter.default.post(name: NSWindow.willMoveNotification, object: window)
+        try await wait(0.4)
+        #expect(ends.isEmpty)
+        // Left alone, it gives up with the list.
+        let timed = SystemPanelWatch(webView: webView, window: window, timeout: 0.2) { ends.append($0) }
+        try await wait(0.4)
+        #expect(ends == [.timedOut])
+        #expect(!timed.isWatching)
+    }
+
+    @Test func theSecondClickOfADoubleClickIsTheFirstOnes() {
+        // The menu is gone by the second click, which landed on the page under it, in the next field (#378).
+        #expect(Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: 0.1, interval: 0.5))
+        #expect(Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: -0.01, interval: 0.5))
+        #expect(!Autofill.isSecondClick(clickCount: 1, sameWindow: true, after: 0.1, interval: 0.5))
+        #expect(!Autofill.isSecondClick(clickCount: 2, sameWindow: false, after: 0.1, interval: 0.5))
+        #expect(!Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: 0.6, interval: 0.5))
+    }
+
+    @Test func passwordsTakesAClickAtOnce() throws {
+        // The other rows fill the page, so they still wait out a click aimed elsewhere; Passwords… fills nothing
+        // until you pick in the Mac's list (#378).
+        #expect(AutofillMenu.takesClick(on: .systemPasswords, shownFor: 0))
+        #expect(!AutofillMenu.takesClick(on: .generate, shownFor: 0.1))
+        #expect(AutofillMenu.takesClick(on: .generate, shownFor: 0.6))
+        let menu = AutofillMenu(items: [.generate, .systemPasswords], origin: try #require(Origin(URL(string: "https://example.com"))))
+        menu.frame = NSRect(x: 0, y: 0, width: 300, height: menu.contentHeight)
+        menu.layoutSubtreeIfNeeded()
+        let stand = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        stand.addSubview(menu)
+        func all(_ view: NSView) -> [NSView] { view.subviews + view.subviews.flatMap(all) }
+        let rows = all(menu).compactMap { $0 as? InteractiveView }.filter { $0.accessibilityRole() == .menuItem }
+        try #require(rows.count == 2)
+        #expect(rows.allSatisfy { $0.frame.height > 0 })
+        func center(_ row: NSView) -> NSPoint { row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: stand) }
+        #expect(menu.hitTest(center(rows[0])) === menu)
+        #expect(menu.hitTest(center(rows[1])) === rows[1])
+    }
+
     @Test func appKitHasTheCallThatClosesItsAutoFill() throws {
         let type = try #require(NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type)
         #expect(type.responds(to: NSSelectorFromString("sharedInstance")))

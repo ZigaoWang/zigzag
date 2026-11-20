@@ -2,7 +2,7 @@ import AppKit
 import WebKit
 
 /// A floating text field we draw ourselves: no bezel, our font, our colors.
-final class PlainTextField: NSTextField {
+class PlainTextField: NSTextField {
     var onCancel: (() -> Void)?
     /// Room at the sides for a selection and the first letter to draw whole (the address). Zero for fields lined up
     /// with a label they replace, like renaming.
@@ -609,7 +609,8 @@ class FloatingPanelView: NSView {
 
     /// The rounded body with the arrow on top, in the panel's own (flipped) coordinates.
     private func arrowPath(at x: CGFloat) -> CGPath {
-        let h = Self.arrowHeight, half = Self.arrowWidth / 2, r = radius
+        let h = Self.arrowHeight, half = Self.arrowWidth / 2
+        let r = CALayer.cornerRadius(radius, size: CGSize(width: bounds.width, height: bounds.height - h))
         let body = NSRect(x: 0, y: h, width: bounds.width, height: bounds.height - h)
         let tipX = min(max(x, r + half), body.maxX - r - half)
         let path = CGMutablePath()
@@ -655,18 +656,24 @@ class FloatingPanelView: NSView {
                 if outline.superlayer == nil { layer?.addSublayer(outline) }
             }
             layer?.shadowPath = path
-        } else {
-            surface.layer?.cornerRadius = radius
-            material.layer?.cornerRadius = radius
-            layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         }
         onLayout?()
+        // After `onLayout`, which may set the radius for this layout.
+        if arrowX == nil { roundCorners() }
         matchCorners()
+    }
+
+    private func roundCorners() {
+        let r = CALayer.cornerRadius(radius, size: bounds.size)
+        surface.layer?.round(r, size: bounds.size)
+        material.layer?.round(r, size: bounds.size)
+        layer?.shadowPath = CGPath(roundedRect: bounds, cornerWidth: r, cornerHeight: r, transform: nil)
     }
 
     /// A button tucked into one of the panel's rounded corners follows that corner: its own radius is the panel's
     /// less the gap between them, so the two curves run side by side instead of a square-ish fill in a round shape.
     private func matchCorners() {
+        let radius = CALayer.cornerRadius(radius, size: bounds.size)
         for view in surface.subviews {
             guard view is IconButton || view is TextButton, !view.isHidden, let layer = view.layer else { continue }
             let f = view.frame

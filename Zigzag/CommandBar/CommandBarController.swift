@@ -345,10 +345,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // a new tab is large. Regular weight both ways: what you type reads as text, not a heading.
         // Light type, the space name's voice: the sidebar's size over the address, large and airy for a new tab.
         // In a slim strip's field, the strip's own address size, so it fits the field's height.
-        let fits = isAnchored && host.commandBarFitsAnchor
+        let fits = fitsAnchor
         let font = Tokens.Font.voice(fits ? Tokens.Pane.addressText : isAnchored ? Tokens.Font.sidebarRow().pointSize : 22)
         field.font = font
-        panel.appearance = fits ? host.commandBarAppearance : nil
+        panel.appearance = fits ? host.commandBarAppearance ?? anchorView?.effectiveAppearance : nil
         let placeholder = mode == .history ? String(localized: "Search history", comment: "Placeholder of the command bar's field while it searches history.") : String(localized: "Search or enter address", comment: "Placeholder of the command bar's field.")
         field.placeholderAttributedString = NSAttributedString(string: placeholder,
                                                                attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
@@ -429,6 +429,17 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         return host.commandBarAnchor(asked: anchor.flatMap { $0.window != nil ? $0 : nil }) != nil
     }
 
+    private var anchorView: NSView? { host?.commandBarAnchor(asked: anchor.flatMap { $0.window != nil ? $0 : nil }) }
+
+    /// The split pane's strip whose address the bar opens over.
+    private var paneStrip: PaneHeaderView? { anchorView?.superview as? PaneHeaderView }
+
+    /// Opened over a slim strip's field (Zigzag Mini's, a split pane's): at that field's size, in the strip's light or dark.
+    private var fitsAnchor: Bool {
+        guard isAnchored, let host else { return false }
+        return host.commandBarFitsAnchor || paneStrip != nil
+    }
+
     /// The address the bar opens over, in the overlay's coordinates.
     private func anchorFrame(in host: CommandBarHost) -> NSRect {
         guard let view = host.commandBarAnchor(asked: anchor.flatMap { $0.window != nil ? $0 : nil }) else { return .zero }
@@ -452,8 +463,14 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             let wanted = results.isEmpty ? needed : max(needed, Tokens.Metric.commandBarWidth * 0.7)
             // A field wider than the bar (the address above the page) opens at its own width, never narrower.
             // Fitted to a strip's field, it stays that field's width until suggestions need the room.
-            let widest = host.commandBarFitsAnchor && results.isEmpty ? address.width : max(Tokens.Metric.commandBarWidth, address.width)
+            // A split pane's field may grow into the room between its strip's buttons, never over them.
+            let strip = paneStrip.map { $0.convert(NSRect(x: $0.addressRoom.lowerBound, y: 0, width: $0.addressRoom.upperBound - $0.addressRoom.lowerBound, height: $0.bounds.height), to: host.commandBarOverlay) }
+            let widest = fitsAnchor && results.isEmpty ? max(address.width, strip?.width ?? 0) : max(Tokens.Metric.commandBarWidth, address.width)
             let wide = min(max(wanted, address.width), widest, bounds.width - Tokens.Space.x2 - Tokens.Space.x4)
+            if let strip, results.isEmpty {
+                let x = min(max(round(address.midX - wide / 2), strip.minX), strip.maxX - wide)
+                return NSRect(x: x, y: address.minY, width: wide, height: fieldHeight)
+            }
             let start = host.commandBarCentersOnAnchor ? round(address.midX - wide / 2) : address.minX
             // A field that itself reaches nearer the edge keeps its place.
             let margin = min(Tokens.Space.x4, max(0, bounds.maxX - address.maxX))
@@ -589,7 +606,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// Opened from the address it's the address field's own height, so clicking in changes nothing but the width.
     private var fieldHeight: CGFloat {
         guard isAnchored else { return Tokens.Metric.commandBarFieldHeight }
-        if let host, host.commandBarFitsAnchor {
+        if let host, fitsAnchor {
             let height = anchorFrame(in: host).height
             if height > 0 { return height }
         }
@@ -606,7 +623,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private func layoutPanel() {
         let b = panel.bounds
         // Over the address with nothing below it, it keeps the field's corners; with suggestions, the panel's.
-        let fitted = isAnchored && host?.commandBarFitsAnchor == true
+        let fitted = fitsAnchor
         // In a slim strip, the strip's own corners, as its other fields and buttons have.
         panel.radius = isAnchored && results.isEmpty ? (fitted ? Tokens.Radius.control : Tokens.Sidebar.addressRadius) : Tokens.Radius.panel
         let fieldHeight = self.fieldHeight
