@@ -269,14 +269,6 @@ enum ExtensionStore {
         string.count == 32 && string.allSatisfy { ("a"..."p").contains($0) }
     }
 
-    // MARK: addons.mozilla.org
-
-    /// The AMO site itself: where listings are read and an add-on is added. Its API is a different host, and never
-    /// a page.
-    nonisolated static func addonsHost(_ host: String) -> Bool {
-        host.lowercased() == "addons.mozilla.org"
-    }
-
     /// WebKit keeps a service worker background's registration from one launch to the next, and on a later launch
     /// can bring it back without running its script: WebKit says the background loaded, but it never starts, and the
     /// extension's popup waits forever (1Password, from the second launch on). Chrome starts each worker afresh at
