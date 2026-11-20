@@ -35,6 +35,16 @@ struct AddonsMozillaPageTests {
         #expect(!file(nil))
     }
 
+    /// The store's pages are asked for as Firefox, so its button is Add to Firefox; nowhere else is.
+    @Test func theStorePagesAreAskedAsFirefox() {
+        let page = Tab.addonsPage
+        #expect(page(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/")!) != nil)
+        #expect(page(URL(string: "https://addons.mozilla.org/firefox/addon/darkreader")!) != nil)
+        #expect(page(URL(string: "https://example.com/firefox/addon/ublock-origin/")!) == nil)
+        #expect(page(URL(string: "http://addons.mozilla.org/firefox/addon/ublock-origin/")!) == nil)
+        #expect(page(URL(string: "https://addons.mozilla.org.evil.example/firefox/addon/x/")!) == nil)
+    }
+
     /// AMO publishes each file's sha256; a package whose bytes don't match it is refused, not installed.
     @Test func anAMOPackageMustMatchTheHashTheStorePublishes() {
         let bytes = Data("an xpi's bytes".utf8)
