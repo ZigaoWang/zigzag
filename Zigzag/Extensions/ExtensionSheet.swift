@@ -1,5 +1,15 @@
 import AppKit
+import UniformTypeIdentifiers
 import WebKit
+
+/// The kinds of file the extension picker offers: a folder to read in place, or a Firefox package (.xpi). A Chrome
+/// package (.crx) has no install path here, so it isn't offered. Neither file has a system type of its own on every
+/// Mac, so both are named by their extension.
+nonisolated enum ExtensionFilePicker {
+    static var types: [UTType] {
+        [.folder] + ["xpi"].compactMap { UTType(filenameExtension: $0) }
+    }
+}
 
 /// The one place an extension asks for something: before it's added, and when an update wants more access.
 /// It floats over the top of the page like the other panels. Return confirms, Escape cancels.
@@ -224,5 +234,34 @@ final class ExtensionSheet: FloatingPanelView {
         place(buttons, NSRect(x: pad, y: y, width: inner, height: DialogButtons.height))
         y += DialogButtons.height + pad
         return y
+    }
+}
+
+@available(macOS 15.4, *)
+extension ExtensionSheet {
+    /// Offers a prepared package — a picked `.xpi`, or one found in another browser — with the store's own sheet,
+    /// and installs it once confirmed. Cancel discards the staged copy. The caller reloads on the way back.
+    @MainActor
+    static func offer(_ prepared: ExtensionStore.PreparedInstall, in profile: Profile, over host: NSView,
+                      onInstalled: @escaping @MainActor (Result<String, ExtensionStore.InstallError>) -> Void,
+                      onDeclined: @escaping @MainActor () -> Void = {}) {
+        let info = prepared.extensionInfo
+        let content = Content(
+            icon: info.icon(for: NSSize(width: 40, height: 40)),
+            title: info.displayName.map { String(localized: "Add \($0)?", comment: "Title of the sheet that asks before adding an extension. The name is the extension's.") }
+                ?? String(localized: "Add this extension?", comment: "Title of the sheet that asks before adding an extension that has no name."),
+            // One short line: the header gives the subtitle a single line, and two sentences ran past it.
+            subtitle: String(localized: "Firefox extension, version \(prepared.version)",
+                             comment: "Under the title of the sheet that asks before adding a Firefox extension (.xpi)."),
+            heading: String(localized: "It will be able to", comment: "Heading over the list of what an extension can do, in the sheet that asks before adding it."),
+            report: prepared.report,
+            confirm: String(localized: "Add Extension", comment: "Button that adds the extension, in the sheet that asks first."),
+            cancel: String(localized: "Cancel", comment: "Button that closes a sheet without doing anything."))
+        present(content, over: host, onConfirm: {
+            Task { @MainActor in onInstalled(await ExtensionStore.finishInstall(prepared, in: profile)) }
+        }, onCancel: {
+            ExtensionStore.discard(prepared)
+            onDeclined()
+        })
     }
 }

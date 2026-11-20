@@ -304,6 +304,14 @@
 		8B3741625A4E5D67BD974F41 /* WebNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21F72054D6913E7D8AD017F /* WebNotifications.swift */; };
 		8B941CD9DA6E2EE3FC3CAEC6 /* SharedTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1715A164F86AEB4FE31DB9B5 /* SharedTabsTests.swift */; };
 		8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60823191217F3C0F87144EA5 /* AccessibilityTests.swift */; };
+		FFDAD5641E480BF83AE887CA /* XPIPackageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPIPackageTests.swift; sourceTree = "<group>"; };
+		FF8B61EA3ED59212399D4BA4 /* FirefoxSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxSurfaceTests.swift; sourceTree = "<group>"; };
+		FF38357DDDD3FEBE61157B80 /* FirefoxManifestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxManifestTests.swift; sourceTree = "<group>"; };
+		FF4A41F3AC05F211C900F90D /* XPIPackageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFDAD5641E480BF83AE887CA /* XPIPackageTests.swift */; };
+		FF3D11A4B887788C1215A37E /* FirefoxSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF8B61EA3ED59212399D4BA4 /* FirefoxSurfaceTests.swift */; };
+		FF59F27CC6FDECF72DCB1FB4 /* FirefoxManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF38357DDDD3FEBE61157B80 /* FirefoxManifestTests.swift */; };
+		FF8D840F91AF2964E0AE8A63 /* FirefoxInstallTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxInstallTests.swift; sourceTree = "<group>"; };
+		FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF8D840F91AF2964E0AE8A63 /* FirefoxInstallTests.swift */; };
 		8BCB7AC803E4BEF7AE6B163F /* PDFService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59FDCE08F5D924D2BB0AA3A /* PDFService.swift */; };
 		8BE0DCBEBFC4E933AA1C0531 /* BlockedScriptStandInsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D5275896F347F531AE3C184 /* BlockedScriptStandInsTests.swift */; };
 		8C7416CD981D4B2160DB8AA4 /* darkreader.info.json in Resources */ = {isa = PBXBuildFile; fileRef = 1EC914DFACAD0B1C40DF98C9 /* darkreader.info.json */; };
@@ -508,6 +516,8 @@
 		E8C4FE93204783B7BF9A6F13 /* ExtensionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */; };
 		EB9F2029F6F6FD67B9F34E11 /* PinnedSpaceNameResizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 394832E31B84782D179A328D /* PinnedSpaceNameResizeTests.swift */; };
 		EC05AD3E997E495DCB2D2D54 /* compatibility.json in Resources */ = {isa = PBXBuildFile; fileRef = 97D21B724EB9B209BB1810E1 /* compatibility.json */; };
+		FF60D1CF839F1BC9C3D5D6BF /* firefox-polyfill.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = firefox-polyfill.js; sourceTree = "<group>"; };
+		FFA8F1D26A49C62A0F0393E5 /* firefox-polyfill.js in Resources */ = {isa = PBXBuildFile; fileRef = FF60D1CF839F1BC9C3D5D6BF /* firefox-polyfill.js */; };
 		EC8D7C377217B4137CCBFF7F /* ExtensionContextClaimsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B88E6222A2F5303A4D264AED /* ExtensionContextClaimsTests.swift */; };
 		ECC981B8EFD81BC0FC98A4EC /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55275BFA54A12BED1AC6C615 /* Sparkle */; };
 		ECE245AE4D9C42EE413E00BE /* EmptyPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 609E4F597C7C837A99357BA8 /* EmptyPage.swift */; };
@@ -520,6 +530,10 @@
 		F0C56F3B98303CA051F9F8E1 /* ExtensionOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54E0BE2C311476D13FD8BC6 /* ExtensionOverlayTests.swift */; };
 		F1243541BD1D1B92BCF04426 /* TabNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47942E3D8F04A33C25CEC978 /* TabNavigationTests.swift */; };
 		F126F510FEC04B5F7A87A1F2 /* ExtensionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118460E2A057D11B6C1946F1 /* ExtensionStore.swift */; };
+		FF722FC49AE54E7EF0934117 /* XPIPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XPIPackage.swift; sourceTree = "<group>"; };
+		FFF9E87717C06188E54A9AB3 /* XPIPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF722FC49AE54E7EF0934117 /* XPIPackage.swift */; };
+		FFE49543D32F0F01506BF404 /* FirefoxManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxManifest.swift; sourceTree = "<group>"; };
+		FF3DD1F9D4F9655899042440 /* FirefoxManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE49543D32F0F01506BF404 /* FirefoxManifest.swift */; };
 		F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */; };
 		F1B4DCE6ED5EAEBD6C61BA9D /* TabStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92C68F8087C6786CC457EB4B /* TabStore.swift */; };
 		F2B2D57349048BBF7D703BD1 /* BridgeNamespaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C531844DCB5F002266118C /* BridgeNamespaces.swift */; };
@@ -1227,6 +1241,7 @@
 				95FCFEE43D95B1A09B1F883D /* chrome-api.json */,
 				B030A4C0601F5AE1232B9288 /* chrome-runtime.js */,
 				97D21B724EB9B209BB1810E1 /* compatibility.json */,
+				FF60D1CF839F1BC9C3D5D6BF /* firefox-polyfill.js */,
 				05160D4ABF2A17C7C0D3E968 /* tab-capture-page.js */,
 				ECFB222D7082B8C1D2724708 /* tab-capture.js */,
 				DFEB02EB619B5441AC6DED95 /* web-locks.js */,
@@ -1433,6 +1448,8 @@
 				4B8D72D98D3D83950CEE4AC3 /* ExtensionSheet.swift */,
 				5AC9B41E8717A89ACC4B6BD4 /* ExtensionSidePanel.swift */,
 				118460E2A057D11B6C1946F1 /* ExtensionStore.swift */,
+				FF722FC49AE54E7EF0934117 /* XPIPackage.swift */,
+				FFE49543D32F0F01506BF404 /* FirefoxManifest.swift */,
 				1401764DF9792E0E8F11146A /* ExtensionStorms.swift */,
 				289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */,
 				82E0C32893C3D5F6AEF17C46 /* SharedSoundGate.swift */,
@@ -1723,6 +1740,10 @@
 			isa = PBXGroup;
 			children = (
 				60823191217F3C0F87144EA5 /* AccessibilityTests.swift */,
+				FFDAD5641E480BF83AE887CA /* XPIPackageTests.swift */,
+				FF8B61EA3ED59212399D4BA4 /* FirefoxSurfaceTests.swift */,
+				FF38357DDDD3FEBE61157B80 /* FirefoxManifestTests.swift */,
+				FF8D840F91AF2964E0AE8A63 /* FirefoxInstallTests.swift */,
 				DD7578DF496E9D885F5A6548 /* AddressDropTests.swift */,
 				AFA72586980E3DDF9FDA59A8 /* AddressTests.swift */,
 				8D4C44C0E24339E50B51709A /* AdFiltersTests.swift */,
@@ -2256,6 +2277,7 @@
 				36E2C35A81D3127D10680928 /* chrome-api.json in Resources */,
 				C0FC25E6C63A4DA77D76CA8D /* chrome-runtime.js in Resources */,
 				EC05AD3E997E495DCB2D2D54 /* compatibility.json in Resources */,
+				FFA8F1D26A49C62A0F0393E5 /* firefox-polyfill.js in Resources */,
 				E6AA5B0A7E0A4A0D3BB43C2F /* dark-pages.js in Resources */,
 				7F5235CF381E3DDDA533BDBF /* darkreader-fixes.config in Resources */,
 				D1159A4A8B99C34E9E7A190F /* darkreader-proxy.js in Resources */,
@@ -2368,6 +2390,8 @@
 				E8C4FE93204783B7BF9A6F13 /* ExtensionSheet.swift in Sources */,
 				AFE7C6BEFFFF26CDDB8D783A /* ExtensionSidePanel.swift in Sources */,
 				F126F510FEC04B5F7A87A1F2 /* ExtensionStore.swift in Sources */,
+				FF3DD1F9D4F9655899042440 /* FirefoxManifest.swift in Sources */,
+				FFF9E87717C06188E54A9AB3 /* XPIPackage.swift in Sources */,
 				1A3C4EEF9AB9B8D6903AE06A /* ExtensionStorms.swift in Sources */,
 				8D5DA9B18AB78EDB306BDE3F /* ExternalLinks.swift in Sources */,
 				A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */,
@@ -2588,6 +2612,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */,
+				FFFBC7AE9229B53B119F8200 /* FirefoxInstallTests.swift in Sources */,
+				FF59F27CC6FDECF72DCB1FB4 /* FirefoxManifestTests.swift in Sources */,
+				FF3D11A4B887788C1215A37E /* FirefoxSurfaceTests.swift in Sources */,
+				FF4A41F3AC05F211C900F90D /* XPIPackageTests.swift in Sources */,
 				DC8FE3DC9CACD4BE5F67F667 /* AdFiltersTests.swift in Sources */,
 				F561CDCA7B229704A348D99E /* AddressDropTests.swift in Sources */,
 				1482F4A584F73FF91CA61BE4 /* AddressTests.swift in Sources */,
