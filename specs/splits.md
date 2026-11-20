@@ -8,13 +8,13 @@
 - Drop onto a quarter, or onto a group of four → the new page takes that page's place, and the old one becomes a plain tab.
   Test: TileLayoutTests.aQuarterThatCannotSplitTakesTheNewPage
 - Drop a row onto the middle of another sidebar row → the two open side by side.
-  No test yet.
+  Test: SplitCloseTests.aRowDroppedOnAnotherRowsMiddleOpensBesideIt
 - Drop a page of another split → no split; that split stays as it is.
   Test: SplitDropTests.aSplitIsNeverBrokenByADrop
 - Drop a link or file on the page → it opens as a tab, not a split.
-  No test yet.
+  Test: SplitCloseTests.aLinkDroppedOnThePageOpensATabNotASplit
 - Open in Split View in a tab's sidebar menu or the command bar → it opens on the right of the current page.
-  No test yet.
+  Test: SplitCloseTests.openInSplitViewFromTheMenuOpensOnTheRight
 
 ## The split row
 - A split shows as one sidebar row with a part per page; clicking a part selects that page.
@@ -22,7 +22,7 @@
 - Click × on the row → closes only the page of the part it sits in.
   Test: SplitCloseTests.theRowsCloseButtonClosesOnePart
 - Middle-click the row → closes the page of the part under the pointer.
-  No test yet.
+  Test: SplitCloseTests.aMiddleClickClosesThePartUnderThePointer
 - Close Split View in the row's menu → closes every page; one ⌘Z brings them all back.
   Test: SplitCloseTests.theMenuOffersBoth
 - Separate Split View (or ⌥⌘\ Separate Tabs) → every page becomes its own tab and the selection stays.
@@ -32,7 +32,7 @@
 - ⌘Z after closing one page of a split → the split comes back on the same side at the same size.
   Test: SplitCloseTests.closingTheLeftPageLeavesTheOtherInItsPlace
 - Stack Vertically on a split of two → one above the other; the item then reads Side by Side.
-  No test yet.
+  Test: SplitCloseTests.stackVerticallyThenReadsSideBySide
 
 ## Resizing
 - Plain drag on a line → the whole line moves; in a grid of four, ⇧-drag on either line moves only the segment between two pages.
@@ -54,9 +54,9 @@
 
 ## Pane strips
 - Click a pane's address → that pane gets focus and the command bar opens over the address to edit it.
-  No test yet.
+  Test: SplitCloseTests.aPanesAddressEditsThatPane
 - Back, Forward and Reload on a strip → act on that pane's page only.
-  No test yet.
+  Test: SplitCloseTests.aStripsButtonsActOnItsOwnPane
 - Narrow a strip → its buttons move into ⋯ in stages; Back and × always stay.
   Test: PaneHeaderTests.fewerButtonsAsItNarrows
 - Zoom on a strip (or ⇧⌘↩) → that pane fills the page; Zoom again puts it back.
