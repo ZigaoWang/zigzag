@@ -281,44 +281,6 @@ struct FirefoxInstallTests {
         }
     }
 
-    @Test func anMV3ModuleBackgroundGetsAnImportingWorkerOnDisk() async throws {
-        let work = try Workspace()
-        defer { work.cleanUp() }
-        let background: [String: Any] = ["scripts": ["a.js", "b.js"], "type": "module"]
-        let url = try work.xpiFile(try Self.xpi(Self.manifest("module@example.com", "3.0", [
-            "manifest_version": 3, "background": background,
-        ]), files: ["a.js": Data("let a = 1;".utf8), "b.js": Data("let b = 2;".utf8)]))
-        _ = try Self.installed(await Self.install(at: url, in: work.profile))
-
-        let id = ExtensionStore.xpiID(forGeckoID: "module@example.com", data: Data())
-        let folder = try #require(ExtensionStore.packageDirectory(for: id))
-        let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
-        let written = try #require(onDisk["background"] as? [String: Any])
-        #expect(written["service_worker"] as? String == FirefoxManifest.workerFile)
-        // A module worker can't run importScripts; it imports each script in order.
-        #expect(written["type"] as? String == "module")
-        let worker = try String(contentsOf: folder.appendingPathComponent(FirefoxManifest.workerFile), encoding: .utf8)
-        #expect(worker == "import \"./a.js\";\nimport \"./b.js\";\n")
-    }
-
-    @Test func anMV3ClassicBackgroundGetsImportScripts() async throws {
-        let work = try Workspace()
-        defer { work.cleanUp() }
-        let url = try work.xpiFile(try Self.xpi(Self.manifest("classic@example.com", "3.0", [
-            "manifest_version": 3, "background": ["scripts": ["a.js"]],
-        ]), files: ["a.js": Data("let a = 1;".utf8)]))
-        _ = try Self.installed(await Self.install(at: url, in: work.profile))
-
-        let id = ExtensionStore.xpiID(forGeckoID: "classic@example.com", data: Data())
-        let folder = try #require(ExtensionStore.packageDirectory(for: id))
-        let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: folder.appendingPathComponent("manifest.json"))) as? [String: Any])
-        let written = try #require(onDisk["background"] as? [String: Any])
-        #expect(written["service_worker"] as? String == FirefoxManifest.workerFile)
-        #expect(written["type"] == nil)
-        let worker = try String(contentsOf: folder.appendingPathComponent(FirefoxManifest.workerFile), encoding: .utf8)
-        #expect(worker == "importScripts(\"a.js\");")
-    }
-
     @Test func aPreparedXPIReportsItsKindAndID() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }

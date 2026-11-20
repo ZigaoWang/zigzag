@@ -456,9 +456,7 @@ enum ExtensionStore {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unsupported)
         }
-        guard writeManifest(normalized, in: staging),
-              writeFirefoxWorker(in: staging, original: package.manifest["background"] as? [String: Any],
-                                 normalized: normalized["background"] as? [String: Any]) else {
+        guard writeManifest(normalized, in: staging) else {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unpack)
         }
@@ -492,20 +490,6 @@ enum ExtensionStore {
     private static func writeManifest(_ manifest: [String: Any], in folder: URL) -> Bool {
         guard let data = try? JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys]) else { return false }
         return (try? data.write(to: folder.appendingPathComponent("manifest.json"), options: .atomic)) != nil
-    }
-
-    /// Writes the worker a Firefox package's MV3 background needs: `background.scripts` loaded in order, as WebKit
-    /// has no such key. Called with `module: true` when the manifest says the background is a module, whose worker
-    /// imports the scripts instead (`importScripts` isn't available to it). Nothing is written where the manifest has
-    /// its own service worker already, or no scripts at all.
-    private static func writeFirefoxWorker(in folder: URL, original: [String: Any]?, normalized: [String: Any]?) -> Bool {
-        // The scripts come from the package's own manifest; removing them from the loaded copy is what tells WebKit
-        // to run the worker, so the copy is no place to read them from.
-        guard let original, let scripts = original["scripts"] as? [String], !scripts.isEmpty,
-              normalized?["service_worker"] as? String == FirefoxManifest.workerFile else { return true }
-        let module = (original["type"] as? String) == "module"
-        let source = FirefoxManifest.workerSource(scripts: scripts, module: module)
-        return (try? source.write(to: folder.appendingPathComponent(FirefoxManifest.workerFile), atomically: true, encoding: .utf8)) != nil
     }
 
     /// Installs a prepared package in a profile and loads it there. Returns its name.

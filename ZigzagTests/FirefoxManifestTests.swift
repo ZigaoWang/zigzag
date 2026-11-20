@@ -10,52 +10,6 @@ struct FirefoxManifestTests {
         return String(decoding: data, as: UTF8.self)
     }
 
-    @Test func mv3BackgroundScriptsGainAWorker() {
-        let manifest: [String: Any] = [
-            "manifest_version": 3,
-            "background": ["scripts": ["a.js", "b.js"]],
-        ]
-        let normalized = FirefoxManifest.normalized(manifest)
-        let background = normalized["background"] as? [String: Any]
-        #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
-        // The scripts are the generated worker's to load: WebKit sees only the worker.
-        #expect(background?["scripts"] == nil)
-        #expect(background?["type"] == nil)
-        #expect(FirefoxManifest.workerSource(scripts: ["a.js", "b.js"]) == #"importScripts("a.js", "b.js");"#)
-    }
-
-    @Test func mv3ModuleBackgroundGetsModuleImports() {
-        let scripts = ["a.js", #"quo"te.js"#]
-        let manifest: [String: Any] = [
-            "manifest_version": 3,
-            "background": ["scripts": scripts, "type": "module"],
-        ]
-        let normalized = FirefoxManifest.normalized(manifest)
-        let background = normalized["background"] as? [String: Any]
-        #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
-        #expect(background?["type"] as? String == "module")
-        #expect(background?["scripts"] == nil)
-        #expect(FirefoxManifest.workerSource(scripts: scripts, module: true)
-                == "import \"./a.js\";\nimport \"./quo\\\"te.js\";\n")
-    }
-
-    @Test func mv3ClassicBackgroundDropsAStaleType() {
-        let manifest: [String: Any] = [
-            "manifest_version": 3,
-            "background": ["scripts": ["a.js"], "type": "classic"],
-        ]
-        let normalized = FirefoxManifest.normalized(manifest)
-        let background = normalized["background"] as? [String: Any]
-        #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
-        #expect(background?["type"] == nil)
-        #expect(FirefoxManifest.workerSource(scripts: ["a.js"]) == #"importScripts("a.js");"#)
-    }
-
-    @Test func workerSourceEscapesQuotes() {
-        #expect(FirefoxManifest.workerSource(scripts: [#"a"b.js"#, #"c\d.js"#])
-                == #"importScripts("a\"b.js", "c\\d.js");"#)
-    }
-
     @Test func mv2BackgroundScriptsAreUnchanged() throws {
         let manifest: [String: Any] = [
             "manifest_version": 2,

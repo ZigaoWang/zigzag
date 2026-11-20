@@ -330,26 +330,14 @@ enum ExtensionBridgeScript {
     /// the rest of the app reads it; empty where there is no bundle to read it from (the local test build).
     static let firefoxAppVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
 
-    /// Zigzag's machine architecture in Firefox's spelling, which the platform answer falls back to when WebKit has
-    /// none of its own: Firefox's binding design spells an Apple-silicon Mac's architecture `aarch64`.
-    static let firefoxAppArch: String = {
-        #if arch(arm64)
-        return "aarch64"
-        #else
-        return "x86-64"
-        #endif
-    }()
-
-    /// Firefox's two runtime members that WebKit has no counterpart for (firefox-polyfill.js). WebKit's own `browser`
-    /// stays as it is: what an add-on reads through it is WebKit's, prototypes and all. The script gates itself on the
-    /// package's own manifest — a Firefox package carries browser_specific_settings or applications, a Chrome one
-    /// neither — since the prelude is injected per profile, not per package. The app's version and architecture are
-    /// written in where the polyfill reads them.
+    /// Firefox's one runtime member WebKit has no counterpart for (firefox-polyfill.js): getBrowserInfo. WebKit's own
+    /// `browser` stays as it is: what an add-on reads through it is WebKit's, prototypes and all. The script gates
+    /// itself on the installed record, not the manifest, since a Chrome Web Store package may carry Firefox's keys too.
+    /// The app's version is written in where the polyfill reads it.
     static let firefoxPolyfill: String = {
         guard let url = Bundle.main.url(forResource: "firefox-polyfill", withExtension: "js"),
               let text = try? String(contentsOf: url, encoding: .utf8) else { return "" }
         return text.replacingOccurrences(of: "__ZIGZAG_VERSION__", with: jsString(firefoxAppVersion))
-            .replacingOccurrences(of: "__ZIGZAG_ARCH__", with: jsString(firefoxAppArch))
     }()
 
     /// A Swift string as a JavaScript string literal, for the values written into the scripts.

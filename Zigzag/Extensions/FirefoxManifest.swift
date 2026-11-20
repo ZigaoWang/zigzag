@@ -8,9 +8,6 @@ import Foundation
 /// so the package is copied and this one copy is rewritten; the package's own manifest is never changed. Every
 /// transform builds new values, so the same manifest comes out the same way however many times it is normalized.
 nonisolated enum FirefoxManifest {
-    /// The worker the loaded copy runs where Firefox ran `background.scripts`.
-    static let workerFile = "zigzag-firefox-worker.js"
-
     /// Whether a manifest is a Firefox one: it carries the keys only Firefox writes, which firefox-polyfill.js gates
     /// on and the store records a package's kind by. The gecko ID itself is read by `XPIPackage`.
     static func isFirefox(_ manifest: [String: Any]) -> Bool {
@@ -21,22 +18,6 @@ nonisolated enum FirefoxManifest {
     static func normalized(_ manifest: [String: Any]) -> [String: Any] {
         var out = manifest
         let version = (out["manifest_version"] as? NSNumber)?.intValue ?? 2
-
-        // Firefox's MV3 background is a list of scripts, as MV2's was. A package built for Chrome has the worker
-        // already; one built for Firefox gets a worker that loads its scripts in order. A module worker imports
-        // them, and only a module worker may say it is one.
-        if version >= 3, var background = out["background"] as? [String: Any],
-           let scripts = background["scripts"] as? [String], !scripts.isEmpty,
-           background["service_worker"] == nil {
-            background["service_worker"] = workerFile
-            // The list goes with it: WebKit runs a Firefox MV3 background as a page when `scripts` is there and
-            // never starts the worker, so the scripts are the worker's to load, not WebKit's.
-            background.removeValue(forKey: "scripts")
-            if (background["type"] as? String) != "module" {
-                background.removeValue(forKey: "type")
-            }
-            out["background"] = background
-        }
 
         // WebKit reads a toolbar button from Chrome's `action`. Firefox's MV2 calls it `browser_action`, and its
         // context-specific one `page_action`: copy it over when there is no `action`, or WebKit sees no popup and the
@@ -69,15 +50,6 @@ nonisolated enum FirefoxManifest {
         return out
     }
 
-    /// The worker's body: Firefox's scripts loaded in the order its manifest named them, as JavaScript strings. A
-    /// module background imports each one instead, because `importScripts` is not available to a module worker.
-    static func workerSource(scripts: [String], module: Bool = false) -> String {
-        if module {
-            return scripts.map { "import \"./\(escaped($0))\";\n" }.joined()
-        }
-        return "importScripts(\(scripts.map(quoted).joined(separator: ", ")));"
-    }
-
     /// A host match pattern rather than an API permission's name. Firefox allows patterns in both permission lists.
     private static func isHostPattern(_ name: String) -> Bool {
         name == "<all_urls>" || name.contains("://")
@@ -95,23 +67,4 @@ nonisolated enum FirefoxManifest {
         manifest[key] = requested.filter { !isHostPattern($0) }
     }
 
-    /// One script path as a double-quoted JavaScript string, with the characters that would end it escaped.
-    private static func quoted(_ script: String) -> String {
-        "\"\(escaped(script))\""
-    }
-
-    /// A script path with the characters that would end a double-quoted JavaScript string escaped.
-    private static func escaped(_ script: String) -> String {
-        var escaped = ""
-        for character in script {
-            switch character {
-            case "\\": escaped += "\\\\"
-            case "\"": escaped += "\\\""
-            case "\n": escaped += "\\n"
-            case "\r": escaped += "\\r"
-            default: escaped.append(character)
-            }
-        }
-        return escaped
-    }
 }
