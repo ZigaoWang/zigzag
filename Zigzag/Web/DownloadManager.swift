@@ -573,7 +573,9 @@ extension DownloadManager: WKDownloadDelegate {
         // (Save Page As, the bridge) is an explicit save and is left alone.
         let fromAMO = download.originalRequest?.mainDocumentURL.flatMap(ExtensionStore.addonsSlug)
             ?? (download.webView as? BrowserWebView)?.owner?.url.flatMap(ExtensionStore.addonsSlug)
-        if let slug = fromAMO, chosenDestinations[identifier] == nil,
+        // Only a click opens the sheet: a script on the store's own page can't.
+        let clicked = (download.webView as? BrowserWebView)?.owner?.mainFrameWasClicked == true
+        if let slug = fromAMO, clicked, chosenDestinations[identifier] == nil,
            ExtensionStore.isAddonsFile(download.originalRequest?.url),
            DownloadPolicy.isExtensionPackage(mimeType: response.mimeType, filename: name) {
             let file = FileManager.default.temporaryDirectory

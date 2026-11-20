@@ -945,6 +945,8 @@ final class Tab: NSObject {
     private var ownHistoryTarget: URL?
     /// Download policy for its pages (same as pop-up windows').
     private let downloads = DownloadPolicy()
+    /// The current main-frame navigation was started by a click, key or the address bar.
+    var mainFrameWasClicked: Bool { downloads.mainFrameWasClicked }
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
