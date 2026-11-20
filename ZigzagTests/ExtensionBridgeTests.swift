@@ -1048,13 +1048,15 @@ extension ExtensionBridgeTests {
         #expect(!WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
         context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://push.example/*"))
         #expect(WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
+        // This Mac stays allowed with nothing asked, as it was before there was a local-receivers door: an extension
+        // that already opened ws://localhost keeps working, and only its HTTP path goes through the new switch.
         for text in ["ws://localhost:8080/", "ws://127.0.0.1:1234/x", "ws://127.5.6.7/", "ws://[::1]:9000/", "wss://LOCALHOST./"] {
             #expect(WebSocketBridge.allows(URL(string: text)!, context: context))
         }
         for text in ["ws://push.example/socket", "wss://other.example/socket", "wss://push.example.evil.test/",
                      "wss://name:synthetic@push.example/", "https://push.example/socket", "ws://128.0.0.1/",
                      "ws://localhost.evil.test/", "ws://127.0.0.1.evil.test/", "ws://user:pw@localhost/", "http://localhost/"] {
-            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context))
+            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context), "\(text) is refused")
         }
     }
 }

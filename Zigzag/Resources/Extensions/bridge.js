@@ -83,6 +83,20 @@
   // Upload streams, event streams, explicit referrers, integrity and manual redirects stay with WebKit.
   // A read that redirects to another origin or is too big to carry whole is answered { fallback } and runs
   // here as the original fetch; a write that would do either fails, as it may not be sent twice.
+  // This Mac by the names loopback is reached by; http only, because that is what WebKit blocks. An extension
+  // reaches it through the person's own switch for it, not through host access (a loopback address has none).
+  const localLoopback = (url) => {
+    if (url.protocol !== 'http:') return false;
+    let host = url.hostname.toLowerCase();
+    if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+    if (host.endsWith('.')) host = host.slice(0, -1);
+    if (host === 'localhost' || host.endsWith('.localhost')
+        || host === '::1' || host === '0:0:0:0:0:0:0:1') return true;
+    const parts = host.split('.');
+    return parts.length === 4 && parts.every((p) => /^\d{1,3}$/.test(p) && Number(p) <= 255)
+      && parts[0] === '127';
+  };
+
   if (typeof globalThis.fetch === 'function') {
     const nativeFetch = globalThis.fetch.bind(globalThis);
     const metadata = (response, answer) => {
@@ -93,24 +107,55 @@
       });
       return response;
     };
+    // The bytes of a body, base64, as the native side reads a loopback call.
+    const encoded = (buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(binary);
+    };
     globalThis.fetch = async (input, init) => {
       const isRequest = input instanceof Request;
       const option = (name, fallback) => init && init[name] !== undefined ? init[name] : isRequest ? input[name] : fallback;
       const url = new URL(isRequest ? input.url : String(input), globalThis.location && location.href);
+      const loopback = localLoopback(url);
       const method = String(option('method', 'GET')).toUpperCase();
-      const body = init && init.body != null ? init.body : isRequest ? input.body : null;
+      // The body is read here as bytes. A loopback call carries them base64, so a Request's own body, a Blob or a
+      // buffer reaches the helper exactly as it was written; any other call keeps its body for WebKit.
+      let body = null;
+      let bodyBytes = null;
+      if (init && init.body != null) {
+        const given = init.body;
+        if (typeof given === 'string') body = given;
+        else if (given instanceof URLSearchParams) bodyBytes = new TextEncoder().encode(given.toString()).buffer;
+        else if (given instanceof Blob) bodyBytes = await given.arrayBuffer();
+        else if (given instanceof ArrayBuffer) bodyBytes = given;
+        else if (ArrayBuffer.isView(given)) bodyBytes = given.buffer.slice(given.byteOffset, given.byteOffset + given.byteLength);
+        else return nativeFetch(input, init);
+      } else if (isRequest && input.body !== null) {
+        // A copy, so the request handed on is not disturbed: its bytes are read once, here.
+        bodyBytes = await input.clone().arrayBuffer();
+      }
+      if (loopback) {
+        if (bodyBytes == null && body != null) bodyBytes = new TextEncoder().encode(body).buffer;
+        body = bodyBytes == null ? null : encoded(bodyBytes);
+      } else if (bodyBytes != null) {
+        return nativeFetch(input, init);
+      }
       // Chrome sends a site's cookies with an extension's fetch to it, whether it says include or leaves the default.
+      // A loopback call is the exception: it is another origin on this Mac, and the helper is a plain server with no
+      // CORS reply of its own to read, so the switch alone decides and the default credentials stand.
       const credentials = option('credentials', 'same-origin');
-      if (!['http:', 'https:'].includes(url.protocol) || !['include', 'same-origin'].includes(credentials)
+      if (!['http:', 'https:'].includes(url.protocol) || (!loopback && !['include', 'same-origin'].includes(credentials))
           || !['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'].includes(method)
           || option('mode', 'cors') !== 'cors' || option('integrity', '') || option('keepalive', false)
           || !['', 'no-referrer'].includes(option('referrerPolicy', ''))
           || !['', 'about:client'].includes(option('referrer', 'about:client'))
-          || option('redirect', 'follow') === 'manual' || option('cache', 'default') === 'only-if-cached'
-          || (isRequest && input.body !== null) || (body != null && typeof body !== 'string')) return nativeFetch(input, init);
+          || option('redirect', 'follow') === 'manual' || option('cache', 'default') === 'only-if-cached') return nativeFetch(input, init);
       const headers = new Headers(option('headers', undefined));
       if (/text\/event-stream|application\/(?:x-ndjson|ndjson|stream\+json)/i.test(headers.get('accept') || '')) return nativeFetch(input, init);
-      const request = new Request(input, init);
+      // From a copy, so a fallback can still send the caller's own request with its body.
+      const request = new Request(isRequest ? input.clone() : input, init);
       const signal = request.signal;
       signal.throwIfAborted();
       const requestID = crypto.randomUUID();
@@ -134,6 +179,231 @@
         throw new TypeError(error.message);
       } finally { signal.removeEventListener('abort', abort); }
     };
+  }
+
+  // The same door for an XMLHttpRequest, which an extension's own code uses for a helper that expects one. Every
+  // request that is not an asynchronous one to this Mac stays WebKit's own: a synchronous request has to block, which
+  // this side cannot do, so it is left to fail as it does today.
+  if (typeof globalThis.XMLHttpRequest === 'function') {
+    const NativeXHR = globalThis.XMLHttpRequest;
+    const base = globalThis.location && location.href;
+    const types = ['readystatechange', 'loadstart', 'progress', 'load', 'error', 'abort', 'timeout', 'loadend'];
+    const bytesOf = (text) => {
+      const binary = atob(text), bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    };
+    const textOf = (buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(binary);
+    };
+    class LocalXHR {
+      constructor() {
+        this.native = new NativeXHR();
+        this._local = false;
+        this._listeners = Object.create(null);
+        this._ready = 0;
+        this._status = 0;
+        this._statusText = '';
+        this._body = null;
+        this._headers = null;
+        this._responseType = '';
+        this._responseURL = '';
+        this._timedOut = false;
+        this._aborted = false;
+        this._sent = false;
+        this._timeout = 0;
+        this._withCredentials = false;
+        this.upload = { addEventListener() {}, removeEventListener() {}, onprogress: null, onload: null, onerror: null };
+        for (const type of types) {
+          this.native.addEventListener(type, (event) => { if (!this._local) this._emit(type, event); });
+        }
+      }
+      get readyState() { return this._local ? this._ready : this.native.readyState; }
+      get status() { return this._local ? this._status : this.native.status; }
+      get statusText() { return this._local ? this._statusText : this.native.statusText; }
+      get responseURL() { return this._local ? this._responseURL : this.native.responseURL; }
+      get responseType() { return this._local ? this._responseType : this.native.responseType; }
+      set responseType(value) { if (this._local) this._responseType = value; else this.native.responseType = value; }
+      get timeout() { return this._local ? this._timeout : this.native.timeout; }
+      set timeout(value) { this._timeout = value; this.native.timeout = value; }
+      get withCredentials() { return this._local ? this._withCredentials : this.native.withCredentials; }
+      set withCredentials(value) { this._withCredentials = value; this.native.withCredentials = value; }
+      get response() {
+        if (!this._local) return this.native.response;
+        if (this._responseType === '' || this._responseType === 'text') return this.responseText;
+        if (this._responseType === 'json') {
+          if (this._body === null) return null;
+          try { return JSON.parse(new TextDecoder().decode(this._body)); } catch (error) { return null; }
+        }
+        if (this._responseType === 'document') return null;
+        if (this._body === null) return null;
+        if (this._responseType === 'arraybuffer') return this._body.buffer.slice(this._body.byteOffset, this._body.byteOffset + this._body.byteLength);
+        if (this._responseType === 'blob') return new Blob([this._body], { type: this.getResponseHeader('content-type') || '' });
+        return this._body;
+      }
+      get responseText() {
+        if (!this._local) return this.native.responseText;
+        if (this._responseType !== '' && this._responseType !== 'text') {
+          throw new DOMException('The value is only accessible if the response type is text.', 'InvalidStateError');
+        }
+        if (this._body === null) return '';
+        return new TextDecoder().decode(this._body);
+      }
+      get responseXML() { return this._local ? null : this.native.responseXML; }
+      open(method, url, async = true, user, password) {
+        this._local = false;
+        this._ready = 0; this._status = 0; this._statusText = ''; this._body = null; this._headers = null;
+        this._responseURL = ''; this._sent = false; this._aborted = false; this._timedOut = false;
+        let target = null;
+        try {
+          const parsed = new URL(url, base);
+          if (async !== false && localLoopback(parsed)) target = parsed;
+        } catch (error) { target = null; }
+        if (!target) return this.native.open(method, url, async, user, password);
+        this._local = true;
+        this._request = { method: String(method || 'GET').toUpperCase(), url: target.href, headers: Object.create(null) };
+        this._setState(1);
+        return undefined;
+      }
+      setRequestHeader(name, value) {
+        if (!this._local) return this.native.setRequestHeader(name, value);
+        const key = String(name).toLowerCase();
+        this._request.headers[key] = this._request.headers[key] ? this._request.headers[key] + ', ' + value : String(value);
+      }
+      overrideMimeType(type) { if (!this._local) this.native.overrideMimeType(type); }
+      getResponseHeader(name) {
+        if (!this._local) return this.native.getResponseHeader(name);
+        if (!this._headers) return null;
+        const key = String(name).toLowerCase();
+        const found = this._headers.find((pair) => String(pair[0]).toLowerCase() === key);
+        return found ? found[1] : null;
+      }
+      getAllResponseHeaders() {
+        if (!this._local) return this.native.getAllResponseHeaders();
+        if (!this._headers) return '';
+        return this._headers.map((pair) => pair[0] + ': ' + pair[1]).join('\r\n') + '\r\n';
+      }
+      send(body) {
+        if (!this._local) return this.native.send(body);
+        if (this._ready !== 1 || this._sent) throw new DOMException('The object is in an invalid state.', 'InvalidStateError');
+        this._sent = true;
+        this._emit('loadstart', new ProgressEvent('loadstart'));
+        const request = this._request;
+        const requestID = crypto.randomUUID();
+        this._requestID = requestID;
+        const run = async () => {
+          let payload = null;
+          let contentType = null;
+          if (request.method !== 'GET' && request.method !== 'HEAD' && body != null) {
+            if (typeof body === 'string') {
+              payload = textOf(new TextEncoder().encode(body).buffer);
+              contentType = 'text/plain;charset=UTF-8';
+            } else if (body instanceof URLSearchParams) {
+              payload = textOf(new TextEncoder().encode(body.toString()).buffer);
+              contentType = 'application/x-www-form-urlencoded;charset=UTF-8';
+            } else if (body instanceof Blob) {
+              payload = textOf(await body.arrayBuffer());
+              contentType = body.type || null;
+            } else if (body instanceof ArrayBuffer) {
+              payload = textOf(body);
+            } else if (ArrayBuffer.isView(body)) {
+              payload = textOf(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength));
+            } else {
+              payload = textOf(new TextEncoder().encode(String(body)).buffer);
+              contentType = 'text/plain;charset=UTF-8';
+            }
+          }
+          const headers = Object.entries(request.headers);
+          if (contentType && !request.headers['content-type']) headers.push(['content-type', contentType]);
+          if (this.timeout > 0) {
+            setTimeout(() => {
+              if (this._ready === 4 || this._aborted) return;
+              this._timedOut = true;
+              try { send('extensionFetch', 'cancel', [requestID]).catch(() => {}); } catch (e) {}
+              this._finishError('timeout');
+            }, this.timeout);
+          }
+          let answer;
+          try {
+            answer = await send('extensionFetch', 'fetch', [{
+              requestID, url: request.url, method: request.method, headers, body: payload,
+              credentials: this.withCredentials ? 'include' : 'same-origin',
+            }]);
+          } catch (error) { answer = null; }
+          if (this._aborted || this._timedOut || this._ready === 4) return;
+          // With the person's switch off, native code hands the call back to WebKit. WebKit refuses this Mac, so the
+          // request fails as it did before there was a door.
+          if (!answer || answer.fallback) { this._finishError('error'); return; }
+          const noBody = answer.status === 204 || answer.status === 205 || answer.status === 304;
+          const bytes = noBody ? new Uint8Array(0) : bytesOf(answer.body || '');
+          this._status = answer.status;
+          this._statusText = answer.statusText || '';
+          this._headers = answer.headers || [];
+          this._body = bytes;
+          this._responseURL = answer.url || request.url;
+          this._setState(2);
+          this._setState(3);
+          this._setState(4);
+          const event = new ProgressEvent('load', { loaded: bytes.length, total: bytes.length, lengthComputable: true });
+          this._emit('load', event);
+          this._emit('loadend', event);
+        };
+        run().catch(() => { if (!this._aborted && !this._timedOut) this._finishError('error'); });
+      }
+      abort() {
+        if (!this._local) return this.native.abort();
+        if (this._ready === 4) return;
+        if (this._requestID) { try { send('extensionFetch', 'cancel', [this._requestID]).catch(() => {}); } catch (e) {} }
+        this._aborted = true;
+        this._ready = 4;
+        this._status = 0;
+        this._statusText = '';
+        this._emit('readystatechange', new Event('readystatechange'));
+        this._emit('abort', new ProgressEvent('abort'));
+        this._emit('loadend', new ProgressEvent('loadend'));
+      }
+      _setState(state) {
+        this._ready = state;
+        this._emit('readystatechange', new Event('readystatechange'));
+      }
+      _finishError(type) {
+        if (this._ready === 4) return;
+        this._ready = 4;
+        this._status = 0;
+        this._statusText = '';
+        this._emit('readystatechange', new Event('readystatechange'));
+        this._emit(type, new ProgressEvent(type));
+        this._emit('loadend', new ProgressEvent('loadend'));
+      }
+      _emit(type, event) {
+        const handler = this['on' + type];
+        if (typeof handler === 'function') {
+          try { handler.call(this, event); } catch (error) { setTimeout(() => { throw error; }); }
+        }
+        for (const listener of (this._listeners[type] || []).slice()) {
+          try { listener.call(this, event); } catch (error) { setTimeout(() => { throw error; }); }
+        }
+      }
+      addEventListener(type, listener) {
+        const list = this._listeners[type] || (this._listeners[type] = []);
+        if (!list.includes(listener)) list.push(listener);
+      }
+      removeEventListener(type, listener) {
+        const list = this._listeners[type];
+        if (!list) return;
+        const at = list.indexOf(listener);
+        if (at >= 0) list.splice(at, 1);
+      }
+      dispatchEvent(event) { this._emit(event.type, event); return true; }
+    }
+    for (const [key, value] of Object.entries({ UNSENT: 0, OPENED: 1, HEADERS_RECEIVED: 2, LOADING: 3, DONE: 4 })) {
+      LocalXHR[key] = value;
+      LocalXHR.prototype[key] = value;
+    }
+    globalThis.XMLHttpRequest = LocalXHR;
   }
 
   // A Chrome-style method: a promise, or the trailing callback Chrome extensions often pass instead.

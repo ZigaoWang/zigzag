@@ -13,6 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
+- 你允许的网站可以访问这台 Mac 上监听端口的程序，比如编辑器、下载助手或配套 App 运行的本地代理。Chrome 和 Firefox 允许安全页面访问 `http://localhost` 和 `ws://localhost`，WebKit 却把它当作混合内容拒绝，所以改由 Zigzag 以网站自己的身份发出请求，再把结果交给它。默认关闭：先在“设置 › 隐私 › 允许网站访问这台 Mac 上的 App”里开启，再在网站设置里打开该网站的“这台 Mac 上的 App”。网页无法自己申请这两项。扩展自己的 `ws://localhost` 连接和以前一样可用；它的 `http://localhost` 请求走“设置 › 扩展”里它自己的“这台 Mac 上的 App”开关，默认关闭。只限本机回环：不包括本地网络，不包括其他机器，也不包括图片、脚本和样式表。([#321](https://github.com/ZigaoWang/zigzag/issues/321))
 - 在三四个页面的分屏浏览里，拖动页面之间分隔线交汇的地方，可以同时调整两个方向的大小，指针在那里会变成斜向的调整箭头。在四个页面的网格里，按住 ⇧ 拖动左右页面之间的分隔线，只会移动指针这一侧的那一段，这样上面两个页面的宽度可以和下面的不一样。分开之后每一段都能单独拖动，在中间附近松开会吸附到中间，页面顶部条里的“重置平铺布局”会让网格重新均分。不按 ⇧ 拖动仍然和以前一样移动整条线，连按两下分隔线仍会让它回到中间。感谢 [Lakeland97](https://github.com/Lakeland97)。([#316](https://github.com/ZigaoWang/zigzag/issues/316)、[#309](https://github.com/ZigaoWang/zigzag/issues/309))
 - 同一网站的不同路径可以在不同空间中打开，比如 github.com/org1 在“工作”中打开，github.com/org2 在“个人”中打开。“设置 › 空间”里的规则从上往下排，用第一条匹配的规则。点按规则即可编辑，右键点按可启用或停用，拖动可调整优先级。如果一条规则覆盖了另一条，两条规则都会显示提示。路径不区分大小写，地址可以带端口，如 localhost:3000。原来设好的网站会变成规则，仍然在原来的空间中打开。感谢 [pyoio](https://github.com/pyoio)。([#289](https://github.com/ZigaoWang/zigzag/issues/289))
 - “设置 › 外观 › 边栏大小”新增“自定”：选它以后，用 − 和 + 把边栏设成 80% 到 150%，点按百分比会回到 100%。感谢 [Lakeland97](https://github.com/Lakeland97)。([#361](https://github.com/ZigaoWang/zigzag/issues/361))

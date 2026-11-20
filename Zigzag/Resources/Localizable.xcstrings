@@ -1117,6 +1117,94 @@
         }
       }
     },
+    "A site you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to talk to a program on this Mac, over loopback only. Never the local network, and a page can’t switch itself on." : {
+      "comment" : "Explanation under the apps-on-this-Mac setting in Settings › Privacy. fetch, XMLHttpRequest and WebSocket are API names: keep them as they are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在网站设置里开启的网站可以使用 fetch、XMLHttpRequest 和 WebSocket，与这台 Mac 上监听端口的程序通信，且只限本机回环。绝不涉及本地网络，页面也无法自行开启。"
+          }
+        }
+      }
+    },
+    "Before You Allow This" : {
+      "comment" : "Title of the briefing shown before the apps-on-this-Mac setting can be turned on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启之前"
+          }
+        }
+      }
+    },
+    "I Understand" : {
+      "comment" : "Button that acknowledges the briefing and turns the setting on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已了解"
+          }
+        }
+      }
+    },
+    "Let this extension reach apps on this Mac" : {
+      "comment" : "Accessibility label of the apps-on-this-Mac switch under an extension in Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许此扩展访问这台 Mac 上的 App"
+          }
+        }
+      }
+    },
+    "Lets this extension’s own code read what a program listening on this Mac answers, over loopback only. Without it, the program’s own CORS rules decide. Off until you turn it on." : {
+      "comment" : "Explanation under the apps-on-this-Mac switch on an extension’s row in Settings › Extensions. CORS is a web API name: keep it as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许此扩展自身的代码读取这台 Mac 上监听程序返回的内容，且只限本机回环。关闭时由程序自身的 CORS 规则决定。在你开启之前保持关闭。"
+          }
+        }
+      }
+    },
+    "Allow websites to reach apps on this Mac" : {
+      "comment" : "A setting in Settings › Privacy: the master switch for a site’s scripts reaching a program listening on this Mac. Also its accessibility label.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许网站访问这台 Mac 上的 App"
+          }
+        }
+      }
+    },
+    "localhost loopback local server app fetch websocket xmlhttprequest" : {
+      "comment" : "Words that find the apps-on-this-Mac setting with Find a setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "localhost loopback 本地 服务器 App fetch websocket xmlhttprequest 程序 本机"
+          }
+        }
+      }
+    },
+    "Apps on This Mac" : {
+      "comment" : "A heading in Settings › Privacy, the switch in Site Controls, and the switch under an extension in Settings › Extensions: the programs listening on this Mac that a site or an extension may reach, over loopback only.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的 App"
+          }
+        }
+      }
+    },
     "%lld allowed" : {
       "comment" : "On the Permissions row of the site panel: how many permissions the site has been allowed.",
       "localizations" : {
@@ -7252,6 +7340,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "同一空间的每个窗口列出相同的标签页，各自显示自己的那一个。一个网页同一时间只能显示在一个窗口中。"
+          }
+        }
+      }
+    },
+    "What This Allows…" : {
+      "comment" : "Button on the apps-on-this-Mac setting in Settings › Privacy: reopens the briefing.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此功能允许什么…"
+          }
+        }
+      }
+    },
+    "Websites you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to reach programs listening on this Mac, over loopback only.\n\nThe local network, other machines, images, scripts and stylesheets are not included, and a page cannot switch itself on.\n\nA local program may not have been written to be reachable by a web page, and a site you grant could use it in ways you did not intend. Only grant sites you trust.\n\nTurn one site off in its Site Controls, or turn this setting off for every site." : {
+      "comment" : "The briefing shown before websites may reach apps on this Mac. fetch, XMLHttpRequest and WebSocket are API names: keep them as they are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在网站设置里开启的网站可以使用 fetch、XMLHttpRequest 和 WebSocket，与这台 Mac 上监听端口的程序通信，且只限本机回环。\n\n不包括本地网络、其他机器，也不包括图片、脚本和样式表，页面也无法自行开启。\n\n本机程序未必是按网页可以访问来设计的，你授予的网站可能会以你意料之外的方式使用它。只授予你信任的网站。\n\n在某个网站的网站设置里关掉它，或关掉这个设置，对所有网站生效。"
           }
         }
       }
