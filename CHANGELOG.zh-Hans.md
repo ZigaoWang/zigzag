@@ -24,6 +24,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “设置 › 外观”里的“边栏放在右侧”开关换成了“边栏位置”菜单，可以选左侧或右侧，一眼就知道边栏在哪边。“显示 › 将边栏移到右侧”和“将边栏移到左侧”照旧。感谢 [Lakeland97](https://github.com/Lakeland97)。([#360](https://github.com/ZigaoWang/zigzag/issues/360))
 - “设置 › 通用”里每个已安装的 App 都多了一个“打开”按钮，就在“在‘访达’中显示”前面。和点按它的程序坞图标一样，会打开这个 App；窗口已经开着的话就把它带到前面。感谢 [Lakeland97](https://github.com/Lakeland97)。([#355](https://github.com/ZigaoWang/zigzag/issues/355))
 - 边栏的边缘和分屏页面之间的分隔线更容易抓住了：指针在分隔线两侧几个点内就能拖动，并显示调整大小的指针，边栏里标签页行旁边的空白处也算在内。覆盖在网页滚动条上的部分更少，拖动时分隔线从原来的位置开始移动，不会一下跳到指针那里。感谢 [Lakeland97](https://github.com/Lakeland97)。([#362](https://github.com/ZigaoWang/zigzag/issues/362))
+- 标签页的右键菜单里多了“让页面休眠”，“文件”菜单里也有，作用于当前标签页。它会像 Zigzag 自动休眠那样让页面休眠：页面被释放，浏览到的位置会保留，点按标签页就会重新载入。选中多个标签页时显示为“让 3 个页面休眠”。正在播放声音、通话中、在小播放器里播放或者有你输入的文字的页面不会休眠，会提示原因。标签页会显示休眠时的虚线圈，悬停卡片会写明是你让它休眠的。让当前标签页休眠时，会切回你之前看的那个标签页。感谢 [Lakeland97](https://github.com/Lakeland97)。([#342](https://github.com/ZigaoWang/zigzag/issues/342))
 
 ### 修复
 - 按住 ⇧ 点链接仍然交给网页处理，所以在一排本身是链接的行上按住 ⇧ 选取一段，和以前一样好用；但网页如果随后把当前标签页送到这个链接，比如 GitHub 的文件列表，它会在“速览”卡片中打开，不再移动当前标签页。按住 ⌥ 也一样：网页原本会跳转的链接改为下载。感谢 [Lakeland97](https://github.com/Lakeland97)。([#322](https://github.com/ZigaoWang/zigzag/issues/322))

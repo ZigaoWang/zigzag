@@ -95,6 +95,11 @@ enum SidebarMenus {
         let count = items.count
         // A private window's tabs never join the pins and favorites every window shares.
         let isPrivate = manager.isPrivate
+        var page: [NSMenuItem] = []
+        let sleepers = controller.markedTabs(items).filter(manager.maySuspend)
+        if !sleepers.isEmpty {
+            page.append(Item(suspendTitle(sleepers.count)) { controller.suspendWithToast(sleepers) })
+        }
         var organize: [NSMenuItem] = []
         if !rows.isEmpty, !isPrivate {
             organize.append(Item(rows.count == 1 ? String(localized: "Pin Tab", comment: "Menu item")
@@ -149,7 +154,13 @@ enum SidebarMenus {
         if !pins.isEmpty, !isPrivate {
             close.append(Item(Self.removePinsTitle(pins.count)) { controller.removePinnedWithUndo(pins) })
         }
-        return menu([organize, close])
+        return menu([page, organize, close])
+    }
+
+    /// "Suspend Page", or for several, how many (#342).
+    static func suspendTitle(_ count: Int) -> String {
+        count == 1 ? String(localized: "Suspend Page", comment: "Item in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.")
+            : String(localized: "Suspend \(count) Pages", comment: "Menu item for several picked tabs: puts their pages to sleep; each loads again when you click it.")
     }
 
     static var changeIconTitle: String {
@@ -198,6 +209,9 @@ enum SidebarMenus {
         var page: [NSMenuItem] = []
         if tab.url != nil {
             page.append(keyed(Item(String(localized: "Reload Page", comment: "Item in a tab's context menu in the sidebar.")) { tab.reload() }, #selector(C.reloadPage(_:))))
+        }
+        if manager.maySuspend(tab) {
+            page.append(keyed(Item(suspendTitle(1)) { controller.suspendWithToast([tab]) }, #selector(C.suspendPage(_:))))
         }
         page.append(Item(String(localized: "Duplicate Tab", comment: "Item in a tab's context menu in the sidebar.")) { controller.duplicate(tab) })
         if let url = tab.url {

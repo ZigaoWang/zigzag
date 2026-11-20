@@ -1510,6 +1510,41 @@
         }
       }
     },
+    "%lld pages not put to sleep while they play or have text you typed" : {
+      "comment" : "Toast after Suspend N Pages in the sidebar's menu: some of the picked pages stay awake, because they play sound, are in a call, play in the mini player or Picture in Picture, or hold text you typed.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page not put to sleep while it plays or has text you typed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages not put to sleep while they play or have text you typed"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个页面在播放或有你输入的文字，没有休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld pages of history" : {
       "comment" : "Item in the list of what came over, in the Import window.",
       "localizations" : {
@@ -4030,6 +4065,61 @@
         }
       }
     },
+    "Not put to sleep while it has text you typed" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake so what you typed into it isn't lost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "里面有你输入的文字，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays in the mini player" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video plays in the window's mini player.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在小播放器里播放，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays sound" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's playing sound.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在播放声音，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it uses the camera or microphone" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's in a call.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在用摄像头或麦克风，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while its video is in Picture in Picture" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video floats in Picture in Picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的视频在画中画里，没有休眠"
+          }
+        }
+      }
+    },
     "Open “%@”" : {
       "comment" : "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name.",
       "localizations" : {
@@ -4070,6 +4160,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "边栏位置"
+          }
+        }
+      }
+    },
+    "Suspend %lld Pages" : {
+      "comment" : "Menu item for several picked tabs: puts their pages to sleep; each loads again when you click it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend Page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend %lld Pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "让 %lld 个页面休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Suspend Page" : {
+      "comment" : "File menu item: puts the tab's page to sleep; it loads again when you click the tab.\nItem in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让页面休眠"
           }
         }
       }
@@ -4191,6 +4327,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "不再保留 %@ 的 Cookie"
+          }
+        }
+      }
+    },
+    "You put it to sleep. Loads when you click it." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: you put it to sleep with Suspend Page in its menu, and its page loads again once you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "是你让它休眠的，点按即可重新载入。"
           }
         }
       }

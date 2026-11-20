@@ -530,6 +530,23 @@ extension BrowserWindowController: NSMenuItemValidation {
             copy.load(url)
         }
     }
+    @objc func suspendPage(_ sender: Any?) {
+        guard let tab = selectedTab else { return }
+        suspendWithToast([tab])
+    }
+
+    /// Suspend Page: each tab that can sleep does; a toast says what kept one awake (#342). No undo: the tab stays in
+    /// the list and loads again on a click.
+    func suspendWithToast(_ tabs: [Tab]) {
+        var kept = 0
+        tabManager.suspend(chosen: tabs) { [weak self] _, why in
+            guard let self else { return }
+            kept += 1
+            let text = kept == 1 ? why.note
+                : String(localized: "\(kept) pages not put to sleep while they play or have text you typed", comment: "Toast after Suspend N Pages in the sidebar's menu: some of the picked pages stay awake, because they play sound, are in a call, play in the mini player or Picture in Picture, or hold text you typed.")
+            Toast.show(text, symbol: "moon.zzz", duration: 3, in: self)
+        }
+    }
     @objc func toggleMute(_ sender: Any?) {
         guard let tab = selectedTab else { return }
         tab.setMuted(!tab.isMuted)
@@ -645,6 +662,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         case #selector(findNextMatch(_:)), #selector(findPreviousMatch(_:)):
             return tab != nil && findBar.hasQuery
         case #selector(stopLoading(_:)): return tab?.isLoading ?? false
+        case #selector(suspendPage(_:)): return tab.map(tabManager.maySuspend) ?? false
         case #selector(closeSplitView(_:)): return tab.map { tabManager.split(for: $0) != nil } ?? false
         case #selector(zoomPane(_:)):
             item.title = PaneHeaderView.zoomTitle(paneZoom.isZoomed)
