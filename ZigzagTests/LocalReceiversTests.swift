@@ -299,24 +299,6 @@ struct LocalReceiversTests {
         LocalReceivers.isEnabled = false
     }
 
-    private func expect(_ failure: LocalReceivers.Failure, _ body: () async throws -> Void) async {
-        do {
-            try await body()
-            Issue.record("the request was not refused")
-        } catch let thrown as LocalReceivers.Failure {
-            #expect(thrown == failure)
-        } catch {
-            Issue.record("an unexpected failure: \(error)")
-        }
-    }
-}
-
-private actor Recorder {
-    private var requests: [URLRequest] = []
-
-    func record(_ request: URLRequest) { requests.append(request) }
-    func all() -> [URLRequest] { requests }
-
     // MARK: Leaving a site
 
     /// The script names the origin it was put in for, and installs nowhere else: one left in a tab that has moved on,
@@ -365,4 +347,22 @@ private actor Recorder {
         LocalReceiverShim.sync(controller: controller, tab: nil, origin: first, isPrivate: true)
         #expect(controller.userScripts.isEmpty)
     }
+
+    private func expect(_ failure: LocalReceivers.Failure, _ body: () async throws -> Void) async {
+        do {
+            try await body()
+            Issue.record("the request was not refused")
+        } catch let thrown as LocalReceivers.Failure {
+            #expect(thrown == failure)
+        } catch {
+            Issue.record("an unexpected failure: \(error)")
+        }
+    }
+}
+
+private actor Recorder {
+    private var requests: [URLRequest] = []
+
+    func record(_ request: URLRequest) { requests.append(request) }
+    func all() -> [URLRequest] { requests }
 }
