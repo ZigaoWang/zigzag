@@ -15451,7 +15451,7 @@
       }
     },
     "Pin Group" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.\nUndo action name, shown in the Edit menu as Undo Pin Group.",
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.\nUndo action name, shown in the Edit menu as Undo Pin Group.\nTitle and button of the sheet that pins the tab group you're in as a folder, with where in the space it goes and its name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15462,7 +15462,7 @@
       }
     },
     "Pin Split View" : {
-      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
+      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.\nTitle and button of the sheet that pins the split view you're in, with where in the space it goes and its name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -25603,6 +25603,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "页面会固定在“%@”中。“添加到收藏”则会让它显示在个人资料的所有空间中。"
+          }
+        }
+      }
+    },
+    "The group is pinned in %@ as a folder, with all of its tabs." : {
+      "comment" : "Under the title of the sheet that pins a tab group: the space it's pinned in as a folder, which the sheet doesn't let you change. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分组会作为文件夹固定在“%@”中，里面的标签页都会一起固定。"
+          }
+        }
+      }
+    },
+    "The split view is pinned in %@. Add to Favorites shows it in all of the profile’s spaces instead." : {
+      "comment" : "Under the title of the sheet that pins a split view: the space it's pinned in, which the sheet doesn't let you change, and what Add to Favorites means. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分屏浏览会固定在“%@”中。“添加到收藏”则会让它显示在个人资料的所有空间中。"
           }
         }
       }

@@ -558,7 +558,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             done?()
             return true
         }
-        SavePlaceSheet.show(page: page, spaceID: tab.spaceID, in: root.overlay) { [weak self] answer in
+        SavePlaceSheet.show(page: page, kind: SavePath.kind(of: tab, in: tabManager), spaceID: tab.spaceID, in: root.overlay) { [weak self] answer in
             guard let self, self.save(page, to: answer.place, named: answer.name) else { return }
             Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star.fill",
                        actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, duration: Toast.undoDuration, in: self)
