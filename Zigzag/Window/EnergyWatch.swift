@@ -71,13 +71,14 @@ final class EnergyWatch {
         // Pages share processes: one that also runs a page on screen, or one playing or in a call, may be busy with that
         // page, so none of its tabs is blamed.
         var excused: Set<Int32> = []
-        for controller in WindowManager.shared.controllers {
+        // Includes the AI apps' background window: a page left busy there costs as much as any.
+        for controller in WindowManager.shared.everyController {
             for tab in controller.tabManager.allTabs {
                 guard let webView = tab.webView, let pid = Self.processID(of: webView) else { continue }
                 if Self.isOnScreen(tab, in: controller) || tab.isPlayingAudio || tab.isInUse || tab.isInMiniPlayer { excused.insert(pid) }
             }
         }
-        for controller in WindowManager.shared.controllers {
+        for controller in WindowManager.shared.everyController {
             for tab in controller.tabManager.allTabs {
                 guard let webView = tab.webView, let pid = Self.processID(of: webView), pid > 0,
                       seen.insert(pid).inserted else { continue }
@@ -124,11 +125,9 @@ final class EnergyWatch {
     /// A tab in this process where a looping extension was held back, and which extension.
     @available(macOS 15.4, *)
     private static func heldBack(in pid: Int32) -> (tab: Tab, id: String, host: ExtensionHost)? {
-        for controller in WindowManager.shared.controllers {
-            for tab in controller.tabManager.allTabs where tab.webView.flatMap(processID) == pid {
-                guard !tab.isPrivate, let host = tab.profile.startedExtensions, let id = host.storms.extensions(in: tab).sorted().first else { continue }
-                return (tab, id, host)
-            }
+        for tab in WindowManager.shared.everyOpenTab where tab.webView.flatMap(processID) == pid {
+            guard !tab.isPrivate, let host = tab.profile.startedExtensions, let id = host.storms.extensions(in: tab).sorted().first else { continue }
+            return (tab, id, host)
         }
         return nil
     }
@@ -152,9 +151,7 @@ final class EnergyWatch {
                            menu.addItem(SidebarMenus.Item(String(localized: "Turn Off on \(site)", comment: "Menu item from the toast saying an extension is using a lot of energy: turns the extension off on this site only. The site is a domain.")) {
                                installs.setOff(id, on: site, true)
                                // Its scripts leave the site's open pages as they reload.
-                               for owner in WindowManager.shared.controllers {
-                                   for tab in owner.tabManager.allTabs where tab.webView != nil && tab.profile === profile && ContentBlocker.site(of: tab.url) == site { tab.reload() }
-                               }
+                               for tab in WindowManager.shared.everyOpenTab where tab.webView != nil && tab.profile === profile && ContentBlocker.site(of: tab.url) == site { tab.reload() }
                            })
                        }
                        menu.addItem(SidebarMenus.Item(String(localized: "Turn Off Everywhere", comment: "Menu item from the toast saying an extension is using a lot of energy: turns the extension off on every site.")) {
@@ -187,9 +184,10 @@ final class EnergyWatch {
         var sleepers: [Tab] = [], awake: [Tab] = [], soon = false
         // Each window's selected page (and split partner) never sleeps, even when covered or minimized: it would just
         // reload. Sharing windows (#162) list the same tabs; each is checked once and any window's selection is kept.
-        let kept = WindowManager.shared.controllers.flatMap { owner in owner.tabManager.selectedTab.map { owner.tabManager.panes(of: $0) } ?? [] }
+        // AI apps' own window too: out of sight it shows none (`TabManager.shownTabs`), so only use spares a tab there.
+        let kept = WindowManager.shared.everyController.flatMap(\.tabManager.shownTabs)
         do {
-            for tab in WindowManager.shared.openTabs where tab.webView.flatMap(Self.processID) == pid && !kept.contains(where: { $0 === tab }) {
+            for tab in WindowManager.shared.everyOpenTab where tab.webView.flatMap(Self.processID) == pid && !kept.contains(where: { $0 === tab }) {
                 let mustStay = spared.contains(tab.id)
                     || Self.staysAwake(extensionPage: url.scheme == "webkit-extension", playing: tab.isPlayingAudio, inUse: tab.isInUse,
                                        notifies: tab.notifiesUser, favorite: tab.isFavorite, keptAwake: KeepAwake.isOn(for: tab.url),

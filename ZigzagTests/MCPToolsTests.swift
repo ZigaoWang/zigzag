@@ -87,7 +87,11 @@ struct MCPToolsTests {
         // Turned off in Settings while a tool waited: nothing more happens.
         #expect(MCPSafety.refusal(url: site, isPrivate: false, on: false) == .turnedOff)
         #expect(MCPSafety.refusal(url: site, isPrivate: false, stopped: true, on: false) == .turnedOff)
-        for refusal in [MCPSafety.Refusal.privateWindow, .ownPage, .extensionPage, .notAWebPage, .emptyTab, .stopped, .errorPage, .turnedOff] {
+        // In the background (Headless), a tab of yours is never theirs to use.
+        #expect(MCPSafety.refusal(url: site, isPrivate: false, outsideHeadless: true) == .notHeadless)
+        #expect(MCPSafety.refusal(url: site, isPrivate: false, outsideHeadless: true, needsPage: false) == .notHeadless)
+        #expect(MCPSafety.refusal(url: site, isPrivate: false, on: false, outsideHeadless: true) == .turnedOff)
+        for refusal in [MCPSafety.Refusal.privateWindow, .ownPage, .extensionPage, .notAWebPage, .emptyTab, .stopped, .errorPage, .turnedOff, .notHeadless] {
             #expect(!MCPSafety.message(refusal).isEmpty)
         }
     }

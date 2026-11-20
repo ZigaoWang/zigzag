@@ -38,8 +38,16 @@ final class BrowserWindow: NSWindow {
         didSet { if title != oldValue { layoutTrafficLights() } }
     }
 
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    /// Out of sight for AI apps in the background (Headless.park): stays off every screen where it was put, and
+    /// never becomes key or main.
+    var isParked = false
+
+    override var canBecomeKey: Bool { !isParked }
+    override var canBecomeMain: Bool { !isParked }
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        isParked ? frameRect : super.constrainFrameRect(frameRect, to: screen)
+    }
 
     /// Browser shortcuts win over the page: the menu bar sees key equivalents before the web view does.
     /// The last ⌘← or ⌘→ answered, to know it when WebKit hands it back.

@@ -8,8 +8,15 @@ nonisolated struct ProfileInfo: Codable, Identifiable, Equatable {
     /// The color of its tile. Nil: the one its place in the list gives it.
     var color: SpaceColor?
     var created: Date?
+    /// What Zigzag made it for: `headlessRole` for the AI Apps profile, nil for one you made. Kept as text, so a role
+    /// a later Zigzag adds still reads (as none).
+    var role: String?
 
     var isDefault: Bool { id == Profile.defaultID }
+    /// The profile for AI apps in the background (Headless). Its name is Zigzag's.
+    var isHeadless: Bool { role == Self.headlessRole }
+
+    static let headlessRole = "headless"
 }
 
 /// The profiles there are, and which space is on which. Kept in a file of its own (Profiles.json), not in the
@@ -51,6 +58,20 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
     var all: [ProfileInfo] { [first] + others }
 
     func profile(_ id: UUID) -> ProfileInfo? { all.first { $0.id == id } }
+
+    /// The AI Apps profile, if there's one.
+    var headless: ProfileInfo? { others.first { $0.isHeadless } }
+
+    /// The AI Apps profile: the existing one, or a new one with its own ID (a removed one's data may still be
+    /// waiting to be erased).
+    @discardableResult
+    mutating func addHeadless(name: String, color: SpaceColor? = nil) -> ProfileInfo {
+        if let headless { return headless }
+        var info = ProfileInfo(id: UUID(), name: name, color: color, created: Date())
+        info.role = ProfileInfo.headlessRole
+        others.append(info)
+        return info
+    }
 
     /// Why a profile can't be removed now.
     enum RemovalBlock: Equatable {
@@ -100,7 +121,8 @@ nonisolated struct ProfileDirectory: Codable, Equatable {
             first.name = name
             first.color = color
         } else if let index = others.firstIndex(where: { $0.id == id }) {
-            others[index].name = name
+            // The AI Apps profile's name is Zigzag's: AI apps and the person find it by it.
+            if !others[index].isHeadless { others[index].name = name }
             others[index].color = color
         }
     }

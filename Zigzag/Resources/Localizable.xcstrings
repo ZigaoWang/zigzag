@@ -2394,6 +2394,50 @@
         }
       }
     },
+    "AI Apps" : {
+      "comment" : "The name of the profile AI apps use in the background. It can't be changed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用"
+          }
+        }
+      }
+    },
+    "AI Apps in the Background" : {
+      "comment" : "Heading of the menu bar item's menu while AI apps use Zigzag in the background.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用在后台运行"
+          }
+        }
+      }
+    },
+    "AI apps are using it in the background. Stop them first with Stop AI Apps, under the sparkles in the menu bar." : {
+      "comment" : "Message of the sheet shown instead of the one that deletes the profile AI apps use in the background, while they work in it. Stop AI Apps is the item's name in the menu of Zigzag's sparkles icon in the menu bar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用正在后台使用它。请先用菜单栏中闪光图标下的“停止 AI 应用”停止它们。"
+          }
+        }
+      }
+    },
+    "AI apps are using this window. Closing it hides it again while they work." : {
+      "comment" : "Toast in the window AI apps use in the background, when you show it (Show AI Apps Window).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用正在使用此窗口。在它们工作期间，关闭它只会再次隐藏它。"
+          }
+        }
+      }
+    },
     "Add Space Rule" : {
       "comment" : "Title of the sheet that creates a space rule.",
       "localizations" : {
@@ -2412,6 +2456,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI App 现在不能使用 Zigzag 了。可在“设置 › 自动化”中重新打开。"
+          }
+        }
+      }
+    },
+    "AI apps use this profile when they run in the background. Its name can’t be changed." : {
+      "comment" : "In the sheet that edits the profile AI apps use in the background (AI Apps), in place of its name field.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用在后台运行时使用此个人资料。它的名称无法更改。"
+          }
+        }
+      }
+    },
+    "AI apps work in it. Zigzag never saves or fills passwords here, nor fills forms from your card." : {
+      "comment" : "Explanation under “Not used in this profile” in Settings › Passwords, with the profile AI apps use in the background chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 应用在其中工作。Zigzag 绝不会在这里存储或填写密码，也不会用你的名片填写表单。"
           }
         }
       }
@@ -10131,6 +10197,17 @@
         }
       }
     },
+    "For AI apps in the background." : {
+      "comment" : "Under the name of the profile AI apps use in the background (AI Apps) in Settings › Profiles: what it's for.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "供 AI 应用在后台使用。"
+          }
+        }
+      }
+    },
     "For This Profile" : {
       "comment" : "A heading in the column of Settings, with more than one profile, over the menu that chooses a profile and the sections that show that profile's things.",
       "localizations" : {
@@ -11566,6 +11643,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "它的登录状态、历史记录、收藏和扩展都会被删除，扩展保存的所有内容（包括钱包）也会一并删除。"
+          }
+        }
+      }
+    },
+    "Its spaces go with it. Zigzag makes a new AI Apps profile the next time AI apps run in the background." : {
+      "comment" : "Added to the message of the sheet that deletes the profile AI apps use in the background (AI Apps).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的空间会一并删除。下次 AI 应用在后台运行时，Zigzag 会新建一个“AI 应用”个人资料。"
           }
         }
       }
@@ -13582,6 +13670,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未解锁。准备好后再试一次。"
+          }
+        }
+      }
+    },
+    "Not used in this profile" : {
+      "comment" : "A row in Settings › Passwords, in place of the password settings, with the profile AI apps use in the background chosen.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此个人资料中不使用"
           }
         }
       }
@@ -17221,6 +17320,17 @@
         }
       }
     },
+    "Run AI apps in the background" : {
+      "comment" : "A setting in Settings › Automation: AI apps get a hidden window of their own, on a profile of their own (AI Apps), instead of your windows.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让 AI 应用在后台运行"
+          }
+        }
+      }
+    },
     "Run in private windows affects Open. A file type that saves still saves there." : {
       "comment" : "Under the fields of a per-extension destination's sheet: the private-windows switch only stops Open, not Save.",
       "localizations" : {
@@ -18371,6 +18481,17 @@
         }
       }
     },
+    "Show AI Apps Window" : {
+      "comment" : "Menu item and command bar command: brings the window AI apps use in the background on screen, to watch them work. AI Apps is the name of their profile.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示 AI 应用窗口"
+          }
+        }
+      }
+    },
     "Show Ads" : {
       "comment" : "Answer in the welcome window’s ad blocking step.",
       "localizations" : {
@@ -19407,6 +19528,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止"
+          }
+        }
+      }
+    },
+    "Stop AI Apps" : {
+      "comment" : "Menu bar item's menu while AI apps use Zigzag in the background: cuts every AI app off, as Stop on a tab's bar does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止 AI 应用"
           }
         }
       }
@@ -20486,6 +20618,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "没有可以运行它的标签页。"
+          }
+        }
+      }
+    },
+    "They get a hidden window of their own, on the AI Apps profile, and can’t see your windows or tabs. Opening Zigzag with --headless does the same until it quits." : {
+      "comment" : "Explanation under “Run AI apps in the background” in Settings › Automation. --headless is how Zigzag is opened from Terminal for it: not translated.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它们会在“AI 应用”个人资料中获得一个自己的隐藏窗口，看不到你的窗口和标签页。用 --headless 打开 Zigzag 也会如此，直到退出为止。"
           }
         }
       }
@@ -23646,6 +23789,17 @@
         }
       }
     },
+    "Zigzag: AI apps in the background" : {
+      "comment" : "Tooltip and VoiceOver name of the menu bar item shown while AI apps use Zigzag in the background.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag：AI 应用正在后台运行"
+          }
+        }
+      }
+    },
     "Zoom" : {
       "comment" : "Row in the site panel's This Site group.\nWindow menu item.",
       "localizations" : {
@@ -24148,6 +24302,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "透明"
+          }
+        }
+      }
+    },
+    "headless background hidden window" : {
+      "comment" : "Words that find the Run AI apps in the background setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "headless 后台 隐藏 窗口"
           }
         }
       }

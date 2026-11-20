@@ -34,7 +34,7 @@ enum ArchivePage {
 
     /// Refreshes every open Archive page.
     static func refreshOpenPages() {
-        for tab in WindowManager.shared.controllers.flatMap(\.tabManager.allTabs) where isArchive(tab.url) {
+        for tab in WindowManager.shared.everyOpenTab where isArchive(tab.url) {
             tab.webView?.evaluateJavaScript("window.zigzagRefresh && window.zigzagRefresh()")
         }
     }
