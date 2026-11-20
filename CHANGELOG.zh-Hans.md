@@ -12,7 +12,21 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-18
+
+来自其他 App 的链接会在 Zigzag Mini 中打开；网站可以有自己的图标；空间编辑器更清爽；更新卡片会显示进度；每个网站的设置都能单独修改；已固定的文件夹可以全部在标签页中打开；清除 Cookie 时可以保留你选的网站；同一网站的不同路径可以归到不同空间；可以手动让页面休眠；可以在设置里检查扩展更新；你允许的扩展可以在无痕窗口里运行；另外修复了分屏浏览、切换标签页的快捷键、扩展的网站访问权限、全屏、通行密钥、Proton Pass、YouTube 上 ⌘ 点击、固定分组、GitHub 上的查找等问题。
+
 ### 新功能
+- 运行脚本的下载规则会在网页上显示进度：运行时显示“正在运行脚本”，结束后显示“脚本运行完成”或“脚本运行失败”，并附上脚本最后输出的一行，规则不会再悄悄运行。把链接交给 App、下载工具或默认浏览器的规则，成功后每次打开 Zigzag 会提示一次。感谢 [Lakeland97](https://github.com/Lakeland97)。([#307](https://github.com/ZigaoWang/zigzag/pull/307))
+- 网站可以有自己的图标。在“网站设置”的 ⋯ 菜单里选“更改网站图标…”，会打开和标签页一样的图标选择，有符号、表情符号和“选取图像…”，这个网站的所有标签页、固定标签页、收藏和历史记录都会用它。标签页自己的图标仍然优先，“使用网站图标”可以换回网站原来的图标。“设置 › 隐私 › 网站”会列出它，可以忘掉；在无痕浏览窗口里设置的只到窗口关闭为止。感谢 [bkonia](https://github.com/bkonia)。([#310](https://github.com/ZigaoWang/zigzag/issues/310))
+- “设置 › 隐私 › 网站”里，给一个网站做的每个选择各占一行，用的是和网站设置里一样的控件，每行都有一个 ×，只忘记那一项，不再是一句话加一个“忘记”。JavaScript 和扩展现在放在网站设置的“权限”页，和摄像头等放在一起；给某个网站关掉扩展会按个人资料分别记住。感谢 [Lakeland97](https://github.com/Lakeland97)。([#311](https://github.com/ZigaoWang/zigzag/issues/311), [#312](https://github.com/ZigaoWang/zigzag/issues/312), [#313](https://github.com/ZigaoWang/zigzag/issues/313), [#314](https://github.com/ZigaoWang/zigzag/issues/314))
+- 空间编辑器更简单了。一排色块里有“使用默认颜色”（空间创建时的颜色）、六个预设、空间的背景图像和“自定”，想要自己的颜色时点“自定”，下面会展开色轮和“明暗”。“效果”在色块下面，“个人资料”移到最下面，只占一行，鼠标停在上面会说明个人资料的作用。背景现在也是一个色块：点按它选取图像，点角上的 × 去掉图像。
+- “设置 › 扩展”里每个扩展的下面都有“网站访问权限”：在所有网站上、在你点按它时或在特定网站上，特定网站会列出来，可以添加和移除。它和地址栏旁扩展菜单里的“网站访问权限”是同一个选项。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
+- Raindrop.io 等只在需要时才申请网站权限的扩展，在“网站访问权限”里选“在所有网站上”后就能正常使用。之前这个选项实际上没给它们任何网站的权限，它们访问自己服务器的请求都会被拦下，Raindrop 看起来像坏了或没登录。没选之前，菜单也不再显示它已选中。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
+- AI 应用可以用 `snapshot` 像读屏软件那样查看网页，并按引用操作找到的内容：每个链接、按钮、栏位和菜单都有一个像 `e12` 这样的简短引用，`click`、`type`、`scroll` 和 `press_key` 都可以用它，不必再去猜 CSS 选择器。引用只代表某个元素当时的样子，所以网页改动了它或重新载入后，应用会被告知重新查看，而不会点到别的东西。快照只包含网页上看得到的内容：网页对你隐藏的文字不会出现，按钮按它显示的文字命名（只显示一个符号时，比如 ×，则按它的标签命名），指向其他网站的链接和混用不同字母的词会被标出，网页的文字都放在引号里，不会被当成 Zigzag 自己的话。目标被别的东西挡住时（就像 Cookie 横幅挡住你一样），点按会被拒绝；`type` 和 `press_key` 也不会再使用已停用或键盘无法进入的栏位。现在任何工具都不会给出银行卡信息、一次性验证码之类的内容，规则和 Zigzag 不为休眠的标签页保存它们时一样；由你保存的资料填写的内容，在应用自己键入之前只会显示为“已填写”。([#214](https://github.com/ZigaoWang/zigzag/issues/214))
+- 右键点按已固定的文件夹，菜单里有“全部在标签页中打开”，会按顺序打开它和其中文件夹里的所有已固定标签页，并显示第一个。超过 10 个会先问你，⌘Z 可以再把它们关掉。里面还有文件夹时，菜单里还有“全部展开”和“全部折叠”，一次展开或折叠整个文件夹树。感谢 [mrfragger](https://github.com/mrfragger)。([#343](https://github.com/ZigaoWang/zigzag/issues/343))
+- 可以为你选择的网站保留 Cookie。“清除 Cookie…”会让你在其他所有网站上退出登录，这些网站则不受影响；打开“设置 › 隐私”中的“退出 Zigzag 时清除 Cookie”后，每次退出都会清除其余网站的 Cookie。在网站设置中打开“保留 Cookie”，或在“设置 › 隐私”中添加网站；一个网站同时包括 http、https 和所有子域名。感谢 [mrfragger](https://github.com/mrfragger)。([#334](https://github.com/ZigaoWang/zigzag/issues/334))
+- 用到 Hyper 键（⌃⌥⇧⌘ 一起按）的快捷键，在“设置 › 快捷键”、命令栏和录制快捷键时只显示一个 ✦ 键帽，不再列出四个修饰键。在设置里搜“hyper”也能找到。感谢 [JonasNowak](https://github.com/JonasNowak)。([#352](https://github.com/ZigaoWang/zigzag/pull/352))
 - 同一网站的不同路径可以在不同空间中打开，比如 github.com/org1 在“工作”中打开，github.com/org2 在“个人”中打开。“设置 › 空间”里的规则从上往下排，用第一条匹配的规则。点按规则即可编辑，右键点按可启用或停用，拖动可调整优先级。如果一条规则覆盖了另一条，两条规则都会显示提示。路径不区分大小写。地址可以带端口输入，如 localhost:3000，规则会用于这个网站的所有端口。原来设好的网站会变成规则，仍然在原来的空间中打开。感谢 [pyoio](https://github.com/pyoio)。([#289](https://github.com/ZigaoWang/zigzag/issues/289))
 - “设置 › 外观 › 边栏大小”新增“自定”：选它以后，用 − 和 + 把边栏设成 80% 到 150%，点按百分比会回到 100%。感谢 [Lakeland97](https://github.com/Lakeland97)。([#361](https://github.com/ZigaoWang/zigzag/issues/361))
 - 网站要打开 App 时，提示会说清楚是谁在请求（“app.slack.com 想要打开 Slack App。”），“取消”和“打开 Slack”放在右边，“仅此一次”菜单换成了“始终允许”复选框。其他网站请求也改用“记住对此网站的选择”复选框，窗口太窄时按钮会竖着排，不会被截断。
@@ -29,6 +43,28 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “设置 › 标签页 › ⌃Tab 切换到”可以选 Control-Tab 的作用：“最近用过的标签页”，也就是和以前一样按最近使用排列的切换器；或者“边栏里的下一个标签页”，像 Chrome 一样沿边栏往下走，⌃⇧Tab 往上。([#403](https://github.com/ZigaoWang/zigzag/issues/403))
 
 ### 修复
+- 固定一个分组时，整个分组会保持完整：固定成一个以分组名称命名的文件夹，里面的标签页按原顺序放好，而不是每个标签页各自固定。取消固定其中任何一个页面，整个分组都会回来。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
+- 在 YouTube 上按住 ⌘ 点视频，现在总会在新标签页打开。以前有时会在当前标签页打开，因为 YouTube 自己的脚本把链接接了过去。现在按住 ⌘ 点链接，不管网页怎么处理点按，都会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#317](https://github.com/ZigaoWang/zigzag/issues/317))
+- 每个 PDF 都在自己单独的辅助进程里打开，这本来是 0.9.2 要做到的：发布的版本里所有 PDF 共用一个，同时打开的 PDF 没能彼此隔开。
+- 扩展的右键菜单能正常显示表情和符号了，比如 📋 和 ⌘，不会再变成“ðŸ“‹”这样的乱码。用后台脚本的扩展（大多数 Firefox 附加组件都是这样）之前文字的编码读错了。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
+- 只在你点按它的那个标签页打开侧边栏的扩展，比如 ChatGPT 的扩展，现在点它的按钮就会打开侧边栏，不会再点了没反应。
+- 来自其他 App 的链接现在默认在 Zigzag Mini 中打开，就像 Arc 的 Little Arc。按 ⌘O 可以把网页移到标签页里，不想要的话可以在“设置 › Zigzag Mini”中关闭。第一次打开时会有一条小提示说明这些，也可以直接点“改用标签页”。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
+- 网站设置有了自己的宽度，不再跟着边栏走，边栏很窄时里面的文字不会再被截断或换行。从边栏打开时，边栏太窄它会延伸到网页上；地址栏在网页上方时，它在地址下方以平常的宽度打开。感谢 [Tuszy42](https://github.com/Tuszy42)。([#335](https://github.com/ZigaoWang/zigzag/issues/335))
+- 需要较新 Chrome 的扩展（比如 Heylogin）可以从 Chrome 应用商店安装了，不再显示已下架：Zigzag 之前告诉商店自己是 Chrome 140。感谢 [datarip](https://github.com/datarip)。([#336](https://github.com/ZigaoWang/zigzag/issues/336))
+- 从文件导入现在支持各个浏览器导出的 bookmarks.html，Firefox、LibreWolf、Safari、Chrome 和 Edge 都可以。网页会连同文件夹一起放进单独的空间，和从这台 Mac 上的浏览器导入一样。感谢 [mrfragger](https://github.com/mrfragger)。([#330](https://github.com/ZigaoWang/zigzag/issues/330))
+- 迷你播放器回到标签页的箭头不会再没反应了：它会在标签页现在所在的窗口里找到它，并把那个窗口带到前面；标签页已经在屏幕上时卡片会收起；标签页已经关掉时卡片会直接关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#333](https://github.com/ZigaoWang/zigzag/issues/333))
+- 扩展的弹出窗口打开时就会获得焦点，和 Chrome 一样，所以按钮的提示文字和悬停效果马上就会显示。以前要先在弹出窗口里点一下才会出现。弹出窗口关闭后，焦点回到你之前所在的网页或输入框。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
+- 页内查找现在能标出每一个匹配，包括直接写在按钮里、按弹性盒子排版的行里或紧挨着块元素的文字，比如 GitHub 议题列表里的作者名。WebKit 不在这些地方画高亮，所以匹配只闪一下就没了；现在这些匹配会单独标出来。网页重新绘制的匹配会在一秒内重新标出。感谢 [Lakeland97](https://github.com/Lakeland97)。([#329](https://github.com/ZigaoWang/zigzag/issues/329))
+- Proton Pass 的弹出窗口现在以完整大小打开，能看到项目列表，不会再在搜索栏下面被截断。以前在弹出窗口里，Proton 问自己是不是开在标签页里时，Zigzag 回答的是你当前的标签页，于是它按一个并不存在的标签页去调整了大小。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
+- Proton Pass 现在会在登录输入框里显示它的图标，点输入框时会列出你的登录信息。以前它在网页上的脚本还没找到输入框就停下了，因为它用到的一个浏览器函数（requestIdleCallback）WebKit 没有，现在 Zigzag 像 Chrome 一样给扩展提供这个函数。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
+- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
+- 鼠标侧键的后退和前进在 Zigzag Mini 和已安装的网页 App 里也能用了，不再只在浏览器窗口里有效。感谢 [Tuszy42](https://github.com/Tuszy42)。([#345](https://github.com/ZigaoWang/zigzag/issues/345))
+- 密码管理器扩展的通行密钥在网页打开期间会一直有效。以前 WebKit 可能丢掉网页的通行密钥对象，再换一个没有扩展挂钩的新对象，登录就交给了浏览器，而不是 Bitwarden 这类扩展。Zigzag 现在也会给 Strongbox 让路，和 1Password、Bitwarden 一样。感谢 [bkonia](https://github.com/bkonia)。([#344](https://github.com/ZigaoWang/zigzag/issues/344))
+- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
+- 在空间之间轻扫时，窗口颜色会跟着手指从一个空间的颜色渐变到下一个，取消轻扫时会变回原来的颜色。以前要等手指松开，颜色才会变。
+- 登录页面在用户名栏提供通行密钥后（例如 GitHub），通行密钥仍然可以正常使用。以前重新载入这样的页面，或者再次请求通行密钥时，请求可能被拒绝，之后所有网站的通行密钥都会直接失败，没有任何提示，直到重新启动 Mac。如果你的通行密钥现在已经失效，更新后请重新启动一次 Mac。感谢 [vandenbulckjean](https://github.com/vandenbulckjean)。([#348](https://github.com/ZigaoWang/zigzag/issues/348))
+- 在扩展弹窗里改的设置不会再自己变回去了。Strongbox 的“填充”开关每次点完显示的都是点之前的状态，重新打开又反过来，因为 WebKit 有时会在扩展上一次保存还没完成时就先读了存储。现在每个扩展的保存和读取都按它调用的顺序完成，和 Chrome 一样。感谢 [bkonia](https://github.com/bkonia)。([#350](https://github.com/ZigaoWang/zigzag/issues/350))
+- 按住分组的名字把整个标签页分组拖到固定标签页那里，现在会把整组固定成一个文件夹，和“固定分组”、⌘D 一样。之前分组那一行根本放不进去，松手后又回到标签页里。单独拖分组里的一个标签页，还是只固定那一个。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 - 按住 ⇧ 点链接仍然交给网页处理，所以在一排本身是链接的行上按住 ⇧ 选取一段，和以前一样好用；但网页如果随后把当前标签页送到这个链接，比如 GitHub 的文件列表，它会在“速览”卡片中打开，不再移动当前标签页。按住 ⌥ 也一样：网页原本会跳转的链接改为下载。感谢 [Lakeland97](https://github.com/Lakeland97)。([#322](https://github.com/ZigaoWang/zigzag/issues/322))
 - Zigzag 启动后第一次按 ⌘, 会马上打开设置，不再要等好几秒。以前打开设置时会把每个部分要列的内容都读一遍，比如网站数据、扩展和已安装的 App；现在只在你第一次打开某个部分或搜索时才读取。感谢 [Lakeland97](https://github.com/Lakeland97)。([#357](https://github.com/ZigaoWang/zigzag/issues/357))
 - 固定标签页收起时，打开着的固定页面会显示在所在文件夹的名字下面，和展开时一样缩进，而不是一个个单独列出。以前收起时固定一个分组，看起来像散成了几个单独的固定标签页；现在会显示成它那一个文件夹。没有打开页面的文件夹仍然隐藏。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
@@ -71,46 +107,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - “显示 › 开发者”里多了“在页面上方显示工具”和“隐藏页面上方的工具”，和“设置 › 开发者 › 在页面上方显示工具”是同一个开关，控制开发者模式下页面上方那条工具栏：拷贝链接、控制台、检查元素、页面外观和尺寸、重新载入和 ⋯。在设置里搜索“工具栏”也能找到它。这条工具栏只在开发者模式的页面单独显示时出现；分屏浏览时，每个页面的工具在它的“网站设置”里。([#405](https://github.com/ZigaoWang/zigzag/issues/405))
 - 查找栏关着的时候按 ⌘G 或 ⇧⌘G，会重新打开查找栏，跳到下一个或上一个匹配项。以前按 ⌘G 会跳过一个。
 - 网页里嵌的框架中的链接，按住 ⌘ 点按或用中键点按，现在也会在新标签页打开：默认在后台，按住 ⇧ 就在前台，和网页其他地方一样。以前会直接在框架里打开。普通点按还是在框架里打开。
-
-## [0.9.3] - 2026-11-18
-
-来自其他 App 的链接会在 Zigzag Mini 中打开；网站可以有自己的图标；空间编辑器更清爽；更新卡片会显示进度；每个网站的设置都能单独修改；已固定的文件夹可以全部在标签页中打开；清除 Cookie 时可以保留你选的网站；另外修复了通行密钥、Proton Pass、YouTube 上 ⌘ 点击、固定分组、GitHub 上的查找等问题。
-
-### 新功能
-- 运行脚本的下载规则会在网页上显示进度：运行时显示“正在运行脚本”，结束后显示“脚本运行完成”或“脚本运行失败”，并附上脚本最后输出的一行，规则不会再悄悄运行。把链接交给 App、下载工具或默认浏览器的规则，成功后每次打开 Zigzag 会提示一次。感谢 [Lakeland97](https://github.com/Lakeland97)。([#307](https://github.com/ZigaoWang/zigzag/pull/307))
-- 网站可以有自己的图标。在“网站设置”的 ⋯ 菜单里选“更改网站图标…”，会打开和标签页一样的图标选择，有符号、表情符号和“选取图像…”，这个网站的所有标签页、固定标签页、收藏和历史记录都会用它。标签页自己的图标仍然优先，“使用网站图标”可以换回网站原来的图标。“设置 › 隐私 › 网站”会列出它，可以忘掉；在无痕浏览窗口里设置的只到窗口关闭为止。感谢 [bkonia](https://github.com/bkonia)。([#310](https://github.com/ZigaoWang/zigzag/issues/310))
-- “设置 › 隐私 › 网站”里，给一个网站做的每个选择各占一行，用的是和网站设置里一样的控件，每行都有一个 ×，只忘记那一项，不再是一句话加一个“忘记”。JavaScript 和扩展现在放在网站设置的“权限”页，和摄像头等放在一起；给某个网站关掉扩展会按个人资料分别记住。感谢 [Lakeland97](https://github.com/Lakeland97)。([#311](https://github.com/ZigaoWang/zigzag/issues/311), [#312](https://github.com/ZigaoWang/zigzag/issues/312), [#313](https://github.com/ZigaoWang/zigzag/issues/313), [#314](https://github.com/ZigaoWang/zigzag/issues/314))
-- 空间编辑器更简单了。一排色块里有“使用默认颜色”（空间创建时的颜色）、六个预设、空间的背景图像和“自定”，想要自己的颜色时点“自定”，下面会展开色轮和“明暗”。“效果”在色块下面，“个人资料”移到最下面，只占一行，鼠标停在上面会说明个人资料的作用。背景现在也是一个色块：点按它选取图像，点角上的 × 去掉图像。
-- “设置 › 扩展”里每个扩展的下面都有“网站访问权限”：在所有网站上、在你点按它时或在特定网站上，特定网站会列出来，可以添加和移除。它和地址栏旁扩展菜单里的“网站访问权限”是同一个选项。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
-- Raindrop.io 等只在需要时才申请网站权限的扩展，在“网站访问权限”里选“在所有网站上”后就能正常使用。之前这个选项实际上没给它们任何网站的权限，它们访问自己服务器的请求都会被拦下，Raindrop 看起来像坏了或没登录。没选之前，菜单也不再显示它已选中。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
-- AI 应用可以用 `snapshot` 像读屏软件那样查看网页，并按引用操作找到的内容：每个链接、按钮、栏位和菜单都有一个像 `e12` 这样的简短引用，`click`、`type`、`scroll` 和 `press_key` 都可以用它，不必再去猜 CSS 选择器。引用只代表某个元素当时的样子，所以网页改动了它或重新载入后，应用会被告知重新查看，而不会点到别的东西。快照只包含网页上看得到的内容：网页对你隐藏的文字不会出现，按钮按它显示的文字命名（只显示一个符号时，比如 ×，则按它的标签命名），指向其他网站的链接和混用不同字母的词会被标出，网页的文字都放在引号里，不会被当成 Zigzag 自己的话。目标被别的东西挡住时（就像 Cookie 横幅挡住你一样），点按会被拒绝；`type` 和 `press_key` 也不会再使用已停用或键盘无法进入的栏位。现在任何工具都不会给出银行卡信息、一次性验证码之类的内容，规则和 Zigzag 不为休眠的标签页保存它们时一样；由你保存的资料填写的内容，在应用自己键入之前只会显示为“已填写”。([#214](https://github.com/ZigaoWang/zigzag/issues/214))
-- 右键点按已固定的文件夹，菜单里有“全部在标签页中打开”，会按顺序打开它和其中文件夹里的所有已固定标签页，并显示第一个。超过 10 个会先问你，⌘Z 可以再把它们关掉。里面还有文件夹时，菜单里还有“全部展开”和“全部折叠”，一次展开或折叠整个文件夹树。感谢 [mrfragger](https://github.com/mrfragger)。([#343](https://github.com/ZigaoWang/zigzag/issues/343))
-- 可以为你选择的网站保留 Cookie。“清除 Cookie…”会让你在其他所有网站上退出登录，这些网站则不受影响；打开“设置 › 隐私”中的“退出 Zigzag 时清除 Cookie”后，每次退出都会清除其余网站的 Cookie。在网站设置中打开“保留 Cookie”，或在“设置 › 隐私”中添加网站；一个网站同时包括 http、https 和所有子域名。感谢 [mrfragger](https://github.com/mrfragger)。([#334](https://github.com/ZigaoWang/zigzag/issues/334))
-- 用到 Hyper 键（⌃⌥⇧⌘ 一起按）的快捷键，在“设置 › 快捷键”、命令栏和录制快捷键时只显示一个 ✦ 键帽，不再列出四个修饰键。在设置里搜“hyper”也能找到。感谢 [JonasNowak](https://github.com/JonasNowak)。([#352](https://github.com/ZigaoWang/zigzag/pull/352))
-
-### 修复
-- 固定一个分组时，整个分组会保持完整：固定成一个以分组名称命名的文件夹，里面的标签页按原顺序放好，而不是每个标签页各自固定。取消固定其中任何一个页面，整个分组都会回来。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
-- 在 YouTube 上按住 ⌘ 点视频，现在总会在新标签页打开。以前有时会在当前标签页打开，因为 YouTube 自己的脚本把链接接了过去。现在按住 ⌘ 点链接，不管网页怎么处理点按，都会在新标签页打开。感谢 [Lakeland97](https://github.com/Lakeland97)。([#317](https://github.com/ZigaoWang/zigzag/issues/317))
-- 每个 PDF 都在自己单独的辅助进程里打开，这本来是 0.9.2 要做到的：发布的版本里所有 PDF 共用一个，同时打开的 PDF 没能彼此隔开。
-- 扩展的右键菜单能正常显示表情和符号了，比如 📋 和 ⌘，不会再变成“ðŸ“‹”这样的乱码。用后台脚本的扩展（大多数 Firefox 附加组件都是这样）之前文字的编码读错了。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
-- 只在你点按它的那个标签页打开侧边栏的扩展，比如 ChatGPT 的扩展，现在点它的按钮就会打开侧边栏，不会再点了没反应。
-- 来自其他 App 的链接现在默认在 Zigzag Mini 中打开，就像 Arc 的 Little Arc。按 ⌘O 可以把网页移到标签页里，不想要的话可以在“设置 › Zigzag Mini”中关闭。第一次打开时会有一条小提示说明这些，也可以直接点“改用标签页”。([#246](https://github.com/ZigaoWang/zigzag/issues/246))
-- 网站设置有了自己的宽度，不再跟着边栏走，边栏很窄时里面的文字不会再被截断或换行。从边栏打开时，边栏太窄它会延伸到网页上；地址栏在网页上方时，它在地址下方以平常的宽度打开。感谢 [Tuszy42](https://github.com/Tuszy42)。([#335](https://github.com/ZigaoWang/zigzag/issues/335))
-- 需要较新 Chrome 的扩展（比如 Heylogin）可以从 Chrome 应用商店安装了，不再显示已下架：Zigzag 之前告诉商店自己是 Chrome 140。感谢 [datarip](https://github.com/datarip)。([#336](https://github.com/ZigaoWang/zigzag/issues/336))
-- 从文件导入现在支持各个浏览器导出的 bookmarks.html，Firefox、LibreWolf、Safari、Chrome 和 Edge 都可以。网页会连同文件夹一起放进单独的空间，和从这台 Mac 上的浏览器导入一样。感谢 [mrfragger](https://github.com/mrfragger)。([#330](https://github.com/ZigaoWang/zigzag/issues/330))
-- 迷你播放器回到标签页的箭头不会再没反应了：它会在标签页现在所在的窗口里找到它，并把那个窗口带到前面；标签页已经在屏幕上时卡片会收起；标签页已经关掉时卡片会直接关闭。感谢 [Lakeland97](https://github.com/Lakeland97)。([#333](https://github.com/ZigaoWang/zigzag/issues/333))
-- 扩展的弹出窗口打开时就会获得焦点，和 Chrome 一样，所以按钮的提示文字和悬停效果马上就会显示。以前要先在弹出窗口里点一下才会出现。弹出窗口关闭后，焦点回到你之前所在的网页或输入框。感谢 [mrfragger](https://github.com/mrfragger)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
-- 页内查找现在能标出每一个匹配，包括直接写在按钮里、按弹性盒子排版的行里或紧挨着块元素的文字，比如 GitHub 议题列表里的作者名。WebKit 不在这些地方画高亮，所以匹配只闪一下就没了；现在这些匹配会单独标出来。网页重新绘制的匹配会在一秒内重新标出。感谢 [Lakeland97](https://github.com/Lakeland97)。([#329](https://github.com/ZigaoWang/zigzag/issues/329))
-- Proton Pass 的弹出窗口现在以完整大小打开，能看到项目列表，不会再在搜索栏下面被截断。以前在弹出窗口里，Proton 问自己是不是开在标签页里时，Zigzag 回答的是你当前的标签页，于是它按一个并不存在的标签页去调整了大小。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
-- Proton Pass 现在会在登录输入框里显示它的图标，点输入框时会列出你的登录信息。以前它在网页上的脚本还没找到输入框就停下了，因为它用到的一个浏览器函数（requestIdleCallback）WebKit 没有，现在 Zigzag 像 Chrome 一样给扩展提供这个函数。感谢 [JonasNowak](https://github.com/JonasNowak)。([#287](https://github.com/ZigaoWang/zigzag/issues/287))
-- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
-- 鼠标侧键的后退和前进在 Zigzag Mini 和已安装的网页 App 里也能用了，不再只在浏览器窗口里有效。感谢 [Tuszy42](https://github.com/Tuszy42)。([#345](https://github.com/ZigaoWang/zigzag/issues/345))
-- 密码管理器扩展的通行密钥在网页打开期间会一直有效。以前 WebKit 可能丢掉网页的通行密钥对象，再换一个没有扩展挂钩的新对象，登录就交给了浏览器，而不是 Bitwarden 这类扩展。Zigzag 现在也会给 Strongbox 让路，和 1Password、Bitwarden 一样。感谢 [bkonia](https://github.com/bkonia)。([#344](https://github.com/ZigaoWang/zigzag/issues/344))
-- 扩展的弹出窗口里，图标会像在 Chrome 里那样排列。以前 Zigzag 会把每个没有自己宽度的图标撑满整行，紧挨着标题的图标就把标题挤成了一行一个字，比如 Dashlane 的菜单。现在图标保持网页给它的尺寸。([#340](https://github.com/ZigaoWang/zigzag/issues/340))
-- 在空间之间轻扫时，窗口颜色会跟着手指从一个空间的颜色渐变到下一个，取消轻扫时会变回原来的颜色。以前要等手指松开，颜色才会变。
-- 登录页面在用户名栏提供通行密钥后（例如 GitHub），通行密钥仍然可以正常使用。以前重新载入这样的页面，或者再次请求通行密钥时，请求可能被拒绝，之后所有网站的通行密钥都会直接失败，没有任何提示，直到重新启动 Mac。如果你的通行密钥现在已经失效，更新后请重新启动一次 Mac。感谢 [vandenbulckjean](https://github.com/vandenbulckjean)。([#348](https://github.com/ZigaoWang/zigzag/issues/348))
-- 在扩展弹窗里改的设置不会再自己变回去了。Strongbox 的“填充”开关每次点完显示的都是点之前的状态，重新打开又反过来，因为 WebKit 有时会在扩展上一次保存还没完成时就先读了存储。现在每个扩展的保存和读取都按它调用的顺序完成，和 Chrome 一样。感谢 [bkonia](https://github.com/bkonia)。([#350](https://github.com/ZigaoWang/zigzag/issues/350))
-- 按住分组的名字把整个标签页分组拖到固定标签页那里，现在会把整组固定成一个文件夹，和“固定分组”、⌘D 一样。之前分组那一行根本放不进去，松手后又回到标签页里。单独拖分组里的一个标签页，还是只固定那一个。感谢 [Lakeland97](https://github.com/Lakeland97)。([#325](https://github.com/ZigaoWang/zigzag/issues/325))
 
 ## [0.9.2] - 2026-11-18
 
