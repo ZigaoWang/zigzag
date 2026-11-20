@@ -201,6 +201,8 @@ final class OldTwitterSolver: NSObject {
         sweeper?.cancel()
         sweeper = nil
         extensionID = nil
+        // An update loads a new copy: its sandbox is read again.
+        sandboxScript = nil
     }
 
     // MARK: Words
