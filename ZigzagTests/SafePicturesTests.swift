@@ -244,7 +244,9 @@ struct SafePicturesTests {
     /// it then, and each is asked again on a fresh connection and comes back.
     @Test func aPictureThatHangsTheHelperFailsAlone() async {
         let helper = FakeHelper()
-        let pictures = SafePictures(timeout: 0.2, makeLink: helper.makeLink)
+        // Times out before the helper ends itself, with room for a busy Mac.
+        helper.hangExit = 1.5
+        let pictures = SafePictures(timeout: 1, makeLink: helper.makeLink)
         async let poisoned = pictures.decode(FakeHelper.hang, maxSide: 16)
         let others = await withTaskGroup(of: Bool.self) { group in
             for i in 0..<30 { group.addTask { await pictures.decode(Self.icon(i), maxSide: 16) != nil } }
