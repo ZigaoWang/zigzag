@@ -66,4 +66,4 @@
 - Visit anyway on a public site's certificate warning → trusted until Zigzag quits, a day at most.
   Test: CertificateTrustTests.anExceptionRunsOut
 - Visit anyway on a local server (this Mac, a .local name, a home network address) → kept across launches in Settings › Developer, per port, until its certificate changes or you remove it; never from a private window.
-  No test yet.
+  Test: CertificateTrustTests.aLocalServersCertificateIsRemembered

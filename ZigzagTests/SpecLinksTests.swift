@@ -13,18 +13,25 @@ struct SpecLinksTests {
         return try names.map { try String(contentsOf: folder.appendingPathComponent($0), encoding: .utf8) }
     }
 
-    /// The suite's body: from its declaration to the next type declared at the top level.
-    private static func body(of suite: String, in sources: [String]) -> Substring? {
-        let pattern = try! NSRegularExpression(pattern: "^(?:@\\w+(?:\\([^)]*\\))? )*(?:final )?(?:struct|class) \(suite)\\b", options: .anchorsMatchLines)
+    /// The suite's body: its declaration and every `extension` of it in any file, each up to the next type declared at
+    /// the top level. Nil when no file declares the suite.
+    private static func body(of suite: String, in sources: [String]) -> String? {
+        let declaration = try! NSRegularExpression(pattern: "^(?:@\\w+(?:\\([^)]*\\))? )*(?:final )?(?:struct|class) \(suite)\\b", options: .anchorsMatchLines)
+        let part = try! NSRegularExpression(pattern: "^(?:@\\w+(?:\\([^)]*\\))? )*(?:(?:final )?(?:struct|class)|extension) \(suite)\\b", options: .anchorsMatchLines)
         let next = try! NSRegularExpression(pattern: "^(?:@\\w+(?:\\([^)]*\\))? )*(?:final |private |fileprivate )*(?:struct|class|enum|extension) ", options: .anchorsMatchLines)
+        var declared = false
+        var bodies: [Substring] = []
         for text in sources {
             let all = NSRange(text.startIndex..., in: text)
-            guard let found = pattern.firstMatch(in: text, range: all), let start = Range(found.range, in: text) else { continue }
-            let rest = NSRange(start.upperBound..., in: text)
-            let end = next.firstMatch(in: text, range: rest).flatMap { Range($0.range, in: text)?.lowerBound } ?? text.endIndex
-            return text[start.lowerBound..<end]
+            if declaration.firstMatch(in: text, range: all) != nil { declared = true }
+            for found in part.matches(in: text, range: all) {
+                guard let start = Range(found.range, in: text) else { continue }
+                let rest = NSRange(start.upperBound..., in: text)
+                let end = next.firstMatch(in: text, range: rest).flatMap { Range($0.range, in: text)?.lowerBound } ?? text.endIndex
+                bodies.append(text[start.lowerBound..<end])
+            }
         }
-        return nil
+        return declared ? bodies.joined(separator: "\n") : nil
     }
 
     @Test func everySpecTestExists() throws {

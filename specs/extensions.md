@@ -8,7 +8,7 @@
 - Only the store's own page, in the tab itself → can add or remove; a frame or another site gets no answer.
   Test: WebStoreButtonTests.onlyTheStoresOwnPageIsHeard
 - The store in a private window → gets no answer and can't install.
-  No test yet.
+  Test: WebStoreButtonTests.privateWindowsGetNoAnswer
 - A Firefox Add-ons listing → Add to Firefox reads Add to Zigzag; themes and other buttons keep their words.
   Test: AddonsStoreButtonTests.theInstallButtonSaysZigzagAndNothingElseChanges
 - Click Add to Zigzag there → it counts only as a real click on that store's page, for the store's own file.
@@ -26,7 +26,7 @@
 - Check for Updates in Settings › Extensions → checks now and says what happened.
   Test: CRXPackageTests.checkForUpdatesSaysWhatHappened
 - An update that asks for nothing new → replaces the running version; one that asks for more, or changes the search engine, Zigzag's pages or outside messaging → waits for your approval.
-  No test yet.
+  Test: ExtensionSecurityTests.updatesThatTakeOverMoreWait
 - A folder extension whose manifest now asks for more → gets only what you allowed before.
   Test: ExtensionSecurityTests.aFolderThatNowAsksForMoreWaitsForThePerson
 
