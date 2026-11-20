@@ -247,6 +247,7 @@
 		71B932DF6F32CC896DE84AB4 /* PageHolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FC330CEE0425B72CE83C21D /* PageHolder.swift */; };
 		72796F999AA54249F5465613 /* TabStateCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D86346DE78193D507DCECC /* TabStateCacheTests.swift */; };
 		72E2F6BF3464C210D83D8ADB /* ExtensionReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30417C99681AAC2507555F94 /* ExtensionReport.swift */; };
+		73B530B5FD17EC12389439B1 /* SplitCloseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB6549C72B9E9EB8A91FC24 /* SplitCloseTests.swift */; };
 		73BEB8BF61DB6AA3E32A3ACB /* PasswordMenuTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9EC4A25A23CB02B95200F47 /* PasswordMenuTests.swift */; };
 		73E14C8446755316A2074FAE /* PageQuestionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2243A294BB6D05FECB5249CE /* PageQuestionsTests.swift */; };
 		744F96926627557412B2B114 /* PageFullScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B82054C6133E2CC5F2D859E /* PageFullScreen.swift */; };
@@ -515,6 +516,7 @@
 		EE9A7B05AB9BDA9E496233F5 /* PendingQuestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A274EC7489E7F31FF1125EDC /* PendingQuestions.swift */; };
 		EFB6119FA3897F6A6EFD725D /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CEEDAEE1D9BD6E28A0E2EE7 /* NowPlaying.swift */; };
 		F0C56F3B98303CA051F9F8E1 /* ExtensionOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D54E0BE2C311476D13FD8BC6 /* ExtensionOverlayTests.swift */; };
+		F1243541BD1D1B92BCF04426 /* TabNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47942E3D8F04A33C25CEC978 /* TabNavigationTests.swift */; };
 		F126F510FEC04B5F7A87A1F2 /* ExtensionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118460E2A057D11B6C1946F1 /* ExtensionStore.swift */; };
 		F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */; };
 		F1B4DCE6ED5EAEBD6C61BA9D /* TabStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92C68F8087C6786CC457EB4B /* TabStore.swift */; };
@@ -756,6 +758,7 @@
 		47104C74FDC45A440611D21F /* ReaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderTests.swift; sourceTree = "<group>"; };
 		473190C1E7236CBBFB9B7D43 /* safari-bookmarks.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = "safari-bookmarks.html"; sourceTree = "<group>"; };
 		4747A7F3F3BF04066B45CFDA /* ExtensionCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionCompatibility.swift; sourceTree = "<group>"; };
+		47942E3D8F04A33C25CEC978 /* TabNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabNavigationTests.swift; sourceTree = "<group>"; };
 		481827B643635F1AC8578208 /* ChromeUniverseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChromeUniverseTests.swift; sourceTree = "<group>"; };
 		48773DEB7199082B9EDA7805 /* PaneSiteControlsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaneSiteControlsTests.swift; sourceTree = "<group>"; };
 		4A3DD8FA3DF8FD4B034CA024 /* TopBarTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopBarTests.swift; sourceTree = "<group>"; };
@@ -972,6 +975,7 @@
 		AAAD2D187E4B75F090D74271 /* PictureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureService.swift; sourceTree = "<group>"; };
 		AB2B3B3C45A3F10C98E861B1 /* PageShortcutsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageShortcutsTests.swift; sourceTree = "<group>"; };
 		AB8EE08C53EADEDF40AA9E51 /* ExtensionHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionHost.swift; sourceTree = "<group>"; };
+		ACB6549C72B9E9EB8A91FC24 /* SplitCloseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplitCloseTests.swift; sourceTree = "<group>"; };
 		ADF6A2A22DF8C77C3C203284 /* OwnScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OwnScripts.swift; sourceTree = "<group>"; };
 		AEBF6D0A14B73E1B6D7748A8 /* ExtensionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionBridge.swift; sourceTree = "<group>"; };
 		AF8F49BF1E3DA70E50A2BABD /* MCPWaitAndKeysTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPWaitAndKeysTests.swift; sourceTree = "<group>"; };
@@ -1888,6 +1892,7 @@
 				16AEB2E8A02B7015054DCA5D /* SpaceProfileTests.swift */,
 				87D85B5B031BEAE510CBFC57 /* SpaceSwitcherTests.swift */,
 				CB18D6F14CA9471B875C9E62 /* SpaceSwitchLookTests.swift */,
+				ACB6549C72B9E9EB8A91FC24 /* SplitCloseTests.swift */,
 				B13E82E7DA1A290559EC8C20 /* SplitDropTests.swift */,
 				FAB383D1A0A96BBBED89873A /* SplitRowAlignmentTests.swift */,
 				298850B8A3EE1B52397F62B3 /* StrongPasswordTests.swift */,
@@ -1895,6 +1900,7 @@
 				E18895E549507CE748D20047 /* TabDropIndexTests.swift */,
 				E17F78D0B738DB960F8BD8EF /* TabGroupsTests.swift */,
 				C07FFC0A0F58B379C40EE66C /* TabMuteTests.swift */,
+				47942E3D8F04A33C25CEC978 /* TabNavigationTests.swift */,
 				18A3CEE886C0270C9A5BE70C /* TabSleepTests.swift */,
 				88D86346DE78193D507DCECC /* TabStateCacheTests.swift */,
 				05942C5562AD233537EF434C /* TabSwitcherGridTests.swift */,
@@ -2749,6 +2755,7 @@
 				AE818F69AF3976205EEFA7F0 /* SpaceProfileTests.swift in Sources */,
 				07877547254A5BC579C3D397 /* SpaceSwitchLookTests.swift in Sources */,
 				1AB813A270FF9CA633D5E2F7 /* SpaceSwitcherTests.swift in Sources */,
+				73B530B5FD17EC12389439B1 /* SplitCloseTests.swift in Sources */,
 				40D4C0EB780B16A242E6E1E6 /* SplitDropTests.swift in Sources */,
 				8FE22A2F18661ACD22105921 /* SplitRowAlignmentTests.swift in Sources */,
 				0671150B02144B3F6A0545B2 /* StrongPasswordTests.swift in Sources */,
@@ -2756,6 +2763,7 @@
 				686B2764EE4C4C1D72AF1B54 /* TabDropIndexTests.swift in Sources */,
 				F8BAD69B0AEF4F2C36990D07 /* TabGroupsTests.swift in Sources */,
 				28E294D56D1D8EBE737612AF /* TabMuteTests.swift in Sources */,
+				F1243541BD1D1B92BCF04426 /* TabNavigationTests.swift in Sources */,
 				AF0091F08138B34E47C07295 /* TabSleepTests.swift in Sources */,
 				72796F999AA54249F5465613 /* TabStateCacheTests.swift in Sources */,
 				50336EB3892BC2231180CB68 /* TabSwitcherGridTests.swift in Sources */,

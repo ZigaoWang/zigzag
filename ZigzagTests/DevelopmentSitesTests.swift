@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -225,5 +226,38 @@ struct DevelopmentSitesTests {
             #expect(changes == 2)
             token.cancel()
         }
+    }
+
+    /// The bar above a page in Developer Mode stays as an earlier Zigzag left it, from the keys it wrote (#405).
+    @Test func choicesFromAnEarlierVersionStay() {
+        withDefaults {
+            // Never changed: on, with the bar, on localhost.
+            #expect(DeveloperTools.showsInBar)
+            #expect(DeveloperBarTools.shows(isDevelopment: DeveloperTools.applies(to: url("http://localhost:5173/")), showsInBar: DeveloperTools.showsInBar, inSplit: false))
+            DeveloperTools.defaults.set(false, forKey: "DeveloperToolsInBar")
+            #expect(!DeveloperTools.showsInBar)
+            DeveloperTools.defaults.set(true, forKey: "DeveloperToolsInBar")
+            #expect(DeveloperTools.showsInBar)
+            DeveloperTools.defaults.set(["dev.example.com"], forKey: "DevelopmentSites")
+            #expect(DeveloperTools.applies(to: url("https://app.dev.example.com/")))
+            #expect(!DeveloperTools.applies(to: url("http://localhost:3000/")))
+            DeveloperTools.defaults.set(false, forKey: "DeveloperTools")
+            #expect(!DeveloperTools.isOn)
+            #expect(!DeveloperTools.applies(to: url("https://dev.example.com/")))
+        }
+    }
+
+    /// View › Developer shows or hides the bar, as Settings › Developer › Tools above the page does.
+    @Test func theViewMenuTogglesTheBar() throws {
+        func find(_ menu: NSMenu) -> NSMenuItem? {
+            for item in menu.items {
+                if item.action == #selector(BrowserWindowController.toggleDeveloperBar(_:)) { return item }
+                if let found = item.submenu.flatMap(find) { return found }
+            }
+            return nil
+        }
+        let item = try #require(find(MainMenu.build()))
+        #expect(item.title == "Hide Tools Above the Page")
+        #expect(BrowserWindowController.developerBarTitle(shown: false) == "Show Tools Above the Page")
     }
 }
