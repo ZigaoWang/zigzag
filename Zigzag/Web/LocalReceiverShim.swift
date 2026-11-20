@@ -744,7 +744,7 @@ final class LocalReceiverSocket: NSObject, URLSessionWebSocketDelegate {
 
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         MainActor.assumeIsolated {
-            guard let error else { return }
+            guard error != nil else { return }
             if opened {
                 finish(code: 1006, reason: "", clean: false)
             } else {

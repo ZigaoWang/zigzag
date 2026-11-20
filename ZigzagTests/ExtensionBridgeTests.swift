@@ -1057,7 +1057,6 @@ extension ExtensionBridgeTests {
                      "wss://name:synthetic@push.example/", "https://push.example/socket", "ws://128.0.0.1/",
                      "ws://localhost.evil.test/", "ws://127.0.0.1.evil.test/", "ws://user:pw@localhost/", "http://localhost/"] {
             #expect(!WebSocketBridge.allows(URL(string: text)!, context: context), "\(text) is refused")
-            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context), "\(text) is refused")
         }
     }
 }
