@@ -2711,20 +2711,14 @@ extension BrowserWindowController: SidebarDelegate {
         }), duration: Toast.undoDuration, in: self)
     }
 
-    /// Turns a tab into a saved page, undoably: every save in the sidebar, a drag to Pinned included, comes through
-    /// `save`, so it lands as ⌘D does (#326). Half of a split saves the pair, and a grouped tab saves its group.
+    /// Bookmarks a tab, undoably. A grouped tab pins its group unless `keepingGroup` is false.
     func bookmarkWithUndo(_ tab: Tab, at index: Int?, in spaceID: UUID, keepingGroup: Bool = true) {
-        guard !keepingGroup || !tabManager.pinsGroup(tab) else {
-            // The whole group, as one pinned folder.
-            pageChange(Self.pinGroupUndoName) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: true) }
-            Tutorial.complete("pin")
-            return
-        }
-        guard let page = SavePath.Page(tab: tab) else { return }
-        save(page, to: SavePath.Place(spaceID: spaceID, index: index))
+        Tutorial.complete("pin")
+        let name = keepingGroup && tabManager.pinsGroup(tab) ? Self.pinGroupUndoName : String(localized: "Pin Tab", comment: "Undo action name, shown in the Edit menu as Undo Pin Tab.")
+        pageChange(name) { [tabManager] in tabManager.bookmarkTab(tab, at: index, in: spaceID, keepingGroup: keepingGroup) }
     }
 
-    private static var pinGroupUndoName: String { String(localized: "Save Group", comment: "Undo action name, shown in the Edit menu as Undo Save Group. A group of tabs saved as one pinned folder.") }
+    private static var pinGroupUndoName: String { String(localized: "Pin Group", comment: "Undo action name, shown in the Edit menu as Undo Pin Group.") }
 
     /// A tab group's row dropped among the pinned pages (#325): the whole group pins there as one folder, undoably.
     /// `folder`: the folder the gap is in, if any.
