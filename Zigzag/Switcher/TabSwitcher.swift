@@ -454,6 +454,14 @@ final class TabSwitcher {
     private var shown = false
     private var showWork: DispatchWorkItem?
 
+    /// Settings › Tabs › ⌃Tab switches to: recent tabs (Arc's default, this switcher) or the next row in the sidebar.
+    enum Order: String, CaseIterable { case recent, sidebar }
+    static let orderKey = "ControlTabOrder"
+    static var order: Order {
+        get { UserDefaults.standard.string(forKey: orderKey).flatMap(Order.init(rawValue:)) ?? .recent }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: orderKey) }
+    }
+
     init(controller: BrowserWindowController) {
         self.controller = controller
         // The cards' corners plus the step between them and the panel's edge.
@@ -498,6 +506,10 @@ final class TabSwitcher {
                 return true
             }
             let backwards = event.modifierFlags.contains(.shift)
+            if !isActive, Self.order == .sidebar {
+                controller?.selectAdjacentRow(by: backwards ? -1 : 1)
+                return true
+            }
             if !isActive { begin(backwards: backwards) } else { step(backwards ? -1 : 1) }
             return true
         case .flagsChanged:

@@ -1448,12 +1448,13 @@ final class TabManager {
             returnPane(of: tab, to: opener)
         }
         let pair = split(for: tab)
+        let heir = pair.flatMap { rowHeir(closing: tab, in: $0) }
         // Closing one half of a split shows the other half; one page of a tile group of more, the rest, closed up
         // around its place, and you're in the page that took its room.
         let partnerTab = leaveGroup(tab, notify: false)
         if selectedTab === tab, let partnerTab {
             if #available(macOS 15.4, *) { ExtensionCenter.tabClosed(tab) }
-            closeKeepingSelection(tab, split: pair)
+            closeKeepingSelection(tab, split: pair, heir: heir)
             select(partnerTab)
             return
         }
@@ -1479,6 +1480,7 @@ final class TabManager {
         liftChildren(of: tab)
         list.remove(at: index)
         tabsBySpace[tab.spaceID] = list
+        if let heir { move(heir, toListIndex: index, in: tab.spaceID) }
         recentTabIDs.removeAll { $0 == tab.id }
         store.unwatch(tab.id)
         tab.close()
@@ -1486,8 +1488,29 @@ final class TabManager {
         if wasSelected { selectAfterClosing(tab, index: index) }
     }
 
+    /// The page that takes a split's row when the page the row is at closes alone (#404): nil when it stays put.
+    private func rowHeir(closing tab: Tab, in pair: SplitPair) -> Tab? {
+        guard tab.bookmarkID == nil, let list = tabsBySpace[tab.spaceID],
+              !pair.ids.contains(where: { id in bookmarkTabs.values.contains { $0.id == id } }) else { return nil }
+        let listed = pair.ids.filter { id in list.contains { $0.id == id } }
+        guard listed.first == tab.id, listed.count > 1, !closingTogether.contains(listed[1]),
+              let heir = list.first(where: { $0.id == listed[1] }), heir.groupID == tab.groupID, heir.parentID == tab.parentID else { return nil }
+        return heir
+    }
+
+    /// Puts a tab at a place in its space's list, as counted without it.
+    private func move(_ tab: Tab, toListIndex index: Int, in spaceID: UUID) {
+        guard var list = tabsBySpace[spaceID], let from = list.firstIndex(where: { $0 === tab }) else { return }
+        list.remove(at: from)
+        list.insert(tab, at: min(index, list.count))
+        tabsBySpace[spaceID] = list
+    }
+
+    /// Tabs closing in one `close(_:)` of several: none moves to take another's place.
+    private var closingTogether: Set<UUID> = []
+
     /// Removes a tab without choosing a new selection (the caller does).
-    private func closeKeepingSelection(_ tab: Tab, split pair: SplitPair? = nil) {
+    private func closeKeepingSelection(_ tab: Tab, split pair: SplitPair? = nil, heir: Tab? = nil) {
         if let bookmarkID = tab.bookmarkID {
             bookmarkTabs[bookmarkID] = nil
         } else if var list = tabsBySpace[tab.spaceID], let index = list.firstIndex(where: { $0 === tab }) {
@@ -1495,6 +1518,7 @@ final class TabManager {
             liftChildren(of: tab)
             list.remove(at: index)
             tabsBySpace[tab.spaceID] = list
+            if let heir { move(heir, toListIndex: index, in: tab.spaceID) }
         }
         recentTabIDs.removeAll { $0 == tab.id }
         store.unwatch(tab.id)
@@ -1514,6 +1538,8 @@ final class TabManager {
         let order = tabs.filter { $0 !== selected } + (closingSelected ? [selected].compactMap { $0 } : [])
         let ids = order.filter { $0.bookmarkID == nil }.map(\.id)
         closedLimit = max(closedLimit, ids.count + 50)
+        closingTogether = Set(order.map(\.id))
+        defer { closingTogether = [] }
         together { order.forEach { close($0) } }
         return ids
     }

@@ -480,6 +480,53 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var extraCount: Int { pinnedExtras.isEmpty ? extraPartners.count : pinnedExtras.count }
     /// How many parts the row is split into: one, two halves, or a tile group's three or four.
     private var segmentCount: Int { isSplit ? 2 + extraCount : 1 }
+
+    /// A row of several tabs whose × closes one page (#404): the part pointed at, else the one you're in.
+    var closesPart = false { didSet { if oldValue != closesPart { refreshAccessories(); needsLayout = true } } }
+    /// The part under the pointer, in `half(at:)`'s numbering; nil while it's elsewhere.
+    private var pointedPart: Int? { didSet { if oldValue != pointedPart { refreshAccessories(); needsLayout = true } } }
+    /// The part the × is on, in `half(at:)`'s numbering.
+    var closePart: Int {
+        guard closesPart, isSplit else { return 0 }
+        if let pointedPart, pointedPart < segmentCount { return pointedPart }
+        if isSelected { return min(focusedHalf, segmentCount - 1) }
+        return extraCount == 0 && partnerLeads ? 0 : segmentCount - 1
+    }
+    /// The page the × closes: one part's with `closesPart`, else the row's own.
+    var closingPage: Tab? {
+        let pages = [tab, partner] + extraPages
+        return closesPart && pages.indices.contains(closePart) ? pages[closePart] ?? tab : tab
+    }
+    private var moveTracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let moveTracking { removeTrackingArea(moveTracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .activeInActiveApp, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        moveTracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        trackPointer(event)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        trackPointer(event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        pointedPart = nil
+    }
+
+    private func trackPointer(_ event: NSEvent) {
+        guard closesPart, isSplit else { pointedPart = nil; return }
+        let point = convert(event.locationInWindow, from: nil)
+        pointedPart = bounds.contains(point) ? half(at: point) : nil
+    }
     /// While another tab is dragged over this row's right half: where it would open.
     private let dropHalf = ColorView()
     /// 0 = would open on the left, 1 = on the right, nil = not a drop target.
@@ -816,9 +863,11 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // A pinned tab you're on stays clean, as Arc's does: its button (unload, or back to its page) comes with the
         // pointer. A plain tab you're on keeps its close button in view.
         let showClose = (isHovered || (isSelected && !isBookmark)) && !isLifted && (!isBookmark || !isUnloaded) && renameField == nil && number == nil
+        if closesPart, closeButton.isHidden == showClose { needsLayout = true }
         closeButton.isHidden = !showClose
+        let closesPinned = isBookmark && (!closesPart || closingPage?.bookmarkID != nil)
         closeButton.toolTip = isAway ? String(localized: "Back to Pinned Page", comment: "Tooltip of a button on a tab's row in the sidebar. The pinned tab wandered off; this goes back to its page.")
-            : isBookmark ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
+            : closesPinned ? String(localized: "Unload Page", comment: "Tooltip of a button on a tab's row in the sidebar. Unloads a pinned tab's page; the pin stays.") : String(localized: "Close Tab", comment: "Tooltip of a button on a tab's row in the sidebar.")
         audioButton.isHidden = !showsAudio || renameField != nil
         refreshDeveloperMode()
         refreshAttention()
@@ -964,9 +1013,13 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         if !isSplit { title.fadeTail(endingAt: covered ? closeButton.frame.minX - Self.buttonGap - title.frame.minX : nil) }
         if isAway { pinLabel.fadeTail() }
         // In a split, the last part's title fades before the close button (or ⌘ number).
-        let blocker: NSView? = !isSplit || !overlaysPartEnd ? nil : !closeButton.isHidden ? closeButton : showsNumber ? numberHint : nil
+        let closeOnPart = closesPart && isSplit && !closeButton.isHidden && partTitles.indices.contains(closePart) ? partTitles[closePart] : nil
+        let closeAtEnd = closeOnPart == nil || closeOnPart === lastPartTitle
+        let blocker: NSView? = !isSplit || !overlaysPartEnd ? nil : !closeButton.isHidden && closeAtEnd ? closeButton : showsNumber ? numberHint : nil
         for label in [partnerTitle] + (extraViews ?? []).map(\.title) + (isSplit ? [title] : []) {
-            if label === lastPartTitle, let blocker, label.frame.maxX > blocker.frame.minX {
+            if label === closeOnPart, !closeAtEnd, label.frame.maxX > closeButton.frame.minX {
+                label.fadeTail(endingAt: closeButton.frame.minX - Self.buttonGap - label.frame.minX)
+            } else if label === lastPartTitle, let blocker, label.frame.maxX > blocker.frame.minX {
                 label.fadeTail(endingAt: blocker.frame.minX - Self.buttonGap - label.frame.minX)
             } else {
                 label.fadeTail()
@@ -1028,6 +1081,8 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         lastPartTitle = pieces.last?.title
         let parts = Self.splitParts(count: count, end: contentEnd)
         partEdges = parts.dropFirst().map(\.start)
+        // The part whose page the × closes, left to right; the last keeps the × at the row's end.
+        let closeSpatial = closesPart ? (extraCount == 0 && partnerLeads ? 1 - closePart : closePart) : count - 1
         let iconY = icon.frame.minY
         let titleY = title.frame.minY, titleH = title.frame.height
         let renaming = renameField == nil ? nil : partTitles.indices.contains(renamingPart) ? partTitles[renamingPart] : nil
@@ -1041,7 +1096,9 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 let textEnd = !last ? part.end - Self.inset + Label.inset : keepsRoom ? contentEnd : bounds.width - Self.inset + Label.inset
                 let x = icon.frame.maxX + Self.titleOffset
                 title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd - x), height: titleH)
-                if !audio.isHidden { placeSpeaker(audio, after: title, end: last ? contentEnd : part.end - Self.buttonEdge) }
+                // Clear of the × that comes on this part, so it never moves under the pointer.
+                let speakerEnd = last ? contentEnd : closesPart ? part.end - edge - size.width - Self.buttonGap : part.end - Self.buttonEdge
+                if !audio.isHidden { placeSpeaker(audio, after: title, end: speakerEnd) }
             } else {
                 // Icons centered in their parts, like a segmented control, with the speaker after while playing.
                 let room = audio.isHidden ? side : side + Self.buttonGap + size.width
@@ -1050,6 +1107,12 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
                 title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
             }
             title.isHidden = !titles || title === renaming
+            icon.alphaValue = 1
+            if i == closeSpatial, !last {
+                // With titles, at the part's end over its faded title; icons only, in the icon's place.
+                closeButton.frame.origin.x = titles ? part.end - edge - size.width : round(icon.frame.midX - size.width / 2)
+                if !titles, !closeButton.isHidden { icon.alphaValue = 0 }
+            }
             // Hairline between this part and the previous, inset from the row's ends.
             if i > 0, lines.indices.contains(i - 1) {
                 let line = NSRect(x: part.start - Tokens.Metric.hairline / 2, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
