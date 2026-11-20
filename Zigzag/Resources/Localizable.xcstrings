@@ -119,6 +119,34 @@
         }
       }
     },
+    "%@ and all its subdomains." : {
+      "comment" : "Preview of a domain rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 及其所有子域名。"
+          }
+        }
+      }
+    },
+    "%@ and pages below it, such as %@/repo." : {
+      "comment" : "Preview of a path rule.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ and pages below it, such as %2$@/repo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 及其下的网页，例如 %2$@/repo。"
+          }
+        }
+      }
+    },
     "%@ are handed to %@" : {
       "comment" : "A download rule in a sentence: what it catches, then the script it is given to. The placeholders are the two parts.",
       "localizations" : {
@@ -817,6 +845,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@，%2$@"
+          }
+        }
+      }
+    },
+    "%@, Off" : {
+      "comment" : "Beside a space rule that's turned off: its scope, like “and subdomains”, then that it's off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，已关闭"
           }
         }
       }
@@ -2048,17 +2087,6 @@
         }
       }
     },
-    "A site opens in its space wherever its link comes from: another app, the command bar or another space. It covers the site’s subdomains. When a space is removed, its sites open in any space again." : {
-      "comment" : "Under Sites in Spaces in Settings › Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "网站会在它的空间中打开，无论链接来自其他 App、命令栏还是其他空间，也包括它的子域名。空间被移除后，它的网站会重新在任意空间中打开。"
-          }
-        }
-      }
-    },
     "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it." : {
       "comment" : "Explanation under “New Zigzag Mini” in Settings › Zigzag Mini: what Zigzag Mini is.",
       "localizations" : {
@@ -2208,6 +2236,17 @@
         }
       }
     },
+    "Add Space Rule" : {
+      "comment" : "Title of the sheet that creates a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加空间规则"
+          }
+        }
+      }
+    },
     "AI apps can’t use Zigzag now. Turn them back on in Settings › Automation." : {
       "comment" : "Toast after Stop on the bar over a tab an AI app was using: every AI app is cut off until the setting is turned on again.",
       "localizations" : {
@@ -2215,6 +2254,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI App 现在不能使用 Zigzag 了。可在“设置 › 自动化”中重新打开。"
+          }
+        }
+      }
+    },
+    "About Match Types" : {
+      "comment" : "Button opening space rule help.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于匹配方式"
           }
         }
       }
@@ -2264,7 +2314,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a site an extension may use.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
+      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a site an extension may use.\nButton that adds the site, in the sheet that adds a site whose cookies are kept.\nButton that adds the size, in the sheet that adds a page size.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2385,7 +2435,7 @@
       }
     },
     "Add Rule…" : {
-      "comment" : "Button beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from.",
+      "comment" : "Add a space routing rule in Settings.\nButton beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2407,7 +2457,7 @@
       }
     },
     "Add Site…" : {
-      "comment" : "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use.\nButton beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space.",
+      "comment" : "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use.\nButton beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside “Keep cookies for these sites” in Settings › Privacy: opens the sheet that adds a site whose cookies are kept.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2655,7 +2705,7 @@
       }
     },
     "Address" : {
-      "comment" : "VoiceOver name of the address in a split view page's strip, while it has none.",
+      "comment" : "Label of the address pattern in a download rule's sheet.\nSpace rule address field.\nVoiceOver label of a pop-up window's address while it's selected to copy.\nVoiceOver name of the address in a split view page's strip, while it has none.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2782,17 +2832,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "全部历史记录…"
-          }
-        }
-      }
-    },
-    "All of %@" : {
-      "comment" : "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "整个 %@"
           }
         }
       }
@@ -2974,7 +3013,7 @@
       }
     },
     "Always" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are always drawn dark.\nAddress bar above the page: the bar stays above the page.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2991,17 +3030,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在此网站上始终允许"
-          }
-        }
-      }
-    },
-    "Always Open a Site in a Space" : {
-      "comment" : "Title of the sheet that sends a site to a space, from Settings › Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "始终在一个空间中打开网站"
           }
         }
       }
@@ -3129,6 +3157,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新已准备就绪。在你允许之前，当前版本会继续运行。"
+          }
+        }
+      }
+    },
+    "and pages below it" : {
+      "comment" : "Short scope beside the path of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含下级路径"
+          }
+        }
+      }
+    },
+    "and subdomains" : {
+      "comment" : "Short scope beside the domain of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含子域名"
           }
         }
       }
@@ -3551,6 +3601,17 @@
         }
       }
     },
+    "Autohide" : {
+      "comment" : "Address bar above the page: the bar hides as you scroll down and comes back at the top or on any scroll up.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动隐藏"
+          }
+        }
+      }
+    },
     "Automatic" : {
       "comment" : "A choice for “Favorites per row” in Settings › Appearance: as many as fit the sidebar's width.\nA choice in the Dark page dropdown of the site panel: the site follows Settings › Appearance › Dark pages.",
       "localizations" : {
@@ -3657,17 +3718,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "恢复为 Zigzag 的快捷键"
-          }
-        }
-      }
-    },
-    "Back, forward, reload and the address move from the sidebar to a bar above the page, and stay in view with the sidebar hidden." : {
-      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "后退、前进、重新载入和地址栏从边栏移到页面上方的一栏，隐藏边栏时也一直可见。"
           }
         }
       }
@@ -4145,6 +4195,17 @@
         }
       }
     },
+    "this host only" : {
+      "comment" : "Short scope beside the address of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
     "You’ll be signed out of every site except the %lld sites you keep. Your passwords, pinned tabs and history stay." : {
       "comment" : "Message of the sheet that clears every site's cookies, when some sites keep theirs. The number is how many, always more than one.",
       "localizations" : {
@@ -4174,6 +4235,226 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已隐藏的元素"
+          }
+        }
+      }
+    },
+    "Domain and subdomains" : {
+      "comment" : "Space rule matching a domain and its subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "域名及其子域名"
+          }
+        }
+      }
+    },
+    "Edit Space Rule" : {
+      "comment" : "Existing space rule sheet title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则"
+          }
+        }
+      }
+    },
+    "Edit Space Rule…" : {
+      "comment" : "Edit the winning rule from Site Controls.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则…"
+          }
+        }
+      }
+    },
+    "Enter a host and path, such as github.com/org1." : {
+      "comment" : "Example input for a path rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入域名和路径，例如 github.com/org1。"
+          }
+        }
+      }
+    },
+    "Domain only" : {
+      "comment" : "Space rule matching only the named host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
+    "Matches pages on the exact hostname you enter (for example, github.com)." : {
+      "comment" : "Exact host example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只匹配你填写的这个域名下的网页（例如 github.com）。"
+          }
+        }
+      }
+    },
+    "Matches a path and pages below it on the same host (for example, github.com/org1 and github.com/org1/repo)." : {
+      "comment" : "Path example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配同一域名下的某个路径及其下的网页（例如 github.com/org1 和 github.com/org1/repo）。"
+          }
+        }
+      }
+    },
+    "Matches pages on a domain and its subdomains (for example, github.com and gist.github.com)." : {
+      "comment" : "Domain example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配某个域名及其所有子域名下的网页（例如 github.com 和 gist.github.com）。"
+          }
+        }
+      }
+    },
+    "Move Above %@" : {
+      "comment" : "Moves a space rule above the earlier rule that covers it. The placeholder is that rule's address, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到 %@ 上方"
+          }
+        }
+      }
+    },
+    "Pages on %@ only." : {
+      "comment" : "Preview of an exact host rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只匹配 %@ 上的网页。"
+          }
+        }
+      }
+    },
+    "Path and subpaths" : {
+      "comment" : "Space rule matching a path and its descendants on one host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "路径及其子路径"
+          }
+        }
+      }
+    },
+    "Never used: %@ above covers all of it." : {
+      "comment" : "Below a space rule that an earlier rule covers completely. The placeholder is the earlier rule's address, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会生效：上面的 %@ 已经包含了它。"
+          }
+        }
+      }
+    },
+    "Covers all of %@ below, so that rule is never used." : {
+      "comment" : "Below a space rule that covers a later rule completely. The placeholder is the later rule's address, like github.com/org1.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含了下面的 %@，那条规则不会生效。"
+          }
+        }
+      }
+    },
+    "Covers all of %@ below, so those rules are never used." : {
+      "comment" : "Below a space rule that covers several later rules completely. The placeholder lists their addresses.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含了下面的 %@，那些规则不会生效。"
+          }
+        }
+      }
+    },
+    "Enabled" : {
+      "comment" : "Switch in the space rule editor.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用"
+          }
+        }
+      }
+    },
+    "Rule %lld" : {
+      "comment" : "A rule's position in the ordered list in Settings.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 条规则"
+          }
+        }
+      }
+    },
+    "Enter one hostname, such as github.com, without a path." : {
+      "comment" : "Example input for a domain-only space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入一个域名，例如 github.com，不带路径。"
+          }
+        }
+      }
+    },
+    "Enter the parent hostname, such as github.com, without a wildcard or path." : {
+      "comment" : "Example input for a space rule that includes subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入上级域名，例如 github.com，不带通配符或路径。"
+          }
+        }
+      }
+    },
+    "The http:// or https:// prefix is optional." : {
+      "comment" : "Space rule address tooltip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以不写 http:// 或 https://。"
+          }
+        }
+      }
+    },
+    "The first enabled match chooses the space. Drag to reorder." : {
+      "comment" : "Byline under Sites in Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "链接在第一条匹配且已启用的规则所选的空间中打开。拖动可以调整顺序。"
           }
         }
       }
@@ -4412,7 +4693,7 @@
       }
     },
     "Cancel" : {
-      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nTooltip of a download's button in the downloads panel: stops the download.",
+      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nDiscard edits to a space rule.\nTooltip of a download's button in the downloads panel: stops the download.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6539,7 +6820,7 @@
       }
     },
     "Custom" : {
-      "comment" : "A search engine choice in Settings: one you give an address for.\nTooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own.",
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance: a percentage of Medium that you set.\nA search engine choice in Settings: one you give an address for.\nTooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7615,17 +7896,6 @@
         }
       }
     },
-    "Links to the site and its subdomains open in this space, wherever they come from." : {
-      "comment" : "Under the title of the sheet that sends a site to a space, from Settings › Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "指向此网站及其子域名的链接，无论来自哪里，都会在这个空间中打开。"
-          }
-        }
-      }
-    },
     "List the file extensions this rule catches, like pdf, epub." : {
       "comment" : "Tooltip on the extensions field of a download rule with none yet, so its Add button can't be pressed.",
       "localizations" : {
@@ -7649,7 +7919,7 @@
       }
     },
     "Open in" : {
-      "comment" : "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from.",
+      "comment" : "Destination space for a rule.\nDestination space in Site Controls.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7688,6 +7958,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开位置"
+          }
+        }
+      }
+    },
+    "open in" : {
+      "comment" : "Inline after a domain and its subdomains, or a path and the pages below it: example.com and subdomains open in Work.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开于"
+          }
+        }
+      }
+    },
+    "opens in" : {
+      "comment" : "Inline before the space menu for a single host: example.com (this host only) opens in Work.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开于"
           }
         }
       }
@@ -7747,17 +8039,6 @@
         }
       }
     },
-    "Space for %@" : {
-      "comment" : "VoiceOver name of the space menu on a row in Settings › Spaces › Sites in Spaces: a site, like youtube.com.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 的空间"
-          }
-        }
-      }
-    },
     "Split view: %@" : {
       "comment" : "Accessibility label of a split view's row in the sidebar: its pages' titles, as a list (“Split view: Wikipedia, Example and Google”).",
       "localizations" : {
@@ -7809,17 +8090,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第一条匹配地址的规则生效。规则按列表从上到下运行。"
-          }
-        }
-      }
-    },
-    "To always open a site in a space, choose it under Open in, in the site’s controls." : {
-      "comment" : "Explanation under “None yet” in Settings › Spaces › Sites in Spaces. Open in is the row in the site panel.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要让网站始终在某个空间中打开，请在它的网站设置中的“打开于”里选择空间。"
           }
         }
       }
@@ -8419,7 +8689,7 @@
       }
     },
     "Edit" : {
-      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.",
+      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nEdit a space rule in its Settings row.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11035,6 +11305,17 @@
         }
       }
     },
+    "Larger Sidebar" : {
+      "comment" : "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大边栏"
+          }
+        }
+      }
+    },
     "Larger Text" : {
       "comment" : "VoiceOver label of the button in Reader's text choices that makes the text larger.",
       "localizations" : {
@@ -11344,7 +11625,7 @@
       }
     },
     "Match" : {
-      "comment" : "Label of the choice of how a download rule matches an address, in its sheet.",
+      "comment" : "Label of the choice of how a download rule matches an address, in its sheet.\nSpace rule match type.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11537,7 +11818,7 @@
       }
     },
     "Move Down" : {
-      "comment" : "Menu item that moves a download rule down.",
+      "comment" : "Move a row one place down in Settings.\nTooltip of the button that moves a download rule down the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11735,7 +12016,7 @@
       }
     },
     "Move Up" : {
-      "comment" : "Menu item that moves a download rule up.",
+      "comment" : "Move a row one place up in Settings.\nTooltip of the button that moves a download rule up the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12643,7 +12924,7 @@
       }
     },
     "None yet" : {
-      "comment" : "A row in Settings › Developer, shown when no page size is listed.\nA row in Settings › Developer, shown when no site is in Developer Mode.\nA row under Sites in Spaces in Settings › Spaces, shown when no site always opens in a space.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
+      "comment" : "A row in Settings › Developer, shown when no page size is listed.\nA row in Settings › Developer, shown when no site is in Developer Mode.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -13006,7 +13287,7 @@
       }
     },
     "Off" : {
-      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.",
+      "comment" : "A choice for “Dark pages” in Settings › Appearance: websites are shown as they are.\nAddress bar above the page: the address stays in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15552,7 +15833,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nButton on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again.\nTooltip of a download's button in the downloads panel: takes the download off the list.\nVoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.",
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nRemove a space rule.\nTooltip of a download's button in the downloads panel: takes the download off the list.\nVoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16597,7 +16878,7 @@
       }
     },
     "Save" : {
-      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton of the Edit Style sheet: keeps the CSS for the site.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.",
+      "comment" : "A destination a file of a given type can have: saved into a folder, which starts as the one downloads already go to.\nButton in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton of the Edit Style sheet: keeps the CSS for the site.\nButton of the sheet that changes a download rule.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.\nSave a space rule.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -17933,6 +18214,17 @@
         }
       }
     },
+    "Sidebar size %@, Usual Size" : {
+      "comment" : "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏大小 %@，默认大小"
+          }
+        }
+      }
+    },
     "Sign In" : {
       "comment" : "Button in a site's HTTP sign-in sheet.",
       "localizations" : {
@@ -18175,6 +18467,17 @@
         }
       }
     },
+    "Smaller Sidebar" : {
+      "comment" : "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小边栏"
+          }
+        }
+      }
+    },
     "Smaller Text" : {
       "comment" : "VoiceOver label of the button in Reader's text choices that makes the text smaller.",
       "localizations" : {
@@ -18363,7 +18666,7 @@
       }
     },
     "Space" : {
-      "comment" : "Label of the space menu in the sheet that sends a site to a space, from Settings › Spaces.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "VoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -19124,6 +19427,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "开启后，网站发来第一个文件时会先询问是否允许。允许过的网站会记住答案；关闭后，下载会和以前一样直接保存。"
+          }
+        }
+      }
+    },
+    "Back, forward, reload and the address in a bar above the page instead of in the sidebar. Autohide puts the bar away as you scroll down, and brings it back when you scroll up or point at the window’s top." : {
+      "comment" : "Explanation under “Address bar above the page” in Settings › Appearance.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退、前进、重新载入和地址放在页面上方的栏里，不放在边栏中。选“自动隐藏”时，向下滚动会收起这一栏，向上滚动或把指针移到窗口顶部时会重新出现。"
           }
         }
       }
@@ -20482,7 +20796,7 @@
       }
     },
     "Turn %@ on or off" : {
-      "comment" : "A download rule's switch for VoiceOver. The placeholder is the rule's name.",
+      "comment" : "A download rule's switch for VoiceOver. The placeholder is the rule's name.\nA per-extension destination's switch for VoiceOver. The placeholder is the file extensions it names, like pdf, epub.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20493,7 +20807,7 @@
       }
     },
     "Turn Off" : {
-      "comment" : "Item in an extension's menu: turns the extension off.",
+      "comment" : "Item in an extension's menu: turns the extension off.\nTurn off a space rule from its context menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20570,7 +20884,7 @@
       }
     },
     "Turn On" : {
-      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.",
+      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.\nTurn on a space rule from its context menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -21460,6 +21774,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在使用你的麦克风"
+          }
+        }
+      }
+    },
+    "Usual Size" : {
+      "comment" : "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认大小"
           }
         }
       }
@@ -24503,6 +24828,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选取一张图像用作此网站的图标。"
+          }
+        }
+      }
+    },
+    "Trusted Certificates" : {
+      "comment" : "A heading in Settings › Developer: local servers whose certificate you chose to trust, so Zigzag doesn’t warn again.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "受信任的证书"
+          }
+        }
+      }
+    },
+    "Local servers whose certificate you chose to trust. Zigzag doesn’t warn again while a server shows that certificate. Removing a server brings the warning back." : {
+      "comment" : "Under Trusted Certificates in Settings › Developer.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你选择信任其证书的本地服务器。只要服务器继续使用该证书，Zigzag 就不会再次发出警告。移除某个服务器后会重新显示警告。"
+          }
+        }
+      }
+    },
+    "Add a Local Server" : {
+      "comment" : "Title of the sheet that opens a local server so its certificate can be trusted, from Settings › Developer › Trusted Certificates.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加本地服务器"
+          }
+        }
+      }
+    },
+    "Zigzag opens the server in a new tab. If its certificate isn’t trusted, choose Visit this site anyway on the warning. Only servers on this Mac or your network can be added." : {
+      "comment" : "Under the title of the sheet that opens a local server to trust its certificate.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zigzag 会在新标签页中打开这个服务器。如果它的证书不受信任，请在警告页上选择“仍然访问此网站”。只有这台 Mac 上或你的网络中的服务器才能添加。"
           }
         }
       }

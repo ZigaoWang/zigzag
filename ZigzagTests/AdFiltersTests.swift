@@ -668,7 +668,7 @@ struct AdFiltersTests {
         #expect(AdBlockers.reachesYouTube(access: .sites, approved: ["<all_urls>"], sites: ["youtube.com"], offSites: []))
         #expect(!AdBlockers.reachesYouTube(access: .sites, approved: ["<all_urls>"], sites: ["github.com"], offSites: []))
         #expect(!AdBlockers.reachesYouTube(access: .click, approved: ["<all_urls>"], sites: [], offSites: []))
-        #expect(AdBlockers.reachesYouTube(access: .click, approved: ["<all_urls>"], sites: ["youtube.com"], offSites: []))
+        #expect(!AdBlockers.reachesYouTube(access: .click, approved: ["<all_urls>"], sites: ["youtube.com"], offSites: []))
         // Extensions off on YouTube.
         #expect(!AdBlockers.reachesYouTube(access: .all, approved: ["<all_urls>"], sites: [], offSites: ["youtube.com"]))
     }

@@ -222,14 +222,6 @@ struct PrivateWindowAccessTests {
         #expect(ExtensionStore.read(ExtensionInstalls.State.self, from: file) == nil)
     }
 
-    @Test func aPrivateClickGrantGoesWithTheLastPrivateTabOnItsSite() {
-        guard #available(macOS 15.4, *) else { return }
-        let sites = ["one": ["a.example", "b.example"], "two": ["b.example"]]
-        #expect(ExtensionHost.privateClickSites(sites, stillOpen: ["a.example", "b.example"]) == sites)
-        #expect(ExtensionHost.privateClickSites(sites, stillOpen: ["a.example"]) == ["one": ["a.example"]])
-        #expect(ExtensionHost.privateClickSites(sites, stillOpen: []).isEmpty)
-    }
-
     @Test func anotherProfileAsksAgain() {
         let there = ExtensionInstalls.State(grantedPermissions: ["tabs"], grantedMatchPatterns: ["<all_urls>"], allowsPrivate: true)
         #expect(there.carried(enabled: true).allowsPrivate == nil)

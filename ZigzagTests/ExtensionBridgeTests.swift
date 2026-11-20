@@ -657,7 +657,7 @@ extension ExtensionBridgeTests {
         let optional: Set = [try WKWebExtension.MatchPattern(string: "*://*/*")]
         #expect(ExtensionHost.siteAccessPatterns(nil, approved: [required], optional: optional, sites: []) == [required])
         #expect(Set(ExtensionHost.siteAccessPatterns(.all, approved: [required], optional: optional, sites: [])) == optional.union([required]))
-        #expect(ExtensionHost.siteAccessPatterns(.click, approved: [required], optional: optional, sites: []).isEmpty)
+        #expect(ExtensionHost.siteAccessPatterns(.click, approved: [required], optional: optional, sites: ["bank.example"]).isEmpty)
         #expect(Set(ExtensionHost.siteAccessPatterns(.sites, approved: [], optional: optional, sites: ["raindrop.io"]))
             == Set(ExtensionHost.patterns(for: "raindrop.io")))
     }
@@ -1025,7 +1025,7 @@ struct ExtensionNumberTests {
 }
 
 extension ExtensionBridgeTests {
-    /// Background WebSockets need local, host_permissions, or granted optional hosts; wss://host counts as https://host.
+    /// Background WebSockets need local or granted hosts, never ones only asked for; wss://host counts as https://host.
     @Test func backgroundSocketsNeedHostAccess() async throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -1033,6 +1033,8 @@ extension ExtensionBridgeTests {
         try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["https://named.example/*"],"optional_host_permissions":["https://push.example/*"]}"#.utf8)
             .write(to: folder.appendingPathComponent("manifest.json"))
         let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+        #expect(!WebSocketBridge.allows(URL(string: "wss://named.example/socket")!, context: context))
+        context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://named.example/*"))
         #expect(WebSocketBridge.allows(URL(string: "wss://named.example/socket")!, context: context))
         #expect(!WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
         context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://push.example/*"))
@@ -1084,5 +1086,115 @@ extension ExtensionBridgeTests {
             #expect(!BridgeSidePanel.isEnabled(everywhere: false, forTab: nil))
             #expect(BridgeSidePanel.isEnabled(everywhere: true, forTab: nil))
         }
+    }
+}
+
+/// A tab WebKit can grant on a click, as Zigzag's tabs are, holding one web view.
+@MainActor
+private final class SiteAccessTestTab: NSObject, WKWebExtensionTab {
+    let page: WKWebView
+    init(_ page: WKWebView) { self.page = page }
+    func webView(for context: WKWebExtensionContext) -> WKWebView? { page }
+    func url(for context: WKWebExtensionContext) -> URL? { page.url }
+    func shouldGrantPermissionsOnUserGesture(for context: WKWebExtensionContext) -> Bool { true }
+}
+
+/// Content scripts follow site access as it changes, the extension starting again when it has less, as ExtensionHost
+/// does: When You Click It runs them only once clicked, while the tab stays on that site; On Specific Sites only
+/// there; On All Sites everywhere.
+@MainActor
+struct SiteAccessContentScriptTests {
+    @Test func lessAccessIsNarrowed() {
+        #expect(ExtensionHost.narrowed(from: (["<all_urls>"], []), to: ([], [])))
+        #expect(ExtensionHost.narrowed(from: (["<all_urls>"], []), to: (["<all_urls>"], ["*://bank.example/*"])))
+        #expect(!ExtensionHost.narrowed(from: ([], []), to: (["<all_urls>"], [])))
+        #expect(!ExtensionHost.narrowed(from: (["<all_urls>"], ["*://bank.example/*"]), to: (["<all_urls>"], [])))
+    }
+
+    @Test func contentScriptsFollowSiteAccess() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0","content_scripts":[{"matches":["<all_urls>"],"js":["cs.js"],"run_at":"document_start"}]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("document.documentElement.dataset.cs = 'ran';".utf8).write(to: folder.appendingPathComponent("cs.js"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        let controller = WKWebExtensionController(configuration: .nonPersistent())
+        var context = WKWebExtensionContext(for: ext)
+        let approved = Array(ext.allRequestedMatchPatterns)
+        func apply(_ access: ExtensionInstalls.SiteAccess?, sites: [String] = []) throws {
+            let before = ExtensionHost.access(of: context)
+            ExtensionHost.applySiteAccess(access, approved: approved, sites: sites, offSites: [], approvesActiveTab: false, to: context)
+            guard context.isLoaded, ExtensionHost.narrowed(from: before, to: ExtensionHost.access(of: context)) else { return }
+            try controller.unload(context)
+            context = WKWebExtensionContext(for: ext)
+            ExtensionHost.applySiteAccess(access, approved: approved, sites: sites, offSites: [], approvesActiveTab: false, to: context)
+            try controller.load(context)
+        }
+        try apply(nil)
+        try controller.load(context)
+        defer { try? controller.unload(context) }
+        // Each page with its own configuration, as Zigzag's tabs have.
+        func open(_ address: String, in page: WKWebView? = nil) async throws -> WKWebView {
+            let configuration = WKWebViewConfiguration()
+            configuration.userContentController = WKUserContentController()
+            configuration.webExtensionController = controller
+            let page = page ?? WKWebView(frame: .zero, configuration: configuration)
+            page.loadHTMLString("<!doctype html><title>\(address)</title>", baseURL: URL(string: address)!)
+            for _ in 0..<50 where page.isLoading || page.title != address { try await Task.sleep(for: .milliseconds(50)) }
+            return page
+        }
+        func ran(_ page: WKWebView) async throws -> Bool {
+            try await page.evaluateJavaScript("document.documentElement.dataset.cs === 'ran'") as? Bool ?? false
+        }
+        let local = "http://localhost:8123/", other = "http://127.0.0.1:8123/"
+
+        #expect(try await ran(open(local)))
+        #expect(try await ran(open(other)))
+        try apply(.click)
+        #expect(try await !ran(open(local)))
+        #expect(try await !ran(open(other)))
+        #expect(!context.hasAccess(to: URL(string: local)!))
+        try apply(.sites, sites: ["localhost"])
+        #expect(try await ran(open(local)))
+        #expect(try await !ran(open(other)))
+        try apply(.all)
+        #expect(try await ran(open(local)))
+        #expect(try await ran(open(other)))
+
+        try apply(.click)
+        let clicked = try await open(local)
+        #expect(try await !ran(clicked))
+        let tab = SiteAccessTestTab(clicked)
+        controller.didOpenTab(tab)
+        context.userGesturePerformed(in: tab)
+        #expect(try await ran(clicked))
+        #expect(context.hasAccess(to: URL(string: local)!, in: tab))
+        #expect(!context.hasAccess(to: URL(string: local)!))
+        // Another tab on the same site isn't given it, and the clicked one loses it once it leaves the site.
+        // (macOS 27's WebKit still runs the clicked tab's content scripts in other tabs on that site meanwhile.)
+        let second = SiteAccessTestTab(try await open(local))
+        controller.didOpenTab(second)
+        #expect(!context.hasAccess(to: URL(string: local)!, in: second))
+        controller.didCloseTab(second, windowIsClosing: false)
+        #expect(try await !ran(open(other, in: clicked)))
+        #expect(!context.hasAccess(to: URL(string: other)!, in: tab))
+        #expect(try await !ran(open(local, in: clicked)))
+        #expect(!context.hasAccess(to: URL(string: local)!, in: tab))
+        controller.didCloseTab(tab, windowIsClosing: false)
+    }
+
+    /// Under When You Click It, an extension that never asked for activeTab is given only a site it asked for.
+    @Test func aClickGivesOnlyASiteItAskedFor() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0","host_permissions":["https://github.com/*"],"optional_host_permissions":["https://later.example/*"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        #expect(ExtensionHost.asksFor(URL(string: "https://github.com/x"), in: ext))
+        #expect(ExtensionHost.asksFor(URL(string: "https://later.example/"), in: ext))
+        #expect(!ExtensionHost.asksFor(URL(string: "https://bank.example/"), in: ext))
+        #expect(!ExtensionHost.asksFor(nil, in: ext))
     }
 }

@@ -297,7 +297,8 @@ final class Tab: NSObject {
     func debugVisitAnyway() {
         guard let webView, let host = certificateWarningHost, certificateWarningNonce != nil, let url = webView.url,
               url.host()?.lowercased() == host,
-              CertificateExceptions.allow(host, certificate: certificateWarningCertificate, in: webView.configuration.websiteDataStore) else { return }
+              CertificateExceptions.allow(host, port: url.port ?? 443, certificate: certificateWarningCertificate,
+                                          in: webView.configuration.websiteDataStore) else { return }
         certificateWarningHost = nil
         certificateWarningNonce = nil
         load(url)
@@ -1652,7 +1653,8 @@ extension Tab: WKNavigationDelegate {
                                                     pageHost: webView.url?.host()?.lowercased(), warnedHost: certificateWarningHost)
             if fromWarning, let nonce = certificateWarningNonce,
                let real = CertificateExceptions.destination(of: url, warnedHost: certificateWarningHost, nonce: nonce), let host = real.host() {
-                CertificateExceptions.allow(host, certificate: certificateWarningCertificate, in: webView.configuration.websiteDataStore)
+                CertificateExceptions.allow(host, port: real.port ?? 443, certificate: certificateWarningCertificate,
+                                            in: webView.configuration.websiteDataStore)
                 certificateWarningHost = nil
                 certificateWarningNonce = nil
                 DispatchQueue.main.async { [weak self] in self?.load(real) }

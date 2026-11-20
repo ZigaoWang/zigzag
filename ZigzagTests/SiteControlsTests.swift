@@ -465,6 +465,34 @@ struct ZoomStepperTests {
         #expect(changes == [1.75, 1.5, 1])
         #expect(stepper.zoom == 1)
     }
+
+    /// The stepper takes the steps of what it sets (#361): the sidebar size's 5% steps from 75% to 150%, its
+    /// percentage back to 100%, and the room its widest step needs.
+    @Test func takesTheStepsOfWhatItSets() {
+        let stepper = ZoomStepper()
+        stepper.steps = Tokens.Sidebar.customSteps
+        stepper.reset = { 1 }
+        var changes: [CGFloat] = []
+        stepper.onChange = { changes.append($0) }
+
+        stepper.zoom = 1
+        stepper.debugPress("in")
+        #expect(stepper.zoom == 1.05)
+        stepper.zoom = 0.75
+        stepper.debugPress("out")
+        #expect(stepper.zoom == 0.75)
+        stepper.zoom = 1.5
+        stepper.debugPress("in")
+        #expect(stepper.zoom == 1.5)
+        stepper.debugPress("reset")
+        #expect(stepper.zoom == 1)
+        #expect(changes == [1.05, 1])
+
+        #expect(ZoomLevels.step(1, by: 1, in: Tokens.Sidebar.customSteps) == 1.05)
+        #expect(!ZoomLevels.canStep(1.5, by: 1, in: Tokens.Sidebar.customSteps))
+        // A page's stepper keeps its 300% room; this one needs only 150%.
+        #expect(stepper.intrinsicContentSize.width < ZoomStepper().intrinsicContentSize.width)
+    }
 }
 
 /// A test root (EC P-256) and a site certificate it issued (RSA 2048) for test.zigzag.example, valid 1 Jan 2026 to
