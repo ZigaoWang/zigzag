@@ -184,16 +184,16 @@ struct SystemPasswordsTests {
         var asked = false
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 40, y: 60, width: 280, height: 32), in: overlay, restoringFocusTo: stand, ask: { field in
-            asked = field === picker.passwordField
+            asked = field === picker.passwordView
             return true
         }) { outcome = $0 }
         #expect(asked)
         #expect(picker.isPresented)
         #expect(picker.anchor.superview === overlay)
         #expect(picker.anchor.frame == NSRect(x: 40, y: 60, width: 280, height: 32))
-        #expect(picker.passwordField.contentType == .password && picker.usernameField.contentType == .username)
+        #expect(picker.passwordView.contentType == .password && picker.usernameField.contentType == .username)
         // Focused, so AutoFill has a field, but never in the way of a click on the page.
-        #expect(picker.passwordField.currentEditor() != nil)
+        #expect(window.firstResponder === picker.passwordView)
         #expect(picker.anchor.hitTest(NSPoint(x: 50, y: 70)) == nil)
         picker.cancel()
         guard case .cancelled(.replaced) = outcome else { Issue.record("expected a cancel, got \(String(describing: outcome))"); return }
@@ -208,7 +208,7 @@ struct SystemPasswordsTests {
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
         picker.usernameField.stringValue = "sam@example.com"
-        picker.passwordField.stringValue = "fake-pass"
+        picker.passwordView.string = "fake-pass"
         picker.fieldsDidChange()
         #expect(outcome == nil)  // read once both fields have had their turn
         try await wait(0.5)
@@ -216,7 +216,7 @@ struct SystemPasswordsTests {
         #expect(username.withUnsafeString { $0 } == "sam@example.com")
         #expect(password.withUnsafeString { $0 } == "fake-pass")
         // Nothing left behind in the native fields, and they're gone.
-        #expect(picker.usernameField.stringValue.isEmpty && picker.passwordField.stringValue.isEmpty)
+        #expect(picker.usernameField.stringValue.isEmpty && picker.passwordView.string.isEmpty)
         #expect(picker.anchor.superview == nil)
         #expect(window.firstResponder === stand)
         // Printing it never shows it.
@@ -228,7 +228,7 @@ struct SystemPasswordsTests {
         let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
-        picker.passwordField.stringValue = "fake-pass"
+        picker.passwordView.string = "fake-pass"
         picker.fieldsDidChange()
         try await wait(0.5)
         guard case .filled(let username, let password) = outcome else { Issue.record("expected a fill"); return }
@@ -285,8 +285,7 @@ struct SystemPasswordsTests {
             let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
             var outcome: SystemPasswordPicker.Outcome?
             picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
-            let editor = try #require(picker.passwordField.currentEditor() as? NSTextView)
-            #expect(picker.control(picker.passwordField, textView: editor, doCommandBy: command))
+            #expect(picker.textView(picker.passwordView, doCommandBy: command))
             guard case .cancelled(.dismissed) = outcome else { Issue.record("expected dismissed for \(command)"); continue }
             #expect(picker.anchor.superview == nil)
             #expect(window.firstResponder === stand)
@@ -316,11 +315,11 @@ struct SystemPasswordsTests {
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { field in
             asked += 1
-            focusedWhenAsked = field.currentEditor() != nil
+            focusedWhenAsked = field.window?.firstResponder === field
             return true
         }) { outcome = $0 }
         #expect(asked == 0)
-        #expect(picker.passwordField.currentEditor() != nil)
+        #expect(window.firstResponder === picker.passwordView)
         try await wait(0.4)
         #expect(asked == 1)
         #expect(focusedWhenAsked)
@@ -371,12 +370,11 @@ struct SystemPasswordsTests {
         #expect(dismissed == 2)
         // Escape.
         tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
-        let editor = try #require(tracked.passwordField.currentEditor() as? NSTextView)
-        #expect(tracked.control(tracked.passwordField, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:))))
+        #expect(tracked.textView(tracked.passwordView, doCommandBy: #selector(NSResponder.cancelOperation(_:))))
         #expect(dismissed == 4)
         // A login picked.
         tracked.present(over: rect, in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
-        tracked.passwordField.stringValue = "fake-pass"
+        tracked.passwordView.string = "fake-pass"
         tracked.fieldsDidChange()
         try await wait(0.4)
         guard case .filled = outcome else { Issue.record("expected a fill, got \(String(describing: outcome))"); return }
@@ -405,27 +403,68 @@ struct SystemPasswordsTests {
         #expect(inWindowOnDismiss)
     }
 
-    @Test func thePasswordFieldIsMarkedOnlyAsTheListIsAskedFor() async throws {
-        // Focused while marked, AppKit put its own Passwords… suggestion under it before the list opened (#378).
+    @Test func thePasswordIsAViewOfItsOwnThatTakesTheFocus() async throws {
+        // A secure field's focus is its field editor, which AppKit's AutoFill doesn't count among the window's
+        // fields: working the pair out again when the window became key, it lost the username (#378). A text field
+        // focused while marked also got AppKit's own Passwords… suggestion under it; a text view never does.
         let (window, overlay, stand) = host()
         let picker = SystemPasswordPicker(openCheck: nil, settle: 0.2, dismissSystem: {})
-        var markedWhenAsked: NSTextContentType?
-        var asked = 0
+        var askedFor: NSView?
         var outcome: SystemPasswordPicker.Outcome?
         picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { field in
-            asked += 1
-            markedWhenAsked = field.contentType
+            askedFor = field
             return true
         }) { outcome = $0 }
-        #expect(picker.passwordField.currentEditor() != nil)
-        #expect(picker.passwordField.contentType == nil)
+        #expect(window.firstResponder === picker.passwordView)
+        #expect(!picker.passwordView.isFieldEditor)
+        #expect(picker.passwordView.contentType == .password && picker.usernameField.contentType == .username)
         try await wait(0.4)
-        #expect(asked == 1, "outcome \(String(describing: outcome))")
-        #expect(markedWhenAsked == .password, "marked \(String(describing: markedWhenAsked?.rawValue))")
+        #expect(askedFor === picker.passwordView, "outcome \(String(describing: outcome))")
         picker.cancel()
-        #expect(picker.passwordField.contentType == nil)
-        #expect(picker.usernameField.contentType == .username)
         #expect(window.firstResponder === stand)
+    }
+
+    @Test func aPasswordViewThatShowsNothingAndKeepsNothing() {
+        let view = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {}).passwordView
+        #expect(view.textColor == .clear && !view.drawsBackground)
+        #expect(!view.allowsUndo && !view.isRichText)
+        #expect(!view.isContinuousSpellCheckingEnabled && !view.isAutomaticTextCompletionEnabled)
+        #expect(!view.isAccessibilityElement())
+    }
+
+    @Test func aLoginSetWithoutAWordIsStillRead() async throws {
+        // AutoFill sets the username field's value and the password view's text directly, telling no delegate.
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { outcome = $0 }
+        picker.usernameField.stringValue = "sam@example.com"
+        picker.passwordView.string = "fake-pass"
+        try await wait(0.5)
+        guard case .filled(let username, let password) = outcome else { Issue.record("expected a fill, got \(String(describing: outcome))"); return }
+        #expect(username.withUnsafeString { $0 } == "sam@example.com")
+        #expect(password.withUnsafeString { $0 } == "fake-pass")
+        #expect(picker.passwordView.string.isEmpty && picker.usernameField.stringValue.isEmpty)
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func appKitPairsTheFieldsAroundTheFocusedPasswordView() throws {
+        // What AppKit's AutoFill fills a picked login into: both halves, worked out around what has the focus. Only
+        // where the Mac has the part that works it out.
+        _ = Bundle(path: "/System/Library/PrivateFrameworks/AutoFillUI.framework")?.load()
+        guard let type = NSClassFromString("AFUITargetDetectionController") as? NSObject.Type else { return }
+        let mode = NSSelectorFromString("autoFillModeForResponder:")
+        guard type.instancesRespond(to: mode) else { return }
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 5, dismissSystem: {})
+        picker.present(over: NSRect(x: 40, y: 60, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
+        defer { picker.cancel() }
+        let detection = type.init()
+        typealias Detect = @convention(c) (AnyObject, Selector, AnyObject?) -> UInt
+        _ = unsafeBitCast(detection.method(for: mode), to: Detect.self)(detection, mode, window.firstResponder)
+        let group = detection.value(forKey: "autoFillGroup") as? [AnyHashable: Any]
+        #expect(group?[NSTextContentType.username.rawValue] as AnyObject? === picker.usernameField)
+        #expect(group?[NSTextContentType.password.rawValue] as AnyObject? === picker.passwordView)
     }
 
     @Test func aFieldOffThePageAsksNothing() async throws {
@@ -607,13 +646,12 @@ struct SystemPasswordsTests {
             var asked = false
             var outcome: SystemPasswordPicker.Outcome?
             picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { field in
-                asked = field.currentEditor() != nil
+                asked = field.window?.firstResponder === field
                 return true
             }) { outcome = $0 }
             #expect(asked)
             #expect(picker.isPresented)
-            let editor = try #require(picker.passwordField.currentEditor() as? NSTextView)
-            _ = picker.control(picker.passwordField, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:)))
+            _ = picker.textView(picker.passwordView, doCommandBy: #selector(NSResponder.cancelOperation(_:)))
             guard case .cancelled(.dismissed) = outcome else { Issue.record("round \(round): expected dismissed"); return }
             // Closed as it opened and as it ended: nothing from one round is left for the next (#378).
             #expect(dismissed == round * 2)
