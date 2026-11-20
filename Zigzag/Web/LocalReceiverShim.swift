@@ -466,6 +466,8 @@ enum LocalReceiverShim {
             this.emit('error', new Event('error'));
           } else if (event.type === 'close') {
             if (this.readyState === 3) return;
+            // A socket that never opened gets error before close, as WebKit's does.
+            if (this.readyState === 0) this.emit('error', new Event('error'));
             this.readyState = 3;
             delete sockets[this.id];
             this.emit('close', new CloseEvent('close', { code: event.code || 1006, reason: event.reason || '',
@@ -474,7 +476,7 @@ enum LocalReceiverShim {
         }
         fail() {
           if (this.readyState === 3) return;
-          this.emit('error', new Event('error'));
+          if (this.readyState !== 0) this.emit('error', new Event('error'));
           this.dispatch({ type: 'close', code: 1006, reason: '', clean: false });
         }
         addEventListener(type, listener) {
