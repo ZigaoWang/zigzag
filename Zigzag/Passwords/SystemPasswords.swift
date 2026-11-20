@@ -204,6 +204,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
               window.firstResponder === passwordView else { finish(.cancelled(.dismissed)); return }
         // The list points at the field; a field off its page would put it in a corner of the screen.
         guard Self.anchorIsValid(anchor.frame, in: overlay.bounds) else { finish(.cancelled(.unavailable)); return }
+        Self.pairForAutoFill(passwordView)
         guard ask(passwordView) else { finish(.cancelled(.unavailable)); return }
         if let openCheck { after(openCheck) { if !$0.opened { $0.giveUpIfEmpty(.unavailable) } } }
     }
@@ -220,6 +221,24 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate, NSTextViewDeleg
         guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
               let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject else { return }
         for selector in dismissSelectors where controller.responds(to: selector) { controller.perform(selector) }
+    }
+
+    /// The part of AppKit's AutoFill that pairs a password field with its username field, where AppKit has it.
+    static var autoFillDetection: NSObject? {
+        let shared = NSSelectorFromString("sharedInstance"), create = NSSelectorFromString("_createTargetDetectionControllerIfNecessary")
+        guard let type = NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type, type.responds(to: shared),
+              let controller = type.perform(shared)?.takeUnretainedValue() as? NSObject, controller.responds(to: create),
+              let ivar = class_getInstanceVariable(type, "_targetDetectionController") else { return nil }
+        controller.perform(create)
+        return object_getIvar(controller, ivar) as? NSObject
+    }
+
+    /// AppKit pairs the fields only when a text field takes the focus, never a text view, and fills by the last pair (#378).
+    static func pairForAutoFill(_ view: NSView) {
+        let mode = NSSelectorFromString("autoFillModeForResponder:")
+        guard let detection = autoFillDetection, detection.responds(to: mode) else { return }
+        typealias Mode = @convention(c) (NSObject, Selector, NSView) -> UInt
+        _ = unsafeBitCast(detection.method(for: mode), to: Mode.self)(detection, mode, view)
     }
 
     /// The suggestion under a field, then the Passwords panel. AppKit closes the panel itself only for a field that
