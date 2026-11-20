@@ -1,6 +1,54 @@
 import Foundation
+import CryptoKit
 import Testing
 @testable import Zigzag
+
+struct AddonsMozillaPageTests {
+    /// The listing's slug in an AMO page address, with or without the locale prefix and a trailing path.
+    @Test func theListingIsReadFromAnAMOPage() {
+        let slug = ExtensionStore.addonsSlug(from:)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/ublock-origin/")!) == "ublock-origin")
+        #expect(slug(URL(string: "https://addons.mozilla.org/firefox/addon/darkreader")!) == "darkreader")
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/darkreader/reviews/")!) == "darkreader")
+        // Only this store, only a listing, and never a slug that could be a path.
+        #expect(slug(URL(string: "https://example.com/firefox/addon/ublock-origin/")!) == nil)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/")!) == nil)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/")!) == nil)
+        #expect(slug(URL(string: "https://addons.mozilla.org/en-US/firefox/addon/..%2F..%2Fetc/")!) == nil)
+        #expect(slug(nil) == nil)
+        // A lookalike host is not the store, and neither is its API host.
+        #expect(ExtensionStore.addonsHost("addons.mozilla.org"))
+        #expect(!ExtensionStore.addonsHost("services.addons.mozilla.org"))
+        #expect(!ExtensionStore.addonsHost("addons.mozilla.org.evil.example"))
+    }
+
+    /// The file half of the boundary: only AMO's own download path hands over a package. A page there can point a
+    /// button anywhere, and another host's copy of the path is not the store.
+    @Test func onlyTheStoresOwnDownloadPathIsAPackage() {
+        let file = ExtensionStore.isAddonsFile
+        #expect(file(URL(string: "https://addons.mozilla.org/firefox/downloads/file/4242/ublock_origin-1.60.0.xpi")!))
+        #expect(file(URL(string: "https://addons.mozilla.org/en-US/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(URL(string: "https://example.com/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(URL(string: "https://addons.mozilla.org/firefox/addon/ublock-origin/")!))
+        #expect(!file(URL(string: "http://addons.mozilla.org/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(URL(string: "https://addons.mozilla.org.evil.example/firefox/downloads/file/1/addon.xpi")!))
+        #expect(!file(nil))
+    }
+
+    /// AMO publishes each file's sha256; a package whose bytes don't match it is refused, not installed.
+    @Test func anAMOPackageMustMatchTheHashTheStorePublishes() {
+        let bytes = Data("an xpi's bytes".utf8)
+        let good = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good))
+        #expect(ExtensionStore.matchesPublishedHash(bytes, sha256: good.uppercased()))
+        // A different file, a truncated hash, an empty one, none at all, and one with something appended: refused.
+        #expect(!ExtensionStore.matchesPublishedHash(Data("other bytes".utf8), sha256: good))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: String(good.prefix(63))))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: ""))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: nil))
+        #expect(!ExtensionStore.matchesPublishedHash(bytes, sha256: good + "00"))
+    }
+}
 
 /// An XPI made byte by byte: stored entries, then the central index and its end record. Shared by every test that
 /// needs one — `FirefoxInstallTests` and `XPIPackageTests` — so
