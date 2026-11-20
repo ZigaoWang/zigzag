@@ -246,6 +246,8 @@ final class OldTwitterSolver: NSObject {
             throw Failure("OldTwitter's sandbox has no script")
         }
         let code = String(html[start.upperBound..<end.lowerBound])
+        // Unpatched, it would listen to the page's own messages in its world.
+        guard code.contains("window.__zigzagSolveMessage = ") else { throw Failure("OldTwitter's sandbox isn't patched") }
         sandboxScript = code
         return code
     }
