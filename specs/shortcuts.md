@@ -2,19 +2,19 @@
 
 ## Tabs and windows
 - ⌘T → the command bar opens for a new tab; ⌘T again closes it.
-  No test yet.
+  Test: MenuShortcutsTests.commandTOpensTheNewTabBarAndAgainClosesIt
 - ⌘N → a new window; with no window open, the last closed one comes back instead.
   No test yet.
 - ⇧⌘N → a new private window.
   No test yet.
 - ⌘W → closes the command bar, the overview card, floating content or the picked rows if one is up, else the tab (undoable); ⇧⌘W closes the window, ⌥⌘W the other tabs.
-  No test yet.
+  Test: MenuShortcutsTests.commandWClosesWhatIsUpFirstThenTheTab
 - ⇧⌘T → the most recently closed tab or window comes back, across all windows.
   Test: ReopenLastClosedTests.theLatestClosedComesBackFirst
 - ⌥⌘↓ / ⌥⌘↑ (or ⇧⌘] / ⇧⌘[) → next or previous row as the sidebar shows it, wrapping, staying in the space.
   Test: TabNavigationTests.goesDownTheSidebarAndWraps
 - ⌥⌘→ / ⌥⌘← → next or previous space, stopping at the ends.
-  No test yet.
+  Test: MenuShortcutsTests.optionCommandArrowsGoThroughTheSpacesAndStopAtTheEnds
 - ⌃Tab / ⌃⇧Tab → recent-tabs switcher by default; sidebar order when Settings › Tabs says so.
   Test: TabNavigationTests.controlTabFollowsTheSetting
 - ⌘1–⌘8 → that row of the sidebar; ⌘9, or a number past the end → the last row.
@@ -26,19 +26,19 @@
 
 ## Page
 - ⌘L → the command bar opens over the address with the current URL selected; Return on it unchanged reloads.
-  No test yet.
+  Test: MenuShortcutsTests.commandLSelectsTheAddressAndReturnUnchangedReloads
 - ⌘R → reload. ⇧⌘R → reload ignoring the cache.
   Test: DeveloperToolTests.shiftCommandRReloadsIgnoringTheCache
 - ⌥⌘R → Reader on or off; on a loading page it waits, and ⌥⌘R again on that tab cancels the wait.
   Test: ReaderWaitTests.onlyTheSameTabCallsTheWaitOff
 - ⌘[ / ⌘] (or ⌘← / ⌘→ when nothing is being edited) → back and forward.
-  No test yet.
+  Test: MenuShortcutsTests.commandBracketsGoBackAndForward
 - ⌘F → the find bar; ⌘F again with its field focused hides it.
-  No test yet.
+  Test: MenuShortcutsTests.commandFShowsTheFindBarAndAgainHidesIt
 - ⌘G / ⇧⌘G → next or previous match, opening the find bar if it's closed.
   Test: FindCountTests.findNextWithTheBarClosedStepsOnce
 - ⌘D → Pin Tab: pins the page to the end of the space's pinned pages without asking.
-  No test yet.
+  Test: MenuShortcutsTests.commandDPinsAtTheEndOfPinnedWithoutAsking
 - ⇧⌘D → Pin Tab to Folder: always asks which folder of the space and what name.
   Test: SavePathTests.shiftOnEveryPathAsksWhere
 - ⌘+ (or ⌘=) / ⌘− → zoom in or out by steps, saved per site; ⌘0 → back to the default page zoom in Settings.
