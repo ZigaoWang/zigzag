@@ -119,6 +119,34 @@
         }
       }
     },
+    "%@ and all its subdomains." : {
+      "comment" : "Preview of a domain rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 及其所有子域名。"
+          }
+        }
+      }
+    },
+    "%@ and pages below it, such as %@/repo." : {
+      "comment" : "Preview of a path rule.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ and pages below it, such as %2$@/repo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 及其下的网页，例如 %2$@/repo。"
+          }
+        }
+      }
+    },
     "%@ are handed to %@" : {
       "comment" : "A download rule in a sentence: what it catches, then the script it is given to. The placeholders are the two parts.",
       "localizations" : {
@@ -817,6 +845,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@，%2$@"
+          }
+        }
+      }
+    },
+    "%@, Off" : {
+      "comment" : "Beside a space rule that's turned off: its scope, like “and subdomains”, then that it's off.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@，已关闭"
           }
         }
       }
@@ -1559,6 +1598,41 @@
         }
       }
     },
+    "%lld pages not put to sleep while they play or have text you typed" : {
+      "comment" : "Toast after Suspend N Pages in the sidebar's menu: some of the picked pages stay awake, because they play sound, are in a call, play in the mini player or Picture in Picture, or hold text you typed.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld page not put to sleep while it plays or has text you typed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld pages not put to sleep while they play or have text you typed"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 个页面在播放或有你输入的文字，没有休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld pages of history" : {
       "comment" : "Item in the list of what came over, in the Import window.",
       "localizations" : {
@@ -1938,6 +2012,41 @@
         }
       }
     },
+    "%lld updates need your approval." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld update needs your approval."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld updates need your approval."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个更新需要你批准。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld zapped" : {
       "comment" : "How many elements on a site were hidden with Zap Element, like “3 zapped”: a row in the site panel, with Restore All after it, and a choice made for a site in Settings › Privacy › Sites.",
       "localizations" : {
@@ -2136,17 +2245,6 @@
         }
       }
     },
-    "A site opens in its space wherever its link comes from: another app, the command bar or another space. It covers the site’s subdomains. When a space is removed, its sites open in any space again." : {
-      "comment" : "Under Sites in Spaces in Settings › Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "网站会在它的空间中打开，无论链接来自其他 App、命令栏还是其他空间，也包括它的子域名。空间被移除后，它的网站会重新在任意空间中打开。"
-          }
-        }
-      }
-    },
     "A small window for a quick look at a page. Esc closes it, and ⌘O moves it into your browser window to keep it." : {
       "comment" : "Explanation under “New Zigzag Mini” in Settings › Zigzag Mini: what Zigzag Mini is.",
       "localizations" : {
@@ -2296,6 +2394,17 @@
         }
       }
     },
+    "Add Space Rule" : {
+      "comment" : "Title of the sheet that creates a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加空间规则"
+          }
+        }
+      }
+    },
     "AI apps can’t use Zigzag now. Turn them back on in Settings › Automation." : {
       "comment" : "Toast after Stop on the bar over a tab an AI app was using: every AI app is cut off until the setting is turned on again.",
       "localizations" : {
@@ -2303,6 +2412,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "AI App 现在不能使用 Zigzag 了。可在“设置 › 自动化”中重新打开。"
+          }
+        }
+      }
+    },
+    "About Match Types" : {
+      "comment" : "Button opening space rule help.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于匹配方式"
           }
         }
       }
@@ -2352,7 +2472,7 @@
       }
     },
     "Add" : {
-      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a site an extension may use.\nButton that adds the size, in the sheet that adds a page size.\nButton that sends the site to the space, in the sheet that adds a site to Sites in Spaces.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
+      "comment" : "Button in Settings › Passwords that adds Apple's iCloud Passwords extension again, after it was removed.\nButton of the sheet that makes a download rule.\nButton on an extension another profile has, in Settings › Extensions: adds it to the profile shown.\nButton that adds the site, in the sheet that adds a site an extension may use.\nButton that adds the site, in the sheet that adds a site whose cookies are kept.\nButton that adds the size, in the sheet that adds a page size.\nButton that turns Developer Mode on for the site, in the sheet that adds a site to Developer Mode.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2391,6 +2511,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加 %lld 个扩展？"
+          }
+        }
+      }
+    },
+    "Add %lld to Favorites" : {
+      "comment" : "Menu item for several picked sidebar rows",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 %lld 项添加到收藏"
           }
         }
       }
@@ -2462,7 +2593,7 @@
       }
     },
     "Add Rule…" : {
-      "comment" : "Button beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from.",
+      "comment" : "Add a space routing rule in Settings.\nButton beside the download rules in Settings › Downloads: opens the menu of actions and presets a new rule can start from.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2484,7 +2615,7 @@
       }
     },
     "Add Site…" : {
-      "comment" : "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use.\nButton beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside Sites in Spaces in Settings › Spaces: opens the sheet that sends a site to a space.",
+      "comment" : "Button beside Site access in Settings › Extensions, with On Specific Sites chosen: opens the sheet that adds a site the extension may use.\nButton beside Sites in Developer Mode in Settings › Developer: opens the sheet that turns Developer Mode on for a site.\nButton beside “Keep cookies for these sites” in Settings › Privacy: opens the sheet that adds a site whose cookies are kept.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2582,6 +2713,17 @@
         }
       }
     },
+    "Add to Favorites" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到收藏"
+          }
+        }
+      }
+    },
     "Add to Folder" : {
       "comment" : "Item in a pinned tab's context menu in the sidebar. Opens a list of folders.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Folder.",
       "localizations" : {
@@ -2659,6 +2801,17 @@
         }
       }
     },
+    "Added to Favorites" : {
+      "comment" : "Toast after the tab is added to Favorites.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已添加到收藏"
+          }
+        }
+      }
+    },
     "Added. Find it in site controls, by the address." : {
       "comment" : "On the bar over a Chrome Web Store page once the extension is installed. Site controls is the panel by the address.",
       "localizations" : {
@@ -2710,7 +2863,7 @@
       }
     },
     "Address" : {
-      "comment" : "VoiceOver name of the address in a split view page's strip, while it has none.",
+      "comment" : "Label of the address pattern in a download rule's sheet.\nSpace rule address field.\nVoiceOver label of a pop-up window's address while it's selected to copy.\nVoiceOver name of the address in a split view page's strip, while it has none.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -2841,17 +2994,6 @@
         }
       }
     },
-    "All of %@" : {
-      "comment" : "Under Open in in the site panel, when the space chosen is for the whole site the page is part of (its parent domain, like youtube.com for music.youtube.com).",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "整个 %@"
-          }
-        }
-      }
-    },
     "All Passwords" : {
       "comment" : "A kind of password in the Passwords window's column, and the list's title: every saved password.",
       "localizations" : {
@@ -2870,6 +3012,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "所有发行说明"
+          }
+        }
+      }
+    },
+    "All extensions are up to date." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when nothing changed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有扩展都已是最新版本。"
           }
         }
       }
@@ -3050,17 +3203,6 @@
         }
       }
     },
-    "Always Open a Site in a Space" : {
-      "comment" : "Title of the sheet that sends a site to a space, from Settings › Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "始终在一个空间中打开网站"
-          }
-        }
-      }
-    },
     "Always Translate" : {
       "comment" : "A heading in Settings › Translation.",
       "localizations" : {
@@ -3184,6 +3326,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新已准备就绪。在你允许之前，当前版本会继续运行。"
+          }
+        }
+      }
+    },
+    "and pages below it" : {
+      "comment" : "Short scope beside the path of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含下级路径"
+          }
+        }
+      }
+    },
+    "and subdomains" : {
+      "comment" : "Short scope beside the domain of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "含子域名"
           }
         }
       }
@@ -4047,6 +4211,61 @@
         }
       }
     },
+    "Not put to sleep while it has text you typed" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake so what you typed into it isn't lost.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "里面有你输入的文字，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays in the mini player" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video plays in the window's mini player.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在小播放器里播放，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it plays sound" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's playing sound.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在播放声音，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while it uses the camera or microphone" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's in a call.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它在用摄像头或麦克风，没有休眠"
+          }
+        }
+      }
+    },
+    "Not put to sleep while its video is in Picture in Picture" : {
+      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video floats in Picture in Picture.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它的视频在画中画里，没有休眠"
+          }
+        }
+      }
+    },
     "Open “%@”" : {
       "comment" : "VoiceOver label of the Open button on an installed app's row in Settings › General; the app's name.",
       "localizations" : {
@@ -4087,6 +4306,52 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "边栏位置"
+          }
+        }
+      }
+    },
+    "Suspend %lld Pages" : {
+      "comment" : "Menu item for several picked tabs: puts their pages to sleep; each loads again when you click it.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend Page"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suspend %lld Pages"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "让 %lld 个页面休眠"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Suspend Page" : {
+      "comment" : "File menu item: puts the tab's page to sleep; it loads again when you click the tab.\nItem in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让页面休眠"
           }
         }
       }
@@ -4378,6 +4643,28 @@
         }
       }
     },
+    "You put it to sleep. Loads when you click it." : {
+      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: you put it to sleep with Suspend Page in its menu, and its page loads again once you click it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "是你让它休眠的，点按即可重新载入。"
+          }
+        }
+      }
+    },
+    "this host only" : {
+      "comment" : "Short scope beside the address of a space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
     "You’ll be signed out of every site except the %lld sites you keep. Your passwords, pinned tabs and history stay." : {
       "comment" : "Message of the sheet that clears every site's cookies, when some sites keep theirs. The number is how many, always more than one.",
       "localizations" : {
@@ -4407,6 +4694,226 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已隐藏的元素"
+          }
+        }
+      }
+    },
+    "Domain and subdomains" : {
+      "comment" : "Space rule matching a domain and its subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "域名及其子域名"
+          }
+        }
+      }
+    },
+    "Edit Space Rule" : {
+      "comment" : "Existing space rule sheet title.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则"
+          }
+        }
+      }
+    },
+    "Edit Space Rule…" : {
+      "comment" : "Edit the winning rule from Site Controls.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑空间规则…"
+          }
+        }
+      }
+    },
+    "Enter a host and path, such as github.com/org1." : {
+      "comment" : "Example input for a path rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入域名和路径，例如 github.com/org1。"
+          }
+        }
+      }
+    },
+    "Domain only" : {
+      "comment" : "Space rule matching only the named host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅此域名"
+          }
+        }
+      }
+    },
+    "Matches pages on the exact hostname you enter (for example, github.com)." : {
+      "comment" : "Exact host example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只匹配你填写的这个域名下的网页（例如 github.com）。"
+          }
+        }
+      }
+    },
+    "Matches a path and pages below it on the same host (for example, github.com/org1 and github.com/org1/repo)." : {
+      "comment" : "Path example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配同一域名下的某个路径及其下的网页（例如 github.com/org1 和 github.com/org1/repo）。"
+          }
+        }
+      }
+    },
+    "Matches pages on a domain and its subdomains (for example, github.com and gist.github.com)." : {
+      "comment" : "Domain example in the match types popover.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配某个域名及其所有子域名下的网页（例如 github.com 和 gist.github.com）。"
+          }
+        }
+      }
+    },
+    "Move Above %@" : {
+      "comment" : "Moves a space rule above the earlier rule that covers it. The placeholder is that rule's address, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移到 %@ 上方"
+          }
+        }
+      }
+    },
+    "Pages on %@ only." : {
+      "comment" : "Preview of an exact host rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只匹配 %@ 上的网页。"
+          }
+        }
+      }
+    },
+    "Path and subpaths" : {
+      "comment" : "Space rule matching a path and its descendants on one host.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "路径及其子路径"
+          }
+        }
+      }
+    },
+    "Never used: %@ above covers all of it." : {
+      "comment" : "Below a space rule that an earlier rule covers completely. The placeholder is the earlier rule's address, like github.com.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会生效：上面的 %@ 已经包含了它。"
+          }
+        }
+      }
+    },
+    "Covers all of %@ below, so that rule is never used." : {
+      "comment" : "Below a space rule that covers a later rule completely. The placeholder is the later rule's address, like github.com/org1.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含了下面的 %@，那条规则不会生效。"
+          }
+        }
+      }
+    },
+    "Covers all of %@ below, so those rules are never used." : {
+      "comment" : "Below a space rule that covers several later rules completely. The placeholder lists their addresses.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含了下面的 %@，那些规则不会生效。"
+          }
+        }
+      }
+    },
+    "Enabled" : {
+      "comment" : "Switch in the space rule editor.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用"
+          }
+        }
+      }
+    },
+    "Rule %lld" : {
+      "comment" : "A rule's position in the ordered list in Settings.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第 %lld 条规则"
+          }
+        }
+      }
+    },
+    "Enter one hostname, such as github.com, without a path." : {
+      "comment" : "Example input for a domain-only space rule.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入一个域名，例如 github.com，不带路径。"
+          }
+        }
+      }
+    },
+    "Enter the parent hostname, such as github.com, without a wildcard or path." : {
+      "comment" : "Example input for a space rule that includes subdomains.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入上级域名，例如 github.com，不带通配符或路径。"
+          }
+        }
+      }
+    },
+    "The http:// or https:// prefix is optional." : {
+      "comment" : "Space rule address tooltip.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以不写 http:// 或 https://。"
+          }
+        }
+      }
+    },
+    "The first enabled match chooses the space. Drag to reorder." : {
+      "comment" : "Byline under Sites in Spaces.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "链接在第一条匹配且已启用的规则所选的空间中打开。拖动可以调整顺序。"
           }
         }
       }
@@ -4645,7 +5152,7 @@
       }
     },
     "Cancel" : {
-      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nTooltip of a download's button in the downloads panel: stops the download.",
+      "comment" : "Button in a page's JavaScript dialog sheet.\nButton in a sheet that asks before doing something.\nButton in the Touch ID prompt for passwords.\nButton that closes a sheet without doing anything.\nButton that stops editing a login in the Passwords window.\nDiscard edits to a space rule.\nTooltip of a download's button in the downloads panel: stops the download.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -4952,6 +5459,17 @@
         }
       }
     },
+    "Check for Updates" : {
+      "comment" : "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查更新"
+          }
+        }
+      }
+    },
     "Check for Updates…" : {
       "comment" : "Button in Settings › General, beside Zigzag's version.\nZigzag menu item.",
       "localizations" : {
@@ -4997,7 +5515,7 @@
       }
     },
     "Checking…" : {
-      "comment" : "On the certificate page of the site panel, while the certificate is read.",
+      "comment" : "On the certificate page of the site panel, while the certificate is read.\nThe Check for Updates button in Settings › Extensions while it checks.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6441,6 +6959,41 @@
         }
       }
     },
+    "Couldn’t check %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Couldn’t check %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "有 %lld 个扩展无法检查。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Couldn’t check for updates. Try again later." : {
       "comment" : "Toast when Check for Updates… or Restart to Update can't reach the update feed.",
       "localizations" : {
@@ -6783,7 +7336,7 @@
       }
     },
     "Custom" : {
-      "comment" : "A search engine choice in Settings: one you give an address for.\nTooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own.",
+      "comment" : "A choice for “Sidebar size” in Settings › Appearance: a percentage of Medium that you set.\nA search engine choice in Settings: one you give an address for.\nTooltip and accessibility label of the last swatch in a space's editor: shows the color wheel for a color of your own.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7863,17 +8416,6 @@
         }
       }
     },
-    "Links to the site and its subdomains open in this space, wherever they come from." : {
-      "comment" : "Under the title of the sheet that sends a site to a space, from Settings › Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "指向此网站及其子域名的链接，无论来自哪里，都会在这个空间中打开。"
-          }
-        }
-      }
-    },
     "List the file extensions this rule catches, like pdf, epub." : {
       "comment" : "Tooltip on the extensions field of a download rule with none yet, so its Add button can't be pressed.",
       "localizations" : {
@@ -7897,7 +8439,7 @@
       }
     },
     "Open in" : {
-      "comment" : "Row in the site panel's This Site group: the space this site's pages always open in, whatever space the link came from.",
+      "comment" : "Destination space for a rule.\nDestination space in Site Controls.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -7936,6 +8478,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打开位置"
+          }
+        }
+      }
+    },
+    "open in" : {
+      "comment" : "Inline after a domain and its subdomains, or a path and the pages below it: example.com and subdomains open in Work.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开于"
+          }
+        }
+      }
+    },
+    "opens in" : {
+      "comment" : "Inline before the space menu for a single host: example.com (this host only) opens in Work.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开于"
           }
         }
       }
@@ -7995,17 +8559,6 @@
         }
       }
     },
-    "Space for %@" : {
-      "comment" : "VoiceOver name of the space menu on a row in Settings › Spaces › Sites in Spaces: a site, like youtube.com.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 的空间"
-          }
-        }
-      }
-    },
     "Split view: %@" : {
       "comment" : "Accessibility label of a split view's row in the sidebar: its pages' titles, as a list (“Split view: Wikipedia, Example and Google”).",
       "localizations" : {
@@ -8057,17 +8610,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第一条匹配地址的规则生效。规则按列表从上到下运行。"
-          }
-        }
-      }
-    },
-    "To always open a site in a space, choose it under Open in, in the site’s controls." : {
-      "comment" : "Explanation under “None yet” in Settings › Spaces › Sites in Spaces. Open in is the row in the site panel.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要让网站始终在某个空间中打开，请在它的网站设置中的“打开于”里选择空间。"
           }
         }
       }
@@ -8667,7 +9209,7 @@
       }
     },
     "Edit" : {
-      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.",
+      "comment" : "A menu in the menu bar.\nButton on a saved login in the Passwords window.\nEdit a space rule in its Settings row.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -9557,7 +10099,7 @@
       }
     },
     "Folder" : {
-      "comment" : "Label of the folder menu in the sheet that saves a page to a place.\nName of an imported folder that had none.",
+      "comment" : "Name of an imported folder that had none.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11283,6 +11825,17 @@
         }
       }
     },
+    "Larger Sidebar" : {
+      "comment" : "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放大边栏"
+          }
+        }
+      }
+    },
     "Larger Text" : {
       "comment" : "VoiceOver label of the button in Reader's text choices that makes the text larger.",
       "localizations" : {
@@ -11592,7 +12145,7 @@
       }
     },
     "Match" : {
-      "comment" : "Label of the choice of how a download rule matches an address, in its sheet.",
+      "comment" : "Label of the choice of how a download rule matches an address, in its sheet.\nSpace rule match type.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11785,7 +12338,7 @@
       }
     },
     "Move Down" : {
-      "comment" : "Menu item that moves a download rule down.",
+      "comment" : "Move a row one place down in Settings.\nTooltip of the button that moves a download rule down the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -11983,7 +12536,7 @@
       }
     },
     "Move Up" : {
-      "comment" : "Menu item that moves a download rule up.",
+      "comment" : "Move a row one place up in Settings.\nTooltip of the button that moves a download rule up the list.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12242,7 +12795,7 @@
       }
     },
     "Name" : {
-      "comment" : "Placeholder of the field that renames a favorite.\nPlaceholder of the field that renames a tab, in its sidebar row.\nPlaceholder of the name field in the sheet that saves a page to a place: what the saved page is called.",
+      "comment" : "Placeholder of the field that renames a favorite.\nPlaceholder of the field that renames a tab, in its sidebar row.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12407,7 +12960,7 @@
       }
     },
     "New Folder" : {
-      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nPlaceholder of the field that names a new folder in the sheet that saves a page to a place.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder.",
+      "comment" : "Item in a space's context menu.\nName a new folder of pinned tabs gets, until it's renamed.\nName of a folder an extension makes without giving it one.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo New Folder.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -12670,6 +13223,17 @@
         }
       }
     },
+    "No extensions from the Chrome Web Store to check." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有来自 Chrome 网上应用店的扩展需要检查。"
+          }
+        }
+      }
+    },
     "No extensions yet" : {
       "comment" : "A setting in Settings › Extensions.",
       "localizations" : {
@@ -12891,7 +13455,7 @@
       }
     },
     "None yet" : {
-      "comment" : "A row in Settings › Developer, shown when no page size is listed.\nA row in Settings › Developer, shown when no site is in Developer Mode.\nA row under Sites in Spaces in Settings › Spaces, shown when no site always opens in a space.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
+      "comment" : "A row in Settings › Developer, shown when no page size is listed.\nA row in Settings › Developer, shown when no site is in Developer Mode.\nA setting in Settings › Privacy.\nUnder Always Translate in Settings › Translation, when there's no language.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -14829,6 +15393,74 @@
         }
       }
     },
+    "Pin %lld Tabs" : {
+      "comment" : "Menu item for several picked tabs",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Pin Tab"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Pin %lld Tabs"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "固定 %lld 个标签页"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Pin Group" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.\nUndo action name, shown in the Edit menu as Undo Pin Group.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定分组"
+          }
+        }
+      }
+    },
+    "Pin Split View" : {
+      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定分屏浏览"
+          }
+        }
+      }
+    },
+    "Pin Tab" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nMenu item\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定标签页"
+          }
+        }
+      }
+    },
     "Pin Tabs" : {
       "comment" : "Undo action name, shown in Edit › Undo.",
       "localizations" : {
@@ -14862,13 +15494,13 @@
         }
       }
     },
-    "Save this page" : {
+    "Pin this page" : {
       "comment" : "A step's title in the getting-started guide, a card in the window.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "存储这个页面"
+            "value" : "固定这个页面"
           }
         }
       }
@@ -14891,6 +15523,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "粉色"
+          }
+        }
+      }
+    },
+    "Pinned" : {
+      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已固定"
           }
         }
       }
@@ -15721,7 +16364,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nButton on a row in Settings › Spaces › Sites in Spaces: the site opens in any space again.\nTooltip of a download's button in the downloads panel: takes the download off the list.\nVoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.",
+      "comment" : "Button of the sheet that asks before removing an extension.\nButton of the sheet that asks before removing pages from History.\nButton of the sheet that removes a site installed as an app.\nButton of the sheet that removes one site's data.\nButton on a row in Settings › Developer: takes the site or the page size off its list.\nRemove a space rule.\nTooltip of a download's button in the downloads panel: takes the download off the list.\nVoiceOver action on the Background swatch in a space's editor: takes the picture off the space's empty page and deletes Zigzag's copy of it.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16512,13 +17155,13 @@
         }
       }
     },
-    "Right-click its tab, then Save Page" : {
-      "comment" : "Under the save step's title in the getting-started guide, a card in the window, when Save Page has no shortcut. Save Page is an item in a tab's menu in the sidebar.",
+    "Right-click its tab, then Pin Tab" : {
+      "comment" : "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "右键点按它的标签页，然后点按“存储页面”"
+            "value" : "右键点按它的标签页，然后点按“固定标签页”"
           }
         }
       }
@@ -16766,7 +17409,7 @@
       }
     },
     "Save" : {
-      "comment" : "Button in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton of the Edit Style sheet: keeps the CSS for the site.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.\nButton that saves the page, in the sheet that asks where in the space it goes.\nUndo action name, shown in the Edit menu as Undo Save.",
+      "comment" : "A destination a file of a given type can have: saved into a folder, which starts as the one downloads already go to.\nButton in the save-password prompt.\nButton in the toast after taking a screenshot: saves it as a file.\nButton of the Edit Style sheet: keeps the CSS for the site.\nButton of the sheet that changes a download rule.\nButton that saves a profile's new name and color.\nButton that saves the changes to a login in the Passwords window.\nSave a space rule.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -16854,7 +17497,7 @@
       }
     },
     "Saved" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a page is saved into Pinned.\nToast after changes to a login are saved.",
+      "comment" : "Toast after changes to a login are saved.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -18102,6 +18745,17 @@
         }
       }
     },
+    "Sidebar size %@, Usual Size" : {
+      "comment" : "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏大小 %@，默认大小"
+          }
+        }
+      }
+    },
     "Sign In" : {
       "comment" : "Button in a site's HTTP sign-in sheet.",
       "localizations" : {
@@ -18344,6 +18998,17 @@
         }
       }
     },
+    "Smaller Sidebar" : {
+      "comment" : "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "缩小边栏"
+          }
+        }
+      }
+    },
     "Smaller Text" : {
       "comment" : "VoiceOver label of the button in Reader's text choices that makes the text smaller.",
       "localizations" : {
@@ -18532,7 +19197,7 @@
       }
     },
     "Space" : {
-      "comment" : "Label of the space menu in the sheet that sends a site to a space, from Settings › Spaces.\nVoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
+      "comment" : "VoiceOver name of the space in Zigzag Mini's top strip, the one Open in moves the page to. Its value is the space's name.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20662,7 +21327,7 @@
       }
     },
     "Turn %@ on or off" : {
-      "comment" : "A download rule's switch for VoiceOver. The placeholder is the rule's name.",
+      "comment" : "A download rule's switch for VoiceOver. The placeholder is the rule's name.\nA per-extension destination's switch for VoiceOver. The placeholder is the file extensions it names, like pdf, epub.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20673,7 +21338,7 @@
       }
     },
     "Turn Off" : {
-      "comment" : "Item in an extension's menu: turns the extension off.",
+      "comment" : "Item in an extension's menu: turns the extension off.\nTurn off a space rule from its context menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -20750,7 +21415,7 @@
       }
     },
     "Turn On" : {
-      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.",
+      "comment" : "Button in Settings › Passwords that turns Apple's iCloud Passwords extension back on.\nButton in the toast that offers to archive unused tabs.\nTurn on a space rule from its context menu.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -21048,6 +21713,85 @@
         }
       }
     },
+    "Unpin %lld Tabs" : {
+      "comment" : "Menu item for several picked pinned pages",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unpin Tab"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Unpin %lld Tabs"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "取消固定 %lld 个标签页"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Unpin Group" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar. The tab is in a pinned group; the whole group goes back to the tabs.\nMenu bar item: unpins the whole pinned group the tab is in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定分组"
+          }
+        }
+      }
+    },
+    "Unpin Split View" : {
+      "comment" : "Item in a pinned tab's context menu in the sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定分屏浏览"
+          }
+        }
+      }
+    },
+    "Unpin Tab" : {
+      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nMenu item\nUndo action name, shown in the Edit menu as Undo Unpin Tab.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定标签页"
+          }
+        }
+      }
+    },
+    "Unpin Tabs" : {
+      "comment" : "Undo action name, shown in Edit › Undo.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定标签页"
+          }
+        }
+      }
+    },
     "Unpin from Address" : {
       "comment" : "Item in an extension's menu, and VoiceOver action of its tile in the site panel: takes the extension's button out of the address bar.",
       "localizations" : {
@@ -21055,6 +21799,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从地址栏取消固定"
+          }
+        }
+      }
+    },
+    "Unpinned" : {
+      "comment" : "Toast after a pinned tab is unpinned.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取消固定"
           }
         }
       }
@@ -21154,6 +21909,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新请求更多权限"
+          }
+        }
+      }
+    },
+    "Updated %lld extensions." : {
+      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extension."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Updated %lld extensions."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已更新 %lld 个扩展。"
+                }
+              }
+            }
           }
         }
       }
@@ -21550,6 +22340,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在使用你的麦克风"
+          }
+        }
+      }
+    },
+    "Usual Size" : {
+      "comment" : "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认大小"
           }
         }
       }
@@ -21986,17 +22787,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要在哪里打开"
-          }
-        }
-      }
-    },
-    "Where It's Saved" : {
-      "comment" : "Accessibility name of the chevron on the toast that says a page is saved: opens the places it can be moved to.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储位置"
           }
         }
       }
@@ -24608,1253 +25398,6 @@
         }
       }
     },
-    "Save Group" : {
-      "comment" : "A command in the command bar, named as in the menu bar: saves the group of tabs as one pinned folder.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group is saved as a folder.\nUndo action name, shown in the Edit menu as Undo Save Group. A group of tabs saved as one pinned folder.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储分组"
-          }
-        }
-      }
-    },
-    "Save Split View" : {
-      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pages are saved together.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储分屏浏览"
-          }
-        }
-      }
-    },
-    "Save Page" : {
-      "comment" : "A command in the command bar, named as in the menu bar: saves the page into Pinned.\nFile menu item, with ⌘D: saves the page you're on, into the space you're in, without asking.\nItem in a tab's context menu in the sidebar: saves the page into Pinned, and with ⇧ held, asks which folder.\nMenu item for one picked tab: saves the page into Pinned.\nTitle of the sheet that saves the page you're on, with where in the space it goes and its name.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Save Page"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储页面"
-          }
-        }
-      }
-    },
-    "Save Page to Folder…" : {
-      "comment" : "File menu item, with ⇧⌘D: saves the page you're on, asking which folder of the space it goes in and what it's called.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Save Page to Folder…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将页面存储到文件夹…"
-          }
-        }
-      }
-    },
-    "Save to Pins" : {
-      "comment" : "Item in a page's right-click menu over a link: saves the link, without opening it.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Save to Pins"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储到已固定"
-          }
-        }
-      }
-    },
-    "Saved to Pins" : {
-      "comment" : "Toast after a link is saved to Pins from its right-click menu, without opening it.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Saved to Pins"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已存储到已固定"
-          }
-        }
-      }
-    },
-    "In Every Space" : {
-      "comment" : "A tick on a saved page: it shows in every space of its profile, as a favorite does.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "In Every Space"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在所有空间中"
-          }
-        }
-      }
-    },
-    "Saved in Every Space" : {
-      "comment" : "Toast after a saved page is ticked In Every Space: it now shows in every space of its profile.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Saved in Every Space"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已存储在所有空间中"
-          }
-        }
-      }
-    },
-    "Saved in This Space" : {
-      "comment" : "Toast after In Every Space is ticked off a saved page: the page stays saved, in this space only.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Saved in This Space"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已存储在此空间"
-          }
-        }
-      }
-    },
-    "Top of Pinned" : {
-      "comment" : "Choice in the sheet that saves a page to a place: among the space's pinned pages, in no folder.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Top of Pinned"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已固定的顶端"
-          }
-        }
-      }
-    },
-    "New Folder…" : {
-      "comment" : "Item at the foot of the folder menu in the sheet that saves a page to a place: names a new folder to save the page in.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "New Folder…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新建文件夹…"
-          }
-        }
-      }
-    },
-    "Unsave Group" : {
-      "comment" : "A command in the command bar, named as in the menu bar: takes the saved group out of Pinned.\nItem in a saved tab's context menu in the sidebar. The tab is in a saved group; the whole group goes back to the tabs.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消存储分组"
-          }
-        }
-      }
-    },
-    "Unsave Page" : {
-      "comment" : "A command in the command bar, named as in the menu bar: takes a saved page out of Pinned.\nItem in a pinned tab's context menu in the sidebar: takes it out of Pinned, back among the tabs.\nUndo action name, shown in the Edit menu as Undo Unsave Page.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Unsave Page"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消存储页面"
-          }
-        }
-      }
-    },
-    "Unsave Split View" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar: takes both pages of a pinned split view out of Pinned.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Unsave Split View"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消存储分屏浏览"
-          }
-        }
-      }
-    },
-    "Save %lld Pages" : {
-      "comment" : "Menu item for several picked sidebar rows and tabs: saves them into Pinned.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Save Page"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Save %lld Pages"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "存储 %lld 个页面"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Unsave %lld Pages" : {
-      "comment" : "Menu item for several picked pinned pages: takes them out of Pinned, back among the tabs.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Unsave Page"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Unsave %lld Pages"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "取消存储 %lld 个页面"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Save This Page" : {
-      "comment" : "Button in the toast after closing a pinned tab that had wandered: saves the page it was on instead.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Save This Page"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "存储此页面"
-          }
-        }
-      }
-    },
-    "Save This Page Instead" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar. Makes the page it shows now the saved one.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Save This Page Instead"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "改为存储此页面"
-          }
-        }
-      }
-    },
-    "Unsaved" : {
-      "comment" : "Toast after a saved page is taken out of Pinned, back among the tabs.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Unsaved"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已取消存储"
-          }
-        }
-      }
-    },
-    "The page is saved in %@. In Every Space shows it in all of the profile’s spaces instead." : {
-      "comment" : "Under the title of the sheet that saves a page: the space it's saved in, which the sheet doesn't let you change, and what In Every Space means. The placeholder is the space's name.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "The page is saved in %@. In Every Space shows it in all of the profile’s spaces instead."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "页面会存储在“%@”中。“在所有空间中”会让它显示在个人资料的所有空间里。"
-          }
-        }
-      }
-    },
-    "%@ and all its subdomains." : {
-      "comment" : "Preview of a domain rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 及其所有子域名。"
-          }
-        }
-      }
-    },
-    "%@ and pages below it, such as %@/repo." : {
-      "comment" : "Preview of a path rule.",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "%1$@ and pages below it, such as %2$@/repo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ 及其下的网页，例如 %2$@/repo。"
-          }
-        }
-      }
-    },
-    "%@, Off" : {
-      "comment" : "Beside a space rule that's turned off: its scope, like “and subdomains”, then that it's off.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@，已关闭"
-          }
-        }
-      }
-    },
-    "%lld pages not put to sleep while they play or have text you typed" : {
-      "comment" : "Toast after Suspend N Pages in the sidebar's menu: some of the picked pages stay awake, because they play sound, are in a call, play in the mini player or Picture in Picture, or hold text you typed.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld page not put to sleep while it plays or has text you typed"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld pages not put to sleep while they play or have text you typed"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld 个页面在播放或有你输入的文字，没有休眠"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld updates need your approval." : {
-      "comment" : "Toast after Check for Updates in Settings › Extensions: how many updates ask for more access and wait for you.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld update needs your approval."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld updates need your approval."
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "有 %lld 个更新需要你批准。"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Add Space Rule" : {
-      "comment" : "Title of the sheet that creates a space rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加空间规则"
-          }
-        }
-      }
-    },
-    "About Match Types" : {
-      "comment" : "Button opening space rule help.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关于匹配方式"
-          }
-        }
-      }
-    },
-    "Add %lld to Favorites" : {
-      "comment" : "Menu item for several picked sidebar rows",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将 %lld 项添加到收藏"
-          }
-        }
-      }
-    },
-    "Add to Favorites" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a pinned tab's context menu in the sidebar.\nItem in a tab's context menu in the sidebar.\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Add to Favorites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加到收藏"
-          }
-        }
-      }
-    },
-    "Added to Favorites" : {
-      "comment" : "Toast after the tab is added to Favorites.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已添加到收藏"
-          }
-        }
-      }
-    },
-    "All extensions are up to date." : {
-      "comment" : "Toast after Check for Updates in Settings › Extensions when nothing changed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有扩展都已是最新版本。"
-          }
-        }
-      }
-    },
-    "and pages below it" : {
-      "comment" : "Short scope beside the path of a space rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "含下级路径"
-          }
-        }
-      }
-    },
-    "and subdomains" : {
-      "comment" : "Short scope beside the domain of a space rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "含子域名"
-          }
-        }
-      }
-    },
-    "Not put to sleep while it has text you typed" : {
-      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake so what you typed into it isn't lost.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "里面有你输入的文字，没有休眠"
-          }
-        }
-      }
-    },
-    "Not put to sleep while it plays in the mini player" : {
-      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video plays in the window's mini player.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它在小播放器里播放，没有休眠"
-          }
-        }
-      }
-    },
-    "Not put to sleep while it plays sound" : {
-      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's playing sound.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它在播放声音，没有休眠"
-          }
-        }
-      }
-    },
-    "Not put to sleep while it uses the camera or microphone" : {
-      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because it's in a call.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它在用摄像头或麦克风，没有休眠"
-          }
-        }
-      }
-    },
-    "Not put to sleep while its video is in Picture in Picture" : {
-      "comment" : "Toast after Suspend Page in a tab's menu: the page stays awake because its video floats in Picture in Picture.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它的视频在画中画里，没有休眠"
-          }
-        }
-      }
-    },
-    "Suspend %lld Pages" : {
-      "comment" : "Menu item for several picked tabs: puts their pages to sleep; each loads again when you click it.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Suspend Page"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Suspend %lld Pages"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "让 %lld 个页面休眠"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Suspend Page" : {
-      "comment" : "File menu item: puts the tab's page to sleep; it loads again when you click the tab.\nItem in a tab's context menu in the sidebar: puts its page to sleep; it loads again when you click the tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "让页面休眠"
-          }
-        }
-      }
-    },
-    "You put it to sleep. Loads when you click it." : {
-      "comment" : "Under a sleeping tab's title in its hover card, or its tooltip: you put it to sleep with Suspend Page in its menu, and its page loads again once you click it.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "是你让它休眠的，点按即可重新载入。"
-          }
-        }
-      }
-    },
-    "this host only" : {
-      "comment" : "Short scope beside the address of a space rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅此域名"
-          }
-        }
-      }
-    },
-    "Domain and subdomains" : {
-      "comment" : "Space rule matching a domain and its subdomains.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "域名及其子域名"
-          }
-        }
-      }
-    },
-    "Edit Space Rule" : {
-      "comment" : "Existing space rule sheet title.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "编辑空间规则"
-          }
-        }
-      }
-    },
-    "Edit Space Rule…" : {
-      "comment" : "Edit the winning rule from Site Controls.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "编辑空间规则…"
-          }
-        }
-      }
-    },
-    "Enter a host and path, such as github.com/org1." : {
-      "comment" : "Example input for a path rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入域名和路径，例如 github.com/org1。"
-          }
-        }
-      }
-    },
-    "Domain only" : {
-      "comment" : "Space rule matching only the named host.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仅此域名"
-          }
-        }
-      }
-    },
-    "Matches pages on the exact hostname you enter (for example, github.com)." : {
-      "comment" : "Exact host example in the match types popover.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "只匹配你填写的这个域名下的网页（例如 github.com）。"
-          }
-        }
-      }
-    },
-    "Matches a path and pages below it on the same host (for example, github.com/org1 and github.com/org1/repo)." : {
-      "comment" : "Path example in the match types popover.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匹配同一域名下的某个路径及其下的网页（例如 github.com/org1 和 github.com/org1/repo）。"
-          }
-        }
-      }
-    },
-    "Matches pages on a domain and its subdomains (for example, github.com and gist.github.com)." : {
-      "comment" : "Domain example in the match types popover.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "匹配某个域名及其所有子域名下的网页（例如 github.com 和 gist.github.com）。"
-          }
-        }
-      }
-    },
-    "Move Above %@" : {
-      "comment" : "Moves a space rule above the earlier rule that covers it. The placeholder is that rule's address, like github.com.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移到 %@ 上方"
-          }
-        }
-      }
-    },
-    "Pages on %@ only." : {
-      "comment" : "Preview of an exact host rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "只匹配 %@ 上的网页。"
-          }
-        }
-      }
-    },
-    "Path and subpaths" : {
-      "comment" : "Space rule matching a path and its descendants on one host.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "路径及其子路径"
-          }
-        }
-      }
-    },
-    "Never used: %@ above covers all of it." : {
-      "comment" : "Below a space rule that an earlier rule covers completely. The placeholder is the earlier rule's address, like github.com.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不会生效：上面的 %@ 已经包含了它。"
-          }
-        }
-      }
-    },
-    "Covers all of %@ below, so that rule is never used." : {
-      "comment" : "Below a space rule that covers a later rule completely. The placeholder is the later rule's address, like github.com/org1.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "包含了下面的 %@，那条规则不会生效。"
-          }
-        }
-      }
-    },
-    "Covers all of %@ below, so those rules are never used." : {
-      "comment" : "Below a space rule that covers several later rules completely. The placeholder lists their addresses.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "包含了下面的 %@，那些规则不会生效。"
-          }
-        }
-      }
-    },
-    "Enabled" : {
-      "comment" : "Switch in the space rule editor.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "启用"
-          }
-        }
-      }
-    },
-    "Rule %lld" : {
-      "comment" : "A rule's position in the ordered list in Settings.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第 %lld 条规则"
-          }
-        }
-      }
-    },
-    "Enter one hostname, such as github.com, without a path." : {
-      "comment" : "Example input for a domain-only space rule.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入一个域名，例如 github.com，不带路径。"
-          }
-        }
-      }
-    },
-    "Enter the parent hostname, such as github.com, without a wildcard or path." : {
-      "comment" : "Example input for a space rule that includes subdomains.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "输入上级域名，例如 github.com，不带通配符或路径。"
-          }
-        }
-      }
-    },
-    "The http:// or https:// prefix is optional." : {
-      "comment" : "Space rule address tooltip.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可以不写 http:// 或 https://。"
-          }
-        }
-      }
-    },
-    "The first enabled match chooses the space. Drag to reorder." : {
-      "comment" : "Byline under Sites in Spaces.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "链接在第一条匹配且已启用的规则所选的空间中打开。拖动可以调整顺序。"
-          }
-        }
-      }
-    },
-    "Check for Updates" : {
-      "comment" : "Button in Settings › Extensions: checks every extension from the Chrome Web Store for a new version now.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "检查更新"
-          }
-        }
-      }
-    },
-    "Couldn’t check %lld extensions." : {
-      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions the Chrome Web Store didn't answer for.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Couldn’t check %lld extension."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Couldn’t check %lld extensions."
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "有 %lld 个扩展无法检查。"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "open in" : {
-      "comment" : "Inline after a domain and its subdomains, or a path and the pages below it: example.com and subdomains open in Work.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开于"
-          }
-        }
-      }
-    },
-    "opens in" : {
-      "comment" : "Inline before the space menu for a single host: example.com (this host only) opens in Work.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开于"
-          }
-        }
-      }
-    },
-    "Larger Sidebar" : {
-      "comment" : "Tooltip of the + button on the Sidebar size row of Settings › Appearance: a larger size of your own.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "放大边栏"
-          }
-        }
-      }
-    },
-    "No extensions from the Chrome Web Store to check." : {
-      "comment" : "Toast after Check for Updates in Settings › Extensions when only extensions from a folder are installed.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "没有来自 Chrome 网上应用店的扩展需要检查。"
-          }
-        }
-      }
-    },
-    "Pin %lld Tabs" : {
-      "comment" : "Menu item for several picked tabs",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Pin Tab"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Pin %lld Tabs"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "固定 %lld 个标签页"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Pin Group" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a tab's context menu in the sidebar. The tab is in a group of tabs; the whole group pins as a folder.\nMenu bar item: pins the whole group of tabs the tab is in, as a folder.\nUndo action name, shown in the Edit menu as Undo Pin Group.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定分组"
-          }
-        }
-      }
-    },
-    "Pin Split View" : {
-      "comment" : "Item in a tab's context menu in the sidebar. The tab is half of a split view; both pin together.\nMenu bar item: pins both pages of the split view.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定分屏浏览"
-          }
-        }
-      }
-    },
-    "Pin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nFile menu item.\nItem in a tab's context menu in the sidebar.\nMenu bar item: pins the tab.\nMenu item\nUndo action name, shown in Edit › Undo.\nUndo action name, shown in the Edit menu as Undo Pin Tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定标签页"
-          }
-        }
-      }
-    },
-    "Pin this page" : {
-      "comment" : "A step's title in the getting-started guide, a card in the window.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "固定这个页面"
-          }
-        }
-      }
-    },
-    "Pinned" : {
-      "comment" : "Said once a step is done in the getting-started guide, a card in the window.\nToast after a tab is pinned.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已固定"
-          }
-        }
-      }
-    },
-    "Right-click its tab, then Pin Tab" : {
-      "comment" : "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "右键点按它的标签页，然后点按“固定标签页”"
-          }
-        }
-      }
-    },
-    "Sidebar size %@, Usual Size" : {
-      "comment" : "VoiceOver name of the percentage on the Sidebar size row of Settings › Appearance: the size now, then what pressing it does.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "边栏大小 %@，默认大小"
-          }
-        }
-      }
-    },
-    "Smaller Sidebar" : {
-      "comment" : "Tooltip of the − button on the Sidebar size row of Settings › Appearance: a smaller size of your own.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "缩小边栏"
-          }
-        }
-      }
-    },
-    "Unpin %lld Tabs" : {
-      "comment" : "Menu item for several picked pinned pages",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Unpin Tab"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Unpin %lld Tabs"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "取消固定 %lld 个标签页"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Unpin Group" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar. The tab is in a pinned group; the whole group goes back to the tabs.\nMenu bar item: unpins the whole pinned group the tab is in.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消固定分组"
-          }
-        }
-      }
-    },
-    "Unpin Split View" : {
-      "comment" : "Item in a pinned tab's context menu in the sidebar.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消固定分屏浏览"
-          }
-        }
-      }
-    },
-    "Unpin Tab" : {
-      "comment" : "A command in the command bar, named as in the menu bar.\nItem in a pinned tab's context menu in the sidebar.\nMenu bar item: unpins the tab.\nMenu item\nUndo action name, shown in the Edit menu as Undo Unpin Tab.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消固定标签页"
-          }
-        }
-      }
-    },
-    "Unpin Tabs" : {
-      "comment" : "Undo action name, shown in Edit › Undo.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "取消固定标签页"
-          }
-        }
-      }
-    },
-    "Unpinned" : {
-      "comment" : "Toast after a pinned tab is unpinned.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已取消固定"
-          }
-        }
-      }
-    },
-    "Updated %lld extensions." : {
-      "comment" : "Toast after Check for Updates in Settings › Extensions: how many extensions were updated.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Updated %lld extension."
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Updated %lld extensions."
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "已更新 %lld 个扩展。"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "Usual Size" : {
-      "comment" : "Tooltip of the percentage on the Sidebar size row of Settings › Appearance: sets the size of your own back to 100%.",
-      "localizations" : {
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "默认大小"
-          }
-        }
-      }
-    },
     "Trusted Certificates" : {
       "comment" : "A heading in Settings › Developer: local servers whose certificate you chose to trust, so Zigzag doesn’t warn again.",
       "localizations" : {
@@ -25994,6 +25537,83 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工具栏 顶栏 工具 按钮 拷贝链接 控制台 检查元素 深色 浅色 页面尺寸 重新载入 开发者 toolbar top bar tools console inspect"
+          }
+        }
+      }
+    },
+    "Pin Tab to Folder…" : {
+      "comment" : "File menu item, with ⇧⌘D: pins the page you're on, asking which folder of the space it goes in and what it's called.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将标签页固定到文件夹…"
+          }
+        }
+      }
+    },
+    "Pin Link" : {
+      "comment" : "Item in a page's right-click menu over a link: pins the link, without opening it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定链接"
+          }
+        }
+      }
+    },
+    "Pin Page" : {
+      "comment" : "Tooltip of the address bar's star button: pins the page you're on, and with ⇧ held, asks where.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定页面"
+          }
+        }
+      }
+    },
+    "The page is pinned in %@. Add to Favorites shows it in all of the profile’s spaces instead." : {
+      "comment" : "Under the title of the sheet that pins a page: the space it's pinned in, which the sheet doesn't let you change, and what Add to Favorites means. The placeholder is the space's name.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "页面会固定在“%@”中。“添加到收藏”则会让它显示在个人资料的所有空间中。"
+          }
+        }
+      }
+    },
+    "Where It's Pinned" : {
+      "comment" : "Accessibility name of the chevron on the toast that says a page is pinned: opens the places it can be moved to.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定位置"
+          }
+        }
+      }
+    },
+    "Top of Pinned" : {
+      "comment" : "Choice in the sheet that pins a page: among the space's pinned pages, in no folder.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定页面顶部"
+          }
+        }
+      }
+    },
+    "New Folder…" : {
+      "comment" : "Item at the foot of the folder menu in the sheet that pins a page: names a new folder to pin the page in.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建文件夹…"
           }
         }
       }
