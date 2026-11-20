@@ -6,6 +6,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 ## [Unreleased]
 
 ### Fixed
+- A swipe back or forward that arms with a quick flick no longer shows its ring jump to full and then drop back when your fingers stop. The ring now follows how far you've swiped, and the arrow turning filled is what says letting go will go back or forward, so stopping short after a flick only takes the fill away. Thanks to [frarees](https://github.com/frarees). ([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - A private window no longer adds to Favorites or renames, files or moves pinned tabs and their folders; it leaves your saved pages as they are.
 - A space rule for a path of a site now also takes the site's www. address, as rules for a whole domain already did: github.com/org1 matches www.github.com/org1, and a rule written with www. matches the bare address too.
 - The space editor says when Clear glass is showing as Frosted: on battery or in Low Power Mode, a line under Glass explains it, and goes away when you plug in or turn Low Power Mode off.

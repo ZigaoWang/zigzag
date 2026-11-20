@@ -300,7 +300,8 @@ final class SwipeNavigator {
         // Filled whenever letting go now would navigate, a quick flick short of the distance too.
         // One tap as it arms; hovering at the line doesn't arm it again (#377).
         if arming.step(progress: progress, speed: speed(at: now)) { Haptics.snap() }
-        arrow.progress = arming.armed ? 1 : min(progress, 1)
+        // The ring follows the fingers only, so stopping after a flick never runs it back (#377).
+        arrow.progress = min(progress, 1)
         if arrow.isArmed != arming.armed { arrow.isArmed = arming.armed }
         recheck?.cancel()
         recheck = nil
@@ -634,7 +635,7 @@ final class SwipeArrowView: NSView {
         symbol.contentTintColor = isArmed ? theme.onAccent : Tokens.Color.icon
         Tokens.Motion.withoutAnimation { ring.strokeEnd = min(max(progress, 0), 1) }
         // Fades in as you swipe; once letting go will move, it fills.
-        alphaValue = min(1, max(0, (progress - 0.1) * 2))
+        alphaValue = isArmed ? 1 : min(1, max(0, (progress - 0.1) * 2))
     }
 
     /// Fades as the page settles back. Navigated, it shows filled first, however fast the swipe was.
