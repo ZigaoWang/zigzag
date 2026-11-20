@@ -107,6 +107,7 @@ enum WebKitSetup {
             // Cookie consent pop-ups answered with no (#175), in Zigzag's own world, apart from ad blocking.
             CookieBanners.attach(to: configuration.userContentController)
             WebStoreButton.attach(to: configuration)
+            AddonsStoreButton.attach(to: configuration)
             // Extension pages only: their uncaught errors go to the extensions log, so a page that stalls says why.
             configuration.userContentController.addUserScript(PageErrors.script)
             configuration.userContentController.add(PageErrors.shared, contentWorld: .page, name: PageErrors.messageName)
