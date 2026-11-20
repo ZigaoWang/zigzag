@@ -35,23 +35,6 @@ final class OldTwitterSolver: NSObject {
         if (event.source !== window || !data || !data.__zigzagSolverReply || typeof data.token !== "string") return;
         try { handler.postMessage({ op: "reply", token: data.token, message: data.message }).catch(() => {}); } catch (e) {}
       });
-      // OldTwitter's own pages write Chrome's address for their icons and fonts. WebKit serves them at its own, so
-      // the text it reads is fixed before it's used. Only extension pages and stylesheets are touched.
-      const api = globalThis.chrome || globalThis.browser;
-      const nativeFetch = window.fetch;
-      try {
-        // Writable, so OldTwitter's own `fetch = ...` that signs requests still takes, whichever script runs first.
-        Object.defineProperty(window, "fetch", { configurable: true, writable: true, value: async (input, options) => {
-          const response = await nativeFetch.call(window, input, options);
-          const url = typeof input === "string" ? input : (input && input.url) || "";
-          if (!/^webkit-extension:/i.test(url) || !/[.](html|css)([?#]|$)/i.test(url)) return response;
-          const id = api && api.runtime && api.runtime.id ? api.runtime.id : "";
-          const text = (await response.text())
-            .replaceAll("chrome-extension://", "webkit-extension://")
-            .replaceAll("__MSG_@@extension_id__", id);
-          return new Response(text, { status: response.status, statusText: response.statusText, headers: response.headers });
-        } });
-      } catch (e) {}
     })();
     """
 
