@@ -229,6 +229,24 @@ struct SettingsSearchTests {
             #expect(row.searchText.localizedCaseInsensitiveContains(query), "“\(query)” should match \(row.searchText)")
         }
     }
+
+    /// Close Tabs Below has no line in the menu bar and no keys, but Settings › Shortcuts lists it and it can take
+    /// keys of yours, which work and aren't fixed ones; the other hidden aliases stay unlisted.
+    @Test func closeTabsBelowCanHaveAShortcut() throws {
+        let menu = MainMenu.build()
+        func items(_ menu: NSMenu) -> [NSMenuItem] { menu.items.flatMap { $0.submenu.map(items) ?? [$0] } }
+        let below = try #require(items(menu).first { $0.action == #selector(BrowserWindowController.closeTabsBelow(_:)) })
+        #expect(below.isHidden && below.keyEquivalent.isEmpty)
+        #expect(Shortcuts.id(below) != nil)
+        #expect(Shortcuts.isListed(below))
+        below.keyEquivalent = "j"
+        below.keyEquivalentModifierMask = [.command, .option]
+        #expect(below.allowsKeyEquivalentWhenHidden)
+        #expect(Shortcuts.reserved(Shortcuts.Combo(key: "j", modifiers: below.keyEquivalentModifierMask.rawValue), in: menu) == nil)
+        let next = try #require(items(menu).first { $0.action == #selector(BrowserWindowController.selectNextTab(_:)) && $0.isHidden })
+        #expect(Shortcuts.id(next) == nil)
+        #expect(!Shortcuts.isListed(next))
+    }
 }
 
 /// Settings reads a section's slow rows when it's first shown or searched, never all of them on opening (#357).

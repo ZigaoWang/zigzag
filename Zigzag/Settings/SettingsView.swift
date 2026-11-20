@@ -2955,9 +2955,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             func walk(_ menu: NSMenu, prefix: String) {
                 for item in menu.items where !item.isSeparatorItem {
                     if let sub = item.submenu { walk(sub, prefix: item.title + " › "); continue }
-                    // Items with keys, and ones whose keys you took away (so you can give them back).
-                    guard !item.isAlternate, !item.keyEquivalent.isEmpty || Shortcuts.isCustom(item),
-                          !item.isHidden || item.action == #selector(BrowserWindowController.closeTabsBelow(_:)) else { continue }
+                    guard Shortcuts.isListed(item) else { continue }
                     // A list of what each key does doesn't need the menu's "…".
                     let title = prefix + (item.title.hasSuffix("…") ? String(item.title.dropLast()) : item.title)
                     let row = ShortcutRow(title: title, item: item)
