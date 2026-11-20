@@ -1161,6 +1161,17 @@
         }
       }
     },
+    "Firefox Add-ons didn’t answer, so this extension couldn’t be checked and wasn’t added. Try again in a moment." : {
+      "comment" : "Shown when Add to Firefox on addons.mozilla.org was clicked but the store's API couldn't be reached to check the file.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 附加组件没有回应，无法检查这个扩展，所以没有添加。请稍后再试。"
+          }
+        }
+      }
+    },
     "Find one in the Chrome Web Store or Firefox Add-ons and choose Add to Zigzag." : {
       "comment" : "Explanation under “No extensions yet” in Settings › Extensions. Firefox Add-ons is addons.mozilla.org.",
       "localizations" : {

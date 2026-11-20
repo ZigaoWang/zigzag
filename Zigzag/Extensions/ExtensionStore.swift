@@ -375,16 +375,69 @@ enum ExtensionStore {
         }
     }
 
-    private static let addonsAPISession = URLSession(configuration: .cookieless, delegate: NoRedirects(), delegateQueue: nil)
+    private static let addonsAPISession: URLSession = {
+        let configuration = URLSessionConfiguration.cookieless
+        // Never an answer kept from an earlier ask: it may name a version the page no longer offers.
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        return URLSession(configuration: configuration, delegate: NoRedirects(), delegateQueue: nil)
+    }()
 
-    /// The listing's current file, straight from AMO's API: no redirect, and only an https AMO answer counts.
-    @concurrent nonisolated static func publishedAddonsFile(slug: String) async -> PublishedAddonsFile? {
-        guard let url = addonsAPIURL(slug: slug),
-              let (data, response) = try? await addonsAPISession.data(from: url),
-              let http = response as? HTTPURLResponse, http.statusCode == 200,
-              let answered = http.url, answered.scheme == "https", answered.host()?.lowercased() == "addons.mozilla.org"
-        else { return nil }
+    /// The listing's current file, straight from AMO's API: no redirect, and only an https AMO answer counts. Asked
+    /// again once when the first ask gets no usable answer.
+    @concurrent nonisolated static func publishedAddonsFile(
+        slug: String, attempts: Int = 2,
+        fetch: @escaping @Sendable (URL) async -> (Data, URLResponse)? = { try? await addonsAPISession.data(from: $0) }
+    ) async -> PublishedAddonsFile? {
+        guard let url = addonsAPIURL(slug: slug) else { return nil }
+        for attempt in 0..<max(1, attempts) {
+            if attempt > 0 { try? await Task.sleep(for: .milliseconds(400)) }
+            if let (data, response) = await fetch(url), let file = publishedAddonsFile(fromAPI: data, response: response) { return file }
+        }
+        return nil
+    }
+
+    /// An API answer's file, when the answer is a 200 from https AMO.
+    nonisolated static func publishedAddonsFile(fromAPI data: Data, response: URLResponse) -> PublishedAddonsFile? {
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let answered = http.url, answered.scheme == "https", answered.host()?.lowercased() == "addons.mozilla.org" else { return nil }
         return publishedAddonsFile(fromAPI: data)
+    }
+
+    /// A click on an AMO file link from one of the store's listing pages, kept from the click to the file it hands
+    /// over, so neither the tab's address nor a later navigation can change what it was (#429).
+    struct AddonsClick: Equatable, Sendable {
+        let file: URL
+        let slug: String
+
+        /// A user-started main-frame navigation to the store's file from a listing; nil for anything else.
+        nonisolated init?(target: URL?, page: URL?, userInitiated: Bool) {
+            guard userInitiated, let target, ExtensionStore.isAddonsFile(target),
+                  let slug = ExtensionStore.addonsSlug(from: page) else { return nil }
+            file = target
+            self.slug = slug
+        }
+
+        /// The clicked file itself (a redirect or query aside, the same AMO file path).
+        nonisolated func covers(_ url: URL?) -> Bool {
+            guard let url, ExtensionStore.isAddonsFile(url) else { return false }
+            return url.path == file.path
+        }
+    }
+
+    /// What a clicked AMO file becomes, once the API has answered.
+    enum AddonsInstall: Equatable, Sendable {
+        /// The listing's current file: the install sheet.
+        case install(PublishedAddonsFile)
+        /// Another file (an older version's Download file): saved as a download, as any file.
+        case notCurrent
+        /// The API gave no answer: nothing is saved, and a notice says so.
+        case unreachable
+    }
+
+    nonisolated static func addonsInstall(file: URL?, published: PublishedAddonsFile?) -> AddonsInstall {
+        guard let published else { return .unreachable }
+        return isPublishedAddonsFile(file, published: published.url) ? .install(published) : .notCurrent
     }
 
     /// WebKit keeps a service worker background's registration from one launch to the next, and on a later launch
