@@ -2637,8 +2637,8 @@ final class TabManager {
         asleep.forEach { putToSleep($0, refused: refused) }
     }
 
-    /// Where to go from the tab you're on when it's put to sleep: as closing it would go (its opener, the tab you were
-    /// on before, a neighbor), never to a page of its split or one going to sleep with it.
+    /// Where to go from the tab you're on when it's put to sleep: its opener, the tab you were on before, else a
+    /// neighbor, never to a page of its split or one going to sleep with it.
     private func awayTarget(from tab: Tab, leaving: [Tab]) -> Tab? {
         let away = panes(of: tab) + leaving
         let fits = { (other: Tab) in !other.isClosed && other.spaceID == tab.spaceID && !away.contains { $0 === other } }
