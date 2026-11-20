@@ -726,7 +726,7 @@ final class FavoriteTile: InteractiveView {
             for (region, view) in zip(regions, pageIcons) {
                 let x = region.columns.map { columns[$0] }.reduce(0, +) / CGFloat(region.columns.count)
                 let y = region.rows.map { rows[$0] }.reduce(0, +) / CGFloat(region.rows.count)
-                view.frame = NSRect(x: x - size / 2, y: y - size / 2, width: size, height: size).integral
+                view.frame = backingAlignedRect(NSRect(x: x - size / 2, y: y - size / 2, width: size, height: size), options: .alignAllEdgesNearest)
             }
         } else if !partners.isEmpty {
             // A split: both pages' icons side by side, at a tab's size. In the narrowest tiles they move closer, then
@@ -735,14 +735,14 @@ final class FavoriteTile: InteractiveView {
             let gap = max(2, min(Tokens.Space.x1, room - Tokens.Sidebar.favicon * 2))
             let size = min(Tokens.Sidebar.favicon, floor((room - gap) / 2))
             let x = (bounds.width - size * 2 - gap) / 2, y = (bounds.height - size) / 2
-            icon.frame = NSRect(x: x, y: y, width: size, height: size).integral
-            partnerIcon.frame = NSRect(x: x + size + gap, y: y, width: size, height: size).integral
+            icon.frame = backingAlignedRect(NSRect(x: x, y: y, width: size, height: size), options: .alignAllEdgesNearest)
+            partnerIcon.frame = backingAlignedRect(NSRect(x: x + size + gap, y: y, width: size, height: size), options: .alignAllEdgesNearest)
         } else {
             // Every favorite at one size: a site's own 32px icon is drawn up to it with the best filtering, only a
             // 16px one stays at a tab's size rather than blur.
             // An icon you chose is drawn, never blurred: always the larger size.
             let size = icon.image.map { IconChoice.isPageIcon($0) || FaviconStore.sharpSide(of: $0) >= Self.iconSide } == true ? Self.iconSide : Tokens.Sidebar.favicon
-            icon.frame = NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size).integral
+            icon.frame = backingAlignedRect(NSRect(x: (bounds.width - size) / 2, y: (bounds.height - size) / 2, width: size, height: size), options: .alignAllEdgesNearest)
         }
         let side = Self.closeSide, edge = Self.closeInset
         closeButton.frame = NSRect(x: bounds.width - side - edge, y: isFlipped ? edge : bounds.height - side - edge, width: side, height: side)
