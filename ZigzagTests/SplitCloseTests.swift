@@ -77,20 +77,21 @@ import Testing
         }
     }
 
-    /// Close Tab closes the page alone; Close Split View all of it, in one ⌘Z.
+    /// Close Tab closes the page alone; Close Split View all of it, and one ⌘Z puts it all back where it was.
     @Test func theMenuOffersBoth() throws {
-        try inWindow(["A", "B", "C"]) { controller, tabs in
+        try inWindow(["A", "C", "B"]) { controller, tabs in
             let manager = controller.tabManager
-            manager.makeSplit(tabs[0], with: tabs[1])
-            let menu = SidebarMenus.tabMenu(for: tabs[1], controller: controller)
+            manager.makeSplit(tabs[0], with: tabs[2])
+            let menu = SidebarMenus.tabMenu(for: tabs[2], controller: controller)
             let titles = menu.items.map(\.title)
             let close = try #require(titles.firstIndex(of: "Close Tab"))
             #expect(titles[close + 1] == "Close Split View")
             let item = menu.items[close + 1]
             NSApp.sendAction(try #require(item.action), to: item.target, from: item)
-            #expect(manager.tab(with: tabs[0].id) == nil && manager.tab(with: tabs[1].id) == nil)
+            #expect(manager.tab(with: tabs[0].id) == nil && manager.tab(with: tabs[2].id) == nil)
             #expect(manager.currentTabs.map(\.displayTitle) == ["C"])
             controller.sidebarUndo.undo()
+            #expect(manager.currentTabs.map(\.displayTitle) == ["A", "C", "B"])
             #expect(manager.currentTabs.first { $0.displayTitle == "A" }.flatMap(manager.split(for:)) != nil)
         }
     }
