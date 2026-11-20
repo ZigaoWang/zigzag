@@ -237,8 +237,10 @@ final class BrowserWebView: WKWebView {
     /// A link's right-click menu gets Pin Link (#326), under Open Link's items: the link pinned without opening it.
     /// Only over a link, and only in a browser window, which is where pins live.
     private func addSaveToPins(to menu: NSMenu) {
+        // Our own Open Link items (#419) replaced WebKit's, so they're found by action.
+        let openActions: Set<Selector> = [#selector(openInNewTab(_:)), #selector(openInNewWindow(_:)), #selector(openInPrivateWindow(_:)), #selector(openInPeek(_:))]
         guard owner != nil, WindowManager.shared.controller(for: window) != nil,
-              let last = menu.items.lastIndex(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) else { return }
+              let last = menu.items.lastIndex(where: { $0.action.map(openActions.contains) == true || $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }) else { return }
         let item = NSMenuItem(title: String(localized: "Pin Link", comment: "Item in a page's right-click menu over a link: pins the link, without opening it."),
                               action: #selector(saveHoveredLinkToPins(_:)), keyEquivalent: "")
         item.target = self
