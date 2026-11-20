@@ -13,6 +13,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 ## [Unreleased]
 
 ### 新功能
+- 可以从文件安装 Firefox 扩展了：在“设置 › 扩展 › 从文件安装…”里选 **.xpi** 文件。扩展用的是 WebKit 自带的 `browser` API，和 Chrome 扩展一样，另外补上了 Firefox 的 `runtime.getBrowserInfo` 和 `runtime.getPlatformInfo`。容器这类 Firefox 独有的 API 暂不支持。感谢 [Lakeland97](https://github.com/Lakeland97)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - 你允许的网站可以访问这台 Mac 上监听端口的程序，比如编辑器、下载助手或配套 App 运行的本地代理。Chrome 和 Firefox 允许安全页面访问 `http://localhost` 和 `ws://localhost`，WebKit 却把它当作混合内容拒绝，所以改由 Zigzag 以网站自己的身份发出请求，再把结果交给它。默认关闭：先在“设置 › 隐私 › 允许网站访问这台 Mac 上的 App”里开启，再在网站设置里打开该网站的“这台 Mac 上的 App”。网页无法自己申请这两项。扩展访问这台 Mac 上的程序和以前一样。开启这项设置后，“设置 › 扩展”里每个扩展还会多一个“这台 Mac 上的 App”开关，默认关闭，打开后即使扩展没有这个地址的访问权限，它的 `http://localhost` 请求也能通过。只限本机回环：不包括本地网络，不包括其他机器，不包括浏览器屏蔽的端口（比如邮件用的 25），也不包括图片、脚本和样式表。([#321](https://github.com/ZigaoWang/zigzag/issues/321))
 - 在三四个页面的分屏浏览里，拖动页面之间分隔线交汇的地方，可以同时调整两个方向的大小，指针在那里会变成斜向的调整箭头。在四个页面的网格里，按住 ⇧ 拖动左右页面之间的分隔线，只会移动指针这一侧的那一段，这样上面两个页面的宽度可以和下面的不一样。分开之后每一段都能单独拖动，在中间附近松开会吸附到中间，页面顶部条里的“重置平铺布局”会让网格重新均分。不按 ⇧ 拖动仍然和以前一样移动整条线，连按两下分隔线仍会让它回到中间。感谢 [Lakeland97](https://github.com/Lakeland97)。([#316](https://github.com/ZigaoWang/zigzag/issues/316)、[#309](https://github.com/ZigaoWang/zigzag/issues/309))
 - 扩展的地址栏关键词可以用了，比如 Raindrop.io 的“rd”。在命令栏里输入关键词，再按空格或 Tab：输入框前面会显示扩展的名称，接下来输入的内容会交给这个扩展，它给出的建议显示在下面。按 Return 交给扩展处理，⌘Return 在后台的新标签页中打开，⌘⇧Return 或 ⌥Return 在前台的新标签页中打开。按 Esc，或者什么都没输入时按删除键，就会退出关键词。两个扩展用了同一个关键词时，先安装的那个优先；Zigzag 已经用来搜索网站的关键词，比如 YouTube 的“yt”，仍然归那个网站。在无痕浏览窗口中，只有允许在那里使用的扩展的关键词有效。“设置 › 扩展”里不会再提示关键词无法使用。感谢 [git-bhanu](https://github.com/git-bhanu)。([#324](https://github.com/ZigaoWang/zigzag/issues/324))
@@ -29,7 +30,6 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 来自其他 App 的链接会在 Zigzag Mini 中打开；网站可以有自己的图标；空间编辑器更清爽；更新卡片会显示进度；每个网站的设置都能单独修改；已固定的文件夹可以全部在标签页中打开；清除 Cookie 时可以保留你选的网站；同一网站的不同路径可以归到不同空间；可以手动让页面休眠；可以在设置里检查扩展更新；你允许的扩展可以在无痕窗口里运行；另外修复了分屏浏览、切换标签页的快捷键、扩展的网站访问权限、全屏、通行密钥、Proton Pass、YouTube 上 ⌘ 点击、固定分组、GitHub 上的查找等问题。
 
 ### 新功能
-- Firefox 扩展和 Chrome 扩展走同一套层，现在可以安装和运行：在“设置 › 扩展 › 从文件安装…”里选择 **.xpi** 文件。扩展的 `browser.*` API 用的是 WebKit 自己的实现，后台、内容脚本和选项页都像在 Firefox 里一样工作；Zigzag 无法支持的部分会在安装前列在安装面板里，而不是之后无声失败。感谢 [Lakeland97](https://github.com/Lakeland97)。([#277](https://github.com/ZigaoWang/zigzag/issues/277))
 - 运行脚本的下载规则会在网页上显示进度：运行时显示“正在运行脚本”，结束后显示“脚本运行完成”或“脚本运行失败”，并附上脚本最后输出的一行，规则不会再悄悄运行。把链接交给 App、下载工具或默认浏览器的规则，成功后每次打开 Zigzag 会提示一次。感谢 [Lakeland97](https://github.com/Lakeland97)。([#307](https://github.com/ZigaoWang/zigzag/pull/307))
 - 网站可以有自己的图标。在“网站设置”的 ⋯ 菜单里选“更改网站图标…”，会打开和标签页一样的图标选择，有符号、表情符号和“选取图像…”，这个网站的所有标签页、固定标签页、收藏和历史记录都会用它。标签页自己的图标仍然优先，“使用网站图标”可以换回网站原来的图标。“设置 › 隐私 › 网站”会列出它，可以忘掉；在无痕浏览窗口里设置的只到窗口关闭为止。感谢 [bkonia](https://github.com/bkonia)。([#310](https://github.com/ZigaoWang/zigzag/issues/310))
 - “设置 › 隐私 › 网站”里，给一个网站做的每个选择各占一行，用的是和网站设置里一样的控件，每行都有一个 ×，只忘记那一项，不再是一句话加一个“忘记”。JavaScript 和扩展现在放在网站设置的“权限”页，和摄像头等放在一起；给某个网站关掉扩展会按个人资料分别记住。感谢 [Lakeland97](https://github.com/Lakeland97)。([#311](https://github.com/ZigaoWang/zigzag/issues/311), [#312](https://github.com/ZigaoWang/zigzag/issues/312), [#313](https://github.com/ZigaoWang/zigzag/issues/313), [#314](https://github.com/ZigaoWang/zigzag/issues/314))
