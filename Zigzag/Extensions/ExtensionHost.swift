@@ -1882,9 +1882,13 @@ extension Tab: WKWebExtensionTab {
     func isLoadingComplete(for context: WKWebExtensionContext) -> Bool { !isLoading }
     func isSelected(for context: WKWebExtensionContext) -> Bool {
         if miniWindow != nil || peekWindow != nil { return true }
-        guard let window = windowController, window.tabManager.selectedTab === self else { return false }
+        guard let window = windowController else { return false }
         // Under a Peek, the peeked page is its window's active tab.
-        return window.peekedTab.map { !$0.isSeen(by: context) } ?? true
+        if window.tabManager.selectedTab === self { return window.peekedTab.map { !$0.isSeen(by: context) } ?? true }
+        // With none of its tabs in the space in front, the one `activeTab(for:)` gives, so a query finds it too.
+        guard window.tabManager.selectedTab.map({ !$0.isSeen(by: context) }) ?? true,
+              window.peekedTab.map({ !$0.isSeen(by: context) }) ?? true else { return false }
+        return (window.activeTab(for: context) as? Tab) === self
     }
     func isPinned(for context: WKWebExtensionContext) -> Bool { bookmarkID != nil }
     func isPlayingAudio(for context: WKWebExtensionContext) -> Bool { isPlayingAudio }
@@ -1942,6 +1946,7 @@ extension Tab: WKWebExtensionTab {
 extension BrowserWindowController: WKWebExtensionWindow {
     // A private window is listed only to an extension allowed there; to any other, its tabs stay unseen.
     // An extension sees the tabs of its own profile: the window may be showing a space on another.
+    /// Every space's, as in Chrome every tab in a window is listed, not only the space in front's.
     /// With shared tabs (#162), only the ones in this window; an extension sees each tab in one window (where it's shown
     /// or last was).
     func tabs(for context: WKWebExtensionContext) -> [any WKWebExtensionTab] {

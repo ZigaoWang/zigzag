@@ -1280,3 +1280,67 @@ struct SiteAccessContentScriptTests {
         #expect(!ExtensionHost.asksFor(nil, in: ext))
     }
 }
+
+extension ExtensionBridgeTests {
+    /// tabs.query lists every space's tabs in a window, this space's first, as Chrome lists every tab in a window;
+    /// the active one is the one the window gives, even with nothing open in the space in front.
+    @available(macOS 15.4, *)
+    @Test func extensionsListTabsOfEverySpaceInTheWindow() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0","permissions":["tabs"]}"#.utf8).write(to: folder.appendingPathComponent("manifest.json"))
+        let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
+
+        let before = Library.shared.snapshot
+        defer { Library.shared.restore(before) }
+        let home = Library.shared.spaces[0].id
+        let work = Library.shared.addSpace(name: "Tabs query").id
+        let manager = TabManager(spaceID: home)
+        defer { manager.invalidate() }
+        let first = Tab(url: URL(string: "https://one.example/"), title: "One", spaceID: home)
+        let second = Tab(url: URL(string: "https://two.example/"), title: "Two", spaceID: home)
+        let away = Tab(url: URL(string: "https://away.example/"), title: "Away", spaceID: work)
+        manager.adopt([first, second], in: home)
+        manager.adopt([away], in: work)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { controller.window?.close() }
+        manager.select(second)
+        // Loaded with the tabs' profile's extensions, so they're its to see.
+        let extensions = first.profile.extensions.controller
+        try extensions.load(context)
+        defer { try? extensions.unload(context) }
+
+        let listed = { controller.tabs(for: context).compactMap { $0 as? Tab } }
+        #expect(listed().map(\.displayTitle) == ["One", "Two", "Away"])
+        #expect(away.window(for: context) === controller)
+        #expect(away.indexInWindow(for: context) == 2)
+        #expect(second.isSelected(for: context) && !first.isSelected(for: context) && !away.isSelected(for: context))
+
+        // In the other space, its tabs come first and its tab is the active one.
+        manager.switchToSpace(work)
+        manager.select(away)
+        #expect(listed().map(\.displayTitle) == ["Away", "One", "Two"])
+        #expect(away.isSelected(for: context) && !second.isSelected(for: context))
+
+        // A space with nothing open: the window's active tab is the one left selected elsewhere, and a query finds it.
+        let empty = Library.shared.addSpace(name: "Tabs query empty").id
+        manager.switchToSpace(empty)
+        #expect(listed().count == 3)
+        let active = try #require(controller.activeTab(for: context) as? Tab)
+        #expect(listed().filter { $0.isSelected(for: context) }.map(ObjectIdentifier.init) == [ObjectIdentifier(active)])
+
+        // A private window stays hidden from an extension not allowed there.
+        let hidden = TabManager(spaceID: home, isPrivate: true)
+        defer { hidden.invalidate() }
+        hidden.adopt([Tab(url: URL(string: "https://private.example/"), title: "Private", spaceID: home)], in: home)
+        let privateWindow = BrowserWindowController(tabManager: hidden, frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        defer { privateWindow.window?.close() }
+        #expect(!context.hasAccessToPrivateData)
+        #expect(privateWindow.tabs(for: context).isEmpty)
+        #expect(privateWindow.activeTab(for: context) == nil)
+        // Allowed there, it lists them.
+        context.hasAccessToPrivateData = true
+        #expect(privateWindow.tabs(for: context).compactMap { ($0 as? Tab)?.displayTitle } == ["Private"])
+    }
+}

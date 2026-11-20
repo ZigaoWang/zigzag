@@ -257,7 +257,7 @@ final class TabManager {
         tab.host = host
         tab.store?.listsChanged()
         if #available(macOS 15.4, *), let old, !old.tabManager.isPrivate,
-           let place = old.tabManager.navigableTabs.firstIndex(where: { $0 === tab }) {
+           let place = old.tabManager.tabsForExtensions.firstIndex(where: { $0 === tab }) {
             ExtensionCenter.tabMoved(tab, from: place, in: old)
         }
     }
@@ -772,7 +772,20 @@ final class TabManager {
         return favoriteLive + bookmarkLive + currentTabs
     }
 
-    /// Cached navigable tabs per extension set, and their indexes, for `tabs(for:)` and `indexInWindow`. WebKit asks on
+    /// Every space's open pages, as Chrome lists a window's tabs: this space's first, then the others in sidebar order.
+    var tabsForExtensions: [Tab] {
+        var list = navigableTabs
+        var listedFavorites: Set<UUID> = [profile.id]
+        for space in Library.shared.spaces where space.id != currentSpaceID {
+            let owner = Library.shared.profileID(ofSpace: space.id)
+            if listedFavorites.insert(owner).inserted { list += Library.shared.favorites(in: owner).compactMap { bookmarkTabs[$0.id] } }
+            list += Library.shared.bookmarks(in: space.id).compactMap { bookmarkTabs[$0.id] }
+            list += tabs(in: space.id)
+        }
+        return list
+    }
+
+    /// Cached tabs per extension set, and their indexes, for `tabs(for:)` and `indexInWindow`. WebKit asks on
     /// every extension message and tab query, and rebuilding each time was slow (#89). Kept until anything here or in
     /// the library changes, or `extensionListLifetime` passes.
     private var extensionLists: [ObjectIdentifier: (tabs: [Tab], places: [ObjectIdentifier: Int])] = [:]
@@ -789,7 +802,7 @@ final class TabManager {
             extensionListsMade = now
         }
         if let list = extensionLists[key] { return list }
-        let tabs = navigableTabs.filter(isSeen)
+        let tabs = tabsForExtensions.filter(isSeen)
         let list = (tabs, Self.places(tabs))
         extensionLists[key] = list
         return list
