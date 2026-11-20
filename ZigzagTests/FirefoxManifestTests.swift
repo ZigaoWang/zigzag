@@ -18,7 +18,8 @@ struct FirefoxManifestTests {
         let normalized = FirefoxManifest.normalized(manifest)
         let background = normalized["background"] as? [String: Any]
         #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
-        #expect(background?["scripts"] as? [String] == ["a.js", "b.js"])
+        // The scripts are the generated worker's to load: WebKit sees only the worker.
+        #expect(background?["scripts"] == nil)
         #expect(background?["type"] == nil)
         #expect(FirefoxManifest.workerSource(scripts: ["a.js", "b.js"]) == #"importScripts("a.js", "b.js");"#)
     }
@@ -33,7 +34,7 @@ struct FirefoxManifestTests {
         let background = normalized["background"] as? [String: Any]
         #expect(background?["service_worker"] as? String == "zigzag-firefox-worker.js")
         #expect(background?["type"] as? String == "module")
-        #expect(background?["scripts"] as? [String] == scripts)
+        #expect(background?["scripts"] == nil)
         #expect(FirefoxManifest.workerSource(scripts: scripts, module: true)
                 == "import \"./a.js\";\nimport \"./quo\\\"te.js\";\n")
     }

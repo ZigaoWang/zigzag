@@ -29,6 +29,9 @@ nonisolated enum FirefoxManifest {
            let scripts = background["scripts"] as? [String], !scripts.isEmpty,
            background["service_worker"] == nil {
             background["service_worker"] = workerFile
+            // The list goes with it: WebKit runs a Firefox MV3 background as a page when `scripts` is there and
+            // never starts the worker, so the scripts are the worker's to load, not WebKit's.
+            background.removeValue(forKey: "scripts")
             if (background["type"] as? String) != "module" {
                 background.removeValue(forKey: "type")
             }

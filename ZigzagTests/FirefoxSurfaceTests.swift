@@ -187,6 +187,12 @@ struct FirefoxSurfaceTests {
         #expect(arm.evaluateScript("__platform.os")?.toString() == "mac")
         #expect(arm.evaluateScript("__platform.arch")?.toString() == "aarch64")
 
+        // WebKit's own answer on an Apple-silicon Mac spells it arm; Firefox says aarch64 for the same machine.
+        let webKitArm = Self.firefoxWorld(manifest: Self.firefoxManifest,
+                                          extra: "browser.runtime.getPlatformInfo = () => Promise.resolve({ os: 'mac', arch: 'arm' });")
+        webKitArm.evaluateScript("var __platform = null; browser.runtime.getPlatformInfo().then((info) => { __platform = info; });")
+        #expect(webKitArm.evaluateScript("__platform.arch")?.toString() == "aarch64")
+
         let intel = Self.firefoxWorld(manifest: Self.firefoxManifest,
                                       extra: "browser.runtime.getPlatformInfo = () => Promise.resolve({ os: 'mac', arch: 'x86_64' });")
         intel.evaluateScript("var __platform = null; browser.runtime.getPlatformInfo().then((info) => { __platform = info; });")

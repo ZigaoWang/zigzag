@@ -454,5 +454,10 @@ struct FirefoxInstallTests {
         let chromeShim = try #require(ExtensionShims.shim(for: chrome))
         #expect(chromeShim.backgroundPrelude?.contains(marker) == false)
         #expect(chromeShim.pagePrelude?.contains(marker) != true)
+        // Popups and options pages read the page list, not the background one: a Firefox record with no built-in
+        // shim is still there, and a Chrome record is not.
+        let pages = Dictionary(uniqueKeysWithValues: ExtensionShims.pagePreludes)
+        #expect(pages[firefox]?.hasPrefix(marker) == true)
+        #expect(pages[chrome] == nil)
     }
 }

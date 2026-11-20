@@ -457,7 +457,8 @@ enum ExtensionStore {
             return .failure(.unsupported)
         }
         guard writeManifest(normalized, in: staging),
-              writeFirefoxWorker(in: staging, background: normalized["background"] as? [String: Any]) else {
+              writeFirefoxWorker(in: staging, original: package.manifest["background"] as? [String: Any],
+                                 normalized: normalized["background"] as? [String: Any]) else {
             try? FileManager.default.removeItem(at: staging)
             return .failure(.unpack)
         }
@@ -497,10 +498,12 @@ enum ExtensionStore {
     /// has no such key. Called with `module: true` when the manifest says the background is a module, whose worker
     /// imports the scripts instead (`importScripts` isn't available to it). Nothing is written where the manifest has
     /// its own service worker already, or no scripts at all.
-    private static func writeFirefoxWorker(in folder: URL, background: [String: Any]?) -> Bool {
-        guard let background, let scripts = background["scripts"] as? [String], !scripts.isEmpty,
-              background["service_worker"] as? String == FirefoxManifest.workerFile else { return true }
-        let module = (background["type"] as? String) == "module"
+    private static func writeFirefoxWorker(in folder: URL, original: [String: Any]?, normalized: [String: Any]?) -> Bool {
+        // The scripts come from the package's own manifest; removing them from the loaded copy is what tells WebKit
+        // to run the worker, so the copy is no place to read them from.
+        guard let original, let scripts = original["scripts"] as? [String], !scripts.isEmpty,
+              normalized?["service_worker"] as? String == FirefoxManifest.workerFile else { return true }
+        let module = (original["type"] as? String) == "module"
         let source = FirefoxManifest.workerSource(scripts: scripts, module: module)
         return (try? source.write(to: folder.appendingPathComponent(FirefoxManifest.workerFile), atomically: true, encoding: .utf8)) != nil
     }
@@ -1236,8 +1239,20 @@ enum ExtensionShims {
     })();
     """
 
-    /// Every page prelude, by extension ID.
-    static var pagePreludes: [(id: String, source: String)] { shims.compactMap { id, shim in shim.pagePrelude.map { (id, $0) } } }
+    /// Every page prelude, by extension ID: through `shim(for:)`, so a Firefox package's marker and its own page
+    /// prelude reach its popup and options page, which read this list rather than the background one.
+    static var pagePreludes: [(id: String, source: String)] {
+        // Every built-in shim, and every record that says Firefox: a Firefox package with no built-in shim still needs
+        // its marker in its popup, and only the record knows it is one.
+        let ids = Set(shims.keys).union(recordIDs.filter { ExtensionStore.kind(of: $0) == .firefox })
+        return ids.sorted().compactMap { id in shim(for: id)?.pagePrelude.map { (id, $0) } }
+    }
+
+    /// Ids with a record, whether or not its package can be read: the record is what marks a Firefox package.
+    private static var recordIDs: [String] {
+        ((try? FileManager.default.contentsOfDirectory(atPath: ExtensionStore.root.path)) ?? [])
+            .filter { ExtensionStore.package($0) != nil }
+    }
 
     private static let shims: [String: Shim] = [
         ExtensionStore.onePasswordID: Shim(backgroundPrelude: onePasswordPrelude, pagePrelude: diagnostics,

@@ -20,7 +20,8 @@
   // binding design spells an Apple-silicon Mac's `aarch64`.
   const FIREFOX_PLATFORM = { os: 'mac', arch: appArch };
   // Firefox's spelling of the machine's architecture (WebKit reports Chrome's).
-  const firefoxArch = (arch) => arch === 'arm64' ? 'aarch64'
+  // WebKit answers "arm" on an Apple-silicon Mac; Firefox says aarch64 for the same machine.
+  const firefoxArch = (arch) => arch === 'arm64' || arch === 'arm' ? 'aarch64'
     : (arch === 'x86-64' || arch === 'x86_64') ? 'x86-64'
     : typeof arch === 'string' && arch ? arch : FIREFOX_PLATFORM.arch;
 
