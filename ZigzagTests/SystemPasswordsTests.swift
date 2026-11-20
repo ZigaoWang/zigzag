@@ -403,6 +403,71 @@ struct SystemPasswordsTests {
         #expect(inWindowOnDismiss)
     }
 
+    @Test func thePasswordFieldIsMarkedOnlyAsTheListIsAskedFor() async throws {
+        // Focused while marked, AppKit put its own Passwords… suggestion under it before the list opened (#378).
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0.2, dismissSystem: {})
+        var markedWhenAsked: NSTextContentType?
+        var asked = 0
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { field in
+            asked += 1
+            markedWhenAsked = field.contentType
+            return true
+        }) { outcome = $0 }
+        #expect(picker.passwordField.currentEditor() != nil)
+        #expect(picker.passwordField.contentType == nil)
+        try await wait(0.4)
+        #expect(asked == 1, "outcome \(String(describing: outcome))")
+        #expect(markedWhenAsked == .password, "marked \(String(describing: markedWhenAsked?.rawValue))")
+        picker.cancel()
+        #expect(picker.passwordField.contentType == nil)
+        #expect(picker.usernameField.contentType == .username)
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func aFieldOffThePageAsksNothing() async throws {
+        // The list points at the field: without one on the page, it opened at the screen's corner (#378).
+        let bounds = NSRect(x: 0, y: 0, width: 600, height: 400)
+        #expect(SystemPasswordPicker.anchorIsValid(NSRect(x: 40, y: 60, width: 280, height: 32), in: bounds))
+        #expect(!SystemPasswordPicker.anchorIsValid(NSRect(x: 40, y: 900, width: 280, height: 32), in: bounds))
+        #expect(!SystemPasswordPicker.anchorIsValid(NSRect(x: -400, y: 60, width: 280, height: 32), in: bounds))
+        #expect(!SystemPasswordPicker.anchorIsValid(.zero, in: bounds))
+        let (window, overlay, stand) = host()
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: {})
+        var asked = false
+        var outcome: SystemPasswordPicker.Outcome?
+        picker.present(over: NSRect(x: 40, y: 900, width: 280, height: 32), in: overlay, restoringFocusTo: stand, ask: { _ in asked = true; return true }) { outcome = $0 }
+        #expect(!asked)
+        guard case .cancelled(.unavailable) = outcome else { Issue.record("expected unavailable, got \(String(describing: outcome))"); return }
+        #expect(window.firstResponder === stand)
+    }
+
+    @Test func theMacsListIsClosedAgainWhenTheWindowIsNextKey() async throws {
+        // AppKit brings it back for whatever has the focus, with no field to point at (#378).
+        let (window, overlay, stand) = host()
+        var dismissed = 0
+        let picker = SystemPasswordPicker(openCheck: nil, settle: 0, dismissSystem: { dismissed += 1 })
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
+        picker.cancel()
+        #expect(dismissed == 1)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        try await wait(0.1)
+        #expect(dismissed == 2)
+        // Opened again: the new list is left alone.
+        picker.present(over: NSRect(x: 0, y: 0, width: 200, height: 30), in: overlay, restoringFocusTo: stand, ask: { _ in true }) { _ in }
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        try await wait(0.1)
+        #expect(dismissed == 2)
+        picker.cancel()
+        #expect(dismissed == 3)
+        // And only for a moment.
+        try await wait(SystemPasswordPicker.reshowGuardTime + 0.3)
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+        try await wait(0.1)
+        #expect(dismissed == 3)
+    }
+
     @Test func appKitHasTheCallThatClosesItsAutoFill() throws {
         let type = try #require(NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type)
         #expect(type.responds(to: NSSelectorFromString("sharedInstance")))
