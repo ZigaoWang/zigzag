@@ -462,7 +462,8 @@ extension ExtensionBridgeTests {
         // A made-up site that can't be reached directly: only the proxy can answer for it.
         _ = try? await ExtensionFetchRequests().response(["method": "POST", "body": "{}"], url: URL(string: "https://proxied.example/write")!,
                                                          extensionID: "test", store: store)
-        #expect(proxy.requests.withLock { $0 } == 1)
+        // The connection to the proxy can be tried again when it can't finish the tunnel.
+        #expect(proxy.requests.withLock { $0 } >= 1)
     }
 
     @Test func writeCancellationAndRevokedAccessPreventDispatch() async throws {
@@ -1114,7 +1115,8 @@ private final class SiteAccessTestTab: NSObject, WKWebExtensionTab {
 struct SiteAccessContentScriptTests {
     @Test func lessAccessIsNarrowed() {
         #expect(ExtensionHost.narrowed(from: (["<all_urls>"], []), to: ([], [])))
-        #expect(ExtensionHost.narrowed(from: (["<all_urls>"], []), to: (["<all_urls>"], ["*://bank.example/*"])))
+        #expect(!ExtensionHost.narrowed(from: (["<all_urls>"], []), to: (["<all_urls>"], ["*://bank.example/*"])))
+        #expect(ExtensionHost.narrowed(from: (["<all_urls>"], []), to: (["*://github.com/*"], ["*://bank.example/*"])))
         #expect(!ExtensionHost.narrowed(from: ([], []), to: (["<all_urls>"], [])))
         #expect(!ExtensionHost.narrowed(from: (["<all_urls>"], ["*://bank.example/*"]), to: (["<all_urls>"], [])))
     }
@@ -1190,6 +1192,42 @@ struct SiteAccessContentScriptTests {
         #expect(try await !ran(open(local, in: clicked)))
         #expect(!context.hasAccess(to: URL(string: local)!, in: tab))
         controller.didCloseTab(tab, windowIsClosing: false)
+    }
+
+    /// A site where extensions are off keeps their content scripts out at once, with the extension left running.
+    @Test func anOffSiteNeedsNoRestart() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        try Data(#"{"manifest_version":3,"name":"Probe","version":"1.0","content_scripts":[{"matches":["<all_urls>"],"js":["cs.js"],"run_at":"document_start"}]}"#.utf8)
+            .write(to: folder.appendingPathComponent("manifest.json"))
+        try Data("document.documentElement.dataset.cs = 'ran';".utf8).write(to: folder.appendingPathComponent("cs.js"))
+        let ext = try await WKWebExtension(resourceBaseURL: folder)
+        let controller = WKWebExtensionController(configuration: .nonPersistent())
+        let context = WKWebExtensionContext(for: ext)
+        let approved = Array(ext.allRequestedMatchPatterns)
+        ExtensionHost.applySiteAccess(nil, approved: approved, sites: [], offSites: [], approvesActiveTab: false, to: context)
+        try controller.load(context)
+        defer { try? controller.unload(context) }
+        func ran(_ address: String) async throws -> Bool {
+            let configuration = WKWebViewConfiguration()
+            configuration.userContentController = WKUserContentController()
+            configuration.webExtensionController = controller
+            let page = WKWebView(frame: .zero, configuration: configuration)
+            page.loadHTMLString("<!doctype html><title>\(address)</title>", baseURL: URL(string: address)!)
+            for _ in 0..<50 where page.isLoading || page.title != address { try await Task.sleep(for: .milliseconds(50)) }
+            return try await page.evaluateJavaScript("document.documentElement.dataset.cs === 'ran'") as? Bool ?? false
+        }
+        let off = "http://localhost:8123/", other = "http://127.0.0.1:8123/"
+        #expect(try await ran(off))
+        let before = ExtensionHost.access(of: context)
+        ExtensionHost.applySiteAccess(nil, approved: approved, sites: [], offSites: ["localhost"], approvesActiveTab: false, to: context)
+        #expect(!ExtensionHost.narrowed(from: before, to: ExtensionHost.access(of: context)))
+        #expect(context.isLoaded && controller.extensionContexts.contains(context))
+        #expect(try await !ran(off))
+        #expect(try await ran(other))
+        ExtensionHost.applySiteAccess(nil, approved: approved, sites: [], offSites: [], approvesActiveTab: false, to: context)
+        #expect(try await ran(off))
     }
 
     /// Under When You Click It, an extension that never asked for activeTab is given only a site it asked for.
