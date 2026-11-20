@@ -468,6 +468,18 @@ final class EdgeSidebarHost: NSView {
     /// File › New Tab (⌘T) with the panel key: the browser's own bar, in place over the screen.
     @objc func newTab(_ sender: Any?) { EdgeSidebar.shared.newTabInPlace() }
 
+    /// Esc while the panel has the keyboard puts it away, as it closes anything else opened to use for a moment. A
+    /// menu or the command bar is the first responder while either is up, so it closes itself first instead.
+    override func cancelOperation(_ sender: Any?) { EdgeSidebar.shared.hide() }
+
+    /// A click outside the card, in the panel's gutter, puts it away; clicks on the card belong to the sidebar in it
+    /// (its own blank space does the same).
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        if container?.frame.contains(point) != true { EdgeSidebar.shared.hide(); return }
+        super.mouseDown(with: event)
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
         if mods == .command, event.charactersIgnoringModifiers?.lowercased() == "t" {

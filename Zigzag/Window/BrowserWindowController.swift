@@ -2966,7 +2966,7 @@ extension BrowserWindowController: SidebarDelegate {
 
     /// Whether a tab's menu offers Open in Zigzag Mini (and a tab ⌥-dragged out of the windows goes there).
     func canOpenInMini(_ tab: Tab) -> Bool {
-        !tab.isClosed && MiniWindowController.canTake(tab.url, isPinned: tab.bookmarkID != nil, isPrivate: tabManager.isPrivate)
+        !tab.isClosed && MiniWindowController.canTake(tab.url)
     }
 
     /// Open in Zigzag Mini: the tab's page, live, goes into a Zigzag Mini window over this one (or where the tab was
@@ -3558,6 +3558,8 @@ extension BrowserWindowController {
         mirror.list.onPickTab = { [weak self] tab in self?.pickFromEdgeSidebar(tab) }
         // Its New Tab row opens the browser's bar over the screen, not in the window behind the panel.
         mirror.list.onNewTab = { EdgeSidebar.shared.newTabInPlace() }
+        // A click on empty space puts the panel away, as the pointer leaving it does.
+        mirror.blankClick = { EdgeSidebar.shared.hide() }
         // A mirror, not a window's sidebar: no bar to lend its address buttons to, and no close button, since
         // moving the pointer away is what puts the panel back.
         mirror.hasTopBar = false
@@ -3723,12 +3725,13 @@ extension BrowserWindowController {
             EdgeSidebar.shared.holdForPeek(false)
             if same { return }
         }
-        // A page can't be borrowed into Mini (pinned, private, Zigzag's own): the browser window is the answer.
-        guard MiniWindowController.canTake(tab.url, isPinned: tab.bookmarkID != nil, isPrivate: tabManager.isPrivate),
-              let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else {
+        // Any page can be borrowed, pinned or private or Zigzag's own, as the person asked. One that has no web view
+        // yet (a just-opened tab, a picked pinned page never looked at) is made here first, beside the panel.
+        guard tab.url != nil, let sidebarFrame = EdgeSidebar.shared.sidebarCardScreenFrame else {
             bringForwardForEdge()
             return
         }
+        if MiniWindowController.needsPage(tab) { tab.reload() }
         if EdgePeek.shared.isVisible { EdgePeek.shared.close() }
         let screen = NSScreen.screens.first { $0.visibleFrame.intersects(sidebarFrame) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -3751,7 +3754,17 @@ extension BrowserWindowController {
     /// from the panel itself (a menu, the site panel, the space editor), which needs it where it is.
     func bringForwardForEdge(keepingPanel: Bool = false) {
         if !keepingPanel { EdgeSidebar.shared.picked() }
-        window?.makeKeyAndOrderFront(nil)
+        bringForwardHere()
+    }
+
+    /// Brings the window forward on the Space the person is on now, and leaves it behaving as it did: a window that
+    /// only joins the current Space would otherwise follow the person around.
+    func bringForwardHere() {
+        guard let window else { return }
+        let before = window.collectionBehavior
+        window.collectionBehavior = before.union(.moveToActiveSpace)
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate()
+        DispatchQueue.main.async { window.collectionBehavior = before }
     }
 }

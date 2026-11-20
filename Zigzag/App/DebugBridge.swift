@@ -221,7 +221,7 @@ enum DebugBridge {
         case "miniborrow":
             guard let browser = WindowManager.shared.keyController,
                   let tab = browser.tabManager.selectedTab,
-                  MiniWindowController.canTake(tab.url, isPinned: tab.bookmarkID != nil, isPrivate: browser.tabManager.isPrivate)
+                  MiniWindowController.canTake(tab.url)
             else { break }
             MiniWindowController.open(borrowing: tab, from: browser)
         case "mininote": mini?.debugLinksNote(arg)

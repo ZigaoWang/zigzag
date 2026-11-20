@@ -1007,8 +1007,17 @@ final class SidebarView: NSView {
             delegate?.sidebarDoubleClickedBlank()
             return
         }
+        // A single click on empty space does nothing in a window's sidebar; the edge panel uses it to put itself away.
+        if event.clickCount == 1, let blankClick {
+            blankClick()
+            return
+        }
         window?.titleBarMouseDown(event)
     }
+
+    /// What a single click on empty space does, for the sidebar shown over the screen: the edge panel goes away, as it
+    /// would if the pointer had left it. Nil in a window's sidebar, where such a click only prepares a drag.
+    var blankClick: (() -> Void)?
 
     /// Settings › Appearance › Double-click the sidebar for a new tab. On by default.
     static var doubleClickOpensNewTab: Bool {

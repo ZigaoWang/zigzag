@@ -275,13 +275,15 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
         return controller
     }
 
-    /// Whether a tab's page can go into Zigzag Mini: an ordinary tab's web page or file. Not a pinned page's or a
-    /// favorite's, which belong to the sidebar, nor Zigzag's own pages, nor a private window's: Zigzag Mini isn't
-    /// private.
-    nonisolated static func canTake(_ url: URL?, isPinned: Bool, isPrivate: Bool) -> Bool {
-        guard !isPinned, !isPrivate, let url else { return false }
-        return ["http", "https", "file"].contains(url.scheme?.lowercased() ?? "")
-    }
+    /// Whether a tab's page can go into Zigzag Mini. Any tab's page can, as in a browser's picture-in-picture or a
+    /// second window: the page is the tab's own live one, moved and moved back, so a pinned page, a private window's
+    /// tab and even Zigzag's own pages go as they are. Modern pages draw with their own scripts, so split view's
+    /// wait is skipped.
+    nonisolated static func canTake(_ url: URL?) -> Bool { url != nil }
+
+    /// Whether the tab's page has to be made first: one just opened, or a picked pinned page never looked at in this
+    /// session, has no web view until it is shown. Made beside the panel, in the tab's own profile and window rules.
+    static func needsPage(_ tab: Tab) -> Bool { !tab.isClosed && tab.pageHolder == nil }
 
     /// The app a link came from, to go back to when this closes, if you're still only here. Using a browser window
     /// in between means you're in Zigzag now, so closing this stays in Zigzag.
@@ -801,8 +803,9 @@ final class MiniWindowController: NSWindowController, NSWindowDelegate {
                 browser.tabManager.select(tab)
             }
             if bringForward {
-                browser.window?.makeKeyAndOrderFront(nil)
-                NSApp.activate()
+                // The person is looking at this Space now, which may not be the one the browser was left on: the
+                // window comes to it rather than the screen going back to the window.
+                browser.bringForwardHere()
             }
         }
     }
