@@ -67,6 +67,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - ⌘G and ⇧⌘G with the find bar closed bring it back and go to the next or previous match. ⌘G used to skip one.
 - ⌘-clicking or middle-clicking a link inside a frame on a page opens it in a new tab, in the background or in front with ⇧, as everywhere else on the page. It used to load in the frame itself. A plain click still loads in the frame.
 - When a site asks to show notifications or use your camera, microphone or location, Remember for this site starts checked, so Allow or Don't Allow stays for the site, as in Chrome. It used to start unchecked, so the answer lasted only until the page reloaded: Gmail and Slack notifications stopped after a reload, and a call site asked for the camera again on every visit. Uncheck it to answer for this page only. Answers you already saved stay as they are, and private windows still remember nothing. ([#410](https://github.com/ZigaoWang/zigzag/issues/410))
+- ⇧⌘R reloads the page ignoring the cache, as in Chrome and Arc, and Show Reader moves to ⌥⌘R; they used to be the other way around, as in Safari. Installed apps use ⇧⌘R for Reload Ignoring Cache too. Shortcuts you changed in Settings › Shortcuts stay as you set them, and if you had already given ⇧⌘R or ⌥⌘R to something else, it keeps them. ([#413](https://github.com/ZigaoWang/zigzag/issues/413))
 
 ## [0.9.3] - 2026-11-18
 
