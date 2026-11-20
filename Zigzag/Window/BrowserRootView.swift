@@ -1192,6 +1192,8 @@ final class BrowserRootView: SpaceFrameView {
         draggedCorner = nil
         dragStartedParted = false
         hideSnapGuides()
+        // Handles kept for the drag's sake go now, or a line that changed its pages would leave one behind.
+        needsLayout = true
         if let tiles { onTilesChange?(tiles, true) }
     }
 
