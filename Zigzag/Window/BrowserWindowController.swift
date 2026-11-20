@@ -117,8 +117,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         root.zoomScrim.onClick = { [weak self] in self?.unzoomPane() }
         root.onTilesChange = { [weak self] shape, final in
             guard let self, let tab = self.tabManager.selectedTab else { return }
-            // The reset button appears as soon as a drag takes a line away from the middle, and goes when it is even.
-            self.root.paneCards.forEach { $0.header.resetsLayout = !shape.isEven }
+            // The reset button shows while a grid's line is parted, and goes when it's one line again.
+            self.root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
             guard final else { return }
             self.tabManager.setTileShape(shape, for: tab)
             self.onStateChange?()
@@ -1139,7 +1139,7 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
                 let page = pages[i]
                 // Swap and the layout are a split of two's; a tile group's pages keep the places they were dropped in.
                 card.header.arrangesSplit = !pair.isGroup
-                card.header.resetsLayout = !pair.shape.isEven
+                card.header.resetsLayout = pair.shape.isParted
                 card.header.resetLayout.onClick = { [weak self] _ in self?.resetTileLayout(nil) }
                 card.header.setVertical(pair.vertical)
                 card.header.orientation.onClick = { [weak self] _ in self?.tabManager.toggleSplitOrientation(for: first) }

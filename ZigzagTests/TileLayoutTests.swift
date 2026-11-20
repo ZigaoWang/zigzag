@@ -116,16 +116,39 @@ struct TileLayoutTests {
         #expect(frames.map(\.minY).min() == area.minY && frames.map(\.maxY).max() == area.maxY)
     }
 
-    @Test func eachColumnKeepsItsOwnLineBetweenTheRows() {
+    @Test func theLineBetweenTheRowsIsOneLine() throws {
         var shape = TileShape(regions: [.left, .topRight, .bottomRight])
-        // The right column's line moves; the left page still runs the whole height.
+        // The right column's line moves; the left page still runs the whole height, and its column's share follows.
         shape.moveRowLine(in: 1, to: 0.4, length: area.height, minimum: 100)
         let frames = shape.frames(in: area, gap: 0)
         #expect(frames[0] == CGRect(x: 100, y: 50, width: 500, height: 600))
         #expect(frames[1] == CGRect(x: 600, y: 50, width: 500, height: 240))
         #expect(frames[2] == CGRect(x: 600, y: 290, width: 500, height: 360))
-        #expect(shape.rowShares == [0.5, 0.4])
+        #expect(shape.rowShares == [0.4, 0.4])
         #expect(frames[0].maxX == frames[1].minX && frames[2].maxY == area.maxY)
+        // A fourth page in the left half's place keeps the line where it was.
+        let ids = [UUID(), UUID(), UUID(), UUID()]
+        let three = try #require(Pair(ids: Array(ids.prefix(3)), shape: shape))
+        let four = try #require(three.adding(ids[3], .place(region: .bottomLeft, regions: [.topLeft, .topRight, .bottomRight])))
+        #expect(four.shape.rowShares == [0.4, 0.4])
+        // Out of a grid the line between the columns is one line too.
+        var top = TileShape(regions: [.top, .bottomLeft, .bottomRight])
+        top.moveColumnLine(in: 1, to: 0.3, length: area.width, minimum: 100)
+        #expect(top.columnShares == [0.3, 0.3] && !top.isParted)
+    }
+
+    @Test func aPartedGridsQuarterKeepsItsWidthAsItGrows() throws {
+        let ids = [UUID(), UUID(), UUID(), UUID()]
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.columnShares = [0.3, 0.6]
+        #expect(shape.isParted)
+        let group = try #require(Pair(ids: ids, shape: shape))
+        // The top left goes: the bottom left grows into the left half at its own width.
+        let rest = try #require(group.removing(ids[0]))
+        #expect(rest.shape.regions.contains(.left) && rest.shape.column == 0.6)
+        // A grid whose line is one, at any share, isn't parted.
+        #expect(!TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight], column: 0.3).isParted)
+        #expect(!TileShape(regions: [.left, .right], column: 0.3).isParted)
     }
 
     @Test func aGridsLineBetweenTheRowsRunsAcrossBothColumns() {
@@ -296,7 +319,7 @@ struct TileLayoutTests {
         shape.moveRowLine(in: 1, to: 0.3, length: area.height, minimum: 100)
         let ids = [UUID(), UUID(), UUID()]
         let group = try #require(Pair(ids: ids, shape: shape))
-        #expect(group.shares == [0.5, 0.5, 0.5, 0.3])
+        #expect(group.shares == [0.5, 0.5, 0.3, 0.3])
         #expect(group.shape == shape)
         let back = try JSONDecoder().decode(Pair.self, from: JSONEncoder().encode(group))
         #expect(back.shape.columnShares == shape.columnShares && back.shape.rowShares == shape.rowShares)

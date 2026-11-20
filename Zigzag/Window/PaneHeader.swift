@@ -12,8 +12,8 @@ final class PaneHeaderView: NSView {
     let reload = PaneHeaderView.button("arrow.clockwise", toolTip: String(localized: "Reload", comment: "Tooltip of a button in the strip on top of each page of a split view: reloads the page."))
     let orientation = PaneHeaderView.button("rectangle.split.1x2", toolTip: String(localized: "Stack Vertically", comment: "Tooltip of a button in the strip on top of each page of a split view: stacks the two pages one above the other."))
     let swap = PaneHeaderView.button("arrow.left.arrow.right", toolTip: String(localized: "Swap Sides", comment: "Tooltip of a button in the strip on top of each page of a split view: swaps the two pages."))
-    /// Puts every line between the tiles back in the middle, the standard even grid. Shown only while a layout is
-    /// custom, beside the split's own buttons (#316).
+    /// Puts every line between the tiles back in the middle, the standard even grid. Shown only while a grid's line is
+    /// parted, beside the split's own buttons (#316).
     let resetLayout = PaneHeaderView.button("square.grid.2x2", toolTip: String(localized: "Reset Tile Layout", comment: "Tooltip of a button in the strip on top of a tiled page: puts every line between the tiles back in the middle, making the standard even grid."))
     /// Enlarges this pane over the others for a moment, and puts it back (#160).
     let zoom = PaneHeaderView.button("arrow.up.left.and.arrow.down.right", toolTip: PaneHeaderView.zoomTitle(false))
@@ -51,7 +51,7 @@ final class PaneHeaderView: NSView {
     var onSiteControls: ((Tab, NSView) -> Void)?
     /// A split of two has swap and the layout; a tile group's pages keep the places they were dropped in (#160).
     var arrangesSplit = true { didSet { if arrangesSplit != oldValue { needsLayout = true } } }
-    /// The tiles have lines of their own, away from the middle: show the reset button that makes the grid even again.
+    /// A grid's line is parted: show the reset button that makes the grid even again.
     var resetsLayout = false { didSet { if resetsLayout != oldValue { needsLayout = true } } }
     /// Up in the bar above the page (`TopBarView.strips`) instead of on the pane's card: the bar's height, on the
     /// window's frame, no hairline, and like the bar it moves the window and zooms it on a double-click.

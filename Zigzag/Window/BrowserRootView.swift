@@ -374,9 +374,9 @@ final class BrowserRootView: SpaceFrameView {
     /// The segment or corner being dragged: the handle keeps to it as the shape moves under the pointer.
     private var draggedSegment: TileShape.Segment?
     private var draggedCorner: TileShape.Corner?
-    /// Whether the group was the even grid when this drag began: an even group moves its whole lines plainly, and its
-    /// segments with Shift; a custom group moves segments, plain or with Shift (#316).
-    private var dragStartedEven = true
+    /// Whether the grid's line between the columns was parted when this drag began: until it is, a plain drag moves
+    /// whole lines as it always did, and Shift moves one segment (#316).
+    private var dragStartedParted = false
 
     private struct DividerKey: Hashable {
         var axis: TileShape.Segment.Axis
@@ -1042,31 +1042,31 @@ final class BrowserRootView: SpaceFrameView {
         tileHandles.addSubview(snapGuideRow, positioned: .above, relativeTo: nil)
     }
 
-    /// A strip you drag to move its line, between the two panes either side (#316). From the even grid a plain drag
-    /// moves the whole line, as a split always did, and Shift moves only this segment; a custom layout moves segments
-    /// plainly, with Shift keeping a near line from snapping (#316).
+    /// A strip you drag to move its line, between the two panes either side (#316). Until a grid is parted a plain
+    /// drag moves the whole line, as a split always did, and Shift moves only this segment; a parted grid moves
+    /// segments plainly, with Shift keeping a near line from snapping (#316).
     private func makeDividerHandle() -> ResizeHandle {
         let handle = ResizeHandle()
         handle.onBegin = { [weak self, weak handle] in
             guard let self else { return }
             self.draggedSegment = handle?.segment
-            self.dragStartedEven = self.tiles?.isEven ?? true
+            self.dragStartedParted = self.tiles?.isParted ?? false
         }
         handle.onDrag = { [weak self] value, shift in
             guard let self, let segment = self.draggedSegment, var shape = self.tiles else { return }
             let area = self.cardFrame
-            let whole = self.dragStartedEven && !shift
+            let whole = !self.dragStartedParted && !shift
             var nearColumn = false, nearRow = false
             if segment.axis == .column {
                 shape.moveColumnLine(in: segment.row, to: (value - area.minX) / area.width,
                                      length: area.width, minimum: Self.minimumPaneWidth, whole: whole)
-                nearColumn = !shift && shape.columnLineIsNearEven(in: segment.row, whole: whole, length: area.width)
+                nearColumn = !whole && !shift && shape.columnLineIsNearEven(in: segment.row, whole: whole, length: area.width)
             } else {
                 // Window y runs bottom-up; this view is flipped.
                 let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
                 shape.moveRowLine(in: segment.column, to: (y - area.minY) / area.height,
                                   length: area.height, minimum: Self.minimumPaneHeight, whole: whole)
-                nearRow = !shift && shape.rowLineIsNearEven(in: segment.column, whole: whole, length: area.height)
+                nearRow = !whole && !shift && shape.rowLineIsNearEven(in: segment.column, whole: whole, length: area.height)
             }
             self.tiles = shape
             self.layoutSubtreeIfNeeded()
@@ -1074,32 +1074,32 @@ final class BrowserRootView: SpaceFrameView {
             self.onTilesChange?(shape, false)
         }
         handle.onEnd = { [weak self] shift in self?.endTilesDrag(shift: shift) }
-        handle.onDoubleClick = { [weak self] in self?.evenOutTiles() }
+        handle.onDoubleClick = { [weak self, weak handle] in self?.evenOutTiles(handle?.segment?.axis) }
         handle.isHidden = true
         tileHandles.addSubview(handle)
         return handle
     }
 
     /// A square where a strip each way meet: dragging it moves both, so the pane at the corner grows both ways (#309).
-    /// From the even grid a plain drag moves both whole lines; Shift moves only the segments that meet there.
+    /// Until a grid is parted a plain drag moves both whole lines; Shift moves only the segments that meet there.
     private func makeCornerHandle() -> ResizeHandle {
         let handle = ResizeHandle()
         handle.dragsBothWays = true
         handle.onBegin = { [weak self, weak handle] in
             guard let self else { return }
             self.draggedCorner = handle?.corner
-            self.dragStartedEven = self.tiles?.isEven ?? true
+            self.dragStartedParted = self.tiles?.isParted ?? false
         }
         handle.onDragPoint = { [weak self] point, shift in
             guard let self, let corner = self.draggedCorner, var shape = self.tiles else { return }
             let area = self.cardFrame
-            let whole = self.dragStartedEven && !shift
+            let whole = !self.dragStartedParted && !shift
             shape.moveCorner(corner, to: self.convert(point, from: nil), in: area,
                              minimumWidth: Self.minimumPaneWidth, minimumHeight: Self.minimumPaneHeight, whole: whole)
             self.tiles = shape
             self.layoutSubtreeIfNeeded()
             let near = self.cornerIsNearEven(corner, in: shape, whole: whole, area: area)
-            self.showSnapGuides(column: !shift && near.column, row: !shift && near.row)
+            self.showSnapGuides(column: !whole && !shift && near.column, row: !whole && !shift && near.row)
             self.onTilesChange?(shape, false)
         }
         handle.onEnd = { [weak self] shift in self?.endTilesDrag(shift: shift) }
@@ -1141,12 +1141,13 @@ final class BrowserRootView: SpaceFrameView {
     /// The drag is over: a line let go near the middle snaps there, unless Shift held it away, and the group's lines
     /// are saved as they ended (#316).
     private func endTilesDrag(shift: Bool) {
-        guard !shift, var shape = tiles else {
+        // A whole line stays where it's let go, as it always did; only a segment snaps.
+        guard !shift, dragStartedParted, var shape = tiles else {
             finishTilesDrag()
             return
         }
         let area = cardFrame
-        let whole = dragStartedEven && !shift
+        let whole = false
         var snapped = false
         if let segment = draggedSegment {
             if segment.axis == .column, shape.columnLineIsNearEven(in: segment.row, whole: whole, length: area.width) {
@@ -1177,15 +1178,20 @@ final class BrowserRootView: SpaceFrameView {
     private func finishTilesDrag() {
         draggedSegment = nil
         draggedCorner = nil
-        dragStartedEven = true
+        dragStartedParted = false
         hideSnapGuides()
         if let tiles { onTilesChange?(tiles, true) }
     }
 
-    /// Even again: every line at the middle, the panes gliding there rather than jumping.
-    private func evenOutTiles() {
+    /// Even again, the panes gliding there rather than jumping: a line's double-click puts that whole line in the
+    /// middle, as it always did; a corner's, both lines.
+    private func evenOutTiles(_ axis: TileShape.Segment.Axis? = nil) {
         guard var shape = tiles else { return }
-        shape.evenOut()
+        switch axis {
+        case .column: shape.snapColumnLine(in: 0, whole: true)
+        case .row: shape.snapRowLine(in: 0, whole: true)
+        case nil: shape.evenOut()
+        }
         setTiles(shape, animated: true)
         onTilesChange?(shape, true)
     }

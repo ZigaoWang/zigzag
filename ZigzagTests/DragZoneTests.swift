@@ -135,6 +135,57 @@ struct DragZoneTests {
         #expect(segmentOnly.columnShares[1] == 0.5)
     }
 
+    @Test func aPlainDragOutsideAPartedGridIsTheDragItAlwaysWas() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        let frame = try #require(window.contentView?.superview)
+        func press(_ shape: TileShape, row: Int, by dx: CGFloat, clicks: Int = 1) throws -> TileShape {
+            root.setTiles(shape, animated: false)
+            window.layoutIfNeeded()
+            let area = root.cardFrame
+            let segment = try #require(root.tiles?.segments(in: area, gap: root.paneGap, slop: Tokens.Metric.dragReach)
+                .first { $0.axis == .column && $0.row == row })
+            let start = root.convert(NSPoint(x: segment.frame.midX, y: segment.frame.midY - segment.frame.height / 4), to: nil)
+            let end = NSPoint(x: start.x + dx, y: start.y)
+            let handle = try #require(frame.hitTest(frame.convert(start, from: nil)) as? ResizeHandle)
+            let steps: [(NSEvent.EventType, NSPoint)] = clicks == 2 ? [(.leftMouseDown, start), (.leftMouseUp, start)]
+                : [(.leftMouseDown, start), (.leftMouseDragged, end), (.leftMouseUp, end)]
+            for (type, point) in steps {
+                let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                                                            timestamp: ProcessInfo.processInfo.systemUptime,
+                                                            windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                            clickCount: clicks, pressure: 1))
+                switch type {
+                case .leftMouseDown: handle.mouseDown(with: event)
+                case .leftMouseDragged: handle.mouseDragged(with: event)
+                default: handle.mouseUp(with: event)
+                }
+            }
+            return try #require(root.tiles)
+        }
+        let grid: [TileRegion] = [.topLeft, .topRight, .bottomLeft, .bottomRight]
+        // A grid saved off the middle: a plain drag still moves its whole line.
+        let moved = try press(TileShape(regions: grid, column: 0.3, row: 0.6), row: 0, by: 60)
+        #expect(moved.columnShares[0] > 0.3 && moved.columnShares[1] == moved.columnShares[0] && moved.rowShares == [0.6, 0.6])
+        // Let go a few points from the middle, a split stays there.
+        let pair = TileShape(regions: [.left, .right], column: 0.45)
+        let nearMiddle = (0.5 - 0.45) * root.cardFrame.width - 4
+        let kept = try press(pair, row: 0, by: nearMiddle)
+        #expect(kept.column != 0.5)
+        // A double-click on the line between the columns evens that line alone.
+        let three = try press(TileShape(regions: [.left, .topRight, .bottomRight], column: 0.3, row: 0.3), row: 0, by: 0, clicks: 2)
+        #expect(three.columnShares == [0.5, 0.5] && three.rowShares == [0.3, 0.3])
+    }
+
     @Test func aNearEvenLineSnapsOnReleaseUnlessShiftHoldsIt() throws {
         let space = Library.shared.spaces[0].id
         let before = Library.shared.snapshot

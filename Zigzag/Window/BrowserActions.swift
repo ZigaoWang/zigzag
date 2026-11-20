@@ -417,10 +417,10 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let tab = selectedTab { tabManager.toggleSplitOrientation(for: tab) }
     }
 
-    /// Puts a tile group's lines back in the middle: the standard even grid, and its plain drags move whole lines
+    /// Puts a parted grid's lines back in the middle: the standard even grid, and its plain drags move whole lines
     /// again (#316).
     @objc func resetTileLayout(_ sender: Any?) {
-        guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, !shape.isEven else { return }
+        guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, shape.isParted else { return }
         shape.evenOut()
         tabManager.setTileShape(shape, for: tab)
         root.setTiles(shape, animated: true)

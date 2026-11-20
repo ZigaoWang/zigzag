@@ -52,12 +52,9 @@ nonisolated enum TileRegion: String, Codable, CaseIterable, Sendable {
 /// between them are. Two pages are halves, side by side or stacked, as a split always was; three are a half and two
 /// quarters; four a grid of quarters. Worked out top-down, as the window lays its panes out.
 ///
-/// Each line is a segment per row or column (#316), not one line across the whole area: a row has its own line between
-/// the columns, so the top left can be wider than the bottom left, and a column its own line between the rows. A page
-/// that spans both rows (a left or right half) makes one line of the two, as does one that spans both columns (a top or
-/// bottom half), so no page is sheared. A grid of four quarters keeps one line between its rows and one per row
-/// between its columns: four rectangles covering the area cannot hold both pairs of lines apart without leaving a hole
-/// between them.
+/// A grid of four quarters can part its line between the columns, a segment per row (#316), so the top left can be
+/// wider than the bottom left. Every other line is one line: a half spans the rows or columns beside it, and four
+/// rectangles covering the area cannot hold both pairs of lines apart without leaving a hole between them.
 nonisolated struct TileShape: Equatable, Sendable {
     var regions: [TileRegion]
     /// The share of the width left of the line between the columns, in each row (top, bottom).
@@ -254,27 +251,29 @@ nonisolated struct TileShape: Equatable, Sendable {
         return (union(.column), union(.row))
     }
 
-    /// Moves the line between the columns in `row` (both rows where a page spans them) to `share` of the width, kept so
-    /// no page gets smaller than `minimum` points. `whole`: every row's line moves together, the old full-height
-    /// split; otherwise only the segment in `row` moves (#316).
+    /// A grid of four, the one layout whose line between the columns has a segment in each row.
+    var isGrid: Bool { regions.count == 4 }
+
+    /// A grid whose rows have moved their lines between the columns apart (#316).
+    var isParted: Bool { isGrid && abs(columnShares[0] - columnShares[1]) > 0.0001 }
+
+    /// Moves the line between the columns in `row` to `share` of the width, kept so no page gets smaller than `minimum`
+    /// points. `whole`, or any layout but a grid: every row's line moves together, the old full-height split;
+    /// otherwise only the segment in `row` moves (#316).
     mutating func moveColumnLine(in row: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
         let value = Self.clamped(share, length: length, minimum: minimum)
-        if whole || spansRows {
+        if whole || !isGrid {
             columnShares = [value, value]
         } else if columnShares.indices.contains(row) {
             columnShares[row] = value
         }
     }
 
-    /// Moves the line between the rows in `column` (both columns where they share one) to `share` of the height.
-    /// `whole`: every column's line moves together; otherwise only the segment in `column` moves (#316).
+    /// Moves the line between the rows to `share` of the height. It is one line in every layout: a grid's runs across
+    /// both columns, and elsewhere only one column has one, so the other column's share follows it.
     mutating func moveRowLine(in column: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
         let value = Self.clamped(share, length: length, minimum: minimum)
-        if whole || !spansRows {
-            rowShares = [value, value]
-        } else if rowShares.indices.contains(column) {
-            rowShares[column] = value
-        }
+        rowShares = [value, value]
     }
 
     /// Moves a corner to `point` (in the area's top-down coordinates): the line between the columns there and the line
@@ -283,15 +282,11 @@ nonisolated struct TileShape: Equatable, Sendable {
     mutating func moveCorner(_ corner: Corner, to point: CGPoint, in area: CGRect, minimumWidth: CGFloat, minimumHeight: CGFloat, whole: Bool = false) {
         let x = Self.clamped((point.x - area.minX) / max(area.width, 1), length: area.width, minimum: minimumWidth)
         let y = Self.clamped((point.y - area.minY) / max(area.height, 1), length: area.height, minimum: minimumHeight)
-        if whole {
+        rowShares = [y, y]
+        if whole || !isGrid {
             columnShares = [x, x]
-            rowShares = [y, y]
-        } else if spansRows {
-            columnShares = [x, x]
-            for column in corner.columns where rowShares.indices.contains(column) { rowShares[column] = y }
         } else {
             for row in corner.rows where columnShares.indices.contains(row) { columnShares[row] = x }
-            rowShares = [y, y]
         }
     }
 
@@ -309,35 +304,28 @@ nonisolated struct TileShape: Equatable, Sendable {
     /// Whether the line between the columns in `row` is near the middle: one row's segment, or the whole line where
     /// the rows share it, or `whole` (#316).
     func columnLineIsNearEven(in row: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
-        let shares = whole || spansRows ? columnShares : columnShares.indices.contains(row) ? [columnShares[row]] : []
+        let shares = whole || !isGrid ? columnShares : columnShares.indices.contains(row) ? [columnShares[row]] : []
         return !shares.isEmpty && shares.allSatisfy { Self.nearEven($0, length: length, points: points) }
     }
 
-    /// Whether the line between the rows in `column` is near the middle: one column's segment, or the whole line where
-    /// the columns share it, or `whole` (#316).
+    /// Whether the line between the rows is near the middle; it is one line in every layout.
     func rowLineIsNearEven(in column: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
-        let shares = whole || !spansRows ? rowShares : rowShares.indices.contains(column) ? [rowShares[column]] : []
-        return !shares.isEmpty && shares.allSatisfy { Self.nearEven($0, length: length, points: points) }
+        rowShares.allSatisfy { Self.nearEven($0, length: length, points: points) }
     }
 
     /// Puts the line between the columns in `row` back in the middle, exactly: the snap when a drag lets go near
     /// even. `whole`, or the rows sharing one line, puts every row's line there.
     mutating func snapColumnLine(in row: Int, whole: Bool = false) {
-        if whole || spansRows {
+        if whole || !isGrid {
             columnShares = [0.5, 0.5]
         } else if columnShares.indices.contains(row) {
             columnShares[row] = 0.5
         }
     }
 
-    /// Puts the line between the rows in `column` back in the middle, exactly: the snap when a drag lets go near
-    /// even. `whole`, or the columns sharing one line, puts every column's line there.
+    /// Puts the line between the rows back in the middle, exactly: the snap when a drag lets go near even.
     mutating func snapRowLine(in column: Int, whole: Bool = false) {
-        if whole || !spansRows {
-            rowShares = [0.5, 0.5]
-        } else if rowShares.indices.contains(column) {
-            rowShares[column] = 0.5
-        }
+        rowShares = [0.5, 0.5]
     }
 
     /// The even grid again: every line at the middle.
@@ -640,6 +628,11 @@ extension TabManager.SplitPair {
         rest.remove(at: index)
         var after = shape
         after.regions = regions
+        // A parted grid's quarter that grows into a half keeps its row's width.
+        if shape.isParted, let half = regions.firstIndex(where: \.isColumn),
+           let grown = ids.firstIndex(of: rest[half]) {
+            after.column = shape.columnShares[shape.regions[grown].rows.lowerBound]
+        }
         return Self(ids: rest, shape: after)
     }
 
