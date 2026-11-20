@@ -42,10 +42,19 @@ struct PageLinkTests {
         // A middle click opens a tab of its own, with or without a modifier.
         #expect(activation([], button: 4) == .newTab(inFront: false))
         #expect(activation(.shift, button: 4) == .newTab(inFront: true))
-        // Only a link activation in the main frame: a frame's link and a page's own navigation are the page's.
+        // A page's own navigation is the page's, and so is a frame's link with ⇧, ⌥ or nothing held.
         #expect(activation(.shift, type: .other) == .page)
         #expect(activation(.command, type: .formSubmitted) == .page)
         #expect(activation(.shift, mainFrame: false) == .page)
+        #expect(activation(.option, mainFrame: false) == .page)
+        #expect(activation([], mainFrame: false) == .page)
+        #expect(activation(.command, type: .other, mainFrame: false) == .page)
+        #expect(activation([], type: .other, mainFrame: false, followed: .peek) == .page)
+        // A frame's link opens a tab on ⌘ or a middle click, as on the page.
+        #expect(activation(.command, mainFrame: false) == .newTab(inFront: false))
+        #expect(activation([.command, .shift], mainFrame: false) == .newTab(inFront: true))
+        #expect(activation([], button: 4, mainFrame: false) == .newTab(inFront: false))
+        #expect(activation(.shift, button: 4, mainFrame: false) == .newTab(inFront: true))
         // Control is not one of the modifiers a click opens elsewhere with: ⌃-click is the page's context menu.
         #expect(activation(.control) == .page)
         // A page's own navigation is the click's only when it follows that very click: ⇧ peeks, ⌥ downloads, and a
