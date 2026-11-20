@@ -184,8 +184,8 @@ enum ExternalLinks {
         }
     }
 
-    /// The words of "Open Claude?": who asks and what happens, Remember naming the site and the app, and Cancel
-    /// then Open Claude.
+    /// The words of "Open Slack?": who asks and what happens, Remember naming the site and the app, and Cancel
+    /// then Open Slack.
     struct Question: Equatable {
         let title: String
         let detail: String
@@ -200,7 +200,7 @@ enum ExternalLinks {
         let actions = [PermissionAction.cancel, open]
         let question = Question(
             title: open.title,
-            detail: String(localized: "\(site) wants to open the \(name) app.", comment: "Under a page's question to open an app: the site, then the app's name, like “claude.ai wants to open the Claude app.”."),
+            detail: String(localized: "\(site) wants to open the \(name) app.", comment: "Under a page's question to open an app: the site, then the app's name, like “app.slack.com wants to open the Slack app.”."),
             rememberTitle: String(localized: "Always allow \(site) to open \(name)", comment: "Checkbox on a page's question to open an app: the site may open this app without asking from now on. The placeholders are the site and the app's name."),
             actions: actions.map(\.id))
         return (question, actions)
