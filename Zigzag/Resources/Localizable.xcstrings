@@ -3606,7 +3606,7 @@
       }
     },
     "At most %lld pins. Unpin one first." : {
-      "comment" : "Tooltip of the pin on an extension's tile, and of the disabled menu item, when the most extensions that can be pinned already are. The number is that limit.",
+      "comment" : "Tooltip of the disabled Pin to Address item in an extension's menu, when the most extensions that can be pinned already are. The number is that limit.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -15225,7 +15225,7 @@
       }
     },
     "Pin to Address" : {
-      "comment" : "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: gives the extension a button in the address bar.",
+      "comment" : "Item in an extension's menu, and VoiceOver action of its tile in the site panel: gives the extension a button in the address bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -21490,7 +21490,7 @@
       }
     },
     "Unpin from Address" : {
-      "comment" : "Item in an extension's menu, tooltip of the pin on its tile in the site panel, and VoiceOver action: takes the extension's button out of the address bar.",
+      "comment" : "Item in an extension's menu, and VoiceOver action of its tile in the site panel: takes the extension's button out of the address bar.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {

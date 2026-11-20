@@ -1531,10 +1531,9 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let right = SidebarMenus.Item(AddressView.moveRightTitle, symbol: "arrow.right") { [weak self] in self?.sidebar.address.movePin(id, by: 1) }
         right.isEnabled = index < visible.count - 1
         menu.addItem(right)
-        menu.addItem(.separator())
     }
 
-    /// An extension's menu: its settings, site access for `tab`, pinning, turning off, and removing, which asks over
+    /// An extension's menu: pinning, its settings, site access for `tab`, turning off, and removing, which asks over
     /// `overlay`. A browser window's, and an installed app's window's (#356).
     @available(macOS 15.4, *)
     static func extensionMenu(for context: WKWebExtensionContext, profile: Profile, tab: Tab?, isPrivate: Bool, over overlay: NSView,
@@ -1546,11 +1545,13 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
         let title = NSMenuItem(title: context.webExtension.displayName ?? String(localized: "Extension", comment: "Heading of an extension's menu when the extension has no name."), action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
+        // Pinning first: Site Controls' tiles pin only from here.
+        pins(menu, id)
+        menu.addItem(.separator())
         if let options = context.optionsPageURL {
             menu.addItem(SidebarMenus.Item(String(localized: "Settings", comment: "Item in an extension's menu: opens the extension's own settings page."), symbol: "gearshape") { openOptions(options) })
         }
         menu.addItem(siteAccessItem(for: id, profile: profile, tab: tab, isPrivate: isPrivate))
-        pins(menu, id)
         menu.addItem(SidebarMenus.Item(String(localized: "Turn Off", comment: "Item in an extension's menu: turns the extension off."), symbol: "pause.circle") { installs.setEnabled(id, false) })
         menu.addItem(SidebarMenus.Item(String(localized: "Remove from Zigzag…", comment: "Item in an extension's menu: removes the extension."), symbol: "trash") { [weak overlay] in
             guard let overlay else { return }

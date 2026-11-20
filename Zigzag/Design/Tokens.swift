@@ -321,13 +321,10 @@ enum Tokens {
         static var addressMinText: CGFloat { scaled(72) }
         /// An extension's icon in the address: a site's icon's size, so it reads as big as the field's glyphs.
         static let addressIcon: CGFloat = 16
-        /// The pin button on a corner of an extension's tile in Site Controls: a 16pt round chip like a favorite's
-        /// close, a 9pt glyph in it, a 20pt target around it, the chip this far in from the tile's edges so it's
-        /// plainly the tile's own.
-        static let hoverPin: CGFloat = 20
-        static let hoverPinChip: CGFloat = 16
-        static let hoverPinGlyph: CGFloat = 9
-        static let hoverPinInset: CGFloat = 2
+        /// The mark on a pinned extension's tile in Site Controls: a 12pt round chip, the count pill's height, with a
+        /// 7pt glyph in it.
+        static let pinMark: CGFloat = 12
+        static let pinMarkGlyph: CGFloat = 7
 
         /// The bottom bar: 26pt buttons, 4pt from its edges, a space key (`spaceKey`) for each space.
         static let bottomBarHeight: CGFloat = 34
