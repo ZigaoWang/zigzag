@@ -93,6 +93,23 @@ extension CALayer {
         }
         Tokens.Motion.withoutAnimation { backgroundColor = color }
     }
+
+    /// Rounds the corners for a shape of `size`: never more than half its short side, and a capsule's ends true
+    /// half-circles, since a continuous curve that big comes to a point.
+    func round(_ radius: CGFloat, size: CGSize) {
+        let fitted = Self.cornerRadius(radius, size: size)
+        cornerRadius = fitted
+        cornerCurve = Self.isCapsule(fitted, size: size) ? .circular : .continuous
+    }
+
+    nonisolated static func cornerRadius(_ radius: CGFloat, size: CGSize) -> CGFloat {
+        max(0, min(radius, min(size.width, size.height) / 2))
+    }
+
+    /// A continuous curve needs about 1.53 times its radius on each side; past that, circular.
+    nonisolated static func isCapsule(_ radius: CGFloat, size: CGSize) -> Bool {
+        radius > 0 && radius * 2 * 1.528 > min(size.width, size.height)
+    }
 }
 
 /// Base for everything clickable we draw ourselves: tracks hover, press, selection and enabled state.
