@@ -176,6 +176,43 @@ import Testing
         }
     }
 
+    /// The toast keeps the pin and its space from when it was made: after a switch to another space, its menu moves
+    /// that pin in its own space, and each move is one ⌘Z.
+    @Test func theToastMovesItsOwnPinInItsOwnSpaceUndoably() throws {
+        try scratch { space, elsewhere, folder in
+            let manager = TabManager(spaceID: space)
+            defer { manager.invalidate() }
+            let tab = Tab(url: URL(string: "https://example.com/toast")!, spaceID: space)
+            manager.adopt([tab], in: space)
+            manager.select(tab)
+            let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+            defer { controller.window?.close() }
+            _ = try #require(Library.shared.addBookmark(url: URL(string: "https://example.com/top")!, title: "Top", to: space))
+            // One group per step, as each click is in the app.
+            let undo = controller.sidebarUndo
+            undo.groupsByEvent = false
+            func step(_ body: () -> Void) { undo.beginUndoGrouping(); body(); undo.endUndoGrouping() }
+            step { controller.saveFromStar() }
+            let item = try #require(controller.pinnedItem(of: tab))
+            #expect(item.spaceID == space)
+            manager.switchToSpace(elsewhere)
+            #expect(manager.currentSpaceID == elsewhere)
+
+            step { controller.moveSaved(item, to: .folder(folder.id)) }
+            #expect(Library.shared.spaceID(ofBookmark: item.bookmarkID) == space)
+            #expect(Library.shared.folderID(containing: item.bookmarkID) == folder.id)
+            step { controller.moveSaved(item, to: .top) }
+            #expect(Library.shared.bookmarks(in: space).first?.id == item.bookmarkID)
+            #expect(Library.shared.bookmarks(in: elsewhere).isEmpty)
+
+            undo.undo()
+            #expect(Library.shared.folderID(containing: item.bookmarkID) == folder.id)
+            undo.undo()
+            #expect(Library.shared.folderID(containing: item.bookmarkID) == nil)
+            #expect(Library.shared.bookmarks(in: space).last?.id == item.bookmarkID)
+        }
+    }
+
     // MARK: Quick save, no question
 
     /// The star, ⌘D and Save in a page's or a link's menu ask nothing: unmodified, each is the quick save.
