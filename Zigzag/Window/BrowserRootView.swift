@@ -1063,21 +1063,21 @@ final class BrowserRootView: SpaceFrameView {
             guard let self, let segment = self.draggedSegment, var shape = self.tiles else { return }
             let area = self.cardFrame
             let whole = !self.dragStartedParted && !shift
-            var nearColumn = false, nearRow = false
+            var snapColumn: CGFloat?, snapRow: CGFloat?
             if segment.axis == .column {
                 shape.moveColumnLine(in: segment.row, to: (value - area.minX) / area.width,
                                      length: area.width, minimum: Self.minimumPaneWidth, whole: whole)
-                nearColumn = !whole && !shift && shape.columnLineIsNearEven(in: segment.row, whole: whole, length: area.width)
+                if !whole && !shift { snapColumn = shape.columnSnapShare(in: segment.row, whole: whole, length: area.width) }
             } else {
                 // Window y runs bottom-up; this view is flipped.
                 let y = self.convert(NSPoint(x: 0, y: value), from: nil).y
                 shape.moveRowLine(in: segment.column, to: (y - area.minY) / area.height,
                                   length: area.height, minimum: Self.minimumPaneHeight, whole: whole)
-                nearRow = !whole && !shift && shape.rowLineIsNearEven(in: segment.column, whole: whole, length: area.height)
+                if !whole && !shift { snapRow = shape.rowSnapShare(in: segment.column, whole: whole, length: area.height) }
             }
             self.tiles = shape
             self.layoutSubtreeIfNeeded()
-            self.showSnapGuides(column: nearColumn, row: nearRow)
+            self.showSnapGuides(column: snapColumn, row: snapRow)
             self.onTilesChange?(shape, false)
         }
         handle.onEnd = { [weak self] shift in self?.endTilesDrag(shift: shift) }
@@ -1099,7 +1099,7 @@ final class BrowserRootView: SpaceFrameView {
             if let handle, let corner = handle.corner, let shape = self.tiles {
                 let area = self.cardFrame, press = self.convert(handle.pressedAt, from: nil)
                 let x = area.minX + shape.columnShares[corner.rows.first ?? 0] * area.width
-                let y = area.minY + shape.row * area.height
+                let y = area.minY + shape.rowShares[corner.columns.first ?? 0] * area.height
                 self.cornerGrab = CGSize(width: press.x - x, height: press.y - y)
             }
         }
@@ -1112,8 +1112,9 @@ final class BrowserRootView: SpaceFrameView {
                              minimumWidth: Self.minimumPaneWidth, minimumHeight: Self.minimumPaneHeight, whole: whole)
             self.tiles = shape
             self.layoutSubtreeIfNeeded()
-            let near = self.cornerIsNearEven(corner, in: shape, whole: whole, area: area)
-            self.showSnapGuides(column: !whole && !shift && near.column, row: !whole && !shift && near.row)
+            let snapColumn = !whole && !shift ? corner.rows.lazy.compactMap { shape.columnSnapShare(in: $0, whole: whole, length: area.width) }.first : nil
+            let snapRow = !whole && !shift ? corner.columns.lazy.compactMap { shape.rowSnapShare(in: $0, whole: whole, length: area.height) }.first : nil
+            self.showSnapGuides(column: snapColumn, row: snapRow)
             self.onTilesChange?(shape, false)
         }
         handle.onEnd = { [weak self] shift in self?.endTilesDrag(shift: shift) }
@@ -1123,25 +1124,19 @@ final class BrowserRootView: SpaceFrameView {
         return handle
     }
 
-    /// Where the corner's lines sit against the middle: each whole line, or each segment that meets there (#316).
-    private func cornerIsNearEven(_ corner: TileShape.Corner, in shape: TileShape, whole: Bool, area: NSRect) -> (column: Bool, row: Bool) {
-        (corner.rows.allSatisfy { shape.columnLineIsNearEven(in: $0, whole: whole, length: area.width) },
-         corner.columns.allSatisfy { shape.rowLineIsNearEven(in: $0, whole: whole, length: area.height) })
-    }
-
-    /// Shows the middle where a dragged line has come within a few points of it. Letting go there puts the line
-    /// exactly in the middle; Shift keeps it where it was let go (#316).
-    private func showSnapGuides(column: Bool, row: Bool) {
+    /// Shows the line a dragged line would snap to: the middle, or the other segment's line, where two come
+    /// together. Letting go there puts the line exactly there; Shift keeps it where it was let go (#316).
+    private func showSnapGuides(column: CGFloat?, row: CGFloat?) {
         let area = cardFrame, thickness: CGFloat = 3, inset = Tokens.Space.x2
-        snapGuideColumn.isHidden = !column
-        snapGuideRow.isHidden = !row
-        if column {
-            let rect = NSRect(x: area.midX - thickness / 2, y: area.minY + inset,
+        snapGuideColumn.isHidden = column == nil
+        snapGuideRow.isHidden = row == nil
+        if let column {
+            let rect = NSRect(x: area.minX + column * area.width - thickness / 2, y: area.minY + inset,
                               width: thickness, height: max(0, area.height - inset * 2))
             snapGuideColumn.frame = tileHandles.convert(rect, from: self)
         }
-        if row {
-            let rect = NSRect(x: area.minX + inset, y: area.midY - thickness / 2,
+        if let row {
+            let rect = NSRect(x: area.minX + inset, y: area.minY + row * area.height - thickness / 2,
                               width: max(0, area.width - inset * 2), height: thickness)
             snapGuideRow.frame = tileHandles.convert(rect, from: self)
         }
@@ -1152,8 +1147,8 @@ final class BrowserRootView: SpaceFrameView {
         snapGuideRow.isHidden = true
     }
 
-    /// The drag is over: a line let go near the middle snaps there, unless Shift held it away, and the group's lines
-    /// are saved as they ended (#316).
+    /// The drag is over: a line let go near a snap — the middle, or the line it would meet — snaps there, unless
+    /// Shift held it away, and the group's lines are saved as they ended (#316).
     private func endTilesDrag(shift: Bool) {
         // A whole line stays where it's let go, as it always did; only a segment snaps.
         guard !shift, dragStartedParted, var shape = tiles else {
@@ -1164,21 +1159,20 @@ final class BrowserRootView: SpaceFrameView {
         let whole = false
         var snapped = false
         if let segment = draggedSegment {
-            if segment.axis == .column, shape.columnLineIsNearEven(in: segment.row, whole: whole, length: area.width) {
-                shape.snapColumnLine(in: segment.row, whole: whole)
+            if segment.axis == .column, let share = shape.columnSnapShare(in: segment.row, whole: whole, length: area.width) {
+                shape.snapColumnLine(in: segment.row, to: share, whole: whole)
                 snapped = true
-            } else if segment.axis == .row, shape.rowLineIsNearEven(in: segment.column, whole: whole, length: area.height) {
-                shape.snapRowLine(in: segment.column, whole: whole)
+            } else if segment.axis == .row, let share = shape.rowSnapShare(in: segment.column, whole: whole, length: area.height) {
+                shape.snapRowLine(in: segment.column, to: share, whole: whole)
                 snapped = true
             }
         } else if let corner = draggedCorner {
-            let near = cornerIsNearEven(corner, in: shape, whole: whole, area: area)
-            if near.column {
-                for row in corner.rows { shape.snapColumnLine(in: row, whole: whole) }
+            if let share = corner.rows.lazy.compactMap({ shape.columnSnapShare(in: $0, whole: whole, length: area.width) }).first {
+                for row in corner.rows { shape.snapColumnLine(in: row, to: share, whole: whole) }
                 snapped = true
             }
-            if near.row {
-                for column in corner.columns { shape.snapRowLine(in: column, whole: whole) }
+            if let share = corner.columns.lazy.compactMap({ shape.rowSnapShare(in: $0, whole: whole, length: area.height) }).first {
+                for column in corner.columns { shape.snapRowLine(in: column, to: share, whole: whole) }
                 snapped = true
             }
         }
@@ -1204,8 +1198,8 @@ final class BrowserRootView: SpaceFrameView {
     private func evenOutTiles(_ axis: TileShape.Segment.Axis? = nil) {
         guard var shape = tiles else { return }
         switch axis {
-        case .column: shape.snapColumnLine(in: 0, whole: true)
-        case .row: shape.snapRowLine(in: 0, whole: true)
+        case .column: shape.snapColumnLine(in: 0, to: 0.5, whole: true)
+        case .row: shape.snapRowLine(in: 0, to: 0.5, whole: true)
         case nil: shape.evenOut()
         }
         setTiles(shape, animated: true)

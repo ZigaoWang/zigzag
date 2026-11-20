@@ -151,15 +151,42 @@ struct TileLayoutTests {
         #expect(!TileShape(regions: [.left, .right], column: 0.3).isParted)
     }
 
-    @Test func aGridsLineBetweenTheRowsRunsAcrossBothColumns() {
+    @Test func eachColumnKeepsItsOwnLineBetweenTheRows() {
         var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        // The right column's line moves; the left column's stays where it was, so the top right grows taller.
         shape.moveRowLine(in: 1, to: 0.7, length: area.height, minimum: 100)
         let frames = shape.frames(in: area, gap: 10)
-        // Four rectangles covering the area cannot keep both pairs of lines apart: the row line is one.
-        #expect(frames[0].height == 413 && frames[1].height == 413)
-        #expect(frames[2].height == 177 && frames[3].height == 177)
-        #expect(frames[1].minY == frames[0].minY && frames[3].minY == frames[2].minY)
-        #expect(shape.rowShares == [0.7, 0.7])
+        #expect(frames[0].height == 295 && frames[2].height == 295)
+        #expect(frames[1].height + frames[3].height + 10 == 600, "\(frames) shares \(shape.columnShares) \(shape.rowShares)")
+        #expect(frames[1].height > frames[0].height && frames[3].height < frames[0].height, "\(frames) shares \(shape.columnShares) \(shape.rowShares) apart \(shape.rowsApart)")
+        #expect(frames[2].minY == frames[0].maxY + 10)
+        #expect(frames[1].minY == frames[0].minY && frames[3].minY == frames[1].maxY + 10)
+        #expect(shape.rowShares == [0.5, 0.7])
+        #expect(shape.rowsApart && !shape.columnsApart && shape.isParted)
+        // Four rectangles cover the area only with one pair of lines apart: parting the rows joined the columns.
+        #expect(shape.columnShares == [0.5, 0.5])
+        for i in 0..<4 { for j in (i + 1)..<4 { #expect(!frames[i].intersects(frames[j])) } }
+        #expect(frames.map(\.minX).min() == area.minX && frames.map(\.maxX).max() == area.maxX)
+        #expect(frames.map(\.minY).min() == area.minY && frames.map(\.maxY).max() == area.maxY)
+        // Parting the columns in turn joins the rows again.
+        shape.moveColumnLine(in: 0, to: 0.3, length: area.width, minimum: 100)
+        #expect(shape.columnsApart && !shape.rowsApart)
+    }
+
+    @Test func aSegmentSnapsToTheOtherColumnsLineAndTheMiddle() {
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.moveRowLine(in: 0, to: 0.35, length: area.height, minimum: 100)
+        shape.moveRowLine(in: 1, to: 0.35 + 5 / area.height, length: area.height, minimum: 100)
+        // The right column's line is a few points from the left's: that is where it snaps, not the middle.
+        #expect(shape.rowSnapShare(in: 1, whole: false, length: area.height) == 0.35)
+        shape.snapRowLine(in: 1, to: 0.35)
+        #expect(shape.rowShares == [0.35, 0.35] && !shape.isParted)
+        // Far from the other line, the middle is still the snap.
+        shape.moveRowLine(in: 0, to: 0.4, length: area.height, minimum: 100)
+        shape.moveRowLine(in: 1, to: 0.5 + 6 / area.height, length: area.height, minimum: 100)
+        #expect(shape.rowSnapShare(in: 1, whole: false, length: area.height) == 0.5)
+        // A whole line has only the middle.
+        #expect(shape.rowSnapShare(in: 0, whole: true, length: area.height) == nil)
     }
 
     @Test func linesKeepTheirShareOfTheArea() {
@@ -258,23 +285,26 @@ struct TileLayoutTests {
         var grid = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
         grid.moveColumnLine(in: 0, to: 0.3, length: area.width, minimum: 100)
         grid.moveColumnLine(in: 1, to: 0.7, length: area.width, minimum: 100)
-        grid.moveRowLine(in: 1, to: 0.7, length: area.height, minimum: 100)
         #expect(!grid.isEven)
         // Within 8pt of the middle, the guide shows and the line snaps in when let go.
         #expect(TileShape.nearEven(0.5 + 6 / area.width, length: area.width))
         #expect(!TileShape.nearEven(0.5 + 12 / area.width, length: area.width))
         #expect(grid.columnLineIsNearEven(in: 0, whole: false, length: area.width) == false)
-        grid.snapColumnLine(in: 0)
+        grid.snapColumnLine(in: 0, to: 0.5)
         #expect(grid.columnShares == [0.5, 0.7])
         // The other row's line is still custom; snapping it too makes the columns even.
-        grid.snapColumnLine(in: 1)
-        #expect(grid.columnShares == [0.5, 0.5] && !grid.isEven)
-        grid.snapRowLine(in: 1)
+        grid.snapColumnLine(in: 1, to: 0.5)
+        #expect(grid.columnShares == [0.5, 0.5] && grid.isEven)
+        // A row segment parts the rows and joins the columns into one line.
+        grid.moveRowLine(in: 1, to: 0.7, length: area.height, minimum: 100)
+        #expect(grid.rowsApart && !grid.columnsApart)
+        #expect(grid.rowLineIsNearEven(in: 1, whole: false, length: area.height) == false)
+        grid.snapRowLine(in: 1, to: 0.5)
         #expect(grid.rowShares == [0.5, 0.5] && grid.isEven)
         // A whole line snaps every share, and the even grid reads as even.
         var whole = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight], column: 0.3, row: 0.6)
-        whole.snapColumnLine(in: 0, whole: true)
-        whole.snapRowLine(in: 0, whole: true)
+        whole.snapColumnLine(in: 0, to: 0.5, whole: true)
+        whole.snapRowLine(in: 0, to: 0.5, whole: true)
         #expect(whole.isEven)
     }
 
@@ -283,7 +313,7 @@ struct TileLayoutTests {
         var split = TileShape(regions: [.left, .right])
         split.moveColumnLine(in: 0, to: 0.4, length: area.width, minimum: 100)
         #expect(!split.isEven)
-        split.snapColumnLine(in: 0)
+        split.snapColumnLine(in: 0, to: 0.5)
         #expect(split.isEven)
         // A near line is within the 8pt guide band; a far one is not.
         #expect(split.columnLineIsNearEven(in: 0, whole: false, length: area.width))
@@ -297,10 +327,12 @@ struct TileLayoutTests {
         shape.moveColumnLine(in: 0, to: 0.01, length: area.width, minimum: 260)
         #expect(abs(shape.columnShares[0] - 0.26) < 1e-9)
         #expect(shape.columnShares[1] == 0.5)
-        // The grid's one line between the rows stops where a page is still tall enough.
+        // The right column's line between the rows stops where a page is still tall enough; the left's stays, and
+        // the columns join into one line.
         shape.moveRowLine(in: 1, to: 0.99, length: area.height, minimum: 260)
         let tallest = 1 - 260.0 / area.height
-        #expect(abs(shape.rowShares[0] - tallest) < 1e-9 && shape.rowShares[1] == shape.rowShares[0])
+        #expect(abs(shape.rowShares[1] - tallest) < 1e-9 && shape.rowShares[0] == 0.5)
+        #expect(abs(shape.columnShares[0] - 0.38) < 1e-9 && shape.columnShares[1] == shape.columnShares[0])
         // A corner both ways, each against its own minimum.
         var grid = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
         let corner = try #require(grid.corners(in: area, gap: 10, slop: 2).first)
