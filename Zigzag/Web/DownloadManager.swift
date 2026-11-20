@@ -186,6 +186,8 @@ final class DownloadManager: NSObject {
         let file: URL
         weak var window: NSWindow?
         let profile: UUID
+        /// The listing it came from, when it came from AMO: the package must match the sha256 that listing publishes.
+        let slug: String?
     }
     private var pendingExtensionInstalls: [ObjectIdentifier: PendingExtensionInstall] = [:]
 
@@ -564,15 +566,19 @@ extension DownloadManager: WKDownloadDelegate {
             try? FileManager.default.removeItem(at: earlier)
             return earlier
         }
-        // A Firefox package from a page is an install, not a download to keep: it goes to a temporary file, stays
-        // out of the list, and is offered with the store's own sheet when it arrives. Rules don't apply to it, and
-        // a destination someone already chose (Save Page As, the bridge) is an explicit save and is left alone.
-        if chosenDestinations[identifier] == nil,
+        // A Firefox package from the store is an install, not a download to keep: it goes to a temporary file,
+        // stays out of the list, and is offered with the store's own sheet once its bytes match the sha256 AMO
+        // publishes. Only AMO's own listing page counts, so no other site can open the sheet. Rules don't apply,
+        // and a destination someone already chose (Save Page As, the bridge) is an explicit save and is left alone.
+        let fromAMO = download.originalRequest?.mainDocumentURL.flatMap(ExtensionStore.addonsSlug)
+            ?? (download.webView as? BrowserWebView)?.owner?.url.flatMap(ExtensionStore.addonsSlug)
+        if let slug = fromAMO, chosenDestinations[identifier] == nil,
            DownloadPolicy.isExtensionPackage(mimeType: response.mimeType, filename: name) {
             let file = FileManager.default.temporaryDirectory
                 .appendingPathComponent("Zigzag-\(UUID().uuidString)-\(Self.safeFilename(name))")
             pendingExtensionInstalls[identifier] = PendingExtensionInstall(file: file, window: window,
-                                                                          profile: item(for: download)?.profile ?? Profile.defaultID)
+                                                                          profile: item(for: download)?.profile ?? Profile.defaultID,
+                                                                          slug: slug)
             items.removeAll { $0.download === download }
             changed.send(nil)
             return file
@@ -764,6 +770,18 @@ extension DownloadManager: WKDownloadDelegate {
             return
         }
         Task { @MainActor in
+            // From AMO, the package must be the file the store published: its listing names each file's sha256,
+            // and one that doesn't match is a different file, so it is not installed.
+            if let slug = pending.slug {
+                let data = try? Data(contentsOf: file)
+                let published = await Self.publishedXPIHash(slug: slug)
+                guard let data, ExtensionStore.matchesPublishedHash(data, sha256: published) else {
+                    try? FileManager.default.removeItem(at: file)
+                    Self.noticeCouldNotAdd(String(localized: "This extension’s package doesn’t match the one the Firefox Add-ons store publishes, so it wasn’t installed.",
+                                                  comment: "Shown when an .xpi downloaded from addons.mozilla.org doesn't match the sha256 the store publishes for it."), in: host)
+                    return
+                }
+            }
             let prepared = await ExtensionStore.prepareInstallXPI(at: file)
             // The store read the file into its own staging folder; the download copy is never kept.
             try? FileManager.default.removeItem(at: file)
@@ -776,6 +794,20 @@ extension DownloadManager: WKDownloadDelegate {
                 })
             }
         }
+    }
+
+    /// The sha256 AMO publishes for a listing's current file, from its API. Nil when the store can't be reached or
+    /// names no hash, and then nothing is installed: a package that can't be checked isn't taken on trust.
+    @available(macOS 15.4, *)
+    private static func publishedXPIHash(slug: String) async -> String? {
+        guard let url = URL(string: "https://addons.mozilla.org/api/v5/addons/addon/\(slug)/?lang=en-US"),
+              let answered = try? await ExtensionStore.fetch(url),
+              let data = answered.0,
+              (answered.1 as? HTTPURLResponse)?.statusCode == 200,
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let current = root["current_version"] as? [String: Any],
+              let file = current["file"] as? [String: Any] else { return nil }
+        return file["hash"] as? String
     }
 
     private static func noticeCouldNotAdd(_ message: String, in host: NSView) {

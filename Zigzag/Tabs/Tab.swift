@@ -1658,7 +1658,7 @@ extension Tab: WKNavigationDelegate {
         if decidesMainFrame {
             // addons.mozilla.org offers an add-on to Firefox itself: a Firefox there, so its own button says Add to
             // Firefox and hands over the .xpi, which the download hook installs. Everywhere else the chosen agent.
-            let storeAgent = url.flatMap(Self.addonsPage) != nil ? DeveloperState.UserAgent.firefox.string : nil
+            let storeAgent = Self.addonsPage(url) != nil ? DeveloperState.UserAgent.firefox.string : nil
             let wanted = storeAgent ?? developerInEffect(at: url).userAgent.string
             let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
                                        type: navigationAction.navigationType)
