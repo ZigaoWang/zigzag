@@ -1041,22 +1041,22 @@ extension ExtensionBridgeTests {
         try Data(#"{"manifest_version":3,"name":"Synthetic","version":"1.0","host_permissions":["https://named.example/*"],"optional_host_permissions":["https://push.example/*"]}"#.utf8)
             .write(to: folder.appendingPathComponent("manifest.json"))
         let context = WKWebExtensionContext(for: try await WKWebExtension(resourceBaseURL: folder))
-        #expect(!WebSocketBridge.allows(URL(string: "wss://named.example/socket")!, context: context, localReceivers: false))
+        #expect(!WebSocketBridge.allows(URL(string: "wss://named.example/socket")!, context: context))
         context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://named.example/*"))
-        #expect(WebSocketBridge.allows(URL(string: "wss://named.example/socket")!, context: context, localReceivers: false))
-        #expect(!WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context, localReceivers: false))
+        #expect(WebSocketBridge.allows(URL(string: "wss://named.example/socket")!, context: context))
+        #expect(!WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
         context.setPermissionStatus(.grantedExplicitly, for: try WKWebExtension.MatchPattern(string: "https://push.example/*"))
-        #expect(WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context, localReceivers: false))
-        // This Mac needs the person's switch for this extension, and a host permission is not one.
+        #expect(WebSocketBridge.allows(URL(string: "wss://push.example/socket")!, context: context))
+        // This Mac stays allowed with nothing asked, as it was before there was a local-receivers door: an extension
+        // that already opened ws://localhost keeps working, and only its HTTP path goes through the new switch.
         for text in ["ws://localhost:8080/", "ws://127.0.0.1:1234/x", "ws://127.5.6.7/", "ws://[::1]:9000/", "wss://LOCALHOST./"] {
-            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context, localReceivers: false))
-            #expect(WebSocketBridge.allows(URL(string: text)!, context: context, localReceivers: true))
+            #expect(WebSocketBridge.allows(URL(string: text)!, context: context))
         }
         for text in ["ws://push.example/socket", "wss://other.example/socket", "wss://push.example.evil.test/",
                      "wss://name:synthetic@push.example/", "https://push.example/socket", "ws://128.0.0.1/",
                      "ws://localhost.evil.test/", "ws://127.0.0.1.evil.test/", "ws://user:pw@localhost/", "http://localhost/"] {
-            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context, localReceivers: false), "\(text) is refused")
-            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context, localReceivers: true), "\(text) is refused")
+            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context), "\(text) is refused")
+            #expect(!WebSocketBridge.allows(URL(string: text)!, context: context), "\(text) is refused")
         }
     }
 }
