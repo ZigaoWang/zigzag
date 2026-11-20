@@ -578,7 +578,7 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
     private func openSocket(_ body: [String: Any], from origin: String, webView: WKWebView?,
                             reply: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
         guard let id = body["id"] as? String, let text = body["url"] as? String, let url = URL(string: text),
-              url.scheme?.lowercased() == "ws", LocalReceivers.isLoopback(url) else {
+              url.scheme?.lowercased() == "ws", LocalReceivers.isLoopback(url), LocalReceivers.blockedPort(of: url) == nil else {
             reply(["error": "refused"], nil)
             return
         }

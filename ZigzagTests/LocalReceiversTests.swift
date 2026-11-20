@@ -361,6 +361,21 @@ struct LocalReceiversTests {
         }
     }
 
+    /// The ports browsers never load from stay shut through the door, for sites and extensions alike.
+    @Test func aBlockedPortNeverLeaves() async {
+        #expect(LocalReceivers.blockedPort(of: URL(string: "http://localhost:25/")!) == 25)
+        #expect(LocalReceivers.blockedPort(of: URL(string: "ws://127.0.0.1:6667/")!) == 6667)
+        #expect(LocalReceivers.blockedPort(of: URL(string: "http://localhost/")!) == nil)
+        #expect(LocalReceivers.blockedPort(of: URL(string: "http://localhost:6379/")!) == nil, "not on the spec's list")
+        for identity in [site, LocalReceivers.Identity.webExtension(id: "abc")] {
+            await expect(.blockedPort(587)) {
+                _ = try await LocalReceivers.send(LocalReceivers.Request(url: URL(string: "http://localhost:587/")!), as: identity,
+                                                  transport: { _ in Issue.record("sent"); throw URLError(.cancelled) })
+            }
+        }
+        #expect(LocalReceivers.Failure.blockedPort(22).errorDescription == "Port 22 is blocked, as browsers block it.")
+    }
+
     /// A site's call is cross-site: SameSite cookies stay behind, as WebKit leaves them; an extension's carry them.
     @Test func aSiteCallLeavesSameSiteCookiesBehind() throws {
         func cookie(_ name: String, sameSite: HTTPCookieStringPolicy?) throws -> HTTPCookie {

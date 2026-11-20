@@ -95,6 +95,22 @@ nonisolated enum LocalReceivers {
         /// The helper asked for something this door does not do, like leaving loopback.
         case refused(String)
         case tooLarge
+        /// A port browsers never load from, so a page can't speak HTTP to a mail or file server.
+        case blockedPort(Int)
+    }
+
+    /// The Fetch spec's bad ports, as WebKit blocks them for any load (WTF's `portAllowed`), port 0 included.
+    static let blockedPorts: Set<Int> = [
+        0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109,
+        110, 111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531,
+        532, 540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060,
+        5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+    ]
+
+    /// The port `url` names, if it's one of those.
+    static func blockedPort(of url: URL) -> Int? {
+        guard let port = url.port, blockedPorts.contains(port) else { return nil }
+        return port
     }
 
     /// The master switch: Settings › Privacy, off until the person reads the briefing and turns it on. The per-site
@@ -123,6 +139,7 @@ nonisolated enum LocalReceivers {
                      transport: Transport? = nil) async throws -> Response {
         guard isLoopback(request.url) else { throw Failure.notLoopback }
         guard isWellFormed(request) else { throw Failure.refused("the request is malformed") }
+        if let port = blockedPort(of: request.url) { throw Failure.blockedPort(port) }
         let run = transport ?? defaultTransport
         if !identity.isWebExtension, needsPreflight(request) {
             let preflight = try await run(urlRequest(for: preflightRequest(for: request), as: identity))
@@ -359,6 +376,7 @@ extension LocalReceivers.Failure: LocalizedError {
         case .noAnswer: return "Nothing answered at that address."
         case .cors(let reason), .refused(let reason): return "\(reason.prefix(1).uppercased())\(reason.dropFirst())."
         case .tooLarge: return "The answer was too large to read."
+        case .blockedPort(let port): return "Port \(port) is blocked, as browsers block it."
         }
     }
 }
