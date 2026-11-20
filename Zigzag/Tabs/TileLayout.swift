@@ -255,33 +255,88 @@ nonisolated struct TileShape: Equatable, Sendable {
     }
 
     /// Moves the line between the columns in `row` (both rows where a page spans them) to `share` of the width, kept so
-    /// no page gets smaller than `minimum` points.
-    mutating func moveColumnLine(in row: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat) {
+    /// no page gets smaller than `minimum` points. `whole`: every row's line moves together, the old full-height
+    /// split; otherwise only the segment in `row` moves (#316).
+    mutating func moveColumnLine(in row: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
         let value = Self.clamped(share, length: length, minimum: minimum)
-        if spansRows { columnShares = [value, value] } else if columnShares.indices.contains(row) { columnShares[row] = value }
+        if whole || spansRows {
+            columnShares = [value, value]
+        } else if columnShares.indices.contains(row) {
+            columnShares[row] = value
+        }
     }
 
     /// Moves the line between the rows in `column` (both columns where they share one) to `share` of the height.
-    mutating func moveRowLine(in column: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat) {
+    /// `whole`: every column's line moves together; otherwise only the segment in `column` moves (#316).
+    mutating func moveRowLine(in column: Int, to share: CGFloat, length: CGFloat, minimum: CGFloat, whole: Bool = false) {
         let value = Self.clamped(share, length: length, minimum: minimum)
-        if spansRows {
-            if rowShares.indices.contains(column) { rowShares[column] = value }
-        } else {
+        if whole || !spansRows {
             rowShares = [value, value]
+        } else if rowShares.indices.contains(column) {
+            rowShares[column] = value
         }
     }
 
     /// Moves a corner to `point` (in the area's top-down coordinates): the line between the columns there and the line
-    /// between the rows, each kept so no page gets smaller than `minimumWidth` by `minimumHeight`.
-    mutating func moveCorner(_ corner: Corner, to point: CGPoint, in area: CGRect, minimumWidth: CGFloat, minimumHeight: CGFloat) {
+    /// between the rows, each kept so no page gets smaller than `minimumWidth` by `minimumHeight`. `whole`: both
+    /// full lines move, as the old corner did; otherwise only the segments that meet there (#309).
+    mutating func moveCorner(_ corner: Corner, to point: CGPoint, in area: CGRect, minimumWidth: CGFloat, minimumHeight: CGFloat, whole: Bool = false) {
         let x = Self.clamped((point.x - area.minX) / max(area.width, 1), length: area.width, minimum: minimumWidth)
         let y = Self.clamped((point.y - area.minY) / max(area.height, 1), length: area.height, minimum: minimumHeight)
-        if spansRows {
+        if whole {
+            columnShares = [x, x]
+            rowShares = [y, y]
+        } else if spansRows {
             columnShares = [x, x]
             for column in corner.columns where rowShares.indices.contains(column) { rowShares[column] = y }
         } else {
             for row in corner.rows where columnShares.indices.contains(row) { columnShares[row] = x }
             rowShares = [y, y]
+        }
+    }
+
+    /// Whether every line sits in the middle: the standard even grid.
+    var isEven: Bool {
+        columnShares.allSatisfy { abs($0 - 0.5) < 0.001 } && rowShares.allSatisfy { abs($0 - 0.5) < 0.001 }
+    }
+
+    /// Whether `share` is within `points` of the middle of a line `length` long: the drag shows the even guide and
+    /// snaps on release unless Shift holds it away.
+    static func nearEven(_ share: CGFloat, length: CGFloat, points: CGFloat = 8) -> Bool {
+        abs(share - 0.5) * max(length, 1) <= points
+    }
+
+    /// Whether the line between the columns in `row` is near the middle: one row's segment, or the whole line where
+    /// the rows share it, or `whole` (#316).
+    func columnLineIsNearEven(in row: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
+        let shares = whole || spansRows ? columnShares : columnShares.indices.contains(row) ? [columnShares[row]] : []
+        return !shares.isEmpty && shares.allSatisfy { Self.nearEven($0, length: length, points: points) }
+    }
+
+    /// Whether the line between the rows in `column` is near the middle: one column's segment, or the whole line where
+    /// the columns share it, or `whole` (#316).
+    func rowLineIsNearEven(in column: Int, whole: Bool, length: CGFloat, points: CGFloat = 8) -> Bool {
+        let shares = whole || !spansRows ? rowShares : rowShares.indices.contains(column) ? [rowShares[column]] : []
+        return !shares.isEmpty && shares.allSatisfy { Self.nearEven($0, length: length, points: points) }
+    }
+
+    /// Puts the line between the columns in `row` back in the middle, exactly: the snap when a drag lets go near
+    /// even. `whole`, or the rows sharing one line, puts every row's line there.
+    mutating func snapColumnLine(in row: Int, whole: Bool = false) {
+        if whole || spansRows {
+            columnShares = [0.5, 0.5]
+        } else if columnShares.indices.contains(row) {
+            columnShares[row] = 0.5
+        }
+    }
+
+    /// Puts the line between the rows in `column` back in the middle, exactly: the snap when a drag lets go near
+    /// even. `whole`, or the columns sharing one line, puts every column's line there.
+    mutating func snapRowLine(in column: Int, whole: Bool = false) {
+        if whole || !spansRows {
+            rowShares = [0.5, 0.5]
+        } else if rowShares.indices.contains(column) {
+            rowShares[column] = 0.5
         }
     }
 

@@ -214,6 +214,60 @@ struct TileLayoutTests {
         #expect(shape.frames(in: area, gap: 10) == even.frames(in: area, gap: 10))
     }
 
+    @Test func aWholeLineMovesEveryRowOrColumnTogether() {
+        var grid = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        // The plain drag of an even grid: the one line between the columns moves in both rows.
+        grid.moveColumnLine(in: 0, to: 0.3, length: area.width, minimum: 100, whole: true)
+        #expect(grid.columnShares == [0.3, 0.3])
+        #expect(grid.rowShares == [0.5, 0.5])
+        // Shift moves only the top row's segment.
+        grid.moveColumnLine(in: 0, to: 0.7, length: area.width, minimum: 100)
+        #expect(grid.columnShares == [0.7, 0.3])
+        // A corner dragged whole moves both lines the same way.
+        let corner = TileShape(regions: [.left, .topRight, .bottomRight]).corners(in: area, gap: 10, slop: 2)[0]
+        var three = TileShape(regions: [.left, .topRight, .bottomRight])
+        three.moveCorner(corner, to: CGPoint(x: area.minX + 0.4 * area.width, y: area.minY + 0.4 * area.height),
+                         in: area, minimumWidth: 100, minimumHeight: 100, whole: true)
+        #expect(three.columnShares == [0.4, 0.4] && three.rowShares == [0.4, 0.4])
+    }
+
+    @Test func aCustomLayoutSnapsALineBackToTheMiddleNearEven() {
+        var grid = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        grid.moveColumnLine(in: 0, to: 0.3, length: area.width, minimum: 100)
+        grid.moveColumnLine(in: 1, to: 0.7, length: area.width, minimum: 100)
+        grid.moveRowLine(in: 1, to: 0.7, length: area.height, minimum: 100)
+        #expect(!grid.isEven)
+        // Within 8pt of the middle, the guide shows and the line snaps in when let go.
+        #expect(TileShape.nearEven(0.5 + 6 / area.width, length: area.width))
+        #expect(!TileShape.nearEven(0.5 + 12 / area.width, length: area.width))
+        #expect(grid.columnLineIsNearEven(in: 0, whole: false, length: area.width) == false)
+        grid.snapColumnLine(in: 0)
+        #expect(grid.columnShares == [0.5, 0.7])
+        // The other row's line is still custom; snapping it too makes the columns even.
+        grid.snapColumnLine(in: 1)
+        #expect(grid.columnShares == [0.5, 0.5] && !grid.isEven)
+        grid.snapRowLine(in: 1)
+        #expect(grid.rowShares == [0.5, 0.5] && grid.isEven)
+        // A whole line snaps every share, and the even grid reads as even.
+        var whole = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight], column: 0.3, row: 0.6)
+        whole.snapColumnLine(in: 0, whole: true)
+        whole.snapRowLine(in: 0, whole: true)
+        #expect(whole.isEven)
+    }
+
+    @Test func aGroupsEvenStateComesFromItsShares() {
+        #expect(TileShape(regions: [.left, .right]).isEven)
+        var split = TileShape(regions: [.left, .right])
+        split.moveColumnLine(in: 0, to: 0.4, length: area.width, minimum: 100)
+        #expect(!split.isEven)
+        split.snapColumnLine(in: 0)
+        #expect(split.isEven)
+        // A near line is within the 8pt guide band; a far one is not.
+        #expect(split.columnLineIsNearEven(in: 0, whole: false, length: area.width))
+        split.moveColumnLine(in: 0, to: 0.42, length: area.width, minimum: 100)
+        #expect(!split.columnLineIsNearEven(in: 0, whole: false, length: area.width))
+    }
+
     @Test func everyLineKeepsEachPageUsable() throws {
         var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
         // The top row's line stops where its pages are still wide enough, and leaves the bottom row's alone.

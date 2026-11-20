@@ -43,6 +43,152 @@ struct DragZoneTests {
         #expect(ResizeHandle.dragged(230, grab: -8) == 238)
     }
 
+    @Test func aVerticalDragMovesTheLineBetweenTheRowsInEveryTileShape() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        let shapes = [
+            TileShape(regions: [.top, .bottom]),
+            TileShape(regions: [.left, .topRight, .bottomRight]),
+            TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight]),
+        ]
+        for shape in shapes {
+            root.setTiles(shape, animated: false)
+            window.layoutIfNeeded()
+            let area = root.cardFrame
+            let gap = root.paneGap
+            let segment = try #require(root.tiles?.segments(in: area, gap: gap, slop: Tokens.Metric.dragReach).first { $0.axis == .row })
+            // On the line between the rows, away from the corner where a square takes the press.
+            let point = root.convert(NSPoint(x: segment.frame.midX - segment.frame.width / 4, y: segment.frame.midY), to: nil)
+            let frame = try #require(window.contentView?.superview)
+            let handle = try #require(frame.hitTest(frame.convert(point, from: nil)) as? ResizeHandle)
+            #expect(handle.isVertical, "\(shape.regions)")
+            let down = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: point, modifierFlags: [],
+                                                       timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                       context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+            handle.mouseDown(with: down)
+            let moved = try #require(NSEvent.mouseEvent(with: .leftMouseDragged, location: NSPoint(x: point.x, y: point.y - 60),
+                                                        modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 1,
+                                                        clickCount: 1, pressure: 1))
+            handle.mouseDragged(with: moved)
+            // Dragged down, the line goes down: the top row gets more of the height.
+            let share = try #require(root.tiles?.rowShares[segment.column])
+            #expect(share > 0.5, "\(shape.regions)")
+        }
+    }
+
+    @Test func aPlainDragMovesTheWholeLineAndShiftMovesOneSegment() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        let shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        root.setTiles(shape, animated: false)
+        window.layoutIfNeeded()
+        let area = root.cardFrame
+        let segment = try #require(root.tiles?.segments(in: area, gap: root.paneGap, slop: Tokens.Metric.dragReach)
+            .first { $0.axis == .column && $0.row == 0 })
+        let start = root.convert(NSPoint(x: segment.frame.midX, y: segment.frame.midY), to: nil)
+        let target = NSPoint(x: start.x + 60, y: start.y)
+        let frame = try #require(window.contentView?.superview)
+        let handle = try #require(frame.hitTest(frame.convert(start, from: nil)) as? ResizeHandle)
+        func drag(_ point: NSPoint, shift: Bool) throws {
+            for (type, at) in [(NSEvent.EventType.leftMouseDown, start), (.leftMouseDragged, point), (.leftMouseUp, point)] {
+                let event = try #require(NSEvent.mouseEvent(with: type, location: at, modifierFlags: shift ? [.shift] : [],
+                                                            timestamp: ProcessInfo.processInfo.systemUptime,
+                                                            windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                            clickCount: 1, pressure: 1))
+                switch type {
+                case .leftMouseDown: handle.mouseDown(with: event)
+                case .leftMouseDragged: handle.mouseDragged(with: event)
+                default: handle.mouseUp(with: event)
+                }
+            }
+        }
+        // From the even grid, a plain drag moves both rows' lines together.
+        try drag(target, shift: false)
+        let whole = try #require(root.tiles)
+        #expect(whole.columnShares[0] > 0.5)
+        #expect(whole.columnShares[1] == whole.columnShares[0])
+        // Again from even, Shift moves only the top row's segment.
+        root.setTiles(shape, animated: false)
+        window.layoutIfNeeded()
+        try drag(target, shift: true)
+        let segmentOnly = try #require(root.tiles)
+        #expect(segmentOnly.columnShares[0] > 0.5)
+        #expect(segmentOnly.columnShares[1] == 0.5)
+    }
+
+    @Test func aNearEvenLineSnapsOnReleaseUnlessShiftHoldsIt() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        var custom = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        custom.columnShares = [0.3, 0.5]
+        root.setTiles(custom, animated: false)
+        window.layoutIfNeeded()
+        let area = root.cardFrame
+        let segment = try #require(root.tiles?.segments(in: area, gap: root.paneGap, slop: Tokens.Metric.dragReach)
+            .first { $0.axis == .column && $0.row == 0 })
+        // On the drawn line itself, so there is no grab offset between the pointer and the line.
+        let first = try #require(root.tiles?.frames(in: area, gap: root.paneGap).first)
+        let lineX = first.maxX
+        let start = root.convert(NSPoint(x: lineX, y: segment.frame.midY), to: nil)
+        let near = root.convert(NSPoint(x: area.midX + 4, y: segment.frame.midY), to: nil)
+        let frame = try #require(window.contentView?.superview)
+        let handle = try #require(frame.hitTest(frame.convert(start, from: nil)) as? ResizeHandle)
+        func drag(shift: Bool) throws {
+            let events: [(NSEvent.EventType, NSPoint)] = [(.leftMouseDown, start), (.leftMouseDragged, near), (.leftMouseUp, near)]
+            for (type, point) in events {
+                let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: shift ? [.shift] : [],
+                                                            timestamp: ProcessInfo.processInfo.systemUptime,
+                                                            windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                            clickCount: 1, pressure: 1))
+                switch type {
+                case .leftMouseDown: handle.mouseDown(with: event)
+                case .leftMouseDragged:
+                    handle.mouseDragged(with: event)
+                    let during = try #require(root.tiles?.columnShares[0])
+                    #expect(abs(during - 0.5) * area.width <= 8)
+                default: handle.mouseUp(with: event)
+                }
+            }
+        }
+        try drag(shift: false)
+        #expect(root.tiles?.columnShares[0] == 0.5)
+        // The same near miss with Shift held stays where it was let go.
+        root.setTiles(custom, animated: false)
+        window.layoutIfNeeded()
+        try drag(shift: true)
+        let held = try #require(root.tiles?.columnShares[0])
+        #expect(held != 0.5)
+        #expect(abs(held - 0.5) * area.width <= 8)
+    }
+
     @Test func theBandTakesThePointerOverTheSidebarAndThePage() throws {
         let space = Library.shared.spaces[0].id
         let before = Library.shared.snapshot

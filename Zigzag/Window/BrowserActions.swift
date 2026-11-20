@@ -417,6 +417,17 @@ extension BrowserWindowController: NSMenuItemValidation {
         if let tab = selectedTab { tabManager.toggleSplitOrientation(for: tab) }
     }
 
+    /// Puts a tile group's lines back in the middle: the standard even grid, and its plain drags move whole lines
+    /// again (#316).
+    @objc func resetTileLayout(_ sender: Any?) {
+        guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, !shape.isEven else { return }
+        shape.evenOut()
+        tabManager.setTileShape(shape, for: tab)
+        root.setTiles(shape, animated: true)
+        root.paneCards.forEach { $0.header.resetsLayout = false }
+        onStateChange?()
+    }
+
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
     /// The page in view: the one peeked at while Peek is open, otherwise the tab you're on.
     @objc func translatePage(_ sender: Any?) { translatePage(tab: peek.isVisible ? peek.tab : nil) }
