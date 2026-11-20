@@ -91,4 +91,31 @@ struct FindCountTests {
         }
         #expect(count == 6)
     }
+
+    private final class Host: FindBarHost {
+        let window: NSWindow?
+        let webView: WKWebView
+        let findBarOverlay = NSView()
+        init(window: NSWindow, webView: WKWebView) { self.window = window; self.webView = webView }
+        var focusedPaneFrame: NSRect { webView.frame }
+        var findBarHeaderHeight: CGFloat { 0 }
+        var findBarIsCovered: Bool { false }
+        var findableWebView: WKWebView? { webView }
+        var findablePDF: PDFViewerView? { nil }
+    }
+
+    /// ⌘G with the bar closed goes one match on, not two.
+    @Test func findNextWithTheBarClosedStepsOnce() async throws {
+        let (webView, window) = try await page()
+        defer { window.close() }
+        let host = Host(window: window, webView: webView)
+        let bar = FindBarController(window: host)
+        bar.show(query: "apple", focus: false, animated: false)
+        for _ in 0..<40 where bar.place != 0 { try await Task.sleep(for: .milliseconds(50)) }
+        #expect(bar.place == 0)
+        bar.hide()
+        bar.next(backwards: false)
+        try await Task.sleep(for: .milliseconds(800))
+        #expect(bar.place == 0)
+    }
 }

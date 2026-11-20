@@ -1733,6 +1733,14 @@ extension Tab: WKNavigationDelegate {
         let toTheWeb = Self.route(forPageLink: url, from: self.url) == .load
         // A page navigation to the link a ⇧ or ⌥ click was just on is that click's; a real link click clears the mark.
         if isLinkClick { followedClick = nil }
+        // A frame's link opens a tab on ⌘ or a middle click, as on the page; every other click stays the frame's.
+        if isLinkClick, !isMainFrame, toTheWeb,
+           case .newTab(let inFront) = Self.linkActivation(type: navigationAction.navigationType, isMainFrame: false,
+                                                           modifiers: navigationAction.modifierFlags, buttonNumber: navigationAction.buttonNumber) {
+            if userInitiated, host?.tab(self, routesLink: url, arrival: .linkNewTab, inBackground: !inFront) == true { return (.cancel, preferences) }
+            host?.tab(self, openURL: url, disposition: inFront ? .foregroundTab : .backgroundTab)
+            return (.cancel, preferences)
+        }
         let followed = isMainFrame && toTheWeb && navigationAction.navigationType == .other ? followedActivation(for: url) : nil
         if (isLinkClick || followed != nil) && isMainFrame && toTheWeb {
             let flags = navigationAction.modifierFlags
@@ -1797,7 +1805,11 @@ extension Tab: WKNavigationDelegate {
 
     nonisolated static func linkActivation(type: WKNavigationType, isMainFrame: Bool, modifiers: NSEvent.ModifierFlags,
                                            buttonNumber: Int, followed: LinkActivation? = nil) -> LinkActivation {
-        guard isMainFrame else { return .page }
+        guard isMainFrame else {
+            // In a frame, only ⌘ and the middle button: ⇧ and ⌥ stay the frame's.
+            let opensTab = type == .linkActivated && (buttonNumber == 4 || modifiers.contains(.command))
+            return opensTab ? .newTab(inFront: modifiers.contains(.shift)) : .page
+        }
         if type == .linkActivated {
             // ⌘ wins over ⌥, as in Chrome.
             if buttonNumber == 4 /* middle click */ || modifiers.contains(.command) { return .newTab(inFront: modifiers.contains(.shift)) }
