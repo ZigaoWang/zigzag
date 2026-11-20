@@ -154,7 +154,8 @@
           || option('redirect', 'follow') === 'manual' || option('cache', 'default') === 'only-if-cached') return nativeFetch(input, init);
       const headers = new Headers(option('headers', undefined));
       if (/text\/event-stream|application\/(?:x-ndjson|ndjson|stream\+json)/i.test(headers.get('accept') || '')) return nativeFetch(input, init);
-      const request = new Request(input, init);
+      // From a copy, so a fallback can still send the caller's own request with its body.
+      const request = new Request(isRequest ? input.clone() : input, init);
       const signal = request.signal;
       signal.throwIfAborted();
       const requestID = crypto.randomUUID();
