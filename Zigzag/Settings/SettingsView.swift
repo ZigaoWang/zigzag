@@ -2710,7 +2710,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         ConfirmSheet.show(in: self, title: String(localized: "Before You Allow This", comment: "Title of the briefing shown before the apps-on-this-Mac setting can be turned on."),
                           message: message,
-                          confirmTitle: String(localized: "I understand", comment: "Button that acknowledges the briefing and turns the setting on.")) { agreed in
+                          confirmTitle: String(localized: "I Understand", comment: "Button that acknowledges the briefing and turns the setting on.")) { agreed in
             guard agreed else { return }
             reason()
         }

@@ -1139,7 +1139,7 @@
         }
       }
     },
-    "I understand" : {
+    "I Understand" : {
       "comment" : "Button that acknowledges the briefing and turns the setting on.",
       "localizations" : {
         "zh-Hans" : {
