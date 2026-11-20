@@ -48,6 +48,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     private var generation = 0
     /// The new-password field's own rules, for the generator.
     private var rules = PasswordGenerator.Rules()
+    /// Hides the menu as a scroll over the page starts, as Safari's goes (#378).
+    private var scrollMonitor: Any?
 
     /// Offer saved logins in sign-in fields. On by default, unless a password-manager extension is handling them
     /// and Zigzag has no passwords brought over from another browser.
@@ -185,6 +187,11 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         field.width > 0 && field.height > 0 && field.midX >= 0 && field.midX <= viewport.width && field.midY >= 0 && field.midY <= viewport.height
     }
 
+    /// Whether a scroll hides the menu: one being made now, over the page or the menu.
+    static func scrollHidesMenu(phase: NSEvent.Phase, momentumPhase: NSEvent.Phase, overPage: Bool, overMenu: Bool) -> Bool {
+        (overPage || overMenu) && SystemPanelWatch.isUserScroll(phase: phase, momentumPhase: momentumPhase)
+    }
+
     /// Return fills only for a user-focused field or a visible menu.
     static func enterMayFill(focusedByUser: Bool, menuOnScreen: Bool) -> Bool { focusedByUser || menuOnScreen }
 
@@ -213,6 +220,20 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         self.menu = menu
         target = (webView, frame, origin)
         setSuggesting(true)
+        watchScrolls(in: webView)
+    }
+
+    private func watchScrolls(in webView: BrowserWebView) {
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self, weak webView] event in
+            MainActor.assumeIsolated {
+                guard let self, let webView, let menu = self.menu, event.window === webView.window else { return }
+                let overPage = webView.bounds.contains(webView.convert(event.locationInWindow, from: nil))
+                let overMenu = menu.bounds.contains(menu.convert(event.locationInWindow, from: nil))
+                if Self.scrollHidesMenu(phase: event.phase, momentumPhase: event.momentumPhase, overPage: overPage, overMenu: overMenu) { self.hide() }
+            }
+            return event
+        }
     }
 
     var isShowing: Bool { menu != nil }
@@ -305,6 +326,8 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     #endif
 
     func hide() {
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = nil
         guard let menu else { target = nil; return }
         setSuggesting(false)
         self.menu = nil

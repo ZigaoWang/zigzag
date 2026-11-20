@@ -601,6 +601,17 @@ struct SystemPasswordsTests {
         #expect(!timed.isWatching)
     }
 
+    @Test func aScrollHidesTheMenuAsItStarts() {
+        // Before, the menu went only once a scroll ended, and stayed while the pointer was on it (#378).
+        #expect(Autofill.scrollHidesMenu(phase: .began, momentumPhase: [], overPage: true, overMenu: false))
+        #expect(Autofill.scrollHidesMenu(phase: .changed, momentumPhase: [], overPage: false, overMenu: true))
+        #expect(Autofill.scrollHidesMenu(phase: [], momentumPhase: [], overPage: true, overMenu: false))
+        // The glide of a scroll from before it opened, fingers resting, or a scroll in the sidebar leave it.
+        #expect(!Autofill.scrollHidesMenu(phase: [], momentumPhase: .changed, overPage: true, overMenu: false))
+        #expect(!Autofill.scrollHidesMenu(phase: .mayBegin, momentumPhase: [], overPage: true, overMenu: false))
+        #expect(!Autofill.scrollHidesMenu(phase: .began, momentumPhase: [], overPage: false, overMenu: false))
+    }
+
     @Test func theSecondClickOfADoubleClickIsTheFirstOnes() {
         // The menu is gone by the second click, which landed on the page under it, in the next field (#378).
         #expect(Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: 0.1, interval: 0.5))
