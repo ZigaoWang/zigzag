@@ -301,6 +301,7 @@
 		89D91A7F01926421AAB5F54D /* PictureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAD2D187E4B75F090D74271 /* PictureService.swift */; };
 		8A3C09720A513455A8558735 /* HostText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332AF8C9FDBEACF03ABEAA6B /* HostText.swift */; };
 		8A420D8CE1121ED2499E5BEA /* TampermonkeyBetaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E86A4321EAFCD34A963267AF /* TampermonkeyBetaTests.swift */; };
+		C33CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D44CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolverTests.swift */; };
 		8B3741625A4E5D67BD974F41 /* WebNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21F72054D6913E7D8AD017F /* WebNotifications.swift */; };
 		8B941CD9DA6E2EE3FC3CAEC6 /* SharedTabsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1715A164F86AEB4FE31DB9B5 /* SharedTabsTests.swift */; };
 		8BC4954D2DEB077F618E9167 /* AccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60823191217F3C0F87144EA5 /* AccessibilityTests.swift */; };
@@ -534,6 +535,7 @@
 		FFF9E87717C06188E54A9AB3 /* XPIPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF722FC49AE54E7EF0934117 /* XPIPackage.swift */; };
 		FFE49543D32F0F01506BF404 /* FirefoxManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirefoxManifest.swift; sourceTree = "<group>"; };
 		FF3DD1F9D4F9655899042440 /* FirefoxManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE49543D32F0F01506BF404 /* FirefoxManifest.swift */; };
+		A11CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolver.swift */; };
 		F139A6B43F93D0A8D0D163AF /* BrowserWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BC90DFBBFAEA51FE582EDA9 /* BrowserWindowController.swift */; };
 		F1B4DCE6ED5EAEBD6C61BA9D /* TabStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92C68F8087C6786CC457EB4B /* TabStore.swift */; };
 		F2B2D57349048BBF7D703BD1 /* BridgeNamespaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5C531844DCB5F002266118C /* BridgeNamespaces.swift */; };
@@ -669,6 +671,7 @@
 		107AB21E7CCBB0D7E7C8676F /* DeveloperToolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperToolTests.swift; sourceTree = "<group>"; };
 		111BB58676C39406F3B81A0E /* FavoriteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteTests.swift; sourceTree = "<group>"; };
 		118460E2A057D11B6C1946F1 /* ExtensionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStore.swift; sourceTree = "<group>"; };
+		B22CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OldTwitterSolver.swift; sourceTree = "<group>"; };
 		11A4EB98BE921B92AA85CBF4 /* PhoneLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLink.swift; sourceTree = "<group>"; };
 		11F2F4A8F4A424FF36C24EBF /* NativeKeepAliveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeKeepAliveTests.swift; sourceTree = "<group>"; };
 		11FBCA259F006B5E81632DE3 /* PagePrintingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PagePrintingTests.swift; sourceTree = "<group>"; };
@@ -1130,6 +1133,7 @@
 		E6B84DBDA9267299D5DB571D /* PageVideos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageVideos.swift; sourceTree = "<group>"; };
 		E748383173F4821F4C0D92B3 /* WhatsNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhatsNew.swift; sourceTree = "<group>"; };
 		E86A4321EAFCD34A963267AF /* TampermonkeyBetaTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TampermonkeyBetaTests.swift; sourceTree = "<group>"; };
+		D44CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OldTwitterSolverTests.swift; sourceTree = "<group>"; };
 		E875E9125F4529D21C27D9A3 /* NowPlayingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingTests.swift; sourceTree = "<group>"; };
 		E88166CA759B416DF4C5BCE2 /* MCPSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPSetup.swift; sourceTree = "<group>"; };
 		E93C55CE791B917094F9314D /* MCPJSON.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MCPJSON.swift; sourceTree = "<group>"; };
@@ -1450,6 +1454,7 @@
 				118460E2A057D11B6C1946F1 /* ExtensionStore.swift */,
 				FF722FC49AE54E7EF0934117 /* XPIPackage.swift */,
 				FFE49543D32F0F01506BF404 /* FirefoxManifest.swift */,
+				B22CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolver.swift */,
 				1401764DF9792E0E8F11146A /* ExtensionStorms.swift */,
 				289F60BB400BACFDF97EA0E6 /* NativeAudioOut.swift */,
 				82E0C32893C3D5F6AEF17C46 /* SharedSoundGate.swift */,
@@ -1933,6 +1938,7 @@
 				05942C5562AD233537EF434C /* TabSwitcherGridTests.swift */,
 				7DE64C0B67C2BECCFFF951D0 /* TabToMiniTests.swift */,
 				E86A4321EAFCD34A963267AF /* TampermonkeyBetaTests.swift */,
+				D44CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolverTests.swift */,
 				192E65AD41512C6227E9A03C /* TileLayoutTests.swift */,
 				4A3DD8FA3DF8FD4B034CA024 /* TopBarTests.swift */,
 				05D6F7B260C273A2579439E6 /* TrafficLightTests.swift */,
@@ -2392,6 +2398,7 @@
 				F126F510FEC04B5F7A87A1F2 /* ExtensionStore.swift in Sources */,
 				FF3DD1F9D4F9655899042440 /* FirefoxManifest.swift in Sources */,
 				FFF9E87717C06188E54A9AB3 /* XPIPackage.swift in Sources */,
+				A11CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolver.swift in Sources */,
 				1A3C4EEF9AB9B8D6903AE06A /* ExtensionStorms.swift in Sources */,
 				8D5DA9B18AB78EDB306BDE3F /* ExternalLinks.swift in Sources */,
 				A49DFBB9C68513D2B9431F6A /* FaviconStore.swift in Sources */,
@@ -2805,6 +2812,7 @@
 				50336EB3892BC2231180CB68 /* TabSwitcherGridTests.swift in Sources */,
 				28CF048F268D437CFFEEE7BF /* TabToMiniTests.swift in Sources */,
 				8A420D8CE1121ED2499E5BEA /* TampermonkeyBetaTests.swift in Sources */,
+				C33CE0D1E2F3A4B5C6D7E8F9 /* OldTwitterSolverTests.swift in Sources */,
 				A08F33F5B078BBE5F98A6003 /* TileLayoutTests.swift in Sources */,
 				9992350EAA124066EE5A5A1E /* TopBarTests.swift in Sources */,
 				6C9901D77ADEF8D71D366EA2 /* TrafficLightTests.swift in Sources */,

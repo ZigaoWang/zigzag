@@ -188,6 +188,8 @@ final class ExtensionHost: NSObject {
     private(set) lazy var bridge = ExtensionBridge(host: self)
     /// Content scripts held back for reconnecting in a loop (ConnectGuard).
     private(set) lazy var storms = ExtensionStorms(host: self)
+    /// The sandbox OldTwitter's request signing needs, outside its content scripts and the site's policy.
+    private(set) lazy var oldTwitterSolver = OldTwitterSolver(host: self)
     /// Passes its two signals on to the ones views watch for any profile (ExtensionCenter).
     private var forwarding: [SignalToken] = []
     private var nativePorts: [ObjectIdentifier: NativeMessagingHost] = [:]
@@ -283,6 +285,15 @@ final class ExtensionHost: NSObject {
     private(set) var finishedLoading = false
 
     func context(for id: String) -> WKWebExtensionContext? { contexts.first { $0.uniqueIdentifier == id } }
+
+    /// OldTwitter's challenge call, in this web view's extension world, when the extension is on.
+    func attachOldTwitterSolver(to configuration: WKWebViewConfiguration) {
+        guard let id = profile.installs.installedIDs.first(where: {
+                  OldTwitterSolver.isOldTwitter(id: $0, manifest: ExtensionStore.manifest(for: $0) ?? [:])
+              }),
+              profile.installs.state(id)?.enabled == true else { return }
+        oldTwitterSolver.attach(to: configuration, extensionID: id)
+    }
 
     /// The extension, loaded in this profile, that the page at this address is one of.
     func context(forPage url: URL?) -> WKWebExtensionContext? {
@@ -489,6 +500,7 @@ final class ExtensionHost: NSObject {
         // Its companion-app helpers end with it, whether or not WebKit closed their ports.
         NativeMessagingHost.terminateAll(for: id, of: self)
         bridge.release(id)
+        if oldTwitterSolver.extensionID == id { oldTwitterSolver.release() }
         use.forget(id)
         Passkeys.refresh()
         changed.send()
