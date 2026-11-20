@@ -715,6 +715,10 @@ extension TabManager.SplitPair {
            let grown = ids.firstIndex(of: rest[half]) {
             after.column = shape.columnShares[shape.regions[grown].rows.lowerBound]
         }
+        // A grid parted between its rows keeps the row line of the column still split in two.
+        if shape.rowsApart, let half = regions.first(where: \.isColumn) {
+            after.row = shape.rowShares[half == .left ? 1 : 0]
+        }
         return Self(ids: rest, shape: after)
     }
 

@@ -202,6 +202,25 @@ struct TileLayoutTests {
         #expect(shape.columnShares[0] == shape.columnShares[1] && abs(shape.columnShares[0] - 0.45) < 1e-9)
     }
 
+    @Test func pagesComeAndGoFromPartedRowsWithoutAJump() throws {
+        let ids = [UUID(), UUID(), UUID(), UUID()]
+        var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
+        shape.rowShares = [0.3, 0.6]
+        let group = try #require(Pair(ids: ids, shape: shape))
+        // The top left goes: the right column, still in two, keeps its line.
+        let rest = try #require(group.removing(ids[0]))
+        #expect(rest.shape.row == 0.6 && rest.shape.rowShares == [0.6, 0.6])
+        // A page back in the left half's bottom: the new grid's row line is where the right column's was.
+        let back = try #require(rest.adding(UUID(), .place(region: .bottomLeft, regions: [.topLeft, .topRight, .bottomRight])))
+        #expect(back.shape.rowShares == [0.6, 0.6])
+        // A grid saved with its columns parted, as before rows could part, opens the same.
+        var columns = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight], row: 0.4)
+        columns.columnShares = [0.3, 0.6]
+        let saved = try #require(Pair(ids: ids, shape: columns))
+        let reopened = try JSONDecoder().decode(Pair.self, from: JSONEncoder().encode(saved))
+        #expect(reopened.shape.columnShares == [0.3, 0.6] && reopened.shape.rowShares == [0.4, 0.4])
+    }
+
     @Test func aSegmentSnapsToTheOtherColumnsLineAndTheMiddle() {
         var shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight])
         shape.moveRowLine(in: 0, to: 0.35, length: area.height, minimum: 100)
