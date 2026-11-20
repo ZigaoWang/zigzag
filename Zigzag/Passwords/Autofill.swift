@@ -325,6 +325,28 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         if let window, systemRequest?.webView.window === window { SystemPasswordPicker.shared.cancel() }
     }
 
+    /// The second click of a double-click on Passwords… stops here: the menu is gone by then, and it would land on
+    /// the page under it, in the next field (#378).
+    private var secondClickMonitor: Any?
+
+    private func swallowSecondClick(in window: NSWindow?) {
+        if let secondClickMonitor { NSEvent.removeMonitor(secondClickMonitor) }
+        let since = ProcessInfo.processInfo.systemUptime, interval = NSEvent.doubleClickInterval
+        let monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
+            Self.isSecondClick(clickCount: event.clickCount, sameWindow: event.window === window, after: event.timestamp - since, interval: interval) ? nil : event
+        }
+        secondClickMonitor = monitor
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
+            guard let self, let monitor, let current = self.secondClickMonitor, current as AnyObject === monitor as AnyObject else { return }
+            NSEvent.removeMonitor(current)
+            self.secondClickMonitor = nil
+        }
+    }
+
+    static func isSecondClick(clickCount: Int, sameWindow: Bool, after elapsed: TimeInterval, interval: TimeInterval) -> Bool {
+        clickCount >= 2 && sameWindow && elapsed <= interval
+    }
+
     /// While the menu is up, the page script hands arrow keys and Escape to it; Return only once a login in it is
     /// highlighted, so Return in a field still signs in as usual.
     private func setSuggesting(_ on: Bool) {
@@ -467,6 +489,9 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         }
         let request = target
         let rect = overlay.convert(target.webView.convert(field, to: nil), from: nil)
+        swallowSecondClick(in: target.webView.window)
+        // Only for a field on the page: the list points at it, and at the screen's corner without one.
+        guard Self.isInView(field, viewport: target.webView.bounds.size) else { hide(); Self.tell(Self.pageMovedOn, about: target.webView); return }
         hide()
         // The Mac's AutoFill panel on the page's own field, with this site's logins first. Without it, the list
         // opened on native fields laid over the page.
@@ -978,6 +1003,11 @@ final class AutofillMenu: FloatingPanelView {
     static let quietFor: TimeInterval = 0.5
 
     static func takesInput(shownFor: TimeInterval) -> Bool { shownFor > quietFor }
+    /// Passwords… takes a click at once: it fills nothing by itself, the Mac's list still needs your pick (#378).
+    static func takesClick(on item: Item, shownFor: TimeInterval) -> Bool {
+        if case .systemPasswords = item { return true }
+        return takesInput(shownFor: shownFor)
+    }
     static func takesKey(_ key: String, shownFor: TimeInterval) -> Bool { key != "Enter" || takesInput(shownFor: shownFor) }
     func takesKey(_ key: String) -> Bool { Self.takesKey(key, shownFor: ProcessInfo.processInfo.systemUptime - shownAt) }
     var takesInput: Bool { Self.takesInput(shownFor: ProcessInfo.processInfo.systemUptime - shownAt) }
@@ -990,6 +1020,9 @@ final class AutofillMenu: FloatingPanelView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard let hit = super.hitTest(point) else { return nil }
+        let row = rows.first { hit === $0 || hit.isDescendant(of: $0) }
+        let shownFor = ProcessInfo.processInfo.systemUptime - shownAt
+        if let row { return Self.takesClick(on: row.item, shownFor: shownFor) ? hit : self }
         return takesInput ? hit : self
     }
 

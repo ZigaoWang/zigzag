@@ -468,6 +468,35 @@ struct SystemPasswordsTests {
         #expect(dismissed == 3)
     }
 
+    @Test func theSecondClickOfADoubleClickIsTheFirstOnes() {
+        // The menu is gone by the second click, which landed on the page under it, in the next field (#378).
+        #expect(Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: 0.1, interval: 0.5))
+        #expect(Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: -0.01, interval: 0.5))
+        #expect(!Autofill.isSecondClick(clickCount: 1, sameWindow: true, after: 0.1, interval: 0.5))
+        #expect(!Autofill.isSecondClick(clickCount: 2, sameWindow: false, after: 0.1, interval: 0.5))
+        #expect(!Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: 0.6, interval: 0.5))
+    }
+
+    @Test func passwordsTakesAClickAtOnce() throws {
+        // The other rows fill the page, so they still wait out a click aimed elsewhere; Passwords… fills nothing
+        // until you pick in the Mac's list (#378).
+        #expect(AutofillMenu.takesClick(on: .systemPasswords, shownFor: 0))
+        #expect(!AutofillMenu.takesClick(on: .generate, shownFor: 0.1))
+        #expect(AutofillMenu.takesClick(on: .generate, shownFor: 0.6))
+        let menu = AutofillMenu(items: [.generate, .systemPasswords], origin: try #require(Origin(URL(string: "https://example.com"))))
+        menu.frame = NSRect(x: 0, y: 0, width: 300, height: menu.contentHeight)
+        menu.layoutSubtreeIfNeeded()
+        let stand = NSView(frame: NSRect(x: 0, y: 0, width: 400, height: 400))
+        stand.addSubview(menu)
+        func all(_ view: NSView) -> [NSView] { view.subviews + view.subviews.flatMap(all) }
+        let rows = all(menu).compactMap { $0 as? InteractiveView }.filter { $0.accessibilityRole() == .menuItem }
+        try #require(rows.count == 2)
+        #expect(rows.allSatisfy { $0.frame.height > 0 })
+        func center(_ row: NSView) -> NSPoint { row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: stand) }
+        #expect(menu.hitTest(center(rows[0])) === menu)
+        #expect(menu.hitTest(center(rows[1])) === rows[1])
+    }
+
     @Test func appKitHasTheCallThatClosesItsAutoFill() throws {
         let type = try #require(NSClassFromString("NSAutoFillHeuristicController") as? NSObject.Type)
         #expect(type.responds(to: NSSelectorFromString("sharedInstance")))
