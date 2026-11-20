@@ -208,6 +208,7 @@ enum SavePath {
     /// Files a page already pinned where the picker said. Its folder is left as it was unless one was chosen.
     private static func file(_ id: UUID, into place: Place, folder: UUID?) {
         if place.newFolder == nil, place.folderID == nil, place.index == nil { return }
+        leaveFavorites(id, for: place.spaceID)
         if Library.shared.spaceID(ofBookmark: id) != place.spaceID {
             Library.shared.moveBookmark(id, to: Int.max, in: place.spaceID, folder: .some(folder))
         } else {
@@ -308,7 +309,14 @@ enum SavePath {
     @discardableResult
     static func moveToTop(_ bookmarkID: UUID, in spaceID: UUID) -> Bool {
         guard Library.shared.bookmark(bookmarkID) != nil, Library.shared.space(spaceID) != nil else { return false }
+        leaveFavorites(bookmarkID, for: spaceID)
         Library.shared.moveBookmark(bookmarkID, to: 0, in: spaceID, folder: .some(nil))
         return true
+    }
+
+    /// A favorite filed into a space leaves Favorites first, so it's never a favorite and a pinned page at once.
+    private static func leaveFavorites(_ id: UUID, for spaceID: UUID) {
+        guard Library.shared.isFavorite(id) else { return }
+        Library.shared.pinFavorite(id, in: spaceID, at: Int.max)
     }
 }

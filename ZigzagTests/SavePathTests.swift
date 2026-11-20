@@ -35,6 +35,27 @@ import Testing
         #expect(library.folderID(containing: bookmark?.id ?? UUID()) == nil, "the top level", sourceLocation: sourceLocation)
     }
 
+    /// A favorite filed into Pinned or a folder, from the picker or the toast, leaves Favorites: one page, never both.
+    @Test func aFavoriteFiledInASpaceLeavesFavorites() throws {
+        try scratch { space, _, folder in
+            let profile = library.profileID(ofSpace: space)
+            for move in 0..<3 {
+                let favorite = library.addFavorite(url: URL(string: "https://example.com/favorite\(move)")!, title: "Favorite", in: profile)
+                defer { library.removeBookmark(favorite.id) }
+                switch move {
+                case 0: #expect(SavePath.moveToTop(favorite.id, in: space))
+                case 1:
+                    #expect(SavePath.move(favorite.id, to: SavePath.place(in: space, folder: folder.id)))
+                    #expect(library.folderID(containing: favorite.id) == folder.id)
+                default: #expect(SavePath.move(favorite.id, to: SavePath.place(in: space, folder: nil, atTop: true)))
+                }
+                #expect(!library.isFavorite(favorite.id), "move \(move)")
+                #expect(library.spaceID(ofBookmark: favorite.id) == space, "move \(move)")
+                #expect(library.bookmarks(in: space).filter { $0.id == favorite.id }.count == 1, "move \(move)")
+            }
+        }
+    }
+
     // MARK: Quick save, no question
 
     /// The star, ⌘D and Save in a page's or a link's menu ask nothing: unmodified, each is the quick save.
