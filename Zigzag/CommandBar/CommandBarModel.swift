@@ -16,6 +16,8 @@ struct CommandResult: Equatable {
         case action(String)
         /// A line that only says something ("No history yet"): nothing to run, so Return and clicks pass it by.
         case note
+        /// What's typed after an extension's keyword, or one of its suggestions: sent to the extension (BridgeOmnibox).
+        case omnibox(extensionID: String, content: String, isDefault: Bool)
     }
 
     let kind: Kind
@@ -25,11 +27,13 @@ struct CommandResult: Equatable {
     var symbol: String?
     /// A bookmark that's a favorite rather than a pinned tab, so the bar says which it opens.
     var isFavorite = false
+    /// Stretches of the title an extension's suggestion marks as a match, dim or an address.
+    var titleRuns: [OmniboxText.Run] = []
 
     var actionLabel: String {
         switch kind {
-        case .open, .history: String(localized: "Open", comment: "Action label at the right of the selected command bar result, saying what Return does: opens the page.")
-        case .search, .suggestion, .searchOn: String(localized: "Search", comment: "Action label at the right of the selected command bar result, saying what Return does: searches for it.")
+        case .open, .history, .omnibox(_, _, false): String(localized: "Open", comment: "Action label at the right of the selected command bar result, saying what Return does: opens the page.")
+        case .search, .suggestion, .searchOn, .omnibox(_, _, true): String(localized: "Search", comment: "Action label at the right of the selected command bar result, saying what Return does: searches for it.")
         case .switchTo: String(localized: "Switch to Tab", comment: "Action label at the right of the selected command bar result, saying what Return does: goes to the open tab.")
         case .bookmark: isFavorite ? String(localized: "Open Favorite", comment: "Action label at the right of the selected command bar result, saying what Return does: opens the favorite.")
                                     : String(localized: "Open Pinned Tab", comment: "Action label at the right of the selected command bar result, saying what Return does: opens the pinned tab.")
@@ -349,7 +353,7 @@ enum CommandRanker {
     static func context(for manager: TabManager) -> Context {
         var c = Context()
         c.isPrivate = manager.isPrivate
-        c.canReopen = manager.canReopenClosedTab
+        c.canReopen = WindowManager.shared.canReopenLastClosed(from: manager)
         c.spaces = Library.shared.spaces.map { Context.Space(id: $0.id, name: $0.name) }
         c.currentSpaceID = manager.currentSpaceID
         let tabs = manager.currentTabs

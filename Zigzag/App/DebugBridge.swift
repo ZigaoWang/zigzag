@@ -852,7 +852,20 @@ enum DebugBridge {
             // Typing into an open bar only types, as the keyboard would.
             if !controller.commandBar.isVisible { controller.commandBar.show(mode: .newTab) }
             if !arg.isEmpty { controller.commandBar.debugType(arg) }
-        case "enter": controller.commandBar.debugEnter()
+        // enter [cmd] [shift] [opt]: Return in the bar, with those keys held.
+        case "enter":
+            let words = Set(arg.split(separator: " ").map(String.init))
+            var keys: NSEvent.ModifierFlags = []
+            if words.contains("cmd") { keys.insert(.command) }
+            if words.contains("shift") { keys.insert(.shift) }
+            if words.contains("opt") { keys.insert(.option) }
+            controller.commandBar.debugEnter(keys)
+        case "barrows":
+            if let data = try? JSONSerialization.data(withJSONObject: controller.commandBar.debugState, options: [.prettyPrinted, .sortedKeys]) {
+                try? data.write(to: URL(fileURLWithPath: arg))
+            }
+        case "baresc": controller.commandBar.debugEscape()
+        case "barback": controller.commandBar.debugBackspace()
         case "edit": controller.commandBar.show(mode: .editCurrent); if !arg.isEmpty { controller.commandBar.debugType(arg) }
         case "dismissbar": controller.commandBar.dismiss()
         // bardrag <dx> <dy> [hold]: drags the open bar by its edge (hold: keeps the guides); barreset: double-clicks

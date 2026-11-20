@@ -298,7 +298,7 @@ nonisolated enum PackageZip {
         }
     }
 
-    private static func content(of entry: Entry, in bytes: [UInt8]) throws -> [UInt8] {
+    static func content(of entry: Entry, in bytes: [UInt8]) throws -> [UInt8] {
         let name = entry.path.joined(separator: "/")
         let header = entry.localHeader
         guard header + 30 <= bytes.count, uint32(bytes, header) == 0x0403_4B50 else { throw Failure.malformed }

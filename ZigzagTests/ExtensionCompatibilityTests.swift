@@ -543,7 +543,6 @@ struct ExtensionCompatibilityTests {
             "extension.limit.management": "Managing other extensions",
             "extension.limit.pageCapture": "Saving pages",
             "extension.limit.desktopCapture": "Recording your screen",
-            "extension.limit.addressBarKeyword": "Address bar keyword",
             "extension.limit.publicSuffix": "Domain names",
             "extension.limit.devtools": "Developer tools",
             "extension.limit.contentSettings": "Content settings",
@@ -605,10 +604,9 @@ struct ExtensionCompatibilityTests {
         // tabCapture is partial and silent; its wording is kept.
         #expect(overlay.permissions["tabCapture"]?.status == .partial)
         #expect(compatibility.limits(forPermissions: ["tabCapture"], manifestKeys: []).isEmpty)
-        let omnibox = compatibility.limits(forPermissions: [], manifestKeys: ["omnibox"])
-        #expect(omnibox.count == 1)
-        #expect(omnibox.first?.catalogKey == "extension.limit.addressBarKeyword")
-        #expect(omnibox.first?.text == "Address bar keyword")
+        // Address bar keywords work in the command bar (#324): no line.
+        #expect(overlay.manifest["omnibox"]?.status == .supported)
+        #expect(compatibility.limits(forPermissions: [], manifestKeys: ["omnibox"]).isEmpty)
     }
 
     @MainActor @Test func aClaimCannotGrantAnything() throws {

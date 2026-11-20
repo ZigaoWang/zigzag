@@ -1158,8 +1158,9 @@
         }
       }
     }
-    if (api.omnibox) {
-      for (const fn of ['setDefaultSuggestion']) setMember(['omnibox'], fn, settled(undefined));
+    // Without a keyword nothing is typed for it; one with a keyword has the bridge's.
+    if (api.omnibox && /isn't available/.test(String(api.omnibox.setDefaultSuggestion))) {
+      setMember(['omnibox'], 'setDefaultSuggestion', settled(undefined));
     }
     };
     Object.defineProperty(globalThis, '__zigzagAfterSurface', { value: afterSurface, configurable: true });

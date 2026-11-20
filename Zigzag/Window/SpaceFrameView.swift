@@ -24,10 +24,11 @@ class SpaceFrameView: ColorView {
             }
         }
         let (color, end, clear) = Self.frameColors(of: space, isPrivate: isPrivate)
-        // See-through: the window lets the frosted desktop through, and the space's color washes over it, thinner the
-        // more shows.
-        window?.isOpaque = !clear
-        window?.backgroundColor = clear ? .clear : .windowBackgroundColor
+        // See-through: the frosted desktop shows through, and the space's color washes over it, thinner the more shows.
+        // Only clear glass needs a see-through window, which macOS shows at 80 Hz on a 120 Hz display (#394).
+        let seeThroughWindow = clear && space.usesClearGlass
+        window?.isOpaque = !seeThroughWindow
+        window?.backgroundColor = seeThroughWindow ? .clear : .windowBackgroundColor
         setGlass(clear, clear: space.usesClearGlass, tint: space.frameColor)
         // See-through, the wash goes in the gradient layer, the one above the frosted desktop (the frame's own color
         // sits under it and would be hidden); a single color washes as a gradient of itself.

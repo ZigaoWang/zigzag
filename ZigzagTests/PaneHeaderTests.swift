@@ -33,6 +33,16 @@ import Testing
         #expect(PaneHeaderView.fit(width: 250, edge: edge, address: 30) == .all)
     }
 
+    @Test func theResetButtonTakesItsOwnRoom() {
+        // A reset button shows only on a custom layout; where it fits, it keeps the address whole.
+        #expect(PaneHeaderView.fit(width: 370, edge: edge, address: address) == .all)
+        #expect(PaneHeaderView.fit(width: 370, edge: edge, address: address, resetLayout: true) != .all)
+        #expect(PaneHeaderView.fit(width: 700, edge: edge, address: address, resetLayout: true) == .all)
+        // A tile group has no swap or layout, so reset fits well before a split's strip would show it.
+        #expect(PaneHeaderView.fit(width: 335, edge: edge, address: address, splitButtons: false, resetLayout: true) == .splitInMore)
+        #expect(PaneHeaderView.fit(width: 350, edge: edge, address: address, splitButtons: false, resetLayout: true) == .all)
+    }
+
     @Test func fewerButtonsAsItNarrows() {
         var last = Fit.all
         for width in stride(from: 700, through: 60, by: -10) {

@@ -423,9 +423,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func openLocation(_ sender: Any?) { frontBrowserWindow()?.commandBar.show(mode: .editCurrent) }
     @objc func openDocument(_ sender: Any?) { frontBrowserWindow()?.openDocument(sender) }
     @objc func reopenClosedWindow(_ sender: Any?) { WindowManager.shared.reopenClosedWindow() }
-    /// With no window open, the tab went with its window: that comes back instead.
+    /// The latest closed tab or window, as in Chrome; with no window open, that's usually the window.
     @objc func reopenClosedTab(_ sender: Any?) {
-        if WindowManager.shared.controllers.isEmpty { WindowManager.shared.reopenClosedWindow() } else { frontBrowserWindow()?.tabManager.reopenClosedTab() }
+        WindowManager.shared.reopenLastClosed(from: WindowManager.shared.controllers.isEmpty ? nil : WindowManager.shared.keyController?.tabManager)
     }
     @objc func showHistory(_ sender: Any?) { frontBrowserWindow().map(HistoryPage.open) }
     @objc func showArchive(_ sender: Any?) { frontBrowserWindow().map(ArchivePage.open) }
@@ -482,8 +482,8 @@ extension AppDelegate: NSMenuItemValidation {
         // Shows Restart to Update while an update is ready.
         if menuItem.action == #selector(checkForUpdates(_:)) { menuItem.title = Updater.shared.menuTitle }
         if menuItem.action == #selector(reopenClosedTab(_:)) {
-            let manager = (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first)?.tabManager
-            return manager?.canReopenClosedTab ?? WindowManager.shared.canReopenClosedWindow
+            let manager = WindowManager.shared.controllers.isEmpty ? nil : (WindowManager.shared.keyController ?? WindowManager.shared.controllers.first)?.tabManager
+            return WindowManager.shared.canReopenLastClosed(from: manager)
         }
         // Already your browser: nothing to offer, so it isn't there (as in Safari and Chrome).
         if menuItem.action == #selector(makeDefaultBrowser(_:)) { menuItem.isHidden = DefaultBrowser.isDefault; return true }

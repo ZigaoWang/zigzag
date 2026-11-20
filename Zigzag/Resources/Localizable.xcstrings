@@ -1117,6 +1117,94 @@
         }
       }
     },
+    "A site you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to talk to a program on this Mac, over loopback only. Never the local network, and a page can’t switch itself on." : {
+      "comment" : "Explanation under the apps-on-this-Mac setting in Settings › Privacy. fetch, XMLHttpRequest and WebSocket are API names: keep them as they are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在网站设置里开启的网站可以使用 fetch、XMLHttpRequest 和 WebSocket，与这台 Mac 上监听端口的程序通信，且只限本机回环。绝不涉及本地网络，页面也无法自行开启。"
+          }
+        }
+      }
+    },
+    "Before You Allow This" : {
+      "comment" : "Title of the briefing shown before the apps-on-this-Mac setting can be turned on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启之前"
+          }
+        }
+      }
+    },
+    "I Understand" : {
+      "comment" : "Button that acknowledges the briefing and turns the setting on.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我已了解"
+          }
+        }
+      }
+    },
+    "Let this extension reach apps on this Mac" : {
+      "comment" : "Accessibility label of the apps-on-this-Mac switch under an extension in Settings › Extensions.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许此扩展访问这台 Mac 上的 App"
+          }
+        }
+      }
+    },
+    "Lets this extension’s own code read what a program listening on this Mac answers, over loopback only. Without it, the program’s own CORS rules decide. Off until you turn it on." : {
+      "comment" : "Explanation under the apps-on-this-Mac switch on an extension’s row in Settings › Extensions. CORS is a web API name: keep it as it is.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许此扩展自身的代码读取这台 Mac 上监听程序返回的内容，且只限本机回环。关闭时由程序自身的 CORS 规则决定。在你开启之前保持关闭。"
+          }
+        }
+      }
+    },
+    "Allow websites to reach apps on this Mac" : {
+      "comment" : "A setting in Settings › Privacy: the master switch for a site’s scripts reaching a program listening on this Mac. Also its accessibility label.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许网站访问这台 Mac 上的 App"
+          }
+        }
+      }
+    },
+    "localhost loopback local server app fetch websocket xmlhttprequest" : {
+      "comment" : "Words that find the apps-on-this-Mac setting with Find a setting. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "localhost loopback 本地 服务器 App fetch websocket xmlhttprequest 程序 本机"
+          }
+        }
+      }
+    },
+    "Apps on This Mac" : {
+      "comment" : "A heading in Settings › Privacy, the switch in Site Controls, and the switch under an extension in Settings › Extensions: the programs listening on this Mac that a site or an extension may reach, over loopback only.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上的 App"
+          }
+        }
+      }
+    },
     "%lld allowed" : {
       "comment" : "On the Permissions row of the site panel: how many permissions the site has been allowed.",
       "localizations" : {
@@ -3968,6 +4056,18 @@
         }
       }
     },
+    "Choose a folder that holds the extension’s manifest.json, or a Firefox extension (.xpi) file." : {
+      "comment" : "Message of the panel that installs an extension from a folder or a .xpi file. manifest.json and .xpi are file names.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一个包含扩展 manifest.json 的文件夹，或一个 Firefox 扩展（.xpi）文件。"
+          }
+        }
+      }
+    },
+
     "Clear %@" : {
       "comment" : "Tooltip of the × on a site's row in Settings › Privacy › Sites: forgets that one choice for the site.",
       "localizations" : {
@@ -4300,6 +4400,18 @@
         }
       }
     },
+    "Couldn’t add this extension" : {
+      "comment" : "Title of the notice when a picked extension file can't be added.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法添加这个扩展"
+          }
+        }
+      }
+    },
+
     "Each time you quit, every other site’s cookies and data are cleared, so you start signed out of them next time." : {
       "comment" : "Explanation under “Clear cookies when Zigzag quits” in Settings › Privacy: every site but the ones kept.",
       "localizations" : {
@@ -4311,6 +4423,148 @@
         }
       }
     },
+    "extension.limit.browserSettings" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: changing the browser's own settings.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Browser settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浏览器设置"
+          }
+        }
+      }
+    },
+
+    "extension.limit.contextualIdentities" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: containers, Firefox's separate identities for tabs.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Containers"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "容器"
+          }
+        }
+      }
+    },
+
+    "extension.limit.dns" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: resolving host names itself.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "DNS resolution"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DNS 解析"
+          }
+        }
+      }
+    },
+
+    "extension.limit.pkcs11" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: PKCS#11 security modules.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Security modules"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全模块"
+          }
+        }
+      }
+    },
+
+    "extension.limit.sidebarAction" : {
+      "comment" : "A Firefox extension feature Zigzag limits: the side panel from sidebar_action is shown, but nothing answers browser.sidebarAction's open, close, toggle and other controls.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Side panel toolbar controls (the panel itself is shown)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏面板工具栏控件（面板本身会显示）"
+          }
+        }
+      }
+    },
+
+    "extension.limit.theme" : {
+      "comment" : "A Firefox extension feature Zigzag cannot provide: installing browser themes.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Themes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主题"
+          }
+        }
+      }
+    },
+
+
+
+
+    "Firefox" : {
+      "comment" : "Under an extension's name in Settings › Extensions: it is a Firefox extension (.xpi).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox"
+          }
+        }
+      }
+    },
+
+    "Firefox extension, version %@" : {
+      "comment" : "Under the title of the sheet that asks before adding a Firefox extension (.xpi).",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Firefox 扩展，版本 %@"
+          }
+        }
+      }
+    },
+
+
     "Follow Setting" : {
       "comment" : "A choice for JavaScript in Settings › Privacy › Sites: the site follows Settings › Privacy › JavaScript.",
       "localizations" : {
@@ -4322,6 +4576,18 @@
         }
       }
     },
+    "Install from File…" : {
+      "comment" : "Button in Settings › Extensions: installs an extension from a folder or a Firefox package file (.xpi) on this Mac.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从文件安装…"
+          }
+        }
+      }
+    },
+
     "Keep cookies" : {
       "comment" : "Row in the site panel's This Site group: clearing every site's cookies, or clearing them when Zigzag quits, leaves this site's alone, so you stay signed in.",
       "localizations" : {
@@ -7256,6 +7522,28 @@
         }
       }
     },
+    "What This Allows…" : {
+      "comment" : "Button on the apps-on-this-Mac setting in Settings › Privacy: reopens the briefing.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此功能允许什么…"
+          }
+        }
+      }
+    },
+    "Websites you switch on in Site Controls can use fetch, XMLHttpRequest and WebSocket to reach programs listening on this Mac, over loopback only.\n\nThe local network, other machines, images, scripts and stylesheets are not included, and a page cannot switch itself on.\n\nA local program may not have been written to be reachable by a web page, and a site you grant could use it in ways you did not intend. Only grant sites you trust.\n\nTurn one site off in its Site Controls, or turn this setting off for every site." : {
+      "comment" : "The briefing shown before websites may reach apps on this Mac. fetch, XMLHttpRequest and WebSocket are API names: keep them as they are.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你在网站设置里开启的网站可以使用 fetch、XMLHttpRequest 和 WebSocket，与这台 Mac 上监听端口的程序通信，且只限本机回环。\n\n不包括本地网络、其他机器，也不包括图片、脚本和样式表，页面也无法自行开启。\n\n本机程序未必是按网页可以访问来设计的，你授予的网站可能会以你意料之外的方式使用它。只授予你信任的网站。\n\n在某个网站的网站设置里关掉它，或关掉这个设置，对所有网站生效。"
+          }
+        }
+      }
+    },
     "extension.limit.action" : {
       "comment" : "A Chrome extension feature Zigzag limits: badge text color and toolbar button settings.",
       "extractionState" : "extracted_with_value",
@@ -7270,24 +7558,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工具栏按钮设置"
-          }
-        }
-      }
-    },
-    "extension.limit.addressBarKeyword" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: an omnibox keyword.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Address bar keyword"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地址栏关键词"
           }
         }
       }
@@ -16654,6 +16924,17 @@
         }
       }
     },
+    "Reset Tile Layout" : {
+      "comment" : "Tooltip of a button in the strip on top of a tiled page: puts every line between the tiles back in the middle, making the standard even grid.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置平铺布局"
+          }
+        }
+      }
+    },
     "Reset to Defaults" : {
       "comment" : "Button beside Feature Flags in Settings › Developer: every WebKit feature flag you changed goes back to WebKit's default. Also the button of the sheet that asks first.",
       "localizations" : {
@@ -20425,6 +20706,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此扩展的安装包无法验证，所以没有安装。"
+          }
+        }
+      }
+    },
+    "This extension’s package doesn’t match the one the Firefox Add-ons store publishes, so it wasn’t installed." : {
+      "comment" : "Shown when an .xpi downloaded from addons.mozilla.org doesn't match the sha256 the store publishes for it.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此扩展的安装包与 Firefox 附加组件商店发布的不一致，所以没有安装。"
           }
         }
       }

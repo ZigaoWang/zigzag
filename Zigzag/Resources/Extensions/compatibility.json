@@ -150,10 +150,6 @@
       "catalog": "extension.limit.desktopCapture",
       "order": 300
     },
-    "omnibox": {
-      "catalog": "extension.limit.addressBarKeyword",
-      "order": 310
-    },
     "publicSuffix": {
       "catalog": "extension.limit.publicSuffix",
       "order": 320
@@ -704,9 +700,8 @@
       "group": "legacyExtension"
     },
     "omnibox": {
-      "status": "unsupported",
-      "reason": "notImplemented",
-      "group": "omnibox"
+      "status": "bridged",
+      "implementation": "swift:omnibox"
     },
     "privacy": {
       "status": "unsupported",
@@ -1043,9 +1038,7 @@
   },
   "manifest": {
     "omnibox": {
-      "status": "unsupported",
-      "reason": "notImplemented",
-      "group": "omnibox"
+      "status": "supported"
     }
   }
 }

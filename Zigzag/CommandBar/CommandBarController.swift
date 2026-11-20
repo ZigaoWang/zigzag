@@ -13,11 +13,13 @@ final class CommandRowView: InteractiveView {
             guard oldValue != isCompact else { return }
             title.font = isCompact ? Tokens.Font.sidebarRow() : Tokens.Font.row()
             detail.font = isCompact ? Tokens.Font.small() : Tokens.Font.body()
+            styleTitle(ink: title.textColor ?? Tokens.Color.textPrimary)
             needsLayout = true
         }
     }
     private let action = Label("", font: Tokens.Font.small(), color: Tokens.Color.textSecondary)
     private let returnKey = KeyCap(symbol: "return")
+    private var titleRuns: [OmniboxText.Run] = []
 
     private var themeToken: SignalToken?
 
@@ -36,7 +38,9 @@ final class CommandRowView: InteractiveView {
     required init?(coder: NSCoder) { fatalError() }
 
     func configure(_ result: CommandResult) {
+        titleRuns = result.titleRuns
         title.stringValue = result.title
+        styleTitle(ink: title.textColor ?? Tokens.Color.textPrimary)
         detail.stringValue = result.detail
         action.stringValue = result.actionLabel
         if let image = result.icon {
@@ -96,8 +100,26 @@ final class CommandRowView: InteractiveView {
         let theme = Brand.Theme.for(self)
         let fill: NSColor? = isSelected ? theme.accent.withAlphaComponent(isPressed ? 0.26 : 0.18) : nil
         layer?.set(backgroundColor: fill.map { cgColor($0) }, animated: false)
-        title.textColor = isSelected ? theme.rowInk : Tokens.Color.textPrimary
+        styleTitle(ink: isSelected ? theme.rowInk : Tokens.Color.textPrimary)
         needsLayout = true
+    }
+
+    /// An extension's marks on its suggestion's text: a match a weight heavier, an address and dim text quieter.
+    private func styleTitle(ink: NSColor) {
+        title.textColor = ink
+        guard !titleRuns.isEmpty, let font = title.font else { return }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        // Kerned, so the label measures it as drawn, heavier stretches included.
+        let styled = NSMutableAttributedString(string: title.stringValue, attributes: [.font: font, .foregroundColor: ink, .kern: 0, .paragraphStyle: paragraph])
+        for run in titleRuns {
+            let range = NSIntersectionRange(run.range, NSRange(location: 0, length: styled.length))
+            guard range.length > 0 else { continue }
+            if run.styles.contains(.match) { styled.addAttribute(.font, value: NSFont.systemFont(ofSize: font.pointSize, weight: .semibold), range: range) }
+            if run.styles.contains(.url) { styled.addAttribute(.foregroundColor, value: Tokens.Color.textSecondary, range: range) }
+            if run.styles.contains(.dim) { styled.addAttribute(.foregroundColor, value: Tokens.Color.textTertiary, range: range) }
+        }
+        title.attributedStringValue = styled
     }
 }
 
@@ -217,6 +239,14 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// For the guide: searching inside a site, or about to be (its name typed, Tab not yet pressed).
     var isSearchingSite: Bool { scope != nil }
     var isOfferingSiteSearch: Bool { hinted != nil }
+    /// An extension's keyword mode: its name sits in front of the field, and what you type goes to the extension.
+    private var keyword: OmniboxKeyword?
+    private var omniboxInput: OmniboxInput?
+    private var omniboxWork: DispatchWorkItem?
+    /// The keyword what's typed is, so Tab enters it.
+    private var hintedKeyword: OmniboxKeyword?
+    /// A site's or an extension's name in front of the field.
+    private var isScoped: Bool { scope != nil || keyword != nil }
 
     init(host: CommandBarHost) {
         self.host = host
@@ -360,8 +390,9 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     func dismiss(restoringFocus: Bool = true) {
         guard isVisible, let host else { return }
         isVisible = false
-        // Kept only for the new tab bar; opening something clears it (`activate`).
-        unsent = mode == .newTab && !typed.isEmpty ? (typed, Date()) : nil
+        // Kept only for the new tab bar; opening something clears it (`activate`). In a keyword, with the keyword.
+        unsent = mode == .newTab && !typed.isEmpty ? (keyword.map { "\($0.keyword) \(typed)" } ?? typed, Date()) : nil
+        endKeyword()
         if let typingMonitor { NSEvent.removeMonitor(typingMonitor) }
         typingMonitor = nil
         fetcher.cancel()
@@ -596,7 +627,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // Anchored, the text's first letter lands exactly where the resting address's does (12pt in), so nothing moves
         // as you click in; the field's own text inset and its editor's padding make up the rest.
         var fieldX = isAnchored ? Tokens.Space.x3 - 4 : inset + CommandRowView.titleX
-        if scope != nil {
+        if isScoped {
             // The site's name in the field's own type, so it reads as the start of the line, then a hairline.
             let font = field.font ?? Tokens.Font.voice(22)
             chipLabel.font = font
@@ -614,7 +645,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
                                     width: Tokens.Metric.hairline, height: ruleHeight)
             fieldX = chipRule.frame.maxX + Tokens.Space.x2 + 2
         }
-        chipRule.isHidden = scope == nil
+        chipRule.isHidden = !isScoped
         var fieldRight = b.width - (isAnchored ? Tokens.Space.x3 : Tokens.Space.x4)
         if !hint.isHidden {
             let kw = hintKey.width, kh = Tokens.Metric.keyCapHeight
@@ -659,6 +690,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// The rows for what's typed now, from what's at hand: History's part as far as it's been read.
     private func currentResults() -> [CommandResult]? {
         guard let host else { return nil }
+        if let keyword { return Array(keywordResults(keyword).prefix(rowsThatFit)) }
         let editing = mode == .editCurrent && typed == host.commandBarTab?.url?.absoluteString
         let query = editing || scope != nil ? "" : typed
         let pages = query.isEmpty ? [] : history.pages(for: query, limit: CommandRanker.historyLimit(historyOnly: mode == .history))
@@ -777,35 +809,52 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     // MARK: Searching one site
 
     private func refreshHint() {
-        hinted = scope == nil && mode != .history ? SiteSearch.match(typed) : nil
-        hint.stringValue = hinted.map { String(localized: "Search \($0.name)", comment: "In the command bar, when what's typed names a site: Tab searches it. The name is the site's, like YouTube.") } ?? ""
-        hint.isHidden = hinted == nil
-        hintKey.isHidden = hinted == nil
+        hintedKeyword = !isScoped && mode != .history ? OmniboxKeyword.named(typed, among: keywords()) : nil
+        hinted = !isScoped && hintedKeyword == nil && mode != .history ? SiteSearch.match(typed) : nil
+        let name = hintedKeyword?.name ?? hinted?.name
+        hint.stringValue = name.map { String(localized: "Search \($0)", comment: "In the command bar, when what's typed names a site: Tab searches it. The name is the site's, like YouTube.") } ?? ""
+        hint.isHidden = name == nil
+        hintKey.isHidden = name == nil
         panel.needsLayout = true
     }
 
     #if DEBUG
-    func debugTab() { if scope == nil, let site = hinted { setScope(site) } }
+    func debugTab() {
+        if !isScoped, let keyword = hintedKeyword { setKeyword(keyword, typedBefore: typed) } else if scope == nil, let site = hinted { setScope(site) }
+    }
     #endif
 
-    private func setScope(_ site: SiteSearch?) {
-        let entering = site != nil && scope == nil, leaving = site == nil && scope != nil
+    private func setScope(_ site: SiteSearch?) { applyScope(site: site, keyword: nil) }
+
+    /// Into an extension's keyword. `text`: what followed the keyword and its space; `typedBefore`: what Esc gives back.
+    private func setKeyword(_ keyword: OmniboxKeyword, text: String = "", typedBefore: String) {
+        applyScope(site: nil, keyword: keyword, text: text, typedBefore: typedBefore)
+    }
+
+    private func applyScope(site: SiteSearch?, keyword next: OmniboxKeyword?, text: String = "", typedBefore: String? = nil) {
+        let named = site?.name ?? next?.name
+        let entering = named != nil && !isScoped, leaving = named == nil && isScoped
         let before = field.frame
         scope = site
-        if leaving { fadeOutChip() } else { chip.isHidden = site == nil }
+        if next != keyword {
+            endKeyword()
+            keyword = next
+        }
+        if leaving { fadeOutChip() } else { chip.isHidden = named == nil }
         // The site's name in the space's accent, then a hairline, as a page heads itself ("zigzag | history"):
         // no capsule, no brand color.
         let theme = Brand.Theme.for(panel)
         chip.color = .clear
         chip.layer?.borderWidth = 0
         chipLabel.textColor = theme.accent
-        chipLabel.stringValue = site?.name ?? ""
+        chipLabel.stringValue = named ?? ""
         completion = nil
-        if site != nil {
-            if entering { typedBeforeScope = typed }
-            field.stringValue = ""
-            typed = ""
+        if named != nil {
+            if entering { typedBeforeScope = typedBefore ?? typed }
+            field.stringValue = text
+            typed = text
             suggestions = []
+            (field.currentEditor() as? NSTextView)?.selectedRange = NSRange(location: (text as NSString).length, length: 0)
         } else if leaving {
             // Back to exactly what you'd typed, cursor at its end: Tab by mistake costs nothing.
             field.stringValue = typedBeforeScope
@@ -813,14 +862,83 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             (field.currentEditor() as? NSTextView)?.selectedRange = NSRange(location: (typedBeforeScope as NSString).length, length: 0)
         }
         let font = field.font ?? Tokens.Font.title(.regular)
-        let placeholder = site.map { String(localized: "Search \($0.name)", comment: "Placeholder of the command bar's field while it searches one site. The name is the site's, like YouTube.") }
+        let placeholder = named.map { String(localized: "Search \($0)", comment: "Placeholder of the command bar's field while it searches one site. The name is the site's, like YouTube.") }
             ?? (mode == .history ? String(localized: "Search history", comment: "Placeholder of the command bar's field while it searches history.") : String(localized: "Search or enter address", comment: "Placeholder of the command bar's field."))
         field.placeholderAttributedString = NSAttributedString(string: placeholder,
                                                                attributes: [.font: font, .kern: Tokens.Font.voiceKern(font.pointSize), .foregroundColor: Tokens.Color.textTertiary])
         if let site { FaviconStore.shared.prefetch(for: site.home) }
+        if let next, omniboxInput == nil { startKeyword(next, text: text) }
+        // The extension's own icon where the glass was.
+        let icon = next != nil ? omniboxInput?.icon : nil
+        fieldIcon.image = icon ?? Tokens.Symbol.image("magnifyingglass", size: Tokens.TypeSize.title)
         refreshHint()
         refreshResults(animated: true)
         if entering || leaving { animateScope(entering: entering, fieldFrom: before) }
+    }
+
+    // MARK: Extension keywords
+
+    /// The bar's extensions' omnibox, in a browser window; nil elsewhere and while searching history.
+    private var omnibox: BridgeOmnibox? {
+        guard controller != nil, mode != .history, let profile = host?.commandBarProfile else { return nil }
+        return (profile.isDefault ? profile.extensions : profile.startedExtensions)?.bridge.omnibox
+    }
+
+    private func keywords() -> [OmniboxKeyword] { omnibox?.keywords(isPrivate: host?.commandBarIsPrivate ?? false) ?? [] }
+
+    private func startKeyword(_ keyword: OmniboxKeyword, text: String) {
+        guard let omnibox else { return }
+        let input = omnibox.start(keyword, isPrivate: host?.commandBarIsPrivate ?? false)
+        input.onChange = { [weak self, weak input] in
+            guard let self, self.isVisible, let input, self.omniboxInput === input else { return }
+            self.mergeArrived()
+        }
+        omniboxInput = input
+        if !text.isEmpty { input.change(text) }
+    }
+
+    /// Leaving the keyword without Return: onInputCancelled.
+    private func endKeyword() {
+        omniboxWork?.cancel()
+        omniboxInput?.cancel()
+        omniboxInput = nil
+    }
+
+    /// What's typed goes to the extension once typing pauses for a moment.
+    private func keywordTyped(_ text: String) {
+        omniboxWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.isVisible, self.typed == text else { return }
+                self.omniboxInput?.change(text)
+            }
+        }
+        omniboxWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
+    }
+
+    /// What's typed as the extension's default suggestion, then what it suggests; Return sends the chosen one.
+    private func keywordResults(_ keyword: OmniboxKeyword) -> [CommandResult] {
+        let icon = omniboxInput?.icon
+        let symbol = "puzzlepiece.extension"
+        var rows: [CommandResult] = []
+        if !typed.trimmingCharacters(in: .whitespaces).isEmpty {
+            let styled = omniboxInput?.defaultSuggestion.map { OmniboxText.defaultSuggestion($0, typed: typed) }
+            let title = styled.flatMap { $0.text.isEmpty ? nil : $0 } ?? OmniboxText.Styled(text: typed, runs: [])
+            rows.append(CommandResult(kind: .omnibox(extensionID: keyword.extensionID, content: typed, isDefault: true), title: title.text,
+                                      detail: keyword.name, icon: icon, symbol: symbol, titleRuns: title.runs))
+        }
+        for suggestion in omniboxInput?.suggestions ?? [] {
+            let text = suggestion.description.text
+            let address = URL(string: suggestion.content).flatMap { ["http", "https"].contains($0.scheme) ? $0 : nil }
+            let shown = address.map { CommandRanker.displayURL($0) } ?? suggestion.content
+            // Under the text, unless the text already says it.
+            let detail = text.isEmpty || text.contains(shown) ? "" : shown
+            rows.append(CommandResult(kind: .omnibox(extensionID: keyword.extensionID, content: suggestion.content, isDefault: false),
+                                      title: text.isEmpty ? suggestion.content : text, detail: detail, icon: icon, symbol: symbol,
+                                      titleRuns: text.isEmpty ? [] : suggestion.description.runs))
+        }
+        return rows
     }
 
     /// Tab into a site: its chip pops in where your words were, and the field slides over to make room. Leaving
@@ -864,7 +982,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         guard let layer = chip.layer, !chip.isHidden, !Tokens.Motion.reduceMotion else { chip.isHidden = true; return }
         CATransaction.begin()
         CATransaction.setCompletionBlock { [weak self] in
-            guard let self, self.scope == nil else { return }
+            guard let self, !self.isScoped else { return }
             self.chip.isHidden = true
             layer.opacity = 1
             self.panel.needsLayout = true
@@ -893,11 +1011,23 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             || editor.undoManager?.isUndoing == true || editor.undoManager?.isRedoing == true
         let allowed = InlineCompletion.allowed(text, shown: shown, typed: typed, deleting: deleting,
                                                caretAtEnd: caretAtEnd, hasMarkedText: editor.hasMarkedText())
+        // An extension's keyword and a space: what follows goes to the extension. Never while deleting or composing.
+        if !isScoped, !deleting, !editor.hasMarkedText(), let entered = OmniboxKeyword.entered(text, among: keywords()) {
+            setKeyword(entered.keyword, text: entered.rest, typedBefore: String(text.prefix { $0 != " " }))
+            return
+        }
         typed = text
         completion = nil
         completionAsked = nil
+        if keyword != nil {
+            history.stopSites()
+            fetcher.cancel()
+            refreshResults(animated: true)
+            keywordTyped(text)
+            return
+        }
         // Not in a site search or history, and never while an input method is still composing.
-        if allowed, scope == nil, host != nil, mode != .history {
+        if allowed, !isScoped, host != nil, mode != .history {
             // A letter that agrees with the completion keeps it, unless it finished a host you've been to. One lookup per
             // keystroke, off the main thread: until History answers, only the completion already showing can stay.
             completion = InlineCompletion.next(previous: previous, found: foundCompletion(for: text), typed: text)
@@ -936,7 +1066,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     /// History's sites arrived for what you typed: the completion they give fills in now, as if it had come at once,
     /// unless you've moved on since (the caret moved, a row picked with the arrows; another letter asks afresh).
     private func completionArrived() {
-        guard isVisible, let asked = completionAsked, asked == typed, scope == nil, mode != .history, selectedIndex == 0,
+        guard isVisible, let asked = completionAsked, asked == typed, !isScoped, mode != .history, selectedIndex == 0,
               let editor = field.currentEditor() as? NSTextView, !editor.hasMarkedText() else { return }
         let atEnd = field.stringValue == typed && editor.selectedRange == NSRange(location: (typed as NSString).length, length: 0)
         guard atEnd || completionIsSelected(editor) else { return }
@@ -960,7 +1090,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         // ⌥↩ reaches a text field as this, not as a plain newline.
         case #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
             commit(modifiers: (NSApp.currentEvent?.modifierFlags ?? []).union(.option)); return true
-        case #selector(NSResponder.cancelOperation(_:)) where scope != nil:
+        case #selector(NSResponder.cancelOperation(_:)) where isScoped:
             setScope(nil)
             return true
         case #selector(NSResponder.cancelOperation(_:)):
@@ -972,8 +1102,10 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
             }
             return true
         case #selector(NSResponder.insertTab(_:)):
-            // Tab on a site's name searches that site; otherwise it accepts the inline completion.
-            if scope == nil, let site = hinted {
+            // Tab on a keyword or a site's name goes into it; otherwise it accepts the inline completion.
+            if !isScoped, let keyword = hintedKeyword {
+                setKeyword(keyword, typedBefore: typed)
+            } else if !isScoped, let site = hinted {
                 setScope(site)
             } else if completion != nil {
                 acceptCompletion(textView)
@@ -985,7 +1117,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         case #selector(NSResponder.insertBacktab(_:)):
             step(-1)
             return true
-        case #selector(NSResponder.deleteBackward(_:)) where scope != nil && field.stringValue.isEmpty:
+        case #selector(NSResponder.deleteBackward(_:)) where isScoped && field.stringValue.isEmpty:
             setScope(nil)
             return true
         // → and End take the completion as typed, caret after it. (End scrolls a text view rather than moving the caret.)
@@ -1063,6 +1195,17 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
     private func activate(_ result: CommandResult, modifiers: NSEvent.ModifierFlags) {
         guard let host, result.isActionable else { return }
         let editing = mode == .editCurrent && host.commandBarTab != nil
+        // An extension's keyword: the extension decides what happens, told where to open it.
+        if case .omnibox(_, let content, _) = result.kind {
+            let input = omniboxInput
+            omniboxInput = nil
+            omniboxWork?.cancel()
+            input?.enter(content, disposition: OmniboxKeyword.disposition(modifiers: modifiers, inNewTab: !editing))
+            dismiss(restoringFocus: false)
+            unsent = nil
+            if let controller, let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
+            return
+        }
         dismiss(restoringFocus: false)
         unsent = nil
         host.commandBarChoseResult()
@@ -1115,7 +1258,7 @@ final class CommandBarController: NSObject, NSTextFieldDelegate {
         case .action(let id):
             runAction(id)
             return
-        case .note:
+        case .note, .omnibox:
             return
         }
         if let webView = controller.selectedWebView { controller.window?.makeFirstResponder(webView) }
@@ -1163,7 +1306,23 @@ extension CommandBarController {
 
 #if DEBUG
 extension CommandBarController {
-    func debugEnter() { commit(modifiers: []) }
+    func debugEnter(_ modifiers: NSEvent.ModifierFlags = []) { commit(modifiers: modifiers) }
+
+    /// `barrows <path>`: the chip, what's typed, the hint and each row.
+    var debugState: [String: Any] {
+        ["chip": chip.isHidden ? "" : chipLabel.stringValue, "typed": typed, "field": field.stringValue, "keyword": keyword?.keyword ?? "",
+         "hint": hint.isHidden ? "" : hint.stringValue, "selected": selectedIndex,
+         "rows": results.map { result in
+             ["title": result.title, "detail": result.detail, "action": result.actionLabel, "kind": String(describing: result.kind),
+              "runs": result.titleRuns.map { "\($0.range.location)+\($0.range.length) \($0.styles.map(\.rawValue).sorted())" }] as [String: Any]
+         }]
+    }
+
+    /// Backspace in the field, as the key would press it.
+    func debugBackspace() {
+        guard let editor = field.currentEditor() as? NSTextView else { return }
+        if !control(field, textView: editor, doCommandBy: #selector(NSResponder.deleteBackward(_:))) { editor.deleteBackward(nil) }
+    }
 
     func debugType(_ text: String) {
         field.stringValue = text

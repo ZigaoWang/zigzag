@@ -213,6 +213,12 @@ final class ExtensionHost: NSObject {
         configuration.webViewConfiguration.applicationNameForUserAgent = WebKitSetup.applicationNameForUserAgent
         // Profiles' page preludes reach every extension page through the shared configuration; each runs only on
         // its own extension's pages, before their scripts.
+        // Set before the compatibility layer, which reads it to add Firefox's runtime members.
+        for id in ExtensionShims.firefoxIDs {
+            configuration.webViewConfiguration.userContentController.addUserScript(
+                WKUserScript(source: "if (location.host === '\(id)') { globalThis.__zigzagFirefoxPackage = true; }",
+                             injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        }
         // The compatibility layer on every extension page too (popups, options), before their own scripts.
         configuration.webViewConfiguration.userContentController.addUserScript(
             WKUserScript(source: "if (location.protocol === 'webkit-extension:') {\n\(ExtensionBridgeScript.source)\n\(ExtensionShims.compatibility)\n\(ExtensionBridgeScript.afterCompatibility)\n}",

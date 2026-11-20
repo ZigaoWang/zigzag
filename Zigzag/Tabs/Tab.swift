@@ -309,6 +309,11 @@ final class Tab: NSObject {
     var isNotSecure: Bool { url?.scheme?.lowercased() == "http" || usesCertificateException }
 
     private(set) var webView: BrowserWebView?
+    /// The handler a page's loopback calls come through, so its sockets can be ended when it leaves.
+    private weak var localReceivers: LocalReceiverMessages?
+    /// Whether this tab made its web view's configuration, so the loopback door's script and handler are its to change.
+    /// A page WebKit opened for another shares its opener's, and is left alone.
+    private var ownsPageScripts = false
     /// Where the web view sits, with the Web Inspector when it's docked (`PageHolder`): what shows the tab borrows this,
     /// never the web view alone. Made with the first web view and kept, so the next one appears in its place.
     private(set) var pageHolder: PageHolder?
@@ -533,6 +538,15 @@ final class Tab: NSObject {
         if #available(macOS 15.4, *), extensionConfiguration == nil,
            configuration.webExtensionController === profile.extensions.controller {
             profile.extensions.bridge.userScripts.attach(configuration.userContentController, isPrivate: privateStore != nil)
+        }
+        // A page's own scripts may ask Zigzag to make a loopback call, when Settings and the site's switch both say
+        // yes. An extension's own page has its bridge instead, and a private tab keeps WebKit's own networking.
+        // The script goes only into an allowed page, so every other page keeps WebKit's own networking.
+        ownsPageScripts = !fromWebKit
+        if extensionConfiguration == nil {
+            localReceivers = fromWebKit ? nil
+                : LocalReceiverShim.attach(to: configuration, tab: self, origin: url.flatMap(SiteOrigin.of),
+                                           isPrivate: isPrivate)
         }
         showsExtensionPage = extensionConfiguration != nil
         openedByPage = fromWebKit
@@ -931,6 +945,8 @@ final class Tab: NSObject {
     private var ownHistoryTarget: URL?
     /// Download policy for its pages (same as pop-up windows').
     private let downloads = DownloadPolicy()
+    /// The current main-frame navigation was started by a click, key or the address bar.
+    var mainFrameWasClicked: Bool { downloads.mainFrameWasClicked }
 
     static func isExtensionPage(_ url: URL?) -> Bool { url?.scheme == "webkit-extension" }
 
@@ -1600,6 +1616,14 @@ final class Tab: NSObject {
 // MARK: - WKNavigationDelegate
 
 extension Tab: WKNavigationDelegate {
+    /// The AMO page being read, when the address is one. Asked for as Firefox so the store's own button offers the
+    /// add-on ("Add to Firefox" → hand over the .xpi) instead of a browser download.
+    nonisolated static func addonsPage(_ url: URL) -> URL? {
+        guard let host = url.host(), ExtensionStore.addonsHost(host),
+              url.scheme?.lowercased() == "https", url.port == nil || url.port == 443 else { return nil }
+        return url
+    }
+
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, preferences: WKWebpagePreferences) async -> (WKNavigationActionPolicy, WKWebpagePreferences) {
         let userInitiated = PopupNotice.isUserInitiated(navigationAction)
         // The own load ends at the next main-frame decision so it never lingers. Only a decision for its URL counts as
@@ -1667,7 +1691,9 @@ extension Tab: WKNavigationDelegate {
         // The page is asked for as the browser it's to be told it's in (the developer tools' User Agent): a request
         // made as another is made again, so no page off the list is asked for as one you chose for your own site.
         if decidesMainFrame {
-            let wanted = developerInEffect(at: url).userAgent.string
+            // addons.mozilla.org shows Add to Firefox only to Firefox.
+            let storeAgent = Self.addonsPage(url) != nil ? DeveloperState.UserAgent.firefox.string : nil
+            let wanted = storeAgent ?? developerInEffect(at: url).userAgent.string
             let again = Self.asksAgain(sent: webView.customUserAgent, wanted: wanted, isGet: (navigationAction.request.httpMethod ?? "GET") == "GET",
                                        type: navigationAction.navigationType)
             if (webView.customUserAgent ?? "") != (wanted ?? "") { webView.customUserAgent = wanted }
@@ -1801,6 +1827,12 @@ extension Tab: WKNavigationDelegate {
         // The community lists' scriptlets for the document's site, in place before it starts (a frame's follow the
         // page it's in, as the blocklist does).
         if !showsExtensionPage { await ContentBlocker.prepareFilters(in: webView, for: url, mainFrame: isMainFrame) }
+        // The loopback door belongs to the page that is about to start, not to the tab. Put in or taken out here, it is
+        // in place before that page's own code runs; a page without its switch keeps WebKit's own networking.
+        if decidesMainFrame {
+            localReceivers = LocalReceiverShim.sync(webView, tab: self, origin: navigationAction.request.url.flatMap(SiteOrigin.of),
+                                                    isPrivate: isPrivate, owns: ownsPageScripts, current: localReceivers)
+        }
         return (.allow, preferences)
     }
 
@@ -1884,6 +1916,11 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse) async -> WKNavigationResponsePolicy {
         let response = navigationResponse.response
+        // A redirect may land on another origin: the door follows the address that is really going to be shown.
+        if navigationResponse.isForMainFrame, navigationResponse.canShowMIMEType, let landed = response.url {
+            localReceivers = LocalReceiverShim.sync(webView, tab: self, origin: SiteOrigin.of(landed),
+                                                    isPrivate: isPrivate, owns: ownsPageScripts, current: localReceivers)
+        }
         // A site that asks to be reached only securely gets no "Visit anyway" on a certificate warning later.
         StrictTransport.note(response, in: webView.configuration.websiteDataStore)
         // A server error with nothing in it (a proxy on this Mac that couldn't reach the site) would be a blank
@@ -2089,6 +2126,8 @@ extension Tab: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         isLeavingPage = true
+        // The page is going: a socket it opened to this Mac goes with it.
+        localReceivers?.closeAllSockets()
         // Ended while the page is still in its process: the next page may get a new one (#348).
         if Passkeys.available { Passkeys.endRequests(in: webView) {} }
     }
@@ -2108,6 +2147,12 @@ extension Tab: WKNavigationDelegate {
         // Before the address updates, so a pinned page isn't marked as moved on.
         noteLanding(webView.url)
         if webView.url != url { followAddress(of: webView) }
+        // The page that landed is the page the door is for: it stays for an allowed origin, and a page that went
+        // somewhere else has it taken out, so the dev page it became keeps its own fetch, XHR and HMR socket.
+        if let landed = webView.url {
+            localReceivers = LocalReceiverShim.sync(webView, tab: self, origin: SiteOrigin.of(landed),
+                                                    isPrivate: isPrivate, owns: ownsPageScripts, current: localReceivers)
+        }
         // Answers to the last page's questions were for that page: this one asks again.
         permissionAnswers.forget()
         // A sign-in menu belongs to the page it opened on.
@@ -2236,6 +2281,11 @@ extension Tab: WKNavigationDelegate {
         if fallBackToHTTP(after: error as NSError, in: webView) { return }
         // Restore the address of the page still showing.
         if webView.url != url { followAddress(of: webView) }
+        // The load that failed took the door with it: the page still showing keeps the one for where it is.
+        if let showing = webView.url {
+            localReceivers = LocalReceiverShim.sync(webView, tab: self, origin: SiteOrigin.of(showing),
+                                                    isPrivate: isPrivate, owns: ownsPageScripts, current: localReceivers)
+        }
         handle(error, in: webView)
     }
 
