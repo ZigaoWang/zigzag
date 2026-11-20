@@ -120,8 +120,8 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
             // The reset button shows while a grid's line is parted, and goes when it's one line again.
             self.root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
             guard final else { return }
-            self.tabManager.setTileShape(shape, for: tab)
-            self.onStateChange?()
+            // A whole drag is one change: the group's lines when it began are what ⌘Z puts back (#435).
+            self.applyTileShape(shape, undoTo: self.tabManager.split(for: tab)?.shape)
         }
 
         sidebar.delegate = self
@@ -352,6 +352,23 @@ final class BrowserWindowController: NSWindowController, NSWindowDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Puts a tile group's lines where `shape` has them, and with `undoTo` makes ⌘Z return them there (#435). The
+    /// group must still be the one on screen: a drag that ends on another tab changes nothing.
+    func applyTileShape(_ shape: TileShape, undoTo inverse: TileShape?) {
+        guard let tab = tabManager.selectedTab, let current = tabManager.split(for: tab)?.shape else { return }
+        guard current.regions == shape.regions, current != shape else { return }
+        tabManager.setTileShape(shape, for: tab)
+        root.setTiles(shape, animated: true)
+        root.paneCards.forEach { $0.header.resetsLayout = shape.isParted }
+        onStateChange?()
+        guard let inverse else { return }
+        sidebarUndo.registerUndo(withTarget: self) { controller in
+            controller.applyTileShape(inverse, undoTo: shape)
+        }
+        sidebarUndo.setActionName(String(localized: "Resize Tiles", comment: "Undo action name, shown in the Edit menu as Undo Resize Tiles."))
+    }
+
 
     static func defaultFrame() -> NSRect {
         let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)

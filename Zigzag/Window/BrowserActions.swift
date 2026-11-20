@@ -421,11 +421,9 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// again (#316).
     @objc func resetTileLayout(_ sender: Any?) {
         guard let tab = selectedTab, var shape = tabManager.split(for: tab)?.shape, shape.isParted else { return }
+        let before = shape
         shape.evenOut()
-        tabManager.setTileShape(shape, for: tab)
-        root.setTiles(shape, animated: true)
-        root.paneCards.forEach { $0.header.resetsLayout = false }
-        onStateChange?()
+        applyTileShape(shape, undoTo: before)
     }
 
     @objc func toggleReader(_ sender: Any?) { toggleReader() }
