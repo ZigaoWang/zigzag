@@ -22,6 +22,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The highlight under an icon button you point at or press shows clearly on every space color, black and other very dark ones included, where it was barely there. The sidebar's buttons, the space buttons, the strips on split pages, Peek, Zigzag Mini, pop-ups and installed apps all use one rule: a white or black wash just strong enough to stand out from the color under it, and a little stronger when pressed.
 - Thin rounded fields have round ends again, like the address you edit in Zigzag Mini's strip. Its ends came to a point because its corners were rounder than half its height.
 - On a split view's row in the sidebar, the × sits inside the page it closes. Point at a page and its part lights up with its own ×, named Close and the page's title; on the row you're in, the page you're in shows it. It used to sit alone at the row's end, where it looked like it closed the whole split. A part too narrow for its icon and the × shows the × in its icon's place while you point at it.
+- Clicking the address in a split view page's strip edits it in a field the address's own size and place, light or dark with the page, as in Zigzag Mini's strip. It used to open as a taller white box over the strip's buttons, whatever the page's color.
 
 ## [0.9.3] - 2026-11-18
 
