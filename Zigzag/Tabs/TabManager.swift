@@ -1448,6 +1448,7 @@ final class TabManager {
             returnPane(of: tab, to: opener)
         }
         let pair = split(for: tab)
+        if let pair { keepRowPlace(closing: tab, in: pair) }
         // Closing one half of a split shows the other half; one page of a tile group of more, the rest, closed up
         // around its place, and you're in the page that took its room.
         let partnerTab = leaveGroup(tab, notify: false)
@@ -1484,6 +1485,21 @@ final class TabManager {
         tab.close()
         structureChanged()
         if wasSelected { selectAfterClosing(tab, index: index) }
+    }
+
+    /// The page whose row a split shows at is closing: the next page of it moves to that place, so what stays open
+    /// stays where the split's row was (#404).
+    private func keepRowPlace(closing tab: Tab, in pair: SplitPair) {
+        guard tab.bookmarkID == nil, var list = tabsBySpace[tab.spaceID],
+              !pair.ids.contains(where: { id in bookmarkTabs.values.contains { $0.id == id } }) else { return }
+        let listed = pair.ids.filter { id in list.contains { $0.id == id } }
+        guard listed.first == tab.id, listed.count > 1, let heirIndex = list.firstIndex(where: { $0.id == listed[1] }) else { return }
+        let heir = list[heirIndex]
+        guard heir.groupID == tab.groupID, heir.parentID == tab.parentID else { return }
+        list.remove(at: heirIndex)
+        guard let place = list.firstIndex(where: { $0 === tab }) else { return }
+        list.insert(heir, at: place)
+        tabsBySpace[tab.spaceID] = list
     }
 
     /// Removes a tab without choosing a new selection (the caller does).

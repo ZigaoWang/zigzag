@@ -1007,13 +1007,15 @@ final class SidebarListView: NSView {
             // In a row of several pages, the part double-clicked is the page renamed.
             row.onDoubleClick = { [weak row] in row?.beginRename(at: Self.pointer(in: row)) }
             row.onRename = { [weak row] name in (row?.renamingPage ?? row?.tab)?.customTitle = name.isEmpty ? nil : name }
+            // A split row's × closes the page of the part it's on; the other stays open (#404).
             row.onClose = { [weak self, weak row] in
-                guard let tab = row?.tab else { return }
-                // A split row closes both its pages, as the desk's card does.
-                let pages = row?.pages ?? [tab]
-                if pages.count > 1 { self?.delegate?.listClose(pages) } else { self?.delegate?.listClose(tab) }
+                guard let page = row?.closingPage else { return }
+                self?.delegate?.listClose(page)
             }
-            row.onMiddleClick = row.onClose
+            row.onMiddleClick = { [weak self, weak row] in
+                guard let row, let page = Self.pointer(in: row).flatMap(row.page(at:)) ?? row.tab else { return }
+                self?.delegate?.listClose(page)
+            }
             row.onToggleNested = { [weak self, weak row] in
                 guard let tab = row?.tab else { return }
                 self?.delegate?.listSetNestedTabsCollapsed(tab, !tab.isCollapsed)
@@ -1067,10 +1069,14 @@ final class SidebarListView: NSView {
                 }
             }
             // Away from its page, the button says "Back to Pinned Page", and does that; a middle-click still unloads.
-            row.onClose = { [weak self] in
-                if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id) } else { unload() }
+            // Beside a tab, the × on the tab's part closes only that tab (#404).
+            row.onClose = { [weak self, weak row] in
+                if let manager = self?.manager, manager.isAway(id) { manager.resetBookmarkTab(id); return }
+                if let row, row.closesPart, let page = row.closingPage { self?.delegate?.listClose(page) } else { unload() }
             }
-            row.onMiddleClick = unload
+            row.onMiddleClick = { [weak self, weak row] in
+                if let row, row.closesPart, let page = Self.pointer(in: row).flatMap(row.page(at:)) { self?.delegate?.listClose(page) } else { unload() }
+            }
             row.onRightClick = { [weak self, weak row] event in self?.menu(for: item, row: row, event: event) }
             row.onDragStart = { [weak self, weak row] event in
                 guard let self, let row else { return false }
@@ -1119,6 +1125,7 @@ final class SidebarListView: NSView {
             row.partnerLeads = partners.count == 1 && manager.split(for: tab)?.left == partner?.id
             row.isSelected = tab === selected || partners.contains { $0 === selected }
             row.focusedHalf = partners.firstIndex { $0 === selected }.map { $0 + 1 } ?? 0
+            row.closesPart = !partners.isEmpty
             // The pane zoomed over the rest: its part of the row is lit (#160).
             row.zoomedPart = zoomedTabID.flatMap { zoomed in row.pages.firstIndex { $0.id == zoomed } }
             // A split's age for Clear is its newest page's.
@@ -1172,6 +1179,7 @@ final class SidebarListView: NSView {
             let focused = selected.flatMap { selected in parts.firstIndex { $0 != nil && $0 === selected } }
             row.isSelected = focused != nil
             row.focusedHalf = focused ?? 0
+            row.closesPart = beside != nil && !away
             row.isMarked = marked.contains(item)
         default:
             break

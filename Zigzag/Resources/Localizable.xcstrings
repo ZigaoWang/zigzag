@@ -25138,6 +25138,17 @@
           }
         }
       }
+    },
+    "Close Split View" : {
+      "comment" : "Item in a tab's context menu in the sidebar, for a page of a split view: closes all its pages.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭整个分屏浏览"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
