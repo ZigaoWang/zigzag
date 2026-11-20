@@ -539,7 +539,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             if tab.bookmarkID == nil, tabManager.pinsGroup(tab) {
                 bookmarkWithUndo(tab, at: index, in: tab.spaceID)
                 Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star.fill",
-                           actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
+                           actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, duration: Toast.undoDuration, in: self)
                 refreshSavedState(of: tab)
                 done?()
                 return true
@@ -547,7 +547,7 @@ extension BrowserWindowController: NSMenuItemValidation {
             // No sheet, no question: the end of this space's Pinned pages.
             guard save(page, to: SavePath.quickPlace(in: tab.spaceID)) else { return false }
             Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star.fill",
-                       actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
+                       actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, duration: Toast.undoDuration, in: self)
             refreshSavedState(of: tab)
             done?()
             return true
@@ -555,7 +555,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         SavePlaceSheet.show(page: page, spaceID: tab.spaceID, in: root.overlay) { [weak self] answer in
             guard let self, self.save(page, to: answer.place, named: answer.name) else { return }
             Toast.show(String(localized: "Pinned", comment: "Toast after a page is pinned."), symbol: "star.fill",
-                       actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, in: self)
+                       actionMenu: { [weak self] in self?.savedPlacesMenu(for: tab) }, duration: Toast.undoDuration, in: self)
             self.refreshSavedState(of: tab)
             done?()
         }

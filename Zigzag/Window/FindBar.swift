@@ -1150,7 +1150,7 @@ enum Toast {
         @MainActor func hideWhenClear(_ toast: ToastView?) {
             // Shown again since (a repeat toast): that showing decides when it goes.
             guard let toast, toast.superview != nil, state.hideWork == nil else { return }
-            if action != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
+            if action != nil || actionMenu != nil, toast.bounds.contains(toast.convert(toast.window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil)) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak toast] in hideWhenClear(toast) }
                 return
             }
