@@ -77,6 +77,47 @@ struct SiteIconChoiceTests {
         FaviconStore.finishWriting()
         #expect(!FileManager.default.fileExists(atPath: files(host).standIn.path))
     }
+
+    /// A red square saved the way icons were before #386.
+    private func oldIcon(at url: URL) throws {
+        let image = NSImage(size: NSSize(width: 32, height: 32), flipped: false) { rect in
+            NSColor(red: 0.9, green: 0, blue: 0, alpha: 1).setFill()
+            rect.fill()
+            return true
+        }
+        let rep = try #require(image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
+        try #require(rep.representation(using: .png, properties: [:])).write(to: url)
+    }
+
+    @Test func iconsKeptBeforeTheUpdateStayUntilTheSiteShowsItsOwn() async throws {
+        let fm = FileManager.default
+        let folder = fm.temporaryDirectory.appendingPathComponent("old-icons-\(UUID().uuidString)", isDirectory: true)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: folder) }
+        let host = "old-icons-\(UUID().uuidString.prefix(8).lowercased()).test"
+        defer { clear(host) }
+        try oldIcon(at: folder.appendingPathComponent(host + ".png"))
+        try oldIcon(at: folder.appendingPathComponent("imported.test.png"))
+
+        FaviconStore.keepOldIconsAsStandIns(in: folder)
+        // Nothing thrown away: every icon is still there, as a stand-in.
+        #expect(fm.fileExists(atPath: folder.appendingPathComponent(host + ".touch.png").path))
+        #expect(fm.fileExists(atPath: folder.appendingPathComponent("imported.test.touch.png").path))
+        #expect(!fm.fileExists(atPath: folder.appendingPathComponent(host + ".png").path))
+        #expect(fm.fileExists(atPath: folder.appendingPathComponent(".own-first").path))
+        // Only once: an own icon saved after the update stays one.
+        try oldIcon(at: folder.appendingPathComponent("later.test.png"))
+        FaviconStore.keepOldIconsAsStandIns(in: folder)
+        #expect(fm.fileExists(atPath: folder.appendingPathComponent("later.test.png").path))
+
+        // In the real folder, the old icon shows until a page of the site shows its own, which then wins.
+        try fm.moveItem(at: folder.appendingPathComponent(host + ".touch.png"), to: files(host).standIn)
+        #expect(color(FaviconStore.shared.cachedIcon(for: URL(string: "https://\(host)/")!)) == "red")
+        #expect(color(await resolve("https://\(host)/page", [own, touch])) == "green")
+        FaviconStore.finishWriting()
+        #expect(fm.fileExists(atPath: files(host).own.path))
+        #expect(!fm.fileExists(atPath: files(host).standIn.path))
+    }
 }
 
 // MARK: - One service per port
