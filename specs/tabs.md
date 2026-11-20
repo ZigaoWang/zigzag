@@ -6,9 +6,9 @@
 - ⌘W on any other tab → the tab below, else the one above; never the one you used last.
   Test: TabCloseSelectionTests.closingGoesToTheTabBelowNotTheOneYouWereOnBefore
 - ⌘W on a pinned tab or favorite → it unloads and stays; next time it opens fresh at its saved address.
-  No test yet.
+  Test: TabCloseSelectionTests.closingAPinnedPageOrFavoriteUnloadsItAndKeepsIt
 - ⌘W on the last tab of a space → the space's most recent page, else the space shows empty.
-  No test yet.
+  Test: TabCloseSelectionTests.closingTheLastTabGoesToTheSpacesRecentPageElseEmpty
 
 ## Reopening
 - ⇧⌘T → whatever closed last comes back, app-wide: a tab, a tab of a closed window, or a whole window.
@@ -48,11 +48,11 @@
 - A sleeping tab in the tab list → its icon wears a dashed ring.
   Test: UnloadedTabTests.inTheTabsListATabNotRunningWearsTheRing
 - Click a sleeping tab → it loads again where it was.
-  No test yet.
+  Test: UnloadedTabTests.aSleepingTabClickedLoadsAgainWhereItWas
 
 ## Sound
 - A tab playing sound or muted → a speaker after its title; clicking it mutes or unmutes that page.
-  No test yet.
+  Test: RowSpeakerTests.theSpeakerMutesAndUnmutesItsPage
 - Pause the video or audio a tab's sound came from → its speaker goes away after a moment, even if WebKit still says it plays.
   Test: MiniPlayerPageTests.aSoundFromAVideoEndsOnceItStops
 

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Zigzag
@@ -120,5 +121,44 @@ import Testing
         #expect(TabRowView.showsOpenEdge(pinned: true, loaded: [false, true]))
         // A tab's row never has the pinned page's edge.
         #expect(!TabRowView.showsOpenEdge(pinned: false, loaded: [true]))
+    }
+
+    private func until(_ seconds: Double = 10, _ condition: () -> Bool) async -> Bool {
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return condition()
+    }
+
+    /// A sleeping tab you click loads again on the page it was on, with its history.
+    @Test func aSleepingTabClickedLoadsAgainWhereItWas() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("asleep-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let first = folder.appendingPathComponent("first.html"), second = folder.appendingPathComponent("second.html")
+        try "<title>First</title><p>first".write(to: first, atomically: true, encoding: .utf8)
+        try "<title>Second</title><p>second".write(to: second, atomically: true, encoding: .utf8)
+        let space = Library.shared.spaces[0].id
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate() }
+        let other = Tab(url: nil, title: "Other", spaceID: space)
+        let sleeper = Tab(url: first, title: "First", spaceID: space)
+        manager.adopt([other, sleeper], in: space)
+        manager.select(sleeper)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 900, height: 600))
+        defer { controller.window?.close() }
+        #expect(await until { sleeper.webView?.url == first && sleeper.webView?.isLoading == false })
+        sleeper.load(second)
+        #expect(await until { sleeper.webView?.url == second && sleeper.webView?.isLoading == false && sleeper.canGoBack })
+        manager.select(other)
+        sleeper.suspend(because: "test", chosen: true)
+        #expect(await until { sleeper.isAsleep })
+        #expect(sleeper.webView == nil)
+        // The click on its row selects it.
+        manager.select(sleeper)
+        #expect(sleeper.isLoaded && !sleeper.isAsleep)
+        #expect(await until { sleeper.webView?.url == second && sleeper.canGoBack })
     }
 }
