@@ -122,6 +122,7 @@ nonisolated enum LocalReceivers {
     static func send(_ request: Request, as identity: Identity,
                      transport: Transport? = nil) async throws -> Response {
         guard isLoopback(request.url) else { throw Failure.notLoopback }
+        guard isWellFormed(request) else { throw Failure.refused("the request is malformed") }
         let run = transport ?? defaultTransport
         if !identity.isWebExtension, needsPreflight(request) {
             let preflight = try await run(urlRequest(for: preflightRequest(for: request), as: identity))
@@ -143,10 +144,16 @@ nonisolated enum LocalReceivers {
         return answer
     }
 
-    /// The answer to one request, as the page door gives it: the same CORS checks, the same limit.
-    @MainActor
-    static func answer(for request: Request, as identity: Identity, transport: Transport? = nil) async throws -> Response {
-        try await send(request, as: identity, transport: transport)
+    /// A method this door sends and headers HTTP can carry as they are: a name that is a token, a value on one line.
+    /// A page can post to the handler without WebKit's own checks, so they are made here.
+    static func isWellFormed(_ request: Request) -> Bool {
+        let tokenCharacters = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~")
+            .union(CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"))
+        let isToken = { (text: String) in !text.isEmpty && text.unicodeScalars.allSatisfy(tokenCharacters.contains) }
+        guard ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"].contains(request.method) else { return false }
+        return request.headers.allSatisfy { name, value in
+            isToken(name) && !value.unicodeScalars.contains { $0 == "\r" || $0 == "\n" || $0 == "\0" }
+        }
     }
 
     // MARK: - What a browser would ask first
@@ -295,7 +302,8 @@ nonisolated enum LocalReceivers {
         }
     }
 
-    private static func response(_ data: Data, _ raw: URLResponse, for url: URL) throws -> Response {        guard let http = raw as? HTTPURLResponse else { throw Failure.noAnswer }
+    private static func response(_ data: Data, _ raw: URLResponse, for url: URL) throws -> Response {
+        guard let http = raw as? HTTPURLResponse else { throw Failure.noAnswer }
         var headers: [String: String] = [:]
         for (name, value) in http.allHeaderFields {
             headers[String(describing: name).lowercased()] = String(describing: value)
@@ -307,24 +315,29 @@ nonisolated enum LocalReceivers {
         try response(pair.0, pair.1, for: url)
     }
 
-    /// The cookies WebKit would have sent to the helper from this store, for the moment the call is made.
+    /// The cookies WebKit would have sent to the helper from this store, for the moment the call is made. A site's
+    /// call is cross-site, so it leaves out SameSite cookies, as WebKit would.
     @MainActor
-    static func cookies(for url: URL, in store: WKWebsiteDataStore?) async -> String? {
+    static func cookies(for url: URL, in store: WKWebsiteDataStore?, crossSite: Bool) async -> String? {
         guard let store = store?.httpCookieStore else { return nil }
         let all: [HTTPCookie] = await withCheckedContinuation { continuation in
             store.getAllCookies { continuation.resume(returning: $0) }
         }
+        let matching = sendable(all, to: url, crossSite: crossSite)
+        return matching.isEmpty ? nil : HTTPCookie.requestHeaderFields(with: matching)["Cookie"]
+    }
+
+    static func sendable(_ cookies: [HTTPCookie], to url: URL, crossSite: Bool, now: Date = Date()) -> [HTTPCookie] {
         let host = url.host()?.lowercased() ?? ""
         let path = url.path.isEmpty ? "/" : url.path
-        let now = Date()
-        let matching = all.filter { cookie in
+        return cookies.filter { cookie in
             if let expires = cookie.expiresDate, expires <= now { return false }
             if cookie.isSecure, url.scheme?.lowercased() != "https" { return false }
+            if crossSite, cookie.sameSitePolicy == .sameSiteLax || cookie.sameSitePolicy == .sameSiteStrict { return false }
             let domain = cookie.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
             guard !domain.isEmpty, host == domain || host.hasSuffix("." + domain) else { return false }
             return path.hasPrefix(cookie.path.isEmpty ? "/" : cookie.path)
         }
-        return matching.isEmpty ? nil : HTTPCookie.requestHeaderFields(with: matching)["Cookie"]
     }
 
     /// Cookies the helper set, kept where WebKit keeps the profile's, so the next call sends them back.

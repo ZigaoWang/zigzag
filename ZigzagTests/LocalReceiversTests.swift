@@ -348,6 +348,72 @@ struct LocalReceiversTests {
         #expect(controller.userScripts.isEmpty)
     }
 
+    /// A page can post to the handler directly, so the door itself refuses what WebKit's fetch would never send.
+    @Test func aMalformedRequestNeverLeaves() async {
+        #expect(LocalReceivers.isWellFormed(LocalReceivers.Request(url: answerURL, method: "POST", headers: ["X-Token": "abc"])))
+        #expect(!LocalReceivers.isWellFormed(LocalReceivers.Request(url: answerURL, method: "GET\r\nX: y", headers: [:])))
+        #expect(!LocalReceivers.isWellFormed(LocalReceivers.Request(url: answerURL, method: "TRACE", headers: [:])))
+        #expect(!LocalReceivers.isWellFormed(LocalReceivers.Request(url: answerURL, headers: ["Origin ": "https://evil.example"])))
+        #expect(!LocalReceivers.isWellFormed(LocalReceivers.Request(url: answerURL, headers: ["X-A": "1\r\nOrigin: https://evil.example"])))
+        await expect(.refused("the request is malformed")) {
+            _ = try await LocalReceivers.send(LocalReceivers.Request(url: answerURL, headers: ["X-A": "1\nB: 2"]), as: site,
+                                              transport: { _ in Issue.record("sent"); throw URLError(.cancelled) })
+        }
+    }
+
+    /// A site's call is cross-site: SameSite cookies stay behind, as WebKit leaves them; an extension's carry them.
+    @Test func aSiteCallLeavesSameSiteCookiesBehind() throws {
+        func cookie(_ name: String, sameSite: HTTPCookieStringPolicy?) throws -> HTTPCookie {
+            var properties: [HTTPCookiePropertyKey: Any] = [.name: name, .value: "1", .domain: "localhost", .path: "/"]
+            if let sameSite { properties[.sameSitePolicy] = sameSite }
+            return try #require(HTTPCookie(properties: properties))
+        }
+        let cookies = [try cookie("none", sameSite: nil), try cookie("lax", sameSite: .sameSiteLax),
+                       try cookie("strict", sameSite: .sameSiteStrict)]
+        #expect(LocalReceivers.sendable(cookies, to: answerURL, crossSite: true).map(\.name) == ["none"])
+        #expect(LocalReceivers.sendable(cookies, to: answerURL, crossSite: false).map(\.name) == ["none", "lax", "strict"])
+    }
+
+    /// The helper's cookies are never the page's to read, even when it lists them as exposed.
+    @MainActor @Test func aPageNeverReadsTheHelpersCookies() {
+        let answer = LocalReceivers.Response(url: answerURL, status: 200,
+                                             headers: ["content-type": "text/plain", "set-cookie": "s=1", "x-id": "7",
+                                                       "access-control-expose-headers": "Set-Cookie, X-Id"],
+                                             body: Data())
+        let headers = (LocalReceiverMessages.reply(answer, to: LocalReceivers.Request(url: answerURL))["headers"] as? [[String]]) ?? []
+        let names = Set(headers.map { $0[0] })
+        #expect(names.contains("x-id"))
+        #expect(names.contains("content-type"))
+        #expect(!names.contains("set-cookie"))
+    }
+
+    /// Leaving an allowed site ends the sockets its page opened, before the next page can hear from them.
+    @MainActor @Test func leavingAnAllowedSiteEndsItsSockets() {
+        let name = "LocalReceiversTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        let master = LocalReceivers.isEnabled
+        defer {
+            LocalReceivers.isEnabled = master
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let allowed = "https://creator.zerowork.io"
+        LocalReceivers.isEnabled = true
+        SitePermissions.setLocalReceivers(true, origin: allowed)
+
+        let controller = WKUserContentController()
+        let messages = LocalReceiverMessages(tab: Tab(url: nil, spaceID: UUID()))
+        messages.track(LocalReceiverSocket(id: "a", url: URL(string: "ws://127.0.0.1:9")!, protocols: [], origin: allowed,
+                                           webView: nil, reply: { _, _ in }), id: "a")
+        #expect(messages.openSocketCount == 1)
+        let left = LocalReceiverShim.sync(controller: controller, tab: nil, origin: "https://elsewhere.example",
+                                          isPrivate: false, current: messages)
+        #expect(left == nil)
+        #expect(messages.openSocketCount == 0)
+    }
+
     private func expect(_ failure: LocalReceivers.Failure, _ body: () async throws -> Void) async {
         do {
             try await body()

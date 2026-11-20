@@ -61,6 +61,7 @@ enum LocalReceiverShim {
         guard !isPrivate, let origin, serves(origin: origin) else {
             // The page has left the site it was allowed on (or is private): the script and the handler go, so the
             // page it becomes keeps WebKit's own fetch, XHR and WebSocket, with nothing of this door in reach.
+            current?.closeAllSockets()
             OwnScripts.remove(from: controller, where: { $0.source.hasPrefix(marker) })
             controller.removeScriptMessageHandler(forName: name, contentWorld: .page)
             return nil
@@ -142,11 +143,12 @@ enum LocalReceiverShim {
       const aborted = () => new DOMException('The user aborted a request.', 'AbortError');
 
       window.fetch = async (input, init) => {
+        // Where it goes is read first: making a Request from another one takes its body, which WebKit's fetch needs.
+        let url;
+        try { url = new URL(input instanceof Request ? input.url : String(input), location.href); } catch (error) { return nativeFetch(input, init); }
+        if (!isLoopback(url)) return nativeFetch(input, init);
         let request;
         try { request = new Request(input, init); } catch (error) { return nativeFetch(input, init); }
-        let url;
-        try { url = new URL(request.url, location.href); } catch (error) { return nativeFetch(input, init); }
-        if (!isLoopback(url)) return nativeFetch(input, init);
         if (request.mode === 'no-cors' || request.mode === 'navigate' || request.redirect === 'manual') {
           return nativeFetch(input, init);
         }
@@ -582,9 +584,16 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
         }
         let socket = LocalReceiverSocket(id: id, url: url, protocols: (body["protocols"] as? [String]) ?? [],
                                          origin: origin, webView: webView, reply: reply)
+        track(socket, id: id)
+    }
+
+    /// Keeps a socket this page opened until it closes or the page goes.
+    func track(_ socket: LocalReceiverSocket, id: String) {
         socket.onClose = { [weak self] id in self?.sockets[id] = nil }
         sockets[id] = socket
     }
+
+    var openSocketCount: Int { sockets.count }
 
     private func fetch(_ body: [String: Any], from origin: String, webView: WKWebView?,
                        reply: @escaping @MainActor @Sendable (Any?, String?) -> Void) {
@@ -602,7 +611,7 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
             // The same store the page's own WebKit requests use, so a helper sees one set of cookies however it is
             // reached, and what it sets is kept for the page and the next call.
             let store = webView?.configuration.websiteDataStore
-            if credentials.sendsCookies, let cookie = await LocalReceivers.cookies(for: url, in: store) {
+            if credentials.sendsCookies, let cookie = await LocalReceivers.cookies(for: url, in: store, crossSite: true) {
                 request.headers["Cookie"] = cookie
             }
             do {
@@ -642,13 +651,15 @@ final class LocalReceiverMessages: NSObject, WKScriptMessageHandlerWithReply {
     private static let visibleHeaders: Set<String> = [
         "cache-control", "content-language", "content-length", "content-type", "expires", "last-modified", "pragma",
     ]
+    /// Never shown, whatever the helper exposes, as in a browser.
+    private static let hiddenHeaders: Set<String> = ["set-cookie", "set-cookie2"]
 
-    private static func reply(_ answer: LocalReceivers.Response, to request: LocalReceivers.Request) -> [String: Any] {
+    static func reply(_ answer: LocalReceivers.Response, to request: LocalReceivers.Request) -> [String: Any] {
         let exposed = Set((answer.header("access-control-expose-headers") ?? "")
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces).lowercased() })
         let headers = answer.headers
-            .filter { visibleHeaders.contains($0.key) || exposed.contains($0.key) }
+            .filter { visibleHeaders.contains($0.key) || (exposed.contains($0.key) && !hiddenHeaders.contains($0.key)) }
             .map { [$0.key, $0.value] }
         return [
             "status": answer.status,

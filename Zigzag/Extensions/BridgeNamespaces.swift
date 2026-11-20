@@ -1041,7 +1041,7 @@ final class BridgeExtensionFetch: BridgeNamespace {
             guard host.profile.installs.localReceivers(extensionID) else { return ["fallback": true] }
             var local = try Self.localReceiverRequest(options, url: url)
             let store = host.profile.store
-            if local.credentials.sendsCookies, let cookie = await LocalReceivers.cookies(for: url, in: store) {
+            if local.credentials.sendsCookies, let cookie = await LocalReceivers.cookies(for: url, in: store, crossSite: false) {
                 local.headers["Cookie"] = cookie
             }
             let answer = try await LocalReceivers.send(local, as: .webExtension(id: extensionID))
