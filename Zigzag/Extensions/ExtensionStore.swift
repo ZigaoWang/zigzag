@@ -269,6 +269,36 @@ enum ExtensionStore {
         string.count == 32 && string.allSatisfy { ("a"..."p").contains($0) }
     }
 
+    // MARK: addons.mozilla.org
+
+    /// The AMO site itself: where listings are read and an add-on is added. Its API is a different host, and never
+    /// a page.
+    nonisolated static func addonsHost(_ host: String) -> Bool {
+        host.lowercased() == "addons.mozilla.org"
+    }
+
+    /// The listing's slug in an AMO page address: `/en-US/firefox/addon/ublock-origin/reviews/` → `ublock-origin`.
+    /// The locale segment is optional, only this store's listing pages count, and a slug is never a path of its own.
+    nonisolated static func addonsSlug(from url: URL?) -> String? {
+        guard let url, let host = url.host(), addonsHost(host),
+              url.scheme?.lowercased() == "https", url.port == nil || url.port == 443 else { return nil }
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard let addon = parts.firstIndex(of: "addon"), parts.indices.contains(addon + 1) else { return nil }
+        let slug = parts[addon + 1]
+        guard !slug.isEmpty, slug != "..", slug != ".",
+              slug.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { return nil }
+        return slug
+    }
+
+    /// Whether a downloaded package is the file the store said it was: AMO publishes each file's sha256, and a
+    /// package whose bytes don't match is a different file, never installed.
+    nonisolated static func matchesPublishedHash(_ data: Data, sha256: String?) -> Bool {
+        guard let published = sha256?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              published.count == 64, published.allSatisfy(\.isHexDigit) else { return false }
+        let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return actual == published
+    }
+
     /// WebKit keeps a service worker background's registration from one launch to the next, and on a later launch
     /// can bring it back without running its script: WebKit says the background loaded, but it never starts, and the
     /// extension's popup waits forever (1Password, from the second launch on). Chrome starts each worker afresh at
