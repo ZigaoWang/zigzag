@@ -738,22 +738,13 @@ final class TabManager {
         selectionChanged()
     }
 
-    func selectNext(offset: Int) {
-        let list = navigableTabs
-        guard !list.isEmpty else { return }
-        guard let current = selectedTab, let index = list.firstIndex(where: { $0 === current }) else {
-            select(list[0]); return
-        }
-        select(list[(index + offset + list.count) % list.count])
-    }
-
     func select(at index: Int) {
         let list = navigableTabs
         guard !list.isEmpty else { return }
         select(index >= list.count ? list[list.count - 1] : list[index])
     }
 
-    /// Favorites, bookmarks, then tabs, in sidebar order: what Cmd+Option+Up/Down walk.
+    /// Open favorites, open pinned tabs, then tabs, in sidebar order.
     var navigableTabs: [Tab] {
         let favoriteLive = Library.shared.favorites(in: profile.id).compactMap { bookmarkTabs[$0.id] }
         let bookmarkLive = Library.shared.bookmarks(in: currentSpaceID).compactMap { bookmarkTabs[$0.id] }
