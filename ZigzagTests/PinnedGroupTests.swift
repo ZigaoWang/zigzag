@@ -258,7 +258,7 @@ import Testing
             manager.select(tabs[1])
             let item = NSMenuItem(title: "", action: #selector(BrowserWindowController.savePage(_:)), keyEquivalent: "d")
             #expect(controller.validateMenuItem(item))
-            #expect(item.title == String(localized: "Save Group", comment: "Menu bar item: saves the whole group of tabs the tab is in, as a folder."))
+            #expect(item.title == String(localized: "Pin Group", comment: "Menu bar item: pins the whole group of tabs the tab is in, as a folder."))
             controller.savePage(item)
             let folder = try #require(tabs[1].bookmarkID.flatMap(Library.shared.pinnedGroup(containing:)))
             #expect(folder.name == "Reading")

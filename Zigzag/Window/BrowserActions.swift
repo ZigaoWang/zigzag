@@ -595,7 +595,7 @@ extension BrowserWindowController: NSMenuItemValidation {
         menu.addItem(SidebarMenus.Item(String(localized: "New Folder…", comment: "Menu item beside a pinned page: pins it into a folder named as typed.")) { [weak self] in
             self?.askNewFolder(forSaved: id)
         })
-        menu.addItem(SidebarMenus.Item(String(localized: "Remove Pinned Page", comment: "Menu item on a saved page: takes it out of Pinned.")) { [weak self] in
+        menu.addItem(SidebarMenus.Item(String(localized: "Unpin Tab", comment: "Menu item on the toast after pinning: takes the page out of Pinned, back among the tabs.")) { [weak self] in
             self?.toggleSavedState(of: tab)
         })
         return menu

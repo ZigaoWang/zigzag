@@ -109,8 +109,8 @@ enum SidebarMenus {
         }
         // Pinned pages are shared by every window: a private one doesn't take them away.
         if !pins.isEmpty, !isPrivate {
-            organize.append(Item(pins.count == 1 ? String(localized: "Remove Pinned Page", comment: "Menu item for one picked pinned page: takes it out of Pinned, back among the tabs.")
-                                 : String(localized: "Remove \(pins.count) Pinned Pages", comment: "Menu item for several picked pinned pages: takes them out of Pinned, back among the tabs.")) {
+            organize.append(Item(pins.count == 1 ? String(localized: "Unpin Tab", comment: "Menu item")
+                                 : String(localized: "Unpin \(pins.count) Tabs", comment: "Menu item for several picked pinned pages")) {
                 controller.unpinMarked(pins)
             })
         }

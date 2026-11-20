@@ -35,12 +35,12 @@ enum Tutorial {
                  done: String(localized: "You searched YouTube from here", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: String(localized: "Type any site’s name, then Tab, to search it", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window. Tab is the key.")),
             Task(id: "pin",
-                 title: String(localized: "Save this page", comment: "A step's title in the getting-started guide, a card in the window."),
+                 title: String(localized: "Pin this page", comment: "A step's title in the getting-started guide, a card in the window."),
                  keys: pinKeys,
                  note: pinKeys.isEmpty
-                    ? String(localized: "Right-click its tab, then Save Page", comment: "Under the save step's title in the getting-started guide, a card in the window, when Save Page has no shortcut. Save Page is an item in a tab's menu in the sidebar.")
+                    ? String(localized: "Right-click its tab, then Pin Tab", comment: "Under the pin step's title in the getting-started guide, a card in the window, when Pin Tab has no shortcut. Pin Tab is an item in a tab's menu in the sidebar.")
                     : String(localized: "Pinned tabs stay, even after you quit", comment: "Under a step's title in the getting-started guide, a card in the window."),
-                 done: String(localized: "Saved", comment: "Said once a step is done in the getting-started guide, a card in the window."),
+                 done: String(localized: "Pinned", comment: "Said once a step is done in the getting-started guide, a card in the window."),
                  doneNote: String(localized: "It stays at the top of this space", comment: "Under what's said once a step is done, in the getting-started guide, a card in the window.")),
             Task(id: "peek",
                  title: String(localized: "Shift-click a blue link", comment: "A step's title in the getting-started guide, a card in the window."),

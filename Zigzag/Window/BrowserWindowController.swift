@@ -2646,7 +2646,7 @@ extension BrowserWindowController: SidebarDelegate {
             // A long page title would stretch the note across the page: the start of it says which pin.
             let name = pin.title.count > 32 ? String(pin.title.prefix(31)).trimmingCharacters(in: .whitespaces) + "…" : pin.title
             Toast.show(String(localized: "\(name) stays pinned to its own page", comment: "Toast after closing a pinned tab that had wandered to another page. The title is the pinned tab's."), symbol: "pin",
-                       action: (String(localized: "Save This Page", comment: "Button in the toast after closing a pinned tab that had wandered: saves the page it was on instead."), { [weak self] in
+                       action: (String(localized: "Pin This Page", comment: "Button in the toast after closing a pinned tab that had wandered: pins the page it was on instead."), { [weak self] in
                 self?.libraryChange(String(localized: "Update Pinned Page", comment: "Undo action name, shown in the Edit menu as Undo Update Pinned Page.")) { Library.shared.updateBookmark(bookmarkID, url: here) }
             }), duration: 5, in: self)
             return
