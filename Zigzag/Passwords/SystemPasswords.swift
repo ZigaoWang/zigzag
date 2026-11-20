@@ -353,16 +353,23 @@ final class SystemPanelWatch {
             },
         ]
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-            MainActor.assumeIsolated { self?.scrolled(in: event.window) }
+            MainActor.assumeIsolated { self?.scrolled(in: event.window, phase: event.phase, momentumPhase: event.momentumPhase) }
             return event
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in self?.end(.timedOut) }
     }
 
     /// A scroll in the page's window: the field moves out from under the list.
-    func scrolled(in eventWindow: NSWindow?) {
-        guard let window, eventWindow === window else { return }
+    func scrolled(in eventWindow: NSWindow?, phase: NSEvent.Phase = [], momentumPhase: NSEvent.Phase = []) {
+        guard let window, eventWindow === window, Self.isUserScroll(phase: phase, momentumPhase: momentumPhase) else { return }
         end(.scrolled)
+    }
+
+    /// Whether a scroll event is fingers or a wheel moving now: not the glide after a swipe, not fingers resting or
+    /// lifting, which a scroll from before the list opened still sends.
+    nonisolated static func isUserScroll(phase: NSEvent.Phase, momentumPhase: NSEvent.Phase) -> Bool {
+        guard momentumPhase.isEmpty else { return false }
+        return phase.isEmpty || phase.contains(.began) || phase.contains(.changed)
     }
 
     /// Calls `onEnd` once, then stops watching.

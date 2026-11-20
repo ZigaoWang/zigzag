@@ -498,10 +498,31 @@ struct SystemPasswordsTests {
         let (webView, window, _) = await page(form)
         var ends: [SystemPanelWatch.Trigger] = []
         let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
-        watch.scrolled(in: window)
-        watch.scrolled(in: window)
+        // The glide of a scroll from before, and fingers resting or lifting, leave it open.
+        watch.scrolled(in: window, phase: [], momentumPhase: .began)
+        watch.scrolled(in: window, phase: [], momentumPhase: .changed)
+        watch.scrolled(in: window, phase: [], momentumPhase: .ended)
+        watch.scrolled(in: window, phase: .ended)
+        watch.scrolled(in: window, phase: .cancelled)
+        watch.scrolled(in: window, phase: .mayBegin)
+        #expect(ends.isEmpty && watch.isWatching)
+        watch.scrolled(in: window, phase: .changed)
+        watch.scrolled(in: window, phase: .changed)
         #expect(ends == [.scrolled])
         #expect(!watch.isWatching)
+    }
+
+    /// A wheel (no phase) and fingers moving close it; a glide, or fingers resting or lifting, don't.
+    @Test func onlyAScrollBeingMadeCountsAsOne() {
+        #expect(SystemPanelWatch.isUserScroll(phase: [], momentumPhase: []))
+        #expect(SystemPanelWatch.isUserScroll(phase: .began, momentumPhase: []))
+        #expect(SystemPanelWatch.isUserScroll(phase: .changed, momentumPhase: []))
+        #expect(!SystemPanelWatch.isUserScroll(phase: [], momentumPhase: .began))
+        #expect(!SystemPanelWatch.isUserScroll(phase: [], momentumPhase: .changed))
+        #expect(!SystemPanelWatch.isUserScroll(phase: [], momentumPhase: .ended))
+        #expect(!SystemPanelWatch.isUserScroll(phase: .ended, momentumPhase: []))
+        #expect(!SystemPanelWatch.isUserScroll(phase: .cancelled, momentumPhase: []))
+        #expect(!SystemPanelWatch.isUserScroll(phase: .mayBegin, momentumPhase: []))
     }
 
     @Test func theListClosesWhenThePageGoesElsewhere() async throws {
