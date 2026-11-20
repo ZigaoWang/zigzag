@@ -736,6 +736,12 @@ final class LocalReceiverSocket: NSObject, URLSessionWebSocketDelegate {
         }
     }
 
+    /// Refused, as for fetch: a redirect could move the socket off this Mac.
+    nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                                newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
+
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         MainActor.assumeIsolated {
             guard let error else { return }
