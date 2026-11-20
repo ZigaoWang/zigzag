@@ -125,9 +125,7 @@ final class BridgeDownloads: BridgeNamespace {
         return number(for: item)
     }
 
-    /// The view a download starts in. A page about to be saved is often a blob: its extension made in one of its own
-    /// contexts, and WebKit lets only that origin read it: from a page view of Zigzag's the blob can't be opened, and
-    /// the download ends interrupted (SingleFile's save said so). So a blob starts in the extension's own view.
+    /// The view a download starts in: a blob: in a view on the origin that made it, the only one WebKit lets read it.
     private func downloadView(for url: URL, extensionID: String) async throws -> WKWebView {
         guard url.scheme?.lowercased() == "blob" else { return fetcher }
         guard Self.blobOwner(url) == extensionID else { throw BridgeError("Invalid URL") }
