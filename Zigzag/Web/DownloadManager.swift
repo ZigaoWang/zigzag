@@ -54,7 +54,7 @@ final class DownloadItem {
     }
 }
 
-/// Files downloaded from pages. Saved straight to ~/Downloads, no questions asked.
+/// Files downloaded from pages, saved to the Downloads folder setting unless a rule or a question says otherwise.
 final class DownloadManager: NSObject {
     static let shared = DownloadManager()
 
