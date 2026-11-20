@@ -522,11 +522,13 @@ final class ExtensionHost: NSObject {
     @discardableResult
     func load(_ id: String) async -> WKWebExtensionContext? {
         if let existing = context(for: id) { return existing }
-        guard let directory = await profile.installs.loadDirectory(for: id) else { return nil }
+        guard profile.installs.isEnabled(id), let directory = await profile.installs.loadDirectory(for: id) else { return nil }
         do {
             let ext = try await WKWebExtension(resourceBaseURL: directory)
             // Asked for twice at once (the profile's extensions starting as one is added): the first to finish stands.
             if let existing = context(for: id) { return existing }
+            // Turned off while it was being read.
+            guard profile.installs.isEnabled(id) else { return nil }
             installed[id] = ext
             let context = WKWebExtensionContext(for: ext)
             // The store ID, so runtime.id matches Chrome's and storage persists across launches.
