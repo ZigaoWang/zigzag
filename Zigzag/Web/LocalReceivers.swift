@@ -336,3 +336,16 @@ nonisolated enum LocalReceivers {
         }
     }
 }
+
+/// What an extension is told when the door refuses: a sentence, not Swift's own `Zigzag.LocalReceivers.Failure
+/// error 1.` The page door turns every failure into the same `TypeError` WebKit's block would have given it.
+extension LocalReceivers.Failure: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .notLoopback: return "That address isn't on this Mac."
+        case .noAnswer: return "Nothing answered at that address."
+        case .cors(let reason), .refused(let reason): return "\(reason.prefix(1).uppercased())\(reason.dropFirst())."
+        case .tooLarge: return "The answer was too large to read."
+        }
+    }
+}

@@ -2275,7 +2275,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         }
         for (id, ext) in installed {
             extensionsGroup.add(extensionRow(id: id, ext: ext))
-            extensionsGroup.add(localReceiversRow(id: id))
+            // Only while the feature is on: a switch under every extension is a lot of rows for a door most people
+            // never open, and the master switch in Privacy reads as the one place it starts.
+            if LocalReceivers.isEnabled { extensionsGroup.add(localReceiversRow(id: id)) }
             let name = ext.displayName ?? id
             // Only for one that asks to read and change sites.
             if !ext.allRequestedMatchPatterns.isEmpty {
@@ -2485,8 +2487,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         toggle.onChange = { on in installs.setLocalReceivers(on, for: id) }
         let row = FormRow(title: String(localized: "Apps on This Mac",
                                         comment: "A switch under an extension in Settings › Extensions: its own code may reach a program listening on this Mac."),
-                          detail: String(localized: "Lets this extension’s own code reach a program listening on this Mac, over loopback only. Off until you turn it on.",
-                                         comment: "Explanation under the apps-on-this-Mac switch on an extension’s row in Settings › Extensions."),
+                          detail: String(localized: "Lets this extension’s own code read what a program listening on this Mac answers, over loopback only. Without it, the program’s own CORS rules decide. Off until you turn it on.",
+                                         comment: "Explanation under the apps-on-this-Mac switch on an extension’s row in Settings › Extensions. CORS is a web API name: keep it as it is."),
                           control: toggle)
         row.isIndented = true
         return row
@@ -2672,13 +2674,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             guard let self else { return }
             guard on else {
                 LocalReceivers.isEnabled = false
+                // The switches under the extensions go with it.
+                self.reloadExtensions()
                 return
             }
             // The knob has already moved; the setting follows only the acknowledgement.
             toggle.isOn = LocalReceivers.isEnabled
-            self.explainLocalReceivers(reason: {
+            self.explainLocalReceivers(reason: { [weak self] in
                 LocalReceivers.isEnabled = true
                 toggle.isOn = true
+                self?.reloadExtensions()
             })
         }
         let controls = NSStackView(views: [more, toggle])

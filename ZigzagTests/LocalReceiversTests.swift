@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import WebKit
 @testable import Zigzag
 
 @Suite("LocalReceivers")
@@ -315,4 +316,53 @@ private actor Recorder {
 
     func record(_ request: URLRequest) { requests.append(request) }
     func all() -> [URLRequest] { requests }
+
+    // MARK: Leaving a site
+
+    /// The script names the origin it was put in for, and installs nowhere else: one left in a tab that has moved on,
+    /// or handed to a page opened for another, leaves that page's own fetch, XHR and WebSocket alone.
+    @MainActor @Test func theScriptIsForOneOriginOnly() {
+        let script = LocalReceiverShim.source(for: "https://creator.zerowork.io")
+        #expect(script.contains("if (location.origin !== \"https://creator.zerowork.io\") return;"))
+        #expect(script != LocalReceiverShim.source(for: "http://localhost:3000"))
+        #expect(script.hasPrefix("/* zigzag local receivers */"))
+    }
+
+    /// A tab that leaves the site it was allowed on has the script and the handler taken out before the next page
+    /// starts, and a private tab never gets either. Going to another allowed site swaps the script rather than
+    /// piling one up per site.
+    @MainActor @Test func leavingAnAllowedSiteTakesTheDoorOut() {
+        let name = "LocalReceiversTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        let before = SitePermissions.defaults
+        SitePermissions.defaults = defaults
+        let master = LocalReceivers.isEnabled
+        defer {
+            LocalReceivers.isEnabled = master
+            SitePermissions.defaults = before
+            defaults.removePersistentDomain(forName: name)
+        }
+        let first = "https://creator.zerowork.io"
+        let second = "https://second.example"
+        LocalReceivers.isEnabled = true
+        SitePermissions.setLocalReceivers(true, origin: first)
+        SitePermissions.setLocalReceivers(true, origin: second)
+
+        let controller = WKUserContentController()
+        LocalReceiverShim.sync(controller: controller, tab: nil, origin: first, isPrivate: false)
+        #expect(controller.userScripts.count == 1, "the allowed site gets the door")
+
+        // Another allowed site: one script, for the page that is coming, not one per site visited.
+        LocalReceiverShim.sync(controller: controller, tab: nil, origin: second, isPrivate: false)
+        #expect(controller.userScripts.count == 1)
+        #expect(controller.userScripts.first?.source == LocalReceiverShim.source(for: second))
+
+        // A site without its switch: nothing of the door is left in the tab.
+        LocalReceiverShim.sync(controller: controller, tab: nil, origin: "https://elsewhere.example", isPrivate: false)
+        #expect(controller.userScripts.isEmpty)
+
+        // A private tab keeps WebKit's own networking, even where the site is allowed.
+        LocalReceiverShim.sync(controller: controller, tab: nil, origin: first, isPrivate: true)
+        #expect(controller.userScripts.isEmpty)
+    }
 }

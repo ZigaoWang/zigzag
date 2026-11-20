@@ -19,42 +19,89 @@ enum LocalReceiverShim {
 
     /// Adds the page script and the handler that answers it, for a page at `origin` the person has allowed. Every
     /// other page keeps WebKit's own `fetch`, `XMLHttpRequest` and `WebSocket` untouched. A page made by another page
-    /// gets them too; an extension's own page does not. The handler comes back so the tab can end a page's sockets
-    /// when it leaves.
+    /// gets them too; an extension's own page and a private tab do not. The handler comes back so the tab can end a
+    /// page's sockets when it leaves.
     @discardableResult
-    static func attach(to configuration: WKWebViewConfiguration, tab: Tab, origin: String? = nil) -> LocalReceiverMessages? {
+    static func attach(to configuration: WKWebViewConfiguration, tab: Tab, origin: String? = nil,
+                       isPrivate: Bool) -> LocalReceiverMessages? {
         let controller = configuration.userContentController
         // The script is per page, not per tab: a page that navigates to another site is decided again.
         guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return nil }
-        guard let origin, serves(origin: origin) else { return nil }
+        guard !isPrivate, let origin, serves(origin: origin) else { return nil }
         let messages = LocalReceiverMessages(tab: tab)
         controller.addScriptMessageHandler(messages, contentWorld: .page, name: name)
-        controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart,
+        controller.addUserScript(WKUserScript(source: source(for: origin), injectionTime: .atDocumentStart,
                                               forMainFrameOnly: true, in: .page))
         return messages
     }
 
-    /// Adds the script to a page that has already started, for a tab navigated onto an allowed origin. A page
-    /// created with the script already has it.
+    /// Puts the door in, or takes it out, for the page a web view is about to be or has just become. `origin` is where
+    /// it is going (or went). `owns` says this tab made the web view's configuration: a page WebKit opened for another
+    /// page shares its opener's script and handler, so its controller is left alone, and the script's own origin check
+    /// keeps it inert on any page that isn't the one it was put in for.
+    ///
+    /// At the navigation decision the new page has not started, so a script added here is in place before its own code
+    /// runs. At commit the same call confirms what landed; a page that left the site it was allowed on has the script
+    /// and the handler taken out, so it keeps WebKit's own `fetch`, `XMLHttpRequest` and `WebSocket`.
     @discardableResult
-    static func attachIfServed(to webView: WKWebView?, tab: Tab, origin: String?) -> LocalReceiverMessages? {
-        guard let webView, let origin, serves(origin: origin) else { return nil }
-        let controller = webView.configuration.userContentController
-        guard !controller.userScripts.contains(where: { $0.source.hasPrefix(marker) }) else { return nil }
+    static func sync(_ webView: WKWebView?, tab: Tab, origin: String?, isPrivate: Bool, owns: Bool,
+                     current: LocalReceiverMessages?) -> LocalReceiverMessages? {
+        // A page WebKit opened for another shares its opener's controller: nothing here may change it, and the script's
+        // own origin check keeps it inert on the page that isn't the one it was put in for.
+        guard let webView, owns else { return current }
+        return sync(controller: webView.configuration.userContentController, tab: tab, origin: origin,
+                    isPrivate: isPrivate, current: current)
+    }
+
+    /// The same, on a controller alone: what a test drives, and what the web view version delegates to. Without a tab
+    /// no handler is added, so a test can watch the scripts and the handler's absence without a window.
+    @discardableResult
+    static func sync(controller: WKUserContentController, tab: Tab?, origin: String?, isPrivate: Bool,
+                     current: LocalReceiverMessages? = nil) -> LocalReceiverMessages? {
+        guard !isPrivate, let origin, serves(origin: origin) else {
+            // The page has left the site it was allowed on (or is private): the script and the handler go, so the
+            // page it becomes keeps WebKit's own fetch, XHR and WebSocket, with nothing of this door in reach.
+            OwnScripts.remove(from: controller, where: { $0.source.hasPrefix(marker) })
+            controller.removeScriptMessageHandler(forName: name, contentWorld: .page)
+            return nil
+        }
+        // One script, for this origin: an older page's script is not this page's door.
+        let wanted = source(for: origin)
+        OwnScripts.remove(from: controller, where: { $0.source.hasPrefix(marker) && $0.source != wanted })
+        if !controller.userScripts.contains(where: { $0.source == wanted }) {
+            controller.addUserScript(WKUserScript(source: wanted, injectionTime: .atDocumentStart,
+                                                  forMainFrameOnly: true, in: .page))
+        }
+        if let current { return current }
+        guard let tab else { return nil }
         let messages = LocalReceiverMessages(tab: tab)
         controller.addScriptMessageHandler(messages, contentWorld: .page, name: name)
-        controller.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart,
-                                              forMainFrameOnly: true, in: .page))
-        // The page already started: the script goes in now, and stays for its next load.
-        webView.evaluateJavaScript(source, in: nil, in: .page, completionHandler: nil)
         return messages
+    }
+
+    /// The page script for one origin: it installs only in that origin's page.
+    static func source(for origin: String) -> String {
+        sourceTemplate.replacingOccurrences(of: "__ZIGZAG_SERVED_ORIGIN__", with: quoted(origin))
+    }
+
+    /// `text` as a JavaScript string literal, so an origin can't end the string it is written into.
+    private static func quoted(_ text: String) -> String {
+        // No escaped slashes: the script reads `"https://…"`, not `"https:\/\/…"`, so it can be compared as it
+        // is written and read by anyone looking at it.
+        let data = (try? JSONSerialization.data(withJSONObject: [text], options: [.withoutEscapingSlashes]))
+            ?? Data("[]".utf8)
+        let array = String(decoding: data, as: UTF8.self)
+        return String(array.dropFirst().dropLast())
     }
 
     private static let marker = "/* zigzag local receivers */"
 
-    private static let source = #"""
+    private static let sourceTemplate = #"""
     /* zigzag local receivers */
     (() => {
+      // Only the page this script was put in for: one left in a tab that has moved on, or handed to a page WebKit
+      // opened for another, installs nothing anywhere else.
+      if (location.origin !== __ZIGZAG_SERVED_ORIGIN__) return;
       if (window.__zigzagLocalReceivers) return;
       const messages = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.localReceivers;
       if (!messages) return;

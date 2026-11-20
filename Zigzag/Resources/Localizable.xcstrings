@@ -1161,13 +1161,13 @@
         }
       }
     },
-    "Lets this extension’s own code reach a program listening on this Mac, over loopback only. Off until you turn it on." : {
-      "comment" : "Explanation under the apps-on-this-Mac switch on an extension’s row in Settings › Extensions.",
+    "Lets this extension’s own code read what a program listening on this Mac answers, over loopback only. Without it, the program’s own CORS rules decide. Off until you turn it on." : {
+      "comment" : "Explanation under the apps-on-this-Mac switch on an extension’s row in Settings › Extensions. CORS is a web API name: keep it as it is.",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "允许此扩展自己的代码与这台 Mac 上监听端口的程序通信，且只限本机回环。在你开启之前保持关闭。"
+            "value" : "允许此扩展自身的代码读取这台 Mac 上监听程序返回的内容，且只限本机回环。关闭时由程序自身的 CORS 规则决定。在你开启之前保持关闭。"
           }
         }
       }
