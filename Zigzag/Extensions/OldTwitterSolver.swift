@@ -44,8 +44,50 @@ final class OldTwitterSolver: NSObject {
       const from = "chrome-extension://" + id;
       const to = "webkit-extension://" + id;
       const fixed = (text) => (text.includes(from) ? text.split(from).join(to) : text);
+      // A quoted tweet is a link to itself, and its video sits inside it. WebKit's play button on that video never
+      // reaches the page: it follows the quote's link in the UI instead, so play opened the quote in a new tab and a
+      // click could not be taken back. The link is kept aside, so the video is not inside a link at all, and a click
+      // on the quote's text opens it as the link did.
+      const unlinkQuote = (element) => {
+        if (!element || element.tagName !== "A" || !element.classList || !element.classList.contains("tweet-body-quote")) return;
+        const href = element.getAttribute("href");
+        if (!href) return;
+        element.setAttribute("data-zigzag-href", href);
+        element.removeAttribute("href");
+        element.style.cursor = "pointer";
+      };
+      // WebKit's own play button on a quoted video does nothing here: the click never reaches the page and no play
+      // starts. A play button of our own over the video answers a real click, which can start it.
+      const playable = new WeakSet();
+      const addPlay = (video) => {
+        if (!video || video.tagName !== "VIDEO" || !video.closest("a.tweet-body-quote") || playable.has(video)) return;
+        const holder = video.parentElement;
+        if (!holder) return;
+        playable.add(video);
+        if (getComputedStyle(holder).position === "static") holder.style.position = "relative";
+        // Metadata only, so a timeline of quoted videos does not download them. The seek asks for just enough for
+        // the first frame, which otherwise shows black.
+        try {
+          video.preload = "metadata";
+          if (!video.currentTime) video.currentTime = 0.1;
+        } catch (e) {}
+        // An invisible layer over the picture, so a click there plays or pauses it. The video's own controls at
+        // the top and in the bar stay outside it. No button of Zigzag's is drawn: WebKit's own shows.
+        const layer = document.createElement("div");
+        layer.setAttribute("data-zigzag-play", "");
+        layer.style.cssText = "position:absolute;left:0;right:0;top:22%;bottom:18%;z-index:3;background:transparent;cursor:pointer;";
+        layer.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (video.paused) video.play().catch(() => {});
+          else video.pause();
+        });
+        holder.appendChild(layer);
+      };
       const fix = (element) => {
         if (!element || element.nodeType !== 1) return;
+        unlinkQuote(element);
+        addPlay(element);
         if (element.tagName === "STYLE") {
           const text = element.textContent;
           if (text && text.includes(from)) element.textContent = fixed(text);
@@ -60,9 +102,45 @@ final class OldTwitterSolver: NSObject {
       };
       const fixTree = (node) => {
         fix(node);
-        if (node.querySelectorAll) node.querySelectorAll("style,img,link,source,video,use,[style]").forEach(fix);
+        if (node.querySelectorAll) node.querySelectorAll("a,style,img,link,source,video,use,[style]").forEach(fix);
       };
       fixTree(document.documentElement);
+      document.addEventListener("click", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+        if (target.closest("[data-zigzag-play]")) return;
+        // The video's own controls, at the top and in the bar, keep their clicks.
+        if (target.closest("video")) return;
+        // A link in the quoted text (a URL, a mention, the quoted account) is its own.
+        if (target.closest("a[href]")) return;
+        // A quoted tweet opens in the extension's own modal, which is its own handler's doing. Without the href,
+        // nothing follows it in a tab.
+        if (target.closest("a.tweet-body-quote")) event.preventDefault();
+      }, true);
+      // The address is put back for the right-click menu alone, so Open in New Tab still has a link, and taken off
+      // again on the next left press, so a click on the quote or its video never follows it.
+      document.addEventListener("mousedown", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        const quote = target ? target.closest("a.tweet-body-quote") : null;
+        if (!quote) return;
+        const href = quote.getAttribute("data-zigzag-href");
+        if (!href) return;
+        if (event.button === 2) quote.setAttribute("href", href);
+        else if (event.button === 0) quote.removeAttribute("href");
+      }, true);
+      // OldTwitter starts a quoted video again at the sound level the page loaded with, not the one you set with the
+      // controls. The level you set is kept here and put back as it plays, whatever made the video anew.
+      let chosenVolume = null;
+      document.addEventListener("volumechange", (event) => {
+        const video = event.target;
+        if (event.isTrusted && video && video.tagName === "VIDEO" && !video.muted) chosenVolume = video.volume;
+      }, true);
+      document.addEventListener("play", (event) => {
+        const video = event.target;
+        if (chosenVolume !== null && video && video.tagName === "VIDEO" && Math.abs(video.volume - chosenVolume) > 0.01) {
+          video.volume = chosenVolume;
+        }
+      }, true);
       new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           if (mutation.type === "attributes") fix(mutation.target);

@@ -22,7 +22,7 @@ Reader redesigned to feel like part of Zigzag, Capture like Arc's for an area, a
 - Settings says less: lines under a label that only repeated it are gone, the lines that stay carry a consequence or a warning, and choices that asked the same question in different words now use one. Extension Site Access says On Click. ([#448](https://github.com/ZigaoWang/zigzag/issues/448))
 - The address field no longer shows the star where there is nothing to pin: on Zigzag's own pages (Settings, History, the archive), a new tab and private windows. It used to sit there dimmed, and the pins beside it now take its place. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#442](https://github.com/ZigaoWang/zigzag/issues/442))
 - A theme from the Chrome Web Store or Firefox Add-ons, or a theme folder picked with Install from Folder, isn't installed. Zigzag doesn't use browser themes, so it says that and points to a space's colors, where it used to add the theme as an extension that did nothing. ([#454](https://github.com/ZigaoWang/zigzag/issues/454))
-- OldTwitter's icons and fonts show on x.com: the extension's own files are now read at Zigzag's address, which the site's security policy allows, so its icon font, loading picture, list icons and tab icon appear instead of empty squares.
+- OldTwitter's icons and fonts show on x.com: the extension's own files are now read at Zigzag's address, which the site's security policy allows, so its icon font, loading picture, list icons and tab icon appear instead of empty squares. A video inside a quoted tweet plays where it is, and a click on a quoted tweet opens only its own view.
 
 ## [0.9.3] - 2026-11-21
 
