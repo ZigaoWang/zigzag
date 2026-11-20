@@ -308,6 +308,83 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     }
 }
 
+/// What closes the Mac's Passwords list opened for a page, as Safari's closes: the page scrolling or going
+/// somewhere else, its window moving, resizing, hiding or closing. Switching tabs closes it from `TabManager`.
+@MainActor
+final class SystemPanelWatch {
+    enum Trigger: Equatable {
+        case scrolled, navigated, windowMoved, windowResized, windowHidden, windowClosed, timedOut
+    }
+
+    private(set) weak var webView: WKWebView?
+    private weak var window: NSWindow?
+    private var onEnd: ((Trigger) -> Void)?
+    private var observers: [NSObjectProtocol] = []
+    private var keyValueObservers: [NSKeyValueObservation] = []
+    private var scrollMonitor: Any?
+
+    var isWatching: Bool { onEnd != nil }
+
+    init(webView: WKWebView, window: NSWindow, timeout: TimeInterval = SystemPasswordPicker.timeout, onEnd: @escaping (Trigger) -> Void) {
+        self.webView = webView
+        self.window = window
+        self.onEnd = onEnd
+        let center = NotificationCenter.default
+        let triggers: [(Notification.Name, Trigger)] = [
+            (NSWindow.willMoveNotification, .windowMoved), (NSWindow.didMoveNotification, .windowMoved),
+            (NSWindow.willStartLiveResizeNotification, .windowResized), (NSWindow.didResizeNotification, .windowResized),
+            (NSWindow.willEnterFullScreenNotification, .windowResized), (NSWindow.willExitFullScreenNotification, .windowResized),
+            (NSWindow.willMiniaturizeNotification, .windowHidden), (NSWindow.willCloseNotification, .windowClosed),
+        ]
+        observers = triggers.map { name, trigger in
+            center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.end(trigger) }
+            }
+        }
+        observers.append(center.addObserver(forName: NSApplication.didHideNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.end(.windowHidden) }
+        })
+        keyValueObservers = [
+            webView.observe(\.url, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.end(.navigated) }
+            },
+            webView.observe(\.isLoading, options: [.new]) { [weak self] _, change in
+                MainActor.assumeIsolated { if change.newValue == true { self?.end(.navigated) } }
+            },
+        ]
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            MainActor.assumeIsolated { self?.scrolled(in: event.window) }
+            return event
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in self?.end(.timedOut) }
+    }
+
+    /// A scroll in the page's window: the field moves out from under the list.
+    func scrolled(in eventWindow: NSWindow?) {
+        guard let window, eventWindow === window else { return }
+        end(.scrolled)
+    }
+
+    /// Calls `onEnd` once, then stops watching.
+    func end(_ trigger: Trigger) {
+        guard let onEnd else { return }
+        stop()
+        debugLog("syspasswords closed by \(trigger)")
+        onEnd(trigger)
+    }
+
+    /// Stops watching without calling `onEnd`.
+    func stop() {
+        onEnd = nil
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
+        keyValueObservers.forEach { $0.invalidate() }
+        keyValueObservers = []
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = nil
+    }
+}
+
 /// macOS 27 and later: the Mac's own AutoFill panel, opened on the page's field itself, as the page's right-click
 /// AutoFill › Passwords… does. Pointed at the web field, macOS knows the page's site, so the panel puts that site's
 /// logins first ("Suggested") and fills the one you pick straight into the field.

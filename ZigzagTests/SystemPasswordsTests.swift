@@ -468,6 +468,76 @@ struct SystemPasswordsTests {
         #expect(dismissed == 3)
     }
 
+    @Test func theListClosesWhenTheWindowMovesOrResizes() async throws {
+        let (webView, window, _) = await page(form)
+        let triggers: [(Notification.Name, SystemPanelWatch.Trigger)] = [
+            (NSWindow.willMoveNotification, .windowMoved), (NSWindow.didResizeNotification, .windowResized),
+            (NSWindow.willStartLiveResizeNotification, .windowResized), (NSWindow.willEnterFullScreenNotification, .windowResized),
+            (NSWindow.willMiniaturizeNotification, .windowHidden), (NSWindow.willCloseNotification, .windowClosed),
+        ]
+        for (name, expected) in triggers {
+            var ends: [SystemPanelWatch.Trigger] = []
+            let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+            NotificationCenter.default.post(name: name, object: window)
+            NotificationCenter.default.post(name: name, object: window)
+            #expect(ends == [expected])
+            #expect(!watch.isWatching)
+        }
+        // Another window moving is nothing to it.
+        let other = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100), styleMask: [.titled], backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+        NotificationCenter.default.post(name: NSWindow.willMoveNotification, object: other)
+        watch.scrolled(in: other)
+        #expect(ends.isEmpty && watch.isWatching)
+        watch.stop()
+    }
+
+    @Test func theListClosesWhenThePageScrolls() async throws {
+        let (webView, window, _) = await page(form)
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+        watch.scrolled(in: window)
+        watch.scrolled(in: window)
+        #expect(ends == [.scrolled])
+        #expect(!watch.isWatching)
+    }
+
+    @Test func theListClosesWhenThePageGoesElsewhere() async throws {
+        let (webView, window, loading) = await page(form)
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window) { ends.append($0) }
+        await withCheckedContinuation { done in
+            loading.done = done
+            webView.loadHTMLString("<p>next</p>", baseURL: URL(string: "https://example.com/next"))
+        }
+        #expect(ends == [.navigated])
+        #expect(!watch.isWatching)
+        // A page that changes only its address (a history step in a web app) counts too.
+        var steps: [SystemPanelWatch.Trigger] = []
+        let again = SystemPanelWatch(webView: webView, window: window) { steps.append($0) }
+        _ = try await webView.evaluateJavaScript("history.pushState({}, '', '/elsewhere'); 1")
+        try await wait(0.2)
+        #expect(steps == [.navigated])
+        #expect(!again.isWatching)
+    }
+
+    @Test func stoppingTheWatchCallsNothing() async throws {
+        let (webView, window, _) = await page(form)
+        var ends: [SystemPanelWatch.Trigger] = []
+        let watch = SystemPanelWatch(webView: webView, window: window, timeout: 0.2) { ends.append($0) }
+        watch.stop()
+        NotificationCenter.default.post(name: NSWindow.willMoveNotification, object: window)
+        try await wait(0.4)
+        #expect(ends.isEmpty)
+        // Left alone, it gives up with the list.
+        let timed = SystemPanelWatch(webView: webView, window: window, timeout: 0.2) { ends.append($0) }
+        try await wait(0.4)
+        #expect(ends == [.timedOut])
+        #expect(!timed.isWatching)
+    }
+
     @Test func theSecondClickOfADoubleClickIsTheFirstOnes() {
         // The menu is gone by the second click, which landed on the page under it, in the next field (#378).
         #expect(Autofill.isSecondClick(clickCount: 2, sameWindow: true, after: 0.1, interval: 0.5))

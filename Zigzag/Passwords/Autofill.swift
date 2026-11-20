@@ -317,12 +317,31 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     func forget(_ webView: WKWebView) {
         if target?.webView === webView { hide() }
         if systemRequest?.webView === webView { SystemPasswordPicker.shared.cancel() }
+        if panelWatch?.webView === webView { closeSystemPasswords() }
     }
 
     /// The same for every page in a window that's closing.
     func forget(windowOf window: NSWindow?) {
         if let window, target?.webView.window === window { hide() }
         if let window, systemRequest?.webView.window === window { SystemPasswordPicker.shared.cancel() }
+        if let window, panelWatch?.webView?.window === window { closeSystemPasswords() }
+    }
+
+    /// Watches the page the Mac's Passwords list is open for, to close it as Safari's closes.
+    private var panelWatch: SystemPanelWatch?
+
+    private func watchSystemPasswords(for webView: WKWebView) {
+        panelWatch?.stop()
+        guard let window = webView.window else { panelWatch = nil; return }
+        panelWatch = SystemPanelWatch(webView: webView, window: window) { [weak self] _ in self?.closeSystemPasswords() }
+    }
+
+    /// Closes the Mac's Passwords list opened from Passwords… or the key icon, if it's open.
+    func closeSystemPasswords() {
+        guard let watch = panelWatch else { return }
+        panelWatch = nil
+        watch.stop()
+        if SystemPasswordPicker.shared.isPresented { SystemPasswordPicker.shared.cancel() } else { SystemPasswordPicker.dismissSystemAutoFill() }
     }
 
     /// The second click of a double-click on Passwords… stops here: the menu is gone by then, and it would land on
@@ -497,7 +516,10 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         // opened on native fields laid over the page.
         guard SystemAutoFillPanel.isAvailable else { openSystemList(over: rect, in: overlay, for: request); return }
         Task {
-            if await SystemAutoFillPanel.open(in: request.webView, frame: request.frame, origin: request.origin, inFront: Self.isInFront) { return }
+            if await SystemAutoFillPanel.open(in: request.webView, frame: request.frame, origin: request.origin, inFront: Self.isInFront) {
+                self.watchSystemPasswords(for: request.webView)
+                return
+            }
             // It couldn't be asked for, and it's still the page in front, on its site: the list over the field, as before.
             guard Origin(request.webView.url) == request.origin, Self.isInFront(request.webView) else { return }
             self.openSystemList(over: rect, in: overlay, for: request)
@@ -507,9 +529,12 @@ final class Autofill: NSObject, WKScriptMessageHandler {
     /// Passwords… without the Mac's AutoFill panel: its list of passwords, opened on native fields over the page's.
     private func openSystemList(over rect: NSRect, in overlay: NSView, for request: (webView: BrowserWebView, frame: WKFrameInfo, origin: Origin)) {
         systemRequest = request
+        watchSystemPasswords(for: request.webView)
+        let watch = panelWatch
         SystemPasswordPicker.shared.present(over: rect, in: overlay, restoringFocusTo: request.webView) { [weak self] outcome in
             guard let self else { return }
             if self.systemRequest?.webView === request.webView { self.systemRequest = nil }
+            if let watch, self.panelWatch === watch { watch.stop(); self.panelWatch = nil }
             switch outcome {
             case .filled(let username, let password):
                 self.fillFromSystem(username: username, password: password, into: request)
@@ -532,7 +557,7 @@ final class Autofill: NSObject, WKScriptMessageHandler {
         // Zigzag's menu for the same click, shown or on its way, makes room for the panel.
         generation += 1
         hide()
-        Task { _ = await SystemAutoFillPanel.open(in: webView, frame: nil, origin: origin, inFront: Self.isInFront) }
+        Task { if await SystemAutoFillPanel.open(in: webView, frame: nil, origin: origin, inFront: Self.isInFront) { self.watchSystemPasswords(for: webView) } }
     }
 
     /// A click in the page ended (`clickUp`, system uptime) a moment ago.
