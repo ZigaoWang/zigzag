@@ -34,6 +34,8 @@ final class ExtensionBridge {
     let webRequest: BridgeWebRequest
     /// User scripts, which every web view of the profile runs (Tab attaches its own).
     let userScripts: BridgeUserScripts
+    /// Address bar keywords, which the command bar hands what's typed after them.
+    let omnibox: BridgeOmnibox
     /// Open event ports, by extension, with the events each has listeners for.
     private var ports: [ObjectIdentifier: (port: WKWebExtension.MessagePort, id: String, events: Set<String>)] = [:]
 
@@ -50,7 +52,7 @@ final class ExtensionBridge {
         BridgeRuntime.self, BridgeSpeech.self, BridgePower.self, BridgeIdentity.self,
         BridgeFavicons.self, BridgeExtensionFetch.self, BridgeContextMenus.self,
         BridgeOffscreen.self, BridgeSidePanel.self, BridgeTabCapture.self, BridgeProxy.self,
-        BridgeWebRequest.self, BridgeUserScripts.self,
+        BridgeWebRequest.self, BridgeUserScripts.self, BridgeOmnibox.self,
     ]
 
     init(host: ExtensionHost) {
@@ -61,7 +63,8 @@ final class ExtensionBridge {
         proxy = BridgeProxy(host: host)
         webRequest = BridgeWebRequest(host: host)
         userScripts = BridgeUserScripts(host: host)
-        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts]
+        omnibox = BridgeOmnibox(host: host)
+        let direct: [any BridgeNamespace] = [offscreen, sidePanel, tabCapture, proxy, webRequest, userScripts, omnibox]
         let directNames = Set(direct.map { type(of: $0).name })
         let others = Self.handlerTypes.filter { !directNames.contains($0.name) }.map { $0.init(host: host) }
         let all: [any BridgeNamespace] = others + direct

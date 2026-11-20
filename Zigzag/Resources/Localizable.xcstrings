@@ -7384,24 +7384,6 @@
         }
       }
     },
-    "extension.limit.addressBarKeyword" : {
-      "comment" : "A Chrome extension feature Zigzag cannot provide: an omnibox keyword.",
-      "extractionState" : "extracted_with_value",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Address bar keyword"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地址栏关键词"
-          }
-        }
-      }
-    },
     "extension.limit.backgroundPage" : {
       "comment" : "A Chrome extension feature Zigzag limits: runtime.getBackgroundPage answers Manifest V2 only; a Manifest V3 page gets “You do not have a background page.” A Manifest V3 worker keeps WebKit's member, visible rather than absent.",
       "extractionState" : "extracted_with_value",

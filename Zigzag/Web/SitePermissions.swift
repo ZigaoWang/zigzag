@@ -149,6 +149,12 @@ enum SitePermissions {
 
     static func remember(_ action: String?, subject: String, origin: String) { stored["\(origin)|\(subject)"] = action }
 
+    /// Questions whose Remember starts checked, as in Chrome, which keeps these answers for the site.
+    static func remembersByDefault(_ subject: String) -> Bool {
+        [PermissionSubject.notifications, PermissionSubject.location,
+         PermissionSubject.media(.camera), PermissionSubject.media(.microphone)].contains(subject)
+    }
+
     /// Records an answer: "Always" is kept for the site, anything else (and anything in a private window) for `tab`'s
     /// page only. Returns whether `action` allows.
     @discardableResult
@@ -537,13 +543,14 @@ enum SitePermissions {
         notifications(origin: origin) ?? tab?.permissionAnswers.answer(key: origin, kind: "notifications")
     }
 
-    /// Asked like the camera, the answer kept for the page that asked. A private window never shows them anyway.
+    /// Asked like the camera, Remember checked to start. A private window never shows them anyway.
     static func requestNotifications(origin: String, window: NSWindow?, isPrivate: Bool, tab: Tab? = nil) async -> Bool? {
         if let known = notifications(origin: origin, tab: tab) { return known }
         guard let controller = WindowManager.shared.promptHost(for: window) else { return nil }
         let answer = await PermissionPrompt.ask(host: askerName(origin), origin: origin, answerKey: origin, what: "notifications", symbol: "bell.fill", in: controller, tab: tab,
                                                 title: String(localized: "Show notifications", comment: "A site's permission question, without its question mark. The site wants to show notifications."),
                                                 actions: [.deny, .allow], canRemember: true,
+                                                remembersByDefault: remembersByDefault(PermissionSubject.notifications),
                                                 answered: {
                                                     knownAnswer(site: notifications(origin: origin),
                                                                 page: tab?.permissionAnswers.answer(key: origin, kind: "notifications"))
@@ -574,6 +581,7 @@ enum SitePermissions {
                                                 symbol: "location.fill", in: controller, tab: tab,
                                                 title: String(localized: "Use your location", comment: "A site's permission question, without its question mark."),
                                                 actions: [.deny, .allow], canRemember: key != nil,
+                                                remembersByDefault: remembersByDefault(PermissionSubject.location),
                                                 answered: {
                                                     key.flatMap { key in
                                                         knownAnswer(site: location(origin: key),
@@ -623,6 +631,7 @@ enum SitePermissions {
             let answer = await PermissionPrompt.ask(host: askerName(frame: frame, page: page), origin: page, answerKey: key, what: what,
                                                     symbol: type == .microphone ? "mic.fill" : "video.fill", in: controller, tab: tab, title: title,
                                                     actions: [.deny, .allow], canRemember: key != nil,
+                                                    remembersByDefault: remembersByDefault(PermissionSubject.media(type)),
                                                     answered: {
                                                         key.flatMap { key in
                                                             knownAnswer(site: decision(origin: key, type: type),
@@ -948,14 +957,15 @@ final class PermissionPrompt: FloatingPanelView {
     /// frame-and-page key from `SitePermissions.answerKey`. `answered` is checked when it's this question's turn.
     /// `tab` defaults to the front tab. `menu`: answers of one kind as a dropdown that answers (and acts as the
     /// filled answer). `chooser`: a dropdown that only picks, returned as `choice`, with no duration. The Remember
-    /// checkbox (`rememberTitle`, else "Remember for this site") shows only when `canRemember`. `detail` replaces the
+    /// checkbox (`rememberTitle`, else "Remember for this site") shows only when `canRemember`, checked to start when
+    /// `remembersByDefault`. `detail` replaces the
     /// site line with a sentence. A `.cancel` action takes the close button's place. Nil means Not Now.
     static func ask(host: String, origin: String? = nil, answerKey: String? = nil, what: String, symbol: String, icon: NSImage? = nil,
                     in controller: PromptHost, tab: Tab? = nil, title: String? = nil,
                     actions: [PermissionAction] = [.deny, .allow], menu: [PermissionAction] = [],
                     chooser: [PermissionAction] = [],
                     durations: [String]? = nil,
-                    canRemember: Bool = true, rememberTitle: String? = nil, detail: String? = nil,
+                    canRemember: Bool = true, remembersByDefault: Bool = false, rememberTitle: String? = nil, detail: String? = nil,
                     cancellation: QuestionCancellation? = nil,
                     answered: @escaping () -> PermissionAnswer? = { nil }) async -> PermissionAnswer? {
         let remembers = canRemember && !controller.promptIsPrivate
@@ -984,7 +994,7 @@ final class PermissionPrompt: FloatingPanelView {
             setWaiting(questionsWaiting(in: controller) + 1, in: controller)
             let answer = await show(host: host, request: request,
                                   symbol: symbol, icon: icon, actions: actions, menu: menu, chooser: chooser,
-                                  canRemember: remembers, rememberTitle: rememberTitle, detail: detail,
+                                  canRemember: remembers, remembersByDefault: remembersByDefault, rememberTitle: rememberTitle, detail: detail,
                                   durations: durations,
                                   origin: origin, in: controller, tab: tab, cancellation: cancellation, answered: answered)
             PendingQuestions.answer(questionID)
@@ -1009,7 +1019,8 @@ final class PermissionPrompt: FloatingPanelView {
     }
 
     private static func show(host: String, request: String, symbol: String, icon: NSImage?, actions: [PermissionAction],
-                             menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool, rememberTitle: String?, detail: String?,
+                             menu: [PermissionAction], chooser: [PermissionAction], canRemember: Bool, remembersByDefault: Bool = false,
+                             rememberTitle: String?, detail: String?,
                              durations: [String]? = nil,
                              origin: String?, in controller: PromptHost, tab: Tab?,
                              cancellation: QuestionCancellation? = nil,
@@ -1056,6 +1067,7 @@ final class PermissionPrompt: FloatingPanelView {
             }
             prompt.remembers = canRemember && durations == nil
             prompt.remember.isHidden = !prompt.remembers
+            prompt.remember.isOn = prompt.remembers && remembersByDefault
             prompt.remember.title = rememberTitle ?? String(localized: "Remember for this site", comment: "Checkbox on a site's permission question: keeps the answer for the site instead of only this page.")
             prompt.remember.tint = accent
             if let durations {

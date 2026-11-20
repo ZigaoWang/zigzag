@@ -187,6 +187,33 @@ struct DeveloperToolTests {
         }
     }
 
+    /// ⇧⌘R reloads ignoring the cache, as in Chrome and Arc, and Reader has ⌥⌘R; installed apps' menus match.
+    @Test func shiftCommandRReloadsIgnoringTheCache() throws {
+        try withDefaults {
+            for menu in [MainMenu.build(), MainMenu.buildWebApp(name: "App").menu] {
+                let hard = try #require(items(menu).first { $0.action == #selector(BrowserWindowController.reloadPageFromOrigin(_:)) })
+                #expect(hard.keyEquivalent == "r" && hard.keyEquivalentModifierMask == [.command, .shift])
+            }
+            let reader = try #require(items(MainMenu.build()).first { $0.action == #selector(BrowserWindowController.toggleReader(_:)) })
+            #expect(reader.keyEquivalent == "r" && reader.keyEquivalentModifierMask == [.command, .option])
+        }
+    }
+
+    /// Keys you gave another item stay yours when they become an item's shipped keys; that item comes in without.
+    @Test func shippedKeysYouGaveAwayStayYours() {
+        let shiftR = Shortcuts.Combo(key: "r", modifiers: NSEvent.ModifierFlags([.command, .shift]).rawValue)
+        let optionR = Shortcuts.Combo(key: "r", modifiers: NSEvent.ModifierFlags([.command, .option]).rawValue)
+        let shipped = [(id: "reloadPageFromOrigin:#0", combo: shiftR), (id: "toggleReader:#0", combo: optionR),
+                       (id: "selectNextTab:#0", combo: Shortcuts.Combo(key: "]", modifiers: NSEvent.ModifierFlags.command.rawValue))]
+        #expect(Shortcuts.shippedKeysTaken(shipped: shipped, saved: [:]).isEmpty)
+        // Yours on another item: the shipped one gives way.
+        #expect(Shortcuts.shippedKeysTaken(shipped: shipped, saved: ["copyPageURL:#0": shiftR]) == ["reloadPageFromOrigin:#0"])
+        // Your own keys for the item itself, or none, are kept as they are.
+        #expect(Shortcuts.shippedKeysTaken(shipped: shipped, saved: ["toggleReader:#0": shiftR]) == ["reloadPageFromOrigin:#0"])
+        #expect(Shortcuts.shippedKeysTaken(shipped: shipped, saved: ["reloadPageFromOrigin:#0": optionR, "toggleReader:#0": shiftR]).isEmpty)
+        #expect(Shortcuts.shippedKeysTaken(shipped: shipped, saved: ["copyPageURL:#0": .none]).isEmpty)
+    }
+
     @Test func clearingASiteWithAPortSaysEveryPortGoes() {
         let note = BrowserWindowController.everyPortNote(for: URL(string: "http://www.app.test:3000/admin")!, site: "app.test")
         #expect(note?.contains("app.test") == true && note?.contains("3000") == true && note?.contains("www") == false)
