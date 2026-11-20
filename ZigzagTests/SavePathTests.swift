@@ -56,6 +56,14 @@ import Testing
         }
     }
 
+    /// ⇧ on a click of Pin Tab asks where; keys of yours for Pin Tab that hold ⇧ pin and unpin as they always did.
+    @Test func pinTabsOwnKeysNeverAsk() {
+        #expect(BrowserWindowController.shiftAsks(event: .leftMouseUp, shiftHeld: true))
+        #expect(BrowserWindowController.shiftAsks(event: nil, shiftHeld: true))
+        #expect(!BrowserWindowController.shiftAsks(event: .keyDown, shiftHeld: true))
+        #expect(!BrowserWindowController.shiftAsks(event: .leftMouseUp, shiftHeld: false))
+    }
+
     // MARK: Quick save, no question
 
     /// The star, ⌘D and Save in a page's or a link's menu ask nothing: unmodified, each is the quick save.

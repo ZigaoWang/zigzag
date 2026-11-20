@@ -479,8 +479,14 @@ extension BrowserWindowController: NSMenuItemValidation {
     /// item, `savePageToFolder`.
     @objc func toggleBookmark(_ sender: Any?) {
         guard let tab = selectedTab else { return }
-        // A menu item's click keeps ⇧ held while it runs: the tab menu's Pin Tab asks where, like ⇧⌘D.
-        save(tab, request: SavePath.request(for: .savePageCommand, shiftHeld: Self.shiftHeld))
+        // A menu item's click keeps ⇧ held while it runs: the tab menu's Pin Tab asks where, like ⇧⌘D. Keys given to
+        // Pin Tab in Settings may hold ⇧ themselves, so a key press never asks.
+        save(tab, request: SavePath.request(for: .savePageCommand, shiftHeld: Self.shiftAsks(event: NSApp.currentEvent?.type, shiftHeld: Self.shiftHeld)))
+    }
+
+    /// Whether ⇧ makes Pin Tab ask where: on a click, not on its keys.
+    nonisolated static func shiftAsks(event: NSEvent.EventType?, shiftHeld: Bool) -> Bool {
+        shiftHeld && event != .keyDown
     }
 
     /// File › Pin Tab to Folder… (⇧⌘D): asks where in the space the page goes, with a folder or a new one, and its
