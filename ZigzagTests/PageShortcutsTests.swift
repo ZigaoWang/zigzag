@@ -70,6 +70,27 @@ import WebKit
         #expect(!BrowserWindow.browserActions.contains("selectAll:"))
     }
 
+    /// ⇧⌘R reloads without cache, as in Chrome and Arc, and Reader sits on the ⌥⌘R that used to do it.
+    @Test func hardReloadIsOnShiftCommandR() {
+        let menu = MainMenu.build()
+        func item(_ action: Selector) -> NSMenuItem? {
+            func find(_ menu: NSMenu) -> NSMenuItem? {
+                for item in menu.items {
+                    if item.action == action { return item }
+                    if let sub = item.submenu, let found = find(sub) { return found }
+                }
+                return nil
+            }
+            return find(menu)
+        }
+        let reload = item(#selector(BrowserWindowController.reloadPageFromOrigin(_:)))
+        #expect(reload?.keyEquivalent == "r")
+        #expect(reload?.keyEquivalentModifierMask == [.command, .shift])
+        let reader = item(#selector(BrowserWindowController.toggleReader(_:)))
+        #expect(reader?.keyEquivalent == "r")
+        #expect(reader?.keyEquivalentModifierMask == [.command, .option])
+    }
+
     /// WKWebView goes Back on ⌫ (Forward on ⇧⌫) with no focused field; it's disabled in every page's preferences.
     @Test func backspaceNeverGoesBack() {
         let key = "backspaceKeyNavigationEnabled"
