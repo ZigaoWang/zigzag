@@ -57,7 +57,7 @@ final class TopBarView: NSView {
 
     private func refreshOnPage() {
         let onPage = pageColor != nil
-        for case let button as IconButton in [sidebarButton] + buttons { button.isOnPage = onPage }
+        for case let button as IconButton in [sidebarButton] + buttons { button.isOnPage = onPage; button.ground = pageColor }
         (address as? AddressView)?.isOnPage = onPage
         accessory?.isOnPage = onPage
     }

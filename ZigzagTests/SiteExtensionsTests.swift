@@ -105,6 +105,10 @@ struct SiteExtensionsTests {
             #expect(CGFloat(columns + 1) * SiteExtensionsLayout.tileSide + CGFloat(columns) * SiteExtensionsLayout.minGap > width + PanelLinkRow.outset * 2)
             let gap = SiteExtensionsLayout.rowGap(width: width, columns: columns)
             #expect(gap >= SiteExtensionsLayout.minGap && gap <= SiteExtensionsLayout.maxRowGap)
+            // Every tile on whole points, the last row's bottom at the grid's.
+            let frames = (0..<20).map { SiteExtensionsLayout.tileFrame($0, width: width) }
+            #expect(frames.allSatisfy { $0.minX == $0.minX.rounded() && $0.minY == $0.minY.rounded() }, "\(width)")
+            #expect(frames.last?.maxY == SiteExtensionsLayout.bodyHeight(count: 20, width: width), "\(width)")
         }
         #expect(SiteExtensionsLayout.listed(count: 3))
         #expect(!SiteExtensionsLayout.listed(count: 4))

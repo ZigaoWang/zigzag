@@ -75,6 +75,18 @@ struct AddonsMozillaPageTests {
         #expect(ExtensionStore.publishedAddonsFile(fromAPI: Data("not json".utf8)) == nil)
     }
 
+    /// The API's guid comes with the file when it reads as an ID.
+    @Test func theAPIsGUIDIsRead() {
+        func answer(_ guid: String) -> Data {
+            Data(("{\"guid\":\"" + guid + "\",\"current_version\":{\"file\":{\"url\":\"https://addons.mozilla.org/firefox/downloads/file/1/x.xpi\",\"hash\":\"sha256:00\"}}}").utf8)
+        }
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer("uBlock0@raymondhill.net"))?.guid == "uBlock0@raymondhill.net")
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer("{ec8030f7-c20a-464f-9b0e-13a3a9e97384}"))?.guid == "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}")
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer(""))?.guid == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer("a/b"))?.guid == nil)
+        #expect(ExtensionStore.publishedAddonsFile(fromAPI: answer(String(repeating: "a", count: 256)))?.guid == nil)
+    }
+
     /// Only the exact file the API names goes to the install sheet: same AMO host and path.
     @Test func onlyThePublishedFileIsInstalled() {
         let published = URL(string: "https://addons.mozilla.org/firefox/downloads/file/5257481/ublock_origin-1.76.4.xpi")!
@@ -449,6 +461,31 @@ struct FirefoxInstallTests {
         #expect(SettingsView.packageKindDetail(id) == ["Firefox"])
     }
 
+    /// From Add to Firefox, a package with no gecko ID is named by AMO's guid: two versions are one record.
+    @Test func twoVersionsFromTheStoreWithNoGeckoIDAreOneRecord() async throws {
+        let work = try Workspace()
+        defer { work.cleanUp() }
+        for version in ["1.0", "1.1"] {
+            let bytes = try Self.xpi(Self.manifest(nil, version))
+            guard case .success(let prepared) = await ExtensionStore.prepareInstallXPI(data: bytes, storeID: "store@example.com") else {
+                Issue.record("\(version) didn't prepare")
+                return
+            }
+            _ = try Self.installed(await ExtensionStore.finishInstall(prepared, in: work.profile))
+        }
+        let id = ExtensionStore.xpiID(forGeckoID: "store@example.com", data: Data())
+        #expect(ExtensionStore.packageIDs == [id])
+        #expect(work.record(id)?.version == "1.1")
+        // A guid that doesn't read as one isn't used: the bytes name it, as from a file.
+        let bytes = try Self.xpi(Self.manifest(nil, "2.0"))
+        guard case .success(let odd) = await ExtensionStore.prepareInstallXPI(data: bytes, storeID: "../x") else {
+            Issue.record("odd guid didn't prepare")
+            return
+        }
+        #expect(odd.id == ExtensionStore.xpiID(forGeckoID: nil, data: bytes))
+        ExtensionStore.discard(odd)
+    }
+
     /// A signature file in the package changes nothing Zigzag says: its presence isn't a check that the signature is
     /// valid, so Settings says only that this is a Firefox extension, and records the package the same way.
     @Test func aSignatureFileChangesNothingZigzagSays() async throws {
@@ -480,10 +517,9 @@ struct FirefoxInstallTests {
         #expect((onDisk["browser_specific_settings"] as? [String: Any])?["gecko"] != nil)
     }
 
-    /// A folder installed from disk that carries Firefox's own keys is recorded as Firefox with its gecko ID, so its
-    /// record, its sheet and its polyfill agree — and the person's own folder is left exactly as it is, never
-    /// normalized. A folder without those keys stays Chrome's.
-    @Test func aFirefoxFolderIsRecordedFirefoxWithItsGeckoIDAndLeftAsItIs() async throws {
+    /// A folder carrying Firefox's own keys is still recorded as Chrome's: the manifest doesn't decide the kind.
+    /// The person's own folder is left exactly as it is, never normalized.
+    @Test func aFolderWithFirefoxKeysStaysChromeAndIsLeftAsItIs() async throws {
         let work = try Workspace()
         defer { work.cleanUp() }
         let folder = work.folder.appendingPathComponent("firefox-folder", isDirectory: true)
@@ -493,8 +529,8 @@ struct FirefoxInstallTests {
         try XPIArchive.json(manifest).write(to: folder.appendingPathComponent("manifest.json"))
 
         let record = ExtensionStore.unpackedPackage(for: folder)
-        #expect(record.kind == "firefox")
-        #expect(record.firefoxID == "folder@example.com")
+        #expect(record.kind == "chromium")
+        #expect(record.firefoxID == nil)
         #expect(record.unpackedPath == folder.standardizedFileURL.path)
         // The sheet reads the same shipped overlay as any package; a permission only Firefox knows is reported by
         // its own name, since WebKit doesn't supply it and no claim words it.
@@ -510,6 +546,22 @@ struct FirefoxInstallTests {
         let chrome = ExtensionStore.unpackedPackage(for: chromeFolder)
         #expect(chrome.kind == "chromium")
         #expect(chrome.firefoxID == nil)
+    }
+
+    /// A Firefox package added after the profile's extensions started still gets its pages' marker, in the scripts
+    /// the controller hands its pages, once.
+    @Test func aLaterFirefoxPackageIsMarkedInTheControllersPageScripts() throws {
+        // The default profile's host: a profile made for the test would start its extensions after it's gone.
+        let host = Profiles.shared.default.extensions
+        #expect(host.pageScripts === host.controller.configuration.webViewConfiguration.userContentController)
+        let id = "pbcodepdghnilmnkaebcgmmcgnenlfan"
+        let marker = "if (location.host === '\(id)') { globalThis.__zigzagFirefoxPackage = true; }"
+        host.addFirefoxMarker(id)
+        host.addFirefoxMarker(id)
+        host.addFirefoxMarker("not an id')")
+        let sources = host.controller.configuration.webViewConfiguration.userContentController.userScripts.map(\.source)
+        #expect(sources.filter { $0 == marker }.count == 1)
+        #expect(!sources.contains { $0.contains("not an id") })
     }
 
     /// The installed record, not the manifest, decides who gets the Firefox marker.

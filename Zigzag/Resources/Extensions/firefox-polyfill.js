@@ -36,16 +36,20 @@
 
     // The installed record's kind, set by Zigzag, not the manifest: a Chrome Web Store package may carry
     // browser_specific_settings too, and WebKit tells no extension which store it came from.
-    if (globalThis.__zigzagFirefoxPackage !== true) {
-      done = true;   // A Chrome package: nothing of Firefox's is added to it.
-      return true;
-    }
-
     // WebKit's own `browser` is what a Firefox package uses, and it is the object these members go on: `chrome` is
     // left as it was, the surface's stand-ins included.
-    const target = (globalThis.browser && globalThis.browser.runtime) || api.runtime;
-    put(target, 'getBrowserInfo', getBrowserInfo);
+    const addMembers = () => put((globalThis.browser && globalThis.browser.runtime) || api.runtime, 'getBrowserInfo', getBrowserInfo);
     done = true;
+    if (globalThis.__zigzagFirefoxPackage === true) { addMembers(); return true; }
+    // A Chrome package: nothing of Firefox's is added to it. The marker of a Firefox package installed after the
+    // profile's pages were set up comes after this script (ExtensionHost.addFirefoxMarker), and still adds them.
+    try {
+      Object.defineProperty(globalThis, '__zigzagFirefoxPackage', { configurable: true, get: () => false, set: (value) => {
+        if (value !== true) return;
+        Object.defineProperty(globalThis, '__zigzagFirefoxPackage', { value: true, configurable: true, writable: true });
+        addMembers();
+      } });
+    } catch (e) {}
     return true;
   };
   // An extension page gets its `chrome` a moment after the prelude runs; this still comes before its own timers.

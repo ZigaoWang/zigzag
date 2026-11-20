@@ -30,9 +30,9 @@ struct SpaceSwitchLookTests {
         #expect(key.pressScales && !key.pressSinks)
         #expect(key.layer?.backgroundColor == nil || rgba(key.layer?.backgroundColor)[3] == 0)
         key.isHovered = true
-        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.hover, in: light)))
+        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.buttonWash(pressed: false), in: light)))
         key.isPressed = true
-        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.pressed, in: light)))
+        #expect(close(rgba(key.layer?.backgroundColor), rgba(Tokens.Chrome.buttonWash(pressed: true), in: light)))
         let layer = key.layer!
         // Scaled around its middle: the middle stays where it was.
         let t = layer.transform
@@ -42,6 +42,42 @@ struct SpaceSwitchLookTests {
         #expect(abs(moved.x - center.x) < 0.01 && abs(moved.y - center.y) < 0.01, "\(moved)")
         key.isPressed = false
         key.isHovered = false
+    }
+
+    /// Symbols and emoji alike: one square, one size, ink in the middle.
+    @Test func spaceIconsShareOneCenterAndSize() {
+        let side: CGFloat = 18
+        for icon in ["flame.fill", "book.fill", "star.fill", "heart.fill", "music.note", "🔥", "🍎", "📚"] {
+            let image = IconChoice.mark(icon, side: side)
+            #expect(image.size == NSSize(width: side, height: side))
+            let key = "test mark \(icon)"
+            let ink = Tokens.Symbol.inkOffset(of: image, key: key, scale: 2)
+            #expect(abs(ink.width) <= 0.5 && abs(ink.height) <= 0.5, "\(icon) \(ink)")
+            let size = Tokens.Symbol.inkSize(of: image, key: key, scale: 2)
+            #expect(max(size.width, size.height) <= side, "\(icon) \(size)")
+            #expect(abs((size.width * size.height).squareRoot() - IconChoice.markInk * side) <= 1.5, "\(icon) \(size)")
+        }
+    }
+
+    /// Tall and wide ink come out alike, never longer than the square.
+    @Test func markScaleEvensOutTallAndWide() {
+        let side: CGFloat = 18, target = IconChoice.markInk * side
+        for ink in [CGSize(width: 12, height: 16), CGSize(width: 16, height: 12), CGSize(width: 14, height: 14)] {
+            let k = IconChoice.markScale(ink: ink, side: side)
+            #expect(abs((ink.width * k * ink.height * k).squareRoot() - target) < 0.001)
+        }
+        #expect(IconChoice.markScale(ink: CGSize(width: 6, height: 24), side: side) == 0.75)
+        #expect(IconChoice.markScale(ink: .zero, side: side) == 1)
+    }
+
+    /// An icon's key draws no dot under it.
+    @Test func aSpaceKeyWithAnIconHidesItsDot() {
+        let key = SpaceDotView(spaceID: UUID())
+        key.frame = NSRect(x: 0, y: 0, width: Tokens.Sidebar.button, height: Tokens.Sidebar.button)
+        key.icon = "star.fill"
+        key.layout()
+        let dots = key.layer?.sublayers?.filter { !($0 is CATextLayer) && $0.delegate == nil && $0.frame.height == 2 } ?? []
+        #expect(dots.allSatisfy { $0.opacity == 0 })
     }
 
     @Test func mixGoesPartWayInLightAndDark() {

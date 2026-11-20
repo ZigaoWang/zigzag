@@ -180,30 +180,9 @@ final class BrowserWebView: WKWebView {
         super.willOpenMenu(menu, with: event)
         // Extensions' own items ("Translate this page", "Save to Notion") go at the end.
         if #available(macOS 15.4, *), let owner { owner.extensionHost?.addMenuItems(for: owner, to: menu) }
+        Self.arrangeLinkItems(in: menu, target: self)
         for item in menu.items {
             switch item.identifier?.rawValue {
-            case "WKMenuItemIdentifierOpenLinkInNewWindow":
-                item.title = String(localized: "Open Link in New Tab", comment: "Item in a page's right-click menu.")
-                let peek = NSMenuItem(title: String(localized: "Open Link in Peek", comment: "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page."), action: #selector(openInPeek(_:)), keyEquivalent: "")
-                peek.target = self
-                peek.representedObject = item
-                if let index = menu.items.firstIndex(of: item) { menu.insertItem(peek, at: index + 1) }
-                let original = item
-                let tabItem = NSMenuItem(title: original.title, action: #selector(openInNewTab(_:)), keyEquivalent: "")
-                tabItem.target = self
-                tabItem.representedObject = original
-                if let index = menu.items.firstIndex(of: original) {
-                    menu.removeItem(at: index)
-                    menu.insertItem(tabItem, at: index)
-                    // Below Peek: a new window, and a private one.
-                    for (offset, (title, selector)) in [(String(localized: "Open Link in New Window", comment: "Item in a page's right-click menu."), #selector(openInNewWindow(_:))),
-                                                        (String(localized: "Open Link in Private Window", comment: "Item in a page's right-click menu."), #selector(openInPrivateWindow(_:)))].enumerated() {
-                        let windowItem = NSMenuItem(title: title, action: selector, keyEquivalent: "")
-                        windowItem.target = self
-                        windowItem.representedObject = original
-                        menu.insertItem(windowItem, at: min(index + 2 + offset, menu.items.count))
-                    }
-                }
             case "WKMenuItemIdentifierOpenImageInNewWindow":
                 item.title = String(localized: "Open Image in New Tab", comment: "Item in a page's right-click menu.")
             case "WKMenuItemIdentifierOpenMediaInNewWindow":
@@ -220,6 +199,7 @@ final class BrowserWebView: WKWebView {
             }
         }
         addOpenSelection(to: menu)
+        addSaveToPins(to: menu)
         // Only in a browser window's page, which does the translating; not Zigzag Mini's or a web app's.
         if let owner, WindowManager.shared.controller(for: window) != nil { Self.addTranslate(to: menu, for: owner, target: self, action: #selector(translatePage(_:))) }
         Self.addAutoFill(to: menu)
@@ -230,10 +210,60 @@ final class BrowserWebView: WKWebView {
         #endif
     }
 
-    static let openSelectionIdentifier = "ZigzagOpenSelection"
+    /// A link's menu starts as Chrome's does (#419): Open Link in New Tab, in New Window, in Private Window, then
+    /// Peek. WebKit's Open Link (in this tab, even for a target=_blank link) goes below them.
+    static func arrangeLinkItems(in menu: NSMenu, target: AnyObject?) {
+        guard let original = menu.items.first(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLinkInNewWindow" }) else { return }
+        let openLink = menu.items.first { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }
+        let index = [original, openLink].compactMap { $0.map { menu.index(of: $0) } }.min() ?? 0
+        menu.removeItem(original)
+        if let openLink { menu.removeItem(openLink) }
+        let choices = [(String(localized: "Open Link in New Tab", comment: "Item in a page's right-click menu."), #selector(openInNewTab(_:))),
+                       (String(localized: "Open Link in New Window", comment: "Item in a page's right-click menu."), #selector(openInNewWindow(_:))),
+                       (String(localized: "Open Link in Private Window", comment: "Item in a page's right-click menu."), #selector(openInPrivateWindow(_:))),
+                       (String(localized: "Open Link in Peek", comment: "Item in a page's right-click menu. Peek is Zigzag's preview of a link over the page."), #selector(openInPeek(_:)))]
+        let items = choices.map { title, action in
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.target = target
+            item.representedObject = original
+            return item
+        } + [openLink].compactMap { $0 }
+        for (offset, item) in items.enumerated() { menu.insertItem(item, at: min(index + offset, menu.items.count)) }
+    }
 
-    /// A selected web address that isn't a link ("example.com" in a post) gets Open and Open in New Tab at the top,
-    /// like Chrome's Go to (#234). Browser windows only.
+    static let openSelectionIdentifier = "ZigzagOpenSelection"
+    static let saveToPinsIdentifier = "ZigzagSaveToPins"
+
+    /// A link's right-click menu gets Pin Link (#326), under Open Link's items: the link pinned without opening it.
+    /// Only over a link, and only in a browser window, which is where pins live.
+    private func addSaveToPins(to menu: NSMenu) {
+        // Our own Open Link items (#419) replaced WebKit's, so they're found by action.
+        let openActions: Set<Selector> = [#selector(openInNewTab(_:)), #selector(openInNewWindow(_:)), #selector(openInPrivateWindow(_:)), #selector(openInPeek(_:))]
+        guard owner != nil, WindowManager.shared.controller(for: window) != nil,
+              let last = menu.items.lastIndex(where: { $0.action.map(openActions.contains) == true || $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }) else { return }
+        let item = NSMenuItem(title: String(localized: "Pin Link", comment: "Item in a page's right-click menu over a link: pins the link, without opening it."),
+                              action: #selector(saveHoveredLinkToPins(_:)), keyEquivalent: "")
+        item.target = self
+        item.identifier = NSUserInterfaceItemIdentifier(Self.saveToPinsIdentifier)
+        item.image = Tokens.Symbol.image("star")
+        // After the link's own items: Open Link in New Tab, Peek, a New Window, a Private one, and a download.
+        var at = last
+        let linkItems = ["WKMenuItemIdentifierOpenLinkInNewTab", "WKMenuItemIdentifierOpenLinkInPeek", "WKMenuItemIdentifierOpenLinkInNewWindow",
+                         "WKMenuItemIdentifierDownloadLinkedFile", "WKMenuItemIdentifierDownloadLinkedFileAs"]
+        while at + 1 < menu.items.count, linkItems.contains(menu.items[at + 1].identifier?.rawValue ?? "") { at += 1 }
+        menu.insertItem(item, at: at + 1)
+    }
+
+    /// Pin Link chosen in the page's menu: the link the pointer is on, pinned without opening it, named after its
+    /// text. ⇧ held, it asks which folder (#326).
+    @objc private func saveHoveredLinkToPins(_ sender: NSMenuItem) {
+        guard let owner, let url = owner.hoveredLink,
+              let controller = WindowManager.shared.controller(for: window) else { return }
+        controller.saveLinkToPins(url, title: owner.hoveredLinkTitle ?? "", shiftHeld: BrowserWindowController.shiftHeld)
+    }
+
+    /// Selected text that's a web address but not a link ("example.com" in a post) gets Open and Open in New Tab at
+    /// the top of its menu, as Chrome's Go to does (#234). Only in a browser window's page.
     private func addOpenSelection(to menu: NSMenu) {
         guard menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierSearchWeb" }),
               !menu.items.contains(where: { $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }),

@@ -169,4 +169,23 @@ struct NewTabPeekTests {
         #expect(CATransform3DIsIdentity(try #require((fade.toValue as? NSValue)?.caTransform3DValue)))
         #expect(peek.layer?.animation(forKey: "presence.opacity") != nil)
     }
+
+    /// A panel thinner than twice its radius has round ends, never pointed ones.
+    @Test func thinPanelsHaveRoundEnds() {
+        let panel = FloatingPanelView(frame: NSRect(x: 0, y: 0, width: 300, height: 22))
+        panel.radius = Tokens.Radius.panel
+        panel.layoutSubtreeIfNeeded()
+        let layers = panel.subviews.compactMap(\.layer)
+        #expect(!layers.isEmpty)
+        for layer in layers {
+            #expect(layer.cornerRadius == 11)
+            #expect(layer.cornerCurve == .circular)
+        }
+        panel.radius = Tokens.Radius.control
+        panel.layoutSubtreeIfNeeded()
+        for layer in layers {
+            #expect(layer.cornerRadius == Tokens.Radius.control)
+            #expect(layer.cornerCurve == .continuous)
+        }
+    }
 }

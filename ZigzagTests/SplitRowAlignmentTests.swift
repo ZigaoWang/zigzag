@@ -260,3 +260,60 @@ extension SplitRowAlignmentTests {
         #expect(abs(alone.width - shared.width) < 0.001 && abs(alone.height - shared.height) < 0.001)
     }
 }
+
+/// A split part's speaker (#351): after the title while there's room for both, as a tab's is; otherwise the badge a
+/// favorite has, on the icon's corner, the icon cut round it.
+@MainActor struct SplitSpeakerTests {
+    private func row(parts: Int, width: CGFloat) -> TabRowView {
+        let tabs = (0..<parts).map { Tab(url: URL(string: "https://example.com/\($0)"), title: "Page \($0)", spaceID: UUID()) }
+        for (i, tab) in tabs.enumerated() { tab.debugShowSound(playing: i % 2 == 0, muted: i % 2 == 1) }
+        let row = TabRowView(frame: NSRect(x: 0, y: 0, width: width, height: Tokens.Sidebar.rowHeight))
+        row.configure(tab: tabs[0])
+        row.configure(partners: Array(tabs.dropFirst()))
+        row.closesPart = parts > 1
+        row.layoutSubtreeIfNeeded()
+        return row
+    }
+
+    private func speakers(of row: TabRowView) -> [IconButton] {
+        row.subviews.compactMap { $0 as? IconButton }.filter { !$0.isHidden && $0.toolTip?.localizedCaseInsensitiveContains("mute") == true }
+    }
+
+    @Test func iconOnlyPartsShowTheFavoritesBadge() throws {
+        let row = row(parts: 4, width: 228)
+        let icons = row.subviews.compactMap { $0 as? FaviconView }.filter { !$0.isHidden }
+        let badges = speakers(of: row)
+        #expect(icons.count == 4 && badges.count == 4)
+        #expect(badges.allSatisfy { SpeakerBadge.isBadge($0) && $0.frame.size == NSSize(width: SpeakerBadge.target, height: SpeakerBadge.target) })
+        for icon in icons {
+            let disc = row.convert(try #require(icon.speakerCut), from: icon)
+            #expect(badges.contains { abs($0.frame.midX - disc.midX) < 0.01 && abs($0.frame.midY - disc.midY) < 0.01 })
+        }
+    }
+
+    @Test func aTitledPartKeepsTheSpeakerAfterItsTitle() {
+        let row = row(parts: 2, width: 228)
+        let shown = speakers(of: row)
+        #expect(shown.count == 2)
+        #expect(shown.allSatisfy { !SpeakerBadge.isBadge($0) && $0.frame.width == Tokens.Sidebar.rowButton })
+        #expect(row.subviews.compactMap { $0 as? FaviconView }.allSatisfy { $0.speakerCut == nil })
+    }
+
+    /// Too narrow for the title and the speaker after it, the title stays and the speaker goes on the icon.
+    @Test func aPartTooShortForBothKeepsItsTitle() {
+        let row = row(parts: 3, width: 228)
+        let shown = speakers(of: row)
+        #expect(shown.count == 3 && shown.allSatisfy { SpeakerBadge.isBadge($0) })
+        #expect(row.subviews.compactMap { $0 as? Label }.filter { !$0.isHidden && $0.frame.width > 0 }.count == 3)
+    }
+
+    /// Back to one page, the row's own speaker is a row button again and its icon whole.
+    @Test func leavingTheSplitRestoresTheRowSpeaker() {
+        let row = row(parts: 4, width: 228)
+        row.closesPart = false
+        row.configure(partners: [])
+        row.layoutSubtreeIfNeeded()
+        #expect(!SpeakerBadge.isBadge(row.audioButton) && row.audioButton.frame.width == Tokens.Sidebar.rowButton)
+        #expect(row.icon.speakerCut == nil)
+    }
+}

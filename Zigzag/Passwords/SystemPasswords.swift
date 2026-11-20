@@ -65,6 +65,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     private var changes = 0
     private var settling = false
     private var clickMonitor: Any?
+    private var reshowGuard: NSObjectProtocol?
     /// The window was on screen when the fields went in, so it being gone by the ask means it closed or was hidden.
     private var shownInVisibleWindow = false
     /// The system's list took the front (Zigzag stopped being the active app), so coming back means it closed.
@@ -89,8 +90,9 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
         self.settle = settle
         self.dismissSystem = dismissSystem
         super.init()
+        // The password field is marked only as the list is asked for: focused while marked, AppKit puts its own
+        // Passwords… suggestion under it first (#378).
         usernameField.contentType = .username
-        passwordField.contentType = .password
         for field in [usernameField, passwordField] {
             field.delegate = self
             field.focusRingType = .none
@@ -109,6 +111,7 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
     func present(over rect: NSRect, in overlay: NSView, restoringFocusTo responder: NSResponder?,
                  ask: @escaping @MainActor (NSTextField) -> Bool = SystemPasswordPicker.askSystem, completion: @escaping (Outcome) -> Void) {
         if isPresented { finish(.cancelled(.replaced)) }
+        endReshowGuard()
         self.completion = completion
         restoreTo = responder
         opened = false
@@ -140,9 +143,13 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
         // way still lands). Clicks in the Mac's own list are in its window, not this one.
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             MainActor.assumeIsolated {
-                guard let self, self.isPresented, let window = self.anchor.window, event.window === window else { return }
+                // The second click of a double-click is the first one's (`Autofill` keeps it off the page).
+                guard let self, self.isPresented, let window = self.anchor.window, event.window === window, event.clickCount < 2 else { return }
                 let point = self.anchor.convert(event.locationInWindow, from: nil)
-                if !self.anchor.bounds.contains(point) { self.after(0.3) { $0.giveUpIfEmpty(.dismissed) } }
+                guard !self.anchor.bounds.contains(point) else { return }
+                // Closed before the page takes the click, so AppKit never moves it to the page's field.
+                self.dismissSystem()
+                self.after(0.3) { $0.giveUpIfEmpty(.dismissed) }
             }
             return event
         }
@@ -153,10 +160,18 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
 
     private func askNow(_ ask: @MainActor (NSTextField) -> Bool) {
         // The focus moved on while AutoFill caught up, or the window closed or went away: you've moved on.
-        guard anchor.superview != nil, let window = anchor.window, !shownInVisibleWindow || window.isVisible,
+        guard let overlay = anchor.superview, let window = anchor.window, !shownInVisibleWindow || window.isVisible,
               Self.owns(window.firstResponder, [passwordField]) else { finish(.cancelled(.dismissed)); return }
+        // The list points at the field; a field off its page would put it in a corner of the screen.
+        guard Self.anchorIsValid(anchor.frame, in: overlay.bounds), passwordField.currentEditor() != nil else { finish(.cancelled(.unavailable)); return }
+        passwordField.contentType = .password
         guard ask(passwordField) else { finish(.cancelled(.unavailable)); return }
         if let openCheck { after(openCheck) { if !$0.opened { $0.giveUpIfEmpty(.unavailable) } } }
+    }
+
+    /// Whether the list can point at `rect`: a real field, its middle inside the page.
+    static func anchorIsValid(_ rect: NSRect, in bounds: NSRect) -> Bool {
+        rect.width >= 1 && rect.height >= 1 && bounds.contains(NSPoint(x: rect.midX, y: rect.midY))
     }
 
     /// AppKit's AutoFill panel and suggestion outlive the fields they were opened for, and come back each time the
@@ -247,15 +262,39 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
             field.abortEditing()
             field.stringValue = ""
         }
+        passwordField.contentType = nil
         // Focus handed back while the fields are still in the window, so AppKit sees them let go of it.
         if focused, let window { window.makeFirstResponder(restoreTo.flatMap { ($0 as? NSView)?.window === window ? $0 : nil }) }
         dismissSystem()
         anchor.removeFromSuperview()
+        if let window { guardReshow(in: window) }
         switch outcome {
         case .filled: debugLog("syspasswords filled")
         case .cancelled(let reason): debugLog("syspasswords cancelled \(reason)")
         }
         completion(outcome)
+    }
+
+    /// AppKit brings its list back the next time the window is key, for whatever has the focus by then, with no
+    /// field to point at: at the screen's corner (#378). For a moment after the fields go, it's closed again.
+    private func guardReshow(in window: NSWindow) {
+        endReshowGuard()
+        let dismiss = dismissSystem
+        reshowGuard = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: window, queue: .main) { _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { dismiss() } }
+        }
+        let session = session
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.reshowGuardTime) { [weak self] in
+            guard let self, self.session == session, !self.isPresented else { return }
+            self.endReshowGuard()
+        }
+    }
+
+    static let reshowGuardTime: TimeInterval = 1.5
+
+    private func endReshowGuard() {
+        if let reshowGuard { NotificationCenter.default.removeObserver(reshowGuard) }
+        reshowGuard = nil
     }
 
     /// Whether `responder` is one of `fields`, or the field editor working in one.
@@ -266,6 +305,90 @@ final class SystemPasswordPicker: NSObject, NSTextFieldDelegate {
             return fields.contains { $0 === delegate }
         }
         return false
+    }
+}
+
+/// What closes the Mac's Passwords list opened for a page, as Safari's closes: the page scrolling or going
+/// somewhere else, its window moving, resizing, hiding or closing. Switching tabs closes it from `TabManager`.
+@MainActor
+final class SystemPanelWatch {
+    enum Trigger: Equatable {
+        case scrolled, navigated, windowMoved, windowResized, windowHidden, windowClosed, timedOut
+    }
+
+    private(set) weak var webView: WKWebView?
+    private weak var window: NSWindow?
+    private var onEnd: ((Trigger) -> Void)?
+    private var observers: [NSObjectProtocol] = []
+    private var keyValueObservers: [NSKeyValueObservation] = []
+    private var scrollMonitor: Any?
+
+    var isWatching: Bool { onEnd != nil }
+
+    init(webView: WKWebView, window: NSWindow, timeout: TimeInterval = SystemPasswordPicker.timeout, onEnd: @escaping (Trigger) -> Void) {
+        self.webView = webView
+        self.window = window
+        self.onEnd = onEnd
+        let center = NotificationCenter.default
+        let triggers: [(Notification.Name, Trigger)] = [
+            (NSWindow.willMoveNotification, .windowMoved), (NSWindow.didMoveNotification, .windowMoved),
+            (NSWindow.willStartLiveResizeNotification, .windowResized), (NSWindow.didResizeNotification, .windowResized),
+            (NSWindow.willEnterFullScreenNotification, .windowResized), (NSWindow.willExitFullScreenNotification, .windowResized),
+            (NSWindow.willMiniaturizeNotification, .windowHidden), (NSWindow.willCloseNotification, .windowClosed),
+        ]
+        observers = triggers.map { name, trigger in
+            center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.end(trigger) }
+            }
+        }
+        observers.append(center.addObserver(forName: NSApplication.didHideNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.end(.windowHidden) }
+        })
+        keyValueObservers = [
+            webView.observe(\.url, options: [.new]) { [weak self] _, _ in
+                MainActor.assumeIsolated { self?.end(.navigated) }
+            },
+            webView.observe(\.isLoading, options: [.new]) { [weak self] _, change in
+                MainActor.assumeIsolated { if change.newValue == true { self?.end(.navigated) } }
+            },
+        ]
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            MainActor.assumeIsolated { self?.scrolled(in: event.window, phase: event.phase, momentumPhase: event.momentumPhase) }
+            return event
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) { [weak self] in self?.end(.timedOut) }
+    }
+
+    /// A scroll in the page's window: the field moves out from under the list.
+    func scrolled(in eventWindow: NSWindow?, phase: NSEvent.Phase = [], momentumPhase: NSEvent.Phase = []) {
+        guard let window, eventWindow === window, Self.isUserScroll(phase: phase, momentumPhase: momentumPhase) else { return }
+        end(.scrolled)
+    }
+
+    /// Whether a scroll event is fingers or a wheel moving now: not the glide after a swipe, not fingers resting or
+    /// lifting, which a scroll from before the list opened still sends.
+    nonisolated static func isUserScroll(phase: NSEvent.Phase, momentumPhase: NSEvent.Phase) -> Bool {
+        guard momentumPhase.isEmpty else { return false }
+        return phase.isEmpty || phase.contains(.began) || phase.contains(.changed)
+    }
+
+    /// Calls `onEnd` once, then stops watching.
+    func end(_ trigger: Trigger) {
+        guard let onEnd else { return }
+        stop()
+        debugLog("syspasswords closed by \(trigger)")
+        onEnd(trigger)
+    }
+
+    /// Stops watching without calling `onEnd`.
+    func stop() {
+        onEnd = nil
+        observers.forEach { NotificationCenter.default.removeObserver($0) }
+        observers = []
+        keyValueObservers.forEach { $0.invalidate() }
+        keyValueObservers = []
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
+        scrollMonitor = nil
     }
 }
 

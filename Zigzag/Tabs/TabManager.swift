@@ -703,6 +703,8 @@ final class TabManager {
         // A tab closed since (one an old undo step or a stale button still points at) never comes back from here.
         guard !tab.isClosed else { return }
         Autofill.shared.hide()
+        // The Mac's Passwords list belongs to the page it opened on.
+        if tab !== selectedTab { Autofill.shared.closeSystemPasswords() }
         // Favorites belong to every space of their profile: they open in the one you're in. Reached from a space
         // on another profile (the command bar, an extension), one opens in a space of its own profile.
         if tab.isFavorite {

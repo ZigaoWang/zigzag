@@ -95,6 +95,19 @@ struct FirefoxSurfaceTests {
         #expect(context.evaluateScript("chrome.runtime.id")?.toString() == "x")
     }
 
+    /// A Firefox package installed after the profile's pages were set up is marked after the polyfill ran: the
+    /// members still come. Set to anything else, nothing does.
+    @Test func aMarkerSetAfterThePolyfillStillAddsGetBrowserInfo() {
+        let late = Self.firefoxWorld(manifest: Self.firefoxManifest, firefoxPackage: false)
+        #expect(late.evaluateScript("typeof browser.runtime.getBrowserInfo")?.toString() == "undefined")
+        late.evaluateScript("globalThis.__zigzagFirefoxPackage = true;")
+        #expect(late.evaluateScript("typeof browser.runtime.getBrowserInfo")?.toString() == "function")
+        #expect(late.evaluateScript("globalThis.__zigzagFirefoxPackage")?.toBool() == true)
+        let other = Self.firefoxWorld(manifest: Self.firefoxManifest, firefoxPackage: false)
+        other.evaluateScript("globalThis.__zigzagFirefoxPackage = 1;")
+        #expect(other.evaluateScript("typeof browser.runtime.getBrowserInfo")?.toString() == "undefined")
+    }
+
     /// A Firefox package whose manifest carries the older `applications` key is still a Firefox package, as the
     /// record says; the key itself proves nothing either way.
     @Test func aFirefoxPackageWithTheOlderApplicationsKeyIsStillOne() {

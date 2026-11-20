@@ -34,7 +34,7 @@ final class PeekHeaderView: NSView {
         didSet {
             guard ground != oldValue else { return }
             appearance = PageBar.inkAppearance(on: ground).flatMap(NSAppearance.init(named:))
-            [expandButton, closeButton].forEach { $0.isOnPage = ground != nil }
+            [expandButton, closeButton].forEach { $0.isOnPage = ground != nil; $0.ground = ground }
         }
     }
 

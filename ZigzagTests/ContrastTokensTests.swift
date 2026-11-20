@@ -174,6 +174,22 @@ struct ContrastTokensTests {
         }
     }
 
+    /// A button's hover and press reach their contrast on every space, black and white included, measured on that
+    /// space or with none given; pressed shows more than hover.
+    @Test func buttonWashShowsOnEverySpace() {
+        for dark in [false, true] {
+            for (name, frame) in dark ? darkFrames : lightFrames {
+                for grounds in [[frame], []] {
+                    let hover = Brand.contrast(over(resolved(Tokens.Chrome.buttonWash(pressed: false, on: grounds), dark: dark, high: false), frame), frame)
+                    let pressed = Brand.contrast(over(resolved(Tokens.Chrome.buttonWash(pressed: true, on: grounds), dark: dark, high: false), frame), frame)
+                    let what = "\(name) \(dark ? "dark" : "light") \(grounds.isEmpty ? "unknown" : "known"): \(hover) \(pressed)"
+                    #expect(hover >= (grounds.isEmpty ? 1.15 : 1.19), "\(what)")
+                    #expect(pressed > hover + 0.1, "\(what)")
+                }
+            }
+        }
+    }
+
     /// The off switch track is lighter than the page at night, as in macOS.
     @Test func offSwitchStandsOutAtNight() {
         for ground in [Tokens.Color.surface, Tokens.Color.formBackground, Tokens.Color.panelBackground] {

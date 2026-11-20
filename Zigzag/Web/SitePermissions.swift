@@ -80,6 +80,8 @@ enum SitePermissions {
     private static let actionsKey = "SitePermissionActions"
     /// Where the answers are kept; tests use their own.
     static var defaults: UserDefaults = .standard
+    /// A site's kept answer changed, from Site Controls, a question or Settings.
+    static let changed = Signal<Void>()
 
     private static var stored: [String: String] {
         get {
@@ -110,6 +112,7 @@ enum SitePermissions {
             defaults.set(simple, forKey: key)
             if rich.isEmpty { defaults.removeObject(forKey: actionsKey) }
             else { defaults.set(rich, forKey: actionsKey) }
+            changed.send()
         }
     }
 
@@ -328,6 +331,7 @@ enum SitePermissions {
     static func forgetAll() {
         defaults.removeObject(forKey: key)
         defaults.removeObject(forKey: actionsKey)
+        changed.send()
     }
 
     /// A site's answer about your location, if it ever asked.
