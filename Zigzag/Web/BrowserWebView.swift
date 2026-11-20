@@ -235,15 +235,17 @@ final class BrowserWebView: WKWebView {
     static let saveToPinsIdentifier = "ZigzagSaveToPins"
 
     /// A link's right-click menu gets Pin Link (#326), under Open Link's items: the link pinned without opening it.
-    /// Only over a link, and only in a browser window, which is where pins live.
+    /// Only over a link, and only in a browser window that isn't private, which is where pins live.
     private func addSaveToPins(to menu: NSMenu) {
         // Our own Open Link items (#419) replaced WebKit's, so they're found by action.
         let openActions: Set<Selector> = [#selector(openInNewTab(_:)), #selector(openInNewWindow(_:)), #selector(openInPrivateWindow(_:)), #selector(openInPeek(_:))]
-        guard owner != nil, WindowManager.shared.controller(for: window) != nil,
+        guard let owner, !owner.isPrivate, WindowManager.shared.controller(for: window) != nil,
               let last = menu.items.lastIndex(where: { $0.action.map(openActions.contains) == true || $0.identifier?.rawValue == "WKMenuItemIdentifierOpenLink" }) else { return }
         let item = NSMenuItem(title: String(localized: "Pin Link", comment: "Item in a page's right-click menu over a link: pins the link, without opening it."),
-                              action: #selector(saveHoveredLinkToPins(_:)), keyEquivalent: "")
+                              action: #selector(saveMenuLinkToPins(_:)), keyEquivalent: "")
         item.target = self
+        // WebKit's own Open Link in New Window, which knows the link the menu is for.
+        item.representedObject = menu.items.first { $0.action == #selector(openInNewTab(_:)) }?.representedObject
         item.identifier = NSUserInterfaceItemIdentifier(Self.saveToPinsIdentifier)
         item.image = Tokens.Symbol.image("star")
         // After the link's own items: Open Link in New Tab, Peek, a New Window, a Private one, and a download.
@@ -254,12 +256,24 @@ final class BrowserWebView: WKWebView {
         menu.insertItem(item, at: at + 1)
     }
 
-    /// Pin Link chosen in the page's menu: the link the pointer is on, pinned without opening it, named after its
-    /// text. ⇧ held, it asks which folder (#326).
-    @objc private func saveHoveredLinkToPins(_ sender: NSMenuItem) {
-        guard let owner, let url = owner.hoveredLink,
-              let controller = WindowManager.shared.controller(for: window) else { return }
-        controller.saveLinkToPins(url, title: owner.hoveredLinkTitle ?? "", shiftHeld: BrowserWindowController.shiftHeld)
+    /// Pin Link chosen in the page's menu: the link the menu was opened on, pinned without opening it, named after its
+    /// text. WebKit names the link through its own Open Link in New Window, as the Open Link items do; it never
+    /// opens. ⇧ held, it asks which folder (#326).
+    @objc private func saveMenuLinkToPins(_ sender: NSMenuItem) {
+        guard let owner, !owner.isPrivate, WindowManager.shared.controller(for: window) != nil,
+              let original = sender.representedObject as? NSMenuItem, let action = original.action else { return }
+        BrowserWebView.pendingPin = (Source(value: self), BrowserWindowController.shiftHeld, Date().addingTimeInterval(3))
+        NSApp.sendAction(action, to: original.target, from: original)
+    }
+
+    /// Pin Link's link, on its way from WebKit as a request for a new web view: `shiftHeld` asks where.
+    private static var pendingPin: (source: Source, shiftHeld: Bool, until: Date)?
+
+    /// Whether this page's request for a new web view is Pin Link's, used up: ⇧ held or not, or nil if it isn't.
+    static func takePendingPin(for webView: WKWebView?) -> Bool? {
+        guard let pin = pendingPin, let webView, pin.source.value === webView, Date() < pin.until else { return nil }
+        pendingPin = nil
+        return pin.shiftHeld
     }
 
     /// Selected text that's a web address but not a link ("example.com" in a post) gets Open and Open in New Tab at

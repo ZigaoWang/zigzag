@@ -2498,6 +2498,13 @@ extension BrowserWindowController: TabHost {
     }
 
     func tab(_ tab: Tab, createWebViewWith configuration: WKWebViewConfiguration, for action: WKNavigationAction, features: WKWindowFeatures) -> WKWebView? {
+        // Pin Link: WebKit named the link the menu was for; it's pinned, and nothing opens.
+        if let shiftHeld = BrowserWebView.takePendingPin(for: tab.webView) {
+            if let url = action.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+                saveLinkToPins(url, title: tab.hoveredLink == url ? tab.hoveredLinkTitle ?? "" : "", shiftHeld: shiftHeld)
+            }
+            return nil
+        }
         // Site routes (#286) apply to Open Link in New Tab and clicked new-tab links. Sized windows (sign-in pop-ups)
         // and peeks are skipped.
         if let url = action.request.url, Tab.route(forPageLink: url, from: tab.url) == .load,
