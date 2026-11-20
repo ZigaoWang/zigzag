@@ -2,8 +2,8 @@ import Foundation
 import WebKit
 
 /// Every frame says which videos it has and how they're playing, in Zigzag's own script world (the page can't see
-/// it): as a video starts, stops or changes size, and as the page scrolls while one plays. A page with no video never
-/// says anything. While its tab is in the mini player, the frame with its video reports four times a second, so the
+/// it): as a video starts, stops or changes size, as its sound or an audio's starts or stops, and as the page scrolls
+/// while one plays. A page with no video or sound never says anything. While its tab is in the mini player, the frame with its video reports four times a second, so the
 /// card follows the video and its time. The mini player plays, pauses and seeks through the same script.
 final class PageVideos: NSObject, WKScriptMessageHandler {
     static let shared = PageVideos()
@@ -40,16 +40,20 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
                    t: v.currentTime || 0, d: isFinite(v.duration) ? v.duration : -1 };
         });
       };
+      // A video or audio on the page playing with its sound on.
+      const sounding = () => Array.from(document.querySelectorAll('video, audio'))
+        .some((m) => !m.paused && !m.ended && !m.muted && m.volume > 0);
       const report = (always) => {
         const videos = describe();
         const pip = !!document.pictureInPictureElement || list.some((v) => v.webkitPresentationMode === 'picture-in-picture');
         const fs = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        // Nothing to say on a page with no video, however it resizes.
-        const key = videos.length === 0 && !pip && !fs ? '[]'
-          : JSON.stringify(videos.map((v) => [v.x | 0, v.y | 0, v.w | 0, v.h | 0, v.vw, v.vh, v.playing, v.ended, v.muted, v.user])) + pip + fs + innerWidth + 'x' + innerHeight;
+        const sound = sounding();
+        // Nothing to say on a page with no video or sound, however it resizes.
+        const key = videos.length === 0 && !pip && !fs && !sound ? '[]'
+          : JSON.stringify(videos.map((v) => [v.x | 0, v.y | 0, v.w | 0, v.h | 0, v.vw, v.vh, v.playing, v.ended, v.muted, v.user])) + pip + fs + sound + innerWidth + 'x' + innerHeight;
         if (!always && key === last) return;
         last = key;
-        post({ id, main, vw: innerWidth, vh: innerHeight, videos, pip, fs });
+        post({ id, main, vw: innerWidth, vh: innerHeight, videos, pip, fs, sound });
       };
       const soon = () => { if (!timer) timer = setTimeout(() => { timer = 0; report(false); }, 150); };
       document.addEventListener('play', engage, true);
@@ -181,6 +185,8 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
         var videos: [PageVideo]
         var pictureInPicture: Bool
         var fullScreen: Bool
+        /// A video or audio in it plays with its sound on.
+        var playsSound: Bool
     }
 
     private struct Entry {
@@ -211,6 +217,11 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
             .map { (frame: all[$0.frame], video: $0.video) }
     }
 
+    /// A video or audio in one of the page's frames plays with its sound on.
+    func playsSound(in webView: WKWebView) -> Bool {
+        frames(in: webView).contains(where: \.playsSound)
+    }
+
     /// The page floats a video in Picture in Picture, or shows one in full screen, itself.
     func isPresentingItself(_ webView: WKWebView) -> Bool {
         webView.isPictureInPictureActive || webView.fullscreenState != .notInFullscreen
@@ -232,10 +243,11 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
             let videos = (body["videos"] as? [Any] ?? []).compactMap(PageVideo.init)
             func number(_ key: String) -> CGFloat { CGFloat((body[key] as? NSNumber)?.doubleValue ?? 0) }
             entry.frames[id] = Frame(id: id, info: message.frameInfo, isMain: isMain, viewport: CGSize(width: number("vw"), height: number("vh")),
-                                     videos: videos, pictureInPicture: body["pip"] as? Bool ?? false, fullScreen: body["fs"] as? Bool ?? false)
+                                     videos: videos, pictureInPicture: body["pip"] as? Bool ?? false, fullScreen: body["fs"] as? Bool ?? false,
+                                     playsSound: body["sound"] as? Bool ?? false)
         }
         // Many ad frames come and go; the newest few dozen are plenty.
-        if entry.frames.count > 32, let drop = entry.frames.values.first(where: { !$0.isMain && $0.videos.isEmpty }) { entry.frames[drop.id] = nil }
+        if entry.frames.count > 32, let drop = entry.frames.values.first(where: { !$0.isMain && $0.videos.isEmpty && !$0.playsSound }) { entry.frames[drop.id] = nil }
         entries[key] = entry
         // A video gone into Picture in Picture, by the page's own button or WebKit's: its window floats (#210).
         if body["pip"] as? Bool == true { PictureInPicture.floatSoon() }
@@ -270,5 +282,45 @@ final class PageVideos: NSObject, WKScriptMessageHandler {
             return (CGRect(x: n[0], y: n[1], width: n[2], height: n[3]), item[4] as? String ?? "")
         }
         return MiniPlayerLayout.frameOrigin(viewport: frame.viewport, host: frame.info.securityOrigin.host, among: frames)
+    }
+}
+
+/// Whether a tab plays sound, from what WebKit says (`_isPlayingAudio`) and whether a video or audio on the page plays
+/// with its sound on. WebKit goes on saying a page plays sound once a video or audio whose sound goes through Web Audio
+/// is paused (TikTok's player), for as long as the page keeps its audio context running. So a sound that started with
+/// a video or audio playing is over once none plays, after `hold`; a sound that started without one (Web Audio, an
+/// audio element not on the page) lasts as long as WebKit says.
+nonisolated struct PageSound: Equatable {
+    /// How long none plays before the sound counts as over.
+    static let hold: TimeInterval = 1.5
+    /// How long after WebKit starts saying so a video or audio starting still counts as where the sound came from.
+    static let started: TimeInterval = 2
+
+    private(set) var webKit = false
+    private var fromMedia = false
+    private var since: Date?
+    private var mediaStopped: Date?
+
+    /// Takes what WebKit says now and whether a video or audio plays with sound; answers whether the tab plays sound
+    /// and, while that's about to change, when to ask again.
+    mutating func update(webKit: Bool, media: Bool, now: Date = Date()) -> (playing: Bool, recheck: TimeInterval?) {
+        guard webKit else {
+            self = PageSound()
+            return (false, nil)
+        }
+        if !self.webKit {
+            self.webKit = true
+            since = now
+            fromMedia = media
+        }
+        if media, !fromMedia, let since, now.timeIntervalSince(since) < Self.started { fromMedia = true }
+        guard fromMedia, !media else {
+            mediaStopped = nil
+            return (true, nil)
+        }
+        let stopped = mediaStopped ?? now
+        mediaStopped = stopped
+        let quiet = now.timeIntervalSince(stopped)
+        return quiet >= Self.hold ? (false, nil) : (true, Self.hold - quiet)
     }
 }

@@ -322,6 +322,10 @@ final class Tab: NSObject {
     private var pendingConfiguration: WKWebViewConfiguration?
     private var observations: [NSKeyValueObservation] = []
     private var observingAudio = false
+    /// What WebKit says of its sound, and what the tab shows of it (`isPlayingAudio`).
+    private var sound = PageSound()
+    private var soundWait: DispatchWorkItem?
+    private let videosReported = Coalescer()
 
     init(id: UUID = UUID(), url: URL?, title: String? = nil, spaceID: UUID, configuration: WKWebViewConfiguration? = nil,
          interactionState: Data? = nil, lastActivated: Date = Date(), createdAt: Date = Date()) {
@@ -787,6 +791,10 @@ final class Tab: NSObject {
             observingAudio = false
         }
         videosToken = nil
+        videosReported.cancel()
+        sound = PageSound()
+        soundWait?.cancel()
+        soundWait = nil
         coverWait?.cancel()
         coverWait = nil
         ignoresCover = false
@@ -1496,11 +1504,25 @@ final class Tab: NSObject {
     override nonisolated func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
         guard keyPath == "_isPlayingAudio" else { return }
         let playing = (change?[.newKey] as? Bool) ?? false
-        MainActor.assumeIsolated {
-            self.isPlayingAudio = playing
-            self.refreshCoverWatch()
-            self.changed.send(.audio)
+        MainActor.assumeIsolated { self.refreshSound(webKit: playing) }
+    }
+
+    /// Plays sound while WebKit says so, unless that sound came from a video or audio that has stopped (`PageSound`).
+    private func refreshSound(webKit: Bool? = nil) {
+        soundWait?.cancel()
+        soundWait = nil
+        guard let webView else { return }
+        let media = PageVideos.shared.playsSound(in: webView)
+        let (playing, recheck) = sound.update(webKit: webKit ?? sound.webKit, media: media)
+        if let recheck {
+            let wait = DispatchWorkItem { [weak self] in self?.refreshSound() }
+            soundWait = wait
+            DispatchQueue.main.asyncAfter(deadline: .now() + recheck, execute: wait)
         }
+        guard playing != isPlayingAudio else { return }
+        isPlayingAudio = playing
+        refreshCoverWatch()
+        changed.send(.audio)
     }
 
     // MARK: Covered windows
@@ -1528,7 +1550,7 @@ final class Tab: NSObject {
     private var ignoresCover = false
     /// When its sound stopped, while a covered window still doesn't hide it.
     private var soundStopped: Date?
-    /// The page's videos, which turn it back to hidden in a covered window while one plays.
+    /// The page's videos and sound: a covered window hides it again while a video plays; its sound may be over.
     private var videosToken: SignalToken?
 
     /// A page playing sound with no video showing (a music player) stays on screen to WebKit while its window is
@@ -1554,10 +1576,13 @@ final class Tab: NSObject {
     }
 
     private func watchVideos(of webView: BrowserWebView) {
-        guard Self.watchesCover else { return }
         videosToken = PageVideos.shared.reported.observe { [weak self, weak webView] page in
             guard let self, let webView, page === webView, self.webView === webView else { return }
-            self.refreshCoverWatch()
+            // Many frames reporting at once: looked at once.
+            self.videosReported.schedule { [weak self] in
+                self?.refreshSound()
+                self?.refreshCoverWatch()
+            }
         }
     }
 

@@ -20,6 +20,22 @@ struct NowPlayingTests {
         #expect(choice.pick(from: []).isEmpty)
     }
 
+    /// A paused embedded video whose page WebKit still says plays (its sound went through Web Audio): its card goes
+    /// once the sound is over, and the tab playing now gets the card when you leave it.
+    @Test func aPausedVideosCardGoesAndThePlayingTabGetsIt() {
+        let start = Date()
+        var embed = PageSound()
+        var choice = NowPlayingChoice()
+        func pick(webKit: Bool, media: Bool, at time: TimeInterval, onVideo: Bool) -> [UUID] {
+            let sounding = embed.update(webKit: webKit, media: media, now: start + time).playing
+            return choice.pick(from: [tab(b, "https://videos.example/", sounding: true, selected: onVideo), tab(a, "https://news.example/", sounding: sounding)])
+        }
+        #expect(pick(webKit: true, media: true, at: 0, onVideo: false) == [b, a])
+        #expect(pick(webKit: true, media: false, at: 10, onVideo: true) == [a])
+        #expect(pick(webKit: true, media: false, at: 10 + PageSound.hold, onVideo: true).isEmpty)
+        #expect(pick(webKit: true, media: false, at: 600, onVideo: false) == [b])
+    }
+
     @Test func everyTabThatStartsGetsACardOnTopAndNoneMove() {
         var choice = NowPlayingChoice()
         let on = tab(e, sounding: false, selected: true)

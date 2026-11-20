@@ -23,6 +23,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - The downloads panel is wide enough for its own words. With a narrow sidebar, Open Downloads Folder no longer ends in "…", and a download's status line shows whole; the panel reaches a little over the page when it needs the room. A long file name still shortens in the middle. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#430](https://github.com/ZigaoWang/zigzag/issues/430))
 - ⌥⌘← and ⌥⌘→ always switch spaces, even on a page that uses those keys itself, as the tab and window keys already did. Before, a page that used them got them first and the space stayed.
 - Close Tabs Below is listed in Settings › Shortcuts and can have a shortcut of yours. It was meant to be there but was left out, so it could never get one.
+- A tab's speaker goes away once its sound stops. A video whose sound goes through the page's own audio, as TikTok's embedded player does, kept the speaker on long after you paused it, though nothing played, and kept its card at the bottom of the sidebar in place of the tab really playing. The tab could also not be put to sleep then, as if it still played.
 
 ## [0.9.3] - 2026-11-18
 
