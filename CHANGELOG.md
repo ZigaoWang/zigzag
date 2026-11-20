@@ -48,6 +48,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A site shows the same icon in every tab, pinned tab, favorite and Zigzag Mini. Two GitHub tabs could show different icons, the octocat in one and GitHub's rounded home-screen icon in the other, depending on what loaded first. A site's own icon now always wins over its home-screen icon, which stands in only for a site with none of its own, and a page that changes its icon, as GitHub does for dark mode, changes it in its tab too. ([#386](https://github.com/ZigaoWang/zigzag/issues/386))
 - Holding Delete on tabs picked in the sidebar closes them once, and the rest of the press no longer reaches the page, where it could delete text in a field. Delete in the sidebar acts only on rows picked with ⌘- or ⇧-click; after a plain click on a tab the keys stay with the page, and ⌘W closes it. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#375](https://github.com/ZigaoWang/zigzag/issues/375))
 - An extension set to When You Click It or On Specific Sites no longer runs on other sites. Changing an extension's site access while it was running left its content scripts on every site until Zigzag restarted. When You Click It now gives the extension only the tab you click it in, until that tab goes to another site or closes, as in Chrome, instead of keeping every site you clicked it on.
+- Settings › Developer’s lists keep the same spacing from the Add button to the first option row. Sites in Developer Mode used to sit closer than Page Sizes.
 
 ## [0.9.3] - 2026-11-18
 

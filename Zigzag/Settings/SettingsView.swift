@@ -3125,7 +3125,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
 
         // A section: a quiet label low in its slot, standing in for a divider, then the group. A button that acts on the
         // whole group (New Space, Reset All) sits at the label's right, lined up with the rows' own controls.
-        func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil) {
+        func section(_ title: String?, _ group: FormGroup, accessory: NSView? = nil, groupTopInset: CGFloat = 0) {
             var accessory = accessory
             // The sites' list has its search and Remove All by its heading, narrower on a narrow page.
             if group === siteDataGroup {
@@ -3150,6 +3150,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
                 }
                 y += slot
             }
+            y += groupTopInset
             group.frame = NSRect(x: pad, y: y, width: contentWidth, height: group.fittingHeight(for: contentWidth))
             group.needsLayout = true
             place(group)
@@ -3239,7 +3240,9 @@ final class SettingsView: NSView, NSTextFieldDelegate {
             section(Self.alwaysTranslateHeading, alwaysGroup, accessory: alwaysReset)
         case .developer:
             section(nil, developerToolsGroup)
-            section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton)
+            // Sites rows are one line, while Page Sizes rows carry a second: lower this group so the first Remove
+            // button lines up with Page Sizes.
+            section(Self.developmentSitesHeading, developmentSitesGroup, accessory: addSiteButton, groupTopInset: 7)
             note(String(localized: "A site covers every port and its subdomains: localhost is localhost:3000 and app.localhost too.", comment: "Under the list in Settings › Developer."))
             section(Self.pageSizesHeading, pageSizesGroup, accessory: addSizeButton)
             section(Self.localServersHeading, localServersGroup)
