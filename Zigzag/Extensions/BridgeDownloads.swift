@@ -24,6 +24,8 @@ final class BridgeDownloads: BridgeNamespace {
     /// A page of each extension's own, for a blob: download when it has no offscreen page open. WebKit lets only
     /// the origin that made a blob read it, and a page of Zigzag's has an origin of its own.
     private var originViews: [String: WKWebView] = [:]
+    /// The loads of those pages still under way, so a second download waits for the page too.
+    private var originLoads: [String: Task<Void, Never>] = [:]
     /// Blank page written into an extension's loaded copy for a blob download with no offscreen page open. It has no
     /// scripts: only its origin matters.
     private static let originPageFile = "zigzag-download.html"
@@ -139,7 +141,10 @@ final class BridgeDownloads: BridgeNamespace {
     /// for this. Nil when Zigzag has no writable copy of the extension.
     private func originView(for extensionID: String) async -> WKWebView? {
         if let open = host.bridge.offscreen.page(for: extensionID) { return open }
-        if let kept = originViews[extensionID] { return kept }
+        if let kept = originViews[extensionID] {
+            await originLoads[extensionID]?.value
+            return kept
+        }
         guard let context = host.context(for: extensionID), let configuration = context.webViewConfiguration,
               let directory = host.profile.installs.overlayDirectory(for: extensionID) else { return nil }
         let file = directory.appendingPathComponent(Self.originPageFile)
@@ -151,7 +156,10 @@ final class BridgeDownloads: BridgeNamespace {
         let loaded = PageLoadWaiter()
         view.navigationDelegate = loaded
         view.load(URLRequest(url: page))
-        await loaded.wait(seconds: 3)
+        let load = Task { await loaded.wait(seconds: 3) }
+        originLoads[extensionID] = load
+        await load.value
+        originLoads[extensionID] = nil
         view.navigationDelegate = nil
         return view
     }
