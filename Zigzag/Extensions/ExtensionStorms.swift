@@ -235,6 +235,26 @@ nonisolated enum BackgroundWake {
 
     """
 
+    /// The extensions log's lines for wakes: the first ask, the first failure for each extension in a session, and,
+    /// once its background does start, how many asks had failed. Nothing else, so a background that keeps failing
+    /// writes one line, not one every `gap`.
+    struct Log {
+        private var failures: [String: Int] = [:]
+
+        mutating func started(_ id: String, name: String, first: Bool) -> String? {
+            if let failed = failures.removeValue(forKey: id) {
+                return "\(name): its background started after \(failed) \(failed == 1 ? "ask" : "asks") that didn't start it"
+            }
+            return first ? "\(name): a page's message waited on its background; asked it to start" : nil
+        }
+
+        mutating func failed(_ id: String, name: String, error: String) -> String? {
+            let count = failures[id, default: 0] + 1
+            failures[id] = count
+            return count == 1 ? "\(name): a page's message waited on its background, which didn't start: \(error)" : nil
+        }
+    }
+
     /// Whether Zigzag asks WebKit again: not within `gap` of the last time for the same extension.
     static func due(last: Date?, now: Date) -> Bool {
         guard let last else { return true }
@@ -289,12 +309,15 @@ final class ExtensionStorms {
         Task {
             do {
                 try await context.loadBackgroundContent()
-                if first { ExtensionLog.write("\(name): a page's message waited on its background; asked it to start") }
+                if let line = self.wakeLog.started(id, name: name, first: first) { ExtensionLog.write(line) }
             } catch {
-                ExtensionLog.write("\(name): a page's message waited on its background, which didn't start: \(error.localizedDescription)")
+                if let line = self.wakeLog.failed(id, name: name, error: error.localizedDescription) { ExtensionLog.write(line) }
             }
         }
     }
+
+    /// What the extensions log says of the wakes (BackgroundWake).
+    private var wakeLog = BackgroundWake.Log()
 
     func noted(_ id: String, name: String, rate: Int, in tab: Tab) {
         guard byTab[tab.id]?.contains(id) != true else { return }

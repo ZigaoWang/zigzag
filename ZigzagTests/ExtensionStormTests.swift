@@ -270,6 +270,20 @@ struct ExtensionStormTests {
         #expect(number(context, "told.length") == 0)
     }
 
+    /// A background that keeps not starting writes one line per extension, and one more, with the count, once it does.
+    @Test func aFailingWakeIsLoggedOnceAndItsEndOnce() {
+        var log = BackgroundWake.Log()
+        #expect(log.started("a", name: "A", first: true) != nil)
+        #expect(log.started("a", name: "A", first: false) == nil)
+        #expect(log.failed("b", name: "B", error: "no") != nil)
+        #expect(log.failed("b", name: "B", error: "no") == nil)
+        #expect(log.failed("b", name: "B", error: "no") == nil)
+        #expect(log.failed("c", name: "C", error: "no") != nil)
+        #expect(log.started("b", name: "B", first: false)?.contains("3") == true)
+        #expect(log.started("b", name: "B", first: false) == nil)
+        #expect(log.failed("b", name: "B", error: "no") != nil)
+    }
+
     @Test func zigzagAsksAtMostOncePerGap() {
         let now = Date()
         #expect(BackgroundWake.due(last: nil, now: now))
