@@ -1060,6 +1060,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     private var heldLayouts = 0
     private var layoutIsWanted = false
     private var shortcutGroups: [(String, FormGroup)] = []
+    private var listedShortcuts: [String] = []
 
     private let engine = DropdownButton()
     /// The engines extensions give, listed after Zigzag's own, in the order the menu shows them.
@@ -1942,7 +1943,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         refreshTitle()
         if showsWebsiteData { reloadPrivacy(); reloadListedSiteData() }
         readSoon([pane])
-        if pane == .shortcuts { reloadShortcuts() }
+        if pane == .shortcuts { readShortcuts() }
         if pane == .extensions { findAppExtensions() }
         layoutDocument()
         documentView.scroll(.zero)
@@ -2738,6 +2739,8 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     /// Every shortcut, read from the menu bar itself so the list is always right.
     private func reloadShortcuts() {
         let timing = SettingsTiming.begin("reloadShortcuts"); defer { timing.end() }
+        counted("shortcuts")
+        listedShortcuts = shortcutsInMenu
         var groups: [(String, FormGroup)] = []
         for top in NSApp.mainMenu?.items ?? [] {
             guard let menu = top.submenu else { continue }
@@ -2772,6 +2775,16 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         shortcutGroups = groups
     }
 
+    /// Each shortcut's name and keys as the menus have them now.
+    private var shortcutsInMenu: [String] {
+        Shortcuts.allItems.map { "\($0.title) \($0.keyEquivalent) \($0.keyEquivalentModifierMask.rawValue) \($0.isHidden)" }
+    }
+
+    /// Makes the shortcuts' rows again only when the menus' shortcuts changed, instead of on each key typed in setting searchbar.
+    private func readShortcuts() {
+        if listedShortcuts != shortcutsInMenu { reloadShortcuts() }
+    }
+
     func controlTextDidChange(_ obj: Notification) {
         if (obj.object as? NSTextField) === settingSearch.field { searchChanged() }
         if (obj.object as? NSTextField) === flagSearch.field { layoutDocument() }
@@ -2788,7 +2801,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         items.forEach { $0.isSelected = !isSearching && $0.pane == pane }
         moveSectionSelection(animated: false)
         refreshTitle()
-        reloadShortcuts()
+        readShortcuts()
         if isSearching { readSoon(SettingsPane.allCases) }
         // "Find a setting" finds sites by name too: the list is read if no pane with it has been shown yet.
         if isSearching, siteDataList.model == nil || siteDataList.model?.state == .idle { reloadSiteData() }
@@ -4801,8 +4814,8 @@ final class ShortcutRow: InteractiveView, SettingsSearchable {
     private func finish(taken: NSMenuItem?) {
         stopRecording()
         let name = taken.map { $0.title.hasSuffix("…") ? String($0.title.dropLast()) : $0.title }
-        onChange?()
         if let name { ShortcutRow.lastTaken = (item, name) }
+        onChange?()
     }
 
     /// The last change that took keys from another command, said on the row once the list redraws.
