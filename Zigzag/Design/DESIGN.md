@@ -526,7 +526,8 @@ The rules behind them, from animations.dev, Emil Kowalski's writing and Apple's 
   colors it was made with), six presets in light and deep pairs, Background (the empty page's picture, a dashed slot
   until there is one, then its thumbnail with a × on hover) and Custom, ringed when the colors are none of the
   others, which unfolds the wheel and Shade. Under them Effects, folded under a disclosure (`DisclosureRow`): a
-  second color and its direction, See-through, Grain. Effects opens by itself when the space uses any of them. Last,
+  second color and its direction, See-through, Glass (Clear or Frosted, for a see-through space), Grain. While
+  Clear shows as frosted on battery or in Low Power Mode, a line in the explanation style under Glass says so. Effects opens by itself when the space uses any of them. Last,
   under a hairline, Profile: a dropdown of the profiles, with New Profile at its end (a profile of the space's own,
   named after it and following its name while you type it, in one step with no sheet); its tooltip says spaces on
   the same profile share sign-ins, history and extensions. The

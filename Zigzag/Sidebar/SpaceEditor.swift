@@ -1229,6 +1229,15 @@ final class SpaceLookEditor: NSView {
     private let glassLabel = SpaceLookEditor.rowLabel(String(localized: "Glass", comment: "A row in the space editor's Effects, for a see-through space: clear or frosted glass."))
     private let glassSwitch = SlidingSwitch([.text(String(localized: "glass.clear", defaultValue: "Clear", comment: "In the space editor, for a see-through space: clear glass, the desktop sharp behind it. Not the sidebar's Clear button.")),
                                                  .text(String(localized: "Frosted", comment: "In the space editor, for a see-through space: frosted glass, the desktop blurred behind it."))])
+    /// Under Glass while Clear is chosen but battery saving shows it frosted.
+    private let glassNote: NSTextField = {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = Tokens.Font.detail()
+        label.textColor = Tokens.Color.textSecondary
+        label.isSelectable = false
+        return label
+    }()
+    private var glassNoteText: String?
     private let grainLabel = SpaceLookEditor.rowLabel(String(localized: "Grain", comment: "A slider in the space editor: how much film grain the color has."))
     private let grainSlider = LookSlider(.grain)
     /// The color the space was made with, which `defaultSwatch` goes back to.
@@ -1260,7 +1269,7 @@ final class SpaceLookEditor: NSView {
         defaultSwatch = LookSwatch(look: .curated(defaultColor), name: String(localized: "Use Default Colors", comment: "Item in a space's context menu, and tooltip of the first swatch in the space editor: puts back the colors the space had when it was made."))
         super.init(frame: .zero)
         if draft.brightness == nil { draft.brightness = Self.startingDepth(space, dark: dark) }
-        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, grainLabel, grainSlider, effects]
+        let views: [NSView] = [wheel, colorsLabel, addSlot, dial, shadeLabel, shadeSlider, clearLabel, clearSlider, glassLabel, glassSwitch, glassNote, grainLabel, grainSlider, effects]
         showsEffects = space.hue2 != nil || space.isSeeThrough || (space.grain ?? 0) > 0.01
         (tiles + views + chips).forEach { addSubview($0) }
 
@@ -1332,12 +1341,27 @@ final class SpaceLookEditor: NSView {
             self.draft.angle = angle
             self.changed(final: final, animated: false)
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(powerSavingChanged), name: PowerSaving.changed, object: nil)
         sync(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
+
+    @objc private func powerSavingChanged() { sync(animated: false) }
+
+    /// What the note under Glass says: why Clear shows as frosted right now, or nil while it doesn't.
+    static func glassNote(clearChosen: Bool, onBattery: Bool, lowPowerMode: Bool) -> String? {
+        guard clearChosen else { return nil }
+        if onBattery {
+            return String(localized: "On battery, Clear shows as Frosted to save power.", comment: "Under Glass in the space editor, while the Mac runs on its battery: clear glass shows as frosted until it's plugged in.")
+        }
+        if lowPowerMode {
+            return String(localized: "In Low Power Mode, Clear shows as Frosted to save power.", comment: "Under Glass in the space editor, while Low Power Mode is on: clear glass shows as frosted until it's off.")
+        }
+        return nil
+    }
 
     /// Left and right move keyboard focus along the swatches.
     override func keyDown(with event: NSEvent) {
@@ -1503,7 +1527,13 @@ final class SpaceLookEditor: NSView {
         // Frosted or clear only matters once the space is see-through.
         let glassShown = showsEffects && space.isSeeThrough && SpaceInfo.hasClearGlass
         for view in [glassLabel, glassSwitch] as [NSView] { view.isHidden = !glassShown }
-        if glassShown != showsGlass { showsGlass = glassShown; onResize?() }
+        let note = glassShown ? Self.glassNote(clearChosen: space.clearGlass != false, onBattery: PowerSaving.onBattery,
+                                               lowPowerMode: PowerSaving.lowPowerMode) : nil
+        glassNote.stringValue = note ?? ""
+        glassNote.isHidden = note == nil
+        let noteChanged = note != glassNoteText
+        glassNoteText = note
+        if glassShown != showsGlass || noteChanged { showsGlass = glassShown; onResize?() }
         if !showsEffects { chips[1].isHidden = true; addSlot.isHidden = true }
         fade([dial], in: two && showsEffects, animated: animated)
         needsLayout = true
@@ -1547,7 +1577,14 @@ final class SpaceLookEditor: NSView {
         if showsCustom { h += customHeight }
         if showsEffects { h += Tokens.Space.x2 + dialSize + Tokens.Space.x3 + (sliderHeight + Tokens.Space.x3) * 2 - Tokens.Space.x3 }
         if showsGlass { h += sliderHeight + Tokens.Space.x3 }
+        if glassNoteText != nil { h += glassNoteHeight + Tokens.Space.x1 }
         return h
+    }
+
+    /// The note under Glass, wrapped to the controls' column.
+    private var glassNoteHeight: CGFloat {
+        let width = (bounds.width > 0 ? bounds.width : SpaceEditorPanel.width - Tokens.Space.x3 * 2) - labelWidth + Label.inset * 2
+        return ceil(glassNote.sizeThatFits(NSSize(width: width, height: 200)).height)
     }
 
     /// Wide enough for the longest name, so every control starts at the same line.
@@ -1596,6 +1633,12 @@ final class SpaceLookEditor: NSView {
         if showsGlass {
             row(glassLabel, glassSwitch, y: y, height: sliderHeight)
             y += sliderHeight + Tokens.Space.x3
+            if glassNoteText != nil {
+                // Under the switch, its text on the switch's leading edge.
+                let height = glassNoteHeight
+                glassNote.frame = NSRect(x: labelWidth - Label.inset, y: y - Tokens.Space.x2, width: width - labelWidth + Label.inset * 2, height: height)
+                y += height + Tokens.Space.x1
+            }
         }
         row(grainLabel, grainSlider, y: y, height: sliderHeight)
         y += sliderHeight + Tokens.Space.x3

@@ -7,7 +7,10 @@ import IOKit.ps
 enum PowerSaving {
     nonisolated static let changed = Notification.Name("PowerSavingChanged")
 
-    static var isOn: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled || onBattery }
+    static var isOn: Bool { lowPowerMode || onBattery }
+
+    /// Whether Low Power Mode is on.
+    static var lowPowerMode: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled }
 
     /// Whether the Mac is running on its battery right now. (The source type is only borrowed from the info, which
     /// is ours: a "Get", not a "Copy".)

@@ -21,8 +21,8 @@
   No test yet.
 - Frosted → the window stays opaque; only clear glass makes it see-through.
   Test: SidebarSlideTests.onlyClearGlassMakesTheWindowSeeThrough
-- Clear on battery or in Low Power Mode → shows frosted instead.
-  No test yet.
+- Clear on battery or in Low Power Mode → shows frosted instead, and the editor says why under Glass until you plug in or turn it off.
+  Test: SidebarSlideTests.theEditorSaysWhenClearShowsAsFrosted
 
 ## Icons in the bottom bar
 - Give a space an icon, a symbol or an emoji → its key shows it, with no dot under it.
