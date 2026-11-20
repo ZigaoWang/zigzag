@@ -220,7 +220,8 @@ nonisolated struct TileShape: Equatable, Sendable {
     func corners(in area: CGRect, gap: CGFloat, slop: CGFloat, leading: CGFloat? = nil) -> [Corner] {
         let strips = segments(in: area, gap: gap, slop: slop, leading: leading)
         let vertical = strips.filter { $0.axis == .column }, horizontal = strips.filter { $0.axis == .row }
-        let side: CGFloat = 12, reach = gap + slop + 0.5
+        // Larger than where the two strips cross, so the corner is easy to catch.
+        let side = gap + slop * 4, reach = gap + slop + 0.5
         var corners: [Corner] = []
         for line in vertical {
             for across in horizontal {

@@ -186,6 +186,48 @@ struct DragZoneTests {
         #expect(three.columnShares == [0.5, 0.5] && three.rowShares == [0.3, 0.3])
     }
 
+    @Test func aCornerIsEasyToCatchAndNeverJumps() throws {
+        let space = Library.shared.spaces[0].id
+        let before = Library.shared.snapshot
+        let manager = TabManager(spaceID: space)
+        defer { manager.invalidate(); Library.shared.restore(before) }
+        let tab = Tab(url: nil, title: "Page", spaceID: space)
+        manager.adopt([tab], in: space)
+        let controller = BrowserWindowController(tabManager: manager, frame: NSRect(x: 0, y: 0, width: 1000, height: 700))
+        defer { controller.window?.close() }
+        manager.select(tab)
+        let window = try #require(controller.window)
+        let root = controller.root
+        let shape = TileShape(regions: [.topLeft, .topRight, .bottomLeft, .bottomRight], column: 0.4, row: 0.6)
+        root.setTiles(shape, animated: false)
+        window.layoutIfNeeded()
+        let area = root.cardFrame, gap = root.paneGap, reach = Tokens.Metric.dragReach
+        let corner = try #require(shape.corners(in: area, gap: gap, slop: reach, leading: reach / 2).first)
+        // Larger than where the two strips cross.
+        let strips = shape.segments(in: area, gap: gap, slop: reach, leading: reach / 2)
+        let crossing = try #require(strips.first { $0.axis == .column }?.frame.width)
+        #expect(corner.frame.width > crossing && corner.frame.height > crossing)
+        // Pressed off its middle and moved nowhere, nothing moves; moved 50 points, the lines move 50 points.
+        let start = root.convert(NSPoint(x: corner.frame.midX + 5, y: corner.frame.midY - 5), to: nil)
+        let frame = try #require(window.contentView?.superview)
+        let handle = try #require(frame.hitTest(frame.convert(start, from: nil)) as? ResizeHandle)
+        for (type, dx) in [(NSEvent.EventType.leftMouseDown, 0.0), (.leftMouseDragged, 0), (.leftMouseDragged, 50), (.leftMouseUp, 50)] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: NSPoint(x: start.x + dx, y: start.y), modifierFlags: [],
+                                                        timestamp: ProcessInfo.processInfo.systemUptime,
+                                                        windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                                        clickCount: 1, pressure: 1))
+            switch type {
+            case .leftMouseDown: handle.mouseDown(with: event)
+            case .leftMouseDragged:
+                handle.mouseDragged(with: event)
+                let moved = try #require(root.tiles)
+                #expect(abs(moved.columnShares[0] - (0.4 + dx / area.width)) < 1e-6 && abs(moved.row - 0.6) < 1e-6)
+                #expect(moved.columnShares[1] == moved.columnShares[0])
+            default: handle.mouseUp(with: event)
+            }
+        }
+    }
+
     @Test func aNearEvenLineSnapsOnReleaseUnlessShiftHoldsIt() throws {
         let space = Library.shared.spaces[0].id
         let before = Library.shared.snapshot

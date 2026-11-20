@@ -265,9 +265,12 @@ final class ResizeHandle: NSView {
     var line: CGFloat = 0
     /// From the line to where the press landed.
     private var grab: CGFloat = 0
+    /// Where the press landed, in window coordinates.
+    private(set) var pressedAt: NSPoint = .zero
 
     override func resetCursorRects() {
-        addCursorRect(bounds, cursor: dragsBothWays ? .crosshair : isVertical ? .rowResize : .columnResize)
+        addCursorRect(bounds, cursor: dragsBothWays ? .frameResize(position: .topLeft, directions: .all)
+            : isVertical ? .rowResize : .columnResize)
     }
 
     override var mouseDownCanMoveWindow: Bool { false }
@@ -275,6 +278,7 @@ final class ResizeHandle: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         grab = (isVertical ? point.y : point.x) - line
+        pressedAt = event.locationInWindow
         onBegin?()
         if event.clickCount == 2 { onDoubleClick?() }
     }
@@ -374,6 +378,8 @@ final class BrowserRootView: SpaceFrameView {
     /// The segment or corner being dragged: the handle keeps to it as the shape moves under the pointer.
     private var draggedSegment: TileShape.Segment?
     private var draggedCorner: TileShape.Corner?
+    /// From where the dragged corner's lines meet to where the press landed, so the corner never jumps to the pointer.
+    private var cornerGrab: CGSize = .zero
     /// Whether the grid's line between the columns was parted when this drag began: until it is, a plain drag moves
     /// whole lines as it always did, and Shift moves one segment (#316).
     private var dragStartedParted = false
@@ -1032,8 +1038,7 @@ final class BrowserRootView: SpaceFrameView {
         }
         if draggedCorner == nil {
             for key in cornerHandles.keys.filter({ !meeting.contains($0) }) {
-                cornerHandles[key]?.isHidden = true
-                cornerHandles[key]?.corner = nil
+                cornerHandles[key]?.removeFromSuperview()
                 cornerHandles.removeValue(forKey: key)
             }
         }
@@ -1089,12 +1094,19 @@ final class BrowserRootView: SpaceFrameView {
             guard let self else { return }
             self.draggedCorner = handle?.corner
             self.dragStartedParted = self.tiles?.isParted ?? false
+            if let handle, let corner = handle.corner, let shape = self.tiles {
+                let area = self.cardFrame, press = self.convert(handle.pressedAt, from: nil)
+                let x = area.minX + shape.columnShares[corner.rows.first ?? 0] * area.width
+                let y = area.minY + shape.row * area.height
+                self.cornerGrab = CGSize(width: press.x - x, height: press.y - y)
+            }
         }
         handle.onDragPoint = { [weak self] point, shift in
             guard let self, let corner = self.draggedCorner, var shape = self.tiles else { return }
             let area = self.cardFrame
             let whole = !self.dragStartedParted && !shift
-            shape.moveCorner(corner, to: self.convert(point, from: nil), in: area,
+            let at = self.convert(point, from: nil)
+            shape.moveCorner(corner, to: CGPoint(x: at.x - self.cornerGrab.width, y: at.y - self.cornerGrab.height), in: area,
                              minimumWidth: Self.minimumPaneWidth, minimumHeight: Self.minimumPaneHeight, whole: whole)
             self.tiles = shape
             self.layoutSubtreeIfNeeded()
