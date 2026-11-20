@@ -33,6 +33,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 点弹出窗口的地址时，地址会显示在和 Zigzag Mini、分屏顶栏一样的地址框里并被选中，字体和选中颜色也一样，不再是一行普通文字。
 - 轻扫后退或前进时，箭头填满那一下触控板只震一次，不管扫得多快。以前用中等速度轻扫，箭头会在快要松手就跳转的位置反复填满又变空，每次都震一下。现在填满后会一直保持，直到往回扫一点，或者快速一扫后停在半路，松手的结果和箭头显示的一致。感谢 [frarees](https://github.com/frarees)。([#377](https://github.com/ZigaoWang/zigzag/issues/377))
 - OldTwitter 在 x.com 上又能用了。它给请求签名时要用到一个沙箱页面，而 WebKit 里 X 的安全策略会挡住它；现在 Zigzag 会把扩展自己的沙箱脚本放在一个独立的内容环境里运行，这个环境拿不到扩展 API，网站自己的安全策略保持不变。图标和字体也能正常载入了：扩展的页面用 Chrome 的 `chrome-extension://` 地址引用自己的文件，现在 Zigzag 会把它当作自己的地址来读。感谢 [datarip](https://github.com/datarip)。([#417](https://github.com/ZigaoWang/zigzag/issues/417))
+- 密码菜单里的“密码…”第一次点按就有效，会直接在栏位旁打开 Mac 的密码列表，不再先闪出一个 macOS 自己的“密码”小菜单。连按两下也不会再把光标放进下一个栏位，或者把列表打开在屏幕角落。滚动网页、前进或后退、切换标签页、移动窗口或调整窗口大小时，列表会关上，和 Safari 一样。现在菜单一出现，“密码…”就能点；填写登录信息的那几行仍然要等半秒，免得网页让你在点别处时选中它。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 
 ## [0.9.3] - 2026-11-18
 
