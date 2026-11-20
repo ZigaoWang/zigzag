@@ -408,6 +408,42 @@
     onProxyError: event('proxy.onProxyError'),
   });
 
+  // Address bar keywords: the command bar tells an extension that declares one what's typed after it
+  // (BridgeOmnibox.swift). onInputChanged's suggest callback stays here; Zigzag names the input it answers.
+  const keyword = manifest.omnibox && typeof manifest.omnibox.keyword === 'string' ? manifest.omnibox.keyword.trim() : '';
+  if (keyword) {
+    const suggesting = event('omnibox.onInputChanged');
+    const wrapped = new WeakMap();
+    const wrap = (listener) => {
+      if (!wrapped.has(listener)) {
+        wrapped.set(listener, (text, request) => listener(text, (suggestions) => {
+          send('omnibox', 'suggest', [request, Array.isArray(suggestions) ? suggestions : []]).catch(() => {});
+        }));
+      }
+      return wrapped.get(listener);
+    };
+    const omnibox = {
+      setDefaultSuggestion: method('omnibox', 'setDefaultSuggestion'),
+      onInputStarted: event('omnibox.onInputStarted'),
+      onInputChanged: {
+        addListener(listener) { if (typeof listener === 'function') suggesting.addListener(wrap(listener)); },
+        removeListener(listener) { if (wrapped.has(listener)) suggesting.removeListener(wrapped.get(listener)); },
+        hasListener(listener) { return wrapped.has(listener) && suggesting.hasListener(wrapped.get(listener)); },
+        hasListeners() { return suggesting.hasListeners(); },
+      },
+      onInputEntered: event('omnibox.onInputEntered'),
+      onInputCancelled: event('omnibox.onInputCancelled'),
+      // Zigzag's rows can't be deleted, so this never fires.
+      onDeleteSuggestion: event('omnibox.onDeleteSuggestion'),
+      OnInputEnteredDisposition: { CURRENT_TAB: 'currentTab', NEW_FOREGROUND_TAB: 'newForegroundTab', NEW_BACKGROUND_TAB: 'newBackgroundTab' },
+      DescriptionStyleType: { URL: 'url', MATCH: 'match', DIM: 'dim' },
+    };
+    for (const target of new Set([globalThis.chrome, globalThis.browser])) {
+      if (!target) continue;
+      try { Object.defineProperty(target, 'omnibox', { value: omnibox, configurable: true, enumerable: true, writable: true }); } catch (e) {}
+    }
+  }
+
   // Sign-ins: Chrome asks webRequest.onAuthRequired listeners when a site or a proxy wants a name and password
   // (1Password and Bitwarden fill a site's, FoxyProxy its proxies'). WebKit's own listeners only watch, so Zigzag asks
   // these itself, with Chrome's details: a site's as it asks (BridgeWebRequest.swift), a proxy's as soon as the
