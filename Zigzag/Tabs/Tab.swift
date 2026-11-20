@@ -647,6 +647,27 @@ final class Tab: NSObject {
     /// The asking for `suspend` still waiting, so whichever of the page's answer and the wait for it comes first decides.
     private var sleepTicket = 0
 
+    /// Whether the page holds text you typed, asked as `suspend` asks: a page that doesn't answer in two seconds goes
+    /// by what was read as you left it.
+    func checkTypedText(_ completion: @escaping (Bool) -> Void) {
+        let answer = Once { (state: PageState?) in completion(state?.hasTypedText == true) }
+        readPageState { answer.call($0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            MainActor.assumeIsolated { answer.call(self?.pageState) }
+        }
+    }
+
+    /// Runs its closure the first time it's called only.
+    private final class Once {
+        private var body: ((PageState?) -> Void)?
+        init(_ body: @escaping (PageState?) -> Void) { self.body = body }
+        func call(_ state: PageState?) {
+            let run = body
+            body = nil
+            run?(state)
+        }
+    }
+
     private func sleep(_ webView: BrowserWebView, ticket: Int, state: PageState?, because reason: String?, chosen: Bool,
                        refused: ((StaysAwake) -> Void)?) {
         guard sleepTicket == ticket, self.webView === webView else { return }
