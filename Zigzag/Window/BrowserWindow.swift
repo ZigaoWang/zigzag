@@ -120,8 +120,8 @@ final class BrowserWindow: NSWindow {
     static let browserActions: Set<String> = [
         "showSettings:", "showPasswords:", "hide:", "hideOtherApplications:", "terminate:",
         "newTab:", "newWindow:", "newPrivateWindow:", "openLocation:", "closeTab:", "closeOtherTabs:", "performClose:",
-        "reopenClosedTab:", "selectNextTab:", "selectPreviousTab:", "selectTabByNumber:", "selectLastTab:",
-        "selectSpaceByNumber:", "showSpaceSwitcher:", "newSpace:", "reloadPage:", "reloadPageFromOrigin:", "stopLoading:",
+        "reopenClosedTab:", "selectNextTab:", "selectPreviousTab:", "selectTabByNumber:",
+        "nextSpace:", "previousSpace:", "selectSpaceByNumber:", "showSpaceSwitcher:", "newSpace:", "reloadPage:", "reloadPageFromOrigin:", "stopLoading:",
         "performMiniaturize:", "toggleFullScreen:", "toggleBrowserSidebar:", "toggleDeskView:", "showWebInspector:",
         "showDownloads:", "showHistory:", "hideWebApp:", "quitWebApp:",
     ]
