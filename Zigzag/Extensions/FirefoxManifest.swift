@@ -35,6 +35,14 @@ nonisolated enum FirefoxManifest {
             out["background"] = background
         }
 
+        // WebKit reads a toolbar button from Chrome's `action`. Firefox's MV2 calls it `browser_action`, and its
+        // context-specific one `page_action`: copy it over when there is no `action`, or WebKit sees no popup and the
+        // click falls through to whatever page the extension opens, flashing the popup first.
+        if out["action"] == nil,
+           let button = out["browser_action"] as? [String: Any] ?? out["page_action"] as? [String: Any] {
+            out["action"] = button
+        }
+
         // WebKit's side panel reads Chrome's key. Firefox's own stays beside it, with its title and icon.
         if let sidebar = out["sidebar_action"] as? [String: Any],
            let panel = sidebar["default_panel"] as? String, !panel.isEmpty,

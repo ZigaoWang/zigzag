@@ -81,6 +81,54 @@ struct FirefoxManifestTests {
         #expect(sidebar?["default_icon"] as? String == "icon.png")
     }
 
+    @Test func browserActionGainsTheActionWebKitReads() {
+        let manifest: [String: Any] = [
+            "manifest_version": 2,
+            "browser_action": [
+                "default_popup": "popup.html",
+                "default_title": "Popup",
+                "default_icon": "icon.png",
+            ],
+        ]
+        let normalized = FirefoxManifest.normalized(manifest)
+        let action = normalized["action"] as? [String: Any]
+        #expect(action?["default_popup"] as? String == "popup.html")
+        #expect(action?["default_title"] as? String == "Popup")
+        #expect(action?["default_icon"] as? String == "icon.png")
+        // Firefox's own key stays, and the manifest handed in is untouched.
+        #expect(normalized["browser_action"] as? [String: Any] != nil)
+        #expect(manifest["action"] == nil)
+        // The same manifest again changes nothing.
+        #expect((try? text(FirefoxManifest.normalized(normalized))) == (try? text(normalized)))
+    }
+
+    @Test func anExistingActionIsKeptOverBrowserAction() {
+        let manifest: [String: Any] = [
+            "manifest_version": 3,
+            "action": ["default_popup": "modern.html"],
+            "browser_action": ["default_popup": "old.html"],
+        ]
+        let normalized = FirefoxManifest.normalized(manifest)
+        #expect((normalized["action"] as? [String: Any])?["default_popup"] as? String == "modern.html")
+    }
+
+    @Test func pageActionGainsActionWhenThereIsNoToolbarButton() {
+        let manifest: [String: Any] = [
+            "manifest_version": 2,
+            "page_action": ["default_popup": "page.html"],
+        ]
+        let normalized = FirefoxManifest.normalized(manifest)
+        #expect((normalized["action"] as? [String: Any])?["default_popup"] as? String == "page.html")
+        // A browser action wins over a page action when both are there.
+        let both: [String: Any] = [
+            "manifest_version": 2,
+            "browser_action": ["default_popup": "toolbar.html"],
+            "page_action": ["default_popup": "page.html"],
+        ]
+        let withBoth = FirefoxManifest.normalized(both)
+        #expect((withBoth["action"] as? [String: Any])?["default_popup"] as? String == "toolbar.html")
+    }
+
     @Test func existingWorkerAndSidePanelAreKept() {
         let manifest: [String: Any] = [
             "manifest_version": 3,
