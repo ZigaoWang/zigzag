@@ -548,6 +548,22 @@ struct FirefoxInstallTests {
         #expect(chrome.firefoxID == nil)
     }
 
+    /// A Firefox package added after the profile's extensions started still gets its pages' marker, in the scripts
+    /// the controller hands its pages, once.
+    @Test func aLaterFirefoxPackageIsMarkedInTheControllersPageScripts() throws {
+        // The default profile's host: a profile made for the test would start its extensions after it's gone.
+        let host = Profiles.shared.default.extensions
+        #expect(host.pageScripts === host.controller.configuration.webViewConfiguration.userContentController)
+        let id = "pbcodepdghnilmnkaebcgmmcgnenlfan"
+        let marker = "if (location.host === '\(id)') { globalThis.__zigzagFirefoxPackage = true; }"
+        host.addFirefoxMarker(id)
+        host.addFirefoxMarker(id)
+        host.addFirefoxMarker("not an id')")
+        let sources = host.controller.configuration.webViewConfiguration.userContentController.userScripts.map(\.source)
+        #expect(sources.filter { $0 == marker }.count == 1)
+        #expect(!sources.contains { $0.contains("not an id") })
+    }
+
     /// The installed record, not the manifest, decides who gets the Firefox marker.
     @Test func onlyAFirefoxRecordGetsTheFirefoxMarker() throws {
         let work = try Workspace()
