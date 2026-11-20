@@ -23,6 +23,7 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 在 macOS 26 及更早版本上，滚动页面、后退或前进、点按别处时，Mac 的“密码”列表会关闭；每次打开它，搜索栏都能输入，不再只有第一次可以。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - 输入框下的密码菜单在你开始滚动时就会隐藏，鼠标停在菜单上也一样，不再等滚动结束才消失。点按菜单已经打开的那个输入框，菜单会保持打开，不再关掉又重新打开。感谢 [frarees](https://github.com/frarees)。([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - “1Password 正在它的 App 中等你”的提示，现在只在你刚用过 1Password 之后出现：点了它的按钮、在它的弹出窗口里操作、用了它的快捷键，或者正在填登录栏。提示只出现在你操作的那个窗口。Mac 唤醒或扩展重启后 1Password 自己重新连接时，不会再在你做别的事时弹出来。
+- “设置 › 扩展”和扩展菜单里的“获取扩展”除了 Chrome 网上应用店，现在也能打开 Firefox 附加组件；还没有扩展时，设置里也会提到这两个地方。在 addons.mozilla.org 的扩展页面上，安装按钮会和 Chrome 网上应用店的一样显示“添加到 Zigzag”，不再是“添加到 Firefox”。感谢 [Lakeland97](https://github.com/Lakeland97)。([#423](https://github.com/ZigaoWang/zigzag/issues/423), [#424](https://github.com/ZigaoWang/zigzag/issues/424))
 
 ## [0.9.3] - 2026-11-18
 
