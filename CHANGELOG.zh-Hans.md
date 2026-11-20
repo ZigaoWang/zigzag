@@ -56,12 +56,12 @@ Zigzag 的每个版本，最新的在最上面。App 会显示你正在用的版
 - 扩展在速览里的网页上和在标签页里一样好用了。以前速览里的网页对扩展来说不算标签页，像 SponsorBlock 这样的扩展能在网页上运行，却收不到后台的回复，也不知道自己在哪个标签页里。现在它是所在窗口的一个标签页，速览打开时就是当前标签页，打开、变化和关闭时扩展都会知道；“作为标签页打开”后仍是同一个标签页。在无痕浏览窗口中，只有你允许的扩展能看到它。感谢 [Lakeland97](https://github.com/Lakeland97)。([#374](https://github.com/ZigaoWang/zigzag/issues/374))
 - 同一个网站在每个标签页、固定标签页、收藏和 Zigzag Mini 里显示的图标都一样了。以前两个 GitHub 标签页可能一个显示章鱼猫，另一个显示 GitHub 的圆角主屏幕图标，取决于哪个先加载。现在网站自己的图标总是优先于主屏幕图标，主屏幕图标只在网站没有自己的图标时才用；网页换了图标（比如 GitHub 在深色模式下会换），标签页上的图标也会跟着换。([#386](https://github.com/ZigaoWang/zigzag/issues/386))
 - 在边栏里选中几个标签页后按住 Delete 键，只会关闭它们一次，剩下的按键不会再传到网页里，以免删掉文本框里的文字。边栏里的 Delete 键只对用 ⌘ 或 ⇧ 点按选中的行起作用；普通点按一个标签页后，按键仍然交给网页，要关闭它请按 ⌘W。感谢 [Lakeland97](https://github.com/Lakeland97)。([#375](https://github.com/ZigaoWang/zigzag/issues/375))
-- 你在警告页上为本地服务器信任的证书，会记在“设置 › 开发者”里。列表旁边的“添加网站…”会打开一个本地 HTTPS 服务器，让你在警告页上信任它。每个端口单独记住，所以一台 NAS 上的多个 HTTPS 服务各有一份信任记录。通过网络地址访问的 NAS 或容器不用每次启动都再问一遍。网页仍然显示为不安全。点服务器旁边的“移除”会重新显示警告。公开网站的证书信任仍然只在本次启动中有效。
+- 你在警告页上为本地服务器信任的证书，会记在“设置 › 开发者”里。列表旁边的“添加网站…”会打开一个本地 HTTPS 服务器，让你在警告页上信任它。每个端口单独记住，所以一台 NAS 上的多个 HTTPS 服务各有一份信任记录。通过网络地址访问的 NAS 或容器不用每次启动都再问一遍。网页仍然显示为不安全。点服务器旁边的“移除”会重新显示警告。公开网站的证书信任仍然只在本次启动中有效。感谢 [datarip](https://github.com/datarip)。([#400](https://github.com/ZigaoWang/zigzag/issues/400))
 - 网站访问权限设为“在你点按它时”或“在特定网站上”的扩展，不会再在其他网站上运行。以前扩展运行时改了它的网站访问权限，它的内容脚本仍会在所有网站上运行，直到 Zigzag 重新启动。现在“在你点按它时”只把你点按它的那个标签页交给扩展，直到这个标签页去了别的网站或被关掉，和 Chrome 一样，不再记住你点按过它的每个网站。从扩展的网站访问权限里去掉网站时，扩展会重新启动；为某个网站关闭扩展不会让扩展重新启动。它的后台只能和这台 Mac 以及它现在能访问的网站建立 WebSocket 连接。
-- “设置 › 开发者”里的列表从“添加”按钮到第一行选项的间距现在保持一致。“开发者模式中的网站”以前比“页面大小”更近。感谢 [datarip](https://github.com/datarip)。
-- 同一地址上的多个服务各自保留自己的图标。同一台服务器上不同端口的两个应用会在各自的标签页显示自己的图标。以前最后打开的那个会把图标用到这个地址的所有标签页上。感谢 [datarip](https://github.com/datarip)。
+- “设置 › 开发者”里的列表从“添加”按钮到第一行选项的间距现在保持一致。“开发者模式中的网站”以前比“页面大小”更近。感谢 [datarip](https://github.com/datarip)。([#396](https://github.com/ZigaoWang/zigzag/issues/396))
+- 同一地址上的多个服务各自保留自己的图标。同一台服务器上不同端口的两个应用会在各自的标签页显示自己的图标。以前最后打开的那个会把图标用到这个地址的所有标签页上。感谢 [datarip](https://github.com/datarip)。([#398](https://github.com/ZigaoWang/zigzag/issues/398))
 - 在设置里搜索时不再卡顿，切换到“设置 › 快捷键”时也更快了。之前每次都会重新生成所有快捷键的行。感谢 [hungraw](https://github.com/hungraw)。([#402](https://github.com/ZigaoWang/zigzag/issues/402))
-- 像 SingleFile 这样的扩展，可以把它在自己的隐藏页面里生成的网页保存下来了。扩展用 blob 地址生成的文件，以前是从 Zigzag 自己的页面开始下载的，WebKit 不允许那个页面读取它，下载就中断了，扩展会把它当成错误提示出来。现在下载从扩展自己的页面开始，能照常保存。感谢 [datarip](https://github.com/datarip)。
+- 像 SingleFile 这样的扩展，可以把它在自己的隐藏页面里生成的网页保存下来了。扩展用 blob 地址生成的文件，以前是从 Zigzag 自己的页面开始下载的，WebKit 不允许那个页面读取它，下载就中断了，扩展会把它当成错误提示出来。现在下载从扩展自己的页面开始，能照常保存。感谢 [datarip](https://github.com/datarip)。([#407](https://github.com/ZigaoWang/zigzag/issues/407))
 - 网站在页面上弹出的询问，比如带“好”和“取消”的“github.com 提示”、登录框或选择证书，现在会跟着下面的网页变成浅色或深色，和摄像头、位置的请求卡片一样。以前在浅色的空间里，深色网站弹出的询问还是白色的；询问显示时网页变了，它也会跟着变。感谢 [Lakeland97](https://github.com/Lakeland97)。([#300](https://github.com/ZigaoWang/zigzag/issues/300))
 - Passbolt 能正常启动了，点按它的工具栏按钮也有反应了。有些扩展的后台放在一个文件夹里，并按名称载入同一文件夹里的其他脚本，Passbolt 就是这样。在 Zigzag 里它们找不到这些脚本，后台一直没能启动，点按按钮也就没反应。现在它们会从后台自己的文件夹载入，和在 Chrome 里一样。感谢 [bkonia](https://github.com/bkonia)。([#393](https://github.com/ZigaoWang/zigzag/issues/393))
 - 全屏不太会再卡在一半了（窗口能被拖动、也看不到窗口按钮）。macOS 还在把窗口切进或切出全屏时，Zigzag 不再去挪窗口按钮；如果 macOS 没能进入全屏，窗口会恢复平常的标题栏和按钮。感谢 [Lakeland97](https://github.com/Lakeland97)。([#401](https://github.com/ZigaoWang/zigzag/issues/401))
