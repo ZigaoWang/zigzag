@@ -66,6 +66,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - View › Developer has Show Tools Above the Page and Hide Tools Above the Page, the same switch as Settings › Developer › Tools above the page, for the bar of developer tools above a page in Developer Mode: Copy Link, the console, Inspect Element, the page's look and size, reload and ⋯. Searching Settings for toolbar finds it too. The bar shows over a page in Developer Mode on its own; in split view each page's tools are in its Site Controls. ([#405](https://github.com/ZigaoWang/zigzag/issues/405))
 - ⌘G and ⇧⌘G with the find bar closed bring it back and go to the next or previous match. ⌘G used to skip one.
 - ⌘-clicking or middle-clicking a link inside a frame on a page opens it in a new tab, in the background or in front with ⇧, as everywhere else on the page. It used to load in the frame itself. A plain click still loads in the frame.
+- When a site asks to show notifications or use your camera, microphone or location, Remember for this site starts checked, so Allow or Don't Allow stays for the site, as in Chrome. It used to start unchecked, so the answer lasted only until the page reloaded: Gmail and Slack notifications stopped after a reload, and a call site asked for the camera again on every visit. Uncheck it to answer for this page only. Answers you already saved stay as they are, and private windows still remember nothing. ([#410](https://github.com/ZigaoWang/zigzag/issues/410))
 
 ## [0.9.3] - 2026-11-18
 

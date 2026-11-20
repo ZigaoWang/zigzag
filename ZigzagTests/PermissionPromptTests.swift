@@ -112,6 +112,26 @@ struct PermissionPromptTests {
         #expect(answer?.remember == false)
     }
 
+    /// Notifications, camera, microphone and location start with Remember checked, as in Chrome; the rest don't.
+    @Test func chromeKeptQuestionsStartWithRememberChecked() {
+        #expect(SitePermissions.remembersByDefault(PermissionSubject.notifications))
+        #expect(SitePermissions.remembersByDefault(PermissionSubject.location))
+        #expect(SitePermissions.remembersByDefault(PermissionSubject.media(.camera)))
+        #expect(SitePermissions.remembersByDefault(PermissionSubject.media(.microphone)))
+        #expect(!SitePermissions.remembersByDefault(PermissionSubject.downloads))
+        #expect(!SitePermissions.remembersByDefault(PermissionSubject.screen))
+        #expect(!SitePermissions.remembersByDefault(PermissionSubject.popups))
+    }
+
+    /// A checked Remember in a private window keeps nothing for the site.
+    @Test func aPrivateTabKeepsNothingForTheSite() {
+        let origin = "https://remember-default-\(UUID().uuidString).test"
+        defer { SitePermissions.remember(nil, subject: PermissionSubject.notifications, origin: origin) }
+        SitePermissions.rememberAnswer(PermissionAnswer(action: "allow", remember: true), subject: PermissionSubject.notifications,
+                                       origin: origin, tab: nil, isPrivate: true)
+        #expect(SitePermissions.action(PermissionSubject.notifications, origin: origin) == nil)
+    }
+
     /// Other questions keep Remember for either answer, Don't Allow included.
     @Test func rememberStillKeepsADenyOnOtherQuestions() {
         let answer = PermissionPrompt.answer(for: .deny, rememberChecked: true, canRemember: true)
