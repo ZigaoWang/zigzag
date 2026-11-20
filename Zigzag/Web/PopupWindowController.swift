@@ -912,6 +912,8 @@ final class PopupHeaderView: NSView {
     private var shownSecure = true
     private let hit = AddressHit()
     private var selectable: SelectableAddress?
+    /// The address field the selected address sits in: the one the command bar shows over a strip's address.
+    private var selectableBox: FloatingPanelView?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -994,7 +996,17 @@ final class PopupHeaderView: NSView {
         hit.frame.origin.y = 0
         hit.frame.size.height = bounds.height
         hit.isHidden = PopupWindowController.movableURL(shownURL) == nil
-        selectable?.frame = selectableFrame
+        layoutSelectable()
+    }
+
+    private func layoutSelectable() {
+        guard let box = selectableBox, let field = selectable else { return }
+        let h = Tokens.Pane.addressHeight
+        box.frame = NSRect(x: selectableFrame.minX, y: round((bounds.height - h) / 2), width: selectableFrame.width, height: h)
+        // The command bar's own insets in a strip's field (`CommandBarController.layoutPanel`).
+        let inset = field.textInset, x = Tokens.Space.x3 - 4
+        let textHeight = ceil(field.intrinsicContentSize.height)
+        field.frame = NSRect(x: x - inset, y: field.centeredY(in: h) - inset * 2, width: max(0, box.bounds.width - x - Tokens.Space.x3) + inset * 2, height: textHeight + inset * 4)
     }
 
     /// The room the whole address takes while selected: the strip between the traffic lights and the buttons.
@@ -1007,27 +1019,29 @@ final class PopupHeaderView: NSView {
     /// Shows the whole address selected, read-only, until Esc or focus moves on.
     func selectAddress() {
         guard let url = PopupWindowController.movableURL(shownURL), selectable == nil else { return }
-        let field = SelectableAddress(string: url.absoluteString)
+        let field = SelectableAddress(font: Tokens.Font.voice(Tokens.Pane.addressText), placeholder: "")
+        field.stringValue = url.absoluteString
         field.isEditable = false
         field.isSelectable = true
-        field.isBordered = false
-        field.isBezeled = false
-        field.drawsBackground = false
-        field.focusRingType = .none
-        field.font = label.font
-        field.textColor = Tokens.Color.textPrimary
-        field.lineBreakMode = .byTruncatingTail
-        field.cell?.usesSingleLineMode = true
-        field.cell?.isScrollable = true
-        field.alignment = .center
+        field.textInset = 2
+        field.centersText = true
         field.onEnd = { [weak self] in self?.endSelecting() }
         field.setAccessibilityLabel(String(localized: "Address", comment: "VoiceOver label of a pop-up window's address while it's selected to copy."))
-        field.frame = selectableFrame
-        addSubview(field)
+        let box = FloatingPanelView()
+        box.radius = Tokens.Radius.control
+        box.addSubview(field)
+        addSubview(box)
+        selectableBox = box
         selectable = field
+        layoutSelectable()
         [label, lock, hit].forEach { $0.isHidden = true }
         window?.makeFirstResponder(field)
         field.selectText(nil)
+        if let editor = field.currentEditor() as? NSTextView {
+            let accent = Brand.Theme.of(nil).accent
+            editor.insertionPointColor = accent
+            editor.selectedTextAttributes = [.backgroundColor: accent.withAlphaComponent(Tokens.Color.textSelectionAlpha)]
+        }
     }
 
     private func endSelecting() {
@@ -1035,7 +1049,8 @@ final class PopupHeaderView: NSView {
         selectable = nil
         field.onEnd = nil
         if field.currentEditor() != nil { window?.makeFirstResponder(nil) }
-        field.removeFromSuperview()
+        selectableBox?.removeFromSuperview()
+        selectableBox = nil
         label.isHidden = false
         hit.isHidden = false
         show(url: shownURL, secure: shownSecure)
@@ -1078,7 +1093,7 @@ private final class AddressHit: NSView {
 }
 
 /// The selected address: says when it's let go, by Esc or by focus moving on.
-private final class SelectableAddress: NSTextField {
+private final class SelectableAddress: PlainTextField {
     var onEnd: (() -> Void)?
     override func cancelOperation(_ sender: Any?) { onEnd?() }
     override func textDidEndEditing(_ notification: Notification) {

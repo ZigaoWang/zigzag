@@ -232,6 +232,8 @@ final class PaneHeaderView: NSView {
     static func pillFits(_ frame: NSRect) -> Bool { frame.width >= PaneAddressView.padding * 3 }
 
     private var currentFit = Fit.all
+    /// Where the address may sit, between the strip's buttons: the room it grows into while edited.
+    private(set) var addressRoom: ClosedRange<CGFloat> = 0...0
     /// The widest the address grows over its card.
     static let addressMaxWidth: CGFloat = 560
     /// On its card's top, on the card or up in the bar with the card behind it, rather than on the window's frame.
@@ -299,7 +301,8 @@ final class PaneHeaderView: NSView {
         [back, forward, reload, zoom, swap, orientation, resetLayout, close, more, closeTab].forEach { $0.radius = Tokens.Radius.control }
         // The address pill is centered over its pane, as wide as its text, within the room the buttons leave, and
         // nudged clear of them where centering would cut it.
-        address.frame = Self.pillFrame(center: addressCenter ?? bounds.midX, room: x + Tokens.Space.x2...max(x + Tokens.Space.x2, trailing - Tokens.Space.x2),
+        addressRoom = x + Tokens.Space.x2...max(x + Tokens.Space.x2, trailing - Tokens.Space.x2)
+        address.frame = Self.pillFrame(center: addressCenter ?? bounds.midX, room: addressRoom,
                                        fitting: address.fittingWidth, overCard: overCard, midY: y + b / 2)
         address.isHidden = address.text.isEmpty || !Self.pillFits(address.frame)
         line.frame = NSRect(x: 0, y: bounds.height - Tokens.Metric.hairline, width: bounds.width, height: Tokens.Metric.hairline)

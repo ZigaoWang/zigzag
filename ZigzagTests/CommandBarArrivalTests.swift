@@ -12,7 +12,7 @@ import Testing
         init() { window?.isReleasedWhenClosed = false; window?.contentView = overlay }
         var commandBarOverlay: NSView { overlay }
         var commandBarPageFrame: NSRect { overlay.bounds }
-        func commandBarAnchor(asked: NSView?) -> NSView? { nil }
+        func commandBarAnchor(asked: NSView?) -> NSView? { asked }
         var commandBarTabs: TabManager? { nil }
         var commandBarProfile: Profile { Profiles.shared.default }
         var commandBarTab: Tab? { tab }
@@ -48,6 +48,26 @@ import Testing
         bar.show(mode: .editCurrent)
         bar.pageArrived()
         #expect(bar.isVisible)
+        bar.dismiss(restoringFocus: false)
+    }
+
+    /// A split pane's address opens at its own size, in its strip's light or dark, never past its pane.
+    @Test func aPanesAddressOpensInItsStrip() throws {
+        let host = Host()
+        let tab = Tab(url: URL(string: "https://example.com/a/long/address/that/needs/room")!, spaceID: Library.shared.spaces[0].id)
+        defer { tab.close() }
+        host.tab = tab
+        let strip = PaneHeaderView(frame: NSRect(x: 0, y: 0, width: 420, height: PaneHeaderView.height))
+        strip.appearance = NSAppearance(named: .darkAqua)
+        host.overlay.addSubview(strip)
+        strip.address.text = "example.com"
+        strip.layoutSubtreeIfNeeded()
+        let bar = CommandBarController(host: host)
+        bar.show(mode: .editCurrent, anchor: strip.address)
+        let panel = bar.panelView
+        #expect(panel.frame.height == strip.address.frame.height)
+        #expect(panel.frame.minX >= strip.addressRoom.lowerBound && panel.frame.maxX <= strip.addressRoom.upperBound)
+        #expect(panel.effectiveAppearance.isDark)
         bar.dismiss(restoringFocus: false)
     }
 }
