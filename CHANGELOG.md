@@ -15,6 +15,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - Picking a login in the Mac's Passwords list fills the username too, not only the password, on macOS 26 and earlier. Thanks to [frarees](https://github.com/frarees). ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - The Mac's Passwords list closes when you scroll the page, go back or forward, or click elsewhere on macOS 26 and earlier, and its search field takes typing every time you open it, not only the first. Thanks to [frarees](https://github.com/frarees). ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
 - The password menu under a field hides as soon as you start scrolling, even with the pointer on it, instead of once the scroll ends. A click in the field it's already open for leaves it open instead of closing and opening it again. Thanks to [frarees](https://github.com/frarees). ([#378](https://github.com/ZigaoWang/zigzag/issues/378))
+- The note that 1Password is waiting for you in its app shows only right after you use 1Password: its button, its popup, its shortcut, or a login field you're filling. It shows in the window where you did that. 1Password reconnecting on its own, after the Mac wakes or the extension restarts, no longer brings it up while you're doing something else.
 
 ## [0.9.3] - 2026-11-18
 
