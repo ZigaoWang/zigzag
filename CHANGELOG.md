@@ -5,6 +5,9 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 
 ## [Unreleased]
 
+### Fixed
+- A link's right-click menu starts with Open Link in New Tab, then New Window, Private Window and Peek, as in Chrome. Open Link, which opens it in the tab you're on, moves below them instead of being first, where it did what a click already does. Thanks to [retorquere](https://github.com/retorquere). ([#419](https://github.com/ZigaoWang/zigzag/issues/419))
+
 ## [0.9.3] - 2026-11-18
 
 Links from other apps open in Zigzag Mini, a site can have an icon of its own, a calmer space editor, an update card that shows its progress, every site choice editable on its own row, Open All in Tabs for pinned folders, cookies you can keep when clearing, space rules for paths of a site, Suspend Page, Check for Updates for extensions, extensions in private windows when you allow them, Firefox extensions, address bar keywords for extensions, tiles you can resize freely, and fixes for split views, closing and reopening tabs as in Chrome, smooth scrolling at 120 Hz, the Passwords list, tab keys, extension site access, full screen, passkeys, Proton Pass, ⌘-clicks on YouTube, pinned groups, Find on GitHub and more.
