@@ -501,3 +501,75 @@ final class FaviconView: NSView {
 
     private func startSpinning() { spinner.startLooping() }
 }
+
+/// A page's speaker as a small badge on its icon's bottom corner, the icon cut away round it (`FaviconView.speakerCut`):
+/// a favorite's, and an icon-only part of a split row's. A disc of the selected card's light under the glyph, its
+/// target a favorite ×'s size round it.
+@MainActor enum SpeakerBadge {
+    static var target: CGFloat { Tokens.Sidebar.favoriteClose }
+    private static let discName = "speaker badge disc"
+
+    private static func disc(of button: IconButton) -> CALayer? { button.layer?.sublayers?.first { $0.name == discName } }
+    static func isBadge(_ button: IconButton) -> Bool { disc(of: button) != nil }
+
+    /// Makes `button` the badge: its target's size, round, with the disc under its glyph.
+    static func style(_ button: IconButton) {
+        guard !isBadge(button) else { return }
+        button.wantsLayer = true
+        button.setFrameSize(NSSize(width: target, height: target))
+        button.radius = target / 2
+        let disc = CALayer()
+        disc.name = discName
+        button.layer?.insertSublayer(disc, at: 0)
+    }
+
+    /// Takes the disc off again; the caller gives the button back its own size and corners.
+    static func unstyle(_ button: IconButton) { disc(of: button)?.removeFromSuperlayer() }
+
+    /// The glyph: playing and muted in the disc's middle together, the speaker's body on the same pixels in both.
+    static func glyph(muted: Bool) -> (image: NSImage, ink: CGSize) {
+        if glyphs.isEmpty {
+            let config = NSImage.SymbolConfiguration(pointSize: Tokens.Sidebar.favoriteSpeakerGlyph, weight: .semibold, scale: .small)
+            let names = ["speaker.wave.2", "speaker.slash"], keys = names.map { "favorite speaker \($0)" }
+            let images = names.map { name in
+                let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config) ?? NSImage()
+                image.isTemplate = true
+                return image
+            }
+            glyphs = Array(zip(images, Tokens.Symbol.sharedInkOffsets(of: images, keys: keys)))
+        }
+        return glyphs[muted ? 1 : 0]
+    }
+    private static var glyphs: [(image: NSImage, ink: CGSize)] = []
+
+    static func show(_ button: IconButton, muted: Bool) {
+        let glyph = glyph(muted: muted)
+        guard button.glyph !== glyph.image else { return }
+        button.glyph = glyph.image
+        button.glyphInk = glyph.ink
+    }
+
+    /// Puts the badge on `icon`'s bottom corner (the leading one while Developer Mode's chip or an away icon has the
+    /// trailing one), cuts the icon round it, and centers the button on it.
+    static func place(_ button: IconButton, on icon: FaviconView) {
+        let side = icon.frame.width
+        let chip = (side * Tokens.Sidebar.favoriteSpeakerShare * 2).rounded() / 2
+        let leading = icon.developerBadge != nil || icon.originalIcon != nil
+        let cut = FaviconView.speakerFrame(side: side, chip: chip, leading: leading)
+        icon.speakerCut = cut
+        guard let host = button.superview else { return }
+        let disc = host.convert(cut, from: icon)
+        button.frame = NSRect(x: disc.midX - target / 2, y: disc.midY - target / 2, width: target, height: target)
+        Tokens.Motion.withoutAnimation {
+            guard let disc = Self.disc(of: button) else { return }
+            disc.frame = CGRect(x: (target - chip) / 2, y: (target - chip) / 2, width: chip, height: chip)
+            disc.cornerRadius = chip / 2
+            disc.backgroundColor = button.cgColor(Tokens.Chrome.card)
+        }
+    }
+
+    /// The disc again in the current appearance.
+    static func refreshColor(_ button: IconButton) {
+        Tokens.Motion.withoutAnimation { disc(of: button)?.backgroundColor = button.cgColor(Tokens.Chrome.card) }
+    }
+}

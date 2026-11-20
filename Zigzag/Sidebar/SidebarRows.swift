@@ -221,6 +221,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
 
     /// The speaker's glyph: the title's size and weight at the small symbol scale, so its ink is the caps' height.
     static func showSpeaker(_ button: IconButton, muted: Bool) {
+        if SpeakerBadge.isBadge(button) { SpeakerBadge.show(button, muted: muted); return }
         let glyph = speakerGlyph(muted: muted)
         guard button.glyph !== glyph.image else { return }
         button.glyph = glyph.image
@@ -246,6 +247,18 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         return speakerGlyphs[key]![muted ? 1 : 0]
     }
     private static var speakerGlyphs: [String: [(image: NSImage, ink: CGSize, size: CGSize)]] = [:]
+
+    /// A page's speaker as the badge on its icon's corner a favorite has (`SpeakerBadge`), or back to a row button.
+    private static func showSpeaker(_ button: IconButton, badge: Bool, muted: Bool) {
+        if badge {
+            SpeakerBadge.style(button)
+        } else if SpeakerBadge.isBadge(button) {
+            SpeakerBadge.unstyle(button)
+            button.setFrameSize(NSSize(width: Tokens.Sidebar.rowButton, height: Tokens.Sidebar.rowButton))
+            button.radius = Tokens.Radius.small + 1
+        }
+        showSpeaker(button, muted: muted)
+    }
 
     /// The ink size the speaker is placed by: the playing glyph's, in both states.
     private static func speakerInk(_ button: IconButton) -> CGSize { speakerGlyph(muted: false).size }
@@ -493,7 +506,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let spatial = extraCount == 0 && partnerLeads ? 1 - part : part
         let spans = partSpans
         guard spans.indices.contains(spatial) else { return true }
-        let span = spans[spatial], side = Tokens.Sidebar.favicon, button = closeButton.frame.width
+        let span = spans[spatial], side = Tokens.Sidebar.favicon, button = Tokens.Sidebar.rowButton
         return span.end - Self.buttonEdge - button >= (span.start + span.end + side) / 2 + Self.buttonGap
     }
 
@@ -839,7 +852,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     private var numberHint: NumberHintView?
     private var showsNumber: Bool { number != nil && numberHint != nil }
     /// The close button's place at the row's end, or the number's while it's there.
-    private var endSlot: CGFloat { showsClose ? closeButton.frame.width : showsNumber ? numberHint?.width ?? 0 : 0 }
+    private var endSlot: CGFloat { showsClose ? Tokens.Sidebar.rowButton : showsNumber ? numberHint?.width ?? 0 : 0 }
 
     /// The close button (or a pinned tab's unload/back button) shows on hover over the title's faded end, so the title
     /// never shifts. The selected tab keeps it visible, so it reserves the room.
@@ -1067,7 +1080,7 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
     }
 
     private func layoutButtonsAndHalves() {
-        let size = closeButton.frame.size
+        let size = NSSize(width: Tokens.Sidebar.rowButton, height: Tokens.Sidebar.rowButton)
         let edge = Self.buttonEdge
         let y = (bounds.height - size.height) / 2
         closeButton.frame.origin = NSPoint(x: bounds.width - edge - size.width, y: y)
@@ -1094,13 +1107,19 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
             partWash?.isHidden = true
             // Restore the title hidden for an icon-only split, unless it's being renamed.
             title.isHidden = renameField != nil
+            styleClose(chip: false)
+            Self.showSpeaker(audioButton, badge: false, muted: tab?.isMuted == true)
+            icon.speakerCut = nil
             return
         }
         // A split shows its pages in one row, equal parts in screen order with hairlines between: icon, faded title, and a
         // speaker while playing or muted. Parts too narrow for a few letters show a centered icon only.
-        let pieces: [(icon: FaviconView, title: Label, audio: IconButton)] = {
-            let own = (icon, title, audioButton), other = (partnerIcon, partnerTitle, partnerAudioButton)
-            let extras = (extraViews ?? []).prefix(extraCount).map { ($0.icon, $0.title, $0.audio) }
+        let pieces: [(icon: FaviconView, title: Label, audio: IconButton, page: Tab?)] = {
+            let own = (icon, title, audioButton, tab), other = (partnerIcon, partnerTitle, partnerAudioButton, partner)
+            let pages = extraPages
+            let extras = (extraViews ?? []).prefix(extraCount).enumerated().map { i, views in
+                (views.icon, views.title, views.audio, pages.indices.contains(i) ? pages[i] : nil)
+            }
             return (extraCount == 0 && partnerLeads ? [other, own] : [own, other]) + extras
         }()
         let lines = [divider] + (extraViews ?? []).prefix(extraCount).map(\.divider)
@@ -1129,43 +1148,60 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         let iconY = icon.frame.minY
         let titleY = title.frame.minY, titleH = title.frame.height
         let renaming = renameField == nil ? nil : partTitles.indices.contains(renamingPart) ? partTitles[renamingPart] : nil
+        var chipOrigin: NSPoint?
         for (i, part) in parts.enumerated() {
-            let (icon, title, audio) = pieces[i]
+            let (icon, title, audio, page) = pieces[i]
             let last = i == count - 1
+            // Clear of the × that comes on this part, so it never moves under the pointer.
+            let speakerEnd = closesPart ? part.end - edge - size.width - Self.buttonGap : last ? contentEnd : part.end - Self.buttonEdge
+            let titleX = part.start + Self.inset + side + Self.titleOffset
+            // Where the speaker after the title would leave it too few letters, it's the icon's badge instead.
+            let inline = titles && (audio.isHidden || speakerEnd - titleX - Label.inset - Tokens.Sidebar.inlineGlyphGap
+                - Self.speakerInk(audio).width >= Tokens.Sidebar.splitTitleMin())
+            Self.showSpeaker(audio, badge: !inline, muted: page?.isMuted == true)
             if titles {
                 icon.frame = NSRect(x: part.start + Self.inset, y: iconY, width: side, height: side)
                 // Same gap from the next hairline as the icon has from its own; the last title ends where a tab's does or at the
                 // reserved close button room.
                 let textEnd = !last ? part.end - Self.inset + Label.inset : keepsRoom ? contentEnd : bounds.width - Self.inset + Label.inset
-                let x = icon.frame.maxX + Self.titleOffset
-                title.frame = NSRect(x: x, y: titleY, width: max(0, textEnd - x), height: titleH)
-                // Clear of the × that comes on this part, so it never moves under the pointer.
-                let speakerEnd = closesPart ? part.end - edge - size.width - Self.buttonGap : last ? contentEnd : part.end - Self.buttonEdge
-                if !audio.isHidden { placeSpeaker(audio, after: title, end: speakerEnd) }
+                title.frame = NSRect(x: titleX, y: titleY, width: max(0, textEnd - titleX), height: titleH)
+                if audio.isHidden {
+                    icon.speakerCut = nil
+                } else if inline {
+                    placeSpeaker(audio, after: title, end: speakerEnd)
+                    icon.speakerCut = nil
+                } else {
+                    SpeakerBadge.place(audio, on: icon)
+                }
             } else {
-                // Icons centered in their parts, like a segmented control, with the speaker after while playing.
-                let room = audio.isHidden ? side : side + Self.buttonGap + size.width
-                icon.frame = NSRect(x: round((part.start + part.end - room) / 2), y: iconY, width: side, height: side)
-                if !audio.isHidden { audio.frame.origin = NSPoint(x: icon.frame.maxX + Self.buttonGap, y: y) }
+                // Icons centered in their parts, like a segmented control, the speaker a badge on the icon's corner.
+                let scale = window?.backingScaleFactor ?? 2
+                icon.frame = NSRect(x: ((part.start + part.end - side) / 2 * scale).rounded() / scale, y: iconY, width: side, height: side)
+                if audio.isHidden { icon.speakerCut = nil } else { SpeakerBadge.place(audio, on: icon) }
                 title.frame = NSRect(x: icon.frame.maxX, y: titleY, width: 0, height: titleH)
             }
             title.isHidden = !titles || title === renaming
             icon.alphaValue = 1
             if closesInPart, i == closeSpatial {
-                // At the part's own end, over its faded title or beside its icon; a part too narrow for both has
-                // the × in its icon's place, the part's wash saying whose it is.
+                // At the part's own end, over its faded title or beside its icon; a part too narrow for both has a
+                // favorite's small × in its top corner, its icon and speaker staying, the part's wash saying whose it is.
                 let end = part.end - edge - size.width
-                let before = audio.isHidden ? icon.frame.maxX : audio.frame.maxX
-                let fits = titles || end >= before + Self.buttonGap
+                let fits = titles || end >= icon.frame.maxX + Self.buttonGap
                 if !fits, !(isHovered && pointedPart != nil) { closeButton.isHidden = true }
-                closeButton.frame.origin.x = fits ? end : round(icon.frame.midX - size.width / 2)
-                if !fits, !closeButton.isHidden { icon.alphaValue = 0 }
+                if fits {
+                    closeButton.frame.origin.x = end
+                } else {
+                    let chip = Tokens.Sidebar.favoriteClose, inset = Tokens.Metric.dropInset + Self.chipInset
+                    chipOrigin = NSPoint(x: part.end - inset - chip, y: isFlipped ? inset : bounds.height - inset - chip)
+                }
                 washSpan = (part.start, part.end)
             } else if i == closeSpatial, !last {
                 // With titles, at the part's end over its faded title; icons only, in the icon's place.
                 closeButton.frame.origin.x = titles ? part.end - edge - size.width : round(icon.frame.midX - size.width / 2)
                 if !titles, !closeButton.isHidden { icon.alphaValue = 0 }
             }
+            // The badge goes with its icon.
+            audio.alphaValue = SpeakerBadge.isBadge(audio) ? icon.alphaValue : 1
             // Hairline between this part and the previous, inset from the row's ends.
             if i > 0, lines.indices.contains(i - 1) {
                 let line = NSRect(x: part.start - Tokens.Metric.hairline / 2, y: Tokens.Space.x2, width: Tokens.Metric.hairline, height: bounds.height - Tokens.Space.x4)
@@ -1184,7 +1220,29 @@ final class TabRowView: SidebarRowView, NSTextFieldDelegate {
         // ⌘'s number at the row's end, over the last part's icon when there's no title to cover.
         if closesInPart, showsNumber, !titles, let last = pieces.last, let hint = numberHint, last.icon.frame.maxX > hint.frame.minX - Self.buttonGap {
             last.icon.alphaValue = 0
+            last.audio.alphaValue = 0
         }
+        styleClose(chip: chipOrigin != nil)
+        if let chipOrigin { closeButton.frame.origin = chipOrigin }
+    }
+
+    /// From the part's wash to a favorite's × in its corner.
+    private static let chipInset: CGFloat = 1.5
+    private var closeIsChip = false
+
+    /// The × as a row button, or as a favorite's small chip with a hairline (`FavoriteTile`).
+    private func styleClose(chip: Bool) {
+        if chip { Tokens.Motion.withoutAnimation { closeButton.layer?.borderColor = cgColor(Tokens.Color.controlEdge) } }
+        guard chip != closeIsChip else { return }
+        closeIsChip = chip
+        let side = chip ? Tokens.Sidebar.favoriteClose : Tokens.Sidebar.rowButton
+        closeButton.setFrameSize(NSSize(width: side, height: side))
+        closeButton.symbolSize = chip ? Tokens.Sidebar.favoriteCloseGlyph : Tokens.Sidebar.rowGlyph
+        closeButton.radius = chip ? side / 2 : Tokens.Radius.small + 1
+        closeButton.tint = chip ? Tokens.Color.textSecondary : Tokens.Color.icon
+        closeButton.showsFillAtRest = chip
+        closeButton.wantsLayer = true
+        Tokens.Motion.withoutAnimation { closeButton.layer?.borderWidth = chip ? Tokens.Metric.hairline : 0 }
     }
 
     /// A speaker right after its title's text, as browsers put it with the page, not with the close button: in the

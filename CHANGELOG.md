@@ -11,6 +11,7 @@ Every release of Zigzag, newest first. The app shows the notes for the version y
 - A favorite's icon stays square and in the middle of its tile at every sidebar width, instead of growing a point and sitting half a point off.
 - Extension icons in Site Controls' grid sit on whole points, so the rows below the first are as sharp as the first.
 - Settings › Privacy › Site Permissions shows its sites again, right under its heading. In beta 6 the list was drawn a whole list's height lower, under a second Site Permissions heading, so the section looked empty, and the Allow websites to reach apps on this Mac switch was missing. A change made in Site Controls now also shows in Settings while it's open, in any window. Thanks to [Lakeland97](https://github.com/Lakeland97). ([#420](https://github.com/ZigaoWang/zigzag/issues/420))
+- In a split row too narrow for a page's title and its speaker side by side, the speaker is a small badge on the page's icon, as on a favorite, so the title stays and the speaker lines up with the icon. Click it to mute or unmute, as before. In a part with only its icon, pointing at it shows a favorite's small × in the part's corner instead of putting the × where the icon was, so the icon and its speaker stay.
 
 ## [0.9.3] - 2026-11-18
 
