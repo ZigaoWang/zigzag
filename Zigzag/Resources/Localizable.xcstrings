@@ -25149,6 +25149,61 @@
           }
         }
       }
+    },
+    "Recent Tabs" : {
+      "comment" : "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab shows the tabs you used last, most recent first.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近用过的标签页"
+          }
+        }
+      }
+    },
+    "Next Tab in the Sidebar" : {
+      "comment" : "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab goes to the tab below in the sidebar, as in Chrome.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "边栏里的下一个标签页"
+          }
+        }
+      }
+    },
+    "⌃Tab switches to" : {
+      "comment" : "A setting in Settings › Tabs: what Control-Tab does. ⌃ is the Control key. Followed by Recent Tabs or Next Tab in the Sidebar.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⌃Tab 切换到"
+          }
+        }
+      }
+    },
+    "Recent Tabs shows the tabs you used last, as ⌘Tab does with apps. ⌥⌘↓ and ⌥⌘↑ always go down and up the sidebar." : {
+      "comment" : "Explanation under “⌃Tab switches to” in Settings › Tabs. ⌘, ⌥ are the Command and Option keys.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“最近用过的标签页”按你用过的先后列出标签页，就像 ⌘Tab 切换 App。⌥⌘↓ 和 ⌥⌘↑ 总是在边栏里上下移动。"
+          }
+        }
+      }
+    },
+    "control tab ctrl tab switcher recent order next previous cycle keyboard shortcut chrome arc" : {
+      "comment" : "Words that find the ⌃Tab switches to setting with Find a setting in Settings. Not shown.",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "control tab ctrl tab 切换 最近 顺序 下一个 上一个 循环 键盘 快捷键 chrome arc"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

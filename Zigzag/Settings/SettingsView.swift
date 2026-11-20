@@ -1123,6 +1123,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
     }()
     private let newTabPlace = DropdownButton()
     private var newTabRow: FormRow!
+    private let controlTabOrder = DropdownButton()
     private let pinOfferToggle = Toggle()
     private let nestToggle = Toggle()
     private let shareTabsToggle = Toggle()
@@ -1644,6 +1645,20 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         newTabRow.keywords = String(localized: "new tab homepage home page start page position order same site domain group organize", comment: "Words that find the New tabs open setting with Find a setting in Settings. Zigzag has no homepage, so words about one find this row. Not shown.")
         tabsGroup.add(newTabRow)
         refreshNewTabPlace()
+        controlTabOrder.options = TabSwitcher.Order.allCases.map { order in
+            let title = switch order {
+            case .recent: String(localized: "Recent Tabs", comment: "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab shows the tabs you used last, most recent first.")
+            case .sidebar: String(localized: "Next Tab in the Sidebar", comment: "A choice for “⌃Tab switches to” in Settings › Tabs: Control-Tab goes to the tab below in the sidebar, as in Chrome.")
+            }
+            return DropdownButton.Option(title: title)
+        }
+        controlTabOrder.onSelect = { index in TabSwitcher.order = TabSwitcher.Order.allCases[index] }
+        let controlTabRow = FormRow(title: String(localized: "⌃Tab switches to", comment: "A setting in Settings › Tabs: what Control-Tab does. ⌃ is the Control key. Followed by Recent Tabs or Next Tab in the Sidebar."),
+                                    detail: String(localized: "Recent Tabs shows the tabs you used last, as ⌘Tab does with apps. ⌥⌘↓ and ⌥⌘↑ always go down and up the sidebar.",
+                                                   comment: "Explanation under “⌃Tab switches to” in Settings › Tabs. ⌘, ⌥ are the Command and Option keys."),
+                                    control: controlTabOrder)
+        controlTabRow.keywords = String(localized: "control tab ctrl tab switcher recent order next previous cycle keyboard shortcut chrome arc", comment: "Words that find the ⌃Tab switches to setting with Find a setting in Settings. Not shown.")
+        tabsGroup.add(controlTabRow)
         nestToggle.onChange = { on in TabManager.nestsOpenedLinks = on }
         let nestRow = FormRow(title: String(localized: "Open ⌘-clicked links under their tab", comment: "A setting in Settings › Tabs: a link opened in a new tab goes in the sidebar nested under the tab it came from. ⌘ is the Command key."),
                               detail: String(localized: "A link you open in a new tab sits under the page it came from. Drag a tab out to make it a tab of its own.", comment: "Explanation under “Open ⌘-clicked links under their tab” in Settings › Tabs."),
@@ -3793,6 +3808,7 @@ final class SettingsView: NSView, NSTextFieldDelegate {
         developerTrustToggle.isOn = DeveloperTools.trustsLocalServers
         refreshAIApps()
         newTabPlace.selectedIndex = TabManager.NewTabPlace.allCases.firstIndex(of: TabManager.newTabPlace) ?? 0
+        controlTabOrder.selectedIndex = TabSwitcher.Order.allCases.firstIndex(of: TabSwitcher.order) ?? 0
         refreshNewTabPlace()
         pinOfferToggle.isOn = BrowserWindowController.offersToPinWanderedPage
         nestToggle.isOn = TabManager.nestsOpenedLinks

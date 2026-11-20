@@ -501,8 +501,45 @@ extension BrowserWindowController: NSMenuItemValidation {
         return tabManager.siblingMoveTarget(tab, by: offset)
     }
 
-    @objc func selectNextTab(_ sender: Any?) { tabManager.selectNext(offset: 1) }
-    @objc func selectPreviousTab(_ sender: Any?) { tabManager.selectNext(offset: -1) }
+    @objc func selectNextTab(_ sender: Any?) { selectAdjacentRow(by: 1) }
+    @objc func selectPreviousTab(_ sender: Any?) { selectAdjacentRow(by: -1) }
+
+    /// The stops ⌥⌘↑/↓ and ⇧⌘[/] walk, top to bottom: open favorites, then the sidebar's rows as shown.
+    var tabRowStops: [SidebarItem] {
+        let favorites = Library.shared.favoriteTiles(in: tabManager.profile.id).filter { tile in
+            ([tile.0] + tile.partners).contains { tabManager.bookmarkTab(for: $0.id) != nil }
+        }
+        return favorites.map { SidebarItem.bookmark($0.0.id) } + sidebar.list.pageRows
+    }
+
+    /// The pages a stop stands for: a split's are all of them.
+    func pages(of stop: SidebarItem) -> [Tab] {
+        switch stop {
+        case .tab(let id): return tabManager.tab(with: id).map(tabManager.panes(of:)) ?? []
+        case .bookmark(let id):
+            let ids = Library.shared.pinnedSplit(containing: id)?.ids ?? Library.shared.favoriteSplits.first(where: { $0.ids.contains(id) })?.ids ?? [id]
+            let open = ids.compactMap(tabManager.bookmarkTab(for:))
+            return open.flatMap(tabManager.panes(of:)).reduce(into: []) { list, tab in if !list.contains(where: { $0 === tab }) { list.append(tab) } }
+        default: return []
+        }
+    }
+
+    /// Next or previous row in this space's sidebar, as shown, wrapping at the ends as Chrome does. A split is one
+    /// stop; going to it shows the page of it you were on last.
+    func selectAdjacentRow(by offset: Int) {
+        let stops = tabRowStops
+        guard !stops.isEmpty else { return }
+        let current = tabManager.selectedTab
+        let index = current.flatMap { tab in stops.firstIndex { pages(of: $0).contains { $0 === tab } } }
+        let target = index.map { (($0 + offset) % stops.count + stops.count) % stops.count } ?? (offset > 0 ? 0 : stops.count - 1)
+        let stop = stops[target]
+        let recent = tabManager.recentTabIDs
+        if let page = pages(of: stop).min(by: { (recent.firstIndex(of: $0.id) ?? .max) < (recent.firstIndex(of: $1.id) ?? .max) }) {
+            tabManager.select(page)
+        } else if case .bookmark(let id) = stop, let bookmark = Library.shared.bookmark(id) {
+            tabManager.openBookmark(bookmark)
+        }
+    }
     /// ⌘1–⌘9: numbered as the sidebar shows them, each favorite tile, then each pinned and tab row, open or not.
     @objc func selectTabByNumber(_ sender: NSMenuItem) {
         // In the tab overview, the number picks the card in that place, as you see them.
